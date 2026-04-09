@@ -2,11 +2,13 @@ import { ForbiddenResponseSchema, NotFoundResponseSchema } from "@mistle/http/er
 import { describe, expect } from "vitest";
 
 import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
+import { createOrganizationActor } from "./helpers/organization-fixture.js";
 import { it } from "./test-context.js";
 
 describe("organization membership capabilities integration", () => {
   it("returns capabilities for an authenticated organization member", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+    const authenticatedSession = await createOrganizationActor({
+      fixture,
       email: "integration-membership-capabilities-owner@example.com",
     });
 
@@ -43,10 +45,12 @@ describe("organization membership capabilities integration", () => {
   it("returns 403 for an authenticated actor without organization membership", async ({
     fixture,
   }) => {
-    const firstSession = await fixture.authSession({
+    const firstSession = await createOrganizationActor({
+      fixture,
       email: "integration-membership-capabilities-forbidden-a@example.com",
     });
-    const secondSession = await fixture.authSession({
+    const secondSession = await createOrganizationActor({
+      fixture,
       email: "integration-membership-capabilities-forbidden-b@example.com",
     });
 
@@ -69,7 +73,8 @@ describe("organization membership capabilities integration", () => {
   });
 
   it("returns 404 for an organization that does not exist", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+    const authenticatedSession = await createOrganizationActor({
+      fixture,
       email: "integration-membership-capabilities-not-found@example.com",
     });
 

@@ -1,10 +1,9 @@
-import { members, users } from "@mistle/db/control-plane";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
-import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { listMembers } from "../src/organizations/services/list-members.js";
 import { createRuntimeWithObjectStore } from "./helpers/control-plane-runtime-with-object-store.js";
+import { createOrganizationActor, seedOrganizationMember } from "./helpers/organization-fixture.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
@@ -13,13 +12,16 @@ describe("organization members integration", () => {
     fixture,
   }) => {
     const searchedEmail = "members-case-beta@example.com";
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-members-owner@example.com",
     });
-    const memberOneSession = await fixture.authSession({
+    const memberOneSession = await createOrganizationActor({
+      fixture,
       email: "members-case-alpha@example.com",
     });
-    const memberTwoSession = await fixture.authSession({
+    const memberTwoSession = await createOrganizationActor({
+      fixture,
       email: searchedEmail,
     });
     const seaweedfs = await startSeaweedfsS3({
@@ -34,33 +36,23 @@ describe("organization members integration", () => {
     const memberOneObjectKey = `avatars/users/${memberOneSession.userId}/members_case_alpha.webp`;
 
     try {
-      await runtime.db.insert(members).values([
-        {
-          organizationId: ownerSession.organizationId,
-          userId: memberOneSession.userId,
-          role: "member",
-          createdAt: new Date("2026-03-02T00:00:00.000Z"),
-        },
-        {
-          organizationId: ownerSession.organizationId,
-          userId: memberTwoSession.userId,
-          role: "admin",
-          createdAt: new Date("2026-03-03T00:00:00.000Z"),
-        },
-      ]);
-      await runtime.db
-        .update(users)
-        .set({
-          name: "Members Case Alpha",
-          imageObjectKey: memberOneObjectKey,
-        })
-        .where(eq(users.id, memberOneSession.userId));
-      await runtime.db
-        .update(users)
-        .set({
-          name: "Completely Different Name",
-        })
-        .where(eq(users.id, memberTwoSession.userId));
+      await seedOrganizationMember({
+        db: runtime.db,
+        organizationId: ownerSession.organizationId,
+        userId: memberOneSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-02T00:00:00.000Z"),
+        name: "Members Case Alpha",
+        imageObjectKey: memberOneObjectKey,
+      });
+      await seedOrganizationMember({
+        db: runtime.db,
+        organizationId: ownerSession.organizationId,
+        userId: memberTwoSession.userId,
+        role: "admin",
+        createdAt: new Date("2026-03-03T00:00:00.000Z"),
+        name: "Completely Different Name",
+      });
       await objectStore.putObject({
         Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
@@ -179,10 +171,12 @@ describe("organization members integration", () => {
   });
 
   it("returns members when avatar presigning fails", async ({ fixture }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-members-avatar-failure-owner@example.com",
     });
-    const memberSession = await fixture.authSession({
+    const memberSession = await createOrganizationActor({
+      fixture,
       email: "members-avatar-failure@example.com",
     });
     const seaweedfs = await startSeaweedfsS3({
@@ -192,19 +186,15 @@ describe("organization members integration", () => {
     const memberObjectKey = `avatars/users/${memberSession.userId}/members_avatar_failure.webp`;
 
     try {
-      await fixture.db.insert(members).values({
+      await seedOrganizationMember({
+        db: fixture.db,
         organizationId: ownerSession.organizationId,
         userId: memberSession.userId,
         role: "member",
         createdAt: new Date("2026-03-04T00:00:00.000Z"),
+        name: "Avatar Failure Member",
+        imageObjectKey: memberObjectKey,
       });
-      await fixture.db
-        .update(users)
-        .set({
-          name: "Avatar Failure Member",
-          imageObjectKey: memberObjectKey,
-        })
-        .where(eq(users.id, memberSession.userId));
       await objectStore.putObject({
         Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
@@ -253,57 +243,47 @@ describe("organization members integration", () => {
   it("paginates members by the normalized display name returned to clients", async ({
     fixture,
   }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-members-sort-owner@example.com",
     });
-    const blankNameSession = await fixture.authSession({
+    const blankNameSession = await createOrganizationActor({
+      fixture,
       email: "alpha@example.com",
     });
-    const aliceSession = await fixture.authSession({
+    const aliceSession = await createOrganizationActor({
+      fixture,
       email: "alice@example.com",
     });
-    const namedSession = await fixture.authSession({
+    const namedSession = await createOrganizationActor({
+      fixture,
       email: "zeta@example.com",
     });
 
-    await fixture.db.insert(members).values([
-      {
-        organizationId: ownerSession.organizationId,
-        userId: blankNameSession.userId,
-        role: "member",
-        createdAt: new Date("2026-03-05T00:00:00.000Z"),
-      },
-      {
-        organizationId: ownerSession.organizationId,
-        userId: aliceSession.userId,
-        role: "member",
-        createdAt: new Date("2026-03-01T00:00:00.000Z"),
-      },
-      {
-        organizationId: ownerSession.organizationId,
-        userId: namedSession.userId,
-        role: "member",
-        createdAt: new Date("2026-03-05T00:00:00.000Z"),
-      },
-    ]);
-    await fixture.db
-      .update(users)
-      .set({
-        name: "   ",
-      })
-      .where(eq(users.id, blankNameSession.userId));
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Alice Person",
-      })
-      .where(eq(users.id, aliceSession.userId));
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Beta Person",
-      })
-      .where(eq(users.id, namedSession.userId));
+    await seedOrganizationMember({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      userId: blankNameSession.userId,
+      role: "member",
+      createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      name: "   ",
+    });
+    await seedOrganizationMember({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      userId: aliceSession.userId,
+      role: "member",
+      createdAt: new Date("2026-03-01T00:00:00.000Z"),
+      name: "Alice Person",
+    });
+    await seedOrganizationMember({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      userId: namedSession.userId,
+      role: "member",
+      createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      name: "Beta Person",
+    });
 
     const firstPageResponse = await fixture.request(
       `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=`,

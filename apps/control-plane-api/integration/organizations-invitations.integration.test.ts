@@ -1,41 +1,38 @@
-import { invitations, users } from "@mistle/db/control-plane";
-import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import {
+  createOrganizationActor,
+  seedOrganizationInvitation,
+} from "./helpers/organization-fixture.js";
 import { it } from "./test-context.js";
 
 describe("organization invitations integration", () => {
   it("returns paginated invitations with inviter names", async ({ fixture }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-invitations-owner@example.com",
+      name: "Org Owner",
     });
-
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Org Owner",
-      })
-      .where(eq(users.id, ownerSession.userId));
-    await fixture.db.insert(invitations).values([
-      {
-        organizationId: ownerSession.organizationId,
-        email: "invite-alpha@example.com",
-        role: "member",
-        inviterId: ownerSession.userId,
-        status: "pending",
-        expiresAt: new Date("2026-03-10T00:00:00.000Z"),
-        createdAt: new Date("2026-03-04T00:00:00.000Z"),
-      },
-      {
-        organizationId: ownerSession.organizationId,
-        email: "invite-beta@example.com",
-        role: "admin",
-        inviterId: ownerSession.userId,
-        status: "revoked",
-        expiresAt: new Date("2026-03-11T00:00:00.000Z"),
-        createdAt: new Date("2026-03-05T00:00:00.000Z"),
-      },
-    ]);
+    await seedOrganizationInvitation({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      email: "invite-alpha@example.com",
+      role: "member",
+      inviterId: ownerSession.userId,
+      status: "pending",
+      expiresAt: new Date("2026-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-04T00:00:00.000Z"),
+    });
+    await seedOrganizationInvitation({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      email: "invite-beta@example.com",
+      role: "admin",
+      inviterId: ownerSession.userId,
+      status: "revoked",
+      expiresAt: new Date("2026-03-11T00:00:00.000Z"),
+      createdAt: new Date("2026-03-05T00:00:00.000Z"),
+    });
 
     const response = await fixture.request(
       `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=invite-`,
@@ -79,36 +76,31 @@ describe("organization invitations integration", () => {
   });
 
   it("matches invitation search against visible role and status semantics", async ({ fixture }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-invitations-search@example.com",
+      name: "Org Owner",
     });
-
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Org Owner",
-      })
-      .where(eq(users.id, ownerSession.userId));
-    await fixture.db.insert(invitations).values([
-      {
-        organizationId: ownerSession.organizationId,
-        email: "future-member@example.com",
-        role: "member",
-        inviterId: ownerSession.userId,
-        status: "pending",
-        expiresAt: new Date("3026-03-10T00:00:00.000Z"),
-        createdAt: new Date("2026-03-04T00:00:00.000Z"),
-      },
-      {
-        organizationId: ownerSession.organizationId,
-        email: "expired-admin@example.com",
-        role: "admin",
-        inviterId: ownerSession.userId,
-        status: "pending",
-        expiresAt: new Date("2020-03-10T00:00:00.000Z"),
-        createdAt: new Date("2026-03-03T00:00:00.000Z"),
-      },
-    ]);
+    await seedOrganizationInvitation({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      email: "future-member@example.com",
+      role: "member",
+      inviterId: ownerSession.userId,
+      status: "pending",
+      expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-04T00:00:00.000Z"),
+    });
+    await seedOrganizationInvitation({
+      db: fixture.db,
+      organizationId: ownerSession.organizationId,
+      email: "expired-admin@example.com",
+      role: "admin",
+      inviterId: ownerSession.userId,
+      status: "pending",
+      expiresAt: new Date("2020-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-03T00:00:00.000Z"),
+    });
 
     const pendingResponse = await fixture.request(
       `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=pending`,
@@ -190,17 +182,13 @@ describe("organization invitations integration", () => {
   });
 
   it("fails when invitations contain an unexpected status", async ({ fixture }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-invitations-invalid-status@example.com",
+      name: "Org Owner",
     });
-
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Org Owner",
-      })
-      .where(eq(users.id, ownerSession.userId));
-    await fixture.db.insert(invitations).values({
+    await seedOrganizationInvitation({
+      db: fixture.db,
       organizationId: ownerSession.organizationId,
       email: "broken-invite@example.com",
       role: "member",
@@ -223,17 +211,13 @@ describe("organization invitations integration", () => {
   });
 
   it("fails when invitations contain an unexpected role", async ({ fixture }) => {
-    const ownerSession = await fixture.authSession({
+    const ownerSession = await createOrganizationActor({
+      fixture,
       email: "integration-org-invitations-invalid-role@example.com",
+      name: "Org Owner",
     });
-
-    await fixture.db
-      .update(users)
-      .set({
-        name: "Org Owner",
-      })
-      .where(eq(users.id, ownerSession.userId));
-    await fixture.db.insert(invitations).values({
+    await seedOrganizationInvitation({
+      db: fixture.db,
       organizationId: ownerSession.organizationId,
       email: "broken-role-invite@example.com",
       role: null,
