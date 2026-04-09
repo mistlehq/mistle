@@ -162,7 +162,7 @@ export async function deleteIntegrationConnection(
               connectionSecrets,
               source: {
                 id: source.id,
-                targetKey: source.targetKey ?? connection.targetKey,
+                targetKey: source.targetKey,
                 organizationId: source.organizationId,
                 integrationConnectionId: source.integrationConnectionId,
                 ...(source.displayName === null ? {} : { displayName: source.displayName }),

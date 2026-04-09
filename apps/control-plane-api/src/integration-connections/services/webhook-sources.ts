@@ -309,7 +309,7 @@ function toWebhookSourceListItem(input: {
 }): WebhookSourceListItem {
   return {
     id: input.source.id,
-    targetKey: input.source.targetKey ?? "",
+    targetKey: input.source.targetKey,
     integrationConnectionId: input.source.integrationConnectionId,
     displayName: input.descriptor.displayName,
     endpointKey: input.source.endpointKey,
@@ -356,7 +356,7 @@ async function resolveWebhookSourceDescriptor(input: {
     },
     source: {
       id: input.source.id,
-      targetKey: input.source.targetKey ?? input.connection.targetKey,
+      targetKey: input.source.targetKey,
       organizationId: input.source.organizationId,
       integrationConnectionId: input.source.integrationConnectionId,
       ...(input.source.displayName === null || input.source.displayName === undefined
@@ -708,7 +708,7 @@ export async function createIntegrationWebhookSource(
         connectionSecrets,
         source: {
           id: insertedSource.id,
-          targetKey: insertedSource.targetKey ?? connection.targetKey,
+          targetKey: insertedSource.targetKey,
           organizationId: input.organizationId,
           integrationConnectionId: connection.id,
           ...(insertedSource.displayName === null
@@ -860,7 +860,7 @@ export async function deleteIntegrationWebhookSource(
         }),
         source: {
           id: source.id,
-          targetKey: source.targetKey ?? connection.targetKey,
+          targetKey: source.targetKey,
           organizationId: source.organizationId,
           integrationConnectionId: source.integrationConnectionId,
           ...(source.displayName === null ? {} : { displayName: source.displayName }),
