@@ -22,7 +22,8 @@ export type MembersDirectoryTableRowViewModel = {
   key: string;
   name: string;
   email: string;
-  status: string;
+  role: string;
+  status: string | null;
   date: string;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
@@ -114,6 +115,7 @@ export function buildMembersDirectoryTableRowViewModels(input: {
       key: `${row.kind}:${row.id}`,
       name: formattedRow.name,
       email: formattedRow.email,
+      role: formattedRow.role,
       status: formattedRow.status,
       date: formattedRow.date,
       showMemberAvatar: row.kind === "member",

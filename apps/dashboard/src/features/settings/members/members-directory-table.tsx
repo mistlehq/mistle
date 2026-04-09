@@ -34,6 +34,8 @@ export function MembersDirectoryTable(input: {
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
 }): React.JSX.Element {
+  const showNameColumn = input.activeFilter === "members";
+  const showInvitationStatusColumn = input.activeFilter === "invitations";
   const [selectedInvitationForDetails, setSelectedInvitationForDetails] =
     useState<SettingsInvitation | null>(null);
   const rows = buildMembersDirectoryRows({
@@ -67,15 +69,22 @@ export function MembersDirectoryTable(input: {
       <Table className="min-w-[48rem]">
         <TableHeader className="bg-muted/60">
           <TableRow className="h-9 border-b">
-            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-              Name
-            </TableHead>
+            {showNameColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                Name
+              </TableHead>
+            ) : null}
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
               Email
             </TableHead>
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-              Status
+              Role
             </TableHead>
+            {showInvitationStatusColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Status
+              </TableHead>
+            ) : null}
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               Date
             </TableHead>
@@ -104,7 +113,10 @@ export function MembersDirectoryTable(input: {
                 date={row.date}
                 email={row.email}
                 key={row.key}
+                role={row.role}
                 showMemberAvatar={row.showMemberAvatar}
+                showNameColumn={showNameColumn}
+                showStatusColumn={showInvitationStatusColumn}
                 memberAvatar={row.memberAvatar}
                 name={row.name}
                 status={row.status}

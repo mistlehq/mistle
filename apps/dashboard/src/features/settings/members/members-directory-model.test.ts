@@ -116,14 +116,16 @@ describe("members directory model", () => {
       kind: "invitation",
       name: "invitee@example.com",
       email: "invitee@example.com",
-      status: "Admin",
+      role: "Admin",
+      status: "Pending",
       displayStatus: { kind: "pending" },
     });
     expect(rows[1]).toMatchObject({
       kind: "member",
       name: "member1@example.com",
       email: "member1@example.com",
-      status: "Member",
+      role: "Member",
+      status: null,
     });
   });
 
@@ -205,7 +207,8 @@ describe("members directory model", () => {
     expect(formatMembersDirectoryRow(firstRow)).toMatchObject({
       name: "invitee@example.com",
       email: "invitee@example.com",
-      status: "Member",
+      role: "Member",
+      status: "Pending",
     });
   });
 
@@ -284,7 +287,7 @@ describe("members directory model", () => {
       },
       {
         key: "revoke_invitation",
-        label: "Revoke invitation",
+        label: "Cancel invitation",
         disabled: true,
         destructive: true,
       },
@@ -350,7 +353,7 @@ describe("members directory model", () => {
         },
       }),
     ).toEqual({
-      label: "Revoked",
+      label: "Canceled",
       state: "revoke_invitation_completed",
       tone: "destructive",
     });

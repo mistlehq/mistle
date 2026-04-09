@@ -49,34 +49,30 @@ export type InvitationDisplayStatus =
   | { kind: "revoked" }
   | { kind: "unknown"; rawStatus: string };
 
-export function invitationStatusLabel(
-  role: OrganizationRole,
-  displayStatus: InvitationDisplayStatus,
-): string {
-  const roleLabel = formatRoleLabel(role);
+export function invitationStatusLabel(displayStatus: InvitationDisplayStatus): string {
   if (displayStatus.kind === "pending") {
-    return roleLabel;
+    return "Pending";
   }
 
   if (displayStatus.kind === "expired") {
-    return `${roleLabel} (Invite expired)`;
+    return "Expired";
   }
 
   if (displayStatus.kind === "accepted") {
-    return `${roleLabel} (Accepted)`;
+    return "Accepted";
   }
 
   if (displayStatus.kind === "canceled") {
-    return `${roleLabel} (Canceled)`;
+    return "Canceled";
   }
 
   if (displayStatus.kind === "rejected") {
-    return `${roleLabel} (Rejected)`;
+    return "Rejected";
   }
 
   if (displayStatus.kind === "revoked") {
-    return `${roleLabel} (Revoked)`;
+    return "Revoked";
   }
 
-  return `${roleLabel} (${displayStatus.rawStatus})`;
+  return displayStatus.rawStatus;
 }

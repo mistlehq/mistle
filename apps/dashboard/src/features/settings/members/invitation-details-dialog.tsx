@@ -23,12 +23,7 @@ export function InvitationDetailsDialog(input: {
             </div>
             <div className="gap-1 grid">
               <dt className="text-muted-foreground">Status</dt>
-              <dd>
-                {invitationStatusLabel(
-                  input.invitation.role,
-                  resolveInvitationDisplayStatus(input.invitation),
-                )}
-              </dd>
+              <dd>{invitationStatusLabel(resolveInvitationDisplayStatus(input.invitation))}</dd>
             </div>
             <div className="gap-1 grid">
               <dt className="text-muted-foreground">Invited by</dt>

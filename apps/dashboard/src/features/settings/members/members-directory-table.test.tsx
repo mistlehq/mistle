@@ -155,4 +155,53 @@ describe("MembersDirectoryTable", () => {
 
     expect(markup).toContain("MO");
   });
+
+  it("uses a role column header on the active members tab", () => {
+    const markup = renderMembersDirectoryTable(
+      <MembersDirectoryTable
+        activeFilter="members"
+        capabilities={null}
+        canManageInvitations
+        invitations={[]}
+        memberAvatarsByUserId={new Map()}
+        members={[]}
+        onChangeRole={() => {}}
+        onRemoveMember={() => {}}
+        onResendInvite={() => {}}
+        onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
+        pendingMemberOperation={null}
+        searchValue=""
+        invitationActionState={null}
+      />,
+    );
+
+    expect(markup).toContain(">Role<");
+    expect(markup).not.toContain(">Status<");
+  });
+
+  it("uses role and status column headers on the invited tab", () => {
+    const markup = renderMembersDirectoryTable(
+      <MembersDirectoryTable
+        activeFilter="invitations"
+        capabilities={null}
+        canManageInvitations
+        invitations={[]}
+        memberAvatarsByUserId={new Map()}
+        members={[]}
+        onChangeRole={() => {}}
+        onRemoveMember={() => {}}
+        onResendInvite={() => {}}
+        onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
+        pendingMemberOperation={null}
+        searchValue=""
+        invitationActionState={null}
+      />,
+    );
+
+    expect(markup).toContain(">Role<");
+    expect(markup).toContain(">Status<");
+    expect(markup).not.toContain(">Name<");
+  });
 });

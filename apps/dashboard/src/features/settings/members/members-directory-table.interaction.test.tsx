@@ -133,7 +133,7 @@ describe("MembersDirectoryTable interaction", () => {
 
     expect(await screen.findByText("View details")).toBeTruthy();
     expect(await screen.findByText("Resend invite")).toBeTruthy();
-    expect(await screen.findByText("Revoke invitation")).toBeTruthy();
+    expect(await screen.findByText("Cancel invitation")).toBeTruthy();
   });
 
   it("shows sending state in place of invitation actions while resend is pending", () => {
@@ -228,7 +228,7 @@ describe("MembersDirectoryTable interaction", () => {
     expect(screen.getByLabelText("Invitation actions")).toBeTruthy();
   });
 
-  it("shows revoked state in place of invitation actions", () => {
+  it("shows canceled state in place of invitation actions", () => {
     renderTable(
       <MembersDirectoryTable
         {...baseProps}

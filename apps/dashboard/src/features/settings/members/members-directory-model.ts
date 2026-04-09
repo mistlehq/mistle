@@ -78,7 +78,7 @@ export type MembersDirectoryActionFeedback = {
 
 const INVITATION_PENDING_ACTION_LABEL: Record<"resend_invite" | "revoke_invitation", string> = {
   resend_invite: "Resending invite...",
-  revoke_invitation: "Revoking invitation...",
+  revoke_invitation: "Canceling invitation...",
 };
 
 const INVITATION_FEEDBACK_BY_PHASE_AND_ACTION: Record<
@@ -111,7 +111,7 @@ const INVITATION_FEEDBACK_BY_PHASE_AND_ACTION: Record<
       tone: "success",
     },
     revoke_invitation: {
-      label: "Revoked",
+      label: "Canceled",
       state: "revoke_invitation_completed",
       tone: "destructive",
     },
@@ -230,7 +230,7 @@ export function buildInvitationActionDescriptors(input: {
       key: "revoke_invitation",
       label: revokePending
         ? INVITATION_PENDING_ACTION_LABEL.revoke_invitation
-        : "Revoke invitation",
+        : "Cancel invitation",
       disabled: invitationActionsDisabled,
       destructive: true,
     });
@@ -261,7 +261,8 @@ export type MembersDirectoryRow =
       id: string;
       name: string;
       email: string;
-      status: string;
+      role: string;
+      status: null;
       date: string;
       member: SettingsMember;
     }
@@ -270,6 +271,7 @@ export type MembersDirectoryRow =
       id: string;
       name: string;
       email: string;
+      role: string;
       status: string;
       date: string;
       invitation: SettingsInvitation;
@@ -316,12 +318,14 @@ export type MembersDirectoryActionDescriptor =
 export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
   name: string;
   email: string;
-  status: string;
+  role: string;
+  status: string | null;
   date: string;
 } {
   return {
     name: row.name,
     email: row.email,
+    role: row.role,
     status: row.status,
     date: formatDate(row.date),
   };
@@ -351,7 +355,8 @@ export function buildMembersDirectoryRows(input: {
       email: member.email,
     }),
     email: member.email,
-    status: formatRoleLabel(member.role),
+    role: formatRoleLabel(member.role),
+    status: null,
     date: member.joinedAt,
     member,
   }));
@@ -363,7 +368,8 @@ export function buildMembersDirectoryRows(input: {
       id: invitation.id,
       name: invitation.email,
       email: invitation.email,
-      status: invitationStatusLabel(invitation.role, displayStatus),
+      role: formatRoleLabel(invitation.role),
+      status: invitationStatusLabel(displayStatus),
       date: invitation.createdAt,
       invitation,
       displayStatus,
