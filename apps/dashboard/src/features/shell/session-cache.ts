@@ -13,9 +13,18 @@ export async function refreshAuthenticatedSessionAfterOrganizationSwitch(input: 
   fetchSessionData: () => Promise<SessionData>;
 }): Promise<SessionData> {
   removeNonSessionQueries(input.queryClient);
+  await input.queryClient.cancelQueries({
+    exact: true,
+    queryKey: SESSION_QUERY_KEY,
+  });
+  await input.queryClient.invalidateQueries({
+    exact: true,
+    queryKey: SESSION_QUERY_KEY,
+  });
   return input.queryClient.fetchQuery({
     queryKey: SESSION_QUERY_KEY,
     queryFn: input.fetchSessionData,
+    staleTime: 0,
   });
 }
 
