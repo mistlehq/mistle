@@ -1,6 +1,7 @@
 import {
   automations,
   integrationConnections,
+  IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   integrationTargets,
   sandboxProfileVersionIntegrationBindings,
@@ -142,5 +143,127 @@ describe("home summary integration", () => {
         hasAutomations: true,
       },
     });
+  });
+
+  it("does not count inactive connections as completed integrations", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-inactive-connection@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-home-summary-inactive",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {},
+    });
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_home_summary_inactive",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-home-summary-inactive",
+        displayName: "OpenAI inactive",
+        status: IntegrationConnectionStatuses.ERROR,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(response.status).toBe(200);
+    const body = homeSummaryResponseSchema.parse(await response.json());
+    expect(body.onboarding.hasIntegrations).toBe(false);
+  });
+
+  it("ignores non-agent bindings when checking whether a profile is usable", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-non-agent-binding@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values([
+      {
+        targetKey: "openai-home-summary-agent",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {},
+      },
+      {
+        targetKey: "github-home-summary-git",
+        familyId: "github",
+        variantId: "github-default",
+        enabled: true,
+        config: {},
+      },
+    ]);
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_home_summary_agent",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-home-summary-agent",
+        displayName: "OpenAI",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "icn_home_summary_git",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-home-summary-git",
+        displayName: "GitHub",
+        status: IntegrationConnectionStatuses.ERROR,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_home_summary_non_agent",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Profile with stale git binding",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_home_summary_non_agent",
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_home_summary_agent",
+        sandboxProfileId: "sbp_home_summary_non_agent",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_home_summary_agent",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {},
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "ibd_home_summary_git",
+        sandboxProfileId: "sbp_home_summary_non_agent",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_home_summary_git",
+        kind: IntegrationBindingKinds.GIT,
+        config: {},
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(response.status).toBe(200);
+    const body = homeSummaryResponseSchema.parse(await response.json());
+    expect(body.onboarding.hasUsableProfiles).toBe(true);
   });
 });

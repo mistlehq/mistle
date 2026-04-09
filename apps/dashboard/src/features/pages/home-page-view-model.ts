@@ -128,7 +128,7 @@ export const HomePageStoryModels = {
       "Sandbox profiles need an active agent-capable connection before sessions can launch.",
     primaryCta: {
       href: "/settings/organization/integrations",
-      label: "Connect integration",
+      label: "Add integrations",
     },
     secondaryCta: {
       href: "/sandbox-profiles",
@@ -141,7 +141,7 @@ export const HomePageStoryModels = {
         description:
           "The workspace does not have an active integration connection available for agent bindings.",
         href: "/settings/organization/integrations",
-        actionLabel: "Connect integration",
+        actionLabel: "Add integrations",
       },
     ],
     steps: withStepStatuses({
@@ -193,7 +193,7 @@ export const HomePageStoryModels = {
     supportingText:
       "Your profile exists, but it still needs setup before agents can start with the right tools, permissions, and environment.",
     primaryCta: {
-      href: "/sandbox-profiles/sbp_agent_ops",
+      href: "/sandbox-profiles",
       label: "Complete profile",
     },
     secondaryCta: {
@@ -206,16 +206,16 @@ export const HomePageStoryModels = {
         title: "Profile has no agent binding",
         description:
           "Attach an active agent connection to the latest profile version so sessions can start.",
-        href: "/sandbox-profiles/sbp_agent_ops",
-        actionLabel: "Add binding",
+        href: "/sandbox-profiles",
+        actionLabel: "Complete profile",
       },
       {
         id: "no_launchable_profile",
         title: "No launchable profile",
         description:
           "The current profile exists, but it does not meet session-launch requirements.",
-        href: "/sessions/new",
-        actionLabel: "Review launch",
+        href: "/sandbox-profiles",
+        actionLabel: "Complete profile",
       },
     ],
     steps: replaceStep(
@@ -231,7 +231,7 @@ export const HomePageStoryModels = {
         description:
           "Finish setting up the profile so agents have the tools, permissions, and environment they need to start.",
         actionLabel: "Complete profile",
-        href: "/sandbox-profiles/sbp_agent_ops",
+        href: "/sandbox-profiles",
       },
     ),
   } satisfies HomeOnboardingViewModel,

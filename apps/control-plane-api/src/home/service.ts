@@ -43,6 +43,7 @@ export async function getHomeSummary(
           select 1
           from ${integrationConnections} as icn
           where icn."organization_id" = ${params.organizationId}
+            and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
         ) as "hasIntegrations",
         exists(
           select 1
@@ -85,6 +86,7 @@ export async function getHomeSummary(
                   from "control_plane"."sandbox_profile_versions" as spv
                   where spv."sandbox_profile_id" = sp."id"
                 )
+                and spvib."kind" = ${IntegrationBindingKinds.AGENT}
                 and (
                   icn."id" is null
                   or icn."status" <> ${IntegrationConnectionStatuses.ACTIVE}

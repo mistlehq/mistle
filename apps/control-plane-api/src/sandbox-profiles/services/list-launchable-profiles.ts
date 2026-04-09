@@ -65,6 +65,7 @@ export async function listLaunchableProfiles(
           on itg."target_key" = icn."target_key"
         where spvib."sandbox_profile_id" = ${sandboxProfiles.id}
           and spvib."sandbox_profile_version" = ${latestVersionSql}
+          and spvib."kind" = ${IntegrationBindingKinds.AGENT}
           and (
             icn."id" is null
             or icn."status" <> ${IntegrationConnectionStatuses.ACTIVE}
