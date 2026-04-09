@@ -32,21 +32,31 @@ const IntegrationEgressGrantConfig = {
   tokenAudience: "tokenizer-proxy",
 } as const;
 
-async function mintIntegrationEgressGrant(input: {
-  egressRuleId: string;
-  upstreamBaseUrl: string;
-  bindingId: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
-  authInjectionUsername?: string;
-  additionalHeaders?: Readonly<Record<string, string>>;
-  connectionId: string;
-  secretType: string;
-  slotKey?: string;
-  resolverKey?: string;
-  allowedMethods?: ReadonlyArray<string>;
-  allowedPathPrefixes?: ReadonlyArray<string>;
-}): Promise<string> {
+async function mintIntegrationEgressGrant(
+  input: {
+    egressRuleId: string;
+    upstreamBaseUrl: string;
+    bindingId: string;
+    connectionId: string;
+    secretType: string;
+    additionalHeaders?: Readonly<Record<string, string>>;
+    slotKey?: string;
+    resolverKey?: string;
+    allowedMethods?: ReadonlyArray<string>;
+    allowedPathPrefixes?: ReadonlyArray<string>;
+  } & (
+    | {
+        authInjectionType: "bearer" | "basic" | "header" | "query";
+        authInjectionTarget: string;
+        authInjectionUsername?: string;
+      }
+    | {
+        authInjectionType: "aws_sigv4";
+        authInjectionService: string;
+        authInjectionRegion: string;
+      }
+  ),
+): Promise<string> {
   return await mintEgressGrant({
     config: IntegrationEgressGrantConfig,
     claims: {
@@ -57,13 +67,20 @@ async function mintIntegrationEgressGrant(input: {
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,
       authInjectionType: input.authInjectionType,
-      authInjectionTarget: input.authInjectionTarget,
-      ...(input.authInjectionUsername === undefined
-        ? {}
-        : { authInjectionUsername: input.authInjectionUsername }),
       ...(input.additionalHeaders === undefined
         ? {}
         : { additionalHeaders: input.additionalHeaders }),
+      ...("authInjectionTarget" in input
+        ? {
+            authInjectionTarget: input.authInjectionTarget,
+            ...(input.authInjectionUsername === undefined
+              ? {}
+              : { authInjectionUsername: input.authInjectionUsername }),
+          }
+        : {
+            authInjectionService: input.authInjectionService,
+            authInjectionRegion: input.authInjectionRegion,
+          }),
       ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
       ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
       ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
@@ -102,7 +119,7 @@ function writeJson(response: ServerResponse, statusCode: number, body: unknown):
 async function startControlPlaneCredentialServer(input: {
   host: string;
   serviceToken: string;
-  credentialValue: string;
+  credentialValue?: string;
   statusCode?: number;
   responseBody?: unknown;
 }): Promise<StartedControlPlaneCredentialServer> {
@@ -141,7 +158,8 @@ async function startControlPlaneCredentialServer(input: {
       response,
       input.statusCode ?? 200,
       input.responseBody ?? {
-        value: input.credentialValue,
+        kind: "value",
+        value: input.credentialValue ?? "test-secret",
       },
     );
   });
@@ -884,6 +902,99 @@ describe("tokenizer proxy integration", () => {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }
   });
+
+  it("signs aws sigv4 requests with temporary session credentials", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      responseBody: {
+        kind: "aws_session",
+        accessKeyId: "ASIAEXAMPLEACCESS",
+        secretAccessKey: "example-secret-access-key",
+        sessionToken: "example-session-token",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_aws_sm",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_aws",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "secretsmanager",
+      authInjectionRegion: "us-east-1",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      resolverKey: "assume-role-session",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      for (const requestIndex of [1, 2]) {
+        const response = await fetch(`http://${host}:${String(port)}/tokenizer-proxy/egress/`, {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            requestIndex,
+          }),
+        });
+        const body: unknown = await response.json();
+
+        expect(response.status).toBe(200);
+        if (typeof body !== "object" || body === null || !("headers" in body)) {
+          throw new Error("Expected echoed response headers.");
+        }
+
+        const authorizationHeader = readHeaderValue(body.headers, "authorization");
+        if (authorizationHeader === undefined) {
+          throw new Error("Expected SigV4 authorization header.");
+        }
+        expect(authorizationHeader).toContain("AWS4-HMAC-SHA256");
+        expect(authorizationHeader).toContain("Credential=ASIAEXAMPLEACCESS/");
+        expect(authorizationHeader).toContain("/us-east-1/secretsmanager/aws4_request");
+        expect(authorizationHeader).toContain("SignedHeaders=");
+        expect(authorizationHeader).toContain("host");
+        expect(authorizationHeader).toContain("x-amz-content-sha256");
+        expect(authorizationHeader).toContain("x-amz-date");
+        expect(authorizationHeader).toContain("x-amz-security-token");
+        expect(readHeaderValue(body.headers, "x-amz-security-token")).toBe("example-session-token");
+        expect(readHeaderValue(body.headers, "x-amz-date")).toBeDefined();
+        expect(readHeaderValue(body.headers, "x-amz-content-sha256")).toBeDefined();
+      }
+
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_aws",
+          connectionId: "icn_aws",
+          resolverKey: "assume-role-session",
+          secretType: "aws_secret_access_key",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 15_000);
 
   it("forwards websocket upgrades to the upstream with injected auth and fixed headers", async () => {
     const upstreamService = await startWebSocketUpstream({
