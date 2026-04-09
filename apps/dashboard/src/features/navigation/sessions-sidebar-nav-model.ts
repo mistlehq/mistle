@@ -108,7 +108,7 @@ export function buildSessionsSidebarNavGroups(
         status: item.status,
         keepaliveActive: item.keepaliveActive,
         updatedAt: item.updatedAt,
-        nowEpochMs: input?.nowEpochMs,
+        ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
       }),
       to: `/sessions/${encodeURIComponent(item.id)}`,
       showActivityIndicator,
