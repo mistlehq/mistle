@@ -14,6 +14,7 @@ import {
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
+import { UntouchedWebhookAutomationInputTemplateError } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -325,7 +326,7 @@ describe("WebhookAutomationForm", () => {
     expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("shows the required-fields summary without inline copy for basic required fields", () => {
+  it("shows the required-fields summary without inline copy for generic input template errors", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <WebhookAutomationForm
@@ -364,6 +365,35 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
     expect(screen.queryByText("Input template is required.")).toBeNull();
     expect(screen.getByText("Please add a trigger")).toBeDefined();
+  });
+
+  it("renders the placeholder-specific instructions error inline", () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WebhookAutomationForm
+          connectionOptions={ConnectionOptions}
+          fieldErrors={{
+            inputTemplate: UntouchedWebhookAutomationInputTemplateError,
+          }}
+          formError={null}
+          validationSummaryError="Please address the fields highlighted in red."
+          isDeleting={false}
+          isSaving={false}
+          mode="create"
+          onDelete={null}
+          onSubmit={() => {}}
+          onValueChange={() => {}}
+          sandboxProfileOptions={SandboxProfileOptions}
+          triggerPickerDisabledState={null}
+          webhookEventOptions={WebhookEventOptions}
+          values={FormValues}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getAllByText(UntouchedWebhookAutomationInputTemplateError).length,
+    ).toBeGreaterThan(0);
   });
 
   it("shows save failures at the top of the form", () => {

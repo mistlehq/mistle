@@ -4,7 +4,10 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { InitialWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import {
+  InitialWebhookAutomationInputTemplate,
+  UntouchedWebhookAutomationInputTemplateError,
+} from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
@@ -166,8 +169,7 @@ export function validateWebhookAutomationFormValues(
   if (trimmedInputTemplate.length === 0) {
     errors.inputTemplate = "Input template is required.";
   } else if (trimmedInputTemplate === InitialWebhookAutomationInputTemplate.trim()) {
-    errors.inputTemplate =
-      "Please replace the instructions placeholder with your own instructions.";
+    errors.inputTemplate = UntouchedWebhookAutomationInputTemplateError;
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {

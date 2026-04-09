@@ -16,3 +16,6 @@ export const InitialWebhookAutomationInputTemplate = [
 
 export const WebhookAutomationInputTemplatePlaceholder =
   "Put core instructions first so that they can be cached. Add event details after that.";
+
+export const UntouchedWebhookAutomationInputTemplateError =
+  "Please replace the instructions placeholder with your own instructions.";

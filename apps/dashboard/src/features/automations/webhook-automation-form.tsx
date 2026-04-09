@@ -14,6 +14,7 @@ import {
   SelectValue,
   Switch,
   Notice,
+  cn,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
@@ -22,7 +23,10 @@ import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
-import { WebhookAutomationInputTemplatePlaceholder } from "./webhook-automation-input-template.js";
+import {
+  UntouchedWebhookAutomationInputTemplateError,
+  WebhookAutomationInputTemplatePlaceholder,
+} from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -81,15 +85,22 @@ function shouldRenderInlineFieldError(input: {
     return false;
   }
 
-  return input.key !== "name" && input.key !== "sandboxProfileId" && input.key !== "inputTemplate";
+  if (input.key === "inputTemplate") {
+    return input.message === UntouchedWebhookAutomationInputTemplateError;
+  }
+
+  return input.key !== "name" && input.key !== "sandboxProfileId";
 }
 
-function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
+function FieldError(input: {
+  message: string | undefined;
+  className?: string;
+}): React.JSX.Element | null {
   if (input.message === undefined) {
     return null;
   }
 
-  return <p className="text-destructive text-sm">{input.message}</p>;
+  return <p className={cn("text-destructive text-sm", input.className)}>{input.message}</p>;
 }
 
 function SelectField(input: {
@@ -423,6 +434,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                     ? input.fieldErrors.inputTemplate
                     : undefined
                 }
+                className="text-right text-xs"
               />
             </FieldContent>
           </Field>

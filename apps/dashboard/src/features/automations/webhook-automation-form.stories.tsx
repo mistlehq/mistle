@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { FormPageFrame } from "../shared/page-frame.js";
+import { validateWebhookAutomationFormValues } from "./webhook-automation-form-helpers.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationEventOption,
@@ -439,29 +440,75 @@ function StoryHarness(input: {
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
+  enableSubmitValidation?: boolean;
+  validateOnMount?: boolean;
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookAutomationStoryQueryClient());
   const [values, setValues] = useState(input.values);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<WebhookAutomationFormValueKey, string>>
+  >({
+    ...(input.fieldErrors ?? {}),
+  });
+  const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
+    input.validationSummaryError ?? null,
+  );
   const pageTitle = input.mode === "create" ? "Create automation" : "Edit automation";
+
+  useEffect(() => {
+    if (input.validateOnMount !== true) {
+      return;
+    }
+
+    const nextFieldErrors = validateWebhookAutomationFormValues(
+      values,
+      input.webhookEventOptions ?? GitHubWebhookEventOptions,
+    );
+    setFieldErrors(nextFieldErrors);
+    setValidationSummaryError(
+      Object.keys(nextFieldErrors).length > 0
+        ? "Please address the fields highlighted in red."
+        : null,
+    );
+  }, [input.validateOnMount, input.webhookEventOptions, values]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <FormPageFrame title={pageTitle}>
         <WebhookAutomationForm
           connectionOptions={input.connectionOptions ?? ConnectionOptions}
-          fieldErrors={input.fieldErrors ?? {}}
+          fieldErrors={fieldErrors}
           formError={input.formError ?? null}
-          validationSummaryError={input.validationSummaryError ?? null}
+          validationSummaryError={validationSummaryError}
           isDeleting={input.isDeleting ?? false}
           isSaving={input.isSaving ?? false}
           mode={input.mode}
           onDelete={input.onDelete ?? null}
-          onSubmit={function onSubmit() {}}
+          onSubmit={() => {
+            if (input.enableSubmitValidation !== true) {
+              return;
+            }
+
+            const nextFieldErrors = validateWebhookAutomationFormValues(
+              values,
+              input.webhookEventOptions ?? GitHubWebhookEventOptions,
+            );
+            setFieldErrors(nextFieldErrors);
+            setValidationSummaryError(
+              Object.keys(nextFieldErrors).length > 0
+                ? "Please address the fields highlighted in red."
+                : null,
+            );
+          }}
           onValueChange={(key, value) => {
             setValues((currentValues) => ({
               ...currentValues,
               [key]: value,
             }));
+            if (input.enableSubmitValidation === true) {
+              setFieldErrors({});
+              setValidationSummaryError(null);
+            }
           }}
           sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
           triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
@@ -518,6 +565,22 @@ export const ValidationErrors: Story = {
     values: {
       ...EmptyCreateValues,
       inputTemplate: "",
+    },
+  },
+};
+
+export const PlaceholderInstructionsValidation: Story = {
+  args: {
+    mode: "create",
+    enableSubmitValidation: true,
+    validateOnMount: true,
+    values: {
+      ...EmptyCreateValues,
+      name: "Review pull requests",
+      sandboxProfileId: "sbp_repo_maintainer",
+      triggerIds: [PullRequestOpenedTriggerId],
+      conversationKeyTemplate:
+        "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
     },
   },
 };
