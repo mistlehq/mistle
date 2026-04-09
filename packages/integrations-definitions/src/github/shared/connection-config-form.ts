@@ -13,12 +13,6 @@ export const GitHubApiKeyConnectionConfigForm: ResolvedIntegrationForm = {
     connection_method: {
       "ui:widget": "hidden",
     },
-    installation_id: {
-      "ui:widget": "hidden",
-    },
-    setup_action: {
-      "ui:widget": "hidden",
-    },
   },
 };
 
@@ -38,12 +32,6 @@ export const GitHubAppInstallationConnectionConfigForm: ResolvedIntegrationForm 
   },
   uiSchema: {
     connection_method: {
-      "ui:widget": "hidden",
-    },
-    installation_id: {
-      "ui:widget": "hidden",
-    },
-    setup_action: {
       "ui:widget": "hidden",
     },
   },
