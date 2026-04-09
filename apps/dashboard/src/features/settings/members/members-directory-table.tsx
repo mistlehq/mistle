@@ -1,51 +1,50 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
+import { useState } from "react";
 
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
-import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
+import type {
+  MemberAvatar,
+  MembersDirectoryFilter,
+  MembershipCapabilities,
+  SettingsInvitation,
+  SettingsMember,
+} from "./members-api.js";
 import {
   type MembersDirectoryInvitationActionState,
   type MembersDirectoryPendingMemberOperation,
 } from "./members-directory-model.js";
+import { buildMembersDirectoryRows } from "./members-directory-model.js";
 import { MembersDirectoryToolbar } from "./members-directory-toolbar.js";
 import { DirectoryTableRow } from "./members-table-rows.js";
 import { buildMembersDirectoryTableRowViewModels } from "./members-table-view-model.js";
-import { useMemberAvatars } from "./use-member-avatars.js";
-import { useMembersDirectoryTableState } from "./use-members-directory-table-state.js";
 
 export function MembersDirectoryTable(input: {
-  organizationId: string;
+  activeFilter: MembersDirectoryFilter;
   members: SettingsMember[];
+  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   invitations: SettingsInvitation[];
   capabilities: MembershipCapabilities | null;
   canManageInvitations: boolean;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
   invitationActionState: MembersDirectoryInvitationActionState;
+  searchValue: string;
+  onFilterChange: (nextValue: MembersDirectoryFilter) => void;
+  onSearchValueChange: (nextValue: string) => void;
   resolveInviterDisplayName: (inviterId: string) => string;
   onChangeRole: (member: SettingsMember) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
 }): React.JSX.Element {
-  const {
-    selectedInvitationForDetails,
-    setSelectedInvitationForDetails,
-    activeFilter,
-    setActiveFilter,
-    searchValue,
-    setSearchValue,
-    hasRows,
-    visibleRows,
-  } = useMembersDirectoryTableState({
+  const [selectedInvitationForDetails, setSelectedInvitationForDetails] =
+    useState<SettingsInvitation | null>(null);
+  const rows = buildMembersDirectoryRows({
     members: input.members,
     invitations: input.invitations,
   });
-  const memberAvatarsByUserId = useMemberAvatars({
-    organizationId: input.organizationId,
-    rows: visibleRows,
-  });
   const tableRows = buildMembersDirectoryTableRowViewModels({
-    rows: visibleRows,
-    memberAvatarsByUserId,
+    rows,
+    memberAvatarsByUserId: input.memberAvatarsByUserId,
     capabilities: input.capabilities,
     canManageInvitations: input.canManageInvitations,
     pendingMemberOperation: input.pendingMemberOperation,
@@ -62,10 +61,10 @@ export function MembersDirectoryTable(input: {
   return (
     <>
       <MembersDirectoryToolbar
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        onSearchValueChange={setSearchValue}
-        searchValue={searchValue}
+        activeFilter={input.activeFilter}
+        onFilterChange={input.onFilterChange}
+        onSearchValueChange={input.onSearchValueChange}
+        searchValue={input.searchValue}
       />
 
       <Table className="min-w-[48rem]">
@@ -89,10 +88,10 @@ export function MembersDirectoryTable(input: {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visibleRows.length === 0 ? (
+          {rows.length === 0 ? (
             <TableRow>
               <TableCell className="text-muted-foreground" colSpan={5}>
-                {hasRows
+                {input.searchValue.length > 0 || input.activeFilter !== "all"
                   ? "No rows match the current search or filter."
                   : "No members or invitations were found."}
               </TableCell>

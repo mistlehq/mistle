@@ -32,9 +32,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   );
 
   const isPageLoading =
-    membersState.membersQuery.isPending ||
-    membersState.invitationsQuery.isPending ||
-    membersState.capabilitiesQuery.isPending;
+    membersState.directoryQuery.isPending || membersState.capabilitiesQuery.isPending;
 
   return (
     <PageFrame description={description} headerActions={headerActions} title={title}>
@@ -52,18 +50,24 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         isLoading={isPageLoading}
         isUpdatingRole={membersState.isUpdatingRole}
         loadErrorMessage={
-          membersState.membersQuery.isError || membersState.invitationsQuery.isError
+          membersState.directoryQuery.isError
             ? toMembersLoadErrorMessage({
-                membersError: membersState.membersQuery.error,
-                invitationsError: membersState.invitationsQuery.error,
-                hasMembersError: membersState.membersQuery.isError,
+                directoryError: membersState.directoryQuery.error,
               })
             : null
         }
+        activeFilter={membersState.activeFilter}
+        hasNextPage={membersState.hasNextPage}
+        hasPreviousPage={membersState.hasPreviousPage}
         members={membersState.members}
+        memberAvatarsByUserId={membersState.memberAvatarsByUserId}
         onChangeRole={membersState.onChangeRole}
         onInviteCompleted={membersState.onInviteCompleted}
         onInviteDialogOpenChange={membersState.setInviteDialogOpen}
+        onFilterChange={membersState.onFilterChange}
+        onNextPage={membersState.onNextPage}
+        onPreviousPage={membersState.onPreviousPage}
+        onSearchValueChange={membersState.onSearchValueChange}
         onRemoveMember={membersState.onRemoveMember}
         onResendInvite={membersState.onResendInvite}
         onRevokeInvite={membersState.onRevokeInvite}
@@ -76,6 +80,9 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         resolveInviterDisplayName={membersState.resolveInviterDisplayName}
         roleChangeDialog={membersState.roleChangeDialog}
         roleUpdateErrorMessage={membersState.roleUpdateErrorMessage}
+        searchValue={membersState.searchValue}
+        total={membersState.total}
+        offset={membersState.offset}
       />
     </PageFrame>
   );

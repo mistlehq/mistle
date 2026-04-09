@@ -4,8 +4,10 @@ export { route as deleteLogoRoute } from "./delete-logo/route.js";
 export { route as getLogoRoute } from "./get-logo/route.js";
 export { route as getLogoContentRoute } from "./get-logo-content/route.js";
 export { route as getMembershipCapabilitiesRoute } from "./get-membership-capabilities/route.js";
+export { route as listDirectoryRoute } from "./list-directory/route.js";
 export { route as listMemberAvatarsRoute } from "./list-member-avatars/route.js";
 export {
+  DirectoryResponseSchema,
   MemberAvatarsResponseSchema,
   MembershipCapabilitiesSchema,
   organizationLogoResponseSchema as OrganizationLogoMetadataResponseSchema,

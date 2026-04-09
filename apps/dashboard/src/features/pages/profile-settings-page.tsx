@@ -54,7 +54,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     onSuccess: async (result) => {
       queryClient.setQueryData(PROFILE_IMAGE_QUERY_KEY, result);
       await queryClient.invalidateQueries({
-        queryKey: ["settings", "member-avatars"],
+        queryKey: ["settings", "members-directory"],
       });
       setProfileImageOperationErrorMessage(null);
     },
@@ -78,7 +78,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         imageVersion: null,
       });
       await queryClient.invalidateQueries({
-        queryKey: ["settings", "member-avatars"],
+        queryKey: ["settings", "members-directory"],
       });
       setProfileImageOperationErrorMessage(null);
     },

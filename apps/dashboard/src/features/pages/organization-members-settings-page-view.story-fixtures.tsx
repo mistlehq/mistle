@@ -1,4 +1,5 @@
 import type {
+  MemberAvatar,
   MembershipCapabilities,
   SettingsInvitation,
   SettingsMember,
@@ -128,8 +129,11 @@ export function createOrganizationMembersSettingsPageStoryArgs(
   const roleChangeDialog = overrides.roleChangeDialog ?? null;
 
   return {
+    activeFilter: overrides.activeFilter ?? "all",
     capabilities: overrides.capabilities ?? OrganizationMembersStoryCapabilities,
     capabilitiesErrorMessage: overrides.capabilitiesErrorMessage ?? null,
+    hasNextPage: overrides.hasNextPage ?? false,
+    hasPreviousPage: overrides.hasPreviousPage ?? false,
     invitationActionState,
     invitations: overrides.invitations ?? OrganizationMembersStoryInvitations,
     inviteDialogOpen: overrides.inviteDialogOpen ?? false,
@@ -137,10 +141,15 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     isLoading: overrides.isLoading ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
     loadErrorMessage: overrides.loadErrorMessage ?? null,
+    memberAvatarsByUserId: overrides.memberAvatarsByUserId ?? new Map<string, MemberAvatar>(),
     members: overrides.members ?? OrganizationMembersStoryMembers,
     onChangeRole: overrides.onChangeRole ?? (() => {}),
     onInviteCompleted: overrides.onInviteCompleted ?? (async () => {}),
     onInviteDialogOpenChange: overrides.onInviteDialogOpenChange ?? (() => {}),
+    onFilterChange: overrides.onFilterChange ?? (() => {}),
+    onNextPage: overrides.onNextPage ?? (() => {}),
+    onPreviousPage: overrides.onPreviousPage ?? (() => {}),
+    onSearchValueChange: overrides.onSearchValueChange ?? (() => {}),
     onRemoveMember: overrides.onRemoveMember ?? (() => {}),
     onResendInvite: overrides.onResendInvite ?? (() => {}),
     onRevokeInvite: overrides.onRevokeInvite ?? (() => {}),
@@ -149,10 +158,16 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     onRoleSelectValueChange: overrides.onRoleSelectValueChange ?? (() => {}),
     onSaveRole: overrides.onSaveRole ?? (() => {}),
     organizationId: overrides.organizationId ?? "org_storybook",
+    offset: overrides.offset ?? 0,
     pendingMemberOperation,
     resolveInviterDisplayName:
       overrides.resolveInviterDisplayName ?? resolveOrganizationMembersStoryInviterDisplayName,
     roleChangeDialog,
     roleUpdateErrorMessage: overrides.roleUpdateErrorMessage ?? null,
+    searchValue: overrides.searchValue ?? "",
+    total:
+      overrides.total ??
+      (overrides.members ?? OrganizationMembersStoryMembers).length +
+        (overrides.invitations ?? OrganizationMembersStoryInvitations).length,
   };
 }

@@ -5,6 +5,7 @@ import { OrganizationGeneralSettingsPageView } from "../pages/organization-gener
 import { OrganizationMembersSettingsPageView } from "../pages/organization-members-settings-page-view.js";
 import { ProfileSettingsPageView } from "../pages/profile-settings-page-view.js";
 import type {
+  MemberAvatar,
   MembershipCapabilities,
   SettingsInvitation,
   SettingsMember,
@@ -118,8 +119,11 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
 export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
+      activeFilter="all"
       capabilities={SettingsFixtureCapabilities}
       capabilitiesErrorMessage={null}
+      hasNextPage={false}
+      hasPreviousPage={false}
       invitationActionState={null}
       invitations={SettingsFixtureInvitations}
       inviteDialogOpen={false}
@@ -127,10 +131,15 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       isLoading={false}
       isUpdatingRole={false}
       loadErrorMessage={null}
+      memberAvatarsByUserId={new Map<string, MemberAvatar>()}
       members={SettingsFixtureMembers}
       onChangeRole={() => {}}
       onInviteCompleted={async () => {}}
       onInviteDialogOpenChange={() => {}}
+      onFilterChange={() => {}}
+      onNextPage={() => {}}
+      onPreviousPage={() => {}}
+      onSearchValueChange={() => {}}
       onRemoveMember={() => {}}
       onResendInvite={() => {}}
       onRevokeInvite={() => {}}
@@ -139,10 +148,13 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       onRoleSelectValueChange={() => {}}
       onSaveRole={() => {}}
       organizationId="org_storybook"
+      offset={0}
       pendingMemberOperation={null}
       resolveInviterDisplayName={() => "Product Lead"}
       roleChangeDialog={null}
       roleUpdateErrorMessage={null}
+      searchValue=""
+      total={SettingsFixtureMembers.length + SettingsFixtureInvitations.length}
     />
   );
 }

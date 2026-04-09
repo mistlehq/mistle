@@ -1,28 +1,26 @@
 import {
   getMembershipCapabilities,
   inviteMember,
-  listInvitations,
-  listMemberAvatars,
-  listMembers,
+  listMembersDirectoryPage,
   removeMember,
   revokeInvitation,
   updateMemberRole,
   type InviteMemberResponse,
-  type MemberAvatar,
+  type MembersDirectoryFilter,
+  type MembersDirectoryPage,
   type MembershipCapabilities,
   type OrganizationRole,
-  type SettingsInvitation,
-  type SettingsMember,
 } from "./members-api.js";
 
 export type MembersSettingsApi = {
   getMembershipCapabilities: (input: { organizationId: string }) => Promise<MembershipCapabilities>;
-  listMembers: (input: { organizationId: string }) => Promise<SettingsMember[]>;
-  listMemberAvatars: (input: {
+  listMembersDirectoryPage: (input: {
     organizationId: string;
-    userIds: readonly string[];
-  }) => Promise<MemberAvatar[]>;
-  listInvitations: (input: { organizationId: string }) => Promise<SettingsInvitation[]>;
+    limit: number;
+    offset: number;
+    filter: MembersDirectoryFilter;
+    search: string;
+  }) => Promise<MembersDirectoryPage>;
   inviteMember: (input: {
     organizationId: string;
     email: string;
@@ -40,9 +38,7 @@ export type MembersSettingsApi = {
 
 export const defaultMembersSettingsApi: MembersSettingsApi = {
   getMembershipCapabilities,
-  listMembers,
-  listMemberAvatars,
-  listInvitations,
+  listMembersDirectoryPage,
   inviteMember,
   revokeInvitation,
   updateMemberRole,

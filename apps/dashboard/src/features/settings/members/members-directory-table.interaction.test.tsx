@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
-import { buildMembersQueryKeys } from "./members-query-keys.js";
 
 describe("MembersDirectoryTable interaction", () => {
   afterEach(() => {
@@ -22,45 +20,24 @@ describe("MembersDirectoryTable interaction", () => {
   }
 
   const baseProps = {
+    activeFilter: "all" as const,
     capabilities: null,
     canManageInvitations: true,
-    organizationId: "org_1",
+    memberAvatarsByUserId: new Map(),
     onChangeRole: () => {},
+    onFilterChange: () => {},
     onRemoveMember: () => {},
     onResendInvite: () => {},
     onRevokeInvite: () => {},
+    onSearchValueChange: () => {},
     resolveInviterDisplayName: (inviterId: string) => inviterId,
     pendingMemberOperation: null,
     invitationActionState: null,
+    searchValue: "",
   } as const;
 
   function renderTable(element: React.JSX.Element): ReturnType<typeof render> {
-    const queryClient = new QueryClient();
-    seedMemberAvatarsQueryCache({
-      queryClient,
-      element,
-    });
-
-    return render(<QueryClientProvider client={queryClient}>{element}</QueryClientProvider>);
-  }
-
-  function seedMemberAvatarsQueryCache(input: {
-    queryClient: QueryClient;
-    element: React.JSX.Element;
-  }): void {
-    const props = input.element.props as {
-      organizationId?: string;
-      members?: Array<{ userId: string }>;
-    };
-    if (typeof props.organizationId !== "string" || !Array.isArray(props.members)) {
-      return;
-    }
-
-    const userIds = props.members.map((member) => member.userId);
-    input.queryClient.setQueryData(
-      [...buildMembersQueryKeys(props.organizationId).memberAvatars, ...userIds],
-      [],
-    );
+    return render(element);
   }
 
   it("shows capitalized filter label in trigger", () => {
@@ -74,6 +51,7 @@ describe("MembersDirectoryTable interaction", () => {
   it("opens member actions menu and shows row actions", async () => {
     renderTable(
       <MembersDirectoryTable
+        activeFilter="all"
         capabilities={{
           organizationId: "org_1",
           actorRole: "admin",
@@ -92,6 +70,7 @@ describe("MembersDirectoryTable interaction", () => {
         }}
         canManageInvitations
         invitations={[]}
+        memberAvatarsByUserId={new Map()}
         members={[
           {
             id: "mem_1",
@@ -102,13 +81,15 @@ describe("MembersDirectoryTable interaction", () => {
             joinedAt: "2026-01-01T00:00:00.000Z",
           },
         ]}
-        organizationId="org_1"
         onChangeRole={() => {}}
+        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
         resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
+        searchValue=""
         invitationActionState={null}
       />,
     );
@@ -181,33 +162,29 @@ describe("MembersDirectoryTable interaction", () => {
   });
 
   it("shows sent state then allows returning to invitation actions", () => {
-    const client = new QueryClient();
-    client.setQueryData([...buildMembersQueryKeys("org_1").memberAvatars], []);
     const { rerender } = render(
-      <QueryClientProvider client={client}>
-        <MembersDirectoryTable
-          {...baseProps}
-          invitations={[
-            {
-              id: "inv_1",
-              organizationId: "org_1",
-              email: "invitee@example.com",
-              role: "member",
-              inviterId: "user_1",
-              status: "pending",
-              rawStatus: null,
-              createdAt: "2099-01-01T00:00:00.000Z",
-              expiresAt: "2099-01-02T00:00:00.000Z",
-            },
-          ]}
-          members={[]}
-          invitationActionState={{
-            invitationId: "inv_1",
-            action: "resend_invite",
-            phase: "completed",
-          }}
-        />
-      </QueryClientProvider>,
+      <MembersDirectoryTable
+        {...baseProps}
+        invitations={[
+          {
+            id: "inv_1",
+            organizationId: "org_1",
+            email: "invitee@example.com",
+            role: "member",
+            inviterId: "user_1",
+            status: "pending",
+            rawStatus: null,
+            createdAt: "2099-01-01T00:00:00.000Z",
+            expiresAt: "2099-01-02T00:00:00.000Z",
+          },
+        ]}
+        members={[]}
+        invitationActionState={{
+          invitationId: "inv_1",
+          action: "resend_invite",
+          phase: "completed",
+        }}
+      />,
     );
 
     const invitationRow = getInvitationRow();
@@ -217,26 +194,24 @@ describe("MembersDirectoryTable interaction", () => {
     );
 
     rerender(
-      <QueryClientProvider client={client}>
-        <MembersDirectoryTable
-          {...baseProps}
-          invitations={[
-            {
-              id: "inv_1",
-              organizationId: "org_1",
-              email: "invitee@example.com",
-              role: "member",
-              inviterId: "user_1",
-              status: "pending",
-              rawStatus: null,
-              createdAt: "2099-01-01T00:00:00.000Z",
-              expiresAt: "2099-01-02T00:00:00.000Z",
-            },
-          ]}
-          members={[]}
-          invitationActionState={null}
-        />
-      </QueryClientProvider>,
+      <MembersDirectoryTable
+        {...baseProps}
+        invitations={[
+          {
+            id: "inv_1",
+            organizationId: "org_1",
+            email: "invitee@example.com",
+            role: "member",
+            inviterId: "user_1",
+            status: "pending",
+            rawStatus: null,
+            createdAt: "2099-01-01T00:00:00.000Z",
+            expiresAt: "2099-01-02T00:00:00.000Z",
+          },
+        ]}
+        members={[]}
+        invitationActionState={null}
+      />,
     );
 
     expect(screen.getByLabelText("Invitation actions")).toBeTruthy();
@@ -275,39 +250,16 @@ describe("MembersDirectoryTable interaction", () => {
     );
   });
 
-  it("shows filtered empty state when rows exist but no row matches", () => {
+  it("shows filtered empty state when the current page has no rows for the active query", () => {
     renderTable(
       <MembersDirectoryTable
         {...baseProps}
-        invitations={[
-          {
-            id: "inv_1",
-            organizationId: "org_1",
-            email: "invitee@example.com",
-            role: "member",
-            inviterId: "user_1",
-            status: "pending",
-            rawStatus: null,
-            createdAt: "2099-01-01T00:00:00.000Z",
-            expiresAt: "2099-01-02T00:00:00.000Z",
-          },
-        ]}
-        members={[
-          {
-            id: "mem_1",
-            userId: "user_1",
-            name: "Ada",
-            email: "ada@example.com",
-            role: "member",
-            joinedAt: "2026-01-01T00:00:00.000Z",
-          },
-        ]}
+        activeFilter="members"
+        invitations={[]}
+        members={[]}
+        searchValue="no-match-value"
       />,
     );
-
-    fireEvent.change(screen.getByLabelText("Search members and invitations"), {
-      target: { value: "no-match-value" },
-    });
 
     expect(screen.getByText("No rows match the current search or filter.")).toBeTruthy();
   });

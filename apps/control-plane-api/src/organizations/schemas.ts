@@ -35,3 +35,56 @@ export const MemberAvatarSchema = z
   .strict();
 
 export const MemberAvatarsResponseSchema = z.array(MemberAvatarSchema);
+
+export const DirectoryFilterSchema = z.enum(["all", "members", "invitations"]);
+
+export const DirectoryMemberEntrySchema = z
+  .object({
+    kind: z.literal("member"),
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.string().min(1),
+    role: OrganizationRoleSchema,
+    joinedAt: z.iso.datetime(),
+    avatar: MemberAvatarSchema.omit({ userId: true }),
+  })
+  .strict();
+
+export const DirectoryInvitationStatusSchema = z.enum([
+  "pending",
+  "accepted",
+  "canceled",
+  "rejected",
+  "revoked",
+  "unknown",
+]);
+
+export const DirectoryInvitationEntrySchema = z
+  .object({
+    kind: z.literal("invitation"),
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    email: z.string().min(1),
+    role: OrganizationRoleSchema,
+    inviterId: z.string().min(1),
+    status: DirectoryInvitationStatusSchema,
+    rawStatus: z.string().nullable(),
+    expiresAt: z.iso.datetime(),
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const DirectoryEntrySchema = z.discriminatedUnion("kind", [
+  DirectoryMemberEntrySchema,
+  DirectoryInvitationEntrySchema,
+]);
+
+export const DirectoryResponseSchema = z
+  .object({
+    entries: z.array(DirectoryEntrySchema),
+    limit: z.number().int().min(1),
+    offset: z.number().int().min(0),
+    total: z.number().int().min(0),
+  })
+  .strict();

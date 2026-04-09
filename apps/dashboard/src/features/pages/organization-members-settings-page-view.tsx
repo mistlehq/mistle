@@ -3,6 +3,8 @@ import { Notice } from "@mistle/ui";
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
 import type {
+  MemberAvatar,
+  MembersDirectoryFilter,
   MembershipCapabilities,
   SettingsInvitation,
   SettingsMember,
@@ -18,10 +20,15 @@ import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
+import { TableListingFooter } from "../shared/table-listing-footer.js";
+import { TablePagination } from "../shared/table-pagination.js";
 
 export type OrganizationMembersSettingsPageViewProps = {
+  activeFilter: MembersDirectoryFilter;
   capabilities: MembershipCapabilities | null;
   capabilitiesErrorMessage: string | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
   invitationActionState: MembersDirectoryInvitationActionState;
   invitations: SettingsInvitation[];
   inviteDialogOpen: boolean;
@@ -38,10 +45,15 @@ export type OrganizationMembersSettingsPageViewProps = {
   isLoading: boolean;
   isUpdatingRole: boolean;
   loadErrorMessage: string | null;
+  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   members: SettingsMember[];
   onChangeRole: (member: SettingsMember) => void;
   onInviteCompleted: () => Promise<void>;
   onInviteDialogOpenChange: (nextOpen: boolean) => void;
+  onFilterChange: (nextValue: MembersDirectoryFilter) => void;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
+  onSearchValueChange: (nextValue: string) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
@@ -50,10 +62,13 @@ export type OrganizationMembersSettingsPageViewProps = {
   onRoleSelectValueChange: (nextRoleValue: string | null) => void;
   onSaveRole: () => void;
   organizationId: string;
+  offset: number;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
   resolveInviterDisplayName: (inviterId: string) => string;
   roleChangeDialog: RoleChangeDialogState | null;
   roleUpdateErrorMessage: string | null;
+  searchValue: string;
+  total: number;
 };
 
 export function OrganizationMembersSettingsPageView(
@@ -79,18 +94,44 @@ export function OrganizationMembersSettingsPageView(
       ) : null}
 
       <MembersDirectoryTable
+        activeFilter={props.activeFilter}
         capabilities={props.capabilities}
         canManageInvitations={canManageInvitations(props.capabilities)}
         invitationActionState={props.invitationActionState}
         invitations={props.invitations}
+        memberAvatarsByUserId={props.memberAvatarsByUserId}
         members={props.members}
-        organizationId={props.organizationId}
         onChangeRole={props.onChangeRole}
+        onFilterChange={props.onFilterChange}
         onRemoveMember={props.onRemoveMember}
         onResendInvite={props.onResendInvite}
         onRevokeInvite={props.onRevokeInvite}
+        onSearchValueChange={props.onSearchValueChange}
         pendingMemberOperation={props.pendingMemberOperation}
         resolveInviterDisplayName={props.resolveInviterDisplayName}
+        searchValue={props.searchValue}
+      />
+      <TableListingFooter
+        pagination={
+          <TablePagination
+            hasNextPage={props.hasNextPage}
+            hasPreviousPage={props.hasPreviousPage}
+            nextPageDisabled={props.isLoading}
+            onNextPage={props.onNextPage}
+            onPreviousPage={props.onPreviousPage}
+            previousPageDisabled={props.isLoading}
+          />
+        }
+        resultsCount={
+          <p className="text-muted-foreground text-sm">
+            {props.total === 0
+              ? "Showing 0 results"
+              : `Showing ${props.offset + 1}-${Math.min(
+                  props.offset + props.members.length + props.invitations.length,
+                  props.total,
+                )} of ${props.total}`}
+          </p>
+        }
       />
 
       <MemberInviteDialog
