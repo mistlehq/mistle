@@ -15,7 +15,7 @@ export const GitHubApiKeyConnectionConfigSchema = z
   })
   .loose();
 
-export const GitHubAppInstallationConnectionConfigSchema = z
+const GitHubAppInstallationConnectionConfigInputSchema = z
   .object({
     connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
     app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
@@ -23,16 +23,17 @@ export const GitHubAppInstallationConnectionConfigSchema = z
     installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]).optional(),
     setup_action: z.string().min(1).optional(),
   })
-  .strict()
-  .transform((input) => ({
-    connection_method: input.connection_method,
-    app_id: input.app_id.toString(),
-    app_slug: input.app_slug,
-    ...(input.installation_id === undefined
-      ? {}
-      : { installation_id: input.installation_id.toString() }),
-    ...(input.setup_action === undefined ? {} : { setup_action: input.setup_action }),
-  }));
+  .strict();
+
+export const GitHubAppInstallationConnectionConfigSchema = z
+  .object({
+    connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
+    app_id: z.string().min(1),
+    app_slug: z.string().min(1),
+    installation_id: z.string().min(1).optional(),
+    setup_action: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const GitHubConnectionConfigSchema = z.union([
   GitHubApiKeyConnectionConfigSchema,
@@ -43,8 +44,39 @@ export type GitHubConnectionConfig = z.output<typeof GitHubConnectionConfigSchem
 export type GitHubCredentialSecretType =
   (typeof GitHubCredentialSecretTypes)[keyof typeof GitHubCredentialSecretTypes];
 
+export function parseGitHubAppInstallationConnectionConfig(
+  input: unknown,
+): z.output<typeof GitHubAppInstallationConnectionConfigSchema> {
+  const parsedInput = GitHubAppInstallationConnectionConfigInputSchema.parse(input);
+
+  return {
+    connection_method: parsedInput.connection_method,
+    app_id: parsedInput.app_id.toString(),
+    app_slug: parsedInput.app_slug,
+    ...(parsedInput.installation_id === undefined
+      ? {}
+      : { installation_id: parsedInput.installation_id.toString() }),
+    ...(parsedInput.setup_action === undefined ? {} : { setup_action: parsedInput.setup_action }),
+  };
+}
+
+export function parseGitHubConnectionConfig(input: unknown): GitHubConnectionConfig {
+  const parsedConnectionMethod = z
+    .object({
+      connection_method: z.string().min(1),
+    })
+    .loose()
+    .parse(input);
+
+  if (parsedConnectionMethod.connection_method === IntegrationConnectionMethodIds.API_KEY) {
+    return GitHubApiKeyConnectionConfigSchema.parse(input);
+  }
+
+  return parseGitHubAppInstallationConnectionConfig(input);
+}
+
 export function resolveGitHubCredentialSecretType(input: unknown): GitHubCredentialSecretType {
-  const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input);
+  const parsedConnectionConfig = parseGitHubConnectionConfig(input);
 
   if (parsedConnectionConfig.connection_method === IntegrationConnectionMethodIds.API_KEY) {
     return GitHubCredentialSecretTypes.API_KEY;

@@ -2213,7 +2213,7 @@ export interface paths {
                       secretFields: {
                         description?: string;
                         /** @enum {string} */
-                        inputType: "password" | "text";
+                        inputType: "password" | "text" | "textarea";
                         label: string;
                         name: string;
                         placeholder?: string;

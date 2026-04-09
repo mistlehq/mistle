@@ -75,7 +75,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
               {
                 name: "appPrivateKeyPem",
                 label: "App private key PEM",
-                inputType: "password",
+                inputType: "textarea",
               },
               {
                 name: "webhookSecret",
@@ -85,7 +85,10 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
             ],
           },
         ],
-        targetConfig: {},
+        targetConfig: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
         targetDisplayName: "GitHub",
         targetFamilyId: "github",
         targetKey: "github-cloud",
@@ -99,7 +102,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
     });
   });
 
-  it("requires selecting an auth method before create submit", () => {
+  it("requires selecting an auth method before create submit", async () => {
     const queryClient = createTestQueryClient();
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -133,7 +136,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
               {
                 name: "appPrivateKeyPem",
                 label: "App private key PEM",
-                inputType: "password",
+                inputType: "textarea",
               },
               {
                 name: "webhookSecret",
@@ -143,17 +146,25 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
             ],
           },
         ],
-        targetConfig: {},
+        targetConfig: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
         targetDisplayName: "GitHub",
         targetFamilyId: "github",
         targetKey: "github-cloud",
         targetVariantId: "github-cloud",
       });
+    });
+
+    act(() => {
       result.current.onConnectionDisplayNameChange("GitHub connection");
       result.current.submitDialog();
     });
 
-    expect(result.current.error).toBe("Authentication method is required.");
+    await waitFor(() => {
+      expect(result.current.error).toBe("Authentication method is required.");
+    });
   });
 
   it("submits form updates without secret when the secret is blank", async () => {

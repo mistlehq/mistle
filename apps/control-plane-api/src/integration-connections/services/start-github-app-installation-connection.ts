@@ -8,8 +8,8 @@ import {
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
 import {
-  GitHubAppInstallationConnectionConfigSchema,
   GitHubTargetConfigSchema,
+  parseGitHubAppInstallationConnectionConfig,
 } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
@@ -60,7 +60,7 @@ function resolveGitHubAppInstallationConnectionConfigOrThrow(input: {
   }
 
   try {
-    return GitHubAppInstallationConnectionConfigSchema.parse(input.config);
+    return parseGitHubAppInstallationConnectionConfig(input.config);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(

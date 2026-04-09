@@ -44,7 +44,7 @@ function createGitHubTarget() {
           {
             name: "appPrivateKeyPem",
             label: "App private key PEM",
-            inputType: "password" as const,
+            inputType: "textarea" as const,
           },
           {
             name: "webhookSecret",

@@ -6,7 +6,7 @@ const IntegrationConnectionMethodSecretFieldSchema = z
     label: z.string().min(1),
     placeholder: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
-    inputType: z.enum(["password", "text"]),
+    inputType: z.enum(["password", "text", "textarea"]),
     slotKey: z.string().min(1),
   })
   .strict();

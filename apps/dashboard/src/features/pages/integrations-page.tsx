@@ -1,5 +1,6 @@
 import { useParams } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
@@ -18,6 +19,7 @@ import {
 export function IntegrationsPage() {
   const params = useParams();
   const detailTargetKey = params["targetKey"] ?? null;
+  const dashboardConfig = getDashboardConfig();
 
   const connectionDialogState = useIntegrationConnectionDialogState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -66,6 +68,7 @@ export function IntegrationsPage() {
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: directoryState.selectedDetailConnections,
+          controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
           githubAppInstallationStateByConnectionId,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
         })}

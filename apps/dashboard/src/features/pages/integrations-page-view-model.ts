@@ -17,6 +17,9 @@ import type {
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 
+const GitHubAppInstallationCompletePath =
+  "/v1/integration/connections/github-app-installation/complete";
+
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return {};
@@ -97,6 +100,7 @@ export function resolveEditableConnectionMethodId(
 
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
+  controlPlaneApiOrigin?: string;
   githubAppInstallationStateByConnectionId?: ReadonlyMap<
     string,
     {
@@ -110,7 +114,10 @@ export function buildIntegrationConnectionDetailItems(input: {
     const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
-    const githubAppConnectionContext = resolveGitHubAppConnectionContext(connection);
+    const githubAppConnectionContext = resolveGitHubAppConnectionContext(
+      connection,
+      input.controlPlaneApiOrigin,
+    );
     const githubAppInstallationState =
       input.githubAppInstallationStateByConnectionId?.get(connection.id) ?? undefined;
 
@@ -130,14 +137,24 @@ export function buildIntegrationConnectionDetailItems(input: {
         ? {}
         : {
             contextItems: githubAppConnectionContext.contextItems,
+            ...(githubAppConnectionContext.installActionLabel === undefined
+              ? {}
+              : {
+                  installActionLabel: githubAppConnectionContext.installActionLabel,
+                }),
             ...(githubAppConnectionContext.setupDescription === undefined
               ? {}
               : {
+                  ...(githubAppConnectionContext.postInstallationSetupUrl === undefined
+                    ? {}
+                    : {
+                        postInstallationSetupUrl:
+                          githubAppConnectionContext.postInstallationSetupUrl,
+                      }),
                   setupDescription: githubAppConnectionContext.setupDescription,
                   ...(githubAppInstallationState?.errorMessage === undefined
                     ? {}
                     : { setupErrorMessage: githubAppInstallationState.errorMessage }),
-                  installActionLabel: githubAppConnectionContext.installActionLabel,
                   ...(githubAppInstallationState === undefined
                     ? {}
                     : { setupIsPending: githubAppInstallationState.isPending }),
@@ -168,6 +185,7 @@ export function buildIntegrationConnectionDetailItems(input: {
 
 function resolveGitHubAppConnectionContext(
   connection: Pick<IntegrationConnection, "config" | "externalSubjectId">,
+  controlPlaneApiOrigin?: string,
 ):
   | {
       contextItems: readonly {
@@ -175,6 +193,7 @@ function resolveGitHubAppConnectionContext(
         value: string;
       }[];
       installActionLabel?: string;
+      postInstallationSetupUrl?: string;
       setupDescription?: string;
       setupStatusLabel?: string;
       webhookInstructions: string;
@@ -224,10 +243,20 @@ function resolveGitHubAppConnectionContext(
       },
     ],
     ...(installationId === null
+      ? { installActionLabel: "Install GitHub App" }
+      : { installActionLabel: "Manage installation" }),
+    ...(installationId === null
       ? {
-          installActionLabel: "Install GitHub App",
           setupDescription:
-            "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+            "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+          ...(controlPlaneApiOrigin === undefined
+            ? {}
+            : {
+                postInstallationSetupUrl: new URL(
+                  GitHubAppInstallationCompletePath,
+                  controlPlaneApiOrigin,
+                ).toString(),
+              }),
           setupStatusLabel: "Setup incomplete",
         }
       : {}),

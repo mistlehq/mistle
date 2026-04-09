@@ -196,7 +196,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
         connection_method: "github-app-installation",
         app_id: "123",
         app_slug: "mistle-github-app",
-        installation_id: 12345,
+        installation_id: "12345",
       },
     };
     const row: SandboxProfileBindingEditorRow = {

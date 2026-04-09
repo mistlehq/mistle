@@ -39,7 +39,7 @@ const GitHubAppInstallationConnectionMethods = [
       {
         name: "appPrivateKeyPem",
         label: "App private key PEM",
-        inputType: "password",
+        inputType: "textarea",
         secretType: "api_key",
         slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
       },
