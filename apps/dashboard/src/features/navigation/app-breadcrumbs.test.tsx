@@ -60,43 +60,33 @@ describe("app-breadcrumbs", () => {
     const router = createMemoryRouter(
       createRoutesFromElements(
         <Route element={<Outlet />} path="/">
-          <Route
-            element={<Outlet />}
-            handle={{ breadcrumb: "Settings", breadcrumbClickable: false }}
-            path="settings"
-          >
+          <Route element={<Outlet />} handle={{ breadcrumb: "Integrations" }} path="integrations">
             <Route
               element={<Outlet />}
-              handle={{ breadcrumb: "Organization", breadcrumbClickable: false }}
-              path="organization"
+              handle={{ breadcrumb: "GitHub", breadcrumbTo: "/integrations/github" }}
+              path="github"
             >
               <Route
-                element={<Outlet />}
-                handle={{ breadcrumb: "Integrations" }}
-                path="integrations"
-              >
-                <Route
-                  element={<BreadcrumbHarness />}
-                  handle={{
-                    breadcrumb: ({
-                      params,
-                    }: {
-                      params: Readonly<Record<string, string | undefined>>;
-                    }) => `${params["targetKey"] ?? "integration"} callback`,
-                  }}
-                  path=":targetKey/callback-result"
-                />
-              </Route>
+                element={<BreadcrumbHarness />}
+                handle={{
+                  breadcrumb: ({
+                    params,
+                  }: {
+                    params: Readonly<Record<string, string | undefined>>;
+                  }) => `${params["targetKey"] ?? "integration"} callback`,
+                }}
+                path="callback-result"
+              />
             </Route>
           </Route>
         </Route>,
       ),
       {
-        initialEntries: ["/settings/organization/integrations/github/callback-result"],
+        initialEntries: ["/integrations/github/callback-result"],
       },
     );
 
     const markup = renderToStaticMarkup(<RouterProvider router={router} />);
-    expect(markup).toContain('href="/settings/organization/integrations"');
+    expect(markup).toContain('href="/integrations/github"');
   });
 });

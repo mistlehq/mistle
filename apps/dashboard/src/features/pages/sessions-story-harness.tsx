@@ -117,6 +117,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     handleSignOut: () => {},
     inAutomations: routeState.inAutomations,
     inDashboardRoot: routeState.inDashboardRoot,
+    inIntegrations: routeState.inIntegrations,
     inSandboxProfiles: routeState.inSandboxProfiles,
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,

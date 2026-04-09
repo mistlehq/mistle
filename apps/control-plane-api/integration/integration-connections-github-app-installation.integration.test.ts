@@ -52,7 +52,7 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
 function createDashboardOrganizationIntegrationsUrl(
   fixture: ControlPlaneApiIntegrationFixture,
 ): string {
-  return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/settings/organization/integrations");
+  return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/integrations");
 }
 
 describe("integration connections GitHub App installation integration", () => {

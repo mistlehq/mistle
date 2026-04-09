@@ -4,9 +4,9 @@ import { buildDashboardUrl } from "./dashboard-url.js";
 
 describe("buildDashboardUrl", () => {
   it("appends dashboard paths to an origin-only base URL", () => {
-    expect(
-      buildDashboardUrl("https://app.mistle.example", "/settings/organization/integrations"),
-    ).toBe("https://app.mistle.example/settings/organization/integrations");
+    expect(buildDashboardUrl("https://app.mistle.example", "/integrations")).toBe(
+      "https://app.mistle.example/integrations",
+    );
   });
 
   it("preserves configured dashboard subpaths and clears query/hash", () => {

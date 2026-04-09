@@ -136,6 +136,7 @@ export function AppShell(): React.JSX.Element {
     },
     inAutomations: routeState.inAutomations,
     inDashboardRoot: routeState.inDashboardRoot,
+    inIntegrations: routeState.inIntegrations,
     inSandboxProfiles: routeState.inSandboxProfiles,
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,

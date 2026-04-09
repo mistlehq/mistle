@@ -111,6 +111,7 @@ const meta = {
     sidebarContent: (
       <div className="space-y-1 px-2">
         <div className="rounded-md bg-muted px-3 py-2 text-sm">Home</div>
+        <div className="rounded-md px-3 py-2 text-sm">Integrations</div>
         <div className="rounded-md px-3 py-2 text-sm">Sandbox Profiles</div>
         <div className="rounded-md px-3 py-2 text-sm">Sessions</div>
       </div>

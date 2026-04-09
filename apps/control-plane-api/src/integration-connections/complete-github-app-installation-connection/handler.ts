@@ -6,7 +6,7 @@ import type { AppContextBindings } from "../../types.js";
 import { completeGitHubAppInstallationConnection } from "../services/complete-github-app-installation-connection.js";
 import { route } from "./route.js";
 
-const DashboardOrganizationIntegrationsPath = "/settings/organization/integrations";
+const DashboardOrganizationIntegrationsPath = "/integrations";
 
 function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
   return buildDashboardUrl(dashboardBaseUrl, DashboardOrganizationIntegrationsPath);

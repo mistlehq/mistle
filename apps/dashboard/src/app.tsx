@@ -79,6 +79,19 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":automationId"
           />
         </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
+          <Route element={<OrganizationIntegrationsSettingsPage />} index />
+          <Route
+            element={<OrganizationIntegrationsSettingsPage />}
+            handle={ROUTE_HANDLES.integrationDetail}
+            path=":targetKey"
+          />
+          <Route
+            element={<IntegrationsCallbackResultPage />}
+            handle={ROUTE_HANDLES.integrationCallbackResult}
+            path=":targetKey/callback-result"
+          />
+        </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
           <Route element={<SessionsPage />} index />
           <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
@@ -92,9 +105,6 @@ export const APP_ROUTES = createRoutesFromElements(
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
-          organizationIntegrations: <OrganizationIntegrationsSettingsPage />,
-          organizationIntegrationDetail: <OrganizationIntegrationsSettingsPage />,
-          organizationIntegrationCallbackResult: <IntegrationsCallbackResultPage />,
         })}
       </Route>
     </Route>

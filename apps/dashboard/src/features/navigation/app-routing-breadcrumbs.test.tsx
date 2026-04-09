@@ -39,24 +39,25 @@ describe("app routing breadcrumb integration", () => {
             handle={ROUTE_HANDLES.settingsOrganizationMembers}
             path="members"
           />
-          <Route
-            element={<Outlet />}
-            handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
-            path="integrations"
-          >
-            <Route element={<PageHarness />} index />
-            <Route
-              element={<PageHarness />}
-              handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
-              path=":targetKey"
-            />
-            <Route
-              element={<PageHarness />}
-              handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
-              path=":targetKey/callback-result"
-            />
-          </Route>
         </Route>
+      </Route>
+    </Route>,
+  );
+
+  const integrationRoutes = createRoutesFromElements(
+    <Route element={<Outlet />} path="/">
+      <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
+        <Route element={<PageHarness />} index />
+        <Route
+          element={<PageHarness />}
+          handle={ROUTE_HANDLES.integrationDetail}
+          path=":targetKey"
+        />
+        <Route
+          element={<PageHarness />}
+          handle={ROUTE_HANDLES.integrationCallbackResult}
+          path=":targetKey/callback-result"
+        />
       </Route>
     </Route>,
   );
@@ -111,23 +112,40 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Personal");
     expect(markup).toContain('data-slot="meta-description"></p>');
 
-    await router.navigate("/settings/organization/integrations/github/callback-result");
+    await router.navigate("/settings/organization/members");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain('href="/settings/organization/general"');
-    expect(markup).toContain('href="/settings/organization/integrations"');
+    expect(markup).toContain("Members");
+    expect(markup).toContain('data-slot="meta-title">Members');
+  });
+
+  it("updates breadcrumbs across top-level integrations routes", async () => {
+    const router = createMemoryRouter(integrationRoutes, {
+      initialEntries: ["/integrations"],
+    });
+    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain("Integrations");
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('data-slot="meta-title">Integrations');
+    expect(markup).toContain('data-slot="meta-description"></p>');
+
+    await router.navigate("/integrations/github/callback-result");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/integrations"');
     expect(markup).toContain("Github callback");
     expect(markup).toContain("Integration callback result");
     expect(markup).toContain("Review integration connection callback outcome.");
 
-    await router.navigate("/settings/organization/integrations");
-    expect(router.state.location.pathname).toBe("/settings/organization/integrations");
+    await router.navigate("/integrations");
+    expect(router.state.location.pathname).toBe("/integrations");
 
-    await router.navigate("/settings/organization/integrations/github");
+    await router.navigate("/integrations/github");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
-    expect(markup).toContain('href="/settings/organization/general"');
-    expect(markup).toContain('href="/settings/organization/integrations"');
+    expect(markup).toContain('href="/integrations"');
     expect(markup).toContain("Github");
     expect(markup).toContain('data-slot="meta-title">GitHub');
     expect(markup).toContain('data-slot="meta-description">github');
@@ -138,13 +156,27 @@ describe("app routing breadcrumb integration", () => {
       "/settings/personal",
       "/settings/organization/general",
       "/settings/organization/members",
-      "/settings/organization/integrations",
-      "/settings/organization/integrations/github",
-      "/settings/organization/integrations/github/callback-result",
     ];
 
     for (const destination of settingsDestinations) {
       const router = createMemoryRouter(settingsRoutes, {
+        initialEntries: [destination],
+      });
+      const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+      expect(markup).not.toContain("MISSING_TITLE");
+      expect(markup).not.toContain("MISSING_DESCRIPTION");
+    }
+  });
+
+  it("enforces breadcrumb and page metadata coverage for integrations destinations", () => {
+    const integrationDestinations = [
+      "/integrations",
+      "/integrations/github",
+      "/integrations/github/callback-result",
+    ];
+
+    for (const destination of integrationDestinations) {
+      const router = createMemoryRouter(integrationRoutes, {
         initialEntries: [destination],
       });
       const markup = renderToStaticMarkup(<RouterProvider router={router} />);

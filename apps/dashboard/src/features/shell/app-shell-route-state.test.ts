@@ -7,6 +7,7 @@ describe("resolveAppShellRouteState", () => {
     expect(resolveAppShellRouteState("/sessions/sbi_123")).toEqual({
       inAutomations: false,
       inDashboardRoot: false,
+      inIntegrations: false,
       inSandboxProfiles: false,
       inSessionDetail: true,
       inSessions: true,
@@ -18,6 +19,7 @@ describe("resolveAppShellRouteState", () => {
     expect(resolveAppShellRouteState("/sessions/new")).toEqual({
       inAutomations: false,
       inDashboardRoot: false,
+      inIntegrations: false,
       inSandboxProfiles: false,
       inSessionDetail: false,
       inSessions: true,
@@ -29,10 +31,23 @@ describe("resolveAppShellRouteState", () => {
     expect(resolveAppShellRouteState("/settings/account/profile")).toEqual({
       inAutomations: false,
       inDashboardRoot: false,
+      inIntegrations: false,
       inSandboxProfiles: false,
       inSessionDetail: false,
       inSessions: false,
       inSettings: true,
+    });
+  });
+
+  it("marks integrations routes independently from settings", () => {
+    expect(resolveAppShellRouteState("/integrations/github")).toEqual({
+      inAutomations: false,
+      inDashboardRoot: false,
+      inIntegrations: true,
+      inSandboxProfiles: false,
+      inSessionDetail: false,
+      inSessions: false,
+      inSettings: false,
     });
   });
 });
