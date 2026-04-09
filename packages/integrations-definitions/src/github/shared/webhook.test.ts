@@ -51,9 +51,7 @@ function createGitHubCloudTargetConfig() {
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
-    secrets: {
-      webhookSecret: "whsec_123",
-    },
+    secrets: {},
     config: {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
@@ -232,7 +230,9 @@ describe("GitHubWebhookHandler", () => {
       target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
       connection: createConnection(),
-      connectionSecrets: {},
+      connectionSecrets: {
+        webhookSecret: "whsec_123",
+      },
       webhookSourceSecrets: {},
       headers: {
         "x-hub-signature-256": signature,
@@ -248,10 +248,7 @@ describe("GitHubWebhookHandler", () => {
   it("fails verification when webhook secret is missing", async () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
-      target: {
-        ...createGitHubCloudTargetConfig(),
-        secrets: {},
-      },
+      target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
       connection: createConnection(),
       connectionSecrets: {},
@@ -265,7 +262,7 @@ describe("GitHubWebhookHandler", () => {
     expect(verificationResult).toEqual({
       ok: false,
       code: "invalid-body",
-      message: "GitHub target secrets are missing webhook_secret.",
+      message: "GitHub connection secrets are missing webhookSecret.",
     });
   });
 
@@ -275,7 +272,9 @@ describe("GitHubWebhookHandler", () => {
       target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
       connection: createConnection(),
-      connectionSecrets: {},
+      connectionSecrets: {
+        webhookSecret: "whsec_123",
+      },
       webhookSourceSecrets: {},
       headers: {},
       rawBody: encodePayload(IssueCommentCreatedPayload),
@@ -335,6 +334,21 @@ describe("GitHubWebhookHandler", () => {
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
+      candidates: [],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "connection-not-found",
+      message: `No active connection found for GitHub installation '${IssueCommentCreatedPayload.installation.id.toString()}'.`,
+    });
+  });
+
+  it("returns invalid-connection when the path-routed connection installation mismatches the payload", async () => {
+    const result = GitHubWebhookHandler.resolveConnection({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      event: createParsedEvent(),
       candidates: [
         {
           id: "icn_other",
@@ -347,8 +361,8 @@ describe("GitHubWebhookHandler", () => {
 
     expect(result).toEqual({
       ok: false,
-      code: "connection-not-found",
-      message: `No active connection found for GitHub installation '${IssueCommentCreatedPayload.installation.id.toString()}'.`,
+      code: "invalid-connection",
+      message: `GitHub webhook installation '${IssueCommentCreatedPayload.installation.id.toString()}' does not match connection 'icn_other'.`,
     });
   });
 

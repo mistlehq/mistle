@@ -209,7 +209,9 @@ async function verifyGitHubSignature(input: {
 export const GitHubWebhookHandler: IntegrationWebhookHandler<
   GitHubTargetConfig,
   GitHubTargetSecrets,
-  Record<string, string>
+  {
+    webhookSecret?: string;
+  }
 > = {
   resolveWebhookRequest(input) {
     const payload = parseJsonPayload(input.rawBody);
@@ -239,11 +241,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   },
   resolveConnection(input): IntegrationWebhookResolveConnectionResult {
     const installationId = resolveInstallationId(input.event.payload);
-    const matchingCandidates = input.candidates.filter(
-      (candidateConnection) => candidateConnection.externalSubjectId === installationId,
-    );
-
-    if (matchingCandidates.length === 0) {
+    if (input.candidates.length === 0) {
       return {
         ok: false,
         code: "connection-not-found",
@@ -251,7 +249,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
       };
     }
 
-    if (matchingCandidates.length > 1) {
+    if (input.candidates.length > 1) {
       return {
         ok: false,
         code: "connection-ambiguous",
@@ -259,12 +257,28 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
       };
     }
 
-    const [resolvedConnection] = matchingCandidates;
+    const [resolvedConnection] = input.candidates;
     if (resolvedConnection === undefined) {
       return {
         ok: false,
         code: "invalid-connection",
         message: `Failed to resolve connection for GitHub installation '${installationId}'.`,
+      };
+    }
+
+    if (resolvedConnection.externalSubjectId === undefined) {
+      return {
+        ok: false,
+        code: "invalid-connection",
+        message: `GitHub connection '${resolvedConnection.id}' is missing installation context.`,
+      };
+    }
+
+    if (resolvedConnection.externalSubjectId !== installationId) {
+      return {
+        ok: false,
+        code: "invalid-connection",
+        message: `GitHub webhook installation '${installationId}' does not match connection '${resolvedConnection.id}'.`,
       };
     }
 
@@ -274,12 +288,12 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     };
   },
   async verify(input) {
-    const webhookSecret = input.target.secrets.webhookSecret;
+    const webhookSecret = input.connectionSecrets.webhookSecret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,
         code: "invalid-body",
-        message: "GitHub target secrets are missing webhook_secret.",
+        message: "GitHub connection secrets are missing webhookSecret.",
       };
     }
 

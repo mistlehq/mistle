@@ -456,7 +456,9 @@ export type IntegrationCredentialResolverInput = {
   targetKey: string;
   connectionId: string;
   target: IntegrationResolvedTarget;
-  connection: IntegrationConnection;
+  connection: IntegrationConnection & {
+    secrets?: Record<string, string>;
+  };
   binding?: Pick<IntegrationBinding, "id" | "kind"> & { config: Record<string, unknown> };
   secretType: string;
   slotKey?: string;
