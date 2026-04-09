@@ -11,9 +11,11 @@ import {
 import { logs, SeverityNumber, type LogRecord } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import type { PgRequestHookInformation } from "@opentelemetry/instrumentation-pg";
 import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { NodeSDK, resources } from "@opentelemetry/sdk-node";
 
 import { parseOtlpResourceAttributes } from "./otlp-config.js";
@@ -278,7 +280,15 @@ function emitHttpRequestLog(input: {
   }
 }
 
-function configureDefaultNodeInstrumentations(): void {
+function configureDefaultNodeInstrumentations(env: NodeJS.ProcessEnv): void {
+  const configuredInstrumentations =
+    env[OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV] ??
+    process.env[OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV];
+  if (configuredInstrumentations !== undefined) {
+    process.env[OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV] = configuredInstrumentations;
+    return;
+  }
+
   process.env[OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV] = DEFAULT_NODE_INSTRUMENTATIONS.join(",");
 }
 
@@ -447,13 +457,18 @@ export function initializeTelemetry(input: InitializeTelemetryInput): TelemetryH
   process.env[OTLP_TRACES_ENDPOINT_ENV] = config.traces.endpoint;
   process.env[OTLP_LOGS_ENDPOINT_ENV] = config.logs.endpoint;
   process.env[OTLP_METRICS_ENDPOINT_ENV] = config.metrics.endpoint;
-  configureDefaultNodeInstrumentations();
+  configureDefaultNodeInstrumentations(env);
 
   const sdk = new NodeSDK({
     serviceName,
     traceExporter: new OTLPTraceExporter({ url: config.traces.endpoint }),
     logRecordProcessors: [
       new BatchLogRecordProcessor(new OTLPLogExporter({ url: config.logs.endpoint })),
+    ],
+    metricReaders: [
+      new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({ url: config.metrics.endpoint }),
+      }),
     ],
     instrumentations: [
       getNodeAutoInstrumentations({
