@@ -25,6 +25,8 @@ export type MembersDirectoryTableRowViewModel = {
   role: string;
   status: string | null;
   date: string;
+  invitedBy: string | null;
+  expiresAt: string | null;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
   actionsLabel: string;
@@ -36,7 +38,6 @@ export type MembersDirectoryTableRowViewModel = {
 type MembersDirectoryActionHandlers = {
   onChangeRole: (member: SettingsMember) => void;
   onRemoveMember: (member: SettingsMember) => void;
-  onViewInvitationDetails: (invitation: SettingsInvitation) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
 };
@@ -54,9 +55,6 @@ function toMembersTableAction(input: {
         return;
       case "remove_member":
         input.handlers.onRemoveMember(descriptor.member);
-        return;
-      case "view_details":
-        input.handlers.onViewInvitationDetails(descriptor.invitation);
         return;
       case "resend_invite":
         input.handlers.onResendInvite(descriptor.invitation);
@@ -118,6 +116,8 @@ export function buildMembersDirectoryTableRowViewModels(input: {
       role: formattedRow.role,
       status: formattedRow.status,
       date: formattedRow.date,
+      invitedBy: formattedRow.invitedBy,
+      expiresAt: formattedRow.expiresAt,
       showMemberAvatar: row.kind === "member",
       memberAvatar:
         row.kind === "member" ? (input.memberAvatarsByUserId.get(row.member.userId) ?? null) : null,

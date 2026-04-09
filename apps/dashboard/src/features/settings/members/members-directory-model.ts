@@ -174,7 +174,7 @@ export function buildMemberActionDescriptors(input: {
 }
 
 export type InvitationActionDescriptor = {
-  key: "view_details" | "resend_invite" | "revoke_invitation";
+  key: "resend_invite" | "revoke_invitation";
   label: string;
   disabled: boolean;
   destructive: boolean;
@@ -200,14 +200,7 @@ export function buildInvitationActionDescriptors(input: {
     input.invitationActionState.action === "revoke_invitation" &&
     input.invitationActionState.invitationId === input.invitationId;
 
-  const descriptors: InvitationActionDescriptor[] = [
-    {
-      key: "view_details",
-      label: "View details",
-      disabled: false,
-      destructive: false,
-    },
-  ];
+  const descriptors: InvitationActionDescriptor[] = [];
 
   if (canResendInvitation(input.displayStatus)) {
     descriptors.push({
@@ -257,6 +250,8 @@ export type MembersDirectoryRow =
       role: string;
       status: null;
       date: string;
+      invitedBy: null;
+      expiresAt: null;
       member: SettingsMember;
     }
   | {
@@ -267,6 +262,8 @@ export type MembersDirectoryRow =
       role: string;
       status: string;
       date: string;
+      invitedBy: string;
+      expiresAt: string;
       invitation: SettingsInvitation;
       displayStatus: InvitationDisplayStatus;
     };
@@ -285,13 +282,6 @@ export type MembersDirectoryActionDescriptor =
       disabled: boolean;
       destructive: boolean;
       member: SettingsMember;
-    }
-  | {
-      key: "view_details";
-      label: string;
-      disabled: boolean;
-      destructive: boolean;
-      invitation: SettingsInvitation;
     }
   | {
       key: "resend_invite";
@@ -314,6 +304,8 @@ export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
   role: string;
   status: string | null;
   date: string;
+  invitedBy: string | null;
+  expiresAt: string | null;
 } {
   return {
     name: row.name,
@@ -321,19 +313,9 @@ export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
     role: row.role,
     status: row.status,
     date: formatDate(row.date),
+    invitedBy: row.invitedBy,
+    expiresAt: row.expiresAt === null ? null : formatDate(row.expiresAt),
   };
-}
-
-function compareDateDesc(leftIsoDate: string, rightIsoDate: string): number {
-  const leftEpochMs = Date.parse(leftIsoDate);
-  const rightEpochMs = Date.parse(rightIsoDate);
-  const leftValue = Number.isFinite(leftEpochMs) ? leftEpochMs : Number.NEGATIVE_INFINITY;
-  const rightValue = Number.isFinite(rightEpochMs) ? rightEpochMs : Number.NEGATIVE_INFINITY;
-  return rightValue - leftValue;
-}
-
-function compareTextAsc(left: string, right: string): number {
-  return left.localeCompare(right, undefined, { sensitivity: "base" });
 }
 
 export function buildMembersDirectoryRows(input: {
@@ -351,6 +333,8 @@ export function buildMembersDirectoryRows(input: {
     role: formatRoleLabel(member.role),
     status: null,
     date: member.joinedAt,
+    invitedBy: null,
+    expiresAt: null,
     member,
   }));
 
@@ -364,24 +348,14 @@ export function buildMembersDirectoryRows(input: {
       role: formatRoleLabel(invitation.role),
       status: invitationStatusLabel(displayStatus),
       date: invitation.createdAt,
+      invitedBy: invitation.inviterName,
+      expiresAt: invitation.expiresAt,
       invitation,
       displayStatus,
     };
   });
 
-  return [...memberRows, ...invitationRows].sort((left, right) => {
-    const byDate = compareDateDesc(left.date, right.date);
-    if (byDate !== 0) {
-      return byDate;
-    }
-
-    const byName = compareTextAsc(left.name, right.name);
-    if (byName !== 0) {
-      return byName;
-    }
-
-    return compareTextAsc(left.email, right.email);
-  });
+  return [...memberRows, ...invitationRows];
 }
 
 export function buildMembersDirectoryRowActionDescriptors(input: {

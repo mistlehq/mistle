@@ -130,9 +130,35 @@ describe("MembersDirectoryTable interaction", () => {
 
     fireEvent.click(screen.getByLabelText("Invitation actions"));
 
-    expect(await screen.findByText("View details")).toBeTruthy();
     expect(await screen.findByText("Resend invite")).toBeTruthy();
     expect(await screen.findByText("Cancel invitation")).toBeTruthy();
+  });
+
+  it("shows invited by and expiry details directly in the invitations table", () => {
+    renderTable(
+      <MembersDirectoryTable
+        {...baseProps}
+        activeFilter="invitations"
+        invitations={[
+          {
+            id: "inv_1",
+            organizationId: "org_1",
+            email: "invitee@example.com",
+            role: "member",
+            inviterId: "user_1",
+            inviterName: "Inviter Name",
+            status: "pending",
+            createdAt: "2099-01-01T00:00:00.000Z",
+            expiresAt: "2099-01-02T00:00:00.000Z",
+          },
+        ]}
+        members={[]}
+      />,
+    );
+
+    const invitationRow = getInvitationRow();
+    expect(within(invitationRow).getByText("Inviter Name")).toBeTruthy();
+    expect(within(invitationRow).getByText("Jan 2, 2099")).toBeTruthy();
   });
 
   it("shows sending state in place of invitation actions while resend is pending", () => {

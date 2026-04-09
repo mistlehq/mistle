@@ -1,7 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
-import { useState } from "react";
 
-import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
 import type {
   MemberAvatar,
   MembersDirectoryFilter,
@@ -36,8 +34,8 @@ export function MembersDirectoryTable(input: {
 }): React.JSX.Element {
   const showNameColumn = input.activeFilter === "members";
   const showInvitationStatusColumn = input.activeFilter === "invitations";
-  const [selectedInvitationForDetails, setSelectedInvitationForDetails] =
-    useState<SettingsInvitation | null>(null);
+  const showInvitedByColumn = input.activeFilter === "invitations";
+  const showExpiresColumn = input.activeFilter === "invitations";
   const rows = buildMembersDirectoryRows({
     members: input.members,
     invitations: input.invitations,
@@ -52,7 +50,6 @@ export function MembersDirectoryTable(input: {
     handlers: {
       onChangeRole: input.onChangeRole,
       onRemoveMember: input.onRemoveMember,
-      onViewInvitationDetails: setSelectedInvitationForDetails,
       onResendInvite: input.onResendInvite,
       onRevokeInvite: input.onRevokeInvite,
     },
@@ -85,9 +82,19 @@ export function MembersDirectoryTable(input: {
                 Status
               </TableHead>
             ) : null}
+            {showInvitedByColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Invited by
+              </TableHead>
+            ) : null}
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               Date
             </TableHead>
+            {showExpiresColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Expires
+              </TableHead>
+            ) : null}
             <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -96,7 +103,10 @@ export function MembersDirectoryTable(input: {
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell className="text-muted-foreground" colSpan={5}>
+              <TableCell
+                className="text-muted-foreground"
+                colSpan={input.activeFilter === "members" ? 5 : 7}
+              >
                 {input.searchValue.length > 0
                   ? "No rows match the current search."
                   : input.activeFilter === "members"
@@ -117,9 +127,13 @@ export function MembersDirectoryTable(input: {
                 showMemberAvatar={row.showMemberAvatar}
                 showNameColumn={showNameColumn}
                 showStatusColumn={showInvitationStatusColumn}
+                showInvitedByColumn={showInvitedByColumn}
+                showExpiresColumn={showExpiresColumn}
                 memberAvatar={row.memberAvatar}
                 name={row.name}
                 status={row.status}
+                invitedBy={row.invitedBy}
+                expiresAt={row.expiresAt}
                 actionFeedback={row.actionFeedback}
                 {...(row.actionsContentClassName === undefined
                   ? {}
@@ -129,16 +143,6 @@ export function MembersDirectoryTable(input: {
           })}
         </TableBody>
       </Table>
-
-      <InvitationDetailsDialog
-        invitation={selectedInvitationForDetails}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setSelectedInvitationForDetails(null);
-          }
-        }}
-        open={selectedInvitationForDetails !== null}
-      />
     </>
   );
 }

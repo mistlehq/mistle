@@ -111,6 +111,13 @@ describe("members directory model", () => {
 
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({
+      kind: "member",
+      name: "member1@example.com",
+      email: "member1@example.com",
+      role: "Member",
+      status: null,
+    });
+    expect(rows[1]).toMatchObject({
       kind: "invitation",
       name: "invitee@example.com",
       email: "invitee@example.com",
@@ -118,16 +125,9 @@ describe("members directory model", () => {
       status: "Pending",
       displayStatus: { kind: "pending" },
     });
-    expect(rows[1]).toMatchObject({
-      kind: "member",
-      name: "member1@example.com",
-      email: "member1@example.com",
-      role: "Member",
-      status: null,
-    });
   });
 
-  it("sorts rows deterministically", () => {
+  it("preserves the server-provided row order", () => {
     const rows = buildMembersDirectoryRows({
       members: [
         {
@@ -173,7 +173,7 @@ describe("members directory model", () => {
       ],
     });
 
-    expect(rows.map((row) => row.id)).toEqual(["invite_2", "mem_2", "mem_1", "invite_1"]);
+    expect(rows.map((row) => row.id)).toEqual(["mem_2", "mem_1", "invite_1", "invite_2"]);
   });
 
   it("formats a unified table row payload", () => {
@@ -269,12 +269,6 @@ describe("members directory model", () => {
 
     expect(actions).toEqual([
       {
-        key: "view_details",
-        label: "View details",
-        disabled: false,
-        destructive: false,
-      },
-      {
         key: "resend_invite",
         label: "Resending invite...",
         disabled: true,
@@ -297,14 +291,7 @@ describe("members directory model", () => {
       invitationActionState: null,
     });
 
-    expect(actions).toEqual([
-      {
-        key: "view_details",
-        label: "View details",
-        disabled: false,
-        destructive: false,
-      },
-    ]);
+    expect(actions).toEqual([]);
   });
 
   it("resolves invitation row feedback for pending and completed actions", () => {

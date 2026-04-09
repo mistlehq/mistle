@@ -90,8 +90,12 @@ export function DirectoryTableRow(input: {
   email: string;
   role: string;
   status: string | null;
+  invitedBy: string | null;
+  expiresAt: string | null;
   showNameColumn: boolean;
   showStatusColumn: boolean;
+  showInvitedByColumn: boolean;
+  showExpiresColumn: boolean;
   date: string;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
@@ -126,7 +130,13 @@ export function DirectoryTableRow(input: {
       {input.showStatusColumn ? (
         <TableCell className="whitespace-nowrap">{input.status}</TableCell>
       ) : null}
+      {input.showInvitedByColumn ? (
+        <TableCell className="whitespace-nowrap">{input.invitedBy}</TableCell>
+      ) : null}
       <TableCell className="whitespace-nowrap">{input.date}</TableCell>
+      {input.showExpiresColumn ? (
+        <TableCell className="whitespace-nowrap">{input.expiresAt}</TableCell>
+      ) : null}
       <TableCell className="whitespace-nowrap">
         <MembersTableActions
           actionFeedback={input.actionFeedback}
