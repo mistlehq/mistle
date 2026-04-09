@@ -56,7 +56,7 @@ describe("integrations-definitions server", () => {
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
-    expect(awsDefinition?.credentialResolvers).toBeUndefined();
+    expect(awsDefinition?.credentialResolvers?.custom?.["assume-role-session"]).toBeDefined();
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
