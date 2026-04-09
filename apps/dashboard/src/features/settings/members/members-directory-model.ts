@@ -28,13 +28,6 @@ export function resolveInvitationDisplayStatus(
     return { kind: "revoked" };
   }
 
-  if (invitation.status === "unknown") {
-    return {
-      kind: "unknown",
-      rawStatus: invitation.rawStatus ?? "unknown",
-    };
-  }
-
   const expiresAtEpochMs = Date.parse(invitation.expiresAt);
   if (!Number.isFinite(expiresAtEpochMs)) {
     return { kind: "pending" };

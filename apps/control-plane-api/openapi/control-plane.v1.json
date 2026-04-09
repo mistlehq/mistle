@@ -6383,17 +6383,7 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": [
-                              "pending",
-                              "accepted",
-                              "canceled",
-                              "rejected",
-                              "revoked",
-                              "unknown"
-                            ]
-                          },
-                          "rawStatus": {
-                            "type": ["string", "null"]
+                            "enum": ["pending", "accepted", "canceled", "rejected", "revoked"]
                           },
                           "expiresAt": {
                             "type": "string",
@@ -6412,7 +6402,6 @@
                           "inviterId",
                           "inviterName",
                           "status",
-                          "rawStatus",
                           "expiresAt",
                           "createdAt"
                         ],

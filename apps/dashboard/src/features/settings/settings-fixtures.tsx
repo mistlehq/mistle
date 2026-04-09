@@ -56,7 +56,6 @@ export const SettingsFixtureInvitations: SettingsInvitation[] = [
     inviterId: "user_product",
     inviterName: "Product Lead",
     status: "pending",
-    rawStatus: null,
     expiresAt: "2026-12-31T00:00:00.000Z",
     createdAt: "2026-03-01T00:00:00.000Z",
   },

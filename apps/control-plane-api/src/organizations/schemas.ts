@@ -52,7 +52,6 @@ export const InvitationStatusSchema = z.enum([
   "canceled",
   "rejected",
   "revoked",
-  "unknown",
 ]);
 
 export const InvitationsPageEntrySchema = z
@@ -64,7 +63,6 @@ export const InvitationsPageEntrySchema = z
     inviterId: z.string().min(1),
     inviterName: z.string().min(1),
     status: InvitationStatusSchema,
-    rawStatus: z.string().nullable(),
     expiresAt: z.iso.datetime(),
     createdAt: z.iso.datetime(),
   })

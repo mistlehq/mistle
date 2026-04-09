@@ -57,7 +57,6 @@ describe("organization invitations integration", () => {
           inviterId: ownerSession.userId,
           inviterName: "Org Owner",
           status: "revoked",
-          rawStatus: null,
           expiresAt: "2026-03-11T00:00:00.000Z",
           createdAt: "2026-03-05T00:00:00.000Z",
         },
@@ -69,7 +68,6 @@ describe("organization invitations integration", () => {
           inviterId: ownerSession.userId,
           inviterName: "Org Owner",
           status: "pending",
-          rawStatus: null,
           expiresAt: "2026-03-10T00:00:00.000Z",
           createdAt: "2026-03-04T00:00:00.000Z",
         },
@@ -170,5 +168,38 @@ describe("organization invitations integration", () => {
       ],
       total: 1,
     });
+  });
+
+  it("fails when invitations contain an unexpected status", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-invitations-invalid-status@example.com",
+    });
+
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Org Owner",
+      })
+      .where(eq(users.id, ownerSession.userId));
+    await fixture.db.insert(invitations).values({
+      organizationId: ownerSession.organizationId,
+      email: "broken-invite@example.com",
+      role: "member",
+      inviterId: ownerSession.userId,
+      status: "queued",
+      expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-04T00:00:00.000Z"),
+    });
+
+    const response = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(500);
   });
 });

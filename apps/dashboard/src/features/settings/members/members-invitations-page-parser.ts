@@ -49,7 +49,6 @@ function parseInvitationEntry(value: unknown): SettingsInvitation | null {
   const status = readString(record, "status");
   const expiresAt = parseTimestampToIsoString(record["expiresAt"]);
   const createdAt = parseTimestampToIsoString(record["createdAt"]);
-  const rawStatus = parseNullableString(record["rawStatus"]);
   if (
     id === null ||
     organizationId === null ||
@@ -59,8 +58,7 @@ function parseInvitationEntry(value: unknown): SettingsInvitation | null {
     inviterName === null ||
     status === null ||
     expiresAt === null ||
-    createdAt === null ||
-    rawStatus === undefined
+    createdAt === null
   ) {
     return null;
   }
@@ -70,11 +68,12 @@ function parseInvitationEntry(value: unknown): SettingsInvitation | null {
     status !== "accepted" &&
     status !== "canceled" &&
     status !== "rejected" &&
-    status !== "revoked" &&
-    status !== "unknown"
+    status !== "revoked"
   ) {
     return null;
   }
+
+  const invitationStatus: SettingsInvitation["status"] = status;
 
   return {
     id,
@@ -83,21 +82,8 @@ function parseInvitationEntry(value: unknown): SettingsInvitation | null {
     role,
     inviterId,
     inviterName,
-    status,
-    rawStatus,
+    status: invitationStatus,
     expiresAt,
     createdAt,
   };
-}
-
-function parseNullableString(value: unknown): string | null | undefined {
-  if (value === null) {
-    return null;
-  }
-
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  return value;
 }

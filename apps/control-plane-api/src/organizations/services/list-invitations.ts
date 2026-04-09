@@ -17,8 +17,7 @@ export type InvitationPageEntry = {
   role: OrganizationRole;
   inviterId: string;
   inviterName: string;
-  status: "pending" | "accepted" | "canceled" | "rejected" | "revoked" | "unknown";
-  rawStatus: string | null;
+  status: "pending" | "accepted" | "canceled" | "rejected" | "revoked";
   expiresAt: string;
   createdAt: string;
 };
@@ -68,7 +67,6 @@ export async function listInvitations(
   const searchMatchesCanceled = "canceled".includes(normalizedSearch);
   const searchMatchesRejected = "rejected".includes(normalizedSearch);
   const searchMatchesRevoked = "revoked".includes(normalizedSearch);
-  const searchMatchesUnknown = "unknown".includes(normalizedSearch);
   const whereClause = and(
     eq(invitations.organizationId, input.organizationId),
     search.length === 0
@@ -86,7 +84,6 @@ export async function listInvitations(
           searchMatchesCanceled ? eq(invitations.status, "canceled") : undefined,
           searchMatchesRejected ? eq(invitations.status, "rejected") : undefined,
           searchMatchesRevoked ? eq(invitations.status, "revoked") : undefined,
-          searchMatchesUnknown ? eq(invitations.status, "unknown") : undefined,
         ),
   );
 
@@ -129,7 +126,6 @@ export async function listInvitations(
 
   return {
     invitations: invitationRows.map((row) => {
-      const { status, rawStatus } = normalizeInvitationStatus(row.status);
       return {
         id: row.id,
         organizationId: row.organizationId,
@@ -140,8 +136,7 @@ export async function listInvitations(
           name: row.inviterName,
           email: row.inviterEmail,
         }),
-        status,
-        rawStatus,
+        status: normalizeInvitationStatus(row.status),
         expiresAt: row.expiresAt.toISOString(),
         createdAt: row.createdAt.toISOString(),
       };

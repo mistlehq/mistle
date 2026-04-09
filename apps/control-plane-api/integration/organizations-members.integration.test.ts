@@ -8,7 +8,9 @@ import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test
 import { it } from "./test-context.js";
 
 describe("organization members integration", () => {
-  it("returns paginated members with avatar metadata and email search", async ({ fixture }) => {
+  it("returns paginated members with avatar metadata and searchable role labels", async ({
+    fixture,
+  }) => {
     const searchedEmail = "members-case-beta@example.com";
     const ownerSession = await fixture.authSession({
       email: "integration-org-members-owner@example.com",
@@ -106,6 +108,36 @@ describe("organization members integration", () => {
       expect(emailSearchResponse.status).toBe(200);
       const emailSearchPayload: unknown = await emailSearchResponse.json();
       expect(emailSearchPayload).toEqual({
+        members: [
+          {
+            id: expect.any(String),
+            userId: memberTwoSession.userId,
+            name: "Completely Different Name",
+            email: searchedEmail,
+            role: "admin",
+            joinedAt: "2026-03-03T00:00:00.000Z",
+            avatar: {
+              hasImage: false,
+              imageUrl: null,
+            },
+          },
+        ],
+        limit: 25,
+        offset: 0,
+        total: 1,
+      });
+
+      const roleSearchResponse = await runtime.request(
+        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=25&offset=0&search=admin`,
+        {
+          headers: {
+            cookie: ownerSession.cookie,
+          },
+        },
+      );
+
+      expect(roleSearchResponse.status).toBe(200);
+      await expect(roleSearchResponse.json()).resolves.toEqual({
         members: [
           {
             id: expect.any(String),

@@ -12,10 +12,7 @@ export function resolveDirectoryMemberName(input: { name: string; email: string 
   return trimmedName;
 }
 
-export function normalizeInvitationStatus(status: string): {
-  status: InvitationStatus | "unknown";
-  rawStatus: string | null;
-} {
+export function normalizeInvitationStatus(status: string): InvitationStatus {
   if (
     status === "pending" ||
     status === "accepted" ||
@@ -23,16 +20,10 @@ export function normalizeInvitationStatus(status: string): {
     status === "rejected" ||
     status === "revoked"
   ) {
-    return {
-      status,
-      rawStatus: null,
-    };
+    return status;
   }
 
-  return {
-    status: "unknown",
-    rawStatus: status,
-  };
+  throw new Error(`Unexpected invitation status: ${status}`);
 }
 
 export function normalizeOrganizationRole(role: string | null): OrganizationRole {

@@ -29,18 +29,11 @@ export type SettingsInvitation = {
   inviterId: string;
   inviterName: string;
   status: InvitationStatus;
-  rawStatus: string | null;
   expiresAt: string;
   createdAt: string;
 };
 
-export type InvitationStatus =
-  | "pending"
-  | "accepted"
-  | "canceled"
-  | "rejected"
-  | "revoked"
-  | "unknown";
+export type InvitationStatus = "pending" | "accepted" | "canceled" | "rejected" | "revoked";
 
 export type InviteMemberResponse = {
   status: string | null;

@@ -46,8 +46,7 @@ export type InvitationDisplayStatus =
   | { kind: "accepted" }
   | { kind: "canceled" }
   | { kind: "rejected" }
-  | { kind: "revoked" }
-  | { kind: "unknown"; rawStatus: string };
+  | { kind: "revoked" };
 
 export function invitationStatusLabel(displayStatus: InvitationDisplayStatus): string {
   if (displayStatus.kind === "pending") {
@@ -74,5 +73,5 @@ export function invitationStatusLabel(displayStatus: InvitationDisplayStatus): s
     return "Revoked";
   }
 
-  return displayStatus.rawStatus;
+  throw new Error("Unhandled invitation display status.");
 }

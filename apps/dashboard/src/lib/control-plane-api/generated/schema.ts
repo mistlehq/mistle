@@ -2915,11 +2915,10 @@ export interface paths {
                 inviterId: string;
                 inviterName: string;
                 organizationId: string;
-                rawStatus: string | null;
                 /** @enum {string} */
                 role: "owner" | "admin" | "member";
                 /** @enum {string} */
-                status: "pending" | "accepted" | "canceled" | "rejected" | "revoked" | "unknown";
+                status: "pending" | "accepted" | "canceled" | "rejected" | "revoked";
               }[];
               limit: number;
               offset: number;

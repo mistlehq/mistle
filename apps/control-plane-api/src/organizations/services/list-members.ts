@@ -65,6 +65,7 @@ export async function listMembers(
       : or(
           ilike(users.name, `%${escapeLikePattern(search)}%`),
           ilike(users.email, `%${escapeLikePattern(search)}%`),
+          ilike(members.role, `%${escapeLikePattern(search)}%`),
         ),
   );
 
