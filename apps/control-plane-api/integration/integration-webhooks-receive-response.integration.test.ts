@@ -2,7 +2,9 @@ import {
   integrationConnections,
   integrationCredentials,
   integrationTargets,
+  integrationWebhookSources,
   IntegrationConnectionStatuses,
+  IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
@@ -503,6 +505,14 @@ describe("receive integration webhook immediate response integration", () => {
       targetSnapshotConfig: {},
     });
 
+    await fixture.db.insert(integrationWebhookSources).values({
+      organizationId: authenticatedSession.organizationId,
+      integrationConnectionId: "icn_missing_config_connection",
+      targetKey,
+      endpointKey: "ep_missing_config_connection",
+      status: IntegrationWebhookSourceStatuses.ACTIVE,
+    });
+
     const receivedWebhook = await receiveIntegrationWebhook(
       {
         db: fixture.db,
@@ -511,7 +521,7 @@ describe("receive integration webhook immediate response integration", () => {
       },
       {
         targetKey,
-        endpointKey: undefined,
+        endpointKey: "ep_missing_config_connection",
         headers: {
           "content-type": "text/plain",
         },
