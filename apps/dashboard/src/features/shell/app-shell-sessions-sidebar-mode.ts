@@ -22,6 +22,27 @@ export function resolveSessionsNavHref(showSessionsSidebar: boolean): string {
   return showSessionsSidebar ? SessionsRoutes.NEW : SessionsRoutes.INDEX;
 }
 
+export function resolveLocationHref(input: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): string {
+  return `${input.pathname}${input.search}${input.hash}`;
+}
+
 export function resolveSidebarModeEnableNavigationTarget(pathname: string): string | null {
   return isExistingSandboxSessionPath(pathname) ? null : SessionsRoutes.NEW;
+}
+
+export function resolveSidebarModeDisableNavigationTarget(input: {
+  currentLocationHref: string;
+  previousLocationHref: string | null;
+}): string | null {
+  if (input.previousLocationHref === null) {
+    return null;
+  }
+
+  return input.currentLocationHref === input.previousLocationHref
+    ? null
+    : input.previousLocationHref;
 }

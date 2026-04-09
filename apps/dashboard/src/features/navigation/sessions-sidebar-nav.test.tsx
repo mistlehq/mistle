@@ -44,10 +44,13 @@ const groups: SessionsSidebarNavGroup[] = [
   },
 ];
 
-function renderSidebarNav(input?: { groups?: readonly SessionsSidebarNavGroup[] }): void {
+function renderSidebarNav(input?: {
+  groups?: readonly SessionsSidebarNavGroup[];
+  initialEntries?: string[];
+}): void {
   render(
     <SidebarProvider>
-      <MemoryRouter initialEntries={["/sessions"]}>
+      <MemoryRouter initialEntries={input?.initialEntries ?? ["/sessions"]}>
         <SessionsSidebarNav groups={input?.groups ?? groups} />
       </MemoryRouter>
     </SidebarProvider>,
@@ -94,6 +97,16 @@ describe("SessionsSidebarNav", () => {
       "/sessions/new",
     );
     expect(screen.getByRole("textbox", { name: "Search sessions" })).toBeDefined();
+  });
+
+  it("marks the new session link active on the dedicated new-session route", () => {
+    renderSidebarNav({
+      initialEntries: ["/sessions/new"],
+    });
+
+    expect(
+      screen.getByRole("link", { name: "Create a new session" }).getAttribute("data-active"),
+    ).not.toBeNull();
   });
 
   it("allows sandbox profile groups to be collapsed and expanded", () => {

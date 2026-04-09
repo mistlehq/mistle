@@ -217,3 +217,10 @@ export const SessionSelected: Story = {
     showSessionsSidebar: true,
   },
 };
+
+export const ToggleRoundTripFromAutomations: Story = {
+  args: {
+    initialEntries: ["/automations"],
+    showSessionsSidebar: false,
+  },
+};

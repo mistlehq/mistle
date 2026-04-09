@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   isExistingSandboxSessionPath,
+  resolveLocationHref,
+  resolveSidebarModeDisableNavigationTarget,
   isNewSessionPath,
   isSessionsPath,
   resolveSessionsNavHref,
@@ -41,5 +43,39 @@ describe("app shell sessions sidebar mode routing", () => {
   it("resolves the sessions nav href from the sidebar mode state", () => {
     expect(resolveSessionsNavHref(false)).toBe(SessionsRoutes.INDEX);
     expect(resolveSessionsNavHref(true)).toBe(SessionsRoutes.NEW);
+  });
+
+  it("builds a navigation href from pathname, search, and hash", () => {
+    expect(
+      resolveLocationHref({
+        pathname: "/automations",
+        search: "?tab=active",
+        hash: "#details",
+      }),
+    ).toBe("/automations?tab=active#details");
+  });
+
+  it("returns to the previously recorded location when disabling sidebar mode", () => {
+    expect(
+      resolveSidebarModeDisableNavigationTarget({
+        currentLocationHref: SessionsRoutes.NEW,
+        previousLocationHref: "/automations?tab=active#details",
+      }),
+    ).toBe("/automations?tab=active#details");
+  });
+
+  it("skips disable navigation when the current and previous locations match", () => {
+    expect(
+      resolveSidebarModeDisableNavigationTarget({
+        currentLocationHref: "/sessions/sbi_123",
+        previousLocationHref: "/sessions/sbi_123",
+      }),
+    ).toBeNull();
+    expect(
+      resolveSidebarModeDisableNavigationTarget({
+        currentLocationHref: SessionsRoutes.NEW,
+        previousLocationHref: null,
+      }),
+    ).toBeNull();
   });
 });

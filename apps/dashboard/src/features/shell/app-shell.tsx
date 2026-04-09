@@ -19,7 +19,11 @@ import {
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
-import { resolveSidebarModeEnableNavigationTarget } from "./app-shell-sessions-sidebar-mode.js";
+import {
+  resolveLocationHref,
+  resolveSidebarModeDisableNavigationTarget,
+  resolveSidebarModeEnableNavigationTarget,
+} from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
@@ -34,6 +38,7 @@ export function AppShell(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const previousNonSettingsPathRef = useRef<string>("/");
+  const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
@@ -78,11 +83,30 @@ export function AppShell(): React.JSX.Element {
   }
 
   async function handleSessionsSidebarModeChange(nextChecked: boolean): Promise<void> {
+    const currentLocationHref = resolveLocationHref({
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    });
+
     setShowSessionsSidebar(nextChecked);
 
     if (!nextChecked) {
+      const navigationTarget = resolveSidebarModeDisableNavigationTarget({
+        currentLocationHref,
+        previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
+      });
+      previousSessionsSidebarToggleUrlRef.current = null;
+
+      if (navigationTarget === null) {
+        return;
+      }
+
+      await navigate(navigationTarget);
       return;
     }
+
+    previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
 
     const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
 

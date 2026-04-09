@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   createMemoryRouter,
   createRoutesFromElements,
@@ -19,6 +19,8 @@ import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
 import {
+  resolveLocationHref,
+  resolveSidebarModeDisableNavigationTarget,
   resolveSidebarModeEnableNavigationTarget,
   SessionsRoutes,
 } from "../shell/app-shell-sessions-sidebar-mode.js";
@@ -71,6 +73,11 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
             />
           }
         >
+          <Route
+            element={<AutomationsStoryPage />}
+            handle={ROUTE_HANDLES.automations}
+            path="/automations"
+          />
           <Route element={<StoryRouteOutlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
             <Route element={<SessionsPage />} index />
             <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
@@ -99,6 +106,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const location = useLocation();
   const navigate = useNavigate();
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
+  const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
     input.initialShowSessionsSidebar === true,
   );
@@ -128,11 +136,29 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     signOutError: null,
     showSessionsSidebar,
     onShowSessionsSidebarChange: (checked) => {
+      const currentLocationHref = resolveLocationHref({
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+      });
+
       setShowSessionsSidebar(checked);
 
       if (!checked) {
+        const navigationTarget = resolveSidebarModeDisableNavigationTarget({
+          currentLocationHref,
+          previousLocationHref: previousSessionsSidebarToggleUrlRef.current,
+        });
+        previousSessionsSidebarToggleUrlRef.current = null;
+
+        if (navigationTarget !== null) {
+          void navigate(navigationTarget);
+        }
+
         return;
       }
+
+      previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
 
       const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
 
@@ -177,6 +203,25 @@ function SessionDetailStoryPage(): React.JSX.Element {
           <div className="mt-6 rounded-lg border bg-muted/40 px-4 py-3 font-mono text-sm">
             {sandboxInstanceId}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AutomationsStoryPage(): React.JSX.Element {
+  return (
+    <div className="flex min-h-full flex-col bg-background">
+      <div className="flex flex-1 items-center justify-center px-6 py-10">
+        <div className="w-full max-w-2xl rounded-xl border bg-card p-8 shadow-xs">
+          <p className="text-muted-foreground text-sm uppercase tracking-[0.18em]">
+            Storybook route
+          </p>
+          <h1 className="mt-3 font-semibold text-2xl">Automations preview</h1>
+          <p className="mt-3 text-muted-foreground text-sm">
+            Toggle sessions mode on from this route to verify Storybook follows the same
+            sessions-entry and return navigation behavior as the app shell.
+          </p>
         </div>
       </div>
     </div>

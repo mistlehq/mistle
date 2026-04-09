@@ -19,6 +19,7 @@ import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/r
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
+import { isNewSessionPath } from "../shell/app-shell-sessions-sidebar-mode.js";
 import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
 import { filterSessionsSidebarNavGroups } from "./sessions-sidebar-nav-model.js";
 
@@ -66,6 +67,7 @@ export function SessionsSidebarNav(input: {
             <SidebarMenuItem>
               <SidebarMenuButton
                 aria-label="Create a new session"
+                isActive={isNewSessionPath(location.pathname)}
                 render={<NavLink to="/sessions/new" />}
               >
                 <PlusIcon aria-hidden />
