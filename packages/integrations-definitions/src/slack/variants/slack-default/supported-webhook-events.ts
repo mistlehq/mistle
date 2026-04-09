@@ -35,12 +35,21 @@ const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference
 
 const SlackReactionPayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
   {
+    path: ["event", "channel"],
+    description: "Normalized Slack channel ID for the reacted message event.",
+  },
+  {
     path: ["event", "item", "channel"],
     description: "Slack channel ID for the reacted message.",
   },
   {
     path: ["event", "item", "ts"],
     description: "Slack timestamp for the reacted message.",
+  },
+  {
+    path: ["event", SlackThreadRootTimestampField],
+    description:
+      "Normalized Slack thread root timestamp used to group reactions on the same thread together.",
   },
   {
     path: ["event", "user"],
@@ -119,7 +128,11 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     displayName: "Reaction added",
     category: "Reactions",
     payloadReferences: SlackReactionPayloadReferences,
-    conversationKeyOptions: [SlackReactedMessageConversationKeyOption],
+    conversationKeyOptions: [
+      SlackChannelConversationKeyOption,
+      SlackThreadConversationKeyOption,
+      SlackReactedMessageConversationKeyOption,
+    ],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_removed",
@@ -127,6 +140,10 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     displayName: "Reaction removed",
     category: "Reactions",
     payloadReferences: SlackReactionPayloadReferences,
-    conversationKeyOptions: [SlackReactedMessageConversationKeyOption],
+    conversationKeyOptions: [
+      SlackChannelConversationKeyOption,
+      SlackThreadConversationKeyOption,
+      SlackReactedMessageConversationKeyOption,
+    ],
   }),
 ];

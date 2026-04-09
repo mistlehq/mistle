@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+import { once } from "node:events";
+import { createServer } from "node:http";
 
 import {
   integrationConnections,
@@ -11,6 +13,7 @@ import {
   IntegrationWebhookSourceRoutingStrategies,
   IntegrationWebhookSourceStatuses,
 } from "@mistle/db/control-plane";
+import { reserveAvailablePort } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -123,6 +126,28 @@ function createSlackMessageDeletedWebhookPayload(): Record<string, unknown> {
       },
     },
     event_id: "Ev124",
+  };
+}
+
+function createSlackReactionWebhookPayload(): Record<string, unknown> {
+  return {
+    ...createSlackMessageWebhookPayload(),
+    event: createSlackReactionEventPayload(),
+    event_id: "Ev125",
+  };
+}
+
+function createSlackReactionEventPayload(): Record<string, unknown> {
+  return {
+    type: "reaction_added",
+    user: "U123",
+    reaction: "thumbsup",
+    item: {
+      type: "message",
+      channel: "C123",
+      ts: "1710000000.000200",
+    },
+    event_ts: "1710000000.000300",
   };
 }
 
@@ -715,6 +740,175 @@ describe("integration webhooks ingest integration", () => {
       "2024-03-09T16:00:00.000Z",
     );
     expect(persistedEvent.sourceOrderKey).toBe("2024-03-09T16:00:00.000Z#1710000000.000100");
+  });
+
+  it("enriches Slack reaction webhooks with thread metadata before storing them", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-reaction@example.com",
+    });
+    const requests: Array<{
+      authorization: string | undefined;
+      pathname: string;
+      search: string;
+    }> = [];
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const server = createServer((request, response) => {
+      const requestUrl = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
+      requests.push({
+        authorization:
+          typeof request.headers.authorization === "string"
+            ? request.headers.authorization
+            : undefined,
+        pathname: requestUrl.pathname,
+        search: requestUrl.search,
+      });
+      response.statusCode = 200;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          ok: true,
+          messages: [
+            {
+              type: "message",
+              user: "U234",
+              text: "Thread reply",
+              ts: "1710000000.000200",
+              thread_ts: "1710000000.000100",
+            },
+          ],
+        }),
+      );
+    });
+    server.listen(port, host);
+    await once(server, "listening");
+
+    try {
+      await fixture.db
+        .insert(integrationTargets)
+        .values({
+          targetKey,
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: `http://${host}:${String(port)}/api`,
+          },
+        })
+        .onConflictDoUpdate({
+          target: integrationTargets.targetKey,
+          set: {
+            familyId: "slack",
+            variantId: "slack-default",
+            enabled: true,
+            config: {
+              api_base_url: `http://${host}:${String(port)}/api`,
+            },
+          },
+        });
+
+      const createConnectionResponse = await fixture.request(
+        "/v1/integration/connections/slack-default/form",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            displayName: "Slack reactions",
+            methodId: "slack-bot-token",
+            config: {
+              connection_method: "slack-bot-token",
+            },
+            secrets: {
+              botToken: "xoxb-test-bot-token",
+              signingSecret: "slack-signing-secret",
+            },
+          }),
+        },
+      );
+
+      expect(createConnectionResponse.status).toBe(201);
+      const createdConnection = IntegrationConnectionSchema.parse(
+        await createConnectionResponse.json(),
+      );
+
+      const createdSource = await fixture.db.query.integrationWebhookSources.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authenticatedSession.organizationId),
+            eq(table.integrationConnectionId, createdConnection.id),
+            eq(table.targetKey, targetKey),
+          ),
+      });
+      expect(createdSource).toBeDefined();
+
+      if (createdSource?.endpointKey === undefined) {
+        throw new Error("Expected Slack implicit path-routed webhook source.");
+      }
+
+      const payloadObject = createSlackReactionWebhookPayload();
+      const payload = JSON.stringify(payloadObject);
+      const response = await fixture.request(
+        `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-slack-request-timestamp": timestamp,
+            "x-slack-signature": signSlackWebhookPayload({
+              secret: "slack-signing-secret",
+              payload,
+              timestamp,
+            }),
+          },
+          body: payload,
+        },
+      );
+
+      expect(response.status).toBe(202);
+      expect(IngestIntegrationWebhookResponseSchema.parse(await response.json())).toEqual({
+        status: "received",
+      });
+      expect(requests).toEqual([
+        {
+          authorization: "Bearer xoxb-test-bot-token",
+          pathname: "/api/conversations.replies",
+          search: "?channel=C123&ts=1710000000.000200",
+        },
+      ]);
+
+      const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.targetKey, targetKey), eq(table.externalEventId, "Ev125")),
+      });
+
+      expect(persistedEvent).toBeDefined();
+      if (persistedEvent === undefined) {
+        throw new Error("Expected Slack reaction webhook event to be stored.");
+      }
+
+      expect(persistedEvent.integrationConnectionId).toBe(createdConnection.id);
+      expect(persistedEvent.integrationWebhookSourceId).toBe(createdSource.id);
+      expect(persistedEvent.providerEventType).toBe("reaction_added");
+      expect(persistedEvent.eventType).toBe("slack:reaction_added");
+      expect(persistedEvent.payload).toEqual({
+        ...payloadObject,
+        event: {
+          ...createSlackReactionEventPayload(),
+          channel: "C123",
+          [SlackThreadRootTimestampField]: "1710000000.000100",
+        },
+      });
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
   });
 
   it("stores Slack message subtypes outside the slack:message automation path", async ({

@@ -713,6 +713,21 @@ export type IntegrationWebhookVerifyResult =
       message: string;
     };
 
+export type IntegrationWebhookEnrichEventInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
+> = {
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  event: IntegrationWebhookEvent;
+  connection: IntegrationConnection;
+  connectionSecrets: TConnectionSecrets;
+  webhookSourceSecrets: Record<string, string>;
+  headers: IntegrationWebhookHeaders;
+  rawBody: Uint8Array;
+};
+
 export type IntegrationWebhookResolveConnectionFailureCode =
   | "connection-not-found"
   | "connection-ambiguous"
@@ -818,6 +833,9 @@ export type IntegrationWebhookHandler<
   verify(
     input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
   ): MaybePromise<IntegrationWebhookVerifyResult>;
+  enrichEvent?(
+    input: IntegrationWebhookEnrichEventInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
+  ): MaybePromise<IntegrationWebhookEvent>;
 };
 
 export type EgressCredentialResolverRef = {
