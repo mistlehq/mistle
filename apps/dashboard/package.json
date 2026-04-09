@@ -47,7 +47,6 @@
     "streamdown": "^2.5.0"
   },
   "devDependencies": {
-    "@faker-js/faker": "^10.4.0",
     "@rolldown/plugin-babel": "0.2.2",
     "@storybook/react-vite": "^10.3.4",
     "@tailwindcss/vite": "^4.1.14",
