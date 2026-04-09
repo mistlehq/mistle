@@ -357,13 +357,13 @@ export async function receiveIntegrationWebhook(
     | undefined;
 
   try {
-      resolvedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
-        definition,
-        targetKey: input.targetKey,
-        target: resolvedTarget,
-        connections: webhookConnections,
-        resolveConnectionSecrets: async ({ connectionId }) => {
-          const activeConnection = activeConnectionsById.get(connectionId);
+    resolvedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
+      definition,
+      targetKey: input.targetKey,
+      target: resolvedTarget,
+      connections: webhookConnections,
+      resolveConnectionSecrets: async ({ connectionId }) => {
+        const activeConnection = activeConnectionsById.get(connectionId);
         if (activeConnection === undefined) {
           assertConnectionCandidateExistsOrThrow({
             connectionId,
@@ -379,12 +379,12 @@ export async function receiveIntegrationWebhook(
           organizationId: activeConnection.organizationId,
           connectionId,
         });
-        },
-        webhookSourceSecrets,
-        webhookRequest,
-        headers: normalizedHeaders,
-        rawBody: input.rawBody,
-      });
+      },
+      webhookSourceSecrets,
+      webhookRequest,
+      headers: normalizedHeaders,
+      rawBody: input.rawBody,
+    });
   } catch (error) {
     if (error instanceof IntegrationWebhookError) {
       if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {

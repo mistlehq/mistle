@@ -132,8 +132,6 @@ const ImmediateManagedResponseWebhookDefinition: IntegrationDefinition<
     },
   ],
   webhookSource: {
-    ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
-    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
     lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
     async describeSource(input) {
       const endpointKey = input.source.endpointKey;
