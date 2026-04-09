@@ -9,6 +9,7 @@ import {
 
 import { AuthLoginCallbackPage } from "./features/auth/auth-login-callback-page.js";
 import { AuthScreen } from "./features/auth/auth-screen.js";
+import { AuthSwitchOrganizationPage } from "./features/auth/auth-switch-organization-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
@@ -40,6 +41,11 @@ export const APP_ROUTES = createRoutesFromElements(
       element={<AuthLoginCallbackPage />}
       errorElement={<RouteErrorBoundary />}
       path="/auth/login/callback"
+    />
+    <Route
+      element={<AuthSwitchOrganizationPage />}
+      errorElement={<RouteErrorBoundary />}
+      path="/auth/switching-organization"
     />
     <Route
       element={<InvitationAcceptPage />}

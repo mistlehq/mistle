@@ -30,11 +30,7 @@ import {
   ORGANIZATION_SWITCHER_QUERY_KEY,
   switchActiveOrganization,
 } from "./organization-switcher.js";
-import {
-  clearAuthenticatedSessionCache,
-  refreshAuthenticatedSessionAfterOrganizationSwitch,
-} from "./session-cache.js";
-import { fetchSession } from "./session-query.js";
+import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
 
 const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
@@ -124,24 +120,8 @@ export function AppShell(): React.JSX.Element {
       await switchActiveOrganization({
         organizationId,
       });
-
-      try {
-        await refreshAuthenticatedSessionAfterOrganizationSwitch({
-          queryClient,
-          fetchSessionData: fetchSession,
-        });
-      } catch {
-        clearAuthenticatedSessionCache(queryClient);
-        await navigate(
-          `/auth/login?error=server_error&error_description=${encodeURIComponent(
-            "Something went wrong. Please sign in again.",
-          )}`,
-          { replace: true },
-        );
-        return;
-      }
-
-      await navigate("/", { replace: true });
+      globalThis.location.replace("/auth/switching-organization");
+      return;
     } catch (error) {
       setSwitchOrganizationError(
         error instanceof Error ? error.message : "Unable to switch organization.",
