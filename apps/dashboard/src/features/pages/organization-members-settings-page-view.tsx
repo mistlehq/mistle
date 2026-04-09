@@ -1,4 +1,4 @@
-import { Notice } from "@mistle/ui";
+import { Button, Notice, Tabs, TabsList, TabsTrigger } from "@mistle/ui";
 
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
@@ -49,6 +49,7 @@ export type OrganizationMembersSettingsPageViewProps = {
   limit: number;
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   members: SettingsMember[];
+  inviteMembersDisabled: boolean;
   onChangeRole: (member: SettingsMember) => void;
   onInviteCompleted: () => Promise<void>;
   onInviteDialogOpenChange: (nextOpen: boolean) => void;
@@ -66,7 +67,6 @@ export type OrganizationMembersSettingsPageViewProps = {
   organizationId: string;
   offset: number;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
-  resolveInviterDisplayName: (inviterId: string) => string;
   roleChangeDialog: RoleChangeDialogState | null;
   roleUpdateErrorMessage: string | null;
   searchValue: string;
@@ -102,6 +102,31 @@ export function OrganizationMembersSettingsPageView(
         </div>
       ) : null}
 
+      <div className="flex items-center justify-between gap-3">
+        <Tabs
+          onValueChange={(nextValue) => {
+            if (nextValue === "members" || nextValue === "invitations") {
+              props.onFilterChange(nextValue);
+            }
+          }}
+          value={props.activeFilter}
+        >
+          <TabsList variant="line">
+            <TabsTrigger value="members">Members</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Button
+          disabled={props.inviteMembersDisabled}
+          onClick={() => {
+            props.onInviteDialogOpenChange(true);
+          }}
+          type="button"
+        >
+          Invite members
+        </Button>
+      </div>
+
       <MembersDirectoryTable
         activeFilter={props.activeFilter}
         capabilities={props.capabilities}
@@ -111,13 +136,11 @@ export function OrganizationMembersSettingsPageView(
         memberAvatarsByUserId={props.memberAvatarsByUserId}
         members={props.members}
         onChangeRole={props.onChangeRole}
-        onFilterChange={props.onFilterChange}
         onRemoveMember={props.onRemoveMember}
         onResendInvite={props.onResendInvite}
         onRevokeInvite={props.onRevokeInvite}
         onSearchValueChange={props.onSearchValueChange}
         pendingMemberOperation={props.pendingMemberOperation}
-        resolveInviterDisplayName={props.resolveInviterDisplayName}
         searchValue={props.searchValue}
       />
       <TableListingFooter

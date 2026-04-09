@@ -32,7 +32,7 @@ type UseOrganizationMembersSettingsStateResult = {
   setInviteDialogOpen: (nextOpen: boolean) => void;
   roleChangeDialog: RoleChangeDialogState | null;
   capabilitiesQuery: ReturnType<typeof useMembersQueries>["capabilitiesQuery"];
-  directoryQuery: ReturnType<typeof useMembersQueries>["directoryQuery"];
+  activeListQuery: ReturnType<typeof useMembersQueries>["activeListQuery"];
   capabilities: MembershipCapabilities | null;
   members: SettingsMember[];
   invitations: SettingsInvitation[];
@@ -61,7 +61,6 @@ type UseOrganizationMembersSettingsStateResult = {
   onRemoveMember: (member: SettingsMember) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
-  resolveInviterDisplayName: (inviterId: string) => string;
   onInviteCompleted: () => Promise<void>;
 };
 
@@ -79,7 +78,7 @@ export function useOrganizationMembersSettingsState(
   const [invitationActionState, setInvitationActionState] =
     useState<MembersDirectoryInvitationActionState>(null);
   const [roleUpdateErrorMessage, setRoleUpdateErrorMessage] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("all");
+  const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("members");
   const [searchValue, setSearchValue] = useState("");
   const [offset, setOffset] = useState(0);
 
@@ -124,7 +123,7 @@ export function useOrganizationMembersSettingsState(
     setInviteDialogOpen,
     roleChangeDialog,
     capabilitiesQuery: queries.capabilitiesQuery,
-    directoryQuery: queries.directoryQuery,
+    activeListQuery: queries.activeListQuery,
     capabilities: queries.capabilities,
     members: queries.members,
     invitations: queries.invitations,
@@ -197,9 +196,11 @@ export function useOrganizationMembersSettingsState(
     onRemoveMember: mutations.onRemoveMember,
     onResendInvite: mutations.onResendInvite,
     onRevokeInvite: mutations.onRevokeInvite,
-    resolveInviterDisplayName: (inviterId) =>
-      queries.inviterDisplayNames.get(inviterId) ?? inviterId,
-    onInviteCompleted: mutations.onInviteCompleted,
+    onInviteCompleted: async () => {
+      setActiveFilter("invitations");
+      setOffset(0);
+      await mutations.onInviteCompleted();
+    },
   };
 }
 

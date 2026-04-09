@@ -1,6 +1,3 @@
-import { Button } from "@mistle/ui";
-import { useMemo } from "react";
-
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { inviteMember } from "../settings/members/members-api.js";
 import {
@@ -18,25 +15,13 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
     organizationId,
   });
   const { title, description } = resolvePageFrameText(pageMeta, "Members");
-  const headerActions = useMemo(
-    () => (
-      <Button
-        disabled={membersState.inviteMembersDisabled}
-        onClick={() => membersState.setInviteDialogOpen(true)}
-        type="button"
-      >
-        Invite members
-      </Button>
-    ),
-    [membersState.inviteMembersDisabled, membersState.setInviteDialogOpen],
-  );
 
   const isPageLoading =
-    (membersState.directoryQuery.data === undefined && membersState.directoryQuery.isPending) ||
+    (membersState.activeListQuery.data === undefined && membersState.activeListQuery.isPending) ||
     (membersState.capabilitiesQuery.data === undefined && membersState.capabilitiesQuery.isPending);
 
   return (
-    <PageFrame description={description} headerActions={headerActions} title={title}>
+    <PageFrame description={description} title={title}>
       <OrganizationMembersSettingsPageView
         capabilities={membersState.capabilities}
         capabilitiesErrorMessage={
@@ -48,13 +33,14 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         invitations={membersState.invitations}
         inviteDialogOpen={membersState.inviteDialogOpen}
         inviteMemberRequest={inviteMember}
+        inviteMembersDisabled={membersState.inviteMembersDisabled}
         isLoading={isPageLoading}
         isUpdatingRole={membersState.isUpdatingRole}
         limit={membersState.limit}
         loadErrorMessage={
-          membersState.directoryQuery.isError
+          membersState.activeListQuery.isError
             ? toMembersLoadErrorMessage({
-                directoryError: membersState.directoryQuery.error,
+                directoryError: membersState.activeListQuery.error,
               })
             : null
         }
@@ -79,7 +65,6 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         onSaveRole={membersState.onSaveRole}
         organizationId={organizationId}
         pendingMemberOperation={membersState.pendingMemberOperation}
-        resolveInviterDisplayName={membersState.resolveInviterDisplayName}
         roleChangeDialog={membersState.roleChangeDialog}
         roleUpdateErrorMessage={membersState.roleUpdateErrorMessage}
         searchValue={membersState.searchValue}

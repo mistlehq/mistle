@@ -2,13 +2,13 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import type {
   MemberAvatar,
+  InvitationsPage,
   MembershipCapabilities,
   MembersDirectoryFilter,
-  MembersDirectoryPage,
+  MembersPage,
   SettingsInvitation,
   SettingsMember,
 } from "./members-api.js";
-import { formatMemberDisplayName } from "./members-formatters.js";
 import type { MembersQueryKeys } from "./members-query-keys.js";
 import type { MembersSettingsApi } from "./members-settings-api.js";
 
@@ -22,7 +22,11 @@ export function useMembersQueries(input: {
   queryKeys: MembersQueryKeys;
 }): {
   capabilitiesQuery: ReturnType<typeof useQuery<MembershipCapabilities>>;
-  directoryQuery: ReturnType<typeof useQuery<MembersDirectoryPage>>;
+  membersQuery: ReturnType<typeof useQuery<MembersPage>>;
+  invitationsQuery: ReturnType<typeof useQuery<InvitationsPage>>;
+  activeListQuery:
+    | ReturnType<typeof useQuery<MembersPage>>
+    | ReturnType<typeof useQuery<InvitationsPage>>;
   capabilities: MembershipCapabilities | null;
   members: SettingsMember[];
   invitations: SettingsInvitation[];
@@ -30,7 +34,6 @@ export function useMembersQueries(input: {
   limit: number;
   offset: number;
   total: number;
-  inviterDisplayNames: Map<string, string>;
 } {
   const capabilitiesQuery = useQuery({
     queryKey: input.queryKeys.capabilities,
@@ -40,36 +43,52 @@ export function useMembersQueries(input: {
       }),
   });
 
-  const directoryQuery = useQuery({
-    queryKey: [...input.queryKeys.directory, input.limit, input.offset, input.filter, input.search],
+  const membersQuery = useQuery({
+    queryKey: [...input.queryKeys.members, input.limit, input.offset, input.search],
     queryFn: async () =>
-      input.api.listMembersDirectoryPage({
+      input.api.listMembersPage({
         organizationId: input.organizationId,
         limit: input.limit,
         offset: input.offset,
-        filter: input.filter,
         search: input.search,
       }),
+    enabled: input.filter === "members",
     placeholderData: keepPreviousData,
     retry: false,
   });
 
-  const capabilities = capabilitiesQuery.isError ? null : (capabilitiesQuery.data ?? null);
-  const members = directoryQuery.data?.members ?? [];
-  const invitations = directoryQuery.data?.invitations ?? [];
-  const memberAvatarsByUserId = directoryQuery.data?.memberAvatarsByUserId ?? new Map();
-  const limit = directoryQuery.data?.limit ?? input.limit;
-  const offset = directoryQuery.data?.offset ?? input.offset;
-  const total = directoryQuery.data?.total ?? 0;
+  const invitationsQuery = useQuery({
+    queryKey: [...input.queryKeys.invitations, input.limit, input.offset, input.search],
+    queryFn: async () =>
+      input.api.listInvitationsPage({
+        organizationId: input.organizationId,
+        limit: input.limit,
+        offset: input.offset,
+        search: input.search,
+      }),
+    enabled: input.filter === "invitations",
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
 
-  const inviterDisplayNames = new Map<string, string>();
-  for (const member of members) {
-    inviterDisplayNames.set(member.userId, formatMemberDisplayName(member));
-  }
+  const activeListQuery = input.filter === "members" ? membersQuery : invitationsQuery;
+  const capabilities = capabilitiesQuery.isError ? null : (capabilitiesQuery.data ?? null);
+  const members = input.filter === "members" ? (membersQuery.data?.members ?? []) : [];
+  const invitations =
+    input.filter === "invitations" ? (invitationsQuery.data?.invitations ?? []) : [];
+  const memberAvatarsByUserId =
+    input.filter === "members"
+      ? (membersQuery.data?.memberAvatarsByUserId ?? new Map())
+      : new Map();
+  const limit = activeListQuery.data?.limit ?? input.limit;
+  const offset = activeListQuery.data?.offset ?? input.offset;
+  const total = activeListQuery.data?.total ?? 0;
 
   return {
     capabilitiesQuery,
-    directoryQuery,
+    membersQuery,
+    invitationsQuery,
+    activeListQuery,
     capabilities,
     members,
     invitations,
@@ -77,6 +96,5 @@ export function useMembersQueries(input: {
     limit,
     offset,
     total,
-    inviterDisplayNames,
   };
 }

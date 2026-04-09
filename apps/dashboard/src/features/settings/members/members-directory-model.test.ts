@@ -5,7 +5,6 @@ import {
   buildMemberActionDescriptors,
   buildMembersDirectoryRows,
   canResendInvitation,
-  filterMembersDirectoryRows,
   formatMembersDirectoryRow,
   isInvitationActionDisabled,
   resolveInvitationActionFeedback,
@@ -19,6 +18,7 @@ describe("members directory model", () => {
       email: "person@example.com",
       role: "member",
       inviterId: "user_1",
+      inviterName: "Inviter Name",
       status: "pending",
       rawStatus: null,
       expiresAt: "1970-01-02T00:00:00.000Z",
@@ -92,6 +92,7 @@ describe("members directory model", () => {
           email: "invitee@example.com",
           role: "admin",
           inviterId: "user_1",
+          inviterName: "Inviter Name",
           status: "pending",
           rawStatus: null,
           expiresAt: "3026-01-01T00:00:00.000Z",
@@ -143,6 +144,7 @@ describe("members directory model", () => {
           email: "older@example.com",
           role: "member",
           inviterId: "user_1",
+          inviterName: "Inviter Name",
           status: "pending",
           rawStatus: null,
           expiresAt: "3026-01-01T00:00:00.000Z",
@@ -154,6 +156,7 @@ describe("members directory model", () => {
           email: "newer@example.com",
           role: "member",
           inviterId: "user_1",
+          inviterName: "Inviter Name",
           status: "pending",
           rawStatus: null,
           expiresAt: "3026-01-01T00:00:00.000Z",
@@ -163,61 +166,6 @@ describe("members directory model", () => {
     });
 
     expect(rows.map((row) => row.id)).toEqual(["invite_2", "mem_2", "mem_1", "invite_1"]);
-  });
-
-  it("filters rows by table mode and search query", () => {
-    const rows = buildMembersDirectoryRows({
-      members: [
-        {
-          id: "mem_1",
-          userId: "user_1",
-          name: "Ada",
-          email: "ada@example.com",
-          role: "admin",
-          joinedAt: "2026-01-01T00:00:00.000Z",
-        },
-      ],
-      invitations: [
-        {
-          id: "invite_1",
-          organizationId: "org_1",
-          email: "pending@example.com",
-          role: "member",
-          inviterId: "user_1",
-          status: "pending",
-          rawStatus: null,
-          expiresAt: "3026-01-01T00:00:00.000Z",
-          createdAt: "2026-01-02T00:00:00.000Z",
-        },
-        {
-          id: "invite_2",
-          organizationId: "org_1",
-          email: "accepted@example.com",
-          role: "member",
-          inviterId: "user_1",
-          status: "accepted",
-          rawStatus: null,
-          expiresAt: "3026-01-01T00:00:00.000Z",
-          createdAt: "2026-01-03T00:00:00.000Z",
-        },
-      ],
-    });
-
-    expect(
-      filterMembersDirectoryRows({
-        rows,
-        filter: "members",
-        search: "",
-      }).map((row) => row.id),
-    ).toEqual(["mem_1"]);
-
-    expect(
-      filterMembersDirectoryRows({
-        rows,
-        filter: "all",
-        search: "accepted@example.com",
-      }).map((row) => row.id),
-    ).toEqual(["invite_2"]);
   });
 
   it("formats a unified table row payload", () => {
@@ -230,6 +178,7 @@ describe("members directory model", () => {
           email: "invitee@example.com",
           role: "member",
           inviterId: "user_1",
+          inviterName: "Inviter Name",
           status: "pending",
           rawStatus: null,
           expiresAt: "3026-01-01T00:00:00.000Z",

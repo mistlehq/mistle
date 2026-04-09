@@ -7,7 +7,8 @@ describe("buildMembersQueryKeys", () => {
     const keys = buildMembersQueryKeys("org_123");
 
     expect(keys).toEqual({
-      directory: ["settings", "members-directory", "org_123"],
+      members: ["settings", "members-directory", "org_123"],
+      invitations: ["settings", "invitations-directory", "org_123"],
       capabilities: ["settings", "membership-capabilities", "org_123"],
     });
   });

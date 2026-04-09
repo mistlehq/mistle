@@ -10,7 +10,7 @@ export type MemberAvatar = {
   imageUrl: string | null;
 };
 
-export type MembersDirectoryFilter = "all" | "members" | "invitations";
+export type MembersDirectoryFilter = "members" | "invitations";
 
 export type SettingsMember = {
   id: string;
@@ -27,6 +27,7 @@ export type SettingsInvitation = {
   email: string;
   role: OrganizationRole;
   inviterId: string;
+  inviterName: string;
   status: InvitationStatus;
   rawStatus: string | null;
   expiresAt: string;
@@ -48,10 +49,16 @@ export type InviteMemberResponse = {
   raw: unknown;
 };
 
-export type MembersDirectoryPage = {
+export type MembersPage = {
   members: SettingsMember[];
-  invitations: SettingsInvitation[];
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
+  limit: number;
+  offset: number;
+  total: number;
+};
+
+export type InvitationsPage = {
+  invitations: SettingsInvitation[];
   limit: number;
   offset: number;
   total: number;

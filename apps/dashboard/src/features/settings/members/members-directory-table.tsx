@@ -28,9 +28,7 @@ export function MembersDirectoryTable(input: {
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
   invitationActionState: MembersDirectoryInvitationActionState;
   searchValue: string;
-  onFilterChange: (nextValue: MembersDirectoryFilter) => void;
   onSearchValueChange: (nextValue: string) => void;
-  resolveInviterDisplayName: (inviterId: string) => string;
   onChangeRole: (member: SettingsMember) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
@@ -61,8 +59,6 @@ export function MembersDirectoryTable(input: {
   return (
     <>
       <MembersDirectoryToolbar
-        activeFilter={input.activeFilter}
-        onFilterChange={input.onFilterChange}
         onSearchValueChange={input.onSearchValueChange}
         searchValue={input.searchValue}
       />
@@ -91,9 +87,11 @@ export function MembersDirectoryTable(input: {
           {rows.length === 0 ? (
             <TableRow>
               <TableCell className="text-muted-foreground" colSpan={5}>
-                {input.searchValue.length > 0 || input.activeFilter !== "all"
-                  ? "No rows match the current search or filter."
-                  : "No members or invitations were found."}
+                {input.searchValue.length > 0
+                  ? "No rows match the current search."
+                  : input.activeFilter === "members"
+                    ? "No members were found."
+                    : "No invitations were found."}
               </TableCell>
             </TableRow>
           ) : null}
@@ -127,7 +125,6 @@ export function MembersDirectoryTable(input: {
           }
         }}
         open={selectedInvitationForDetails !== null}
-        resolveInviterDisplayName={input.resolveInviterDisplayName}
       />
     </>
   );

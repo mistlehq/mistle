@@ -7,7 +7,6 @@ import { formatDate, invitationStatusLabel } from "./members-formatters.js";
 export function InvitationDetailsDialog(input: {
   invitation: SettingsInvitation | null;
   open: boolean;
-  resolveInviterDisplayName: (inviterId: string) => string;
   onOpenChange: (nextOpen: boolean) => void;
 }): React.JSX.Element {
   return (
@@ -33,7 +32,7 @@ export function InvitationDetailsDialog(input: {
             </div>
             <div className="gap-1 grid">
               <dt className="text-muted-foreground">Invited by</dt>
-              <dd>{input.resolveInviterDisplayName(input.invitation.inviterId)}</dd>
+              <dd>{input.invitation.inviterName}</dd>
             </div>
             <div className="gap-1 grid">
               <dt className="text-muted-foreground">Invited at</dt>

@@ -20,17 +20,15 @@ describe("MembersDirectoryTable interaction", () => {
   }
 
   const baseProps = {
-    activeFilter: "all" as const,
+    activeFilter: "members" as const,
     capabilities: null,
     canManageInvitations: true,
     memberAvatarsByUserId: new Map(),
     onChangeRole: () => {},
-    onFilterChange: () => {},
     onRemoveMember: () => {},
     onResendInvite: () => {},
     onRevokeInvite: () => {},
     onSearchValueChange: () => {},
-    resolveInviterDisplayName: (inviterId: string) => inviterId,
     pendingMemberOperation: null,
     invitationActionState: null,
     searchValue: "",
@@ -40,18 +38,16 @@ describe("MembersDirectoryTable interaction", () => {
     return render(element);
   }
 
-  it("shows capitalized filter label in trigger", () => {
+  it("renders the shared search input", () => {
     renderTable(<MembersDirectoryTable {...baseProps} invitations={[]} members={[]} />);
 
-    const filterTrigger = screen.getByLabelText("Filter directory rows");
-    expect(filterTrigger.textContent).toContain("All");
-    expect(filterTrigger.textContent).not.toContain("all");
+    expect(screen.getByLabelText("Search members and invitations")).toBeTruthy();
   });
 
   it("opens member actions menu and shows row actions", async () => {
     renderTable(
       <MembersDirectoryTable
-        activeFilter="all"
+        activeFilter="members"
         capabilities={{
           organizationId: "org_1",
           actorRole: "admin",
@@ -82,12 +78,10 @@ describe("MembersDirectoryTable interaction", () => {
           },
         ]}
         onChangeRole={() => {}}
-        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
         onSearchValueChange={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
         searchValue=""
         invitationActionState={null}
@@ -111,6 +105,7 @@ describe("MembersDirectoryTable interaction", () => {
             email: "invitee@example.com",
             role: "member",
             inviterId: "user_1",
+            inviterName: "Inviter Name",
             status: "pending",
             rawStatus: null,
             createdAt: "2099-01-01T00:00:00.000Z",
@@ -139,6 +134,7 @@ describe("MembersDirectoryTable interaction", () => {
             email: "invitee@example.com",
             role: "member",
             inviterId: "user_1",
+            inviterName: "Inviter Name",
             status: "pending",
             rawStatus: null,
             createdAt: "2099-01-01T00:00:00.000Z",
@@ -172,6 +168,7 @@ describe("MembersDirectoryTable interaction", () => {
             email: "invitee@example.com",
             role: "member",
             inviterId: "user_1",
+            inviterName: "Inviter Name",
             status: "pending",
             rawStatus: null,
             createdAt: "2099-01-01T00:00:00.000Z",
@@ -203,6 +200,7 @@ describe("MembersDirectoryTable interaction", () => {
             email: "invitee@example.com",
             role: "member",
             inviterId: "user_1",
+            inviterName: "Inviter Name",
             status: "pending",
             rawStatus: null,
             createdAt: "2099-01-01T00:00:00.000Z",
@@ -228,6 +226,7 @@ describe("MembersDirectoryTable interaction", () => {
             email: "invitee@example.com",
             role: "member",
             inviterId: "user_1",
+            inviterName: "Inviter Name",
             status: "pending",
             rawStatus: null,
             createdAt: "2099-01-01T00:00:00.000Z",
@@ -261,6 +260,6 @@ describe("MembersDirectoryTable interaction", () => {
       />,
     );
 
-    expect(screen.getByText("No rows match the current search or filter.")).toBeTruthy();
+    expect(screen.getByText("No rows match the current search.")).toBeTruthy();
   });
 });

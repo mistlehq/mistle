@@ -5,7 +5,7 @@ import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
-import { listDirectory } from "../services/list-directory.js";
+import { listMembers } from "../services/list-members.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -15,7 +15,7 @@ const routeHandler = async (
   const db = ctx.get("db");
   const objectStore = ctx.get("objectStore");
   const { organizationId } = ctx.req.valid("param");
-  const { filter, limit, offset, search } = ctx.req.valid("query");
+  const { limit, offset, search } = ctx.req.valid("query");
 
   await getActiveOrganizationRole({
     db,
@@ -24,7 +24,7 @@ const routeHandler = async (
     organizationId,
   });
 
-  const result = await listDirectory(
+  const result = await listMembers(
     {
       db,
       objectStore,
@@ -34,7 +34,6 @@ const routeHandler = async (
       organizationId,
       limit,
       offset,
-      filter,
       search,
     },
   );

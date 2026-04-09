@@ -305,43 +305,6 @@ export type MembersDirectoryActionDescriptor =
       invitation: SettingsInvitation;
     };
 
-export type MembersDirectoryTableFilter = "all" | "members" | "invitations";
-
-export const MEMBERS_DIRECTORY_TABLE_FILTER_OPTIONS: ReadonlyArray<{
-  value: MembersDirectoryTableFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All" },
-  { value: "members", label: "Members" },
-  { value: "invitations", label: "Invitations" },
-];
-
-const MEMBERS_DIRECTORY_TABLE_FILTER_LABELS: Record<MembersDirectoryTableFilter, string> = {
-  all: "All",
-  members: "Members",
-  invitations: "Invitations",
-};
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected value: ${String(value)}`);
-}
-
-export function formatMembersDirectoryTableFilter(value: MembersDirectoryTableFilter): string {
-  return MEMBERS_DIRECTORY_TABLE_FILTER_LABELS[value];
-}
-
-export function toMembersDirectoryTableFilter(value: string | null): MembersDirectoryTableFilter {
-  if (value === null) {
-    throw new Error("Members directory filter value must not be null.");
-  }
-
-  if (value === "all" || value === "members" || value === "invitations") {
-    return value;
-  }
-
-  throw new Error(`Unexpected members directory filter value: "${value}".`);
-}
-
 export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
   name: string;
   email: string;
@@ -463,49 +426,4 @@ export function directoryRowActionsContentClassName(row: MembersDirectoryRow): s
   }
 
   return undefined;
-}
-
-function normalizeSearch(value: string): string {
-  return value.trim().toLocaleLowerCase();
-}
-
-function includesSearchValue(haystack: string, searchValue: string): boolean {
-  return haystack.toLocaleLowerCase().includes(searchValue);
-}
-
-function filterByTableMode(row: MembersDirectoryRow, filter: MembersDirectoryTableFilter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "members":
-      return row.kind === "member";
-    case "invitations":
-      return row.kind === "invitation";
-    default:
-      return assertNever(filter);
-  }
-}
-
-export function filterMembersDirectoryRows(input: {
-  rows: MembersDirectoryRow[];
-  filter: MembersDirectoryTableFilter;
-  search: string;
-}): MembersDirectoryRow[] {
-  const searchValue = normalizeSearch(input.search);
-
-  return input.rows.filter((row) => {
-    if (!filterByTableMode(row, input.filter)) {
-      return false;
-    }
-
-    if (searchValue.length === 0) {
-      return true;
-    }
-
-    return (
-      includesSearchValue(row.name, searchValue) ||
-      includesSearchValue(row.email, searchValue) ||
-      includesSearchValue(row.status, searchValue)
-    );
-  });
 }

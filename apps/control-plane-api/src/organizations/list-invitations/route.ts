@@ -6,23 +6,23 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { DirectoryResponseSchema } from "../schemas.js";
-import { ListDirectoryParamsSchema, ListDirectoryQuerySchema } from "./schema.js";
+import { InvitationsPageResponseSchema } from "../schemas.js";
+import { ListInvitationsParamsSchema, ListInvitationsQuerySchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/{organizationId}/directory",
+  path: "/{organizationId}/invitations",
   tags: ["Organizations"],
   request: {
-    params: ListDirectoryParamsSchema,
-    query: ListDirectoryQuerySchema,
+    params: ListInvitationsParamsSchema,
+    query: ListInvitationsQuerySchema,
   },
   responses: {
     200: {
-      description: "Paginated organization directory entries.",
+      description: "Paginated organization invitations.",
       content: {
         "application/json": {
-          schema: DirectoryResponseSchema,
+          schema: InvitationsPageResponseSchema,
         },
       },
     },

@@ -54,6 +54,7 @@ export const SettingsFixtureInvitations: SettingsInvitation[] = [
     email: "pending@mistle.so",
     role: "member",
     inviterId: "user_product",
+    inviterName: "Product Lead",
     status: "pending",
     rawStatus: null,
     expiresAt: "2026-12-31T00:00:00.000Z",
@@ -119,15 +120,16 @@ export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Ele
 export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
-      activeFilter="all"
+      activeFilter="members"
       capabilities={SettingsFixtureCapabilities}
       capabilitiesErrorMessage={null}
       hasNextPage={false}
       hasPreviousPage={false}
       invitationActionState={null}
-      invitations={SettingsFixtureInvitations}
+      invitations={[]}
       inviteDialogOpen={false}
       inviteMemberRequest={queueSettingsFixtureInviteMemberRequest}
+      inviteMembersDisabled={false}
       isLoading={false}
       isUpdatingRole={false}
       limit={25}
@@ -151,11 +153,10 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       organizationId="org_storybook"
       offset={0}
       pendingMemberOperation={null}
-      resolveInviterDisplayName={() => "Product Lead"}
       roleChangeDialog={null}
       roleUpdateErrorMessage={null}
       searchValue=""
-      total={SettingsFixtureMembers.length + SettingsFixtureInvitations.length}
+      total={SettingsFixtureMembers.length}
     />
   );
 }

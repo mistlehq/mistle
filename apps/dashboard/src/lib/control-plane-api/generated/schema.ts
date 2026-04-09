@@ -2876,7 +2876,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/directory": {
+  "/v1/organizations/{organizationId}/invitations": {
     parameters: {
       query?: never;
       header?: never;
@@ -2886,7 +2886,6 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          filter?: "all" | "members" | "invitations";
           limit?: number;
           offset?: number | null;
           search?: string;
@@ -2899,55 +2898,29 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Paginated organization directory entries. */
+        /** @description Paginated organization invitations. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              entries: (
-                | {
-                    avatar: {
-                      hasImage: boolean;
-                      /** Format: uri */
-                      imageUrl: string | null;
-                    };
-                    email: string;
-                    id: string;
-                    /** Format: date-time */
-                    joinedAt: string;
-                    /** @enum {string} */
-                    kind: "member";
-                    name: string;
-                    /** @enum {string} */
-                    role: "owner" | "admin" | "member";
-                    userId: string;
-                  }
-                | {
-                    /** Format: date-time */
-                    createdAt: string;
-                    email: string;
-                    /** Format: date-time */
-                    expiresAt: string;
-                    id: string;
-                    inviterId: string;
-                    /** @enum {string} */
-                    kind: "invitation";
-                    organizationId: string;
-                    rawStatus: string | null;
-                    /** @enum {string} */
-                    role: "owner" | "admin" | "member";
-                    /** @enum {string} */
-                    status:
-                      | "pending"
-                      | "accepted"
-                      | "canceled"
-                      | "rejected"
-                      | "revoked"
-                      | "unknown";
-                  }
-              )[];
+              invitations: {
+                /** Format: date-time */
+                createdAt: string;
+                email: string;
+                /** Format: date-time */
+                expiresAt: string;
+                id: string;
+                inviterId: string;
+                inviterName: string;
+                organizationId: string;
+                rawStatus: string | null;
+                /** @enum {string} */
+                role: "owner" | "admin" | "member";
+                /** @enum {string} */
+                status: "pending" | "accepted" | "canceled" | "rejected" | "revoked" | "unknown";
+              }[];
               limit: number;
               offset: number;
               total: number;
@@ -3327,6 +3300,127 @@ export interface paths {
           };
         };
         /** @description Organization logo was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/members": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+          offset?: number | null;
+          search?: string;
+        };
+        header?: never;
+        path: {
+          organizationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated organization members. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              limit: number;
+              members: {
+                avatar: {
+                  hasImage: boolean;
+                  /** Format: uri */
+                  imageUrl: string | null;
+                };
+                email: string;
+                id: string;
+                /** Format: date-time */
+                joinedAt: string;
+                name: string;
+                /** @enum {string} */
+                role: "owner" | "admin" | "member";
+                userId: string;
+              }[];
+              offset: number;
+              total: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Organization was not found. */
         404: {
           headers: {
             [name: string]: unknown;

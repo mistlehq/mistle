@@ -11,19 +11,17 @@ describe("MembersDirectoryTable", () => {
   it("uses a scrollable table with explicit column wrapping choices", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
-        activeFilter="all"
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
         memberAvatarsByUserId={new Map()}
         members={[]}
         onChangeRole={() => {}}
-        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
         onSearchValueChange={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
         searchValue=""
         invitationActionState={null}
@@ -40,7 +38,7 @@ describe("MembersDirectoryTable", () => {
   it("hides role and removal actions when capabilities are unavailable", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
-        activeFilter="all"
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
@@ -56,12 +54,10 @@ describe("MembersDirectoryTable", () => {
           },
         ]}
         onChangeRole={() => {}}
-        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
         onSearchValueChange={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
         searchValue=""
         invitationActionState={null}
@@ -74,7 +70,7 @@ describe("MembersDirectoryTable", () => {
   it("shows a member action menu for each member row when actions are available", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
-        activeFilter="all"
+        activeFilter="members"
         capabilities={{
           organizationId: "org_1",
           actorRole: "admin",
@@ -113,12 +109,10 @@ describe("MembersDirectoryTable", () => {
           },
         ]}
         onChangeRole={() => {}}
-        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
         onSearchValueChange={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
         searchValue=""
         invitationActionState={null}
@@ -133,7 +127,7 @@ describe("MembersDirectoryTable", () => {
   it("renders member avatar fallback markup in the name column", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
-        activeFilter="all"
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
@@ -149,12 +143,10 @@ describe("MembersDirectoryTable", () => {
           },
         ]}
         onChangeRole={() => {}}
-        onFilterChange={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
         onSearchValueChange={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
         pendingMemberOperation={null}
         searchValue=""
         invitationActionState={null}

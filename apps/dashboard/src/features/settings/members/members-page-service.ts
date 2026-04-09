@@ -1,19 +1,18 @@
 import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
 import { MembersApiError } from "./members-api-errors.js";
-import type { MembersDirectoryFilter, MembersDirectoryPage } from "./members-api-types.js";
-import { parseMembersDirectoryPage } from "./members-directory-page-parser.js";
+import type { MembersPage } from "./members-api-types.js";
+import { parseMembersPage } from "./members-page-parser.js";
 
-export async function listMembersDirectoryPage(input: {
+export async function listMembersPage(input: {
   organizationId: string;
   limit: number;
   offset: number;
-  filter: MembersDirectoryFilter;
   search: string;
-}): Promise<MembersDirectoryPage> {
+}): Promise<MembersPage> {
   try {
     const client = getControlPlaneApiClient();
-    const { data } = await client.GET("/v1/organizations/{organizationId}/directory", {
+    const { data } = await client.GET("/v1/organizations/{organizationId}/members", {
       credentials: "include",
       params: {
         path: {
@@ -22,17 +21,16 @@ export async function listMembersDirectoryPage(input: {
         query: {
           limit: input.limit,
           offset: input.offset,
-          filter: input.filter,
           search: input.search,
         },
       },
     });
 
-    return parseMembersDirectoryPage(data);
+    return parseMembersPage(data);
   } catch (error) {
     throw new MembersApiError(
       normalizeHttpApiError({
-        operation: "listMembersDirectoryPage",
+        operation: "listMembersPage",
         error,
         fallbackMessage: "Failed to load members.",
       }),
