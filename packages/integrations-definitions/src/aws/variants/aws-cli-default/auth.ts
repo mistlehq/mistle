@@ -13,6 +13,10 @@ export const AwsCredentialSlotKeys = {
   SECRET_ACCESS_KEY: "aws.aws-cli-default.aws-assume-role.secret-access-key",
 } as const;
 
+export const AwsCredentialResolverKeys = {
+  ASSUME_ROLE_SESSION: "assume-role-session",
+} as const;
+
 export const AwsAssumeRoleConnectionConfigSchema = z
   .object({
     connection_method: z.literal(AwsConnectionMethodIds.AWS_ASSUME_ROLE),

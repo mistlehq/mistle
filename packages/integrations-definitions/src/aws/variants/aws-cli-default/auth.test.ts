@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AwsAssumeRoleConnectionConfigSchema,
   AwsConnectionMethodIds,
+  AwsCredentialResolverKeys,
   AwsCredentialSecretTypes,
   AwsCredentialSlotKeys,
 } from "./auth.js";
@@ -42,5 +43,6 @@ describe("aws auth metadata", () => {
     expect(AwsCredentialSlotKeys.SECRET_ACCESS_KEY).toBe(
       "aws.aws-cli-default.aws-assume-role.secret-access-key",
     );
+    expect(AwsCredentialResolverKeys.ASSUME_ROLE_SESSION).toBe("assume-role-session");
   });
 });

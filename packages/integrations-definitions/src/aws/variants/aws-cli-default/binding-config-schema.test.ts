@@ -29,4 +29,24 @@ describe("AwsBindingConfigSchema", () => {
       }),
     ).toThrow("Default region must be included in the selected regions.");
   });
+
+  it("rejects unsupported AWS service ids", () => {
+    expect(() =>
+      AwsBindingConfigSchema.parse({
+        services: ["not-a-service"],
+        regions: ["us-east-1"],
+        defaultRegion: "us-east-1",
+      }),
+    ).toThrow("Unsupported AWS service id 'not-a-service'.");
+  });
+
+  it("rejects unsupported AWS region ids", () => {
+    expect(() =>
+      AwsBindingConfigSchema.parse({
+        services: ["secretsmanager"],
+        regions: ["antarctica-south-1"],
+        defaultRegion: "antarctica-south-1",
+      }),
+    ).toThrow("Unsupported AWS region 'antarctica-south-1'.");
+  });
 });
