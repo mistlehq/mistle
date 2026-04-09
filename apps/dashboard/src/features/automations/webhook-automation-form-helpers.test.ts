@@ -7,6 +7,7 @@ import {
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
+import { InitialWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -129,7 +130,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: "",
+      inputTemplate: InitialWebhookAutomationInputTemplate,
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},

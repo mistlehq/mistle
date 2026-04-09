@@ -12,6 +12,7 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
+import { InitialWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
@@ -397,7 +398,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: "",
+  inputTemplate: InitialWebhookAutomationInputTemplate,
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},

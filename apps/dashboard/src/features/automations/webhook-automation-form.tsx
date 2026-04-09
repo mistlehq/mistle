@@ -22,7 +22,7 @@ import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
-import { DefaultWebhookAutomationInputTemplatePlaceholder } from "./webhook-automation-input-template.js";
+import { WebhookAutomationInputTemplatePlaceholder } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -410,7 +410,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 onChange={(nextValue) => {
                   input.onValueChange("inputTemplate", nextValue);
                 }}
-                placeholderText={DefaultWebhookAutomationInputTemplatePlaceholder}
+                placeholderText={WebhookAutomationInputTemplatePlaceholder}
                 tokens={agentInstructionTokens}
                 value={input.values.inputTemplate}
               />
