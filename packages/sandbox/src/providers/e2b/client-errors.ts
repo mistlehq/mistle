@@ -66,6 +66,11 @@ export const E2BClientOperationIds = {
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/commandHandle.ts#L193-L203
    */
   INIT: "init",
+  /**
+   * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`
+   * for `/usr/local/bin/sandboxd resume`.
+   */
+  RESUME: "resume",
 } as const;
 export type E2BClientOperation = (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
 

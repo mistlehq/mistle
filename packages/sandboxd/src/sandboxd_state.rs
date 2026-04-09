@@ -76,6 +76,12 @@ pub struct SandboxdState {
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    agent_endpoint_url: Option<String>,
+    runtime_env: BTreeMap<String, String>,
+    clock: Arc<dyn Clock>,
+    sleeper: Arc<dyn Sleeper>,
     tunnel_session: Option<TunnelSession>,
 }
 
@@ -155,12 +161,12 @@ impl SandboxdState {
         let tunnel_session = Some(
             TunnelSession::start(
                 startup_input,
-                keepalive_manager,
-                runtime_readiness_manager,
-                agent_endpoint_url,
-                runtime_env,
-                clock,
-                sleeper,
+                keepalive_manager.clone(),
+                runtime_readiness_manager.clone(),
+                agent_endpoint_url.clone(),
+                runtime_env.clone(),
+                clock.clone(),
+                sleeper.clone(),
             )
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
         );
@@ -169,8 +175,38 @@ impl SandboxdState {
             egress_proxy,
             process_manager,
             runtime_adapters,
+            keepalive_manager,
+            runtime_readiness_manager,
+            agent_endpoint_url,
+            runtime_env,
+            clock,
+            sleeper,
             tunnel_session,
         })
+    }
+
+    /// Reconnects the bootstrap tunnel for an already-initialized daemon.
+    pub fn resume(&mut self, startup_input: &StartupInput) -> Result<(), SandboxdStateError> {
+        if let Some(tunnel_session) = self.tunnel_session.take() {
+            tunnel_session
+                .close()
+                .map_err(|error| SandboxdStateError::CloseTunnelSession(error.to_string()))?;
+        }
+
+        self.tunnel_session = Some(
+            TunnelSession::start(
+                startup_input,
+                self.keepalive_manager.clone(),
+                self.runtime_readiness_manager.clone(),
+                self.agent_endpoint_url.clone(),
+                self.runtime_env.clone(),
+                self.clock.clone(),
+                self.sleeper.clone(),
+            )
+            .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
+        );
+
+        Ok(())
     }
 
     /// Stops the initialized runtime resources owned by the daemon.

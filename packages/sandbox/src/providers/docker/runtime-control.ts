@@ -196,6 +196,10 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
+  async resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+    await this.init(input);
+  }
+
   async close(): Promise<void> {}
 
   async #runDockerOperation<TResult>(

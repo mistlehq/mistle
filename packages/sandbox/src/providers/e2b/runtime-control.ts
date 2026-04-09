@@ -45,6 +45,23 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
+  async resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+    requireSandboxId(input.id);
+
+    try {
+      await this.#client.resume({
+        sandboxId: input.id,
+        payload: input.payload,
+      });
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(input.id, error);
+      }
+
+      throw error;
+    }
+  }
+
   async close(): Promise<void> {}
 }
 

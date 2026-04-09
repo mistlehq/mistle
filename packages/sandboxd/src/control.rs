@@ -1,8 +1,9 @@
 //! Local Unix-socket control plane for a running `sandboxd` process.
 //!
 //! The daemon listens on `/run/.../control.sock` for one-shot local requests
-//! from helper commands such as `sandboxd init`. The control socket is the
-//! only boundary that accepts startup input once the daemon is running.
+//! from helper commands such as `sandboxd init` and `sandboxd resume`. The
+//! control socket is the only boundary that accepts startup lifecycle requests
+//! once the daemon is running.
 
 use std::fmt;
 use std::fs;
@@ -67,8 +68,9 @@ pub enum ControlError {
     InvalidRequest(serde_json::Error),
     InvalidResponse(serde_json::Error),
     VerifyPeer(String),
-    InitRejected(String),
+    StartupRequestRejected(String),
     InitializeSandboxdState(String),
+    ResumeSandboxdState(String),
     CloseSandboxdState(String),
     SerializeResponse(serde_json::Error),
     WriteResponse(std::io::Error),
@@ -137,9 +139,14 @@ impl fmt::Display for ControlError {
             Self::VerifyPeer(error) => {
                 write!(f, "control socket peer verification failed: {error}")
             }
-            Self::InitRejected(error) => write!(f, "sandbox init request was rejected: {error}"),
+            Self::StartupRequestRejected(error) => {
+                write!(f, "sandbox startup request was rejected: {error}")
+            }
             Self::InitializeSandboxdState(error) => {
                 write!(f, "failed to initialize sandboxd state: {error}")
+            }
+            Self::ResumeSandboxdState(error) => {
+                write!(f, "failed to resume sandboxd state: {error}")
             }
             Self::CloseSandboxdState(error) => {
                 write!(f, "failed to close sandboxd state: {error}")
@@ -173,6 +180,8 @@ impl std::error::Error for ControlError {}
 enum ControlRequest {
     #[serde(rename = "init")]
     Init { startup_input: StartupInput },
+    #[serde(rename = "resume")]
+    Resume { startup_input: StartupInput },
 }
 
 /// Carries one JSON response back to a local control socket client.
@@ -261,7 +270,7 @@ impl ControlServer {
     }
 }
 
-/// Starts the local control socket server that accepts one startup submission.
+/// Starts the local control socket server that accepts startup lifecycle requests.
 pub fn start_control_server<S>(
     socket_path: &Path,
     sleeper: S,
@@ -326,16 +335,29 @@ where
 
 /// Submits one startup payload to the running daemon over the local control socket.
 pub fn submit_init(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
+    submit_startup_request(socket_path, ControlRequest::Init {
+        startup_input: startup_input.clone(),
+    })
+}
+
+/// Submits one resume payload to the running daemon over the local control socket.
+pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
+    submit_startup_request(socket_path, ControlRequest::Resume {
+        startup_input: startup_input.clone(),
+    })
+}
+
+fn submit_startup_request(
+    socket_path: &Path,
+    request: ControlRequest,
+) -> Result<(), ControlError> {
     let mut stream =
         UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
             path: socket_path.to_path_buf(),
-            error,
+        error,
         })?;
 
-    let request = serde_json::to_vec(&ControlRequest::Init {
-        startup_input: startup_input.clone(),
-    })
-    .map_err(ControlError::SerializeResponse)?;
+    let request = serde_json::to_vec(&request).map_err(ControlError::SerializeResponse)?;
     stream
         .write_all(&request)
         .map_err(ControlError::WriteResponse)?;
@@ -420,6 +442,7 @@ fn handle_connection(
 
     match request {
         ControlRequest::Init { startup_input } => begin_init(startup_input, state, init_thread),
+        ControlRequest::Resume { startup_input } => begin_resume(startup_input, state),
     }
 }
 
@@ -438,17 +461,17 @@ fn begin_init(
                 state_guard.startup_input = Some(startup_input.clone());
             }
             InitPhase::Initializing => {
-                return Err(ControlError::InitRejected(
+                return Err(ControlError::StartupRequestRejected(
                     "sandboxd is already initializing".to_string(),
                 ));
             }
             InitPhase::Initialized => {
-                return Err(ControlError::InitRejected(
+                return Err(ControlError::StartupRequestRejected(
                     "sandboxd has already completed initialization".to_string(),
                 ));
             }
             InitPhase::Failed(error) => {
-                return Err(ControlError::InitRejected(format!(
+                return Err(ControlError::StartupRequestRejected(format!(
                     "sandboxd initialization already failed: {error}"
                 )));
             }
@@ -459,7 +482,7 @@ fn begin_init(
         .lock()
         .expect("control init thread lock should not be poisoned");
     if init_thread_guard.is_some() {
-        return Err(ControlError::InitRejected(
+        return Err(ControlError::StartupRequestRejected(
             "sandboxd init worker is already running".to_string(),
         ));
     }
@@ -494,6 +517,53 @@ fn begin_init(
     drop(init_thread_guard);
 
     join_init_thread(init_thread)
+}
+
+fn begin_resume(
+    startup_input: StartupInput,
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<(), ControlError> {
+    let mut sandboxd_state = {
+        let mut state_guard = state
+            .lock()
+            .expect("control server state lock should not be poisoned");
+        match &state_guard.init_phase {
+            InitPhase::Uninitialized => {
+                return Err(ControlError::StartupRequestRejected(
+                    "sandboxd has not completed initialization".to_string(),
+                ));
+            }
+            InitPhase::Initializing => {
+                return Err(ControlError::StartupRequestRejected(
+                    "sandboxd is still initializing".to_string(),
+                ));
+            }
+            InitPhase::Initialized => {
+                state_guard.startup_input = Some(startup_input.clone());
+                state_guard.sandboxd_state.take().ok_or_else(|| {
+                    ControlError::ResumeSandboxdState(
+                        "sandboxd state is missing for an initialized daemon".to_string(),
+                    )
+                })?
+            }
+            InitPhase::Failed(error) => {
+                return Err(ControlError::StartupRequestRejected(format!(
+                    "sandboxd initialization already failed: {error}"
+                )));
+            }
+        }
+    };
+
+    let resume_result = sandboxd_state
+        .resume(&startup_input)
+        .map_err(|error| ControlError::ResumeSandboxdState(error.to_string()));
+
+    state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .sandboxd_state = Some(sandboxd_state);
+
+    resume_result
 }
 
 fn join_init_thread(init_thread: &SharedInitThread) -> Result<(), ControlError> {
@@ -560,6 +630,7 @@ mod tests {
 
     use crate::control::{
         DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, InitPhase, start_control_server, submit_init,
+        submit_resume,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::test_support::TestEnvVarGuard;
@@ -577,7 +648,8 @@ mod tests {
         let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
-        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
+        let startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
             ThreadSleeper,
@@ -604,7 +676,8 @@ mod tests {
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
-        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
+        let startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
             ThreadSleeper,
@@ -632,12 +705,80 @@ mod tests {
     }
 
     #[test]
+    fn resumes_after_initialization_completes() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_resume");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let init_startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        let resume_startup_input = valid_startup_input(
+            StartupMode::Existing,
+            "bootstrap-token-value-2",
+            &gateway.ws_url,
+        );
+        let server = start_control_server(
+            &socket_path,
+            ThreadSleeper,
+            DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
+
+        submit_init(&socket_path, &init_startup_input).expect("init submission should succeed");
+        submit_resume(&socket_path, &resume_startup_input)
+            .expect("resume submission should succeed after init");
+
+        assert_eq!(server.init_phase(), InitPhase::Initialized);
+        assert_eq!(server.startup_input(), Some(resume_startup_input));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn rejects_resume_before_initialization_completes() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_resume_before_init");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_bootstrap_gateway();
+        let resume_startup_input =
+            valid_startup_input(StartupMode::Existing, "bootstrap-token-value", &gateway.ws_url);
+        let server = start_control_server(
+            &socket_path,
+            ThreadSleeper,
+            DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        )
+        .expect("control server should start");
+
+        let error =
+            submit_resume(&socket_path, &resume_startup_input).expect_err("resume should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("sandboxd has not completed initialization")
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn returns_init_failure_to_the_control_socket_client() {
         let _env_guard = TestEnvVarGuard::unset(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV);
         let test_dir = create_temp_test_dir("control_init_failure");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
-        let startup_input = valid_startup_input("bootstrap-token-value", &gateway.ws_url);
+        let startup_input =
+            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_control_server(
             &socket_path,
             ThreadSleeper,
@@ -706,9 +847,13 @@ mod tests {
         panic!("timed out waiting for init phase");
     }
 
-    fn valid_startup_input(bootstrap_token: &str, tunnel_gateway_ws_url: &str) -> StartupInput {
+    fn valid_startup_input(
+        startup_mode: StartupMode,
+        bootstrap_token: &str,
+        tunnel_gateway_ws_url: &str,
+    ) -> StartupInput {
         StartupInput {
-            startup_mode: StartupMode::New,
+            startup_mode,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
@@ -795,7 +940,7 @@ mod tests {
                             accept(stream).expect("bootstrap gateway handshake should succeed");
                         loop {
                             match websocket.read() {
-                                Ok(Message::Close(_)) => return,
+                                Ok(Message::Close(_)) => break,
                                 Ok(
                                     Message::Text(_)
                                     | Message::Binary(_)
@@ -805,7 +950,7 @@ mod tests {
                                 ) => {}
                                 Err(tungstenite::Error::Protocol(
                                     tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
-                                )) => return,
+                                )) => break,
                                 Err(error) => {
                                     panic!("bootstrap gateway should read frames: {error}")
                                 }

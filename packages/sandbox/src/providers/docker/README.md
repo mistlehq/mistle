@@ -43,6 +43,7 @@ const runtimeControl = createSandboxRuntimeControl({
 - `inspect({ id })` returns normalized top-level lifecycle fields plus the raw Docker `container.inspect()` payload for the runtime id without attaching to the container.
 - `resume({ id })` restarts the existing stopped Docker container identified by `id`.
 - `createSandboxRuntimeControl(...).init({ id, payload })` runs `sandboxd init` as `root` inside the target container.
+- `createSandboxRuntimeControl(...).resume({ id, payload })` currently reuses `sandboxd init` semantics after the stopped container is restarted.
 - `stop({ id })` stops the Docker container without removing it.
 - `destroy({ id })` force-removes the Docker container.
 

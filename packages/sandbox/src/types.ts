@@ -69,6 +69,7 @@ export interface SandboxInspectResult<
 
 export interface SandboxRuntimeControl {
   init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
+  resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
   close(): Promise<void>;
 }
 

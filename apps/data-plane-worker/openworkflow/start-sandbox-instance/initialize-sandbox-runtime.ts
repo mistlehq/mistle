@@ -12,7 +12,7 @@ import {
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 
-async function createSandboxStartupInput(input: {
+export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
   startupMode: SandboxStartupInput["startupMode"];

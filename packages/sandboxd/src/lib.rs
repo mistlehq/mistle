@@ -1,9 +1,9 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The only supported subcommand, `init`, is a thin local client that reads one
-//! startup payload from stdin, submits it to the running daemon, prints the
-//! daemon response, and exits.
+//! The supported subcommands, `init` and `resume`, are thin local clients that
+//! read one startup payload from stdin, submit it to the running daemon, print
+//! the daemon response, and exit.
 
 use std::fmt;
 use std::io;
@@ -21,6 +21,7 @@ pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
+pub mod resume;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
@@ -36,6 +37,7 @@ use crate::time::ThreadSleeper;
 pub enum SandboxdCommand {
     Daemon,
     Init,
+    Resume,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
@@ -53,7 +55,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'init')"
+                "unknown sandboxd subcommand '{command}' (expected 'init' or 'resume')"
             ),
         }
     }
@@ -74,6 +76,7 @@ where
 
     let command = match command.as_str() {
         "init" => SandboxdCommand::Init,
+        "resume" => SandboxdCommand::Resume,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
         }
@@ -140,6 +143,14 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::Resume => match resume::run_resume(
+            stdin,
+            stdout,
+            Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+        ) {
+            Ok(()) => 0,
+            Err(_) => 1,
+        },
     }
 }
 
@@ -159,6 +170,13 @@ mod tests {
         let command = parse_sandboxd_command(["init"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Init));
+    }
+
+    #[test]
+    fn parses_resume() {
+        let command = parse_sandboxd_command(["resume"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Resume));
     }
 
     #[test]

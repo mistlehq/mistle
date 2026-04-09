@@ -32,6 +32,7 @@ import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-reg
 import type { E2BSandboxInspectResult } from "./types.js";
 
 const InitCommand = "/usr/local/bin/sandboxd init";
+const ResumeCommand = "/usr/local/bin/sandboxd resume";
 const StartDaemonCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd";
 const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
 const DaemonReadinessPollIntervalMs = 100;
@@ -50,6 +51,7 @@ export interface E2BClient {
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
   init(request: E2BInitRequest): Promise<void>;
+  resume(request: E2BInitRequest): Promise<void>;
 }
 
 function createE2BConnectionOptions(config: E2BSandboxConfig): ConnectionOpts {
@@ -231,21 +233,10 @@ export class E2BApiClient implements E2BClient {
     try {
       const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
       await this.#ensureDaemonReady(sandbox);
-      const handle = await sandbox.commands.run(InitCommand, {
-        background: true,
-        stdin: true,
-        timeoutMs: E2BInitCommandTimeoutMs,
-        user: "root",
+      await this.#runStartupCommand(sandbox, {
+        command: InitCommand,
+        payload: parsedRequest.payload,
       });
-
-      try {
-        await sandbox.commands.sendStdin(handle.pid, parsedRequest.payload);
-        await sandbox.commands.closeStdin(handle.pid);
-        await handle.wait();
-      } catch (error) {
-        await handle.kill().catch(() => undefined);
-        throw error;
-      }
     } catch (error) {
       if (error instanceof CommandExitError) {
         throw createCommandExitError({
@@ -256,6 +247,53 @@ export class E2BApiClient implements E2BClient {
       }
 
       throw mapE2BClientError(E2BClientOperationIds.INIT, error);
+    }
+  }
+
+  async resume(request: E2BInitRequest): Promise<void> {
+    const parsedRequest = E2BInitRequestSchema.parse(request);
+
+    try {
+      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      await this.#ensureDaemonReady(sandbox);
+      await this.#runStartupCommand(sandbox, {
+        command: ResumeCommand,
+        payload: parsedRequest.payload,
+      });
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        throw createCommandExitError({
+          operation: E2BClientOperationIds.RESUME,
+          error,
+          commandDescription: "E2B sandbox resume command",
+        });
+      }
+
+      throw mapE2BClientError(E2BClientOperationIds.RESUME, error);
+    }
+  }
+
+  async #runStartupCommand(
+    sandbox: Sandbox,
+    input: {
+      command: string;
+      payload: Uint8Array<ArrayBufferLike>;
+    },
+  ): Promise<void> {
+    const handle = await sandbox.commands.run(input.command, {
+      background: true,
+      stdin: true,
+      timeoutMs: E2BInitCommandTimeoutMs,
+      user: "root",
+    });
+
+    try {
+      await sandbox.commands.sendStdin(handle.pid, input.payload);
+      await sandbox.commands.closeStdin(handle.pid);
+      await handle.wait();
+    } catch (error) {
+      await handle.kill().catch(() => undefined);
+      throw error;
     }
   }
 

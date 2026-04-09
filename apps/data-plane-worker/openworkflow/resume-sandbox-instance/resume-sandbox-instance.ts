@@ -6,10 +6,9 @@ import type { Clock, Sleeper } from "@mistle/time";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
-import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
-import { SandboxStartupModes } from "../start-sandbox-instance/sandbox-startup-input.js";
+import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-runtime.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { resolveResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
@@ -148,10 +147,7 @@ export async function resumeSandboxInstance(
   }
 
   try {
-    // Resuming the provider runtime is not enough to make the sandbox connectable again.
-    // The resumed daemon still needs one `startupMode=existing` init payload so it can
-    // restore its in-memory runtime state and reconnect its tunnel/process tree.
-    await initializeSandboxRuntime(
+    await resumeSandboxRuntime(
       {
         config: ctx.config,
         sandboxRuntimeControl: ctx.sandboxRuntimeControl,
@@ -159,7 +155,6 @@ export async function resumeSandboxInstance(
       {
         sandboxInstanceId: resumedRuntime.sandboxInstanceId,
         providerSandboxId: resumedRuntime.providerSandboxId,
-        startupMode: SandboxStartupModes.EXISTING,
         runtimePlan: resumableSandboxInstance.runtimePlan,
       },
     );

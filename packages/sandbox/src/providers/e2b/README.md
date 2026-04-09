@@ -35,6 +35,7 @@ const adapter = createSandboxAdapter({
 - `stop({ id })` pauses the sandbox.
 - `destroy({ id })` kills the sandbox permanently.
 - `createSandboxRuntimeControl(...).init({ id, payload })` first ensures `sandboxd` is running as `root`, then runs `sandboxd init` through the E2B commands API.
+- `createSandboxRuntimeControl(...).resume({ id, payload })` first ensures `sandboxd` is running as `root`, then runs `sandboxd resume` through the E2B commands API so a paused daemon can reattach its bootstrap tunnel.
 
 ## Error Surface
 
