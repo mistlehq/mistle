@@ -161,7 +161,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Sandbox Profiles");
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-slot="meta-title">Sandbox Profiles');
-    expect(markup).toContain("Manage sandbox-backed agent profiles.");
+    expect(markup).toContain("Manage sandbox profile configuration.");
 
     await router.navigate("/sandbox-profiles/sbp_abc");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
