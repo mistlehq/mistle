@@ -11,12 +11,16 @@ const meta = {
     layout: "padded",
   },
   args: {
+    activeOrganizationId: "org_mistle",
+    isSwitchingOrganization: false,
     organizationName: "Mistle Labs",
     organizationImageUrl: null,
     organizationErrorMessage: null,
+    organizations: [],
     isSigningOut: false,
     onNavigateToSettings: function onNavigateToSettings() {},
     onSignOut: function onSignOut() {},
+    onSwitchOrganization: function onSwitchOrganization() {},
   },
 } satisfies Meta<typeof OrganizationMenuTrigger>;
 
@@ -43,6 +47,32 @@ export const WithError: Story = {
 export const WithLogo: Story = {
   args: {
     organizationImageUrl: "https://images.example.com/mistle-logo.webp",
+  },
+};
+
+export const MultiOrganizationSwitcher: Story = {
+  args: {
+    organizations: [
+      { id: "org_acme", name: "Acme Corp" },
+      { id: "org_mistle", name: "Mistle Labs" },
+      { id: "org_northstar", name: "Northstar Research" },
+    ],
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
+    await expect(await canvas.findByText("Switch organization")).toBeVisible();
+  },
+};
+
+export const SwitchingOrganization: Story = {
+  args: {
+    isSwitchingOrganization: true,
+    organizations: [
+      { id: "org_acme", name: "Acme Corp" },
+      { id: "org_mistle", name: "Mistle Labs" },
+      { id: "org_northstar", name: "Northstar Research" },
+    ],
   },
 };
 

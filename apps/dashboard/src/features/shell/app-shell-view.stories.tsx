@@ -136,3 +136,26 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const MultiOrganizationNavigation: Story = {
+  args: {
+    sidebarHeaderContent: (
+      <OrganizationMenuTrigger
+        activeOrganizationId="org_mistle"
+        isSigningOut={false}
+        isSwitchingOrganization={false}
+        onNavigateToSettings={function onNavigateToSettings() {}}
+        onSignOut={function onSignOut() {}}
+        onSwitchOrganization={function onSwitchOrganization() {}}
+        organizationErrorMessage={null}
+        organizationImageUrl={null}
+        organizationName="Mistle Labs"
+        organizations={[
+          { id: "org_acme", name: "Acme Corp" },
+          { id: "org_mistle", name: "Mistle Labs" },
+          { id: "org_northstar", name: "Northstar Research" },
+        ]}
+      />
+    ),
+  },
+};
