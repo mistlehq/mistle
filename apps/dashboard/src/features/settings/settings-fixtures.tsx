@@ -131,6 +131,7 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       inviteMemberRequest={queueSettingsFixtureInviteMemberRequest}
       inviteMembersDisabled={false}
       isLoading={false}
+      isListFetching={false}
       isUpdatingRole={false}
       limit={25}
       loadErrorMessage={null}

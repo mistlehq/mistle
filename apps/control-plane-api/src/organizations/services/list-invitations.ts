@@ -1,6 +1,6 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { invitations, users } from "@mistle/db/control-plane";
-import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
 
 import {
   escapeLikePattern,
@@ -59,9 +59,35 @@ export async function listInvitations(
   input: ListInvitationsInput,
 ): Promise<ListInvitationsResult> {
   const search = input.search.trim();
+  const normalizedSearch = search.toLowerCase();
+  const searchPattern = `%${escapeLikePattern(search)}%`;
+  const now = new Date();
+  const searchMatchesPending = "pending".includes(normalizedSearch);
+  const searchMatchesExpired = "expired".includes(normalizedSearch);
+  const searchMatchesAccepted = "accepted".includes(normalizedSearch);
+  const searchMatchesCanceled = "canceled".includes(normalizedSearch);
+  const searchMatchesRejected = "rejected".includes(normalizedSearch);
+  const searchMatchesRevoked = "revoked".includes(normalizedSearch);
+  const searchMatchesUnknown = "unknown".includes(normalizedSearch);
   const whereClause = and(
     eq(invitations.organizationId, input.organizationId),
-    search.length === 0 ? undefined : ilike(invitations.email, `%${escapeLikePattern(search)}%`),
+    search.length === 0
+      ? undefined
+      : or(
+          ilike(invitations.email, searchPattern),
+          ilike(invitations.role, searchPattern),
+          searchMatchesPending
+            ? and(eq(invitations.status, "pending"), gte(invitations.expiresAt, now))
+            : undefined,
+          searchMatchesExpired
+            ? and(eq(invitations.status, "pending"), lt(invitations.expiresAt, now))
+            : undefined,
+          searchMatchesAccepted ? eq(invitations.status, "accepted") : undefined,
+          searchMatchesCanceled ? eq(invitations.status, "canceled") : undefined,
+          searchMatchesRejected ? eq(invitations.status, "rejected") : undefined,
+          searchMatchesRevoked ? eq(invitations.status, "revoked") : undefined,
+          searchMatchesUnknown ? eq(invitations.status, "unknown") : undefined,
+        ),
   );
 
   const totalRows = await ctx.db

@@ -44,6 +44,7 @@ export type OrganizationMembersSettingsPageViewProps = {
     raw: unknown;
   }>;
   isLoading: boolean;
+  isListFetching: boolean;
   isUpdatingRole: boolean;
   loadErrorMessage: string | null;
   limit: number;
@@ -148,10 +149,10 @@ export function OrganizationMembersSettingsPageView(
           <TablePagination
             hasNextPage={props.hasNextPage}
             hasPreviousPage={props.hasPreviousPage}
-            nextPageDisabled={props.isLoading}
+            nextPageDisabled={props.isListFetching}
             onNextPage={props.onNextPage}
             onPreviousPage={props.onPreviousPage}
-            previousPageDisabled={props.isLoading}
+            previousPageDisabled={props.isListFetching}
           />
         }
         resultsCount={

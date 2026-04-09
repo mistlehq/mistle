@@ -56,4 +56,19 @@ describe("OrganizationMembersSettingsPageView", () => {
     expect(screen.getAllByText("pending@mistle.so")).toHaveLength(1);
     expect(screen.queryByText("storybook@mistle.so")).toBeNull();
   });
+
+  it("disables pagination controls while the active list is refetching", () => {
+    render(
+      <OrganizationMembersSettingsPageView
+        {...createOrganizationMembersSettingsPageStoryArgs({
+          hasNextPage: true,
+          hasPreviousPage: true,
+          isListFetching: true,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")).toBe(true);
+  });
 });

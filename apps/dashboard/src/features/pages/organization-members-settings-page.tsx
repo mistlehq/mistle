@@ -33,6 +33,7 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         inviteMemberRequest={inviteMember}
         inviteMembersDisabled={membersState.inviteMembersDisabled}
         isLoading={isPageLoading}
+        isListFetching={membersState.activeListQuery.isFetching}
         isUpdatingRole={membersState.isUpdatingRole}
         limit={membersState.limit}
         loadErrorMessage={

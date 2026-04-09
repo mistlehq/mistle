@@ -146,6 +146,7 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     inviteMemberRequest: overrides.inviteMemberRequest ?? inviteOrganizationMemberStoryRequest,
     inviteMembersDisabled: overrides.inviteMembersDisabled ?? false,
     isLoading: overrides.isLoading ?? false,
+    isListFetching: overrides.isListFetching ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
     limit: overrides.limit ?? 25,
     loadErrorMessage: overrides.loadErrorMessage ?? null,

@@ -80,8 +80,8 @@ export function useMembersQueries(input: {
     input.filter === "members"
       ? (membersQuery.data?.memberAvatarsByUserId ?? new Map())
       : new Map();
-  const limit = activeListQuery.data?.limit ?? input.limit;
-  const offset = activeListQuery.data?.offset ?? input.offset;
+  const limit = input.limit;
+  const offset = input.offset;
   const total = activeListQuery.data?.total ?? 0;
 
   return {

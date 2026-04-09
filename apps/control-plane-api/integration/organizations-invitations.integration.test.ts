@@ -79,4 +79,96 @@ describe("organization invitations integration", () => {
       total: 2,
     });
   });
+
+  it("matches invitation search against visible role and status semantics", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-invitations-search@example.com",
+    });
+
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Org Owner",
+      })
+      .where(eq(users.id, ownerSession.userId));
+    await fixture.db.insert(invitations).values([
+      {
+        organizationId: ownerSession.organizationId,
+        email: "future-member@example.com",
+        role: "member",
+        inviterId: ownerSession.userId,
+        status: "pending",
+        expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+        createdAt: new Date("2026-03-04T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        email: "expired-admin@example.com",
+        role: "admin",
+        inviterId: ownerSession.userId,
+        status: "pending",
+        expiresAt: new Date("2020-03-10T00:00:00.000Z"),
+        createdAt: new Date("2026-03-03T00:00:00.000Z"),
+      },
+    ]);
+
+    const pendingResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=pending`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(pendingResponse.status).toBe(200);
+    await expect(pendingResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "future-member@example.com",
+          role: "member",
+          status: "pending",
+        }),
+      ],
+      total: 1,
+    });
+
+    const expiredResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=expired`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(expiredResponse.status).toBe(200);
+    await expect(expiredResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "expired-admin@example.com",
+          role: "admin",
+          status: "pending",
+        }),
+      ],
+      total: 1,
+    });
+
+    const roleResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=admin`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(roleResponse.status).toBe(200);
+    await expect(roleResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "expired-admin@example.com",
+          role: "admin",
+        }),
+      ],
+      total: 1,
+    });
+  });
 });
