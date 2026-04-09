@@ -115,6 +115,7 @@ export type VerifyAndResolveWebhookRequestInput<
   resolveConnectionSecrets(input: {
     connectionId: string;
   }): TConnectionSecrets | Promise<TConnectionSecrets>;
+  webhookSourceSecrets?: Record<string, string>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -181,6 +182,7 @@ export async function verifyAndResolveWebhookRequestOrThrow<
     event: webhookEvent,
     connection,
     connectionSecrets,
+    webhookSourceSecrets: input.webhookSourceSecrets ?? {},
     headers: input.headers,
     rawBody: input.rawBody,
   });

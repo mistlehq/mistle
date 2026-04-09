@@ -294,6 +294,7 @@ describe("webhook helpers", () => {
     let verifyConnectionId: string | undefined;
     let verifyEventType: string | undefined;
     let verifyConnectionSecrets: Record<string, string> | undefined;
+    let verifyWebhookSourceSecrets: Record<string, string> | undefined;
 
     await verifyAndResolveWebhookRequestOrThrow({
       definition: {
@@ -318,6 +319,7 @@ describe("webhook helpers", () => {
             verifyConnectionId = input.connection.id;
             verifyEventType = input.event.eventType;
             verifyConnectionSecrets = input.connectionSecrets;
+            verifyWebhookSourceSecrets = input.webhookSourceSecrets;
             return { ok: true };
           },
         },
@@ -337,6 +339,9 @@ describe("webhook helpers", () => {
           webhook_secret: "whsec_123",
         };
       },
+      webhookSourceSecrets: {
+        source_secret: "whsrc_123",
+      },
       headers: {},
       rawBody: new Uint8Array(),
     });
@@ -346,6 +351,9 @@ describe("webhook helpers", () => {
     expect(verifyEventType).toBe("github.issue_comment.created");
     expect(verifyConnectionSecrets).toEqual({
       webhook_secret: "whsec_123",
+    });
+    expect(verifyWebhookSourceSecrets).toEqual({
+      source_secret: "whsrc_123",
     });
   });
 

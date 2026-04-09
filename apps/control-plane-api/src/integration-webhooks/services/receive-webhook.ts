@@ -396,23 +396,15 @@ export async function receiveIntegrationWebhook(
           throw new Error(`Expected active webhook connection '${connectionId}' to exist.`);
         }
 
-        if (Object.keys(webhookSourceSecrets).length > 0) {
-          return webhookSourceSecrets;
-        }
-
-        const connectionSecrets = await resolveConnectionOwnedWebhookSecrets({
+        return resolveConnectionOwnedWebhookSecrets({
           db,
           integrationRegistry,
           integrationsConfig,
           organizationId: activeConnection.organizationId,
           connectionId,
         });
-
-        return {
-          ...connectionSecrets,
-          ...webhookSourceSecrets,
-        };
       },
+      webhookSourceSecrets,
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,
     });

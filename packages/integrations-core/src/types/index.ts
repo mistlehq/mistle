@@ -700,6 +700,7 @@ export type IntegrationWebhookVerifyInput<
   event: IntegrationWebhookEvent;
   connection: IntegrationConnection;
   connectionSecrets: TConnectionSecrets;
+  webhookSourceSecrets: Record<string, string>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };

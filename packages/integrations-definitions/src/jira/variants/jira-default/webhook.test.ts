@@ -126,6 +126,7 @@ describe("jira webhook handler", () => {
         connectionSecrets: {
           webhookSecret: "whsec_jira",
         },
+        webhookSourceSecrets: {},
         headers: {
           "x-hub-signature": signature,
         },

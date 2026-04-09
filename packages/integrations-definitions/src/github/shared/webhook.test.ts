@@ -233,6 +233,7 @@ describe("GitHubWebhookHandler", () => {
       event: createParsedEvent(),
       connection: createConnection(),
       connectionSecrets: {},
+      webhookSourceSecrets: {},
       headers: {
         "x-hub-signature-256": signature,
       },
@@ -254,6 +255,7 @@ describe("GitHubWebhookHandler", () => {
       event: createParsedEvent(),
       connection: createConnection(),
       connectionSecrets: {},
+      webhookSourceSecrets: {},
       headers: {
         "x-hub-signature-256": "sha256=invalid",
       },
@@ -274,6 +276,7 @@ describe("GitHubWebhookHandler", () => {
       event: createParsedEvent(),
       connection: createConnection(),
       connectionSecrets: {},
+      webhookSourceSecrets: {},
       headers: {},
       rawBody: encodePayload(IssueCommentCreatedPayload),
     });

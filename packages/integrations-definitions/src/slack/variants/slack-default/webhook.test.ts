@@ -355,6 +355,7 @@ describe("slack webhook handler", () => {
         connectionSecrets: {
           signingSecret: "slack-signing-secret",
         },
+        webhookSourceSecrets: {},
         headers: {
           "x-slack-request-timestamp": timestamp,
           "x-slack-signature": signature,
