@@ -4,6 +4,7 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
+import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
@@ -11,6 +12,7 @@ import { LinearDefinition } from "./linear/variants/linear-default/definition.js
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
+export const AwsBrowserDefinition = AwsBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
@@ -18,6 +20,7 @@ export const LinearBrowserDefinition = LinearDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
+  AwsBrowserDefinition,
   JiraBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AwsBrowserDefinition,
   createBrowserDefinitionsBundle,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
@@ -29,6 +30,21 @@ describe("browser definitions", () => {
           definition.variantId === JiraBrowserDefinition.variantId,
       ),
     ).toBe(true);
+  });
+
+  it("registers aws in the browser-safe definitions bundle", () => {
+    const definitions = createBrowserDefinitionsBundle().integrationRegistry.listDefinitions();
+
+    expect(
+      definitions.some(
+        (definition) =>
+          definition.familyId === AwsBrowserDefinition.familyId &&
+          definition.variantId === AwsBrowserDefinition.variantId,
+      ),
+    ).toBe(true);
+    expect(AwsBrowserDefinition.credentialResolvers).toBeUndefined();
+    expect(AwsBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(AwsBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps slack browser definitions free of server-only webhook hooks", () => {

@@ -1,0 +1,10 @@
+export * from "./variants/aws-cli-default/auth.js";
+export * from "./variants/aws-cli-default/base-definition.js";
+export * from "./variants/aws-cli-default/binding-config-form.js";
+export * from "./variants/aws-cli-default/binding-config-schema.js";
+export * from "./variants/aws-cli-default/compile-binding.js";
+export * from "./variants/aws-cli-default/connection-config-form.js";
+export { AwsBaseDefinition as AwsDefinition } from "./variants/aws-cli-default/base-definition.js";
+export * from "./variants/aws-cli-default/target-config-schema.js";
+export * from "./variants/aws-cli-default/target-secret-schema.js";
+export * from "./variants/aws-cli-default/tool-ids.js";
