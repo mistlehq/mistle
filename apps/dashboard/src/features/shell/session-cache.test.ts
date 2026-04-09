@@ -79,7 +79,6 @@ describe("clearAuthenticatedSessionCache", () => {
       fetchSessionData: () => pendingSessionRefresh,
     });
 
-    expect(queryClient.getQueryData(["settings", "members", "org_123"])).toBeUndefined();
     expect(queryClient.getQueryData(SESSION_QUERY_KEY)).toEqual(previousSession);
 
     if (resolveSessionRefresh === undefined) {

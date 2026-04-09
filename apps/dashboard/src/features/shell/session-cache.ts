@@ -12,7 +12,7 @@ export async function refreshAuthenticatedSessionAfterOrganizationSwitch(input: 
   queryClient: QueryClient;
   fetchSessionData: () => Promise<SessionData>;
 }): Promise<SessionData> {
-  removeNonSessionQueries(input.queryClient);
+  await removeNonSessionQueries(input.queryClient);
   await input.queryClient.cancelQueries({
     exact: true,
     queryKey: SESSION_QUERY_KEY,
@@ -28,7 +28,10 @@ export async function refreshAuthenticatedSessionAfterOrganizationSwitch(input: 
   });
 }
 
-function removeNonSessionQueries(queryClient: QueryClient): void {
+async function removeNonSessionQueries(queryClient: QueryClient): Promise<void> {
+  await queryClient.cancelQueries({
+    predicate: (query) => !isSessionQueryKey(query.queryKey),
+  });
   queryClient.removeQueries({
     predicate: (query) => !isSessionQueryKey(query.queryKey),
   });
