@@ -11,8 +11,10 @@ use serde::{Deserialize, Serialize};
 
 /// Default byte credit available for outbound stream data.
 pub const DEFAULT_STREAM_WINDOW_BYTES: usize = 64 * 1024;
+/// Larger initial byte credit for bursty agent-runtime websocket output.
+pub const AGENT_STREAM_WINDOW_BYTES: usize = 1024 * 1024;
 /// Maximum byte credit available for outbound stream data.
-pub const MAX_STREAM_WINDOW_BYTES: usize = DEFAULT_STREAM_WINDOW_BYTES;
+pub const MAX_STREAM_WINDOW_BYTES: usize = AGENT_STREAM_WINDOW_BYTES;
 
 /// Binary frame kind for websocket stream data.
 pub const DATA_FRAME_KIND: u8 = 0x01;

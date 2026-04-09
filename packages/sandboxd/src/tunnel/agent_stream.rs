@@ -15,6 +15,7 @@ use tungstenite::{Error as WebSocketError, Message, WebSocket, connect};
 
 use crate::time::{Duration, Sleeper};
 use crate::tunnel::protocol::{
+    AGENT_STREAM_WINDOW_BYTES,
     CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
     PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -89,7 +90,7 @@ pub fn relay_agent_stream(
     };
     set_agent_socket_nonblocking(&mut agent_socket)?;
 
-    let mut send_window = StreamSendWindow::default();
+    let mut send_window = StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES);
     write_text_frame(socket, stream_open_ok(stream_id))?;
 
     loop {
