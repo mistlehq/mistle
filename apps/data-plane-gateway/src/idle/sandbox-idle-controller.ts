@@ -343,10 +343,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         },
         "Failed to request fenced idle sandbox stop",
       );
-      this.scheduleRequestRetry(
-        nowMs + this.dependencies.requestRetryMs,
-        "idle_stop_retry",
-      );
+      this.scheduleRequestRetry(nowMs + this.dependencies.requestRetryMs, "idle_stop_retry");
       return;
     }
 

@@ -10,8 +10,8 @@ import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memor
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { SandboxKeepaliveRepository } from "../tunnel/sandbox-keepalive-repository.js";
-import { LocalSandboxIdleController } from "./sandbox-idle-controller.js";
 import { SandboxIdleControllerRegistry } from "./sandbox-idle-controller-registry.js";
+import { LocalSandboxIdleController } from "./sandbox-idle-controller.js";
 
 type CapturedSandboxLifecycleRequest = {
   method: string;
