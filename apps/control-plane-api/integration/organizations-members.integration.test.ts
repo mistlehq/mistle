@@ -259,6 +259,9 @@ describe("organization members integration", () => {
     const blankNameSession = await fixture.authSession({
       email: "alpha@example.com",
     });
+    const aliceSession = await fixture.authSession({
+      email: "alice@example.com",
+    });
     const namedSession = await fixture.authSession({
       email: "zeta@example.com",
     });
@@ -269,6 +272,12 @@ describe("organization members integration", () => {
         userId: blankNameSession.userId,
         role: "member",
         createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        userId: aliceSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-01T00:00:00.000Z"),
       },
       {
         organizationId: ownerSession.organizationId,
@@ -283,6 +292,12 @@ describe("organization members integration", () => {
         name: "   ",
       })
       .where(eq(users.id, blankNameSession.userId));
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Alice Person",
+      })
+      .where(eq(users.id, aliceSession.userId));
     await fixture.db
       .update(users)
       .set({
@@ -316,7 +331,7 @@ describe("organization members integration", () => {
       ],
       limit: 1,
       offset: 0,
-      total: 2,
+      total: 3,
     });
 
     const secondPageResponse = await fixture.request(
@@ -332,6 +347,35 @@ describe("organization members integration", () => {
       members: [
         {
           id: expect.any(String),
+          userId: aliceSession.userId,
+          name: "Alice Person",
+          email: "alice@example.com",
+          role: "member",
+          joinedAt: "2026-03-01T00:00:00.000Z",
+          avatar: {
+            hasImage: false,
+            imageUrl: null,
+          },
+        },
+      ],
+      limit: 1,
+      offset: 1,
+      total: 3,
+    });
+
+    const thirdPageResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=2&search=`,
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+    expect(thirdPageResponse.status).toBe(200);
+    await expect(thirdPageResponse.json()).resolves.toEqual({
+      members: [
+        {
+          id: expect.any(String),
           userId: namedSession.userId,
           name: "Beta Person",
           email: "zeta@example.com",
@@ -344,8 +388,8 @@ describe("organization members integration", () => {
         },
       ],
       limit: 1,
-      offset: 1,
-      total: 2,
+      offset: 2,
+      total: 3,
     });
   });
 });

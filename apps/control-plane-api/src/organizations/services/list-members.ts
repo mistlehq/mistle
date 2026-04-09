@@ -95,7 +95,7 @@ export async function listMembers(
     .from(members)
     .innerJoin(users, eq(users.id, members.userId))
     .where(whereClause)
-    .orderBy(desc(members.createdAt), asc(directoryMemberSortName), asc(users.email))
+    .orderBy(asc(directoryMemberSortName), asc(users.email), desc(members.createdAt))
     .limit(input.limit)
     .offset(input.offset);
 
