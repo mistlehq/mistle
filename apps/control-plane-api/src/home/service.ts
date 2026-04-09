@@ -9,14 +9,23 @@ import {
   sandboxProfiles,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import { IntegrationKinds } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { HomeSummaryResponse } from "./schema.js";
 
+const IntegrationRegistry = createIntegrationRegistry();
+const AgentCapableTargetLocators = IntegrationRegistry.listDefinitions()
+  .filter((definition) => definition.kind === IntegrationKinds.AGENT)
+  .map((definition) => ({
+    familyId: definition.familyId,
+    variantId: definition.variantId,
+  }));
+
 const HomeSummaryRowSchema = z
   .object({
-    hasIntegrations: z.boolean(),
     hasProfiles: z.boolean(),
     hasUsableProfiles: z.boolean(),
     hasAutomations: z.boolean(),
@@ -32,19 +41,27 @@ export async function getHomeSummary(
     organizationId: string;
   },
 ): Promise<HomeSummaryResponse> {
-  const [summaryResult, startedSessionResult] = await Promise.all([
+  const [agentCapableIntegrationResult, summaryResult, startedSessionResult] = await Promise.all([
+    input.db
+      .select({
+        familyId: integrationTargets.familyId,
+        variantId: integrationTargets.variantId,
+      })
+      .from(integrationConnections)
+      .innerJoin(
+        integrationTargets,
+        sql`${integrationTargets.targetKey} = ${integrationConnections.targetKey}`,
+      )
+      .where(
+        sql`${integrationConnections.organizationId} = ${params.organizationId}
+          and ${integrationConnections.status} = ${IntegrationConnectionStatuses.ACTIVE}
+          and ${integrationTargets.enabled} = true`,
+      ),
     input.db.execute(sql<{
-      hasIntegrations: boolean;
       hasProfiles: boolean;
       hasUsableProfiles: boolean;
       hasAutomations: boolean;
     }>`select
-        exists(
-          select 1
-          from ${integrationConnections} as icn
-          where icn."organization_id" = ${params.organizationId}
-            and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
-        ) as "hasIntegrations",
         exists(
           select 1
           from ${sandboxProfiles} as sp
@@ -109,16 +126,21 @@ export async function getHomeSummary(
 
   const summary = HomeSummaryRowSchema.parse(
     summaryResult.rows[0] ?? {
-      hasIntegrations: false,
       hasProfiles: false,
       hasUsableProfiles: false,
       hasAutomations: false,
     },
   );
+  const hasAgentCapableIntegrations = agentCapableIntegrationResult.some((row) =>
+    AgentCapableTargetLocators.some(
+      (targetLocator) =>
+        row.familyId === targetLocator.familyId && row.variantId === targetLocator.variantId,
+    ),
+  );
 
   return {
     onboarding: {
-      hasIntegrations: summary.hasIntegrations,
+      hasIntegrations: hasAgentCapableIntegrations,
       hasProfiles: summary.hasProfiles,
       hasUsableProfiles: summary.hasUsableProfiles,
       hasStartedSession: startedSessionResult.items.length > 0,

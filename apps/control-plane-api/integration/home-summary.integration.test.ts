@@ -179,6 +179,42 @@ describe("home summary integration", () => {
     expect(body.onboarding.hasIntegrations).toBe(false);
   });
 
+  it("does not count active non-agent integrations as completed integrations", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-non-agent-connection@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "github-home-summary-active-git",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {},
+    });
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_home_summary_active_git",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-home-summary-active-git",
+        displayName: "GitHub",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(response.status).toBe(200);
+    const body = homeSummaryResponseSchema.parse(await response.json());
+    expect(body.onboarding.hasIntegrations).toBe(false);
+  });
+
   it("ignores non-agent bindings when checking whether a profile is usable", async ({
     fixture,
   }) => {
