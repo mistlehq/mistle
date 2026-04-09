@@ -564,6 +564,7 @@ export interface paths {
                 hasProfiles: boolean;
                 hasStartedSession: boolean;
                 hasUsableProfiles: boolean;
+                hasWebhookCapableIntegration: boolean;
               };
             };
           };

@@ -59,6 +59,7 @@ export type HomeOnboardingSummary = {
   hasProfiles: boolean;
   hasUsableProfiles: boolean;
   hasStartedSession: boolean;
+  hasWebhookCapableIntegration: boolean;
   hasAutomations: boolean;
 };
 
@@ -328,7 +329,7 @@ export function createHomeOnboardingViewModel(
     return HomePageStoryModels.readyForFirstSession;
   }
 
-  if (!input.hasAutomations) {
+  if (input.hasWebhookCapableIntegration && !input.hasAutomations) {
     return HomePageStoryModels.readyForFirstAutomation;
   }
 

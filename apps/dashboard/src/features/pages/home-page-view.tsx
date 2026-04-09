@@ -15,7 +15,11 @@ export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): Rea
         <h1 className="text-3xl font-semibold tracking-tight">Get started</h1>
         <div className="space-y-3">
           {onboarding.steps.map((step) => (
-            <SetupStepRow key={step.id} onNavigate={onNavigate} step={step} />
+            <SetupStepRow
+              key={step.id}
+              step={step}
+              {...(onNavigate === undefined ? {} : { onNavigate })}
+            />
           ))}
         </div>
       </div>

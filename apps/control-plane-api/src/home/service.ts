@@ -24,6 +24,13 @@ const AgentCapableTargetLocators = IntegrationRegistry.listDefinitions()
     variantId: definition.variantId,
   }));
 
+const WebhookCapableTargetLocators = IntegrationRegistry.listDefinitions()
+  .filter((definition) => (definition.supportedWebhookEvents?.length ?? 0) > 0)
+  .map((definition) => ({
+    familyId: definition.familyId,
+    variantId: definition.variantId,
+  }));
+
 const HomeSummaryRowSchema = z
   .object({
     hasProfiles: z.boolean(),
@@ -137,6 +144,12 @@ export async function getHomeSummary(
         row.familyId === targetLocator.familyId && row.variantId === targetLocator.variantId,
     ),
   );
+  const hasWebhookCapableIntegration = agentCapableIntegrationResult.some((row) =>
+    WebhookCapableTargetLocators.some(
+      (targetLocator) =>
+        row.familyId === targetLocator.familyId && row.variantId === targetLocator.variantId,
+    ),
+  );
 
   return {
     onboarding: {
@@ -144,6 +157,7 @@ export async function getHomeSummary(
       hasProfiles: summary.hasProfiles,
       hasUsableProfiles: summary.hasUsableProfiles,
       hasStartedSession: startedSessionResult.items.length > 0,
+      hasWebhookCapableIntegration,
       hasAutomations: summary.hasAutomations,
     },
   };

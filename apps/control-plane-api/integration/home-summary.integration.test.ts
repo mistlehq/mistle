@@ -60,6 +60,7 @@ describe("home summary integration", () => {
         hasProfiles: false,
         hasUsableProfiles: false,
         hasStartedSession: false,
+        hasWebhookCapableIntegration: false,
         hasAutomations: false,
       },
     });
@@ -140,6 +141,7 @@ describe("home summary integration", () => {
         hasProfiles: true,
         hasUsableProfiles: true,
         hasStartedSession: true,
+        hasWebhookCapableIntegration: false,
         hasAutomations: true,
       },
     });
@@ -177,6 +179,7 @@ describe("home summary integration", () => {
     expect(response.status).toBe(200);
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasIntegrations).toBe(false);
+    expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
   });
 
   it("does not count active non-agent integrations as completed integrations", async ({
@@ -213,6 +216,7 @@ describe("home summary integration", () => {
     expect(response.status).toBe(200);
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasIntegrations).toBe(false);
+    expect(body.onboarding.hasWebhookCapableIntegration).toBe(true);
   });
 
   it("ignores non-agent bindings when checking whether a profile is usable", async ({
@@ -301,5 +305,6 @@ describe("home summary integration", () => {
     expect(response.status).toBe(200);
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasUsableProfiles).toBe(true);
+    expect(body.onboarding.hasWebhookCapableIntegration).toBe(true);
   });
 });

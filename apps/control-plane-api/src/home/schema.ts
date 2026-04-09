@@ -8,6 +8,7 @@ export const homeSummaryResponseSchema = z
         hasProfiles: z.boolean(),
         hasUsableProfiles: z.boolean(),
         hasStartedSession: z.boolean(),
+        hasWebhookCapableIntegration: z.boolean(),
         hasAutomations: z.boolean(),
       })
       .strict(),
