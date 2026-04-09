@@ -123,6 +123,7 @@ export function validateWebhookAutomationFormValues(
   eventOptions: readonly WebhookAutomationEventOption[] = [],
 ): Partial<Record<WebhookAutomationFormValueKey, string>> {
   const errors: Partial<Record<WebhookAutomationFormValueKey, string>> = {};
+  const trimmedInputTemplate = values.inputTemplate.trim();
 
   if (values.name.trim().length === 0) {
     errors.name = "Automation name is required.";
@@ -162,8 +163,11 @@ export function validateWebhookAutomationFormValues(
     errors.sandboxProfileId = "Select a sandbox profile.";
   }
 
-  if (values.inputTemplate.trim().length === 0) {
+  if (trimmedInputTemplate.length === 0) {
     errors.inputTemplate = "Input template is required.";
+  } else if (trimmedInputTemplate === InitialWebhookAutomationInputTemplate.trim()) {
+    errors.inputTemplate =
+      "Please replace the instructions placeholder with your own instructions.";
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {

@@ -335,6 +335,39 @@ describe("validateWebhookAutomationFormValues", () => {
       triggerIds: "Trigger is unavailable for the selected sandbox profile.",
     });
   });
+
+  it("rejects the untouched seeded input template", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          inputTemplate: InitialWebhookAutomationInputTemplate,
+          conversationKeyTemplate:
+            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({
+      inputTemplate: "Please replace the instructions placeholder with your own instructions.",
+    });
+  });
+
+  it("accepts the seeded template after the placeholder instructions are replaced", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          inputTemplate: InitialWebhookAutomationInputTemplate.replace(
+            "Replace this with your instructions.",
+            "Review the event and draft a concise response.",
+          ),
+          conversationKeyTemplate:
+            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({});
+  });
 });
 
 describe("automation payload transforms", () => {
