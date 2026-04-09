@@ -2,7 +2,7 @@ import { SidebarTrigger } from "@mistle/ui";
 
 import { SessionsSidebarModeSwitch } from "./sessions-sidebar-mode-switch.js";
 
-export function SessionsSidebarModeControl(input: {
+export function SessionsSidebarHeader(input: {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
 }): React.JSX.Element {

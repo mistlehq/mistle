@@ -9,14 +9,14 @@ import {
 } from "./sessions-page.story-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
-type SessionsSidebarModeStoryArgs = {
+type SessionsSidebarStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
   showSessionsSidebar?: boolean;
 };
 
-function SessionsSidebarModeStory(input: SessionsSidebarModeStoryArgs): React.JSX.Element {
+function SessionsSidebarStory(input: SessionsSidebarStoryArgs): React.JSX.Element {
   return (
     <SessionsStoryHarness
       initialEntries={input.initialEntries}
@@ -110,8 +110,8 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
 }
 
 const meta = {
-  title: "Dashboard/Sessions/SidebarMode",
-  component: SessionsSidebarModeStory,
+  title: "Dashboard/Sessions/Sidebar",
+  component: SessionsSidebarStory,
   tags: ["autodocs"],
   decorators: [withDashboardPageStory],
   parameters: {
@@ -134,9 +134,9 @@ const meta = {
     sandboxInstancesList: buildMixedOpenableSessionsList(),
   },
   render: function RenderStory(args): React.JSX.Element {
-    return <SessionsSidebarModeStory {...args} />;
+    return <SessionsSidebarStory {...args} />;
   },
-} satisfies Meta<typeof SessionsSidebarModeStory>;
+} satisfies Meta<typeof SessionsSidebarStory>;
 
 export default meta;
 

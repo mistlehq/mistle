@@ -13,7 +13,7 @@ import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
-import { SessionsSidebarModeControl } from "../navigation/sessions-sidebar-mode-control.js";
+import { SessionsSidebarHeader } from "../navigation/sessions-sidebar-header.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { AppShellView } from "./app-shell-view.js";
@@ -100,7 +100,7 @@ export function resolveAppShellFrame(input: {
     showBreadcrumbs,
     sidebarContent: showDedicatedSessionsSidebar ? (
       <>
-        <SessionsSidebarModeControl
+        <SessionsSidebarHeader
           checked={input.showSessionsSidebar}
           onCheckedChange={input.onShowSessionsSidebarChange}
         />
