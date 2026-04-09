@@ -9,6 +9,7 @@ import type {
   IntegrationTarget,
   IntegrationWebhookHandler,
   IntegrationWebhookHeaders,
+  IntegrationWebhookRequestResolution,
   IntegrationWebhookResolveConnectionFailureCode,
   IntegrationWebhookResolvedRequest,
 } from "../types/index.js";
@@ -116,6 +117,7 @@ export type VerifyAndResolveWebhookRequestInput<
     connectionId: string;
   }): TConnectionSecrets | Promise<TConnectionSecrets>;
   webhookSourceSecrets?: Record<string, string>;
+  webhookRequest?: IntegrationWebhookRequestResolution;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -129,12 +131,14 @@ export async function verifyAndResolveWebhookRequestOrThrow<
 ): Promise<IntegrationWebhookResolvedRequest> {
   const webhookHandler = getWebhookHandlerOrThrow(input.definition);
 
-  const webhookRequest = await webhookHandler.resolveWebhookRequest({
-    targetKey: input.targetKey,
-    target: input.target,
-    headers: input.headers,
-    rawBody: input.rawBody,
-  });
+  const webhookRequest =
+    input.webhookRequest ??
+    (await webhookHandler.resolveWebhookRequest({
+      targetKey: input.targetKey,
+      target: input.target,
+      headers: input.headers,
+      rawBody: input.rawBody,
+    }));
 
   if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
     return {

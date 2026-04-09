@@ -12,6 +12,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationWebhookError,
   WebhookErrorCodes,
+  getWebhookHandlerOrThrow,
   normalizeWebhookHeaders,
   verifyAndResolveWebhookRequestOrThrow,
 } from "@mistle/integrations-core";
@@ -328,6 +329,38 @@ export async function receiveIntegrationWebhook(
     );
   }
 
+  const normalizedHeaders = normalizeWebhookHeaders(input.headers);
+  const resolvedTarget = {
+    familyId: target.familyId,
+    variantId: target.variantId,
+    enabled: target.enabled,
+    config: parsedTargetConfig,
+    secrets: parsedTargetSecrets,
+  };
+  const webhookHandler = getWebhookHandlerOrThrow(definition);
+  const webhookRequest = await webhookHandler.resolveWebhookRequest({
+    targetKey: input.targetKey,
+    target: resolvedTarget,
+    headers: normalizedHeaders,
+    rawBody: input.rawBody,
+  });
+
+  if (webhookRequest.kind === "response" && webhookRequest.verification === "skip") {
+    if (input.endpointKey !== undefined || webhookSourceCapability.routingStrategy === "path") {
+      await resolveWebhookSourceForPreVerificationOrThrow({
+        db,
+        targetKey: input.targetKey,
+        endpointKey: input.endpointKey,
+        definition,
+      });
+    }
+
+    return {
+      kind: "response",
+      response: webhookRequest.response,
+    };
+  }
+
   let webhookSource = await resolveWebhookSourceForPreVerificationOrThrow({
     db,
     targetKey: input.targetKey,
@@ -378,13 +411,7 @@ export async function receiveIntegrationWebhook(
     resolvedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
       definition,
       targetKey: input.targetKey,
-      target: {
-        familyId: target.familyId,
-        variantId: target.variantId,
-        enabled: target.enabled,
-        config: parsedTargetConfig,
-        secrets: parsedTargetSecrets,
-      },
+      target: resolvedTarget,
       connections: webhookConnections,
       resolveConnectionSecrets: async ({ connectionId }) => {
         const activeConnection = activeConnectionsById.get(connectionId);
@@ -405,7 +432,8 @@ export async function receiveIntegrationWebhook(
         });
       },
       webhookSourceSecrets,
-      headers: normalizeWebhookHeaders(input.headers),
+      webhookRequest,
+      headers: normalizedHeaders,
       rawBody: input.rawBody,
     });
   } catch (error) {

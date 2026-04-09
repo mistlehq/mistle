@@ -1,4 +1,9 @@
-import { integrationTargets } from "@mistle/db/control-plane";
+import {
+  integrationConnections,
+  integrationCredentials,
+  integrationTargets,
+  IntegrationConnectionStatuses,
+} from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
@@ -8,6 +13,7 @@ import {
   IntegrationWebhookSourceRoutingStrategies,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -92,6 +98,94 @@ const VerifiedResponseConnectionConfigSchema = z
     connection_method: z.literal(IntegrationConnectionMethodIds.API_KEY),
   })
   .strict();
+
+const ImmediateManagedResponseWebhookDefinition: IntegrationDefinition<
+  typeof ResponseTargetConfigSchema,
+  typeof ResponseTargetSecretSchema,
+  typeof ResponseBindingConfigSchema,
+  z.output<typeof VerifiedResponseConnectionConfigSchema>
+> = {
+  familyId: "test-webhook",
+  variantId: "test-webhook-response-immediate-managed",
+  kind: IntegrationKinds.CONNECTOR,
+  displayName: "Test Immediate Managed Webhook Response",
+  logoKey: "test-webhook-response-immediate-managed",
+  targetConfigSchema: ResponseTargetConfigSchema,
+  targetSecretSchema: ResponseTargetSecretSchema,
+  bindingConfigSchema: ResponseBindingConfigSchema,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: "form",
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+          secretType: "api_key",
+          slotKey: "test-webhook.test-webhook-response-immediate-managed.api-key.api-key",
+        },
+      ],
+      configSchema: VerifiedResponseConnectionConfigSchema,
+    },
+  ],
+  webhookSource: {
+    ownerScope: IntegrationWebhookSourceOwnerScopes.CONNECTION,
+    routingStrategy: IntegrationWebhookSourceRoutingStrategies.PATH,
+    lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
+    async describeSource(input) {
+      const endpointKey = input.source.endpointKey;
+      if (endpointKey === undefined) {
+        throw new Error(`Managed webhook source '${input.source.id}' is missing endpointKey.`);
+      }
+
+      return {
+        displayName: input.source.displayName ?? "Immediate managed response webhook",
+        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+        providerMetadata: input.source.providerMetadata,
+      };
+    },
+    async createRegistration(input) {
+      const endpointKey = input.source.endpointKey;
+      if (endpointKey === undefined) {
+        throw new Error(`Managed webhook source '${input.source.id}' is missing endpointKey.`);
+      }
+
+      return {
+        providerMetadata: {
+          callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+        },
+      };
+    },
+  },
+  webhookHandler: {
+    resolveWebhookRequest(input) {
+      return {
+        kind: "response",
+        verification: "skip",
+        response: {
+          status: 200,
+          contentType: "text/plain",
+          body: new TextDecoder().decode(input.rawBody),
+        },
+      };
+    },
+    resolveConnection() {
+      throw new Error(
+        "resolveConnection should not be called for immediate managed webhook responses.",
+      );
+    },
+    verify() {
+      throw new Error("verify should not be called for immediate managed webhook responses.");
+    },
+  },
+  compileBinding: () => ({
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+  }),
+};
 
 const VerifiedImmediateResponseWebhookDefinition: IntegrationDefinition<
   typeof ResponseTargetConfigSchema,
@@ -361,6 +455,159 @@ describe("receive integration webhook immediate response integration", () => {
     });
 
     expect(persistedEvents).toEqual([]);
+  });
+
+  it("returns an immediate response without loading malformed active connections", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-receive-response-immediate-malformed@example.com",
+    });
+    const targetKey = "test-webhook-response-target-with-malformed-connection";
+    const registry = new IntegrationRegistry();
+    registry.register(ImmediateResponseWebhookDefinition);
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: ImmediateResponseWebhookDefinition.familyId,
+      variantId: ImmediateResponseWebhookDefinition.variantId,
+      enabled: true,
+      config: {},
+      secrets: null,
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      organizationId: authenticatedSession.organizationId,
+      targetKey,
+      displayName: "Malformed active connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: null,
+      targetSnapshotConfig: {},
+    });
+
+    const receivedWebhook = await receiveIntegrationWebhook(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        targetKey,
+        endpointKey: undefined,
+        headers: {
+          "content-type": "text/plain",
+        },
+        rawBody: new TextEncoder().encode("challenge-value"),
+      },
+    );
+
+    expect(receivedWebhook).toEqual({
+      kind: "response",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "challenge-value",
+      },
+    });
+  });
+
+  it("returns an immediate path-routed response without resolving webhook-source secrets", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-receive-response-immediate-managed@example.com",
+    });
+    const targetKey = "test-webhook-response-immediate-managed-target";
+    const registry = new IntegrationRegistry();
+    registry.register(ImmediateManagedResponseWebhookDefinition);
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: ImmediateManagedResponseWebhookDefinition.familyId,
+      variantId: ImmediateManagedResponseWebhookDefinition.variantId,
+      enabled: true,
+      config: {},
+      secrets: null,
+    });
+
+    const createdConnection = await createFormConnection(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        targetKey,
+        displayName: "Immediate managed response connection",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "immediate-managed-response-secret",
+        },
+      },
+    );
+
+    const createdWebhookSource = await createIntegrationWebhookSource(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+        controlPlaneBaseUrl: fixture.config.auth.baseUrl,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        connectionId: createdConnection.id,
+        displayName: "Immediate managed response webhook",
+      },
+    );
+
+    const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { eq: whereEq }) => whereEq(table.id, createdWebhookSource.id),
+      columns: {
+        webhookSecretCredentialId: true,
+      },
+    });
+
+    if (persistedSource?.webhookSecretCredentialId === null || persistedSource === undefined) {
+      throw new Error(
+        `Expected webhook source '${createdWebhookSource.id}' to have a secret credential.`,
+      );
+    }
+
+    await fixture.db
+      .update(integrationCredentials)
+      .set({
+        revokedAt: sql`now()`,
+      })
+      .where(eq(integrationCredentials.id, persistedSource.webhookSecretCredentialId));
+
+    const receivedWebhook = await receiveIntegrationWebhook(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        targetKey,
+        endpointKey: createdWebhookSource.endpointKey,
+        headers: {
+          "content-type": "text/plain",
+        },
+        rawBody: new TextEncoder().encode("challenge-value"),
+      },
+    );
+
+    expect(receivedWebhook).toEqual({
+      kind: "response",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "challenge-value",
+      },
+    });
   });
 
   it("verifies required immediate responses against connection-owned secrets before returning", async ({
