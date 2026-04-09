@@ -147,6 +147,7 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     isListFetching: overrides.isListFetching ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
     limit: overrides.limit ?? 25,
+    listErrorNoticeMessage: overrides.listErrorNoticeMessage ?? null,
     loadErrorMessage: overrides.loadErrorMessage ?? null,
     memberAvatarsByUserId: overrides.memberAvatarsByUserId ?? new Map<string, MemberAvatar>(),
     members,

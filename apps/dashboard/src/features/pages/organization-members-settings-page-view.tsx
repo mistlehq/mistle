@@ -46,6 +46,7 @@ export type OrganizationMembersSettingsPageViewProps = {
   isLoading: boolean;
   isListFetching: boolean;
   isUpdatingRole: boolean;
+  listErrorNoticeMessage: string | null;
   loadErrorMessage: string | null;
   limit: number;
   memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
@@ -101,6 +102,11 @@ export function OrganizationMembersSettingsPageView(
             later.
           </Notice>
         </div>
+      ) : null}
+      {props.listErrorNoticeMessage ? (
+        <Notice title="Could not refresh directory" variant="alert">
+          {props.listErrorNoticeMessage} Please try again later.
+        </Notice>
       ) : null}
 
       <div className="flex items-center justify-between gap-3">

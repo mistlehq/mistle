@@ -71,4 +71,33 @@ describe("OrganizationMembersSettingsPageView", () => {
     expect(screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")).toBe(true);
     expect(screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")).toBe(true);
   });
+
+  it("shows a non-blocking notice when a refetch fails after data has loaded", () => {
+    render(
+      <OrganizationMembersSettingsPageView
+        {...createOrganizationMembersSettingsPageStoryArgs({
+          listErrorNoticeMessage: "Failed to load members.",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Could not refresh directory")).toBeTruthy();
+    expect(screen.getByText("Storybook Tester")).toBeTruthy();
+    expect(screen.queryByText("Please try again later.", { exact: true })).toBeNull();
+  });
+
+  it("renders the blocking load error state for the initial directory load failure", () => {
+    render(
+      <OrganizationMembersSettingsPageView
+        {...createOrganizationMembersSettingsPageStoryArgs({
+          members: [],
+          total: 0,
+          loadErrorMessage: "Failed to load members.",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Failed to load members. Please try again later.")).toBeTruthy();
+    expect(screen.queryByText("Storybook Tester")).toBeNull();
+  });
 });

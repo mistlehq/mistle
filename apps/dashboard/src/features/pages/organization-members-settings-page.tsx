@@ -17,6 +17,20 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   const isPageLoading =
     (membersState.activeListQuery.data === undefined && membersState.activeListQuery.isPending) ||
     (membersState.capabilitiesQuery.data === undefined && membersState.capabilitiesQuery.isPending);
+  const loadErrorMessage =
+    membersState.activeListQuery.isError && membersState.activeListQuery.data === undefined
+      ? toMembersLoadErrorMessage({
+          activeFilter: membersState.activeFilter,
+          directoryError: membersState.activeListQuery.error,
+        })
+      : null;
+  const listErrorNoticeMessage =
+    membersState.activeListQuery.isError && membersState.activeListQuery.data !== undefined
+      ? toMembersLoadErrorMessage({
+          activeFilter: membersState.activeFilter,
+          directoryError: membersState.activeListQuery.error,
+        })
+      : null;
 
   return (
     <PageFrame description={description} title={title}>
@@ -36,14 +50,8 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
         isListFetching={membersState.activeListQuery.isFetching}
         isUpdatingRole={membersState.isUpdatingRole}
         limit={membersState.limit}
-        loadErrorMessage={
-          membersState.activeListQuery.isError
-            ? toMembersLoadErrorMessage({
-                activeFilter: membersState.activeFilter,
-                directoryError: membersState.activeListQuery.error,
-              })
-            : null
-        }
+        listErrorNoticeMessage={listErrorNoticeMessage}
+        loadErrorMessage={loadErrorMessage}
         activeFilter={membersState.activeFilter}
         hasNextPage={membersState.hasNextPage}
         hasPreviousPage={membersState.hasPreviousPage}

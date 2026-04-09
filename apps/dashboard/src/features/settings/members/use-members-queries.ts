@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import type {
   MemberAvatar,
@@ -53,7 +53,6 @@ export function useMembersQueries(input: {
         search: input.search,
       }),
     enabled: input.filter === "members",
-    placeholderData: keepPreviousData,
     retry: false,
   });
 
@@ -67,7 +66,6 @@ export function useMembersQueries(input: {
         search: input.search,
       }),
     enabled: input.filter === "invitations",
-    placeholderData: keepPreviousData,
     retry: false,
   });
 

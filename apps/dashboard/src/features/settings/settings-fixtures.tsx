@@ -133,6 +133,7 @@ export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Ele
       isListFetching={false}
       isUpdatingRole={false}
       limit={25}
+      listErrorNoticeMessage={null}
       loadErrorMessage={null}
       memberAvatarsByUserId={new Map<string, MemberAvatar>()}
       members={SettingsFixtureMembers}
