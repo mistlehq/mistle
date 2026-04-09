@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
@@ -87,19 +87,6 @@ export function AppShell(): React.JSX.Element {
       ? organizationOptionsQuery.error.message
       : null);
 
-  const switchOrganizationMutation = useMutation({
-    mutationFn: async (organizationId: string) => {
-      await switchActiveOrganization({
-        organizationId,
-      });
-
-      return refreshAuthenticatedSessionAfterOrganizationSwitch({
-        queryClient,
-        fetchSessionData: fetchSession,
-      });
-    },
-  });
-
   async function handleSignOut(): Promise<void> {
     setSignOutError(null);
     setIsSigningOut(true);
@@ -134,7 +121,26 @@ export function AppShell(): React.JSX.Element {
     setIsSwitchingOrganization(true);
 
     try {
-      await switchOrganizationMutation.mutateAsync(organizationId);
+      await switchActiveOrganization({
+        organizationId,
+      });
+
+      try {
+        await refreshAuthenticatedSessionAfterOrganizationSwitch({
+          queryClient,
+          fetchSessionData: fetchSession,
+        });
+      } catch {
+        clearAuthenticatedSessionCache(queryClient);
+        await navigate(
+          `/auth/login?error=server_error&error_description=${encodeURIComponent(
+            "Something went wrong. Please sign in again.",
+          )}`,
+          { replace: true },
+        );
+        return;
+      }
+
       await navigate("/", { replace: true });
     } catch (error) {
       setSwitchOrganizationError(
