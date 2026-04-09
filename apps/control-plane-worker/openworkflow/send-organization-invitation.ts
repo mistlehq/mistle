@@ -1,10 +1,10 @@
 import { EmailTemplateIds, sendEmail } from "@mistle/emails";
 import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "./core/context.js";
+import { defineTracedControlPlaneWorkflow } from "./core/tracing.js";
 
-export const SendOrganizationInvitationWorkflow = defineWorkflow(
+export const SendOrganizationInvitationWorkflow = defineTracedControlPlaneWorkflow(
   SendOrganizationInvitationWorkflowSpec,
   async ({ input: { email, invitationUrl, inviterDisplayName, organizationName, role }, step }) => {
     const { emailDelivery } = await getWorkflowContext();

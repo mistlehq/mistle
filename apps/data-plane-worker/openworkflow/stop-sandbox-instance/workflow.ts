@@ -2,12 +2,12 @@ import {
   StopSandboxInstanceWorkflowSpec,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { stopSandboxInstance } from "./stop-sandbox-instance.js";
 
-export const StopSandboxInstanceWorkflow = defineWorkflow(
+export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   StopSandboxInstanceWorkflowSpec,
   async ({ input, step }): Promise<StopSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();

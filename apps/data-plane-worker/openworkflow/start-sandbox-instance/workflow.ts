@@ -3,9 +3,9 @@ import {
   StartSandboxInstanceWorkflowSpec,
   type StartSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
@@ -25,7 +25,7 @@ const StartSandboxFailureCodes = {
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
 } as const;
 
-export const StartSandboxInstanceWorkflow = defineWorkflow(
+export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   StartSandboxInstanceWorkflowSpec,
   async ({ input: workflowInput, step }): Promise<StartSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();

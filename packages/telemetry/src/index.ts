@@ -563,3 +563,5 @@ export async function shutdownTelemetry(): Promise<void> {
 
   await shutdownEnabledTelemetry(state);
 }
+
+export * from "./workflow-tracing.js";

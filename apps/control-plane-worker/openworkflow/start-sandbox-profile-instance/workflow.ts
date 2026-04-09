@@ -1,10 +1,10 @@
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 
-export const StartSandboxProfileInstanceWorkflow = defineWorkflow(
+export const StartSandboxProfileInstanceWorkflow = defineTracedControlPlaneWorkflow(
   StartSandboxProfileInstanceWorkflowSpec,
   async ({ input, step }) => {
     const { db, dataPlaneClient } = await getWorkflowContext();

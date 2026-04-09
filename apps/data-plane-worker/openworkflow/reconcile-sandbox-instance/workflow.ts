@@ -2,12 +2,12 @@ import {
   ReconcileSandboxInstanceWorkflowSpec,
   type ReconcileSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { reconcileSandboxInstance } from "./reconcile-sandbox-instance.js";
 
-export const ReconcileSandboxInstanceWorkflow = defineWorkflow(
+export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   ReconcileSandboxInstanceWorkflowSpec,
   async ({ input, step }): Promise<ReconcileSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();

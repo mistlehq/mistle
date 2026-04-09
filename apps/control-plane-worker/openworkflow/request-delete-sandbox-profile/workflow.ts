@@ -1,10 +1,10 @@
 import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 
-export const RequestDeleteSandboxProfileWorkflow = defineWorkflow(
+export const RequestDeleteSandboxProfileWorkflow = defineTracedControlPlaneWorkflow(
   RequestDeleteSandboxProfileWorkflowSpec,
   async ({ input: { organizationId, profileId }, step }) => {
     const { db } = await getWorkflowContext();

@@ -2,12 +2,12 @@ import {
   ResumeSandboxInstanceWorkflowSpec,
   type ResumeSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { resumeSandboxInstance } from "./resume-sandbox-instance.js";
 
-export const ResumeSandboxInstanceWorkflow = defineWorkflow(
+export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   ResumeSandboxInstanceWorkflowSpec,
   async ({ input, step }): Promise<ResumeSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();

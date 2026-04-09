@@ -2,14 +2,14 @@ import {
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { markIntegrationWebhookEventFailed } from "./mark-integration-webhook-event-failed.js";
 import { markIntegrationWebhookEventProcessed } from "./mark-integration-webhook-event-processed.js";
 import { prepareIntegrationWebhookEvent } from "./prepare-integration-webhook-event.js";
 
-export const HandleIntegrationWebhookEventWorkflow = defineWorkflow(
+export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWorkflow(
   HandleIntegrationWebhookEventWorkflowSpec,
   async ({ input, step }) => {
     const { controlPlaneInternalClient, db, integrationRegistry, openWorkflow } =

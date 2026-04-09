@@ -1,7 +1,7 @@
 import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { prepareAutomationRun, resolveAutomationRunFailure } from "../shared/automation-run.js";
 import {
   markAutomationRunCompleted,
@@ -21,7 +21,7 @@ function getConversationDeliveryStepName(input: { prefix: string; taskId: string
   return `${input.prefix}:${input.taskId}`;
 }
 
-export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
+export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleAutomationConversationDeliveryWorkflowSpec,
   async ({ input, step }) => {
     const { controlPlaneInternalClient, dataPlaneClient, db } = await getWorkflowContext();

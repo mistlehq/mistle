@@ -1,10 +1,10 @@
 import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
+import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { syncIntegrationConnectionResources } from "./sync-integration-connection-resources.js";
 
-export const SyncIntegrationConnectionResourcesWorkflow = defineWorkflow(
+export const SyncIntegrationConnectionResourcesWorkflow = defineTracedControlPlaneWorkflow(
   SyncIntegrationConnectionResourcesWorkflowSpec,
   async ({ input, step }) => {
     const { controlPlaneInternalClient, db, integrationRegistry } = await getWorkflowContext();

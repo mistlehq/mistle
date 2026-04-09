@@ -1,10 +1,10 @@
 import { EmailTemplateIds, sendEmail } from "@mistle/emails";
 import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "./core/context.js";
+import { defineTracedControlPlaneWorkflow } from "./core/tracing.js";
 
-export const SendVerificationOTPWorkflow = defineWorkflow(
+export const SendVerificationOTPWorkflow = defineTracedControlPlaneWorkflow(
   SendVerificationOTPWorkflowSpec,
   async ({ input: { email, expiresInSeconds, otp, type }, step }) => {
     const { emailDelivery } = await getWorkflowContext();
