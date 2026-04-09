@@ -58,10 +58,9 @@ describe("SessionWorkbenchPage", () => {
   });
 
   it("does not reserve alert space when there are no alerts", () => {
-    const { container } = renderSessionWorkbenchPage();
+    renderSessionWorkbenchPage();
 
-    const pageRoot = container.firstElementChild;
-    expect(pageRoot?.firstElementChild?.getAttribute("role")).toBe("region");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("maps loading read state to the loading badge regardless of lifecycle value", () => {
