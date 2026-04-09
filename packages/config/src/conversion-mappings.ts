@@ -476,6 +476,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN",
   },
   {
+    configPath: ["apps", "data_plane_worker", "sandbox", "e2b", "cpuCount"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "e2b", "cpu_count"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "e2b", "memoryMb"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "e2b", "memory_mb"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB",
+  },
+  {
     configPath: ["apps", "tokenizer_proxy", "server", "host"],
     tomlPath: ["apps", "tokenizer_proxy", "server", "host"],
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_HOST",

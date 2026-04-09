@@ -1,15 +1,21 @@
 import { z } from "zod";
 
+export const E2BDefaultTemplateCpuCount = 4;
+export const E2BDefaultTemplateMemoryMb = 8 * 1024;
+
 export const E2BSandboxConfigSchema = z
   .object({
     apiKey: z.string().trim().min(1, {
       message: "E2B config field `apiKey` is required.",
     }),
     domain: z.string().trim().min(1).optional(),
+    cpuCount: z.number().int().min(1).default(E2BDefaultTemplateCpuCount),
+    memoryMb: z.number().int().min(1).default(E2BDefaultTemplateMemoryMb),
   })
   .strict();
 
-export type E2BSandboxConfig = z.output<typeof E2BSandboxConfigSchema>;
+export type E2BSandboxConfig = z.input<typeof E2BSandboxConfigSchema>;
+export type ValidatedE2BSandboxConfig = z.output<typeof E2BSandboxConfigSchema>;
 
 export const E2BStartSandboxRequestSchema = z
   .object({

@@ -80,6 +80,16 @@ const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfig
     key: "domain",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN",
   },
+  {
+    key: "cpuCount",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT",
+    parse: Number,
+  },
+  {
+    key: "memoryMb",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB",
+    parse: Number,
+  },
 ]);
 
 const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>([

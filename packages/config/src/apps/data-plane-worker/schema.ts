@@ -53,6 +53,12 @@ export const DataPlaneWorkerSandboxE2BConfigSchema = z
   .object({
     apiKey: z.string().min(1),
     domain: z.string().min(1).default(DefaultE2BCloudDomain),
+    cpuCount: z.number().int().min(1).default(4),
+    memoryMb: z
+      .number()
+      .int()
+      .min(1)
+      .default(8 * 1024),
   })
   .strict();
 

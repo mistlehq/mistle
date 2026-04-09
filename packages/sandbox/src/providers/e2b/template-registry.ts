@@ -6,21 +6,42 @@ import { ensureE2BTemplateAlias } from "./template-build.js";
 
 const E2BTemplateAliasPrefix = "mistle-sandbox-base";
 
+export type CreateE2BTemplateAliasInput = {
+  baseRef: string;
+  cpuCount: number;
+  memoryMb: number;
+};
+
 export interface E2BTemplateRegistry {
   resolveAlias(baseRef: string): Promise<string>;
 }
 
-export function createE2BTemplateAlias(baseRef: string): string {
-  const hash = createHash("sha256").update(baseRef).digest("hex");
+export function createE2BTemplateAlias(input: CreateE2BTemplateAliasInput): string {
+  const hashInput = JSON.stringify({
+    baseRef: input.baseRef,
+    cpuCount: input.cpuCount,
+    memoryMb: input.memoryMb,
+  });
+  const hash = createHash("sha256").update(hashInput).digest("hex");
   return `${E2BTemplateAliasPrefix}-${hash.slice(0, 24)}`;
 }
 
 export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
   readonly #connectionOptions: ConnectionOpts;
+  readonly #cpuCount: number | undefined;
+  readonly #memoryMb: number | undefined;
   readonly #aliasPromisesByBaseRef = new Map<string, Promise<string>>();
 
-  constructor(connectionOptions: ConnectionOpts) {
+  constructor(
+    connectionOptions: ConnectionOpts,
+    templateResources?: {
+      cpuCount?: number;
+      memoryMb?: number;
+    },
+  ) {
     this.#connectionOptions = connectionOptions;
+    this.#cpuCount = templateResources?.cpuCount;
+    this.#memoryMb = templateResources?.memoryMb;
   }
 
   async resolveAlias(baseRef: string): Promise<string> {
@@ -44,6 +65,8 @@ export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
     const result = await ensureE2BTemplateAlias({
       baseRef,
       connectionOptions: this.#connectionOptions,
+      ...(this.#cpuCount === undefined ? {} : { cpuCount: this.#cpuCount }),
+      ...(this.#memoryMb === undefined ? {} : { memoryMb: this.#memoryMb }),
     });
 
     return result.alias;

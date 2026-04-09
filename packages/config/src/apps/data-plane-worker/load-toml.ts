@@ -33,6 +33,8 @@ export function loadDataPlaneWorkerFromToml(
     sandboxConfig.e2b = {
       apiKey: sandboxE2B.api_key,
       domain: sandboxE2B.domain,
+      cpuCount: sandboxE2B.cpu_count,
+      memoryMb: sandboxE2B.memory_mb,
     };
   }
 

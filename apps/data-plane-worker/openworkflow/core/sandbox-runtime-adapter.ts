@@ -50,6 +50,12 @@ function createSandboxProviderConfig(
         ...(config.app.sandbox.e2b.domain === undefined
           ? {}
           : { domain: config.app.sandbox.e2b.domain }),
+        ...(config.app.sandbox.e2b.cpuCount === undefined
+          ? {}
+          : { cpuCount: config.app.sandbox.e2b.cpuCount }),
+        ...(config.app.sandbox.e2b.memoryMb === undefined
+          ? {}
+          : { memoryMb: config.app.sandbox.e2b.memoryMb }),
       },
     };
   }

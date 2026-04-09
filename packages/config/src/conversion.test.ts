@@ -60,6 +60,10 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN: "worker.sandbox.e2b.app",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT: "4",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB: "16384",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });
@@ -169,6 +173,12 @@ describe("convertEnvToTomlRecord", () => {
           },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
+            e2b: {
+              api_key: "test-data-plane-worker-key",
+              domain: "worker.sandbox.e2b.app",
+              cpu_count: 4,
+              memory_mb: 16384,
+            },
           },
         },
         data_plane_gateway: {
@@ -290,6 +300,12 @@ describe("convertTomlToEnvRecord", () => {
           },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
+            e2b: {
+              api_key: "test-data-plane-worker-key",
+              domain: "worker.sandbox.e2b.app",
+              cpu_count: 4,
+              memory_mb: 16384,
+            },
           },
         },
         data_plane_gateway: {
@@ -352,6 +368,10 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN: "worker.sandbox.e2b.app",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT: "4",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB: "16384",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });

@@ -8,6 +8,10 @@ import {
   SandboxRuntimeEnv,
   SandboxRuntimeEnvDefaults,
 } from "../../src/index.js";
+import {
+  E2BDefaultTemplateCpuCount,
+  E2BDefaultTemplateMemoryMb,
+} from "../../src/providers/e2b/schemas.js";
 import { createE2BTemplateAlias } from "../../src/providers/e2b/template-registry.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
@@ -27,7 +31,11 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
   it("starts a sandbox from the shared base image and injects env", async ({ fixture }) => {
     const injectedEnvValue = `mistle-e2b-env-${randomUUID()}`;
-    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
+    const expectedTemplateAlias = createE2BTemplateAlias({
+      baseRef: fixture.baseImage.imageId,
+      cpuCount: E2BDefaultTemplateCpuCount,
+      memoryMb: E2BDefaultTemplateMemoryMb,
+    });
     let id: string | undefined;
 
     try {
@@ -52,8 +60,8 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
       expect(inspection.disposition).toBe("active");
       expect(inspection.raw.templateId).not.toBe("");
       expect(inspection.raw.metadata.mistle_template_alias).toBe(expectedTemplateAlias);
-      expect(inspection.raw.cpuCount).toBeGreaterThan(0);
-      expect(inspection.raw.memoryMB).toBeGreaterThan(0);
+      expect(inspection.raw.cpuCount).toBe(E2BDefaultTemplateCpuCount);
+      expect(inspection.raw.memoryMB).toBe(E2BDefaultTemplateMemoryMb);
 
       const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const result = await connectedSandbox.commands.run(
@@ -74,7 +82,11 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     fixture,
   }) => {
     const marker = `mistle-e2b-state-${randomUUID()}`;
-    const expectedTemplateAlias = createE2BTemplateAlias(fixture.baseImage.imageId);
+    const expectedTemplateAlias = createE2BTemplateAlias({
+      baseRef: fixture.baseImage.imageId,
+      cpuCount: E2BDefaultTemplateCpuCount,
+      memoryMb: E2BDefaultTemplateMemoryMb,
+    });
     let id: string | undefined;
 
     try {

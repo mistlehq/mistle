@@ -8,6 +8,8 @@ E2B implementation for `@mistle/sandbox`.
 
 - `apiKey`: E2B API key
 - `domain` (optional): override E2B domain when not using the default `e2b.app`
+- `cpuCount` (optional): template CPU default for newly built E2B templates, defaults to `4`
+- `memoryMb` (optional): template memory default in MB for newly built E2B templates, defaults to `8192`
 
 All config fields are validated with Zod and fail fast when invalid.
 
@@ -28,7 +30,7 @@ const adapter = createSandboxAdapter({
 
 - `start({ image, env })` uses `image.imageId` as the canonical OCI image reference and injects the shared required runtime env.
 - The provider resolves that image through `template-registry.ts`, which derives a deterministic template alias from the OCI image reference and builds it on demand when needed.
-- As long as the base image reference does not change, the provider will target the same E2B template alias.
+- The template alias is derived from the base image reference plus the configured CPU and memory defaults, so changing either resource setting targets a new template.
 - `inspect({ id })` returns normalized top-level lifecycle fields plus the raw E2B `Sandbox.getInfo(...)` payload without connecting to the runtime.
 - The provider persists the derived template alias in sandbox metadata at creation time, so callers can read it back from `inspection.raw.metadata.mistle_template_alias` across pause/resume.
 - `resume({ id })` reconnects to the same E2B sandbox id.

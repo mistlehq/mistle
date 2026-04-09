@@ -19,6 +19,8 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.app",
+        cpuCount: 4,
+        memoryMb: 8192,
       },
     });
   });
@@ -29,6 +31,8 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.example.com",
+        cpuCount: 4,
+        memoryMb: 16384,
       },
     });
 
@@ -37,6 +41,8 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.example.com",
+        cpuCount: 4,
+        memoryMb: 16384,
       },
     });
   });

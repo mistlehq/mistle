@@ -9,12 +9,13 @@ import {
   E2BClientOperationIds,
   mapE2BClientError,
 } from "./client-errors.js";
-import type { E2BSandboxConfig } from "./config.js";
 import {
   createE2BSandboxConnectOptions,
   createE2BSandboxCreateOptions,
 } from "./sandbox-options.js";
 import {
+  E2BDefaultTemplateCpuCount,
+  E2BDefaultTemplateMemoryMb,
   E2BDestroySandboxRequestSchema,
   E2BInitRequestSchema,
   E2BInspectSandboxRequestSchema,
@@ -27,6 +28,7 @@ import {
   type E2BResumeSandboxRequest,
   type E2BStartSandboxRequest,
   type E2BStopSandboxRequest,
+  type ValidatedE2BSandboxConfig,
 } from "./schemas.js";
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
 import type { E2BSandboxInspectResult } from "./types.js";
@@ -54,7 +56,7 @@ export interface E2BClient {
   resume(request: E2BInitRequest): Promise<void>;
 }
 
-function createE2BConnectionOptions(config: E2BSandboxConfig): ConnectionOpts {
+function createE2BConnectionOptions(config: ValidatedE2BSandboxConfig): ConnectionOpts {
   return {
     apiKey: config.apiKey,
     ...(config.domain === undefined ? {} : { domain: config.domain }),
@@ -140,10 +142,17 @@ export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #templateRegistry: E2BTemplateRegistry;
 
-  constructor(input: { config: E2BSandboxConfig; templateRegistry?: E2BTemplateRegistry }) {
+  constructor(input: {
+    config: ValidatedE2BSandboxConfig;
+    templateRegistry?: E2BTemplateRegistry;
+  }) {
     this.#connectionOptions = createE2BConnectionOptions(input.config);
     this.#templateRegistry =
-      input.templateRegistry ?? new E2BApiTemplateRegistry(this.#connectionOptions);
+      input.templateRegistry ??
+      new E2BApiTemplateRegistry(this.#connectionOptions, {
+        cpuCount: input.config.cpuCount ?? E2BDefaultTemplateCpuCount,
+        memoryMb: input.config.memoryMb ?? E2BDefaultTemplateMemoryMb,
+      });
   }
 
   async startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse> {
