@@ -12,6 +12,7 @@
   "devDependencies": {
     "@mistle/db": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
+    "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",

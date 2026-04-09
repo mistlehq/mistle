@@ -11,12 +11,12 @@ import {
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
+import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { z } from "zod";
 
-import { createNodeSandboxSessionRuntime } from "../../packages/sandbox-session-client/src/node.js";
-import { SandboxSessionTransport } from "../../packages/sandbox-session-client/src/transport.js";
 import {
   startCloudflaredTunnel,
   type StartedCloudflaredTunnel,
