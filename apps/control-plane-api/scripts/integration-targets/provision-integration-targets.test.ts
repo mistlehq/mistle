@@ -80,13 +80,13 @@ describe("provision-integration-targets", () => {
         version: 1,
         targets: [
           {
-            targetKey: "github-cloud",
+            targetKey: "example-target",
             enabled: true,
             config: {
-              app_private_key_preview: "line-1\\nline-2\\r\\nline-3",
+              secret_preview: "line-1\\nline-2\\r\\nline-3",
             },
             secrets: {
-              app_private_key_pem: "-----BEGIN KEY-----\\nabc\\r\\ndef\\n-----END KEY-----",
+              secret_blob: "-----BEGIN KEY-----\\nabc\\r\\ndef\\n-----END KEY-----",
             },
           },
         ],
@@ -98,13 +98,13 @@ describe("provision-integration-targets", () => {
       version: 1,
       targets: [
         {
-          targetKey: "github-cloud",
+          targetKey: "example-target",
           enabled: true,
           config: {
-            app_private_key_preview: "line-1\nline-2\r\nline-3",
+            secret_preview: "line-1\nline-2\r\nline-3",
           },
           secrets: {
-            app_private_key_pem: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
+            secret_blob: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
           },
         },
       ],
@@ -117,13 +117,13 @@ describe("provision-integration-targets", () => {
         version: 1,
         targets: [
           {
-            targetKey: "github-cloud",
+            targetKey: "example-target",
             enabled: true,
             config: {
-              app_private_key_preview: "line-1\\\\nline-2\\\\r\\\\nline-3",
+              secret_preview: "line-1\\\\nline-2\\\\r\\\\nline-3",
             },
             secrets: {
-              app_private_key_pem: "-----BEGIN KEY-----\\\\nabc\\\\r\\\\ndef\\\\n-----END KEY-----",
+              secret_blob: "-----BEGIN KEY-----\\\\nabc\\\\r\\\\ndef\\\\n-----END KEY-----",
             },
           },
         ],
@@ -135,13 +135,13 @@ describe("provision-integration-targets", () => {
       version: 1,
       targets: [
         {
-          targetKey: "github-cloud",
+          targetKey: "example-target",
           enabled: true,
           config: {
-            app_private_key_preview: "line-1\nline-2\r\nline-3",
+            secret_preview: "line-1\nline-2\r\nline-3",
           },
           secrets: {
-            app_private_key_pem: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
+            secret_blob: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
           },
         },
       ],
@@ -185,20 +185,17 @@ describe("provision-integration-targets", () => {
         version: 1,
         targets: [
           {
-            targetKey: "github-cloud",
+            targetKey: "example-target",
             enabled: true,
             config: {},
             secretEnv: {
-              app_private_key_pem: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
-              webhook_secret: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET",
+              api_key: "MISTLE_EXAMPLE_TARGET_API_KEY",
             },
           },
         ],
       }),
       {
-        MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
-          "-----BEGIN KEY-----\\nabc\\n-----END KEY-----",
-        MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET: "whsec_123",
+        MISTLE_EXAMPLE_TARGET_API_KEY: "sk-example\\nline-two",
       },
     );
 
@@ -206,12 +203,11 @@ describe("provision-integration-targets", () => {
       version: 1,
       targets: [
         {
-          targetKey: "github-cloud",
+          targetKey: "example-target",
           enabled: true,
           config: {},
           secrets: {
-            app_private_key_pem: "-----BEGIN KEY-----\nabc\n-----END KEY-----",
-            webhook_secret: "whsec_123",
+            api_key: "sk-example\nline-two",
           },
         },
       ],
@@ -223,14 +219,7 @@ describe("provision-integration-targets", () => {
       new URL("../../../../integration-targets.provision.example.json", import.meta.url),
       "utf8",
     );
-    const parsedExampleManifest = parseIntegrationTargetsProvisionManifest(rawExampleManifest, {
-      MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
-        "-----BEGIN KEY-----\nexample\n-----END KEY-----",
-      MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET: "whsec_example_cloud",
-      MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM:
-        "-----BEGIN KEY-----\nexample\n-----END KEY-----",
-      MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET: "whsec_example_enterprise",
-    });
+    const parsedExampleManifest = parseIntegrationTargetsProvisionManifest(rawExampleManifest, {});
     const integrationRegistry = createIntegrationRegistry();
     const expectedTargetKeys = SyncIntegrationTargetsForTests.buildSyncIntegrationTargets(
       integrationRegistry,
@@ -250,21 +239,20 @@ describe("provision-integration-targets", () => {
           version: 1,
           targets: [
             {
-              targetKey: "github-cloud",
+              targetKey: "example-target",
               enabled: true,
               config: {},
               secrets: {
-                webhook_secret: "whsec_123",
+                api_key: "sk-example",
               },
               secretEnv: {
-                app_private_key_pem: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
+                api_key: "MISTLE_EXAMPLE_TARGET_API_KEY",
               },
             },
           ],
         }),
         {
-          MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM:
-            "-----BEGIN KEY-----\\nabc\\n-----END KEY-----",
+          MISTLE_EXAMPLE_TARGET_API_KEY: "sk-live",
         },
       ),
     ).toThrow(/Provide exactly one of 'secrets' or 'secretEnv'/u);
@@ -277,11 +265,11 @@ describe("provision-integration-targets", () => {
           version: 1,
           targets: [
             {
-              targetKey: "github-cloud",
+              targetKey: "example-target",
               enabled: true,
               config: {},
               secretEnv: {
-                webhook_secret: "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET",
+                api_key: "MISTLE_EXAMPLE_TARGET_API_KEY",
               },
             },
           ],
@@ -289,7 +277,7 @@ describe("provision-integration-targets", () => {
         {},
       ),
     ).toThrow(
-      /Missing integration target secret environment variable 'MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET'/u,
+      /Missing integration target secret environment variable 'MISTLE_EXAMPLE_TARGET_API_KEY'/u,
     );
   });
 

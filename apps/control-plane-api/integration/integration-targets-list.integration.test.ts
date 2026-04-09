@@ -39,8 +39,8 @@ describe("integration targets discovery integration", () => {
           variantId: "github-cloud",
           enabled: true,
           config: {
-            base_url: "https://github.com",
-            app_id: "123456",
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
           },
           displayNameOverride: "GitHub Cloud",
           descriptionOverride: "GitHub Cloud target",
@@ -143,8 +143,8 @@ describe("integration targets discovery integration", () => {
       variantId: "github-cloud",
       enabled: true,
       config: {
-        base_url: "https://github.com",
-        app_id: "123456",
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
       },
       displayName: "GitHub Cloud",
       description: "GitHub Cloud target",
@@ -214,7 +214,7 @@ describe("integration targets discovery integration", () => {
       displayNameOverride: "GitHub Cloud",
       descriptionOverride: "GitHub Cloud target",
       targetHealth: {
-        configStatus: "invalid",
+        configStatus: "valid",
       },
     });
 
@@ -364,8 +364,8 @@ describe("integration targets discovery integration", () => {
         variantId: "github-cloud",
         enabled: true,
         config: {
-          base_url: "https://github.com",
-          app_id: "123456",
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
         displayNameOverride: "GitHub Dashboard Contract",
         descriptionOverride: "GitHub contract target",
@@ -431,7 +431,7 @@ describe("integration targets discovery integration", () => {
         },
       ],
       targetHealth: {
-        configStatus: "invalid",
+        configStatus: "valid",
       },
     });
   });
