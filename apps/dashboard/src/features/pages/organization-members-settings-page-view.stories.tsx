@@ -55,6 +55,15 @@ export const LoadError: Story = {
 
 export const Default: Story = {};
 
+export const Invited: Story = {
+  args: {
+    activeFilter: "invitations",
+    invitations: OrganizationMembersStoryInvitations,
+    members: [],
+    total: OrganizationMembersStoryInvitations.length,
+  },
+};
+
 export const CapabilitiesWarning: Story = {
   args: {
     capabilities: null,

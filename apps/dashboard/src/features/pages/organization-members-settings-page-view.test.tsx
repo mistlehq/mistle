@@ -53,7 +53,7 @@ describe("OrganizationMembersSettingsPageView", () => {
       />,
     );
 
-    expect(screen.getAllByText("pending@mistle.so")).toHaveLength(2);
+    expect(screen.getAllByText("pending@mistle.so")).toHaveLength(1);
     expect(screen.queryByText("storybook@mistle.so")).toBeNull();
   });
 });
