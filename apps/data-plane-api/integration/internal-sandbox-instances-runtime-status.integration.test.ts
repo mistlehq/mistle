@@ -298,7 +298,7 @@ describe("internal sandbox instance runtime status integration", () => {
   );
 
   it(
-    "lists effective runtime-composed statuses for attached and unattached sandboxes",
+    "lists effective runtime-composed statuses and only marks keepalive active for running sandboxes",
     async ({ fixture }) => {
       const client = createDataPlaneSandboxInstancesClient({
         baseUrl: fixture.baseUrl,
@@ -389,6 +389,13 @@ describe("internal sandbox instance runtime status integration", () => {
             ready: true,
           }),
         );
+        bootstrapSocket.send(
+          JSON.stringify({
+            type: "keepalive.state",
+            active: true,
+            ttlMs: 30_000,
+          }),
+        );
         await waitForListedSandboxStatus({
           fixture,
           organizationId,
@@ -404,18 +411,22 @@ describe("internal sandbox instance runtime status integration", () => {
           expect.objectContaining({
             id: connectedSandboxInstanceId,
             status: "running",
+            keepaliveActive: true,
           }),
           expect.objectContaining({
             id: disconnectedSandboxInstanceId,
             status: "starting",
+            keepaliveActive: false,
           }),
           expect.objectContaining({
             id: failedSandboxInstanceId,
             status: "failed",
+            keepaliveActive: false,
           }),
           expect.objectContaining({
             id: stoppedSandboxInstanceId,
             status: "stopped",
+            keepaliveActive: false,
           }),
         ]);
 

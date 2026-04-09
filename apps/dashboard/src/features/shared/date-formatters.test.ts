@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDate, formatRelativeOrDate } from "./date-formatters.js";
+import {
+  formatCompactRelativeOrDate,
+  formatDate,
+  formatRelativeOrDate,
+} from "./date-formatters.js";
 
 describe("date formatters", () => {
   it("formats recent timestamps with relative labels", () => {
@@ -31,5 +35,28 @@ describe("date formatters", () => {
 
   it("returns Unknown for invalid timestamps", () => {
     expect(formatRelativeOrDate("not-a-date")).toBe("Unknown");
+  });
+
+  it("formats recent timestamps with compact relative labels", () => {
+    expect(
+      formatCompactRelativeOrDate("2026-03-19T11:50:00.000Z", {
+        nowEpochMs: Date.parse("2026-03-19T12:00:00.000Z"),
+      }),
+    ).toBe("10m");
+    expect(
+      formatCompactRelativeOrDate("2026-03-19T09:00:00.000Z", {
+        nowEpochMs: Date.parse("2026-03-19T12:00:00.000Z"),
+      }),
+    ).toBe("3h");
+    expect(
+      formatCompactRelativeOrDate("2026-03-17T12:00:00.000Z", {
+        nowEpochMs: Date.parse("2026-03-19T12:00:00.000Z"),
+      }),
+    ).toBe("2d");
+    expect(
+      formatCompactRelativeOrDate("2025-03-19T12:00:00.000Z", {
+        nowEpochMs: Date.parse("2026-03-19T12:00:00.000Z"),
+      }),
+    ).toBe("1y");
   });
 });

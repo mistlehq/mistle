@@ -1,16 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
 
-import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import { SessionsPage } from "./sessions-page.js";
 import {
   buildSandboxInstanceListItemFixture,
   buildStoryLaunchableSandboxProfile,
-  createSessionsPageStoryQueryClient,
 } from "./sessions-page.story-fixtures.js";
+import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
@@ -18,23 +15,12 @@ type SessionsPageStoryArgs = {
 };
 
 function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
-  const [queryClient] = useState(() => {
-    const storyData = {
-      ...(input.launchableProfiles !== undefined
-        ? { launchableProfiles: input.launchableProfiles }
-        : {}),
-      ...(input.sandboxInstancesList !== undefined
-        ? { sandboxInstancesList: input.sandboxInstancesList }
-        : {}),
-    };
-
-    return createSessionsPageStoryQueryClient(storyData);
-  });
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionsPage />
-    </QueryClientProvider>
+    <SessionsStoryHarness
+      initialEntries={["/sessions"]}
+      launchableProfiles={input.launchableProfiles}
+      sandboxInstancesList={input.sandboxInstancesList}
+    />
   );
 }
 
@@ -45,7 +31,7 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  decorators: [withDashboardPageStory, withDashboardMemoryRouter],
+  decorators: [withDashboardPageStory],
   args: {
     launchableProfiles: [
       buildStoryLaunchableSandboxProfile({
@@ -114,69 +100,6 @@ export const EmptyState: Story = {
       nextPage: null,
       previousPage: null,
       totalResults: 0,
-    },
-  },
-};
-
-export const PaginatedResults: Story = {
-  args: {
-    sandboxInstancesList: {
-      items: [
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_page_1",
-          title: "Investigate flaky test run",
-          sandboxProfileDisplayName: "Repo Maintainer",
-          status: "running",
-          createdAt: "2026-04-01T09:00:00.000Z",
-        }),
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_page_2",
-          title: "Draft migration guide",
-          sandboxProfileDisplayName: "Docs Maintainer",
-          status: "stopped",
-          createdAt: "2026-03-31T15:30:00.000Z",
-        }),
-      ],
-      nextPage: {
-        after: "cursor_after_2",
-        limit: 20,
-      },
-      previousPage: {
-        before: "cursor_before_0",
-        limit: 20,
-      },
-      totalResults: 42,
-    },
-  },
-};
-
-export const FailedSessions: Story = {
-  args: {
-    sandboxInstancesList: {
-      items: [
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_failed_runtime",
-          title: null,
-          sandboxProfileDisplayName: "Webhook Debugger",
-          status: "failed",
-          createdAt: "2026-03-31T12:00:00.000Z",
-          failureCode: "sandbox_bootstrap_failed",
-          failureMessage: "Could not start sandbox runtime because image pull failed.",
-        }),
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_failed_init",
-          title: "Reconcile Q2 variance report",
-          sandboxProfileDisplayName: "Finance Investigator",
-          status: "failed",
-          createdAt: "2026-03-31T11:15:00.000Z",
-          failureCode: "session_init_failed",
-          failureMessage:
-            "The sandbox started, but the initialization command exited with code 127.",
-        }),
-      ],
-      nextPage: null,
-      previousPage: null,
-      totalResults: 2,
     },
   },
 };

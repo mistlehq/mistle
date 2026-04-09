@@ -3600,6 +3600,7 @@ export interface paths {
                 failureCode: string | null;
                 failureMessage: string | null;
                 id: string;
+                keepaliveActive: boolean;
                 sandboxProfileDisplayName: string | null;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;

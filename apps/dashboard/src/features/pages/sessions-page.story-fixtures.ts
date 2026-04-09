@@ -4,6 +4,7 @@ import {
   createAuthenticatedSessionFixture,
   seedAuthenticatedSession,
 } from "../../test-support/auth-session.js";
+import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   LaunchableSandboxProfile,
@@ -14,6 +15,24 @@ import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
+
+type SessionsSidebarQueryState =
+  | {
+      kind: "success";
+    }
+  | {
+      kind: "pending";
+    }
+  | {
+      errorMessage?: string;
+      kind: "error";
+    };
+
+function storyOrganizationSummaryQueryKey(
+  organizationId: string | null,
+): readonly ["shell", "organization-summary", string | null] {
+  return ["shell", "organization-summary", organizationId];
+}
 
 export function buildStoryLaunchableSandboxProfile(
   overrides: Partial<LaunchableSandboxProfile> & Pick<LaunchableSandboxProfile, "id">,
@@ -44,6 +63,7 @@ export function buildSandboxInstanceListItemFixture(
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,
     status: "running",
+    keepaliveActive: false,
     startedBy: {
       kind: "user",
       id: "user-id",
@@ -61,6 +81,7 @@ export function buildSandboxInstanceListItemFixture(
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sessionsSidebarQueryState?: SessionsSidebarQueryState;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -72,6 +93,10 @@ export function createSessionsPageStoryQueryClient(input?: {
   });
 
   seedAuthenticatedSession(queryClient);
+  queryClient.setQueryData(storyOrganizationSummaryQueryKey("org_123"), {
+    name: "Mistle Labs",
+  });
+  queryClient.setQueryData(organizationLogoQueryKey("org_123"), null);
   queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
     items: input?.launchableProfiles ?? [
       buildStoryLaunchableSandboxProfile({ id: "sbp_profile_alpha" }),
@@ -90,6 +115,38 @@ export function createSessionsPageStoryQueryClient(input?: {
       totalResults: 0,
     },
   );
+  const sessionsSidebarQueryKey = sandboxInstancesListQueryKey({
+    limit: 100,
+    after: null,
+    before: null,
+  });
+  const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
+    kind: "success",
+  };
+
+  if (sessionsSidebarQueryState.kind === "success") {
+    queryClient.setQueryData(
+      sessionsSidebarQueryKey,
+      input?.sandboxInstancesList ?? {
+        items: [],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 0,
+      },
+    );
+  } else if (sessionsSidebarQueryState.kind === "pending") {
+    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+      queryFn: async () => await new Promise<SandboxInstancesListResult>(() => undefined),
+    });
+  } else {
+    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+      queryFn: async () => {
+        throw new Error(
+          sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
+        );
+      },
+    });
+  }
 
   return queryClient;
 }

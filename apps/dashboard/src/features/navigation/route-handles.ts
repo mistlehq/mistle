@@ -159,6 +159,12 @@ export const ROUTE_HANDLES = {
     title: "Sessions",
     description: "",
   },
+  sessionsNew: {
+    appShellInsetOwner: "child",
+    breadcrumb: "New",
+    title: "New session",
+    description: "Start a sandbox-backed session from a sandbox profile.",
+  },
   sessionsDetail: {
     breadcrumb: resolveSessionDetailBreadcrumb,
     title: "Session",

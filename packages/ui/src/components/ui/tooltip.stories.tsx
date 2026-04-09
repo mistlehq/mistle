@@ -48,3 +48,28 @@ export const SidePositions = {
     );
   },
 };
+
+export const LightVariant = {
+  render: function Render() {
+    return (
+      <div className="flex min-h-32 items-center justify-center gap-6">
+        <Tooltip open>
+          <TooltipTrigger render={<Button type="button" variant="outline" />}>
+            Light with arrow
+          </TooltipTrigger>
+          <TooltipContent side="top" variant="light">
+            Uses the light surface treatment.
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip open>
+          <TooltipTrigger render={<Button type="button" variant="outline" />}>
+            Light without arrow
+          </TooltipTrigger>
+          <TooltipContent showArrow={false} side="top" variant="light">
+            Uses the light surface treatment without an arrow.
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  },
+};

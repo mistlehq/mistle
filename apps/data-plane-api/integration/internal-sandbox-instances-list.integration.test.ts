@@ -95,6 +95,7 @@ describe("internal sandbox instances list integration", () => {
       title: "Investigate failed webhook run",
       sandboxProfileVersion: 3,
       status: "failed",
+      keepaliveActive: false,
       startedBy: {
         kind: "system",
         id: "aru_list_a",
@@ -125,6 +126,7 @@ describe("internal sandbox instances list integration", () => {
     expect(secondPage.totalResults).toBe(3);
     expect(secondPage.items.map((item) => item.id)).toEqual(["sbi_list_org_a_001"]);
     expect(secondPage.items[0]?.title).toBeNull();
+    expect(secondPage.items[0]?.keepaliveActive).toBe(false);
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
   }, 60_000);

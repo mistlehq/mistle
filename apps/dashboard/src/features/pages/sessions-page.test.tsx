@@ -122,6 +122,7 @@ describe("SessionsPage", () => {
         sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
         status: "starting",
+        keepaliveActive: false,
         startedBy: {
           kind: "user",
           id: "user-id",
@@ -167,6 +168,7 @@ describe("SessionsPage", () => {
     );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
+    expect(markup).toContain(">Sessions<");
     expect(markup).toContain('<span class="sr-only">Actions</span>');
   });
 

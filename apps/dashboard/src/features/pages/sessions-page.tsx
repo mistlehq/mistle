@@ -23,9 +23,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { listLaunchableSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
@@ -106,7 +105,7 @@ export function SandboxSessionStatusBadge(input: {
   const tooltipMessage = input.failureMessage;
 
   return (
-    <Tooltip>
+    <Tooltip delay={0}>
       <TooltipTrigger
         aria-label="View failure details"
         render={
@@ -173,6 +172,7 @@ export function buildOptimisticSessions(input: {
       sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,
       status: session.status,
+      keepaliveActive: false,
       startedBy: {
         kind: "user",
         id: input.currentUserId,
@@ -225,10 +225,7 @@ export function SessionsPage(): React.JSX.Element {
   const sandboxInstancesBefore =
     sandboxInstancesAfter === null ? parseCursor(searchParams.get("before")) : null;
 
-  const selectableProfilesQuery = useQuery({
-    queryKey: launchableSandboxProfilesQueryKey(),
-    queryFn: async ({ signal }) => listLaunchableSandboxProfiles({ signal }),
-  });
+  const selectableProfilesQuery = useLaunchableSandboxProfiles();
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
       limit: sandboxInstanceListLimit,
@@ -458,7 +455,7 @@ export function SessionsPage(): React.JSX.Element {
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Profile
+                  Sessions
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Started by
@@ -478,7 +475,7 @@ export function SessionsPage(): React.JSX.Element {
               {!isLoadingSessions && !hasSessions ? (
                 <TableRow>
                   <TableCell className="text-muted-foreground" colSpan={5}>
-                    No sandbox instances yet.
+                    No sessions yet.
                   </TableCell>
                 </TableRow>
               ) : (

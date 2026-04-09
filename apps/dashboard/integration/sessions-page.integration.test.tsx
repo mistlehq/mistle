@@ -339,6 +339,51 @@ describe("SessionsPage integration", () => {
     }
   });
 
+  it("renders the sessions empty state when there are no sessions", async () => {
+    const renderedPage = await renderDashboardPageIntegration({
+      handler: (request, response) => {
+        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/sandbox/profiles/launchable") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [],
+            }),
+          );
+          return;
+        }
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/sandbox/instances") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [],
+              nextPage: null,
+              previousPage: null,
+              totalResults: 0,
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404, { "content-type": "application/json" });
+        response.end(JSON.stringify({ message: "Not found" }));
+      },
+      ui: (
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      ),
+    });
+
+    try {
+      expect(await screen.findByText("No sessions yet.")).toBeDefined();
+    } finally {
+      await renderedPage.close();
+    }
+  });
+
   it("starts the selected launchable profile version", async () => {
     const requestedVersions: number[] = [];
 
