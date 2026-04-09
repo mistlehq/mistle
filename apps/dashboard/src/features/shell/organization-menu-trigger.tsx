@@ -75,14 +75,6 @@ export function OrganizationMenuTrigger(input: {
         </div>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64" side="bottom" sideOffset={8}>
-        {input.organizationErrorMessage !== null ? (
-          <>
-            <DropdownMenuGroup>
-              <DropdownMenuItem disabled>{input.organizationErrorMessage}</DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
         <DropdownMenuGroup>
           <DropdownMenuItem onClick={input.onNavigateToSettings}>Settings</DropdownMenuItem>
         </DropdownMenuGroup>
@@ -94,20 +86,24 @@ export function OrganizationMenuTrigger(input: {
                 Switch organization
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup value={input.activeOrganizationId ?? undefined}>
-                  {organizations.map((organization) => (
-                    <DropdownMenuRadioItem
-                      disabled={input.isSwitchingOrganization}
-                      key={organization.id}
-                      onClick={() => {
-                        input.onSwitchOrganization?.(organization.id);
-                      }}
-                      value={organization.id}
-                    >
-                      {organization.name}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
+                {input.organizationErrorMessage !== null ? (
+                  <DropdownMenuItem disabled>{input.organizationErrorMessage}</DropdownMenuItem>
+                ) : (
+                  <DropdownMenuRadioGroup value={input.activeOrganizationId ?? undefined}>
+                    {organizations.map((organization) => (
+                      <DropdownMenuRadioItem
+                        disabled={input.isSwitchingOrganization}
+                        key={organization.id}
+                        onClick={() => {
+                          input.onSwitchOrganization?.(organization.id);
+                        }}
+                        value={organization.id}
+                      >
+                        {organization.name}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}

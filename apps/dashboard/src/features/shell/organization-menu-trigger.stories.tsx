@@ -65,14 +65,17 @@ export const MultiOrganizationSwitcher: Story = {
   },
 };
 
-export const SwitchingOrganization: Story = {
+export const OrganizationListFailure: Story = {
   args: {
-    isSwitchingOrganization: true,
-    organizations: [
-      { id: "org_acme", name: "Acme Corp" },
-      { id: "org_mistle", name: "Mistle Labs" },
-      { id: "org_northstar", name: "Northstar Research" },
-    ],
+    organizationErrorMessage: "Unable to load organizations.",
+    organizations: [{ id: "org_mistle", name: "Mistle Labs" }],
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: "Organization menu" }));
+
+    await expect(await canvas.findByText("Unable to load organizations.")).toBeVisible();
+    await expect(await canvas.findByText("Switch organization")).toBeVisible();
   },
 };
 
