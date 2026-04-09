@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   decryptCredentialUtf8,
+  decryptDeviceAuthorizationProviderStateUtf8,
   decryptRedirectSessionSecretUtf8,
   decryptIntegrationTargetSecrets,
   encryptCredentialUtf8,
+  encryptDeviceAuthorizationProviderStateUtf8,
   encryptRedirectSessionSecretUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
@@ -152,5 +154,28 @@ describe("integration credential crypto", () => {
     });
 
     expect(decrypted).toBe("pkce-verifier-value");
+  });
+
+  it("encrypts and decrypts device authorization provider state with master key material", () => {
+    const ciphertext = encryptDeviceAuthorizationProviderStateUtf8({
+      plaintext: JSON.stringify({
+        device_auth_id: "da_123",
+        interval_seconds: 5,
+      }),
+      masterKeyVersion: 6,
+      masterEncryptionKeyMaterial: "master-key-version-6",
+    });
+
+    const decrypted = decryptDeviceAuthorizationProviderStateUtf8({
+      ciphertext,
+      masterEncryptionKeys: {
+        "6": "master-key-version-6",
+      },
+    });
+
+    expect(JSON.parse(decrypted)).toEqual({
+      device_auth_id: "da_123",
+      interval_seconds: 5,
+    });
   });
 });

@@ -3,6 +3,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import { createRequireAuthSessionMiddleware } from "../middleware/require-auth-session.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
+import * as cancelDeviceAuthorizationAttempt from "./cancel-device-authorization-attempt/index.js";
 import * as completeGitHubAppInstallationConnection from "./complete-github-app-installation-connection/index.js";
 import * as completeOAuth2AuthorizationCodeConnection from "./complete-oauth2-authorization-code-connection/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
@@ -10,11 +11,13 @@ import * as createFormConnection from "./create-form-connection/index.js";
 import * as createIntegrationWebhookSource from "./create-integration-webhook-source/index.js";
 import * as deleteIntegrationConnection from "./delete-integration-connection/index.js";
 import * as deleteIntegrationWebhookSource from "./delete-integration-webhook-source/index.js";
+import * as getDeviceAuthorizationAttempt from "./get-device-authorization-attempt/index.js";
 import * as getIntegrationWebhookSource from "./get-integration-webhook-source/index.js";
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
 import * as listIntegrationWebhookSources from "./list-integration-webhook-sources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
+import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
 import * as startGitHubAppInstallationConnection from "./start-github-app-installation-connection/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
 import * as updateFormConnection from "./update-form-connection/index.js";
@@ -94,6 +97,22 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
     startOAuth2AuthorizationCodeConnection.route,
     startOAuth2AuthorizationCodeConnection.handler,
   );
+
+  routes.use(startDeviceAuthorizationConnection.route.path, requireAuthSession);
+  routes.openapi(
+    startDeviceAuthorizationConnection.route,
+    startDeviceAuthorizationConnection.handler,
+  );
+
+  routes.on(
+    getDeviceAuthorizationAttempt.route.method,
+    getDeviceAuthorizationAttempt.route.path,
+    requireAuthSession,
+  );
+  routes.openapi(getDeviceAuthorizationAttempt.route, getDeviceAuthorizationAttempt.handler);
+
+  routes.use(cancelDeviceAuthorizationAttempt.route.path, requireAuthSession);
+  routes.openapi(cancelDeviceAuthorizationAttempt.route, cancelDeviceAuthorizationAttempt.handler);
 
   routes.openapi(
     completeGitHubAppInstallationConnection.route,

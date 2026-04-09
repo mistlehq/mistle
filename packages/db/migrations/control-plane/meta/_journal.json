@@ -57,6 +57,13 @@
       "when": 1775150160132,
       "tag": "0007_add-integration-webhook-sources",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775808000000,
+      "tag": "0008_add-integration-connection-device-authorization-attempts",
+      "breakpoints": true
     }
   ]
 }

@@ -1772,6 +1772,120 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:targetKey/device-authorization/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            displayName?: string;
+            methodId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Start a device authorization attempt for an integration target. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              attemptId: string;
+              expiresAt?: string;
+              pollAfterMs?: number;
+              /** @enum {string} */
+              status: "pending";
+              userCode: string;
+              /** Format: uri */
+              verificationUrl: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_DEVICE_AUTH_START_INPUT"
+                    | "DEVICE_AUTH_NOT_SUPPORTED"
+                    | "DEVICE_AUTH_CAPABILITY_NOT_CONFIGURED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:targetKey/form": {
     parameters: {
       query?: never;
@@ -2082,6 +2196,256 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/device-authorization/attempts/:attemptId": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          attemptId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Read the current state of a device authorization attempt. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  attemptId: string;
+                  expiresAt?: string;
+                  pollAfterMs?: number;
+                  /** @enum {string} */
+                  status: "pending";
+                  userCode: string;
+                  /** Format: uri */
+                  verificationUrl: string;
+                }
+              | {
+                  attemptId: string;
+                  connectionId: string;
+                  /** @enum {string} */
+                  status: "completed";
+                }
+              | {
+                  attemptId: string;
+                  error: {
+                    code: string;
+                    message: string;
+                  };
+                  /** @enum {string} */
+                  status: "failed";
+                }
+              | {
+                  attemptId: string;
+                  /** @enum {string} */
+                  status: "cancelled";
+                };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_DEVICE_AUTH_STATUS_INPUT";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Device authorization attempt was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DEVICE_AUTH_ATTEMPT_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/device-authorization/attempts/:attemptId/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          attemptId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cancel a device authorization attempt. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  attemptId: string;
+                  expiresAt?: string;
+                  pollAfterMs?: number;
+                  /** @enum {string} */
+                  status: "pending";
+                  userCode: string;
+                  /** Format: uri */
+                  verificationUrl: string;
+                }
+              | {
+                  attemptId: string;
+                  connectionId: string;
+                  /** @enum {string} */
+                  status: "completed";
+                }
+              | {
+                  attemptId: string;
+                  error: {
+                    code: string;
+                    message: string;
+                  };
+                  /** @enum {string} */
+                  status: "failed";
+                }
+              | {
+                  attemptId: string;
+                  /** @enum {string} */
+                  status: "cancelled";
+                };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_DEVICE_AUTH_CANCEL_INPUT";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Device authorization attempt was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "DEVICE_AUTH_ATTEMPT_NOT_FOUND";
               message: string;
             };
           };
