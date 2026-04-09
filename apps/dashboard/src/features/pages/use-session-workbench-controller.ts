@@ -25,6 +25,8 @@ import {
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
+import { useSessionBranchDiff } from "./use-session-branch-diff.js";
+import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
@@ -96,6 +98,18 @@ type SessionWorkbenchState = {
     setPanelSize: (size: number) => void;
     togglePanel: () => void;
   };
+  diffPanelState: {
+    closePanel: () => void;
+    errorMessage: string | null;
+    isLoading: boolean;
+    isVisible: boolean;
+    openPanel: () => void;
+    panelSize: number;
+    patch: string;
+    setPanelSize: (size: number) => void;
+    togglePanel: () => void;
+    truncatedMessage: string | null;
+  };
 };
 
 type SessionConversationPaneState = {
@@ -164,6 +178,9 @@ export function useSessionWorkbenchController(input: {
   const terminalPanelState = useSessionTerminalWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const diffPanelState = useSessionDiffWorkbenchState({
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const lifecycle = sessionState.lifecycle;
   const chat = sessionState.chat;
   const codexConfig = sessionState.codexConfig;
@@ -185,6 +202,11 @@ export function useSessionWorkbenchController(input: {
     lifecycle,
     ptyState,
     queryClient,
+  });
+  const branchDiffState = useSessionBranchDiff({
+    enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
   });
   const configControl = useSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
@@ -243,6 +265,18 @@ export function useSessionWorkbenchController(input: {
         exitCliMode: handoff.handoffToChat,
       },
       terminalPanelState,
+      diffPanelState: {
+        closePanel: diffPanelState.closePanel,
+        errorMessage: branchDiffState.errorMessage,
+        isLoading: branchDiffState.isLoading,
+        isVisible: diffPanelState.isVisible,
+        openPanel: diffPanelState.openPanel,
+        panelSize: diffPanelState.panelSize,
+        patch: branchDiffState.patch,
+        setPanelSize: diffPanelState.setPanelSize,
+        togglePanel: diffPanelState.togglePanel,
+        truncatedMessage: branchDiffState.truncatedMessage,
+      },
     },
     conversationPane: {
       chatState: chat.chatState,

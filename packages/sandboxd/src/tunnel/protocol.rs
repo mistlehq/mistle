@@ -39,6 +39,10 @@ pub const CONNECT_ERROR_CODE_PTY_SESSION_EXISTS: &str = "pty_session_exists";
 pub const CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED: &str = "pty_session_create_failed";
 /// `stream.open.error` code for PTY attach requests without a live session.
 pub const CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE: &str = "pty_session_unavailable";
+/// `stream.open.error` code for rejected one-shot exec requests.
+pub const CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED: &str = "exec_command_rejected";
+/// `stream.open.error` code for one-shot exec requests that cannot be started.
+pub const CONNECT_ERROR_CODE_EXEC_COMMAND_START_FAILED: &str = "exec_command_start_failed";
 
 /// `stream.reset` code for invalid `stream.signal` messages.
 pub const STREAM_RESET_CODE_INVALID_STREAM_SIGNAL: &str = "invalid_stream_signal";
@@ -54,6 +58,8 @@ pub const STREAM_RESET_CODE_STREAM_CLOSE_FAILED: &str = "stream_close_failed";
 pub const STREAM_RESET_CODE_TARGET_CLOSED: &str = "target_closed";
 /// `stream.reset` code for outbound data that exceeds available stream credit.
 pub const STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED: &str = "stream_window_exhausted";
+/// `stream.reset` code for one-shot exec requests that fail after opening.
+pub const STREAM_RESET_CODE_EXEC_COMMAND_FAILED: &str = "exec_command_failed";
 
 /// `stream.reset` code for file uploads whose declared size is exceeded.
 pub const FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED: &str = "byte_count_exceeded";
@@ -126,6 +132,18 @@ pub struct FileUploadStreamChannel {
     pub size_bytes: usize,
 }
 
+/// Exec channel payload accepted by `stream.open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExecStreamChannel {
+    pub kind: String,
+    pub command: String,
+    pub args: Option<Vec<String>>,
+    pub cwd: Option<String>,
+    pub timeout_ms: Option<u64>,
+    pub max_output_bytes: Option<usize>,
+}
+
 /// PTY `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -154,6 +172,16 @@ pub struct FileUploadStreamOpen {
     pub message_type: String,
     pub stream_id: u32,
     pub channel: FileUploadStreamChannel,
+}
+
+/// Exec `stream.open` message accepted by the relay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ExecStreamOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub channel: ExecStreamChannel,
 }
 
 /// PTY resize payload carried in `stream.signal`.
@@ -201,6 +229,7 @@ pub enum StreamControlMessage {
     OpenAgent(AgentStreamOpen),
     OpenPty(PtyStreamOpen),
     OpenFileUpload(FileUploadStreamOpen),
+    OpenExec(ExecStreamOpen),
     Signal(PtyStreamSignal),
     Close(StreamClose),
     Window(StreamWindow),
@@ -354,6 +383,17 @@ struct FileUploadCompletedEvent<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExecResultEvent<'a> {
+    #[serde(rename = "type")]
+    message_type: &'a str,
+    exit_code: i32,
+    stdout: &'a str,
+    stderr: &'a str,
+    truncated: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StreamEvent<'a, T> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -463,6 +503,12 @@ pub fn parse_stream_control_message(
                     validate_file_upload_stream_open(&message)?;
                     Ok(StreamControlMessage::OpenFileUpload(message))
                 }
+                "exec" => {
+                    let message: ExecStreamOpen = serde_json::from_value(parsed_payload)
+                        .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                    validate_exec_stream_open(&message)?;
+                    Ok(StreamControlMessage::OpenExec(message))
+                }
                 _ => Err(TunnelProtocolError::new(format!(
                     "stream.open request channel.kind '{channel_kind}' is not supported"
                 ))),
@@ -499,9 +545,11 @@ pub fn parse_pty_control_message(payload: &str) -> Result<PtyControlMessage, Tun
         StreamControlMessage::Signal(message) => Ok(PtyControlMessage::Signal(message)),
         StreamControlMessage::Close(message) => Ok(PtyControlMessage::Close(message)),
         StreamControlMessage::Window(message) => Ok(PtyControlMessage::Window(message)),
-        StreamControlMessage::OpenAgent(_) | StreamControlMessage::OpenFileUpload(_) => Err(
-            TunnelProtocolError::new("expected PTY control message, got a different channel kind"),
-        ),
+        StreamControlMessage::OpenAgent(_)
+        | StreamControlMessage::OpenFileUpload(_)
+        | StreamControlMessage::OpenExec(_) => Err(TunnelProtocolError::new(
+            "expected PTY control message, got a different channel kind",
+        )),
     }
 }
 
@@ -670,6 +718,27 @@ pub fn file_upload_completed_event(
     })
 }
 
+/// Builds one `stream.event` exec result payload.
+pub fn exec_result_event(
+    stream_id: u32,
+    exit_code: i32,
+    stdout: &str,
+    stderr: &str,
+    truncated: bool,
+) -> String {
+    serialize_json(&StreamEvent {
+        message_type: "stream.event",
+        stream_id,
+        event: ExecResultEvent {
+            message_type: "exec.result",
+            exit_code,
+            stdout,
+            stderr,
+            truncated,
+        },
+    })
+}
+
 /// Builds one `telemetry.open` request payload.
 pub fn telemetry_open(stream_id: u32, signal: &str, format: &str) -> String {
     serialize_json(&TelemetryOpen {
@@ -815,6 +884,44 @@ fn validate_file_upload_stream_open(
     Ok(())
 }
 
+fn validate_exec_stream_open(message: &ExecStreamOpen) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "stream.open" {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request type must be 'stream.open'",
+        ));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.channel.kind != "exec" {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request channel.kind must be 'exec'",
+        ));
+    }
+    if message.channel.command.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request channel.command is required",
+        ));
+    }
+    if let Some(args) = message.channel.args.as_ref()
+        && args.iter().any(|value| value.trim().is_empty())
+    {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request args must contain only non-empty strings",
+        ));
+    }
+    if matches!(message.channel.timeout_ms, Some(0)) {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request timeoutMs must be a positive integer",
+        ));
+    }
+    if matches!(message.channel.max_output_bytes, Some(0)) {
+        return Err(TunnelProtocolError::new(
+            "exec stream.open request maxOutputBytes must be a positive integer",
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_stream_signal(message: &PtyStreamSignal) -> Result<(), TunnelProtocolError> {
     if message.message_type != "stream.signal" {
         return Err(TunnelProtocolError::new(
@@ -934,7 +1041,7 @@ mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
         PtyControlMessage, StreamControlMessage, StreamSendWindow, decode_stream_data_frame,
-        encode_stream_data_frame, file_upload_completed_event,
+        encode_stream_data_frame, exec_result_event, file_upload_completed_event,
         parse_bootstrap_telemetry_control_message, parse_pty_control_message,
         parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
         stream_open_ok, stream_reset, stream_window, telemetry_close, telemetry_open,
@@ -959,6 +1066,12 @@ mod tests {
         )
         .expect("file upload stream.open should parse");
         assert!(matches!(upload, StreamControlMessage::OpenFileUpload(_)));
+
+        let exec = parse_stream_control_message(
+            r#"{"type":"stream.open","streamId":8,"channel":{"kind":"exec","command":"git","args":["status","--short"],"cwd":"/workspace/repo","timeoutMs":15000,"maxOutputBytes":65536}}"#,
+        )
+        .expect("exec stream.open should parse");
+        assert!(matches!(exec, StreamControlMessage::OpenExec(_)));
     }
 
     #[test]
@@ -1019,6 +1132,10 @@ mod tests {
                 "/tmp/attachments/thread_123/file.png",
             ),
             r#"{"type":"stream.event","streamId":7,"event":{"type":"fileUpload.completed","attachmentId":"att_123","threadId":"thread_123","originalFilename":"image.png","mimeType":"image/png","sizeBytes":8,"path":"/tmp/attachments/thread_123/file.png"}}"#
+        );
+        assert_eq!(
+            exec_result_event(9, 0, "stdout", "stderr", true),
+            r#"{"type":"stream.event","streamId":9,"event":{"type":"exec.result","exitCode":0,"stdout":"stdout","stderr":"stderr","truncated":true}}"#
         );
         assert_eq!(
             telemetry_open(42, "logs", "mistle.sandbox-runtime.log.v1"),

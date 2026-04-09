@@ -1,4 +1,4 @@
-import { Notice } from "@mistle/ui";
+import { Notice, Spinner } from "@mistle/ui";
 import { FileDiff, type FileDiffMetadata } from "@pierre/diffs/react";
 import { useMemo } from "react";
 
@@ -13,9 +13,12 @@ const SessionDiffPanelOptions = {
 } as const;
 
 type SessionDiffPanelProps = {
+  errorMessage?: string | null;
+  isLoading?: boolean;
   patch: string;
   summaryLabel: string;
   title?: string;
+  warningMessage?: string | null;
 };
 
 function resolveFileDiffPath(fileDiff: FileDiffMetadata): string {
@@ -49,9 +52,12 @@ function getFileDiffLineStats(fileDiff: FileDiffMetadata): {
 }
 
 export function SessionDiffPanel({
+  errorMessage = null,
+  isLoading = false,
   patch,
   summaryLabel,
   title = "Diffs",
+  warningMessage = null,
 }: SessionDiffPanelProps): React.JSX.Element {
   const parsedPatch = useMemo(() => parseSessionDiffPatch(patch), [patch]);
   const files = parsedPatch.kind === "parsed" ? parsedPatch.files : [];
@@ -68,7 +74,18 @@ export function SessionDiffPanel({
         )}
       </header>
 
-      {parsedPatch.kind === "raw" ? (
+      {isLoading ? (
+        <div className="text-muted-foreground flex min-h-0 flex-1 items-center gap-2 p-3 text-sm">
+          <Spinner aria-label="Loading changes" className="size-4" />
+          <span>Loading changes compared with main.</span>
+        </div>
+      ) : errorMessage !== null ? (
+        <div className="min-h-0 flex-1 overflow-auto p-2">
+          <Notice title="Could not load changes" variant="alert">
+            {errorMessage}
+          </Notice>
+        </div>
+      ) : parsedPatch.kind === "raw" ? (
         <div className="min-h-0 flex-1 overflow-auto p-2">
           <Notice title="Diff parsing failed" variant="alert">
             {parsedPatch.reason}
@@ -82,6 +99,11 @@ export function SessionDiffPanel({
       ) : (
         <div className="min-h-0 flex-1 overflow-auto p-2">
           <div className="flex flex-col gap-2">
+            {warningMessage === null ? null : (
+              <Notice title="Diff truncated" variant="alert">
+                {warningMessage}
+              </Notice>
+            )}
             {files.map((fileDiff) => {
               const stats = getFileDiffLineStats(fileDiff);
               return (

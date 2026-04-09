@@ -37,10 +37,20 @@ const FileUploadStreamChannelSchema = z.object({
   sizeBytes: PositiveIntegerSchema,
 });
 
+const ExecStreamChannelSchema = z.object({
+  kind: z.literal("exec"),
+  command: NonEmptyStringSchema,
+  args: z.array(NonEmptyStringSchema).optional(),
+  cwd: NonEmptyStringSchema.optional(),
+  timeoutMs: PositiveIntegerSchema.optional(),
+  maxOutputBytes: PositiveIntegerSchema.optional(),
+});
+
 const StreamChannelSchema = z.discriminatedUnion("kind", [
   AgentStreamChannelSchema,
   PTYStreamChannelSchema,
   FileUploadStreamChannelSchema,
+  ExecStreamChannelSchema,
 ]);
 
 const PTYResizeSignalSchema = z.object({
@@ -73,9 +83,18 @@ const FileUploadCompletedEventSchema = z.object({
   path: NonEmptyStringSchema,
 });
 
+const ExecResultEventSchema = z.object({
+  type: z.literal("exec.result"),
+  exitCode: z.int(),
+  stdout: z.string(),
+  stderr: z.string(),
+  truncated: z.boolean(),
+});
+
 const StreamEventSchema = z.discriminatedUnion("type", [
   PTYExitEventSchema,
   FileUploadCompletedEventSchema,
+  ExecResultEventSchema,
 ]);
 
 const StreamOpenSchema = z.object({
@@ -370,6 +389,7 @@ const PublishControlMessageSchema = z.discriminatedUnion("type", [
 export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
 export type PTYStreamChannel = z.infer<typeof PTYStreamChannelSchema>;
 export type FileUploadStreamChannel = z.infer<typeof FileUploadStreamChannelSchema>;
+export type ExecStreamChannel = z.infer<typeof ExecStreamChannelSchema>;
 export type StreamChannel = z.infer<typeof StreamChannelSchema>;
 
 export type PTYResizeSignal = z.infer<typeof PTYResizeSignalSchema>;
@@ -377,6 +397,7 @@ export type StreamSignal = z.infer<typeof StreamSignalSchema>;
 
 export type PTYExitEvent = z.infer<typeof PTYExitEventSchema>;
 export type FileUploadCompletedEvent = z.infer<typeof FileUploadCompletedEventSchema>;
+export type ExecResultEvent = z.infer<typeof ExecResultEventSchema>;
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;

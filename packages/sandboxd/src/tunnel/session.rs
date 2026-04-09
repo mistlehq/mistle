@@ -12,9 +12,11 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
+use std::time::Instant;
 
 use futures_util::{SinkExt, StreamExt};
 use serde_json::Value;
@@ -39,18 +41,18 @@ use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
-    CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-    FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
-    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
-    STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
-    decode_stream_data_frame, encode_stream_data_frame, file_upload_completed_event,
-    parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
-    stream_open_ok, stream_reset, stream_window,
+    CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
+    CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
+    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
+    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
+    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
+    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
+    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
+    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+    exec_result_event, file_upload_completed_event, parse_stream_control_message, pty_exit_event,
+    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
 };
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
@@ -75,6 +77,9 @@ const GIF89A_SIGNATURE: &[u8] = &[0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
 const WEBP_RIFF_SIGNATURE: &[u8] = &[0x52, 0x49, 0x46, 0x46];
 const WEBP_BRAND_SIGNATURE: &[u8] = &[0x57, 0x45, 0x42, 0x50];
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
+const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
+const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
 #[derive(Debug)]
@@ -189,6 +194,10 @@ enum TunnelSessionEvent {
         stream_id: u32,
         reason: Option<String>,
     },
+    ExecCompleted {
+        stream_id: u32,
+        result: Box<Result<ExecCommandResult, String>>,
+    },
     Wake,
 }
 
@@ -199,6 +208,17 @@ struct AgentStreamState {
 
 struct PendingAgentOpenState {
     task: TokioJoinHandle<()>,
+}
+
+struct PendingExecOpenState {
+    task: TokioJoinHandle<()>,
+}
+
+struct ExecCommandResult {
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+    truncated: bool,
 }
 
 impl TunnelSession {
@@ -353,6 +373,7 @@ struct TunnelSessionLoopContext<'a> {
 struct TunnelSessionMutableState {
     telemetry_relay: TelemetryRelay,
     pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
+    pending_exec_opens: BTreeMap<u32, PendingExecOpenState>,
     agent_streams: BTreeMap<u32, AgentStreamState>,
     pty_sessions: BTreeMap<String, PtySessionState>,
     file_uploads: BTreeMap<u32, FileUploadState>,
@@ -399,6 +420,7 @@ async fn run_tunnel_session(
     let mut session_state = TunnelSessionMutableState {
         telemetry_relay: TelemetryRelay::default(),
         pending_agent_opens: BTreeMap::new(),
+        pending_exec_opens: BTreeMap::new(),
         agent_streams: BTreeMap::new(),
         pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
@@ -464,6 +486,9 @@ async fn run_tunnel_session(
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
             for pending_agent_open in session_state.pending_agent_opens.values() {
                 pending_agent_open.task.abort();
+            }
+            for pending_exec_open in session_state.pending_exec_opens.values() {
+                pending_exec_open.task.abort();
             }
             for pty_session in session_state.pty_sessions.values() {
                 let _ = pty_session.session.terminate(
@@ -786,6 +811,147 @@ fn spawn_agent_dial_task(
             result: Box::new(result),
         });
     })
+}
+
+fn spawn_exec_task(
+    message: crate::tunnel::protocol::ExecStreamOpen,
+    runtime_env: BTreeMap<String, String>,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> TokioJoinHandle<()> {
+    tokio::task::spawn_blocking(move || {
+        let result = run_exec_command(&message, &runtime_env);
+        let _ = event_sender.send(TunnelSessionEvent::ExecCompleted {
+            stream_id: message.stream_id,
+            result: Box::new(result),
+        });
+    })
+}
+
+struct BoundedOutput {
+    text: String,
+    truncated: bool,
+}
+
+fn run_exec_command(
+    message: &crate::tunnel::protocol::ExecStreamOpen,
+    runtime_env: &BTreeMap<String, String>,
+) -> Result<ExecCommandResult, String> {
+    let max_output_bytes = message
+        .channel
+        .max_output_bytes
+        .unwrap_or(DEFAULT_EXEC_MAX_OUTPUT_BYTES);
+    let timeout_ms = message
+        .channel
+        .timeout_ms
+        .unwrap_or(DEFAULT_EXEC_TIMEOUT_MS);
+    let mut child_command = Command::new(&message.channel.command);
+    if let Some(args) = message.channel.args.as_ref() {
+        child_command.args(args);
+    }
+    child_command.stdin(Stdio::null());
+    child_command.stdout(Stdio::piped());
+    child_command.stderr(Stdio::piped());
+    child_command.envs(runtime_env);
+    if let Some(cwd) = message.channel.cwd.as_deref() {
+        child_command.current_dir(cwd);
+    }
+
+    let mut child = child_command
+        .spawn()
+        .map_err(|error| format!("failed to spawn command: {error}"))?;
+    let stdout_reader = child
+        .stdout
+        .take()
+        .ok_or_else(|| "command stdout pipe was not available".to_string())?;
+    let stderr_reader = child
+        .stderr
+        .take()
+        .ok_or_else(|| "command stderr pipe was not available".to_string())?;
+    let shared_budget = Arc::new(Mutex::new(max_output_bytes));
+    let stdout_budget = Arc::clone(&shared_budget);
+    let stderr_budget = Arc::clone(&shared_budget);
+    let stdout_thread = thread::spawn(move || read_bounded_output(stdout_reader, stdout_budget));
+    let stderr_thread = thread::spawn(move || read_bounded_output(stderr_reader, stderr_budget));
+    let status = wait_for_exec_child(&mut child, timeout_ms)?;
+    let stdout = stdout_thread
+        .join()
+        .map_err(|_| "command stdout reader panicked".to_string())??;
+    let stderr = stderr_thread
+        .join()
+        .map_err(|_| "command stderr reader panicked".to_string())??;
+
+    Ok(ExecCommandResult {
+        exit_code: status.code().unwrap_or(-1),
+        stdout: stdout.text,
+        stderr: stderr.text,
+        truncated: stdout.truncated || stderr.truncated,
+    })
+}
+
+fn wait_for_exec_child(
+    child: &mut std::process::Child,
+    timeout_ms: u64,
+) -> Result<std::process::ExitStatus, String> {
+    let deadline = Instant::now() + std::time::Duration::from_millis(timeout_ms);
+    loop {
+        match child
+            .try_wait()
+            .map_err(|error| format!("failed to poll command: {error}"))?
+        {
+            Some(status) => return Ok(status),
+            None if Instant::now() >= deadline => {
+                child
+                    .kill()
+                    .map_err(|error| format!("failed to kill timed out command: {error}"))?;
+                let _ = child
+                    .wait()
+                    .map_err(|error| format!("failed to wait for timed out command: {error}"))?;
+                return Err(format!("command timed out after {timeout_ms}ms"));
+            }
+            None => thread::sleep(std::time::Duration::from_millis(10)),
+        }
+    }
+}
+
+fn read_bounded_output<R>(
+    mut reader: R,
+    remaining_bytes: Arc<Mutex<usize>>,
+) -> Result<BoundedOutput, String>
+where
+    R: Read,
+{
+    let mut buffer = [0_u8; EXEC_OUTPUT_READ_BUFFER_BYTES];
+    let mut output = Vec::new();
+    let mut truncated = false;
+
+    loop {
+        let bytes_read = reader
+            .read(&mut buffer)
+            .map_err(|error| format!("failed to read command output: {error}"))?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        let allowed_bytes = {
+            let mut remaining = remaining_bytes
+                .lock()
+                .expect("remaining exec output budget lock should not be poisoned");
+            let allowed = (*remaining).min(bytes_read);
+            *remaining -= allowed;
+            allowed
+        };
+
+        if allowed_bytes > 0 {
+            output.extend_from_slice(&buffer[..allowed_bytes]);
+        }
+        if allowed_bytes < bytes_read {
+            truncated = true;
+        }
+    }
+
+    let text = String::from_utf8(output)
+        .map_err(|error| format!("command output was not valid utf-8: {error}"))?;
+    Ok(BoundedOutput { text, truncated })
 }
 
 fn poll_pty_sessions(
@@ -1118,6 +1284,35 @@ async fn handle_tunnel_session_event(
             }
             Ok(())
         }
+        TunnelSessionEvent::ExecCompleted { stream_id, result } => {
+            if session_state
+                .pending_exec_opens
+                .remove(&stream_id)
+                .is_none()
+            {
+                return Ok(());
+            }
+
+            match *result {
+                Ok(exec_result) => {
+                    write_tunnel_text(
+                        tunnel_writer_sender,
+                        exec_result_event(
+                            stream_id,
+                            exec_result.exit_code,
+                            &exec_result.stdout,
+                            &exec_result.stderr,
+                            exec_result.truncated,
+                        ),
+                    )?;
+                    write_tunnel_text(tunnel_writer_sender, stream_complete(stream_id))
+                }
+                Err(error) => write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(stream_id, STREAM_RESET_CODE_EXEC_COMMAND_FAILED, error),
+                ),
+            }
+        }
     }
 }
 
@@ -1246,6 +1441,31 @@ async fn handle_tunnel_control_message(
                 .insert(message.stream_id, upload_state);
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
+        StreamControlMessage::OpenExec(message) => {
+            if message.channel.command != "git" {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_open_error(
+                        message.stream_id,
+                        CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED,
+                        "only direct git commands are supported for exec streams",
+                    ),
+                )?;
+                return Ok(());
+            }
+
+            session_state.pending_exec_opens.insert(
+                message.stream_id,
+                PendingExecOpenState {
+                    task: spawn_exec_task(
+                        message.clone(),
+                        context.runtime_env.clone(),
+                        event_sender.clone(),
+                    ),
+                },
+            );
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
+        }
         StreamControlMessage::Signal(message) => {
             let Some(pty_state) = session_state
                 .pty_sessions
@@ -1280,6 +1500,12 @@ async fn handle_tunnel_control_message(
             }
             if let Some(agent_stream) = session_state.agent_streams.remove(&message.stream_id) {
                 let _ = agent_stream.sender.send(Message::Close(None));
+                return Ok(());
+            }
+            if let Some(pending_exec_open) =
+                session_state.pending_exec_opens.remove(&message.stream_id)
+            {
+                pending_exec_open.task.abort();
                 return Ok(());
             }
             if let Some(pty_session_id) = session_state
@@ -1325,6 +1551,12 @@ async fn handle_tunnel_control_message(
             }
             if session_state
                 .pending_agent_opens
+                .contains_key(&message.stream_id)
+            {
+                return Ok(());
+            }
+            if session_state
+                .pending_exec_opens
                 .contains_key(&message.stream_id)
             {
                 return Ok(());
@@ -2005,9 +2237,8 @@ mod tests {
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
-        AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
-        PAYLOAD_KIND_WEBSOCKET_TEXT, StreamSendWindow, decode_stream_data_frame,
-        encode_stream_data_frame,
+        DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
+        decode_stream_data_frame, encode_stream_data_frame,
     };
     use crate::tunnel::session::TunnelSession;
     use crate::tunnel::telemetry::{TelemetryRelay, decode_telemetry_data_frame};
@@ -2160,7 +2391,9 @@ mod tests {
                 ))
                 .expect("proxied response should send");
             match client_socket.read() {
-                Ok(Message::Close(_)) | Err(WebSocketError::ConnectionClosed) => {}
+                Ok(Message::Close(_))
+                | Err(WebSocketError::ConnectionClosed)
+                | Err(WebSocketError::Protocol(_)) => {}
                 Ok(other_message) => panic!(
                     "expected proxied client websocket to close after tunnel stream shutdown, got {other_message:?}"
                 ),
@@ -3361,6 +3594,152 @@ mod tests {
         agent_server_thread
             .join()
             .expect("agent server thread should exit cleanly");
+    }
+
+    #[test]
+    fn starts_live_tunnel_session_for_exec_streams() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let mut saw_keepalive = false;
+            while !saw_keepalive {
+                let control_message = read_json_text_message(&mut websocket);
+                if control_message["type"] == Value::String("keepalive.state".to_string()) {
+                    saw_keepalive = true;
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 11,
+                        "channel": {
+                            "kind": "exec",
+                            "command": "git",
+                            "args": ["--version"],
+                            "timeoutMs": 1000,
+                            "maxOutputBytes": 4096
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the exec stream");
+
+            let exec_open_ok = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                exec_open_ok["type"],
+                Value::String("stream.open.ok".to_string())
+            );
+            assert_eq!(exec_open_ok["streamId"], Value::Number(11.into()));
+
+            let exec_result = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                exec_result["type"],
+                Value::String("stream.event".to_string())
+            );
+            assert_eq!(exec_result["streamId"], Value::Number(11.into()));
+            assert_eq!(
+                exec_result["event"]["type"],
+                Value::String("exec.result".to_string())
+            );
+            assert_eq!(exec_result["event"]["exitCode"], Value::Number(0.into()));
+            assert_eq!(exec_result["event"]["stderr"], Value::String(String::new()));
+            assert_eq!(exec_result["event"]["truncated"], Value::Bool(false));
+            let stdout = exec_result["event"]["stdout"]
+                .as_str()
+                .expect("exec.result stdout should be a string");
+            assert!(stdout.starts_with("git version "));
+
+            let exec_complete = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                exec_complete["type"],
+                Value::String("stream.complete".to_string())
+            );
+            assert_eq!(exec_complete["streamId"], Value::Number(11.into()));
+
+            send_websocket_ping_and_expect_pong(&mut websocket, b"bootstrap-still-open-after-exec");
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the bootstrap interaction");
+
+        tunnel_session
+            .close()
+            .expect("tunnel session should stop cleanly");
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
     }
 
     fn read_json_text_message<S>(socket: &mut WebSocket<S>) -> Value

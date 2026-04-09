@@ -1,5 +1,5 @@
 import { Badge, Button } from "@mistle/ui";
-import { TerminalIcon } from "@phosphor-icons/react";
+import { GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo } from "react";
 import { useLocation, useParams } from "react-router";
 
@@ -15,6 +15,7 @@ import {
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
+import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
@@ -76,6 +77,13 @@ function SessionWorkbenchPageContent(input: {
     ? (workbench.stoppedSessionState.message ??
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
+  const isDiffOpenDisabled =
+    !workbench.diffPanelState.isVisible && !workbench.connectionReadiness.canConnect;
+  const diffButtonLabel = workbench.diffPanelState.isVisible ? "Changes" : "Open changes";
+  const diffButtonTitle = isDiffOpenDisabled
+    ? (workbench.stoppedSessionState.message ??
+      "Changes are available only when the sandbox is running.")
+    : diffButtonLabel;
   const cliButtonLabel = "CLI";
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
@@ -135,6 +143,25 @@ function SessionWorkbenchPageContent(input: {
           CLI
         </Button>
         <Button
+          aria-label={diffButtonLabel}
+          aria-pressed={workbench.diffPanelState.isVisible}
+          className={
+            workbench.diffPanelState.isVisible
+              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+              : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+          }
+          disabled={isDiffOpenDisabled}
+          onClick={() => {
+            workbench.diffPanelState.togglePanel();
+          }}
+          size="icon-sm"
+          title={diffButtonTitle}
+          type="button"
+          variant="ghost"
+        >
+          <GitDiffIcon className="size-4" />
+        </Button>
+        <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
           className={
@@ -163,10 +190,15 @@ function SessionWorkbenchPageContent(input: {
     ),
     [
       isTerminalOpenDisabled,
+      isDiffOpenDisabled,
       cliButtonTitle,
+      diffButtonLabel,
+      diffButtonTitle,
       terminalButtonLabel,
       showResumeButton,
       terminalButtonTitle,
+      workbench.diffPanelState.isVisible,
+      workbench.diffPanelState.togglePanel,
       workbench.primaryPanelState.canEnterCli,
       workbench.primaryPanelState.disabledReason,
       workbench.primaryPanelState.enterCliMode,
@@ -211,6 +243,16 @@ function SessionWorkbenchPageContent(input: {
     input.sandboxInstanceId,
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
+  const diffPanelErrorMessage = !workbench.connectionReadiness.canConnect
+    ? (workbench.stoppedSessionState.message ??
+      "Changes are available only when the sandbox is running.")
+    : workbench.diffPanelState.errorMessage;
+  const diffPanelPatch = workbench.connectionReadiness.canConnect
+    ? workbench.diffPanelState.patch
+    : "";
+  const diffPanelTruncatedMessage = workbench.connectionReadiness.canConnect
+    ? workbench.diffPanelState.truncatedMessage
+    : null;
 
   const alerts: SessionWorkbenchAlert[] = [];
   if (workbench.sandboxStatusQuery.isError) {
@@ -339,7 +381,7 @@ function SessionWorkbenchPageContent(input: {
       }
       bottomPanelSize={workbench.terminalPanelState.panelSize}
       isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-      isSecondaryPanelVisible={false}
+      isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
       mainContentLayout={
         workbench.primaryPanelState.transitionState === "stable_cli"
           ? { scroll: "contained", width: "full" }
@@ -362,7 +404,7 @@ function SessionWorkbenchPageContent(input: {
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
-      onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
+      onSecondaryPanelResize={workbench.diffPanelState.setPanelSize}
       primaryBottomPanel={
         workbench.primaryPanelState.showsChatComposer ? (
           <>
@@ -384,8 +426,17 @@ function SessionWorkbenchPageContent(input: {
           </>
         ) : null
       }
-      secondaryPanel={<></>}
-      secondaryPanelSize={workbench.terminalPanelState.panelSize}
+      secondaryPanel={
+        <SessionDiffPanel
+          errorMessage={diffPanelErrorMessage}
+          isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
+          patch={diffPanelPatch}
+          summaryLabel="Compared with main"
+          title="Changes"
+          warningMessage={diffPanelTruncatedMessage}
+        />
+      }
+      secondaryPanelSize={workbench.diffPanelState.panelSize}
       sandboxInstanceId={input.sandboxInstanceId}
     />
   );

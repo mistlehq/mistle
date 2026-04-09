@@ -86,6 +86,9 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.ptyState.output.chunks).toEqual([]);
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
+    expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
+    expect(result.current.workbench.diffPanelState.panelSize).toBe(42);
+    expect(result.current.workbench.diffPanelState.patch).toBe("");
     expect(result.current.workbench.lifecycleErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();

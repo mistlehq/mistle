@@ -115,6 +115,52 @@ describe("stream control message parser", () => {
     });
   });
 
+  it("parses exec stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 29,
+          channel: {
+            kind: "exec",
+            command: "git",
+            args: ["diff", "--merge-base", "main...HEAD"],
+            cwd: "/workspace/repo",
+            timeoutMs: 15000,
+            maxOutputBytes: 65536,
+            ignored: true,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.open",
+      streamId: 29,
+      channel: {
+        kind: "exec",
+        command: "git",
+        args: ["diff", "--merge-base", "main...HEAD"],
+        cwd: "/workspace/repo",
+        timeoutMs: 15000,
+        maxOutputBytes: 65536,
+      },
+    });
+  });
+
+  it("rejects malformed exec stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 29,
+          channel: {
+            kind: "exec",
+            command: "",
+          },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("rejects malformed file upload stream opens", () => {
     expect(
       parseStreamControlMessage(
@@ -209,6 +255,32 @@ describe("stream control message parser", () => {
         mimeType: "image/png",
         sizeBytes: 1024,
         path: "/tmp/attachments/thread_123/upload.png",
+      },
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.event",
+          streamId: 10,
+          event: {
+            type: "exec.result",
+            exitCode: 0,
+            stdout: "diff --git a/file b/file\n",
+            stderr: "",
+            truncated: false,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.event",
+      streamId: 10,
+      event: {
+        type: "exec.result",
+        exitCode: 0,
+        stdout: "diff --git a/file b/file\n",
+        stderr: "",
+        truncated: false,
       },
     });
   });
