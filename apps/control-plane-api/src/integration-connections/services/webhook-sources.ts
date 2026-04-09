@@ -560,23 +560,30 @@ export async function listIntegrationWebhookSources(
     webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
     webhookSourceCapability.ownerScope === IntegrationWebhookSourceOwnerScopes.CONNECTION
   ) {
-    const source = await ensureImplicitConnectionWebhookSource({
-      db: ctx.db,
-      organizationId: input.organizationId,
-      connectionId: connection.id,
-      targetKey: connection.targetKey,
-      routingStrategy: webhookSourceCapability.routingStrategy,
-    });
-    const descriptor = await resolveWebhookSourceDescriptor({
-      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
-      webhookSourceCapability,
-      parsedTargetConfig,
-      parsedTargetSecrets,
-      connection,
-      source,
+    const sources = await ctx.db.query.integrationWebhookSources.findMany({
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(
+          whereEq(table.integrationConnectionId, connection.id),
+          whereEq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
+        ),
+      orderBy: (table, { asc }) => [asc(table.createdAt), asc(table.id)],
     });
 
-    return [toWebhookSourceListItem({ source, descriptor })];
+    return Promise.all(
+      sources.map(async (source) =>
+        toWebhookSourceListItem({
+          source,
+          descriptor: await resolveWebhookSourceDescriptor({
+            controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+            webhookSourceCapability,
+            parsedTargetConfig,
+            parsedTargetSecrets,
+            connection,
+            source,
+          }),
+        }),
+      ),
+    );
   }
 
   const sources = await ctx.db.query.integrationWebhookSources.findMany({

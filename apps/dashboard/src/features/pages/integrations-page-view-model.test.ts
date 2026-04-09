@@ -188,6 +188,23 @@ describe("integrations page view model", () => {
 
     expect(item?.authMethodLabel).toBe("GitHub App installation");
     expect(item?.authMethodId).toBe("github-app-installation");
+    expect(item?.contextItems).toEqual([
+      {
+        label: "App ID",
+        value: "123",
+      },
+      {
+        label: "App slug",
+        value: "mistle-github-app",
+      },
+      {
+        label: "Installation",
+        value: "mistle-labs",
+      },
+    ]);
+    expect(item?.webhookInstructions).toBe(
+      "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+    );
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });

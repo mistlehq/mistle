@@ -6,6 +6,7 @@ import type { IntegrationCardViewModel } from "../integrations/directory-model.j
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
 import {
+  IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
@@ -102,6 +103,7 @@ export function buildIntegrationConnectionDetailItems(input: {
     const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
+    const githubAppConnectionContext = resolveGitHubAppConnectionContext(connection);
 
     return {
       id: connection.id,
@@ -115,6 +117,12 @@ export function buildIntegrationConnectionDetailItems(input: {
       ...(connectionMethodId === null
         ? {}
         : { authMethodLabel: formatConnectionMethodLabel(connectionMethodId) }),
+      ...(githubAppConnectionContext === undefined
+        ? {}
+        : {
+            contextItems: githubAppConnectionContext.contextItems,
+            webhookInstructions: githubAppConnectionContext.webhookInstructions,
+          }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
         count: resource.count,
@@ -134,6 +142,65 @@ export function buildIntegrationConnectionDetailItems(input: {
       })),
     };
   });
+}
+
+function resolveGitHubAppConnectionContext(
+  connection: Pick<IntegrationConnection, "config" | "externalSubjectId">,
+):
+  | {
+      contextItems: readonly {
+        label: string;
+        value: string;
+      }[];
+      webhookInstructions: string;
+    }
+  | undefined {
+  const config = connection.config;
+  if (
+    config === undefined ||
+    typeof config !== "object" ||
+    config === null ||
+    Array.isArray(config) ||
+    config.connection_method !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    return undefined;
+  }
+
+  const appId = typeof config.app_id === "string" ? config.app_id : null;
+  const appSlug = typeof config.app_slug === "string" ? config.app_slug : null;
+  const installationId =
+    typeof config.installation_id === "string"
+      ? config.installation_id
+      : typeof connection.externalSubjectId === "string"
+        ? connection.externalSubjectId
+        : null;
+
+  return {
+    contextItems: [
+      ...(appId === null
+        ? []
+        : [
+            {
+              label: "App ID",
+              value: appId,
+            },
+          ]),
+      ...(appSlug === null
+        ? []
+        : [
+            {
+              label: "App slug",
+              value: appSlug,
+            },
+          ]),
+      {
+        label: "Installation",
+        value: installationId === null ? "Pending" : installationId,
+      },
+    ],
+    webhookInstructions:
+      "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+  };
 }
 
 export function createIntegrationConnectionResourceKey(input: {

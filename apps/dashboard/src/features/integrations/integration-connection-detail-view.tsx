@@ -36,6 +36,7 @@ export type IntegrationConnectionDetailItem = {
   id: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
   status: "active" | "error" | "revoked";
+  webhookInstructions?: string;
 };
 
 export type IntegrationConnectionDetailViewProps = {
@@ -225,6 +226,9 @@ function ConnectionCard(input: {
       {input.showWebhookSources === true && input.webhookSourceState !== undefined ? (
         <WebhookSourcesSection
           connectionId={input.connection.id}
+          {...(input.connection.webhookInstructions === undefined
+            ? {}
+            : { descriptionText: input.connection.webhookInstructions })}
           onCreateWebhookSource={
             input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
           }
@@ -432,6 +436,7 @@ function ResourceItemsPreview(input: {
 
 function WebhookSourcesSection(input: {
   connectionId: string;
+  descriptionText?: string;
   onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
@@ -444,7 +449,8 @@ function WebhookSourcesSection(input: {
         <div className="gap-1 flex flex-col">
           <h3 className="font-medium text-sm">Webhooks</h3>
           <p className="text-muted-foreground text-xs">
-            Copy the callback URL into your provider's webhook configuration.
+            {input.descriptionText ??
+              "Copy the callback URL into your provider's webhook configuration."}
           </p>
         </div>
         {input.onCreateWebhookSource ? (
@@ -512,8 +518,7 @@ function WebhookSourceCard(input: {
 }): React.JSX.Element {
   const isDeleting = input.deletingWebhookSourceId === input.source.id;
   const isDeleteSupported =
-    input.onDeleteWebhookSource !== undefined &&
-    (input.source.endpointKey !== undefined || input.source.remoteRegistrationId !== undefined);
+    input.onDeleteWebhookSource !== undefined && input.source.remoteRegistrationId !== undefined;
 
   return (
     <div className="gap-3 flex flex-col rounded-md border p-3">

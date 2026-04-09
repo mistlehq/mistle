@@ -22,7 +22,7 @@ import {
 import { it } from "./test-context.js";
 
 describe("integration connection webhook sources integration", () => {
-  it("materializes a connection-owned implicit webhook source for GitHub App connections", async ({
+  it("lists the implicit webhook source created with a GitHub App form connection", async ({
     fixture,
   }) => {
     const targetKey = "github-cloud-implicit-webhook-source";
@@ -55,27 +55,36 @@ describe("integration connection webhook sources integration", () => {
         },
       });
 
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_github_implicit_webhook_source",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
-      displayName: "GitHub App Installation",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      externalSubjectId: "12345",
-      config: {
-        connection_method: "github-app-installation",
-        app_id: "123",
-        app_slug: "mistle-github-app",
-        installation_id: "12345",
+    const createConnectionResponse = await fixture.request(
+      "/v1/integration/connections/github-cloud-implicit-webhook-source/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub App Installation",
+          methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          secrets: {
+            appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+            webhookSecret: "github-webhook-secret",
+          },
+        }),
       },
-      targetSnapshotConfig: {
-        apiBaseUrl: "https://api.github.com",
-        webBaseUrl: "https://github.com",
-      },
-    });
+    );
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = (await createConnectionResponse.json()) as {
+      id: string;
+    };
 
     const response = await fixture.request(
-      "/v1/integration/connections/icn_github_implicit_webhook_source/webhook-sources",
+      `/v1/integration/connections/${createdConnection.id}/webhook-sources`,
       {
         method: "GET",
         headers: {
@@ -91,7 +100,7 @@ describe("integration connection webhook sources integration", () => {
     expect(body[0]).toMatchObject({
       targetKey,
       ownerScope: "connection",
-      integrationConnectionId: "icn_github_implicit_webhook_source",
+      integrationConnectionId: createdConnection.id,
     });
     expect(body[0]?.callbackUrl).toContain(`/v1/integration/webhooks/${targetKey}/`);
     expect(body[0]?.endpointKey).toBeTruthy();
@@ -102,7 +111,7 @@ describe("integration connection webhook sources integration", () => {
           eq(table.organizationId, authenticatedSession.organizationId),
           eq(table.targetKey, targetKey),
           eq(table.ownerScope, IntegrationWebhookSourceOwnerScopes.CONNECTION),
-          eq(table.integrationConnectionId, "icn_github_implicit_webhook_source"),
+          eq(table.integrationConnectionId, createdConnection.id),
         ),
     });
 

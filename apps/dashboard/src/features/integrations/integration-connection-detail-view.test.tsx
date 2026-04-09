@@ -392,6 +392,8 @@ describe("IntegrationConnectionDetailView", () => {
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
+            webhookInstructions:
+              "Copy the callback URL into your GitHub App webhook settings before you install the app.",
           },
         ]}
         showWebhookSources={true}
@@ -412,8 +414,9 @@ describe("IntegrationConnectionDetailView", () => {
                     ownerScope: "connection",
                     integrationConnectionId: "icn_github_primary",
                     displayName: "GitHub App webhook",
+                    endpointKey: "ep_github_123",
                     callbackUrl:
-                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud",
+                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
                     status: "active",
                     providerMetadata: {},
                     createdAt: "2026-04-03T00:00:00.000Z",
@@ -429,6 +432,11 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
+    expect(
+      screen.getByText(
+        "Copy the callback URL into your GitHub App webhook settings before you install the app.",
+      ),
+    ).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
