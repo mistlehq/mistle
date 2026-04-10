@@ -2334,6 +2334,7 @@ mod tests {
         let mut session_state = TunnelSessionMutableState {
             telemetry_relay: TelemetryRelay::default(),
             pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::from([(
                 7,
                 AgentStreamState {
