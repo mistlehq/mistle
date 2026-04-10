@@ -50,14 +50,14 @@ export const CreateAnAutomation: Story = {
   },
 };
 
-export const Completed: Story = {
-  args: {
-    onboarding: HomePageStoryModels.completed,
-  },
-};
-
 export const AddAWebhookIntegration: Story = {
   args: {
     onboarding: HomePageStoryModels.addWebhookIntegration,
+  },
+};
+
+export const Completed: Story = {
+  args: {
+    onboarding: HomePageStoryModels.completed,
   },
 };

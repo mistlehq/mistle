@@ -9,7 +9,11 @@ import {
   sandboxProfiles,
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstanceSources,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
 import { homeSummaryResponseSchema } from "../src/home/schema.js";
@@ -180,6 +184,89 @@ describe("home summary integration", () => {
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasIntegrations).toBe(false);
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
+  });
+
+  it("counts system-started sandbox instances as a started session", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_home_summary_system_started",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-system-started@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-home-summary-system-started",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {},
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_home_summary_system_started",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "openai-home-summary-system-started",
+      displayName: "OpenAI",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_home_summary_system_started",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Default Profile",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_home_summary_system_started",
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_home_summary_system_started",
+      sandboxProfileId: "sbp_home_summary_system_started",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_home_summary_system_started",
+      kind: "agent",
+      config: {},
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_home_summary_system_started",
+      organizationId: authenticatedSession.organizationId,
+      sandboxProfileId: "sbp_home_summary_system_started",
+      title: "Automation-triggered task",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-home-summary-system-started",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "system",
+      startedById: "aru_home_summary_system_started",
+      source: SandboxInstanceSources.WEBHOOK,
+      createdAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z",
+    });
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(response.status).toBe(200);
+    const body = homeSummaryResponseSchema.parse(await response.json());
+    expect(body.onboarding).toMatchObject({
+      hasIntegrations: true,
+      hasProfiles: true,
+      hasUsableProfiles: true,
+      hasStartedSession: true,
+    });
   });
 
   it("does not count active non-agent integrations as completed integrations", async ({
