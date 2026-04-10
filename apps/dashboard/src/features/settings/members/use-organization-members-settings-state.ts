@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useDebouncedValue } from "../../shared/use-debounced-value.js";
 import type { MembersDirectoryFilter } from "./members-api.js";
@@ -52,28 +52,37 @@ export function useOrganizationMembersSettingsState(
   const [invitationActionState, setInvitationActionState] =
     useState<MembersDirectoryInvitationActionState>(null);
   const [roleUpdateErrorMessage, setRoleUpdateErrorMessage] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("members");
   const [searchValue, setSearchValue] = useState("");
-  const [offset, setOffset] = useState(0);
-  const debouncedSearchValue = useDebouncedValue(searchValue);
-  const committedSearchQueryStateRef = useRef({
-    offset,
-    searchValue,
+  const searchValueRef = useRef(searchValue);
+  const [directoryQueryInput, setDirectoryQueryInput] = useState<{
+    activeFilter: MembersDirectoryFilter;
+    offset: number;
+    searchValue: string;
+  }>({
+    activeFilter: "members",
+    offset: 0,
+    searchValue: "",
   });
+  const debouncedSearchValue = useDebouncedValue(searchValue);
+  const { activeFilter, offset, searchValue: querySearchValue } = directoryQueryInput;
 
-  useLayoutEffect(() => {
-    if (debouncedSearchValue !== searchValue) {
-      return;
-    }
+  useEffect(() => {
+    searchValueRef.current = searchValue;
+  }, [searchValue]);
 
-    committedSearchQueryStateRef.current = {
-      offset,
-      searchValue,
-    };
-  }, [debouncedSearchValue, offset, searchValue]);
+  useEffect(() => {
+    setDirectoryQueryInput((currentValue) => {
+      if (currentValue.searchValue === debouncedSearchValue) {
+        return currentValue;
+      }
 
-  const queryOffset =
-    debouncedSearchValue === searchValue ? offset : committedSearchQueryStateRef.current.offset;
+      return {
+        ...currentValue,
+        offset: 0,
+        searchValue: debouncedSearchValue,
+      };
+    });
+  }, [debouncedSearchValue]);
 
   const queryKeys = buildMembersQueryKeys(input.organizationId);
   const capabilitiesQuery = useQuery({
@@ -84,30 +93,25 @@ export function useOrganizationMembersSettingsState(
       }),
   });
   const membersQuery = useQuery({
-    queryKey: [...queryKeys.members, membersDirectoryPageLimit, queryOffset, debouncedSearchValue],
+    queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, querySearchValue],
     queryFn: async () =>
       api.listMembersPage({
         organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
-        offset: queryOffset,
-        search: debouncedSearchValue,
+        offset,
+        search: querySearchValue,
       }),
     enabled: activeFilter === "members",
     retry: false,
   });
   const invitationsQuery = useQuery({
-    queryKey: [
-      ...queryKeys.invitations,
-      membersDirectoryPageLimit,
-      queryOffset,
-      debouncedSearchValue,
-    ],
+    queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, querySearchValue],
     queryFn: async () =>
       api.listInvitationsPage({
         organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
-        offset: queryOffset,
-        search: debouncedSearchValue,
+        offset,
+        search: querySearchValue,
       }),
     enabled: activeFilter === "invitations",
     retry: false,
@@ -134,13 +138,22 @@ export function useOrganizationMembersSettingsState(
     capabilitiesQuery.isError || !canManageInvitations(directoryQueryState.capabilities);
 
   useEffect(() => {
+    if (directoryQueryState.activeListQuery.data === undefined) {
+      return;
+    }
+
     const nextOffset = clampMembersDirectoryOffset({
       limit: membersDirectoryPageLimit,
       offset,
       total: directoryQueryState.total,
     });
     if (nextOffset !== offset) {
-      setOffset(nextOffset);
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: nextOffset,
+        };
+      });
     }
   }, [directoryQueryState.total, offset]);
 
@@ -181,21 +194,36 @@ export function useOrganizationMembersSettingsState(
     },
     onInviteCompleted: async () => {
       const nextState = resolvePostInviteDirectoryState();
-      setActiveFilter(nextState.activeFilter);
       setSearchValue(nextState.searchValue);
-      setOffset(nextState.offset);
+      setDirectoryQueryInput(nextState);
       await mutations.onInviteCompleted();
     },
     onInviteDialogOpenChange: setInviteDialogOpen,
     onFilterChange: (nextValue) => {
-      setActiveFilter(nextValue);
-      setOffset(0);
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          activeFilter: nextValue,
+          offset: 0,
+          searchValue: searchValueRef.current,
+        };
+      });
     },
     onNextPage: () => {
-      setOffset((currentValue) => currentValue + membersDirectoryPageLimit);
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: currentValue.offset + membersDirectoryPageLimit,
+        };
+      });
     },
     onPreviousPage: () => {
-      setOffset((currentValue) => Math.max(currentValue - membersDirectoryPageLimit, 0));
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: Math.max(currentValue.offset - membersDirectoryPageLimit, 0),
+        };
+      });
     },
     onRemoveMember: mutations.onRemoveMember,
     onResendInvite: mutations.onResendInvite,
@@ -232,8 +260,8 @@ export function useOrganizationMembersSettingsState(
     },
     onSaveRole: mutations.onSaveRole,
     onSearchValueChange: (nextValue) => {
+      searchValueRef.current = nextValue;
       setSearchValue(nextValue);
-      setOffset(0);
     },
     organizationId: input.organizationId,
     offset,
