@@ -1,6 +1,6 @@
 import { Badge, Button } from "@mistle/ui";
 import { GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
@@ -18,10 +18,6 @@ import {
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
-
-export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
-  return input.requiresManualResume;
-}
 
 export function SessionWorkbenchPage(): React.JSX.Element {
   const location = useLocation();
@@ -41,23 +37,18 @@ function SessionWorkbenchPageContent(input: {
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
   const terminalButtonTitle = isTerminalOpenDisabled
-    ? (workbench.stoppedSessionState.message ??
-      "Terminal is available only when the sandbox is running.")
+    ? (workbench.stoppedSessionMessage ?? "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
   const isDiffOpenDisabled =
     !workbench.diffPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const diffButtonLabel = workbench.diffPanelState.isVisible ? "Changes" : "Open changes";
   const diffButtonTitle = isDiffOpenDisabled
-    ? (workbench.stoppedSessionState.message ??
-      "Changes are available only when the sandbox is running.")
+    ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
     : diffButtonLabel;
   const cliButtonLabel = "CLI";
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
-  const showResumeButton = shouldShowResumeAction({
-    requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
-  });
   const isErrorHeaderStatus = workbench.workbenchStatus.kind === "error";
   const headerStatusLabel = isErrorHeaderStatus ? "Error" : "Not connected";
   const headerActions = useMemo(
@@ -76,19 +67,6 @@ function SessionWorkbenchPageContent(input: {
           />
         )}
         <span aria-hidden className="h-5 w-px bg-stone-200" />
-        {showResumeButton ? (
-          <Button
-            disabled={workbench.isResumingStoppedSandbox}
-            onClick={() => {
-              void workbench.requestStoppedSandboxResume();
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {workbench.isResumingStoppedSandbox ? "Resuming..." : "Resume"}
-          </Button>
-        ) : null}
         <Button
           aria-label={cliButtonLabel}
           aria-pressed={workbench.primaryPanelState.isCliToggleActive}
@@ -171,7 +149,6 @@ function SessionWorkbenchPageContent(input: {
       headerStatusLabel,
       isErrorHeaderStatus,
       terminalButtonLabel,
-      showResumeButton,
       terminalButtonTitle,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
@@ -180,9 +157,7 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryPanelState.enterCliMode,
       workbench.primaryPanelState.exitCliMode,
       workbench.primaryPanelState.isCliToggleActive,
-      workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
-      workbench.requestStoppedSandboxResume,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
@@ -217,8 +192,7 @@ function SessionWorkbenchPageContent(input: {
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
   const diffPanelErrorMessage = !workbench.connectionReadiness.canConnect
-    ? (workbench.stoppedSessionState.message ??
-      "Changes are available only when the sandbox is running.")
+    ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
     : workbench.diffPanelState.errorMessage;
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
@@ -293,7 +267,6 @@ function SessionWorkbenchPageContent(input: {
       bottomPanel={
         <SessionTerminalPanel
           key={terminalPanelKey}
-          isResumingSandbox={workbench.isResumingStoppedSandbox}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
@@ -301,7 +274,6 @@ function SessionWorkbenchPageContent(input: {
             workbench.terminalPanelState.closePanel();
             await workbench.ptyState.actions.disconnectPty();
           }}
-          onRequestSandboxResume={workbench.requestStoppedSandboxResume}
           ptyState={workbench.ptyState}
           sandboxStatus={workbench.sandboxLifecycleStatus}
           sandboxInstanceId={input.sandboxInstanceId}
@@ -335,23 +307,16 @@ function SessionWorkbenchPageContent(input: {
       onSecondaryPanelResize={workbench.diffPanelState.setPanelSize}
       primaryBottomPanel={
         workbench.primaryPanelState.showsChatComposer ? (
-          <>
-            {workbench.shouldAutoResumeOnEntry ? (
-              <SessionWorkbenchAutoResumeOnEntry
-                requestStoppedSandboxResume={workbench.requestStoppedSandboxResume}
-              />
-            ) : null}
-            <SessionConversationBottomPanelController
-              chatEntries={conversationPane.chatState.entries}
-              composerStateInput={conversationPane.composerStateInput}
-              isRespondingToServerRequest={
-                conversationPane.serverRequestsState.isRespondingToServerRequest
-              }
-              onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-              key={input.sandboxInstanceId ?? "missing-session"}
-              serverRequestPanelEntries={unmatchedServerRequests}
-            />
-          </>
+          <SessionConversationBottomPanelController
+            chatEntries={conversationPane.chatState.entries}
+            composerStateInput={conversationPane.composerStateInput}
+            isRespondingToServerRequest={
+              conversationPane.serverRequestsState.isRespondingToServerRequest
+            }
+            onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+            key={input.sandboxInstanceId ?? "missing-session"}
+            serverRequestPanelEntries={unmatchedServerRequests}
+          />
         ) : null
       }
       secondaryPanel={
@@ -403,17 +368,6 @@ function renderPrimaryPanelMainContent(input: {
     case "stable_chat":
       return <SessionConversationMainContent {...input.conversation} />;
   }
-}
-
-function SessionWorkbenchAutoResumeOnEntry(input: {
-  requestStoppedSandboxResume: () => Promise<void>;
-}): null {
-  // Syncs this mount with the external resume API; render logic alone cannot start the network request.
-  useEffect(() => {
-    void input.requestStoppedSandboxResume();
-  }, [input.requestStoppedSandboxResume]);
-
-  return null;
 }
 
 function createEmptyComposerViewModel(): ChatComposerViewModel {

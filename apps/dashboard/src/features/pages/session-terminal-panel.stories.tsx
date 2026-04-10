@@ -104,7 +104,6 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
     alerts: [],
     bottomPanel: (
       <SessionTerminalPanel
-        isResumingSandbox={false}
         isConnectionReady={true}
         isVisible={isTerminalVisible}
         onHide={() => {
@@ -112,9 +111,6 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
         }}
         onDisconnectTerminal={() => {
           setIsTerminalVisible(false);
-        }}
-        onRequestSandboxResume={async () => {
-          return;
         }}
         ptyState={ptyState}
         sandboxStatus="running"

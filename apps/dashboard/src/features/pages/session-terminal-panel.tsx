@@ -29,7 +29,7 @@ export type TerminalRecoveryState =
   | {
       kind: "recovering";
       attemptCount: number;
-      command: "none" | "resume" | "reopen";
+      command: "none" | "reopen";
       errorMessage: string | null;
       resetInfo: SandboxPtyResetInfo;
     };
@@ -47,12 +47,8 @@ type TerminalRecoveryEvent =
       resetInfo: SandboxPtyResetInfo;
     }
   | {
-      type: "resume_requested";
-    }
-  | {
       type: "sync_observed";
       isReconnectAttemptInFlight: boolean;
-      isResumingSandbox: boolean;
       lifecycleState: SandboxPtyState;
       sandboxStatus: SessionTerminalRecoverySandboxStatus;
     };
@@ -140,15 +136,6 @@ export function reduceTerminalRecoveryState(
             errorMessage: null,
             resetInfo: event.resetInfo,
           };
-        case "resume_requested":
-          if (state.command !== "resume") {
-            return state;
-          }
-
-          return {
-            ...state,
-            command: "none",
-          };
         case "reopen_requested":
           if (state.command !== "reopen") {
             return state;
@@ -197,13 +184,12 @@ export function reduceTerminalRecoveryState(
             };
           }
 
-          if (event.sandboxStatus === "stopped" && !event.isResumingSandbox) {
-            return state.command === "resume"
-              ? state
-              : {
-                  ...state,
-                  command: "resume",
-                };
+          if (event.sandboxStatus === "stopped") {
+            return {
+              ...state,
+              command: "none",
+              errorMessage: "Terminal disconnected and the sandbox stopped.",
+            };
           }
 
           if (
@@ -267,10 +253,6 @@ function SessionTerminalToolbarStatus(input: {
   );
 }
 
-export function shouldRequestTerminalResume(input: { recovery: TerminalRecoveryState }): boolean {
-  return input.recovery.kind === "recovering" && input.recovery.command === "resume";
-}
-
 export function shouldAttemptTerminalReconnect(input: {
   recovery: TerminalRecoveryState;
 }): boolean {
@@ -292,7 +274,7 @@ export function resolveTerminalRecoveryMessage(input: {
   const prefix = `Terminal disconnected: ${input.recovery.resetInfo.message}`;
   switch (input.sandboxStatus) {
     case "stopped":
-      return `${prefix} Resuming sandbox to restore the terminal.`;
+      return `${prefix} The sandbox stopped and the terminal cannot reconnect.`;
     case "pending":
     case "starting":
     case "resuming":
@@ -307,24 +289,20 @@ export function resolveTerminalRecoveryMessage(input: {
 }
 
 type SessionTerminalPanelProps = {
-  isResumingSandbox: boolean;
   onHide: () => void;
   isVisible: boolean;
   isConnectionReady: boolean;
   onDisconnectTerminal: () => Promise<void> | void;
-  onRequestSandboxResume: () => Promise<void>;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxStatus: SessionTerminalRecoverySandboxStatus;
   sandboxInstanceId: string;
 };
 
 export function SessionTerminalPanel({
-  isResumingSandbox,
   onHide,
   isVisible,
   isConnectionReady,
   onDisconnectTerminal,
-  onRequestSandboxResume,
   ptyState,
   sandboxStatus,
   sandboxInstanceId,
@@ -360,25 +338,10 @@ export function SessionTerminalPanel({
     dispatchRecoveryEvent({
       type: "sync_observed",
       isReconnectAttemptInFlight: isReconnectAttemptInFlightRef.current,
-      isResumingSandbox,
       lifecycleState: lifecycle.state,
       sandboxStatus,
     });
-  }, [isResumingSandbox, lifecycle.state, recovery.kind, sandboxStatus]);
-
-  useEffect(() => {
-    if (!shouldRequestTerminalResume({ recovery })) {
-      return;
-    }
-
-    dispatchRecoveryEvent({
-      type: "resume_requested",
-    });
-
-    void onRequestSandboxResume().catch(() => {
-      // Resume errors surface through the existing stopped-sandbox alert state.
-    });
-  }, [onRequestSandboxResume, recovery]);
+  }, [lifecycle.state, recovery.kind, sandboxStatus]);
 
   useEffect(() => {
     if (!shouldAttemptTerminalReconnect({ recovery })) {
@@ -406,12 +369,11 @@ export function SessionTerminalPanel({
         dispatchRecoveryEvent({
           type: "sync_observed",
           isReconnectAttemptInFlight: false,
-          isResumingSandbox,
           lifecycleState: lifecycle.state,
           sandboxStatus,
         });
       });
-  }, [isResumingSandbox, lifecycle.state, openPty, recovery, sandboxInstanceId, sandboxStatus]);
+  }, [lifecycle.state, openPty, recovery, sandboxInstanceId, sandboxStatus]);
 
   const terminalRecoveryMessage = resolveTerminalRecoveryMessage({
     recovery,

@@ -172,13 +172,9 @@ export const CliSplitWithTerminal: Story = {
     bottomPanel: (
       <SessionTerminalPanel
         isConnectionReady={true}
-        isResumingSandbox={false}
         isVisible={true}
         onDisconnectTerminal={noop}
         onHide={noop}
-        onRequestSandboxResume={async () => {
-          return;
-        }}
         ptyState={createStoryWorkbenchCliPtyState(
           [
             "root@sandbox:~# pwd",

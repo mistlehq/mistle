@@ -13,10 +13,9 @@ export type SandboxAutomationConversation = {
 export type WorkbenchEntryPhase =
   | "connecting"
   | "loading"
-  | "manual_resume_required"
   | "ready"
-  | "resume_pending"
   | "sandbox_failed"
+  | "sandbox_stopped"
   | "sandbox_starting";
 
 export type SessionWorkbenchStatusAlert = {
@@ -117,42 +116,8 @@ export function resolveTrustedSandboxStatus(input: {
   return input.sandboxStatusReadState === "ready" ? input.sandboxStatus : null;
 }
 
-export function shouldShowResumeInFlightState(input: {
-  hasAttemptedInitialStoppedResume: boolean;
-  resumeActionErrorMessage: string | null;
-  shouldAttemptInitialStoppedResume: boolean;
-  isResumingStoppedSandbox: boolean;
-  sandboxStatus: SandboxLifecycleStatus | null;
-}): boolean {
-  return (
-    input.sandboxStatus === "stopped" &&
-    (input.isResumingStoppedSandbox ||
-      input.shouldAttemptInitialStoppedResume ||
-      (input.hasAttemptedInitialStoppedResume && input.resumeActionErrorMessage === null))
-  );
-}
-
-export function shouldPollStoppedSandboxStatus(input: {
-  sandboxStatus: SandboxLifecycleStatus | null;
-  hasAttemptedInitialStoppedResume: boolean;
-  isResumingStoppedSandbox: boolean;
-  resumeActionErrorMessage: string | null;
-}): boolean {
-  return (
-    input.sandboxStatus === "stopped" &&
-    shouldShowResumeInFlightState({
-      hasAttemptedInitialStoppedResume: input.hasAttemptedInitialStoppedResume,
-      resumeActionErrorMessage: input.resumeActionErrorMessage,
-      shouldAttemptInitialStoppedResume: false,
-      isResumingStoppedSandbox: input.isResumingStoppedSandbox,
-      sandboxStatus: input.sandboxStatus,
-    })
-  );
-}
-
 export function resolveWorkbenchEntryPhase(input: {
   connectedSession: boolean;
-  hasResumeInFlightState: boolean;
   sandboxStatus: SandboxLifecycleStatus | null;
 }): WorkbenchEntryPhase {
   if (input.sandboxStatus === "failed") {
@@ -168,7 +133,7 @@ export function resolveWorkbenchEntryPhase(input: {
   }
 
   if (input.sandboxStatus === "stopped") {
-    return input.hasResumeInFlightState ? "resume_pending" : "manual_resume_required";
+    return "sandbox_stopped";
   }
 
   return "loading";
@@ -181,10 +146,6 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
     return "failed";
   }
 
-  if (phase === "resume_pending") {
-    return "resuming";
-  }
-
   if (phase === "sandbox_starting") {
     return "starting";
   }
@@ -193,7 +154,7 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
     return "running";
   }
 
-  if (phase === "manual_resume_required") {
+  if (phase === "sandbox_stopped") {
     return "stopped";
   }
 
@@ -202,16 +163,12 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
 
 export function resolveStoppedSessionMessageForWorkbenchEntryPhase(input: {
   phase: WorkbenchEntryPhase;
-  resumeActionErrorMessage: string | null;
 }): string | null {
-  if (input.phase !== "manual_resume_required") {
+  if (input.phase !== "sandbox_stopped") {
     return null;
   }
 
-  return (
-    input.resumeActionErrorMessage ??
-    "This sandbox is stopped. Resume it to reconnect chat and terminal."
-  );
+  return "This sandbox is stopped. Chat and terminal are unavailable.";
 }
 
 export function resolveSessionWorkbenchStatus(input: {

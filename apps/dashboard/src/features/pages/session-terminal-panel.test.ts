@@ -7,7 +7,6 @@ import {
   shouldAttemptTerminalReconnect,
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
-  shouldRequestTerminalResume,
 } from "./session-terminal-panel.js";
 
 const ResetInfo = {
@@ -115,25 +114,30 @@ describe("reduceTerminalRecoveryState", () => {
     });
   });
 
-  it("requests sandbox resume only for a stopped recovery cycle", () => {
-    const recovery = reduceTerminalRecoveryState(
-      {
-        kind: "recovering",
-        attemptCount: 0,
-        command: "none",
-        errorMessage: null,
-        resetInfo: ResetInfo,
-      },
-      {
-        type: "sync_observed",
-        isReconnectAttemptInFlight: false,
-        isResumingSandbox: false,
-        lifecycleState: "closed",
-        sandboxStatus: "stopped",
-      },
-    );
-
-    expect(shouldRequestTerminalResume({ recovery })).toBe(true);
+  it("fails recovery when the sandbox stops", () => {
+    expect(
+      reduceTerminalRecoveryState(
+        {
+          kind: "recovering",
+          attemptCount: 0,
+          command: "none",
+          errorMessage: null,
+          resetInfo: ResetInfo,
+        },
+        {
+          type: "sync_observed",
+          isReconnectAttemptInFlight: false,
+          lifecycleState: "closed",
+          sandboxStatus: "stopped",
+        },
+      ),
+    ).toEqual({
+      kind: "recovering",
+      attemptCount: 0,
+      command: "none",
+      errorMessage: "Terminal disconnected and the sandbox stopped.",
+      resetInfo: ResetInfo,
+    });
   });
 
   it("requests terminal reopen only for a running recovery cycle", () => {
@@ -148,7 +152,6 @@ describe("reduceTerminalRecoveryState", () => {
       {
         type: "sync_observed",
         isReconnectAttemptInFlight: false,
-        isResumingSandbox: false,
         lifecycleState: "connected",
         sandboxStatus: "running",
       },
@@ -193,7 +196,6 @@ describe("reduceTerminalRecoveryState", () => {
         {
           type: "sync_observed",
           isReconnectAttemptInFlight: false,
-          isResumingSandbox: false,
           lifecycleState: "open",
           sandboxStatus: "running",
         },
@@ -216,7 +218,6 @@ describe("reduceTerminalRecoveryState", () => {
         {
           type: "sync_observed",
           isReconnectAttemptInFlight: false,
-          isResumingSandbox: false,
           lifecycleState: "closed",
           sandboxStatus: "failed",
         },
@@ -243,7 +244,6 @@ describe("reduceTerminalRecoveryState", () => {
         {
           type: "sync_observed",
           isReconnectAttemptInFlight: false,
-          isResumingSandbox: false,
           lifecycleState: "closed",
           sandboxStatus: "running",
         },
@@ -296,14 +296,14 @@ describe("resolveTerminalRecoveryMessage", () => {
     };
   }
 
-  it("explains resume-based recovery for stopped sandboxes", () => {
+  it("explains that stopped sandboxes cannot reconnect the terminal", () => {
     expect(
       resolveTerminalRecoveryMessage({
         recovery: createRecoveringState(),
         sandboxStatus: "stopped",
       }),
     ).toBe(
-      "Terminal disconnected: Sandbox bootstrap tunnel disconnected. Resuming sandbox to restore the terminal.",
+      "Terminal disconnected: Sandbox bootstrap tunnel disconnected. The sandbox stopped and the terminal cannot reconnect.",
     );
   });
 

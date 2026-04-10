@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
-import { SessionWorkbenchPage, shouldShowResumeAction } from "./session-workbench-page.js";
+import { SessionWorkbenchPage } from "./session-workbench-page.js";
 import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-controller.js";
 
 function renderSessionWorkbenchPage(input?: {
@@ -56,10 +56,5 @@ describe("SessionWorkbenchPage", () => {
     renderSessionWorkbenchPage();
 
     expect(screen.queryByRole("alert")).toBeNull();
-  });
-
-  it("shows the resume action only when manual resume is required", () => {
-    expect(shouldShowResumeAction({ requiresManualResume: true })).toBe(true);
-    expect(shouldShowResumeAction({ requiresManualResume: false })).toBe(false);
   });
 });
