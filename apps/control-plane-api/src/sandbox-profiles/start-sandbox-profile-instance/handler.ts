@@ -27,12 +27,14 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
-      primaryRepositoryId: body.primaryRepositoryId,
       startedBy: {
         kind: "user",
         id: user.id,
       },
       source: "dashboard",
+      ...(body.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: body.primaryRepositoryId }),
       ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
       image: {
         imageId: sandboxConfig.defaultBaseImage,

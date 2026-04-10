@@ -13,7 +13,7 @@ type StartProfileInstanceInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
-  primaryRepositoryId: string | null;
+  primaryRepositoryId?: string | null;
   idempotencyKey?: string;
   startedBy: {
     kind: SandboxInstanceStarterKind;
@@ -85,6 +85,25 @@ export async function startProfileInstance(
       `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
     );
   }
+  if (serviceInput.primaryRepositoryId === undefined) {
+    const startedSandbox = await dataPlaneClient.startSandboxInstance({
+      organizationId: serviceInput.organizationId,
+      sandboxProfileId: serviceInput.profileId,
+      sandboxProfileVersion: serviceInput.profileVersion,
+      idempotencyKey,
+      runtimePlan: compiledRuntimePlan,
+      startedBy: serviceInput.startedBy,
+      source: serviceInput.source,
+      image: serviceInput.image,
+    });
+
+    return {
+      status: startedSandbox.status,
+      workflowRunId: startedSandbox.workflowRunId,
+      sandboxInstanceId: startedSandbox.sandboxInstanceId,
+    };
+  }
+
   const repositoryOptions = await listProfileVersionRepositoryOptions(
     {
       db,
