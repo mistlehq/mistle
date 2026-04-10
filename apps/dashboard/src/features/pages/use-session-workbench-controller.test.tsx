@@ -78,8 +78,7 @@ describe("useSessionWorkbenchController", () => {
       requiresManualResume: false,
     });
     expect(result.current.workbench.workbenchStatus).toEqual({
-      tone: "not_connected",
-      label: "Not connected",
+      kind: "not_connected",
       alert: null,
     });
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();

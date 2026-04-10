@@ -31,22 +31,22 @@ export function hasSessionTopAlert(input: {
 export function resolveSessionWorkbenchHeaderStatusUi(input: {
   workbenchStatus: SessionWorkbenchStatus;
 }): SandboxStatusBadgeUi {
-  if (input.workbenchStatus.tone === "not_connected") {
+  if (input.workbenchStatus.kind === "not_connected") {
     return {
-      label: input.workbenchStatus.label,
+      label: "Not connected",
       variant: "outline",
     };
   }
 
-  if (input.workbenchStatus.tone === "error") {
+  if (input.workbenchStatus.kind === "error") {
     return {
-      label: input.workbenchStatus.label,
+      label: "Error",
       variant: "destructive",
     };
   }
 
   return {
-    label: input.workbenchStatus.label,
+    label: "Connected",
     variant: "secondary",
     className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
   };

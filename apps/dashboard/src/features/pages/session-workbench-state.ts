@@ -26,18 +26,15 @@ export type SessionWorkbenchStatusAlert = {
 
 export type SessionWorkbenchStatus =
   | {
-      tone: "connected";
-      label: "Connected";
+      kind: "connected";
       alert: SessionWorkbenchStatusAlert | null;
     }
   | {
-      tone: "error";
-      label: "Error";
+      kind: "error";
       alert: SessionWorkbenchStatusAlert | null;
     }
   | {
-      tone: "not_connected";
-      label: "Not connected";
+      kind: "not_connected";
       alert: SessionWorkbenchStatusAlert | null;
     };
 
@@ -227,8 +224,7 @@ export function resolveSessionWorkbenchStatus(input: {
 }): SessionWorkbenchStatus {
   if (input.lifecycleErrorMessage !== null) {
     return {
-      tone: "error",
-      label: "Error",
+      kind: "error",
       alert: {
         title: "Session connection error",
         description: input.lifecycleErrorMessage,
@@ -238,8 +234,7 @@ export function resolveSessionWorkbenchStatus(input: {
 
   if (input.sandboxFailureMessage !== null) {
     return {
-      tone: "error",
-      label: "Error",
+      kind: "error",
       alert: {
         title: "Sandbox failed",
         description: input.sandboxFailureMessage,
@@ -249,16 +244,14 @@ export function resolveSessionWorkbenchStatus(input: {
 
   if (input.sandboxLifecycleStatus === "failed") {
     return {
-      tone: "error",
-      label: "Error",
+      kind: "error",
       alert: null,
     };
   }
 
   if (input.stoppedSessionMessage !== null) {
     return {
-      tone: "not_connected",
-      label: "Not connected",
+      kind: "not_connected",
       alert: {
         title: "Stopped sandbox",
         description: input.stoppedSessionMessage,
@@ -269,8 +262,7 @@ export function resolveSessionWorkbenchStatus(input: {
   if (input.reconnectMessage !== null) {
     if (input.sandboxLifecycleStatus === "running") {
       return {
-        tone: "connected",
-        label: "Connected",
+        kind: "connected",
         alert: {
           title: "Reconnecting session",
           description: input.reconnectMessage,
@@ -279,8 +271,7 @@ export function resolveSessionWorkbenchStatus(input: {
     }
 
     return {
-      tone: "not_connected",
-      label: "Not connected",
+      kind: "not_connected",
       alert: {
         title: "Reconnecting session",
         description: input.reconnectMessage,
@@ -297,15 +288,13 @@ export function resolveSessionWorkbenchStatus(input: {
     input.sandboxLifecycleStatus === "stopped"
   ) {
     return {
-      tone: "not_connected",
-      label: "Not connected",
+      kind: "not_connected",
       alert: null,
     };
   }
 
   return {
-    tone: "connected",
-    label: "Connected",
+    kind: "connected",
     alert: null,
   };
 }

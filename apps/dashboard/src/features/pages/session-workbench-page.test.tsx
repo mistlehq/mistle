@@ -68,8 +68,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          tone: "not_connected",
-          label: "Not connected",
+          kind: "not_connected",
           alert: null,
         },
       }),
@@ -83,8 +82,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          tone: "connected",
-          label: "Connected",
+          kind: "connected",
           alert: null,
         },
       }),
@@ -99,8 +97,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          tone: "not_connected",
-          label: "Not connected",
+          kind: "not_connected",
           alert: null,
         },
       }),
@@ -114,8 +111,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          tone: "error",
-          label: "Error",
+          kind: "error",
           alert: null,
         },
       }),
