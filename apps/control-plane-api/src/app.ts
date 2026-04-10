@@ -109,7 +109,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
   const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
-  const homeRoutes = withAuthSession(createHomeRoutes());
+  const homeRoutes = withActiveOrganizationAccess(createHomeRoutes());
   const integrationCallbacksRoutes = createIntegrationCallbacksRoutes();
   const integrationConnectionsRoutes = withActiveOrganizationAccess(
     createIntegrationConnectionsRoutes(),

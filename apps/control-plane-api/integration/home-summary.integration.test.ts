@@ -4,6 +4,7 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   integrationTargets,
+  members,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
   sandboxProfiles,
@@ -14,6 +15,7 @@ import {
   SandboxInstanceSources,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
+import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect } from "vitest";
 
 import { homeSummaryResponseSchema } from "../src/home/schema.js";
@@ -184,6 +186,35 @@ describe("home summary integration", () => {
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasIntegrations).toBe(false);
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
+  });
+
+  it("returns 403 when the active organization membership has been revoked", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-revoked-membership@example.com",
+    });
+
+    await fixture.db
+      .delete(members)
+      .where(
+        and(
+          eq(members.organizationId, authenticatedSession.organizationId),
+          eq(members.userId, authenticatedSession.userId),
+        ),
+      );
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("counts system-started sandbox instances as a started session", async ({ fixture }) => {
