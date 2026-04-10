@@ -18,7 +18,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.11",
+    "@hono/node-server": "^1.19.13",
     "@hono/zod-openapi": "^1.2.4",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
