@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  type IntegrationConnectionResources,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
@@ -91,6 +92,50 @@ function resolveResourceOverride(input: {
   );
 }
 
+export function resolveIntegrationResourceListState(input: {
+  data: IntegrationConnectionResources | undefined;
+  errorMessage: string | null;
+  isError: boolean;
+  isPending: boolean;
+  resourceOverridePresent: boolean;
+  visibleItems: IntegrationConnectionResources["items"];
+}):
+  | { mode: "loading" }
+  | { mode: "error"; message: string }
+  | { mode: "ready"; items: IntegrationConnectionResources["items"] } {
+  if (input.resourceOverridePresent) {
+    return {
+      mode: "ready",
+      items: input.visibleItems,
+    };
+  }
+
+  if (input.data !== undefined) {
+    return {
+      mode: "ready",
+      items: input.data.items,
+    };
+  }
+
+  if (input.isPending) {
+    return {
+      mode: "loading",
+    };
+  }
+
+  if (input.isError) {
+    return {
+      mode: "error",
+      message: input.errorMessage ?? "Could not load resources for this connection.",
+    };
+  }
+
+  return {
+    mode: "ready",
+    items: [],
+  };
+}
+
 export function IntegrationResourceStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -121,6 +166,7 @@ export function IntegrationResourceStringArrayWidget(
         signal,
       }),
     enabled: resourceOverride === undefined,
+    placeholderData: (previousData) => previousData,
     retry: false,
   });
 
@@ -244,6 +290,14 @@ export function IntegrationResourceStringArrayWidget(
         error: resourceQuery.error,
         fallbackMessage: "Could not load resources for this connection.",
       });
+  const listState = resolveIntegrationResourceListState({
+    data: resourceQuery.data,
+    errorMessage: resourceListErrorMessage,
+    isError: resourceQuery.isError,
+    isPending: resourceQuery.isPending,
+    resourceOverridePresent: resourceOverride !== undefined,
+    visibleItems,
+  });
   const availableCount =
     resourceOverride?.items.length ??
     resourceQuery.data?.items.length ??
@@ -261,23 +315,11 @@ export function IntegrationResourceStringArrayWidget(
     unavailableSelectedHandles,
     unavailableSelectedHandlesCount: unavailableSelectedHandles.length,
     listState:
-      resourceOverride !== undefined
+      listState.mode === "ready"
         ? {
             mode: "ready",
           }
-        : resourceQuery.isPending
-          ? {
-              mode: "loading",
-            }
-          : resourceQuery.isError
-            ? {
-                mode: "error",
-                message:
-                  resourceListErrorMessage ?? "Could not load resources for this connection.",
-              }
-            : {
-                mode: "ready",
-              },
+        : listState,
     visibleItemsCount: visibleItems.length,
   });
 
@@ -287,27 +329,7 @@ export function IntegrationResourceStringArrayWidget(
       id={props.id}
       isRefreshing={refreshMutation.isPending}
       label={props.label}
-      listState={
-        resourceOverride !== undefined
-          ? {
-              mode: "ready",
-              items: visibleItems,
-            }
-          : resourceQuery.isPending
-            ? {
-                mode: "loading",
-              }
-            : resourceQuery.isError
-              ? {
-                  mode: "error",
-                  message:
-                    resourceListErrorMessage ?? "Could not load resources for this connection.",
-                }
-              : {
-                  mode: "ready",
-                  items: resourceQuery.data.items,
-                }
-      }
+      listState={listState}
       onBlur={() => {
         props.onBlur(props.id, selectedHandles);
       }}
