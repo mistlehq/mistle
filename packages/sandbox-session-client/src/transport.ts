@@ -226,6 +226,7 @@ function withStreamId(input: {
 class SandboxSessionTransportStream implements SandboxSessionStream {
   readonly #listeners = new Set<StreamListener>();
   readonly #transport: SandboxSessionTransport;
+  #isDisposed = false;
   #queuedEvents: SandboxSessionStreamEvent[] = [];
   #state: SandboxSessionStreamState;
 
@@ -246,6 +247,10 @@ class SandboxSessionTransportStream implements SandboxSessionStream {
   }
 
   onEvent(listener: StreamListener): () => void {
+    if (this.#isDisposed) {
+      throw new Error(`Sandbox session stream ${String(this.streamId)} has been disposed.`);
+    }
+
     this.#listeners.add(listener);
     if (this.#queuedEvents.length > 0) {
       const queuedEvents = [...this.#queuedEvents];
@@ -278,7 +283,9 @@ class SandboxSessionTransportStream implements SandboxSessionStream {
   }
 
   dispose(): void {
+    this.#isDisposed = true;
     this.#listeners.clear();
+    this.#queuedEvents = [];
   }
 
   markOpen(): void {
@@ -312,6 +319,10 @@ class SandboxSessionTransportStream implements SandboxSessionStream {
   }
 
   #emit(event: SandboxSessionStreamEvent): void {
+    if (this.#isDisposed) {
+      return;
+    }
+
     if (this.#listeners.size === 0) {
       this.#queuedEvents.push(event);
       return;

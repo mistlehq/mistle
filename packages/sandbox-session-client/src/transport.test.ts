@@ -390,6 +390,44 @@ describe("SandboxSessionTransport", () => {
     expect(transport.readyState).toBe(SandboxSessionSocketReadyStates.CLOSED);
   });
 
+  it("drops late events after a stream is disposed", async () => {
+    const server = await createManagedTestServer();
+    const transport = new SandboxSessionTransport({
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    const receivedEvents: string[] = [];
+
+    await transport.connect({
+      connectionUrl: server.url,
+    });
+
+    const stream = await transport.openStream({
+      channel: {
+        kind: "agent",
+      },
+    });
+
+    stream.onEvent((event) => {
+      if (event.type === "control") {
+        receivedEvents.push(event.message.type);
+      }
+    });
+
+    stream.dispose();
+
+    server.sendControlMessage({
+      type: "stream.window",
+      streamId: stream.streamId,
+      bytes: 5,
+    });
+    await systemSleeper.sleep(50);
+
+    expect(receivedEvents).toEqual([]);
+    expect(() => {
+      stream.onEvent(() => {});
+    }).toThrow(`Sandbox session stream ${String(stream.streamId)} has been disposed.`);
+  });
+
   it("rejects a stream.open handshake when the server rejects the channel", async () => {
     const server = await createManagedTestServer({
       rejectChannelKinds: ["agent"],
