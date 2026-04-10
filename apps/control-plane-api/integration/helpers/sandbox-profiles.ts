@@ -69,6 +69,7 @@ export function createSandboxProfileVersionIntegrationBindingFixture(input: {
   sandboxProfileVersion: number;
   connectionId: string;
   kind: IntegrationBindingKind;
+  config?: Record<string, unknown>;
 }) {
   return {
     id: input.id,
@@ -76,6 +77,6 @@ export function createSandboxProfileVersionIntegrationBindingFixture(input: {
     sandboxProfileVersion: input.sandboxProfileVersion,
     connectionId: input.connectionId,
     kind: input.kind,
-    config: {},
+    config: input.config ?? {},
   };
 }

@@ -31,6 +31,15 @@ export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
 export const launchableSandboxProfileSchema = sandboxProfileSchema
   .extend({
     latestVersion: z.number().int().min(1),
+    repositoryOptions: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          label: z.string().min(1),
+          path: z.string().min(1),
+        })
+        .strict(),
+    ),
   })
   .strict();
 

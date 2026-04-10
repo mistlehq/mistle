@@ -26,31 +26,22 @@ import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/for
 import { FormPageFrame } from "../shared/page-frame.js";
 import { shouldClearSelectedProfile } from "./sessions-page.js";
 
-export type NewSessionPageRepositoryPreviewOption = {
+type NewSessionPageRepositoryOption = {
   value: string;
   label: string;
 };
 
-const WorkspaceRootOption: NewSessionPageRepositoryPreviewOption = {
+const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   value: "__workspace_root__",
   label: "None",
 };
 
-export type NewSessionPagePreviewState = {
-  initialSelectedProfileId?: string;
-  repositoryOptionsByProfileId?: Readonly<
-    Record<string, readonly NewSessionPageRepositoryPreviewOption[]>
-  >;
-};
-
-export function NewSessionPage(input?: {
-  previewState?: NewSessionPagePreviewState;
-}): React.JSX.Element {
+export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [profileQueryText, setProfileQueryText] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
-    input?.previewState?.initialSelectedProfileId ?? null,
+    input?.initialSelectedProfileId ?? null,
   );
   const [selectedRepositoryValue, setSelectedRepositoryValue] = useState<string | null>(null);
   const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
@@ -65,9 +56,10 @@ export function NewSessionPage(input?: {
       ? null
       : (selectableProfiles.find((profile) => profile.id === selectedProfileId) ?? null);
   const repositoryOptionsForProfile =
-    selectedProfileId === null
-      ? []
-      : [...(input?.previewState?.repositoryOptionsByProfileId?.[selectedProfileId] ?? [])];
+    selectedProfile?.repositoryOptions.map((option) => ({
+      value: option.path,
+      label: option.label,
+    })) ?? [];
   const repositoryOptions =
     selectedProfile === null
       ? []
@@ -274,7 +266,7 @@ export function NewSessionPage(input?: {
                         </FieldLabel>
                       </FieldHeader>
                       <FieldContent>
-                        <Combobox<NewSessionPageRepositoryPreviewOption>
+                        <Combobox<NewSessionPageRepositoryOption>
                           autoHighlight
                           disabled={
                             selectableProfilesQuery.isPending || startSessionMutation.isPending

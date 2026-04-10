@@ -26,6 +26,7 @@ type SelectableProfile = {
   displayName: string;
   status: "active";
   latestVersion: number;
+  repositoryOptions: [];
   createdAt: string;
   updatedAt: string;
   organizationId: string;
@@ -41,6 +42,7 @@ function buildSelectableProfile(
     displayName: "Alpha Profile",
     status: "active",
     latestVersion: 3,
+    repositoryOptions: [],
     createdAt: "2026-03-10T00:00:00.000Z",
     updatedAt: "2026-03-10T00:00:00.000Z",
     organizationId: "org_123",

@@ -5845,6 +5845,11 @@ export interface paths {
                 id: string;
                 latestVersion: number;
                 organizationId: string;
+                repositoryOptions: {
+                  id: string;
+                  label: string;
+                  path: string;
+                }[];
                 /** @enum {string} */
                 status: "active" | "inactive";
                 updatedAt: string;

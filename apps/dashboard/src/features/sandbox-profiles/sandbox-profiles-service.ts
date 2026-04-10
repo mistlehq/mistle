@@ -15,6 +15,33 @@ import type {
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
+const LaunchableSandboxProfilesResultSchema = z
+  .object({
+    items: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          organizationId: z.string().min(1),
+          displayName: z.string().min(1),
+          status: z.enum(["active", "inactive"]),
+          latestVersion: z.number().int().min(1),
+          createdAt: z.string().min(1),
+          updatedAt: z.string().min(1),
+          repositoryOptions: z.array(
+            z
+              .object({
+                id: z.string().min(1),
+                label: z.string().min(1),
+                path: z.string().min(1),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export async function listSandboxProfiles(input: {
   limit: number;
   after: string | null;
@@ -77,7 +104,7 @@ export async function listLaunchableSandboxProfiles(input: {
       });
     }
 
-    return data;
+    return LaunchableSandboxProfilesResultSchema.parse(data);
   } catch (error) {
     throw new SandboxProfilesApiError(
       normalizeHttpApiError({

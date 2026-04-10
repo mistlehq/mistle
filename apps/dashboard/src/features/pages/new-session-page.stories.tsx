@@ -25,31 +25,7 @@ function NewSessionPageStory(input: NewSessionPageStoryArgs): React.JSX.Element 
       <MemoryRouter initialEntries={["/sessions/new"]}>
         <Routes>
           <Route
-            element={
-              <NewSessionPage
-                previewState={{
-                  initialSelectedProfileId: input.initialSelectedProfileId,
-                  repositoryOptionsByProfileId: {
-                    sbp_profile_multi_repo: [
-                      {
-                        value: "/root/acme/repo-1",
-                        label: "acme/repo-1",
-                      },
-                      {
-                        value: "/root/acme/repo-2",
-                        label: "acme/repo-2",
-                      },
-                    ],
-                    sbp_profile_single_repo: [
-                      {
-                        value: "/root/acme/docs-site",
-                        label: "acme/docs-site",
-                      },
-                    ],
-                  },
-                }}
-              />
-            }
+            element={<NewSessionPage initialSelectedProfileId={input.initialSelectedProfileId} />}
             path="/sessions/new"
           />
         </Routes>
@@ -71,11 +47,30 @@ const meta = {
       buildStoryLaunchableSandboxProfile({
         id: "sbp_profile_multi_repo",
         displayName: "Engineering Sandbox",
+        repositoryOptions: [
+          {
+            id: "/root/acme/repo-1",
+            label: "acme/repo-1",
+            path: "/root/acme/repo-1",
+          },
+          {
+            id: "/root/acme/repo-2",
+            label: "acme/repo-2",
+            path: "/root/acme/repo-2",
+          },
+        ],
       }),
       buildStoryLaunchableSandboxProfile({
         id: "sbp_profile_single_repo",
         displayName: "Docs Sandbox",
         latestVersion: 7,
+        repositoryOptions: [
+          {
+            id: "/root/acme/docs-site",
+            label: "acme/docs-site",
+            path: "/root/acme/docs-site",
+          },
+        ],
       }),
       buildStoryLaunchableSandboxProfile({
         id: "sbp_profile_no_repo",

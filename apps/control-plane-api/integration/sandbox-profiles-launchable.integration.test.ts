@@ -7,6 +7,8 @@ import {
   sandboxProfileVersions,
   sandboxProfiles,
 } from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { ListLaunchableSandboxProfilesResponseSchema } from "../src/sandbox-profiles/index.js";
@@ -26,6 +28,12 @@ describe("sandbox profiles launchable integration", () => {
     });
 
     await fixture.db.insert(sandboxProfiles).values([
+      createSandboxProfileFixture({
+        id: "sbp_launchable_agent_with_repos",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Launchable Agent With Repos Profile",
+        createdAt: "2026-01-04T00:00:00.000Z",
+      }),
       createSandboxProfileFixture({
         id: "sbp_launchable_agent",
         organizationId: authenticatedSession.organizationId,
@@ -65,6 +73,10 @@ describe("sandbox profiles launchable integration", () => {
     ]);
     await fixture.db.insert(sandboxProfileVersions).values([
       createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_launchable_agent_with_repos",
+        version: 1,
+      }),
+      createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_launchable_agent",
         version: 1,
       }),
@@ -98,16 +110,32 @@ describe("sandbox profiles launchable integration", () => {
       }),
     ]);
     await fixture.db.insert(integrationTargets).values([
-      createIntegrationTargetFixture({
+      {
         targetKey: "openai-sandbox-profiles-launchable",
+        familyId: "openai",
         variantId: "openai-default",
         enabled: true,
-      }),
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        },
+      },
       createIntegrationTargetFixture({
         targetKey: "openai-sandbox-profiles-launchable-disabled",
         variantId: "openai-disabled",
         enabled: false,
       }),
+      {
+        targetKey: "github-cloud-sandbox-profiles-launchable",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      },
     ]);
     await fixture.db.insert(integrationConnections).values([
       createIntegrationConnectionFixture({
@@ -131,14 +159,62 @@ describe("sandbox profiles launchable integration", () => {
         displayName: "Disabled target launchable connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
+      {
+        id: "icn_sandbox_profiles_launchable_github",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-sandbox-profiles-launchable",
+        displayName: "Launchable GitHub connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
     ]);
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_launchable_agent_with_repos_agent_v1",
+        sandboxProfileId: "sbp_launchable_agent_with_repos",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_sandbox_profiles_launchable",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
+      },
+      {
+        id: "ibd_launchable_agent_with_repos_git_v1",
+        sandboxProfileId: "sbp_launchable_agent_with_repos",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_sandbox_profiles_launchable_github",
+        kind: IntegrationBindingKinds.GIT,
+        config: {
+          repositories: ["mistlehq/mistle", "mistlehq/platform"],
+          tools: [],
+        },
+      },
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_agent_v2",
         sandboxProfileId: "sbp_launchable_agent",
         sandboxProfileVersion: 2,
         connectionId: "icn_sandbox_profiles_launchable",
         kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_git_only_v1",
@@ -153,6 +229,16 @@ describe("sandbox profiles launchable integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_sandbox_profiles_launchable",
         kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_old_agent_v2",
@@ -167,6 +253,16 @@ describe("sandbox profiles launchable integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_sandbox_profiles_launchable_inactive",
         kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_disabled_target_v1",
@@ -174,6 +270,16 @@ describe("sandbox profiles launchable integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_sandbox_profiles_launchable_disabled_target",
         kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_mixed_bindings_valid_v1",
@@ -181,6 +287,16 @@ describe("sandbox profiles launchable integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_sandbox_profiles_launchable",
         kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
         id: "ibd_launchable_mixed_bindings_invalid_v1",
@@ -199,14 +315,36 @@ describe("sandbox profiles launchable integration", () => {
     expect(response.status).toBe(200);
 
     const body = ListLaunchableSandboxProfilesResponseSchema.parse(await response.json());
-    expect(body.items).toHaveLength(1);
+    expect(body.items).toHaveLength(2);
     expect(body.items).toStrictEqual([
+      {
+        id: "sbp_launchable_agent_with_repos",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Launchable Agent With Repos Profile",
+        status: "active",
+        latestVersion: 1,
+        repositoryOptions: [
+          {
+            id: "/root/mistlehq/mistle",
+            label: "mistlehq/mistle",
+            path: "/root/mistlehq/mistle",
+          },
+          {
+            id: "/root/mistlehq/platform",
+            label: "mistlehq/platform",
+            path: "/root/mistlehq/platform",
+          },
+        ],
+        createdAt: "2026-01-04T00:00:00.000Z",
+        updatedAt: "2026-01-04T00:00:00.000Z",
+      },
       {
         id: "sbp_launchable_agent",
         organizationId: authenticatedSession.organizationId,
         displayName: "Launchable Agent Profile",
         status: "active",
         latestVersion: 2,
+        repositoryOptions: [],
         createdAt: "2026-01-03T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
       },

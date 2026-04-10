@@ -14,8 +14,20 @@ type UpdateSandboxProfileRequest =
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
 export type SandboxProfilesListResult = ListSandboxProfilesResponse;
-export type LaunchableSandboxProfilesResult = ListLaunchableSandboxProfilesResponse;
-export type LaunchableSandboxProfile = LaunchableSandboxProfilesResult["items"][number];
+export type LaunchableSandboxProfileRepositoryOption = {
+  id: string;
+  label: string;
+  path: string;
+};
+export type LaunchableSandboxProfile = ListLaunchableSandboxProfilesResponse["items"][number] & {
+  repositoryOptions: LaunchableSandboxProfileRepositoryOption[];
+};
+export type LaunchableSandboxProfilesResult = Omit<
+  ListLaunchableSandboxProfilesResponse,
+  "items"
+> & {
+  items: LaunchableSandboxProfile[];
+};
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
 export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
 export type CreateSandboxProfileInput = CreateSandboxProfileRequest;

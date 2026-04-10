@@ -7,30 +7,74 @@ import {
 } from "@mistle/db/control-plane";
 import { desc, eq, sql } from "drizzle-orm";
 
+import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
+import { SandboxProfilesCompileError, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
+
+const WorkspaceRootPrefix = "/root/";
+
+export type LaunchableSandboxProfileRepositoryOption = {
+  id: string;
+  label: string;
+  path: string;
+};
 
 export type LaunchableSandboxProfile = typeof sandboxProfiles.$inferSelect & {
   latestVersion: number;
+  repositoryOptions: LaunchableSandboxProfileRepositoryOption[];
 };
 
+function toRepositoryOptionLabel(path: string): string {
+  if (path.startsWith(WorkspaceRootPrefix)) {
+    return path.slice(WorkspaceRootPrefix.length);
+  }
+
+  return path;
+}
+
+function toRepositoryOptions(input: {
+  workspaceSources: ReadonlyArray<{
+    resourceKind: string;
+    path: string;
+  }>;
+}): LaunchableSandboxProfileRepositoryOption[] {
+  const repositoryOptionsByPath = new Map<string, LaunchableSandboxProfileRepositoryOption>();
+
+  for (const workspaceSource of input.workspaceSources) {
+    if (workspaceSource.resourceKind !== "repository") {
+      continue;
+    }
+
+    repositoryOptionsByPath.set(workspaceSource.path, {
+      id: workspaceSource.path,
+      label: toRepositoryOptionLabel(workspaceSource.path),
+      path: workspaceSource.path,
+    });
+  }
+
+  return [...repositoryOptionsByPath.values()].sort((left, right) =>
+    left.label.localeCompare(right.label),
+  );
+}
+
 export async function listLaunchableProfiles(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  { db, integrationsConfig }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig">,
   input: {
     organizationId: string;
+    imageRef: string;
   },
 ): Promise<{
   items: LaunchableSandboxProfile[];
 }> {
-  // This endpoint is a fast structural eligibility filter for the sessions picker.
-  // It intentionally does not try to mirror every start-time runtime-plan validation,
-  // which still runs when a session is actually started.
+  // This endpoint feeds the dashboard session picker. Compile each candidate so the
+  // response reflects the actual repository workspace sources the sandbox would use.
   const latestVersionSql = sql<number>`(
     select max(spv.version)::int
     from "control_plane"."sandbox_profile_versions" as spv
     where spv."sandbox_profile_id" = ${sandboxProfiles.id}
   )`;
 
-  const items = await db
+  const candidates = await db
     .select({
       id: sandboxProfiles.id,
       organizationId: sandboxProfiles.organizationId,
@@ -76,11 +120,47 @@ export async function listLaunchableProfiles(
     )
     .orderBy(desc(sandboxProfiles.createdAt), desc(sandboxProfiles.id));
 
+  const compiledCandidates = await Promise.all(
+    candidates.map(async (candidate) => {
+      try {
+        const runtimePlan = await compileProfileVersionRuntimePlan(
+          {
+            db,
+            integrationsConfig,
+          },
+          {
+            organizationId: input.organizationId,
+            profileId: candidate.id,
+            profileVersion: candidate.latestVersion,
+            image: {
+              source: "base",
+              imageRef: input.imageRef,
+            },
+          },
+        );
+
+        return {
+          ...candidate,
+          createdAt: new Date(candidate.createdAt).toISOString(),
+          updatedAt: new Date(candidate.updatedAt).toISOString(),
+          repositoryOptions: toRepositoryOptions({
+            workspaceSources: runtimePlan.workspaceSources,
+          }),
+        } satisfies LaunchableSandboxProfile;
+      } catch (error) {
+        if (
+          error instanceof SandboxProfilesCompileError ||
+          error instanceof SandboxProfilesNotFoundError
+        ) {
+          return null;
+        }
+
+        throw error;
+      }
+    }),
+  );
+
   return {
-    items: items.map((item) => ({
-      ...item,
-      createdAt: new Date(item.createdAt).toISOString(),
-      updatedAt: new Date(item.updatedAt).toISOString(),
-    })),
+    items: compiledCandidates.filter((candidate) => candidate !== null),
   };
 }

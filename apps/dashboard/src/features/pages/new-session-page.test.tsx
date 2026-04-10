@@ -9,7 +9,7 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { NewSessionPage, type NewSessionPagePreviewState } from "./new-session-page.js";
+import { NewSessionPage } from "./new-session-page.js";
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 
 function installMatchMediaStub(): void {
@@ -56,7 +56,7 @@ function createNewSessionPageQueryClient(input?: {
 
 function renderNewSessionPage(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
-  previewState?: NewSessionPagePreviewState;
+  initialSelectedProfileId?: string;
 }) {
   const queryClient = createNewSessionPageQueryClient(input);
 
@@ -67,11 +67,9 @@ function renderNewSessionPage(input?: {
           <Route
             element={
               <NewSessionPage
-                {...(input?.previewState === undefined
+                {...(input?.initialSelectedProfileId === undefined
                   ? {}
-                  : {
-                      previewState: input.previewState,
-                    })}
+                  : { initialSelectedProfileId: input.initialSelectedProfileId })}
               />
             }
             path="/sessions/new"
@@ -125,23 +123,26 @@ describe("NewSessionPage", () => {
     expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
   });
 
-  it("shows the starting repository picker in preview mode for a selected multi-repo profile", () => {
+  it("shows the starting repository picker for a selected multi-repo profile", () => {
     renderNewSessionPage({
-      previewState: {
-        initialSelectedProfileId: "sbp_profile_alpha",
-        repositoryOptionsByProfileId: {
-          sbp_profile_alpha: [
+      initialSelectedProfileId: "sbp_profile_alpha",
+      launchableProfiles: [
+        buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+          repositoryOptions: [
             {
-              value: "/start/repo-1",
+              id: "/start/repo-1",
               label: "acme/repo-1",
+              path: "/start/repo-1",
             },
             {
-              value: "/start/repo-2",
+              id: "/start/repo-2",
               label: "acme/repo-2",
+              path: "/start/repo-2",
             },
           ],
-        },
-      },
+        }),
+      ],
     });
 
     expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
@@ -161,17 +162,19 @@ describe("NewSessionPage", () => {
 
   it("preselects the only repository when the selected profile has a single repo", () => {
     renderNewSessionPage({
-      previewState: {
-        initialSelectedProfileId: "sbp_profile_alpha",
-        repositoryOptionsByProfileId: {
-          sbp_profile_alpha: [
+      initialSelectedProfileId: "sbp_profile_alpha",
+      launchableProfiles: [
+        buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+          repositoryOptions: [
             {
-              value: "/start/repo-1",
+              id: "/start/repo-1",
               label: "acme/repo-1",
+              path: "/start/repo-1",
             },
           ],
-        },
-      },
+        }),
+      ],
     });
 
     expect(
@@ -187,10 +190,13 @@ describe("NewSessionPage", () => {
 
   it("shows none as the only starting location when the selected profile has no repositories", () => {
     renderNewSessionPage({
-      previewState: {
-        initialSelectedProfileId: "sbp_profile_alpha",
-        repositoryOptionsByProfileId: {},
-      },
+      initialSelectedProfileId: "sbp_profile_alpha",
+      launchableProfiles: [
+        buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+          repositoryOptions: [],
+        }),
+      ],
     });
 
     expect(
@@ -206,21 +212,24 @@ describe("NewSessionPage", () => {
 
   it("shows the selected repository sandbox path when a repository is chosen", () => {
     const rendered = renderNewSessionPage({
-      previewState: {
-        initialSelectedProfileId: "sbp_profile_alpha",
-        repositoryOptionsByProfileId: {
-          sbp_profile_alpha: [
+      initialSelectedProfileId: "sbp_profile_alpha",
+      launchableProfiles: [
+        buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+          repositoryOptions: [
             {
-              value: "/root/acme/repo-1",
+              id: "/root/acme/repo-1",
               label: "acme/repo-1",
+              path: "/root/acme/repo-1",
             },
             {
-              value: "/root/acme/repo-2",
+              id: "/root/acme/repo-2",
               label: "acme/repo-2",
+              path: "/root/acme/repo-2",
             },
           ],
-        },
-      },
+        }),
+      ],
     });
 
     const locationTriggerButton = rendered.container.querySelectorAll(
