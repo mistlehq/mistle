@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -39,52 +40,46 @@ export function hasSessionTopAlert(input: {
   );
 }
 
+export function resolveSessionWorkbenchHeaderStatusUi(input: {
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+  sandboxStatusReadState: SandboxStatusReadState;
+}): SandboxStatusBadgeUi {
+  if (input.sandboxStatusReadState === "loading") {
+    return {
+      label: "Not connected",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "failed") {
+    return {
+      label: "Error",
+      variant: "destructive",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "running") {
+    return {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  return {
+    label: "Not connected",
+    variant: "outline",
+  };
+}
+
 export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
   return input.requiresManualResume;
 }
 
-export function SessionWorkbenchHeaderStatus(input: {
-  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
-  sandboxStatusReadState: SandboxStatusReadState;
-}): React.JSX.Element {
-  if (input.sandboxStatusReadState === "loading") {
-    return (
-      <span
-        aria-label="Not connected"
-        className="inline-block size-2.5 rounded-full border border-stone-300 bg-stone-300"
-        role="status"
-        title="Not connected"
-      />
-    );
-  }
-
-  if (input.sandboxLifecycleStatus === "failed") {
-    return (
-      <Badge aria-label="Error" title="Error" variant="destructive">
-        Error
-      </Badge>
-    );
-  }
-
-  if (input.sandboxLifecycleStatus === "running") {
-    return (
-      <span
-        aria-label="Connected"
-        className="inline-block size-2.5 rounded-full border border-emerald-700 bg-emerald-600"
-        role="status"
-        title="Connected"
-      />
-    );
-  }
-
-  return (
-    <span
-      aria-label="Not connected"
-      className="inline-block size-2.5 rounded-full border border-stone-300 bg-stone-300"
-      role="status"
-      title="Not connected"
-    />
-  );
+export function shouldShowSessionWorkbenchHeaderStatusLabel(input: {
+  headerStatusUi: SandboxStatusBadgeUi;
+}): boolean {
+  return input.headerStatusUi.variant === "destructive";
 }
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -119,16 +114,41 @@ function SessionWorkbenchPageContent(input: {
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
+  const sandboxHeaderStatusUi = resolveSessionWorkbenchHeaderStatusUi({
+    sandboxLifecycleStatus: workbench.sandboxLifecycleStatus,
+    sandboxStatusReadState: workbench.sandboxStatusReadState,
+  });
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
+  });
+  const showHeaderStatusLabel = shouldShowSessionWorkbenchHeaderStatusLabel({
+    headerStatusUi: sandboxHeaderStatusUi,
   });
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        <SessionWorkbenchHeaderStatus
-          sandboxLifecycleStatus={workbench.sandboxLifecycleStatus}
-          sandboxStatusReadState={workbench.sandboxStatusReadState}
-        />
+        {showHeaderStatusLabel ? (
+          <Badge
+            aria-label={sandboxHeaderStatusUi.label}
+            className={sandboxHeaderStatusUi.className}
+            title={sandboxHeaderStatusUi.label}
+            variant={sandboxHeaderStatusUi.variant}
+          >
+            {sandboxHeaderStatusUi.label}
+          </Badge>
+        ) : (
+          <span
+            aria-label={sandboxHeaderStatusUi.label}
+            className={[
+              "inline-block size-2.5 rounded-full border",
+              sandboxHeaderStatusUi.variant === "secondary"
+                ? "border-emerald-700 bg-emerald-600"
+                : "border-stone-300 bg-stone-300",
+            ].join(" ")}
+            role="status"
+            title={sandboxHeaderStatusUi.label}
+          />
+        )}
         <span aria-hidden className="h-5 w-px bg-stone-200" />
         {showResumeButton ? (
           <Button
@@ -224,6 +244,7 @@ function SessionWorkbenchPageContent(input: {
       diffButtonTitle,
       terminalButtonLabel,
       showResumeButton,
+      showHeaderStatusLabel,
       terminalButtonTitle,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
@@ -235,8 +256,9 @@ function SessionWorkbenchPageContent(input: {
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
-      workbench.sandboxLifecycleStatus,
-      workbench.sandboxStatusReadState,
+      sandboxHeaderStatusUi.className,
+      sandboxHeaderStatusUi.label,
+      sandboxHeaderStatusUi.variant,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
