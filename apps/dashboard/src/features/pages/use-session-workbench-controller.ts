@@ -108,7 +108,6 @@ type SessionWorkbenchState = {
     patch: string;
     setPanelSize: (size: number) => void;
     togglePanel: () => void;
-    truncatedMessage: string | null;
   };
 };
 
@@ -275,7 +274,6 @@ export function useSessionWorkbenchController(input: {
         patch: branchDiffState.patch,
         setPanelSize: diffPanelState.setPanelSize,
         togglePanel: diffPanelState.togglePanel,
-        truncatedMessage: branchDiffState.truncatedMessage,
       },
     },
     conversationPane: {

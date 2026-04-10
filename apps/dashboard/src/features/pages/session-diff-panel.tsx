@@ -18,7 +18,6 @@ type SessionDiffPanelProps = {
   patch: string;
   summaryLabel: string;
   title?: string;
-  warningMessage?: string | null;
 };
 
 function resolveFileDiffPath(fileDiff: FileDiffMetadata): string {
@@ -57,7 +56,6 @@ export function SessionDiffPanel({
   patch,
   summaryLabel,
   title = "Diffs",
-  warningMessage = null,
 }: SessionDiffPanelProps): React.JSX.Element {
   const parsedPatch = useMemo(() => parseSessionDiffPatch(patch), [patch]);
   const files = parsedPatch.kind === "parsed" ? parsedPatch.files : [];
@@ -99,11 +97,6 @@ export function SessionDiffPanel({
       ) : (
         <div className="min-h-0 flex-1 overflow-auto p-2">
           <div className="flex flex-col gap-2">
-            {warningMessage === null ? null : (
-              <Notice title="Diff truncated" variant="alert">
-                {warningMessage}
-              </Notice>
-            )}
             {files.map((fileDiff) => {
               const stats = getFileDiffLineStats(fileDiff);
               return (

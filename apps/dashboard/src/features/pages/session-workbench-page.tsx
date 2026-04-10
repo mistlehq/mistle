@@ -250,9 +250,6 @@ function SessionWorkbenchPageContent(input: {
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
     : "";
-  const diffPanelTruncatedMessage = workbench.connectionReadiness.canConnect
-    ? workbench.diffPanelState.truncatedMessage
-    : null;
 
   const alerts: SessionWorkbenchAlert[] = [];
   if (workbench.sandboxStatusQuery.isError) {
@@ -432,8 +429,7 @@ function SessionWorkbenchPageContent(input: {
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
           patch={diffPanelPatch}
           summaryLabel="Compared with main"
-          title="Changes"
-          warningMessage={diffPanelTruncatedMessage}
+          title="Current changes"
         />
       }
       secondaryPanelSize={workbench.diffPanelState.panelSize}

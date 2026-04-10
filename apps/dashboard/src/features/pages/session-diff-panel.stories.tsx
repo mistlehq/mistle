@@ -77,7 +77,7 @@ function StoryDiffWorkbench({ patch }: StoryDiffWorkbenchProps): React.JSX.Eleme
     mainContent: createStorySessionMainContent(),
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: (
-      <SessionDiffPanel patch={patch} summaryLabel="Compared with main" title="Changes" />
+      <SessionDiffPanel patch={patch} summaryLabel="Compared with main" title="Current changes" />
     ),
     secondaryPanelSize: 42,
   });
