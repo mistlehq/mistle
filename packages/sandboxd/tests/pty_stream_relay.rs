@@ -185,17 +185,46 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         .send(Message::Binary(encoded_primary_input.into()))
         .expect("client should send bytes through the primary stream");
 
-    let primary_window = parse_json_text_message(&mut client_socket);
-    assert_eq!(primary_window["type"], "stream.window");
-    assert_eq!(primary_window["streamId"], 1);
-    assert_eq!(primary_window["bytes"], 4);
+    let mut saw_primary_window = false;
+    let mut saw_primary_output = false;
+    for _ in 0..4 {
+        match client_socket
+            .read()
+            .expect("socket should receive PTY frames after writing to the primary stream")
+        {
+            Message::Text(payload) => {
+                let message: Value =
+                    serde_json::from_str(payload.as_str()).expect("text payload should be valid json");
+                if message["type"] == "stream.window" && message["streamId"] == 1 {
+                    assert_eq!(message["bytes"], 4);
+                    saw_primary_window = true;
+                }
+            }
+            Message::Binary(payload) => {
+                let frame =
+                    decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode");
+                assert_ne!(
+                    frame.stream_id, 2,
+                    "detached secondary stream should not receive further PTY output"
+                );
+                if frame.stream_id == 1 {
+                    let payload =
+                        String::from_utf8(frame.payload).expect("payload should be utf8");
+                    if payload == "bye\r\n" {
+                        saw_primary_output = true;
+                    }
+                }
+            }
+            other_message => panic!("unexpected websocket message after primary write: {other_message:?}"),
+        }
 
-    let primary_output = read_binary_frame(&mut client_socket);
-    assert_eq!(primary_output.stream_id, 1);
-    assert_eq!(
-        String::from_utf8(primary_output.payload).expect("payload should be utf8"),
-        "bye\r\n"
-    );
+        if saw_primary_window && saw_primary_output {
+            break;
+        }
+    }
+
+    assert!(saw_primary_window, "expected primary stream.window after primary write");
+    assert!(saw_primary_output, "expected primary PTY output after primary write");
 
     client_socket
         .send(Message::Text(
