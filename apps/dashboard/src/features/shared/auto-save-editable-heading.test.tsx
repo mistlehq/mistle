@@ -396,10 +396,11 @@ describe("AutoSaveEditableHeading", () => {
     });
 
     const textbox = screen.queryByRole("textbox", { name: "Heading" });
-    const heading = screen.queryByRole("heading", { name: "New Title" });
-    const resolvedValue =
-      textbox instanceof HTMLInputElement ? textbox.value : (heading?.textContent ?? null);
+    if (textbox !== null) {
+      expect(textbox).toHaveProperty("value", "New Title");
+      return;
+    }
 
-    expect(resolvedValue).toBe("New Title");
+    expect(screen.getByRole("heading", { name: "New Title" })).toBeTruthy();
   });
 });
