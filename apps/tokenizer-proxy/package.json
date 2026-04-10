@@ -18,6 +18,7 @@
     "@hono/node-server": "^1.19.13",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/sandbox-egress-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",

@@ -1,4 +1,5 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { resolveProviderEgressTelemetryHandler } from "@mistle/integrations-definitions/server";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { Hash } from "@smithy/hash-node";
@@ -17,8 +18,6 @@ import {
   type StaticAuthorizedEgressGrant,
 } from "./grant.js";
 import {
-  createAwsResponseTelemetryAttributes,
-  createAwsSigV4TelemetryAttributes,
   createCredentialCacheTelemetryAttributes,
   createEgressTelemetryBaseAttributes,
   createUpstreamTelemetryAttributes,
@@ -626,7 +625,16 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         const outgoingBody = await readOutgoingRequestBody(ctx);
 
         if (egressGrant.authInjectionType === "aws_sigv4") {
-          const awsSigV4Attributes = createAwsSigV4TelemetryAttributes({
+          const telemetryHandler = resolveProviderEgressTelemetryHandler(
+            egressGrant.authInjectionType,
+          );
+          if (telemetryHandler === undefined) {
+            throw new Error(
+              `No provider egress telemetry handler is registered for '${egressGrant.authInjectionType}'.`,
+            );
+          }
+
+          const awsSigV4Attributes = telemetryHandler.createRequestTelemetryAttributes({
             service: egressGrant.authInjectionService,
             region: egressGrant.authInjectionRegion,
             hasBody: outgoingBody !== undefined,
@@ -754,8 +762,17 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
 
         span.setAttribute("http.response.status_code", upstreamResponse.status);
         if (egressGrant.authInjectionType === "aws_sigv4") {
+          const telemetryHandler = resolveProviderEgressTelemetryHandler(
+            egressGrant.authInjectionType,
+          );
+          if (telemetryHandler === undefined) {
+            throw new Error(
+              `No provider egress telemetry handler is registered for '${egressGrant.authInjectionType}'.`,
+            );
+          }
+
           span.setAttributes(
-            createAwsResponseTelemetryAttributes({
+            telemetryHandler.createResponseTelemetryAttributes({
               headers: upstreamResponse.headers,
             }),
           );
@@ -783,7 +800,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 : {
                     awsService: egressGrant.authInjectionService,
                     awsRegion: egressGrant.authInjectionRegion,
-                    awsResponse: createAwsResponseTelemetryAttributes({
+                    awsResponse: resolveProviderEgressTelemetryHandler(
+                      egressGrant.authInjectionType,
+                    )?.createResponseTelemetryAttributes({
                       headers: upstreamResponse.headers,
                     }),
                   }),

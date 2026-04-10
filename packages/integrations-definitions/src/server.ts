@@ -13,6 +13,7 @@ import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { SlackDefinition } from "./slack/index.js";
 
 export * from "./aws/server.js";
+export * from "./egress-telemetry.server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
 export * from "./linear/index.js";
