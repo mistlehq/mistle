@@ -124,6 +124,10 @@ export async function getHomeSummary(
           where a."organization_id" = ${params.organizationId}
             and a."kind" = ${AutomationKinds.WEBHOOK}
         ) as "hasAutomations"`),
+    // This intentionally reuses the existing list API for now because the home
+    // onboarding flow is still provisional. If this surface becomes permanent,
+    // replace this with a lightweight persisted existence check instead of
+    // depending on list-time runtime-state resolution.
     input.dataPlaneClient.listSandboxInstances({
       organizationId: params.organizationId,
       limit: 1,
