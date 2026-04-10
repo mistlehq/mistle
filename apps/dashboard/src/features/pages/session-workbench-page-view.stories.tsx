@@ -35,7 +35,7 @@ const meta = {
   },
   args: {
     sandboxInstanceId: StorySandboxInstanceId,
-    alerts: [],
+    alert: null,
     bottomPanel: <div className="h-full w-full border-t bg-white" />,
     bottomPanelSize: 32,
     isBottomPanelVisible: false,
@@ -89,38 +89,28 @@ export const SessionErrorHeader: Story = {
 
 export const WithErrorNoticees: Story = {
   args: {
-    alerts: [
-      {
-        title: "Could not load sandbox status",
-        description: "The status endpoint returned a temporary network error.",
-      },
-      {
-        title: "Sandbox failed",
-        description: "The underlying sandbox exited before the session fully connected.",
-      },
-    ],
+    alert: {
+      title: "Could not load sandbox status",
+      description: "The status endpoint returned a temporary network error.",
+    },
   },
 };
 
 export const WithCliEntryFailureNotice: Story = {
   args: {
-    alerts: [
-      {
-        title: "Could not start Codex CLI",
-        description: "codex executable missing from the sandbox image",
-      },
-    ],
+    alert: {
+      title: "Could not start Codex CLI",
+      description: "codex executable missing from the sandbox image",
+    },
   },
 };
 
 export const WithChatRestoreFailureNotice: Story = {
   args: {
-    alerts: [
-      {
-        title: "Could not restore chat",
-        description: "Minting sandbox connection token failed: Could not mint connection token.",
-      },
-    ],
+    alert: {
+      title: "Could not restore chat",
+      description: "Minting sandbox connection token failed: Could not mint connection token.",
+    },
   },
 };
 

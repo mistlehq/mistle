@@ -115,7 +115,7 @@ export function createStorySessionBottomPanel(
 }
 
 export function renderSessionWorkbenchStory(input: {
-  alerts?: readonly SessionWorkbenchAlert[];
+  alert?: SessionWorkbenchAlert | null;
   bottomPanel?: React.ReactNode;
   bottomPanelSize?: number;
   isSecondaryPanelVisible?: boolean;
@@ -134,7 +134,7 @@ export function renderSessionWorkbenchStory(input: {
 
   return (
     <SessionWorkbenchPageView
-      alerts={input.alerts ?? []}
+      alert={input.alert ?? null}
       bottomPanel={input.bottomPanel ?? <></>}
       bottomPanelSize={input.bottomPanelSize ?? 32}
       isBottomPanelVisible={input.isBottomPanelVisible ?? false}
@@ -200,7 +200,7 @@ export function SessionWorkbenchStoryChrome(input: {
 }
 
 export function renderSessionWorkbenchContentStory(input: {
-  alerts?: readonly SessionWorkbenchAlert[];
+  alert?: SessionWorkbenchAlert | null;
   bottomPanel?: React.ReactNode;
   bottomPanelSize?: number;
   headerStatusUi?: SandboxStatusBadgeUi;

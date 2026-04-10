@@ -12,7 +12,7 @@ type SessionWorkbenchMainContentLayout = {
 
 type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
-  alerts: readonly SessionWorkbenchAlert[];
+  alert: SessionWorkbenchAlert | null;
   isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContent: React.ReactNode;
@@ -35,7 +35,7 @@ export type {
 
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
-  alerts,
+  alert,
   isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContent,
@@ -116,13 +116,11 @@ export function SessionWorkbenchPageView({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {alerts.length === 0 ? null : (
+      {alert === null ? null : (
         <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
-          {alerts.map((alert) => (
-            <Notice key={`${alert.title}:${alert.description}`} title={alert.title} variant="alert">
-              {alert.description}
-            </Notice>
-          ))}
+          <Notice key={`${alert.title}:${alert.description}`} title={alert.title} variant="alert">
+            {alert.description}
+          </Notice>
         </div>
       )}
 

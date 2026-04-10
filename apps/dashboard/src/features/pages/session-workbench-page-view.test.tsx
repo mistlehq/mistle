@@ -9,7 +9,7 @@ describe("SessionWorkbenchPageView", () => {
   it("retains scrollbar gutter and removes chat-width side padding until the desktop breakpoint", () => {
     const { container } = render(
       <SessionWorkbenchPageView
-        alerts={[]}
+        alert={null}
         bottomPanel={<div>Terminal</div>}
         bottomPanelSize={32}
         isBottomPanelVisible={false}
@@ -38,7 +38,7 @@ describe("SessionWorkbenchPageView", () => {
   it("does not reserve scrollbar gutter for full-width layouts", () => {
     const { container } = render(
       <SessionWorkbenchPageView
-        alerts={[]}
+        alert={null}
         bottomPanel={<div>Terminal</div>}
         bottomPanelSize={32}
         isBottomPanelVisible={false}

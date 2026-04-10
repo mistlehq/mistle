@@ -263,43 +263,34 @@ function SessionWorkbenchPageContent(input: {
     ? workbench.diffPanelState.patch
     : "";
 
-  const alerts: SessionWorkbenchAlert[] = [];
-  if (workbench.sandboxStatusQuery.isError) {
-    alerts.push({
-      title: "Could not load sandbox status",
-      description:
-        workbench.sandboxStatusQuery.error instanceof Error
-          ? workbench.sandboxStatusQuery.error.message
-          : "Could not load sandbox status.",
-    });
-  }
-  if (workbench.workbenchStatus.alert !== null) {
-    alerts.push(workbench.workbenchStatus.alert);
-  }
-  if (
-    workbench.primaryPanelState.transitionState === "stable_chat" &&
-    workbench.primaryPanelState.error !== null
-  ) {
-    alerts.push({
-      title:
-        workbench.primaryPanelState.error.kind === "chat_restore_failed"
-          ? "Could not restore chat"
-          : "Could not start Codex CLI",
-      description:
-        workbench.primaryPanelState.error.message ??
-        (workbench.primaryPanelState.error.kind === "chat_restore_failed"
-          ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
-          : "Could not start Codex CLI."),
-    });
-  }
-  const hasTopAlert =
-    workbench.sandboxStatusQuery.isError ||
-    (workbench.primaryPanelState.transitionState === "stable_chat" &&
-      workbench.workbenchStatus.alert !== null);
+  const alert: SessionWorkbenchAlert | null = workbench.sandboxStatusQuery.isError
+    ? {
+        title: "Could not load sandbox status",
+        description:
+          workbench.sandboxStatusQuery.error instanceof Error
+            ? workbench.sandboxStatusQuery.error.message
+            : "Could not load sandbox status.",
+      }
+    : workbench.workbenchStatus.alert !== null
+      ? workbench.workbenchStatus.alert
+      : workbench.primaryPanelState.transitionState === "stable_chat" &&
+          workbench.primaryPanelState.error !== null
+        ? {
+            title:
+              workbench.primaryPanelState.error.kind === "chat_restore_failed"
+                ? "Could not restore chat"
+                : "Could not start Codex CLI",
+            description:
+              workbench.primaryPanelState.error.message ??
+              (workbench.primaryPanelState.error.kind === "chat_restore_failed"
+                ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
+                : "Could not start Codex CLI."),
+          }
+        : null;
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
-        alerts={[]}
+        alert={null}
         bottomPanel={<></>}
         bottomPanelSize={32}
         isBottomPanelVisible={false}
@@ -333,13 +324,7 @@ function SessionWorkbenchPageContent(input: {
 
   return (
     <SessionWorkbenchPageView
-      alerts={
-        hasTopAlert ||
-        (workbench.primaryPanelState.transitionState === "stable_chat" &&
-          workbench.primaryPanelState.error !== null)
-          ? alerts
-          : []
-      }
+      alert={alert}
       isPrimaryPanelTransitioning={
         workbench.primaryPanelState.transitionState === "switching_to_cli" ||
         workbench.primaryPanelState.transitionState === "restoring_chat"
