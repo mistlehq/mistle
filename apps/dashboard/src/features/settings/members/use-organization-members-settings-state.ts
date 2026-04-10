@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { useDebouncedValue } from "../../shared/use-debounced-value.js";
+import { useDebouncedCallback } from "../../shared/use-debounced-callback.js";
 import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
 import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
@@ -52,8 +52,8 @@ export function useOrganizationMembersSettingsState(
   const [invitationActionState, setInvitationActionState] =
     useState<MembersDirectoryInvitationActionState>(null);
   const [roleUpdateErrorMessage, setRoleUpdateErrorMessage] = useState<string | null>(null);
-  const [searchValue, setSearchValue] = useState("");
-  const searchValueRef = useRef(searchValue);
+  const [searchInputValue, setSearchInputValue] = useState("");
+  const searchInputValueRef = useRef(searchInputValue);
   const [directoryQueryInput, setDirectoryQueryInput] = useState<{
     activeFilter: MembersDirectoryFilter;
     offset: number;
@@ -63,26 +63,25 @@ export function useOrganizationMembersSettingsState(
     offset: 0,
     searchValue: "",
   });
-  const debouncedSearchValue = useDebouncedValue(searchValue);
   const { activeFilter, offset, searchValue: querySearchValue } = directoryQueryInput;
 
   useEffect(() => {
-    searchValueRef.current = searchValue;
-  }, [searchValue]);
+    searchInputValueRef.current = searchInputValue;
+  }, [searchInputValue]);
 
-  useEffect(() => {
+  const commitSearchValue = useDebouncedCallback((nextValue: string) => {
     setDirectoryQueryInput((currentValue) => {
-      if (currentValue.searchValue === debouncedSearchValue) {
+      if (currentValue.searchValue === nextValue && currentValue.offset === 0) {
         return currentValue;
       }
 
       return {
         ...currentValue,
         offset: 0,
-        searchValue: debouncedSearchValue,
+        searchValue: nextValue,
       };
     });
-  }, [debouncedSearchValue]);
+  });
 
   const queryKeys = buildMembersQueryKeys(input.organizationId);
   const capabilitiesQuery = useQuery({
@@ -194,18 +193,21 @@ export function useOrganizationMembersSettingsState(
     },
     onInviteCompleted: async () => {
       const nextState = resolvePostInviteDirectoryState();
-      setSearchValue(nextState.searchValue);
+      commitSearchValue.cancel();
+      setSearchInputValue(nextState.searchValue);
+      searchInputValueRef.current = nextState.searchValue;
       setDirectoryQueryInput(nextState);
       await mutations.onInviteCompleted();
     },
     onInviteDialogOpenChange: setInviteDialogOpen,
     onFilterChange: (nextValue) => {
+      commitSearchValue.cancel();
       setDirectoryQueryInput((currentValue) => {
         return {
           ...currentValue,
           activeFilter: nextValue,
           offset: 0,
-          searchValue: searchValueRef.current,
+          searchValue: searchInputValueRef.current,
         };
       });
     },
@@ -260,15 +262,16 @@ export function useOrganizationMembersSettingsState(
     },
     onSaveRole: mutations.onSaveRole,
     onSearchValueChange: (nextValue) => {
-      searchValueRef.current = nextValue;
-      setSearchValue(nextValue);
+      searchInputValueRef.current = nextValue;
+      setSearchInputValue(nextValue);
+      commitSearchValue(nextValue);
     },
     organizationId: input.organizationId,
     offset,
     pendingMemberOperation,
     roleChangeDialog,
     roleUpdateErrorMessage,
-    searchValue,
+    searchValue: searchInputValue,
     total: directoryQueryState.total,
   };
 
