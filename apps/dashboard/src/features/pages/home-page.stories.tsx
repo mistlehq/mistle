@@ -13,7 +13,7 @@ const meta = {
   },
   decorators: [withDashboardPageStory],
   args: {
-    onboarding: HomePageStoryModels.noAiConnection,
+    onboarding: HomePageStoryModels.addIntegrations,
   },
   render: function RenderStory(args): React.JSX.Element {
     return <HomePageView {...args} />;
@@ -28,36 +28,36 @@ export const AddIntegrations: Story = {};
 
 export const SetUpAProfile: Story = {
   args: {
-    onboarding: HomePageStoryModels.missingProfile,
+    onboarding: HomePageStoryModels.setUpProfile,
   },
 };
 
 export const CompleteYourProfile: Story = {
   args: {
-    onboarding: HomePageStoryModels.profileNeedsBinding,
+    onboarding: HomePageStoryModels.completeProfile,
   },
 };
 
 export const LaunchFirstSession: Story = {
   args: {
-    onboarding: HomePageStoryModels.readyForFirstSession,
+    onboarding: HomePageStoryModels.launchFirstSession,
   },
 };
 
 export const CreateAnAutomation: Story = {
   args: {
-    onboarding: HomePageStoryModels.readyForFirstAutomation,
+    onboarding: HomePageStoryModels.createAutomation,
   },
 };
 
-export const Activated: Story = {
+export const Completed: Story = {
   args: {
-    onboarding: HomePageStoryModels.activated,
+    onboarding: HomePageStoryModels.completed,
   },
 };
 
 export const AddAWebhookIntegration: Story = {
   args: {
-    onboarding: HomePageStoryModels.automationRequiresWebhookIntegration,
+    onboarding: HomePageStoryModels.addWebhookIntegration,
   },
 };

@@ -1,10 +1,10 @@
 import { Button, cn } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 
-import type { HomeOnboardingStep, HomeOnboardingViewModel } from "./home-page-view-model.js";
+import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view-model.js";
 
 type HomePageViewProps = {
-  onboarding: HomeOnboardingViewModel;
+  onboarding: HomeChecklistViewModel;
   onNavigate?: (href: string) => void;
 };
 
@@ -28,7 +28,7 @@ export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): Rea
 }
 
 function SetupStepRow(input: {
-  step: HomeOnboardingStep;
+  step: HomeChecklistStep;
   onNavigate?: (href: string) => void;
 }): React.JSX.Element {
   return (
@@ -36,7 +36,6 @@ function SetupStepRow(input: {
       className={cn(
         "flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-start sm:justify-between",
         input.step.status === "current" && "border-primary/40 bg-primary/5",
-        input.step.status === "blocked" && "border-destructive/40 bg-destructive/5",
         input.step.status === "complete" && "border-border/60 bg-muted/15",
         input.step.status === "upcoming" && "border-border/70",
       )}
@@ -51,7 +50,6 @@ function SetupStepRow(input: {
               className={cn(
                 "size-2.5 rounded-full",
                 input.step.status === "current" && "bg-primary",
-                input.step.status === "blocked" && "bg-destructive",
                 input.step.status === "upcoming" && "bg-muted-foreground/30",
               )}
             />
