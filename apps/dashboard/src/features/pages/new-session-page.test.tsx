@@ -203,12 +203,12 @@ describe("NewSessionPage", () => {
       (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
     ).toBe("None");
     expect(
-      screen.getByText("The agent will start its session at the workspace root."),
+      screen.getByText(
+        "The agent will start its session using the profile's default working directory.",
+      ),
     ).toBeDefined();
     expect(
-      screen.getByText(
-        "Git, diffs, and repo-local instructions will not be tied to a specific repository by default.",
-      ),
+      screen.getByText("No primary repository override will be applied for this session."),
     ).toBeDefined();
   });
 

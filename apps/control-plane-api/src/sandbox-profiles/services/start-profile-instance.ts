@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-import { type CompiledRuntimePlan, DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
+import { type CompiledRuntimePlan } from "@mistle/integrations-core";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
@@ -42,7 +42,7 @@ async function resolveEffectiveRuntimePlan(
     compiledRuntimePlan: CompiledRuntimePlan;
   },
 ): Promise<CompiledRuntimePlan> {
-  if (input.primaryRepositoryId === undefined) {
+  if (input.primaryRepositoryId === undefined || input.primaryRepositoryId === null) {
     return input.compiledRuntimePlan;
   }
 
@@ -57,9 +57,7 @@ async function resolveEffectiveRuntimePlan(
     },
   );
   const primaryRepositoryPath =
-    input.primaryRepositoryId === null
-      ? DefaultSandboxWorkspaceDir
-      : (repositoryOptions.find((option) => option.id === input.primaryRepositoryId)?.path ?? null);
+    repositoryOptions.find((option) => option.id === input.primaryRepositoryId)?.path ?? null;
   if (primaryRepositoryPath === null) {
     throw new SandboxProfilesBadRequestError(
       SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
