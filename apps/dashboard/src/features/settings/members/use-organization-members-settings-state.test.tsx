@@ -5,7 +5,6 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_SEARCH_DEBOUNCE_MS } from "../../shared/use-debounced-value.js";
 import type {
   InvitationsPage,
   MembershipCapabilities,
@@ -15,6 +14,8 @@ import type {
 } from "./members-api.js";
 import type { MembersSettingsApi } from "./members-settings-api.js";
 import { useOrganizationMembersSettingsState } from "./use-organization-members-settings-state.js";
+
+const SearchDebounceMs = 300;
 
 function createMembershipCapabilities(): MembershipCapabilities {
   return {
@@ -181,7 +182,7 @@ describe("useOrganizationMembersSettingsState", () => {
         expect(result.current.viewModel.hasNextPage).toBe(false);
       },
       {
-        timeout: DEFAULT_SEARCH_DEBOUNCE_MS + 300,
+        timeout: SearchDebounceMs + 300,
       },
     );
   });
@@ -216,7 +217,7 @@ describe("useOrganizationMembersSettingsState", () => {
         expect(result.current.viewModel.invitations[0]?.email).toBe("gamma@example.com");
       },
       {
-        timeout: Math.max(DEFAULT_SEARCH_DEBOUNCE_MS - 100, 1),
+        timeout: Math.max(SearchDebounceMs - 100, 1),
       },
     );
   });

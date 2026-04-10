@@ -2,7 +2,6 @@ import { useDebouncer } from "@tanstack/react-pacer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { DEFAULT_SEARCH_DEBOUNCE_MS } from "../../shared/use-debounced-value.js";
 import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
 import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
@@ -26,6 +25,8 @@ type UseOrganizationMembersSettingsState = {
 type UseOrganizationMembersSettingsStateResult = {
   viewModel: OrganizationMembersSettingsPageViewModel;
 };
+
+const SearchDebounceMs = 300;
 
 export function resolvePostInviteDirectoryState(): {
   activeFilter: MembersDirectoryFilter;
@@ -85,7 +86,7 @@ export function useOrganizationMembersSettingsState(
       });
     },
     {
-      wait: DEFAULT_SEARCH_DEBOUNCE_MS,
+      wait: SearchDebounceMs,
     },
   );
 

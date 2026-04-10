@@ -1,5 +1,6 @@
 import { Input } from "@mistle/ui";
 import type { RJSFSchema, WidgetProps } from "@rjsf/utils";
+import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
@@ -10,12 +11,12 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
-import { useDebouncedValue } from "../shared/use-debounced-value.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
+const SearchDebounceMs = 300;
 const IntegrationResourceSummaryOptionSchema = z
   .object({
     kind: z.string().min(1),
@@ -88,7 +89,9 @@ export function IntegrationResourceStringArrayWidget(
   const options = resolveWidgetOptions(props.options);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const debouncedSearch = useDebouncedValue(search);
+  const [debouncedSearch] = useDebouncedValue(search, {
+    wait: SearchDebounceMs,
+  });
   const selectedHandles = resolveSelectedHandles(props.value);
 
   const resourceQuery = useQuery({
