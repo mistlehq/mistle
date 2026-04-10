@@ -36,15 +36,6 @@ function normalizeIntegrationBreadcrumbLabel(targetKey: string): string {
   return normalizedId.split(" ").map(toTitleCaseWord).join(" ");
 }
 
-function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): string {
-  const targetKey = input.params["targetKey"];
-  if (targetKey === undefined || targetKey.trim().length === 0) {
-    return "Callback result";
-  }
-
-  return `${normalizeIntegrationBreadcrumbLabel(targetKey)} callback`;
-}
-
 function resolveIntegrationDetailBreadcrumb(input: RouteTextResolverInput): string {
   const targetKey = input.params["targetKey"];
   if (targetKey === undefined || targetKey.trim().length === 0) {
@@ -167,11 +158,6 @@ export const ROUTE_HANDLES = {
     description: resolveIntegrationDetailSubtitle,
     headerIcon: resolveIntegrationDetailHeaderIcon,
   },
-  integrationCallbackResult: {
-    breadcrumb: resolveIntegrationCallbackBreadcrumb,
-    title: "Integration callback result",
-    description: "Review integration connection callback outcome.",
-  },
   sessions: {
     breadcrumb: "Sessions",
     title: "Sessions",
@@ -272,11 +258,6 @@ export const ROUTE_HANDLES = {
     description: resolveIntegrationDetailSubtitle,
     headerIcon: resolveIntegrationDetailHeaderIcon,
   },
-  settingsOrganizationIntegrationCallbackResult: {
-    breadcrumb: resolveIntegrationCallbackBreadcrumb,
-    title: "Integration callback result",
-    description: "Review integration connection callback outcome.",
-  },
 } as const satisfies Record<string, AppRouteHandle>;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
@@ -285,7 +266,6 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsOrganizationMembers",
   "settingsOrganizationIntegrations",
   "settingsOrganizationIntegrationDetail",
-  "settingsOrganizationIntegrationCallbackResult",
 ] as const;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
@@ -296,6 +276,4 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
   settingsOrganizationIntegrationDetail: ROUTE_HANDLES.settingsOrganizationIntegrationDetail,
-  settingsOrganizationIntegrationCallbackResult:
-    ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult,
 };

@@ -53,11 +53,6 @@ describe("app routing breadcrumb integration", () => {
           handle={ROUTE_HANDLES.integrationDetail}
           path=":targetKey"
         />
-        <Route
-          element={<PageHarness />}
-          handle={ROUTE_HANDLES.integrationCallbackResult}
-          path=":targetKey/callback-result"
-        />
       </Route>
     </Route>,
   );
@@ -131,17 +126,6 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-title">Integrations');
     expect(markup).toContain('data-slot="meta-description"></p>');
 
-    await router.navigate("/integrations/github/callback-result");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
-
-    expect(markup).toContain('href="/integrations"');
-    expect(markup).toContain("Github callback");
-    expect(markup).toContain("Integration callback result");
-    expect(markup).toContain("Review integration connection callback outcome.");
-
-    await router.navigate("/integrations");
-    expect(router.state.location.pathname).toBe("/integrations");
-
     await router.navigate("/integrations/github");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
@@ -169,11 +153,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("enforces breadcrumb and page metadata coverage for integrations destinations", () => {
-    const integrationDestinations = [
-      "/integrations",
-      "/integrations/github",
-      "/integrations/github/callback-result",
-    ];
+    const integrationDestinations = ["/integrations", "/integrations/github"];
 
     for (const destination of integrationDestinations) {
       const router = createMemoryRouter(integrationRoutes, {

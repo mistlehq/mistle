@@ -70,7 +70,7 @@ function SetupStepRow(input: {
       </div>
       {input.step.status === "complete" ? null : (
         <Button
-          className="shrink-0"
+          className="my-auto shrink-0"
           disabled={input.step.status !== "current"}
           onClick={() => {
             input.onNavigate?.(input.step.href);

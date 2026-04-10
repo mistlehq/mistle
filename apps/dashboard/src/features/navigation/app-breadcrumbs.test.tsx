@@ -62,31 +62,19 @@ describe("app-breadcrumbs", () => {
         <Route element={<Outlet />} path="/">
           <Route element={<Outlet />} handle={{ breadcrumb: "Integrations" }} path="integrations">
             <Route
-              element={<Outlet />}
+              element={<BreadcrumbHarness />}
               handle={{ breadcrumb: "GitHub", breadcrumbTo: "/integrations/github" }}
               path="github"
-            >
-              <Route
-                element={<BreadcrumbHarness />}
-                handle={{
-                  breadcrumb: ({
-                    params,
-                  }: {
-                    params: Readonly<Record<string, string | undefined>>;
-                  }) => `${params["targetKey"] ?? "integration"} callback`,
-                }}
-                path="callback-result"
-              />
-            </Route>
+            />
           </Route>
         </Route>,
       ),
       {
-        initialEntries: ["/integrations/github/callback-result"],
+        initialEntries: ["/integrations/github"],
       },
     );
 
     const markup = renderToStaticMarkup(<RouterProvider router={router} />);
-    expect(markup).toContain('href="/integrations/github"');
+    expect(markup).toContain('href="/integrations"');
   });
 });

@@ -6,10 +6,14 @@ import type { AppContextBindings } from "../../types.js";
 import { completeGitHubAppInstallationConnection } from "../services/complete-github-app-installation-connection.js";
 import { route } from "./route.js";
 
-const DashboardOrganizationIntegrationsPath = "/integrations";
-
-function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
-  return buildDashboardUrl(dashboardBaseUrl, DashboardOrganizationIntegrationsPath);
+function buildDashboardIntegrationDetailUrl(input: {
+  dashboardBaseUrl: string;
+  targetKey: string;
+}): string {
+  return buildDashboardUrl(
+    input.dashboardBaseUrl,
+    `/integrations/${encodeURIComponent(input.targetKey)}`,
+  );
 }
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
@@ -18,7 +22,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const integrationRegistry = ctx.get("integrationRegistry");
   const query = ctx.req.valid("query");
 
-  await completeGitHubAppInstallationConnection(
+  const completedConnection = await completeGitHubAppInstallationConnection(
     {
       db,
       integrationRegistry,
@@ -28,7 +32,13 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
   );
 
-  return ctx.redirect(buildDashboardIntegrationsUrl(config.dashboard.baseUrl), 302);
+  return ctx.redirect(
+    buildDashboardIntegrationDetailUrl({
+      dashboardBaseUrl: config.dashboard.baseUrl,
+      targetKey: completedConnection.targetKey,
+    }),
+    302,
+  );
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =

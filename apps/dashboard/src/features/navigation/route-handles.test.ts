@@ -15,10 +15,6 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.headerIcon).toBeDefined();
-    expect(ROUTE_HANDLES.integrationCallbackResult.title).toBe("Integration callback result");
-    expect(ROUTE_HANDLES.integrationCallbackResult.description).toBe(
-      "Review integration connection callback outcome.",
-    );
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
     expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
@@ -66,13 +62,6 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.headerIcon).toBeDefined();
-
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.title).toBe(
-      "Integration callback result",
-    );
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.description).toBe(
-      "Review integration connection callback outcome.",
-    );
   });
 
   it("defines intended breadcrumb clickability for parent crumbs", () => {
@@ -87,21 +76,6 @@ describe("route handles", () => {
       expect(handle.title).toBeDefined();
       expect(handle.description).toBeDefined();
     }
-  });
-
-  it("normalizes callback breadcrumb labels for known and unknown integration target keys", () => {
-    const callbackBreadcrumb = ROUTE_HANDLES.integrationCallbackResult.breadcrumb;
-    expect(typeof callbackBreadcrumb).toBe("function");
-
-    if (typeof callbackBreadcrumb !== "function") {
-      throw new Error("integrationCallbackResult breadcrumb must be a function");
-    }
-
-    expect(callbackBreadcrumb({ params: { targetKey: "github" } })).toBe("Github callback");
-    expect(callbackBreadcrumb({ params: { targetKey: "openai" } })).toBe("Openai callback");
-    expect(callbackBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
-      "Custom Integration V2 callback",
-    );
   });
 
   it("normalizes integration detail breadcrumb labels for known and unknown target keys", () => {

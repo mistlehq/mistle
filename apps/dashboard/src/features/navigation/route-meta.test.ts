@@ -66,17 +66,6 @@ describe("route breadcrumb metadata", () => {
         params: {},
         pathname: "/integrations/github",
       },
-      {
-        handle: {
-          breadcrumb: ({ params }: { params: Readonly<Record<string, string | undefined>> }) => {
-            return `${params["targetKey"] ?? "integration"} callback`;
-          },
-        },
-        params: {
-          targetKey: "github",
-        },
-        pathname: "/integrations/github/callback-result",
-      },
     ]);
 
     expect(breadcrumbs).toEqual([
@@ -86,13 +75,8 @@ describe("route breadcrumb metadata", () => {
         to: "/integrations",
       },
       {
-        isCurrent: false,
-        label: "Github",
-        to: "/integrations/github",
-      },
-      {
         isCurrent: true,
-        label: "github callback",
+        label: "Github",
         to: null,
       },
     ]);

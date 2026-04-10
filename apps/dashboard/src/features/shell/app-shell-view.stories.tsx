@@ -60,13 +60,13 @@ function StorySidebarContent(input: {
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={
-                input.locationPathname === "/automations" ||
-                input.locationPathname.startsWith("/automations/")
+                input.locationPathname === "/integrations" ||
+                input.locationPathname.startsWith("/integrations/")
               }
-              render={<NavLink to="/automations" />}
+              render={<NavLink to="/integrations" />}
             >
-              <AutomationsNavIcon aria-hidden className="size-4 shrink-0" />
-              <span>Automations</span>
+              <IntegrationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Integrations</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
@@ -79,6 +79,18 @@ function StorySidebarContent(input: {
             >
               <SandboxProfilesNavIcon aria-hidden className="size-4 shrink-0" />
               <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/automations" ||
+                input.locationPathname.startsWith("/automations/")
+              }
+              render={<NavLink to="/automations" />}
+            >
+              <AutomationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Automations</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SessionsNavToggleItem

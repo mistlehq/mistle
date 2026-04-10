@@ -16,7 +16,6 @@ import {
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
-import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
@@ -94,11 +93,6 @@ export const APP_ROUTES = createRoutesFromElements(
             element={<OrganizationIntegrationsSettingsPage />}
             handle={ROUTE_HANDLES.integrationDetail}
             path=":targetKey"
-          />
-          <Route
-            element={<IntegrationsCallbackResultPage />}
-            handle={ROUTE_HANDLES.integrationCallbackResult}
-            path=":targetKey/callback-result"
           />
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
