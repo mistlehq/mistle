@@ -23,7 +23,6 @@ const meta = {
   decorators: [withDashboardCenteredStory],
   args: {
     id: "storybook-repositories",
-    isUpdatingSearchResults: false,
     label: "Repositories",
     search: "",
     searchPlaceholder: "Search 24 repositories",

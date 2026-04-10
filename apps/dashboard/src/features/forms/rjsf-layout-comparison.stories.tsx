@@ -43,7 +43,14 @@ function RjsfExampleForm(input: {
   uiSchema: UiSchema<JsonObject, RJSFSchema, IntegrationFormContext>;
 }): React.JSX.Element {
   const [queryClient] = useState(() => {
-    const client = new QueryClient();
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          staleTime: Number.POSITIVE_INFINITY,
+        },
+      },
+    });
     for (const entry of input.initialQueryData ?? []) {
       client.setQueryData(entry.queryKey, entry.data);
     }
@@ -203,7 +210,6 @@ function ManualResourcePicker(): React.JSX.Element {
       emptyMessage="No repositories available for this connection."
       id="manual-repositories"
       isRefreshing={false}
-      isUpdatingSearchResults={false}
       label="Repositories"
       listState={createReadyState(RepositoryItems)}
       onBlur={() => {}}

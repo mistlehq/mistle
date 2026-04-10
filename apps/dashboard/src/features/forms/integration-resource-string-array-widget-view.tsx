@@ -10,7 +10,6 @@ import {
 
 export type IntegrationResourceStringArrayWidgetViewProps = {
   id: string;
-  isUpdatingSearchResults: boolean;
   label: string;
   search: string;
   searchPlaceholder: string;
@@ -49,7 +48,6 @@ function IntegrationResourceMessageSection(input: {
 
 function SelectAllRow(input: {
   allVisibleSelected: boolean;
-  disabled?: boolean;
   someVisibleSelected: boolean;
   selectedCountLabel: string | null;
   onToggleAll: () => void;
@@ -67,7 +65,6 @@ function SelectAllRow(input: {
     <label className="hover:bg-muted/40 border-b gap-3 flex items-center p-3 select-none">
       <input
         checked={input.allVisibleSelected}
-        disabled={input.disabled}
         onChange={input.onToggleAll}
         ref={indeterminateRef}
         type="checkbox"
@@ -164,15 +161,10 @@ export function IntegrationResourceStringArrayWidgetView(
         </div>
       ) : null}
 
-      {props.isUpdatingSearchResults ? (
-        <p className="text-muted-foreground text-sm">Updating results...</p>
-      ) : null}
-
       {viewModel.hasVisibleItems ? (
         <div className="overflow-hidden rounded-md border">
           <SelectAllRow
             allVisibleSelected={allVisibleSelected}
-            disabled={props.isUpdatingSearchResults}
             someVisibleSelected={someVisibleSelected}
             selectedCountLabel={viewModel.selectedCountLabel}
             onToggleAll={props.onToggleAll}
@@ -185,7 +177,6 @@ export function IntegrationResourceStringArrayWidgetView(
                 <label className="hover:bg-muted/40 gap-3 flex items-center p-3" key={resource.id}>
                   <input
                     checked={isSelected}
-                    disabled={props.isUpdatingSearchResults}
                     onChange={() => {
                       props.onToggleHandle(resource.handle);
                     }}

@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
-  type IntegrationConnectionResources,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
@@ -82,41 +81,6 @@ function formatSyncMetadata(input: {
   return `Last synced ${input.lastSyncedAt}`;
 }
 
-export function resolveIntegrationResourceListState(input: {
-  data: IntegrationConnectionResources | undefined;
-  errorMessage: string | null;
-  isError: boolean;
-  isPending: boolean;
-}):
-  | { mode: "loading" }
-  | { mode: "error"; message: string }
-  | { mode: "ready"; items: IntegrationConnectionResources["items"] } {
-  if (input.isError) {
-    return {
-      mode: "error",
-      message: input.errorMessage ?? "Could not load resources for this connection.",
-    };
-  }
-
-  if (input.data !== undefined) {
-    return {
-      mode: "ready",
-      items: input.data.items,
-    };
-  }
-
-  if (input.isPending) {
-    return {
-      mode: "loading",
-    };
-  }
-
-  return {
-    mode: "ready",
-    items: [],
-  };
-}
-
 export function IntegrationResourceStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -141,7 +105,6 @@ export function IntegrationResourceStringArrayWidget(
         ...(deferredSearch.length === 0 ? {} : { search: deferredSearch }),
         signal,
       }),
-    placeholderData: (previousData) => previousData,
     retry: false,
   });
 
@@ -240,14 +203,6 @@ export function IntegrationResourceStringArrayWidget(
         error: resourceQuery.error,
         fallbackMessage: "Could not load resources for this connection.",
       });
-  const listState = resolveIntegrationResourceListState({
-    data: resourceQuery.data,
-    errorMessage: resourceListErrorMessage,
-    isError: resourceQuery.isError,
-    isPending: resourceQuery.isPending,
-  });
-  const isUpdatingSearchResults =
-    resourceQuery.isFetching && resourceQuery.isPlaceholderData && resourceQuery.data !== undefined;
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
   const widgetViewModel = buildIntegrationResourceWidgetViewModel({
     title: options.title,
@@ -261,12 +216,18 @@ export function IntegrationResourceStringArrayWidget(
     refreshErrorMessage,
     unavailableSelectedHandles,
     unavailableSelectedHandlesCount: unavailableSelectedHandles.length,
-    listState:
-      listState.mode === "ready"
+    listState: resourceQuery.isPending
+      ? {
+          mode: "loading",
+        }
+      : resourceQuery.isError
         ? {
-            mode: "ready",
+            mode: "error",
+            message: resourceListErrorMessage ?? "Could not load resources for this connection.",
           }
-        : listState,
+        : {
+            mode: "ready",
+          },
     visibleItemsCount: visibleItems.length,
   });
 
@@ -275,9 +236,23 @@ export function IntegrationResourceStringArrayWidget(
       emptyMessage={widgetViewModel.emptyMessage}
       id={props.id}
       isRefreshing={refreshMutation.isPending}
-      isUpdatingSearchResults={isUpdatingSearchResults}
       label={props.label}
-      listState={listState}
+      listState={
+        resourceQuery.isPending
+          ? {
+              mode: "loading",
+            }
+          : resourceQuery.isError
+            ? {
+                mode: "error",
+                message:
+                  resourceListErrorMessage ?? "Could not load resources for this connection.",
+              }
+            : {
+                mode: "ready",
+                items: resourceQuery.data.items,
+              }
+      }
       onBlur={() => {
         props.onBlur(props.id, selectedHandles);
       }}
