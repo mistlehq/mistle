@@ -9,9 +9,8 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import {
   hasSessionTopAlert,
-  resolveSessionWorkbenchHeaderStatusUi,
+  SessionWorkbenchHeaderStatus,
   SessionWorkbenchPage,
-  shouldShowSessionWorkbenchHeaderStatusLabel,
   shouldShowResumeAction,
 } from "./session-workbench-page.js";
 import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-controller.js";
@@ -64,82 +63,52 @@ describe("SessionWorkbenchPage", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("maps loading read state to the loading badge regardless of lifecycle value", () => {
-    expect(
-      resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "running",
-        sandboxStatusReadState: "loading",
-      }),
-    ).toEqual({
-      label: "Not connected",
-      variant: "outline",
-    });
+  it("renders loading read state as a not-connected status dot", () => {
+    render(
+      <SessionWorkbenchHeaderStatus
+        sandboxLifecycleStatus="running"
+        sandboxStatusReadState="loading"
+      />,
+    );
+
+    const status = screen.getByRole("status", { name: "Not connected" });
+    expect(status.className).toContain("bg-stone-300");
   });
 
-  it("maps ready running state to the connected badge", () => {
-    expect(
-      resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "running",
-        sandboxStatusReadState: "ready",
-      }),
-    ).toEqual({
-      label: "Connected",
-      variant: "secondary",
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-    });
+  it("renders ready running state as a connected status dot", () => {
+    render(
+      <SessionWorkbenchHeaderStatus
+        sandboxLifecycleStatus="running"
+        sandboxStatusReadState="ready"
+      />,
+    );
+
+    const status = screen.getByRole("status", { name: "Connected" });
+    expect(status.className).toContain("bg-emerald-600");
   });
 
-  it("maps ready non-running states to the not connected badge", () => {
-    expect(
-      resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "starting",
-        sandboxStatusReadState: "ready",
-      }),
-    ).toEqual({
-      label: "Not connected",
-      variant: "outline",
-    });
+  it("renders ready non-running states as a not-connected status dot", () => {
+    render(
+      <SessionWorkbenchHeaderStatus
+        sandboxLifecycleStatus="starting"
+        sandboxStatusReadState="ready"
+      />,
+    );
+
+    const status = screen.getByRole("status", { name: "Not connected" });
+    expect(status.className).toContain("bg-stone-300");
   });
 
-  it("maps failed state to the error badge", () => {
-    expect(
-      resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "failed",
-        sandboxStatusReadState: "ready",
-      }),
-    ).toEqual({
-      label: "Error",
-      variant: "destructive",
-    });
-  });
+  it("renders failed state as a visible error badge", () => {
+    render(
+      <SessionWorkbenchHeaderStatus
+        sandboxLifecycleStatus="failed"
+        sandboxStatusReadState="ready"
+      />,
+    );
 
-  it("shows visible header text only for the error badge", () => {
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Connected",
-          variant: "secondary",
-        },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Not connected",
-          variant: "outline",
-        },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Error",
-          variant: "destructive",
-        },
-      }),
-    ).toBe(true);
+    expect(screen.getByText("Error")).toBeDefined();
+    expect(screen.queryByRole("status", { name: "Error" })).toBeNull();
   });
 
   it("shows top alerts only when one of the alert sources is present", () => {
