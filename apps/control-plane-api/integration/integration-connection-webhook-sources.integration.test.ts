@@ -2,12 +2,14 @@ import {
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
+  members,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   createIntegrationRegistry,
   JiraConnectionMethodIds,
 } from "@mistle/integrations-definitions";
+import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
@@ -183,6 +185,93 @@ describe("integration connection webhook sources integration", () => {
       where: (table, { eq }) => eq(table.integrationConnectionId, "icn_github_api_key_no_webhooks"),
     });
     expect(persistedSource).toBeUndefined();
+  });
+
+  it("returns 403 for webhook source listing after the active organization membership is revoked", async ({
+    fixture,
+  }) => {
+    const targetKey = "github-cloud-revoked-webhook-source-list";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connection-webhook-sources-revoked-membership@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        },
+      });
+
+    const createConnectionResponse = await fixture.request(
+      `/v1/integration/connections/${targetKey}/form`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub App Installation",
+          methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+          secrets: {
+            appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+            webhookSecret: "github-webhook-secret",
+          },
+        }),
+      },
+    );
+    expect(createConnectionResponse.status).toBe(201);
+    const createdConnection = (await createConnectionResponse.json()) as {
+      id: string;
+    };
+
+    await fixture.db
+      .delete(members)
+      .where(
+        and(
+          eq(members.organizationId, authenticatedSession.organizationId),
+          eq(members.userId, authenticatedSession.userId),
+        ),
+      );
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${createdConnection.id}/webhook-sources`,
+      {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("rejects Jira webhook source creation for service-account connections", async ({

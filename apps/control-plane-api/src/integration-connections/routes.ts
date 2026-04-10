@@ -4,8 +4,6 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import { createRequireAuthSessionMiddleware } from "../middleware/require-auth-session.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import * as cancelDeviceAuthorizationAttempt from "./cancel-device-authorization-attempt/index.js";
-import * as completeGitHubAppInstallationConnection from "./complete-github-app-installation-connection/index.js";
-import * as completeOAuth2AuthorizationCodeConnection from "./complete-oauth2-authorization-code-connection/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import * as createFormConnection from "./create-form-connection/index.js";
 import * as createIntegrationWebhookSource from "./create-integration-webhook-source/index.js";
@@ -113,15 +111,6 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(cancelDeviceAuthorizationAttempt.route.path, requireAuthSession);
   routes.openapi(cancelDeviceAuthorizationAttempt.route, cancelDeviceAuthorizationAttempt.handler);
-
-  routes.openapi(
-    completeGitHubAppInstallationConnection.route,
-    completeGitHubAppInstallationConnection.handler,
-  );
-  routes.openapi(
-    completeOAuth2AuthorizationCodeConnection.route,
-    completeOAuth2AuthorizationCodeConnection.handler,
-  );
 
   return {
     basePath: INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH,

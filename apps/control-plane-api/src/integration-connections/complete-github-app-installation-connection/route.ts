@@ -9,7 +9,7 @@ import {
 
 export const route = createRoute({
   method: "get",
-  path: "/github-app-installation/complete",
+  path: "/github-app-installation",
   tags: ["Integrations"],
   request: {
     query: CompleteGitHubAppInstallationConnectionQuerySchema,

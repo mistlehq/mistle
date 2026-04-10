@@ -10,7 +10,7 @@ import {
 
 export const route = createRoute({
   method: "get",
-  path: "/:targetKey/oauth2-authorization-code/complete",
+  path: "/:targetKey/oauth2-authorization-code",
   tags: ["Integrations"],
   request: {
     params: CompleteOAuth2AuthorizationCodeConnectionParamsSchema,

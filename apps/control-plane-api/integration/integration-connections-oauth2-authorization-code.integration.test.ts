@@ -57,7 +57,7 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/openai-default-oauth2-complete/oauth2-authorization-code/complete?state=missing",
+      "/v1/integration/callbacks/openai-default-oauth2-complete/oauth2-authorization-code?state=missing",
       {
         method: "GET",
       },
