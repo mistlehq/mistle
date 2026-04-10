@@ -2,28 +2,44 @@ import { isValidElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
-import { createAppShellFrameInput } from "./app-shell-frame-fixture.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
+import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
-    const frame = resolveAppShellFrame(
-      createAppShellFrameInput({
-        locationPathname: "/sessions/sbi_123",
-        pageMeta: {
-          appShellInsetOwner: "app-shell",
-          appShellViewportMode: "document",
-          title: "Sessions",
-          headerIcon: null,
-          supportingText: null,
-        },
-        overrides: {
-          organizationOptions: [],
-          organizationName: "Acme",
-          showSessionsSidebar: true,
-        },
-      }),
-    );
+    const locationPathname = "/sessions/sbi_123";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inAutomations: routeState.inAutomations,
+      inDashboardRoot: routeState.inDashboardRoot,
+      inSandboxProfiles: routeState.inSandboxProfiles,
+      inSessionDetail: routeState.inSessionDetail,
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      organizationName: "Acme",
+      pageMeta: {
+        appShellInsetOwner: "app-shell",
+        appShellViewportMode: "document",
+        title: "Sessions",
+        headerIcon: null,
+        supportingText: null,
+      },
+      signOutError: null,
+      showSessionsSidebar: true,
+      onShowSessionsSidebarChange: () => {},
+    });
 
     expect(isValidElement<{ children: ReactNode[]; className: string }>(frame.sidebarContent)).toBe(
       true,
@@ -44,22 +60,39 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
-    const frame = resolveAppShellFrame(
-      createAppShellFrameInput({
-        locationPathname: "/sessions/sbi_123",
-        pageMeta: {
-          appShellInsetOwner: "app-shell",
-          appShellViewportMode: "document",
-          title: "Sessions",
-          headerIcon: null,
-          supportingText: null,
-        },
-        overrides: {
-          organizationOptions: [],
-          organizationName: "Acme",
-        },
-      }),
-    );
+    const locationPathname = "/sessions/sbi_123";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inAutomations: routeState.inAutomations,
+      inDashboardRoot: routeState.inDashboardRoot,
+      inSandboxProfiles: routeState.inSandboxProfiles,
+      inSessionDetail: routeState.inSessionDetail,
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      organizationName: "Acme",
+      pageMeta: {
+        appShellInsetOwner: "app-shell",
+        appShellViewportMode: "document",
+        title: "Sessions",
+        headerIcon: null,
+        supportingText: null,
+      },
+      signOutError: null,
+      showSessionsSidebar: false,
+      onShowSessionsSidebarChange: () => {},
+    });
 
     expect(isValidElement(frame.sidebarContent)).toBe(true);
     if (!isValidElement(frame.sidebarContent)) {
