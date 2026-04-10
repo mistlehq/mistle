@@ -1,14 +1,10 @@
+import { members, users } from "@mistle/db/control-plane";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { listMembers } from "../src/organizations/services/list-members.js";
 import { createRuntimeWithObjectStore } from "./helpers/control-plane-runtime-with-object-store.js";
-import {
-  buildOrganizationActor,
-  buildOrganizationMemberSeed,
-  createPersistedOrganizationActor,
-  createPersistedOrganizationDirectoryFixture,
-} from "./helpers/organization-fixture.js";
 import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
 import { it } from "./test-context.js";
 
@@ -17,6 +13,15 @@ describe("organization members integration", () => {
     fixture,
   }) => {
     const searchedEmail = "members-case-beta@example.com";
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-members-owner@example.com",
+    });
+    const memberOneSession = await fixture.authSession({
+      email: "members-case-alpha@example.com",
+    });
+    const memberTwoSession = await fixture.authSession({
+      email: searchedEmail,
+    });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
     });
@@ -25,52 +30,37 @@ describe("organization members integration", () => {
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
+    const objectStore = createTestObjectStore(seaweedfs);
+    const memberOneObjectKey = `avatars/users/${memberOneSession.userId}/members_case_alpha.webp`;
 
     try {
-      const memberOneActor = buildOrganizationActor({
-        email: "members-case-alpha@example.com",
-      });
-      const memberTwoActor = buildOrganizationActor({
-        email: searchedEmail,
-      });
-      const ownerSession = await createPersistedOrganizationActor({
-        fixture,
-        actor: buildOrganizationActor({
-          email: "integration-org-members-owner@example.com",
-        }),
-      });
-      const memberOneSession = await createPersistedOrganizationActor({
-        fixture,
-        actor: memberOneActor,
-      });
-      const memberOneObjectKey = `avatars/users/${memberOneSession.userId}/members_case_alpha.webp`;
-      const directoryFixture = await createPersistedOrganizationDirectoryFixture({
-        fixture,
-        db: runtime.db,
-        owner: buildOrganizationActor({
-          email: ownerSession.email,
-        }),
-        members: [
-          buildOrganizationMemberSeed({
-            actor: memberOneActor,
-            role: "member",
-            createdAt: new Date("2026-03-02T00:00:00.000Z"),
-            name: "Members Case Alpha",
-            imageObjectKey: memberOneObjectKey,
-          }),
-          buildOrganizationMemberSeed({
-            actor: memberTwoActor,
-            role: "admin",
-            createdAt: new Date("2026-03-03T00:00:00.000Z"),
-            name: "Completely Different Name",
-          }),
-        ],
-      });
-      const objectStore = createTestObjectStore(seaweedfs);
-      const memberTwoSession = directoryFixture.members[1]?.actor;
-      if (memberTwoSession === undefined) {
-        throw new Error("Expected second seeded member.");
-      }
+      await runtime.db.insert(members).values([
+        {
+          organizationId: ownerSession.organizationId,
+          userId: memberOneSession.userId,
+          role: "member",
+          createdAt: new Date("2026-03-02T00:00:00.000Z"),
+        },
+        {
+          organizationId: ownerSession.organizationId,
+          userId: memberTwoSession.userId,
+          role: "admin",
+          createdAt: new Date("2026-03-03T00:00:00.000Z"),
+        },
+      ]);
+      await runtime.db
+        .update(users)
+        .set({
+          name: "Members Case Alpha",
+          imageObjectKey: memberOneObjectKey,
+        })
+        .where(eq(users.id, memberOneSession.userId));
+      await runtime.db
+        .update(users)
+        .set({
+          name: "Completely Different Name",
+        })
+        .where(eq(users.id, memberTwoSession.userId));
       await objectStore.putObject({
         Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
@@ -182,49 +172,39 @@ describe("organization members integration", () => {
       expect(imageResponse.status).toBe(200);
       expect(imageResponse.headers.get("content-type")).toBe("image/webp");
     } finally {
+      objectStore.destroy();
       await runtime.stop();
       await seaweedfs.stop();
     }
   });
 
   it("returns members when avatar presigning fails", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-members-avatar-failure-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "members-avatar-failure@example.com",
+    });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets-avatar-failure",
     });
     const objectStore = createTestObjectStore(seaweedfs);
+    const memberObjectKey = `avatars/users/${memberSession.userId}/members_avatar_failure.webp`;
 
     try {
-      const ownerSession = await createPersistedOrganizationActor({
-        fixture,
-        actor: buildOrganizationActor({
-          email: "integration-org-members-avatar-failure-owner@example.com",
-        }),
+      await fixture.db.insert(members).values({
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-04T00:00:00.000Z"),
       });
-      const memberSession = await createPersistedOrganizationActor({
-        fixture,
-        actor: buildOrganizationActor({
-          email: "members-avatar-failure@example.com",
-        }),
-      });
-      const memberObjectKey = `avatars/users/${memberSession.userId}/members_avatar_failure.webp`;
-      await createPersistedOrganizationDirectoryFixture({
-        fixture,
-        db: fixture.db,
-        owner: buildOrganizationActor({
-          email: ownerSession.email,
-        }),
-        members: [
-          buildOrganizationMemberSeed({
-            actor: buildOrganizationActor({
-              email: memberSession.email,
-            }),
-            role: "member",
-            createdAt: new Date("2026-03-04T00:00:00.000Z"),
-            name: "Avatar Failure Member",
-            imageObjectKey: memberObjectKey,
-          }),
-        ],
-      });
+      await fixture.db
+        .update(users)
+        .set({
+          name: "Avatar Failure Member",
+          imageObjectKey: memberObjectKey,
+        })
+        .where(eq(users.id, memberSession.userId));
       await objectStore.putObject({
         Body: await getStoredWebpFixtureBytes(),
         ContentType: "image/webp",
@@ -273,49 +253,57 @@ describe("organization members integration", () => {
   it("paginates members by the normalized display name returned to clients", async ({
     fixture,
   }) => {
-    const directoryFixture = await createPersistedOrganizationDirectoryFixture({
-      fixture,
-      owner: buildOrganizationActor({
-        email: "integration-org-members-sort-owner@example.com",
-      }),
-      members: [
-        buildOrganizationMemberSeed({
-          actor: buildOrganizationActor({
-            email: "alpha@example.com",
-          }),
-          role: "member",
-          createdAt: new Date("2026-03-05T00:00:00.000Z"),
-          name: "   ",
-        }),
-        buildOrganizationMemberSeed({
-          actor: buildOrganizationActor({
-            email: "alice@example.com",
-          }),
-          role: "member",
-          createdAt: new Date("2026-03-01T00:00:00.000Z"),
-          name: "Alice Person",
-        }),
-        buildOrganizationMemberSeed({
-          actor: buildOrganizationActor({
-            email: "zeta@example.com",
-          }),
-          role: "member",
-          createdAt: new Date("2026-03-05T00:00:00.000Z"),
-          name: "Beta Person",
-        }),
-      ],
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-members-sort-owner@example.com",
     });
-    const ownerSession = directoryFixture.owner;
-    const blankNameSession = directoryFixture.members[0]?.actor;
-    const aliceSession = directoryFixture.members[1]?.actor;
-    const namedSession = directoryFixture.members[2]?.actor;
-    if (
-      blankNameSession === undefined ||
-      aliceSession === undefined ||
-      namedSession === undefined
-    ) {
-      throw new Error("Expected seeded directory members.");
-    }
+    const blankNameSession = await fixture.authSession({
+      email: "alpha@example.com",
+    });
+    const aliceSession = await fixture.authSession({
+      email: "alice@example.com",
+    });
+    const namedSession = await fixture.authSession({
+      email: "zeta@example.com",
+    });
+
+    await fixture.db.insert(members).values([
+      {
+        organizationId: ownerSession.organizationId,
+        userId: blankNameSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        userId: aliceSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-01T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        userId: namedSession.userId,
+        role: "member",
+        createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+    ]);
+    await fixture.db
+      .update(users)
+      .set({
+        name: "   ",
+      })
+      .where(eq(users.id, blankNameSession.userId));
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Alice Person",
+      })
+      .where(eq(users.id, aliceSession.userId));
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Beta Person",
+      })
+      .where(eq(users.id, namedSession.userId));
 
     const firstPageResponse = await fixture.request(
       `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=`,
