@@ -4,6 +4,7 @@ import {
   integrationConnections,
   integrationTargets,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -11,11 +12,9 @@ import { z } from "zod";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const WorkspaceRootPrefix = "/root/";
-const GitBindingConfigSchema = z
-  .object({
-    repositories: z.array(z.string().min(1)),
-  })
-  .strict();
+const GitBindingConfigSchema = z.looseObject({
+  repositories: z.array(z.string().min(1)),
+});
 
 export type LaunchableSandboxProfileRepositoryOption = {
   id: string;
@@ -123,16 +122,33 @@ export async function listLaunchableProfiles(
   const gitBindings =
     candidateIds.length === 0
       ? []
-      : await db.query.sandboxProfileVersionIntegrationBindings.findMany({
-          columns: {
-            sandboxProfileId: true,
-            sandboxProfileVersion: true,
-            config: true,
-          },
-          where: (table) =>
-            sql`${inArray(table.sandboxProfileId, candidateIds)} and ${eq(table.kind, IntegrationBindingKinds.GIT)}`,
-          orderBy: (table, { asc }) => [asc(table.id)],
-        });
+      : await db
+          .select({
+            sandboxProfileId: sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+            sandboxProfileVersion: sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            config: sandboxProfileVersionIntegrationBindings.config,
+          })
+          .from(sandboxProfileVersionIntegrationBindings)
+          .innerJoin(
+            integrationConnections,
+            eq(integrationConnections.id, sandboxProfileVersionIntegrationBindings.connectionId),
+          )
+          .innerJoin(
+            integrationTargets,
+            eq(integrationTargets.targetKey, integrationConnections.targetKey),
+          )
+          .where(
+            sql`${inArray(sandboxProfileVersionIntegrationBindings.sandboxProfileId, candidateIds)}
+              and ${eq(sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.GIT)}
+              and ${eq(integrationConnections.organizationId, input.organizationId)}
+              and ${eq(integrationConnections.status, IntegrationConnectionStatuses.ACTIVE)}
+              and ${eq(integrationTargets.enabled, true)}`,
+          )
+          .orderBy(
+            sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+            sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            sandboxProfileVersionIntegrationBindings.id,
+          );
 
   const gitBindingsByProfileId = new Map<string, Array<{ config: Record<string, unknown> }>>();
   for (const gitBinding of gitBindings) {

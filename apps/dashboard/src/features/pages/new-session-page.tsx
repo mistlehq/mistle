@@ -32,10 +32,12 @@ type NewSessionPageRepositoryOption = {
   path: string;
 };
 
+const WorkspaceRootDescription = "workspace root";
+
 const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   value: "__workspace_root__",
   label: "None",
-  path: "/root",
+  path: WorkspaceRootDescription,
 };
 
 export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
@@ -306,8 +308,14 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
               {selectedLocationPath === null ? null : (
                 <div className="text-muted-foreground flex flex-col gap-1 text-sm">
                   <p>
-                    The agent will start its session in{" "}
-                    <span className="font-mono text-foreground">{selectedLocationPath}</span>.
+                    {selectedNoneOption ? (
+                      "The agent will start its session at the workspace root."
+                    ) : (
+                      <>
+                        The agent will start its session in{" "}
+                        <span className="font-mono text-foreground">{selectedLocationPath}</span>.
+                      </>
+                    )}
                   </p>
                   <p>
                     {selectedNoneOption
