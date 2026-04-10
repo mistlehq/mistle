@@ -17,6 +17,7 @@ import {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
 } from "@mistle/integrations-core";
+import { SpanStatusCode, type Span, trace } from "@opentelemetry/api";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -27,6 +28,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../../lib/crypto.js";
 import { resolveIntegrationTargetSecrets } from "../../../lib/integration-target-secrets.js";
+import { logger } from "../../../logger.js";
 import type { AppContext } from "../../../types.js";
 import {
   InternalIntegrationCredentialsError,
@@ -98,6 +100,46 @@ type OAuth2ClientCredentialsManagedCredentialResolution = {
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
+const ResolveIntegrationCredentialTracer = trace.getTracer("@mistle/control-plane-api");
+
+function createResolveCredentialTelemetryAttributes(input: {
+  connectionId: string;
+  bindingId?: string;
+  targetKey?: string;
+  familyId?: string;
+  variantId?: string;
+  connectionMethod?: string;
+  secretType: string;
+  slotKey?: string;
+  resolverKey?: string;
+  hasBindingContext: boolean;
+  hasHydratedConnectionSecrets?: boolean;
+}): Record<string, string | boolean> {
+  return {
+    "mistle.integration.connection_id": input.connectionId,
+    "mistle.integration.resolve.has_binding_context": input.hasBindingContext,
+    "mistle.integration.credential.secret_type": input.secretType,
+    ...(input.bindingId === undefined ? {} : { "mistle.integration.binding_id": input.bindingId }),
+    ...(input.targetKey === undefined ? {} : { "mistle.integration.target_key": input.targetKey }),
+    ...(input.familyId === undefined ? {} : { "mistle.integration.family_id": input.familyId }),
+    ...(input.variantId === undefined ? {} : { "mistle.integration.variant_id": input.variantId }),
+    ...(input.connectionMethod === undefined
+      ? {}
+      : { "mistle.integration.connection_method": input.connectionMethod }),
+    ...(input.slotKey === undefined
+      ? {}
+      : { "mistle.integration.credential.slot_key": input.slotKey }),
+    ...(input.resolverKey === undefined
+      ? {}
+      : { "mistle.integration.credential.resolver_key": input.resolverKey }),
+    ...(input.hasHydratedConnectionSecrets === undefined
+      ? {}
+      : {
+          "mistle.integration.resolve.has_hydrated_connection_secrets":
+            input.hasHydratedConnectionSecrets,
+        }),
+  };
+}
 
 function createValueCredential(input: {
   value: string;
@@ -1123,257 +1165,334 @@ export async function resolveIntegrationCredential(
   },
   input: ResolveIntegrationCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {
-  const { db, integrationRegistry, integrationsConfig } = ctx;
-  const connection = await db.query.integrationConnections.findFirst({
-    columns: {
-      id: true,
-      organizationId: true,
-      targetKey: true,
-      status: true,
-      externalSubjectId: true,
-      config: true,
-    },
-    where: (table, { eq }) => eq(table.id, input.connectionId),
-  });
-
-  if (connection === undefined) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_FOUND,
-      404,
-      `Integration connection '${input.connectionId}' was not found.`,
-    );
-  }
-
-  if (connection.status !== IntegrationConnectionStatuses.ACTIVE) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_ACTIVE,
-      400,
-      `Integration connection '${connection.id}' is not active.`,
-    );
-  }
-
-  const target = await db.query.integrationTargets.findFirst({
-    columns: {
-      targetKey: true,
-      familyId: true,
-      variantId: true,
-      enabled: true,
-      config: true,
-      secrets: true,
-    },
-    where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
-  });
-
-  if (target === undefined) {
-    throw new Error(`Integration target '${connection.targetKey}' was not found.`);
-  }
-
-  const definition = integrationRegistry.getDefinition({
-    familyId: target.familyId,
-    variantId: target.variantId,
-  });
-
-  if (definition === undefined) {
-    throw new Error(
-      `Integration definition '${target.familyId}::${target.variantId}' was not found.`,
-    );
-  }
-
-  let bindingResolverContext: ResolverContextBinding | undefined;
-  if (input.bindingId !== undefined) {
-    const [binding] = await db
-      .select({
-        id: sandboxProfileVersionIntegrationBindings.id,
-        kind: sandboxProfileVersionIntegrationBindings.kind,
-        connectionId: sandboxProfileVersionIntegrationBindings.connectionId,
-        config: sandboxProfileVersionIntegrationBindings.config,
-      })
-      .from(sandboxProfileVersionIntegrationBindings)
-      .where(eq(sandboxProfileVersionIntegrationBindings.id, input.bindingId))
-      .limit(1);
-
-    if (binding === undefined) {
-      throw new InternalIntegrationCredentialsError(
-        InternalIntegrationCredentialsErrorCodes.BINDING_NOT_FOUND,
-        404,
-        `Integration binding '${input.bindingId}' was not found.`,
+  return await ResolveIntegrationCredentialTracer.startActiveSpan(
+    "control_plane.integration_credentials.resolve",
+    async (span: Span) => {
+      span.setAttributes(
+        createResolveCredentialTelemetryAttributes({
+          connectionId: input.connectionId,
+          ...(input.bindingId === undefined ? {} : { bindingId: input.bindingId }),
+          secretType: input.secretType,
+          ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+          ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
+          hasBindingContext: input.bindingId !== undefined,
+        }),
       );
-    }
 
-    if (binding.connectionId !== connection.id) {
-      throw new InternalIntegrationCredentialsError(
-        InternalIntegrationCredentialsErrorCodes.BINDING_CONNECTION_MISMATCH,
-        400,
-        `Integration binding '${binding.id}' does not belong to connection '${connection.id}'.`,
-      );
-    }
+      try {
+        const { db, integrationRegistry, integrationsConfig } = ctx;
+        const connection = await db.query.integrationConnections.findFirst({
+          columns: {
+            id: true,
+            organizationId: true,
+            targetKey: true,
+            status: true,
+            externalSubjectId: true,
+            config: true,
+          },
+          where: (table, { eq }) => eq(table.id, input.connectionId),
+        });
 
-    bindingResolverContext = resolveResolverContextBinding({
-      binding: {
-        id: binding.id,
-        kind: binding.kind,
-        config: binding.config,
-      },
-      definition,
-    });
-  }
+        if (connection === undefined) {
+          throw new InternalIntegrationCredentialsError(
+            InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_FOUND,
+            404,
+            `Integration connection '${input.connectionId}' was not found.`,
+          );
+        }
 
-  const initialConnectionResolverContext = resolveResolverContextConnection({
-    id: connection.id,
-    status: connection.status,
-    externalSubjectId: connection.externalSubjectId,
-    config: connection.config,
-  });
-  const connectionMethodId = resolveConnectionMethodId(initialConnectionResolverContext.config);
-  const connectionMethod = definition.connectionMethods.find(
-    (method) => method.id === connectionMethodId,
-  );
-  const resolvedConnectionSecrets =
-    connectionMethod?.kind === "form"
-      ? await resolveResolverContextConnectionSecrets({
+        if (connection.status !== IntegrationConnectionStatuses.ACTIVE) {
+          throw new InternalIntegrationCredentialsError(
+            InternalIntegrationCredentialsErrorCodes.CONNECTION_NOT_ACTIVE,
+            400,
+            `Integration connection '${connection.id}' is not active.`,
+          );
+        }
+
+        const target = await db.query.integrationTargets.findFirst({
+          columns: {
+            targetKey: true,
+            familyId: true,
+            variantId: true,
+            enabled: true,
+            config: true,
+            secrets: true,
+          },
+          where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+        });
+
+        if (target === undefined) {
+          throw new Error(`Integration target '${connection.targetKey}' was not found.`);
+        }
+
+        const definition = integrationRegistry.getDefinition({
+          familyId: target.familyId,
+          variantId: target.variantId,
+        });
+
+        if (definition === undefined) {
+          throw new Error(
+            `Integration definition '${target.familyId}::${target.variantId}' was not found.`,
+          );
+        }
+
+        let bindingResolverContext: ResolverContextBinding | undefined;
+        if (input.bindingId !== undefined) {
+          const [binding] = await db
+            .select({
+              id: sandboxProfileVersionIntegrationBindings.id,
+              kind: sandboxProfileVersionIntegrationBindings.kind,
+              connectionId: sandboxProfileVersionIntegrationBindings.connectionId,
+              config: sandboxProfileVersionIntegrationBindings.config,
+            })
+            .from(sandboxProfileVersionIntegrationBindings)
+            .where(eq(sandboxProfileVersionIntegrationBindings.id, input.bindingId))
+            .limit(1);
+
+          if (binding === undefined) {
+            throw new InternalIntegrationCredentialsError(
+              InternalIntegrationCredentialsErrorCodes.BINDING_NOT_FOUND,
+              404,
+              `Integration binding '${input.bindingId}' was not found.`,
+            );
+          }
+
+          if (binding.connectionId !== connection.id) {
+            throw new InternalIntegrationCredentialsError(
+              InternalIntegrationCredentialsErrorCodes.BINDING_CONNECTION_MISMATCH,
+              400,
+              `Integration binding '${binding.id}' does not belong to connection '${connection.id}'.`,
+            );
+          }
+
+          bindingResolverContext = resolveResolverContextBinding({
+            binding: {
+              id: binding.id,
+              kind: binding.kind,
+              config: binding.config,
+            },
+            definition,
+          });
+        }
+
+        const initialConnectionResolverContext = resolveResolverContextConnection({
+          id: connection.id,
+          status: connection.status,
+          externalSubjectId: connection.externalSubjectId,
+          config: connection.config,
+        });
+        const connectionMethodId = resolveConnectionMethodId(
+          initialConnectionResolverContext.config,
+        );
+        const connectionMethod = definition.connectionMethods.find(
+          (method) => method.id === connectionMethodId,
+        );
+        const resolvedConnectionSecrets =
+          connectionMethod?.kind === "form"
+            ? await resolveResolverContextConnectionSecrets({
+                db,
+                integrationsConfig,
+                organizationId: connection.organizationId,
+                connectionId: connection.id,
+                connectionMethod,
+              })
+            : undefined;
+
+        span.setAttributes(
+          createResolveCredentialTelemetryAttributes({
+            connectionId: connection.id,
+            ...(bindingResolverContext === undefined
+              ? {}
+              : { bindingId: bindingResolverContext.id }),
+            targetKey: connection.targetKey,
+            familyId: target.familyId,
+            variantId: target.variantId,
+            ...(connectionMethodId === undefined ? {} : { connectionMethod: connectionMethodId }),
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+            ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
+            hasBindingContext: bindingResolverContext !== undefined,
+            hasHydratedConnectionSecrets: resolvedConnectionSecrets !== undefined,
+          }),
+        );
+
+        const connectionResolverContext = resolveResolverContextConnection({
+          id: connection.id,
+          status: connection.status,
+          externalSubjectId: connection.externalSubjectId,
+          config: connection.config,
+          ...(resolvedConnectionSecrets === undefined
+            ? {}
+            : { secrets: resolvedConnectionSecrets }),
+        });
+
+        if (input.resolverKey !== undefined) {
+          const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
+          if (customResolver === undefined) {
+            throw new InternalIntegrationCredentialsError(
+              InternalIntegrationCredentialsErrorCodes.RESOLVER_NOT_FOUND,
+              404,
+              `Credential resolver '${input.resolverKey}' was not found for target '${connection.targetKey}'.`,
+            );
+          }
+
+          const targetResolverContext = resolveResolverContextTarget({
+            target,
+            definition,
+            integrationsConfig,
+          });
+
+          const resolvedCredential = await customResolver.resolve({
+            organizationId: connection.organizationId,
+            targetKey: connection.targetKey,
+            connectionId: connection.id,
+            target: targetResolverContext,
+            connection: connectionResolverContext,
+            ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+          });
+          span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
+
+          return resolvedCredential;
+        }
+
+        if (
+          definition.oauth2AuthorizationCode !== undefined &&
+          connectionMethod !== undefined &&
+          (connectionMethod.kind === "redirect" ||
+            connectionMethod.kind === "device-authorization") &&
+          (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
+            input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN)
+        ) {
+          const targetResolverContext = resolveResolverContextTarget({
+            target,
+            definition,
+            integrationsConfig,
+          });
+          const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+            familyId: target.familyId,
+            variantId: target.variantId,
+          });
+
+          const resolvedCredential = await resolveOAuth2AuthorizationCodeManagedCredential({
+            db,
+            integrationsConfig,
+            connection: {
+              id: connection.id,
+              organizationId: connection.organizationId,
+              targetKey: connection.targetKey,
+              externalSubjectId: connection.externalSubjectId,
+              config: connection.config,
+            },
+            target: targetResolverContext,
+            oauth2AuthorizationCode: definition.oauth2AuthorizationCode,
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+            accessTokenSlotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
+            refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
+          });
+          span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
+
+          return resolvedCredential;
+        }
+
+        const oauth2ClientSecretField =
+          connectionMethod?.kind === "form"
+            ? connectionMethod.secretFields.find(
+                (secretField) =>
+                  secretField.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+              )
+            : undefined;
+        if (
+          connectionMethod?.kind === "form" &&
+          oauth2ClientSecretField !== undefined &&
+          definition.oauth2ClientCredentials !== undefined &&
+          input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
+        ) {
+          const targetResolverContext = resolveResolverContextTarget({
+            target,
+            definition,
+            integrationsConfig,
+          });
+
+          const resolvedCredential = await resolveOAuth2ClientCredentialsManagedCredential({
+            db,
+            integrationsConfig,
+            connection: {
+              id: connection.id,
+              organizationId: connection.organizationId,
+              targetKey: connection.targetKey,
+              externalSubjectId: connection.externalSubjectId,
+              config: connection.config,
+            },
+            target: targetResolverContext,
+            oauth2ClientCredentials: definition.oauth2ClientCredentials,
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+            accessTokenSlotKey: resolvePersistedSlotKeyOrThrow(input.slotKey),
+            clientSecretSlotKey: oauth2ClientSecretField.slotKey,
+          });
+          span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
+
+          return resolvedCredential;
+        }
+
+        const defaultResolver = definition.credentialResolvers?.default;
+        if (defaultResolver !== undefined) {
+          const targetResolverContext = resolveResolverContextTarget({
+            target,
+            definition,
+            integrationsConfig,
+          });
+
+          const resolvedCredential = await defaultResolver.resolve({
+            organizationId: connection.organizationId,
+            targetKey: connection.targetKey,
+            connectionId: connection.id,
+            target: targetResolverContext,
+            connection: connectionResolverContext,
+            ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+          });
+          span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
+
+          return resolvedCredential;
+        }
+
+        const resolvedCredential = await resolvePersistedCredential({
           db,
           integrationsConfig,
           organizationId: connection.organizationId,
           connectionId: connection.id,
-          connectionMethod,
-        })
-      : undefined;
-  const connectionResolverContext = resolveResolverContextConnection({
-    id: connection.id,
-    status: connection.status,
-    externalSubjectId: connection.externalSubjectId,
-    config: connection.config,
-    ...(resolvedConnectionSecrets === undefined ? {} : { secrets: resolvedConnectionSecrets }),
-  });
+          secretType: input.secretType,
+          ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+        });
+        span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
 
-  if (input.resolverKey !== undefined) {
-    const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
-    if (customResolver === undefined) {
-      throw new InternalIntegrationCredentialsError(
-        InternalIntegrationCredentialsErrorCodes.RESOLVER_NOT_FOUND,
-        404,
-        `Credential resolver '${input.resolverKey}' was not found for target '${connection.targetKey}'.`,
-      );
-    }
-
-    const targetResolverContext = resolveResolverContextTarget({
-      target,
-      definition,
-      integrationsConfig,
-    });
-
-    return customResolver.resolve({
-      organizationId: connection.organizationId,
-      targetKey: connection.targetKey,
-      connectionId: connection.id,
-      target: targetResolverContext,
-      connection: connectionResolverContext,
-      ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
-      secretType: input.secretType,
-      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
-    });
-  }
-
-  if (
-    definition.oauth2AuthorizationCode !== undefined &&
-    connectionMethod !== undefined &&
-    (connectionMethod.kind === "redirect" || connectionMethod.kind === "device-authorization") &&
-    (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
-      input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN)
-  ) {
-    const targetResolverContext = resolveResolverContextTarget({
-      target,
-      definition,
-      integrationsConfig,
-    });
-    const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
-      familyId: target.familyId,
-      variantId: target.variantId,
-    });
-
-    return resolveOAuth2AuthorizationCodeManagedCredential({
-      db,
-      integrationsConfig,
-      connection: {
-        id: connection.id,
-        organizationId: connection.organizationId,
-        targetKey: connection.targetKey,
-        externalSubjectId: connection.externalSubjectId,
-        config: connection.config,
-      },
-      target: targetResolverContext,
-      oauth2AuthorizationCode: definition.oauth2AuthorizationCode,
-      secretType: input.secretType,
-      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
-      accessTokenSlotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
-      refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
-    });
-  }
-
-  const oauth2ClientSecretField =
-    connectionMethod?.kind === "form"
-      ? connectionMethod.secretFields.find(
-          (secretField) =>
-            secretField.secretType === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-        )
-      : undefined;
-  if (
-    connectionMethod?.kind === "form" &&
-    oauth2ClientSecretField !== undefined &&
-    definition.oauth2ClientCredentials !== undefined &&
-    input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
-  ) {
-    const targetResolverContext = resolveResolverContextTarget({
-      target,
-      definition,
-      integrationsConfig,
-    });
-
-    return resolveOAuth2ClientCredentialsManagedCredential({
-      db,
-      integrationsConfig,
-      connection: {
-        id: connection.id,
-        organizationId: connection.organizationId,
-        targetKey: connection.targetKey,
-        externalSubjectId: connection.externalSubjectId,
-        config: connection.config,
-      },
-      target: targetResolverContext,
-      oauth2ClientCredentials: definition.oauth2ClientCredentials,
-      secretType: input.secretType,
-      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
-      accessTokenSlotKey: resolvePersistedSlotKeyOrThrow(input.slotKey),
-      clientSecretSlotKey: oauth2ClientSecretField.slotKey,
-    });
-  }
-
-  const defaultResolver = definition.credentialResolvers?.default;
-  if (defaultResolver !== undefined) {
-    const targetResolverContext = resolveResolverContextTarget({
-      target,
-      definition,
-      integrationsConfig,
-    });
-
-    return defaultResolver.resolve({
-      organizationId: connection.organizationId,
-      targetKey: connection.targetKey,
-      connectionId: connection.id,
-      target: targetResolverContext,
-      connection: connectionResolverContext,
-      ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
-      secretType: input.secretType,
-      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
-    });
-  }
-
-  return resolvePersistedCredential({
-    db,
-    integrationsConfig,
-    organizationId: connection.organizationId,
-    connectionId: connection.id,
-    secretType: input.secretType,
-    ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
-  });
+        return resolvedCredential;
+      } catch (error) {
+        logger.error(
+          {
+            err: error,
+            connectionId: input.connectionId,
+            ...(input.bindingId === undefined ? {} : { bindingId: input.bindingId }),
+            secretType: input.secretType,
+            ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+            ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
+          },
+          "Failed to resolve integration credential",
+        );
+        span.recordException(error instanceof Error ? error : new Error(String(error)));
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "integration credential resolution failed",
+        });
+        throw error;
+      } finally {
+        span.end();
+      }
+    },
+  );
 }

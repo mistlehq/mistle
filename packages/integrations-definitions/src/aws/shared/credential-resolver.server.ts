@@ -3,6 +3,7 @@ import {
   type IntegrationCredentialResolver,
   type IntegrationCredentialResolverInput,
 } from "@mistle/integrations-core";
+import { SpanStatusCode, type Span, trace } from "@opentelemetry/api";
 import { z } from "zod";
 
 import {
@@ -24,6 +25,7 @@ type ResolvedAwsAssumeRoleContext = {
 };
 
 const RoleSessionNameLengthLimit = 64;
+const AwsCredentialResolverTracer = trace.getTracer("@mistle/integrations-definitions");
 const AwsConnectionSecretSchema = z
   .object({
     secretAccessKey: z.string().min(1).optional(),
@@ -99,6 +101,24 @@ export function createAssumeRoleCommandInput(
   };
 }
 
+export function createAwsAssumeRoleTelemetryAttributes(input: {
+  roleArn: string;
+  defaultRegion: string;
+  roleSessionName: string;
+  externalIdPresent: boolean;
+  durationSeconds?: number;
+}): Record<string, string | number | boolean> {
+  return {
+    "mistle.aws.role_arn": input.roleArn,
+    "mistle.aws.region": input.defaultRegion,
+    "mistle.aws.role_session_name": input.roleSessionName,
+    "mistle.aws.external_id_present": input.externalIdPresent,
+    ...(input.durationSeconds === undefined
+      ? {}
+      : { "mistle.aws.duration_seconds": input.durationSeconds }),
+  };
+}
+
 async function createAwsSessionCredential(input: {
   defaultRegion: string;
   accessKeyId: string;
@@ -162,7 +182,43 @@ export const AwsAssumeRoleSessionCredentialResolver: IntegrationCredentialResolv
   async resolve(input) {
     const context = resolveAwsAssumeRoleContext(input);
 
-    return createAwsSessionCredential(context);
+    return await AwsCredentialResolverTracer.startActiveSpan(
+      "integrations.aws.assume_role.resolve_session",
+      async (span: Span) => {
+        span.setAttributes(
+          createAwsAssumeRoleTelemetryAttributes({
+            roleArn: context.roleArn,
+            defaultRegion: context.defaultRegion,
+            roleSessionName: context.roleSessionName,
+            externalIdPresent: context.externalId !== undefined,
+            ...(context.durationSeconds === undefined
+              ? {}
+              : { durationSeconds: context.durationSeconds }),
+          }),
+        );
+        span.setAttribute("mistle.integration.connection_id", input.connectionId);
+        if (input.binding !== undefined) {
+          span.setAttribute("mistle.integration.binding_id", input.binding.id);
+        }
+
+        try {
+          const sessionCredential = await createAwsSessionCredential(context);
+          span.setAttribute("mistle.integration.credential.result_kind", sessionCredential.kind);
+          span.setAttribute("mistle.aws.session_expires_at", sessionCredential.expiresAt);
+
+          return sessionCredential;
+        } catch (error) {
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "aws assume role failed",
+          });
+          throw error;
+        } finally {
+          span.end();
+        }
+      },
+    );
   },
 };
 

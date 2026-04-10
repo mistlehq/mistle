@@ -8,6 +8,7 @@ import {
 import {
   createAssumeRoleCommandInput,
   createAwsAssumeRoleSessionName,
+  createAwsAssumeRoleTelemetryAttributes,
   resolveAwsAssumeRoleContext,
 } from "./credential-resolver.server.js";
 
@@ -97,6 +98,24 @@ describe("aws credential resolver helpers", () => {
       RoleSessionName: "mistle-session",
       ExternalId: "mistle-external-id",
       DurationSeconds: 3600,
+    });
+  });
+
+  it("builds non-sensitive telemetry attributes for AssumeRole resolution", () => {
+    expect(
+      createAwsAssumeRoleTelemetryAttributes({
+        roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+        defaultRegion: "us-east-1",
+        roleSessionName: "mistle-session",
+        externalIdPresent: true,
+        durationSeconds: 3600,
+      }),
+    ).toEqual({
+      "mistle.aws.role_arn": "arn:aws:iam::123456789012:role/mistle-dev",
+      "mistle.aws.region": "us-east-1",
+      "mistle.aws.role_session_name": "mistle-session",
+      "mistle.aws.external_id_present": true,
+      "mistle.aws.duration_seconds": 3600,
     });
   });
 

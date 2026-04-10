@@ -20,6 +20,11 @@ export type CachedCredential =
       expiresAt: string;
     };
 
+export type CredentialCacheLookupResult = {
+  credential?: CachedCredential;
+  result: "hit" | "miss" | "refresh_skew_expired";
+};
+
 type CredentialCacheEntry = {
   credential: CachedCredential;
   expiresAtMs: number;
@@ -73,21 +78,32 @@ export class CredentialCache {
     this.#now = input.now;
   }
 
-  get(input: CredentialCacheKeyInput): CachedCredential | undefined {
+  getWithResult(input: CredentialCacheKeyInput): CredentialCacheLookupResult {
     const key = toCacheKey(input);
     const entry = this.#entries.get(key);
     if (entry === undefined) {
-      return undefined;
+      return {
+        result: "miss",
+      };
     }
 
     const now = this.#now();
     const refreshBoundaryMs = entry.expiresAtMs - this.#refreshSkewMs;
     if (now >= refreshBoundaryMs) {
       this.#entries.delete(key);
-      return undefined;
+      return {
+        result: "refresh_skew_expired",
+      };
     }
 
-    return entry.credential;
+    return {
+      credential: entry.credential,
+      result: "hit",
+    };
+  }
+
+  get(input: CredentialCacheKeyInput): CachedCredential | undefined {
+    return this.getWithResult(input).credential;
   }
 
   set(input: CredentialCacheKeyInput, credential: CachedCredential): void {

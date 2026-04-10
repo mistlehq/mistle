@@ -33,6 +33,20 @@ describe("CredentialCache", () => {
       kind: "value",
       value: "sk-test",
     });
+
+    expect(
+      cache.getWithResult({
+        bindingId: "ibd_openai",
+        connectionId: "icn_openai",
+        secretType: "api_key",
+      }),
+    ).toEqual({
+      credential: {
+        kind: "value",
+        value: "sk-test",
+      },
+      result: "hit",
+    });
   });
 
   it("round-trips aws session credentials until the refresh boundary", () => {
@@ -78,12 +92,33 @@ describe("CredentialCache", () => {
 
     nowMs = Date.parse("2030-01-01T00:00:05.000Z");
     expect(
-      cache.get({
+      cache.getWithResult({
         bindingId: "ibd_aws",
         connectionId: "icn_aws",
         secretType: "aws_secret_access_key",
         resolverKey: "assume-role-session",
       }),
-    ).toBeUndefined();
+    ).toEqual({
+      result: "refresh_skew_expired",
+    });
+  });
+
+  it("returns a miss result when no cache entry exists", () => {
+    const cache = new CredentialCache({
+      maxEntries: 10,
+      defaultTtlSeconds: 60,
+      refreshSkewSeconds: 5,
+      now: () => 0,
+    });
+
+    expect(
+      cache.getWithResult({
+        bindingId: "ibd_missing",
+        connectionId: "icn_missing",
+        secretType: "api_key",
+      }),
+    ).toEqual({
+      result: "miss",
+    });
   });
 });
