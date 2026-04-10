@@ -15,7 +15,6 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
@@ -79,7 +78,6 @@ type IntegrationsEditorSectionProps = {
     config: Record<string, unknown>;
   }) => Promise<boolean>;
   isSubmittingIntegrationBindings: boolean;
-  bindingFormContext?: IntegrationFormContext | undefined;
 };
 
 const BindingSectionKinds: readonly SandboxIntegrationBindingKind[] = ["agent", "git", "connector"];
@@ -325,7 +323,6 @@ export function IntegrationsEditorSection(
         availableConnections={props.availableConnections}
         availableConnectionsByKind={availableConnectionsByKind}
         availableTargets={props.availableTargets}
-        bindingFormContext={props.bindingFormContext}
         isSubmittingIntegrationBindings={props.isSubmittingIntegrationBindings}
         onClose={closeIntegrationDialog}
         onConnectionIdChange={updateDialogConnectionId}

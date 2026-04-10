@@ -16,7 +16,6 @@ import {
 } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import {
   IntegrationHorizontalFieldGroupClassName,
   IntegrationSelectContentClassName,
@@ -53,7 +52,6 @@ export function SandboxProfileBindingDialog(input: {
   availableConnectionsByKind: Readonly<
     Record<SandboxProfileBindingEditorRow["kind"], readonly IntegrationConnectionSummary[]>
   >;
-  bindingFormContext?: IntegrationFormContext | undefined;
   isSubmittingIntegrationBindings: boolean;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   onClose: () => void;
@@ -128,7 +126,6 @@ export function SandboxProfileBindingDialog(input: {
             <SandboxProfileBindingConfigEditor
               availableConnections={input.availableConnections}
               availableTargets={input.availableTargets}
-              formContext={input.bindingFormContext}
               layout="horizontal"
               onIntegrationBindingRowChange={input.onRowChange}
               row={input.state.row}
