@@ -155,7 +155,6 @@ export async function listInstances(
       items: sandboxInstances.items.map((item) => ({
         ...item,
         title: item.title,
-        connectable: item.connectable,
         keepaliveActive: item.keepaliveActive,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {

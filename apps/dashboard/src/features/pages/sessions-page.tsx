@@ -26,8 +26,6 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
-import type { SandboxLifecycleStatus } from "../sessions/session-status.js";
-import { resolveSessionStatus } from "../sessions/session-status.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
@@ -37,7 +35,10 @@ import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useCachedRequiredSession } from "../shell/session-context.js";
-import { resolveSessionStatusBadgeUi } from "./session-status-presentation.js";
+import {
+  resolveSandboxStatusBadgeUi,
+  type SandboxLifecycleStatus,
+} from "./sandbox-status-presentation.js";
 
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
@@ -87,19 +88,11 @@ export function shouldClearSelectedProfile(input: {
 }
 
 export function SandboxSessionStatusBadge(input: {
-  connectable: boolean;
   status: SandboxLifecycleStatus;
   failureCode: string | null;
   failureMessage: string | null;
 }): React.JSX.Element {
-  const statusUi = resolveSessionStatusBadgeUi(
-    resolveSessionStatus({
-      sandboxLifecycleStatus: input.status,
-      sandboxConnectable: input.connectable,
-      isStatusLoading: false,
-      isReconnecting: false,
-    }),
-  );
+  const statusUi = resolveSandboxStatusBadgeUi(input.status);
 
   if (input.failureMessage === null) {
     return (
@@ -157,7 +150,6 @@ export function buildOptimisticSessions(input: {
     sandboxInstanceId: string;
     createdAtIso: string;
     status: SandboxLifecycleStatus;
-    connectable: boolean;
     failureCode: string | null;
     failureMessage: string | null;
   }[];
@@ -180,7 +172,6 @@ export function buildOptimisticSessions(input: {
       sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,
       status: session.status,
-      connectable: session.connectable,
       keepaliveActive: false,
       startedBy: {
         kind: "user",
@@ -512,7 +503,6 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <SandboxSessionStatusBadge
-                            connectable={session.connectable}
                             failureCode={session.failureCode}
                             failureMessage={session.failureMessage}
                             status={session.status}

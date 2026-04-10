@@ -12,11 +12,11 @@ import {
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
-import type { SessionStatusBadgeUi } from "./session-status-presentation.js";
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
@@ -153,7 +153,7 @@ export function renderSessionWorkbenchStory(input: {
 
 export function renderSessionWorkbenchStoryWithChrome(input: {
   children: React.ReactNode;
-  headerStatusUi?: SessionStatusBadgeUi;
+  headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
   const headerStatusUi = input.headerStatusUi ?? {
     label: "Connected",
@@ -194,7 +194,7 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
 
 export function SessionWorkbenchStoryChrome(input: {
   children: React.ReactNode;
-  headerStatusUi?: SessionStatusBadgeUi;
+  headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
   return renderSessionWorkbenchStoryWithChrome(input);
 }
@@ -203,7 +203,7 @@ export function renderSessionWorkbenchContentStory(input: {
   alert?: SessionWorkbenchAlert | null;
   bottomPanel?: React.ReactNode;
   bottomPanelSize?: number;
-  headerStatusUi?: SessionStatusBadgeUi;
+  headerStatusUi?: SandboxStatusBadgeUi;
   isBottomPanelVisible?: boolean;
   isSecondaryPanelVisible?: boolean;
   mainContent: React.ReactNode;

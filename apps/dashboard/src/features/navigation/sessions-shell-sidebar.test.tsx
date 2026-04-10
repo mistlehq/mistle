@@ -15,7 +15,6 @@ function buildSandboxInstanceListItem(
     sandboxProfileDisplayName: "Default Profile",
     sandboxProfileVersion: 1,
     status: "running",
-    connectable: true,
     startedBy: {
       kind: "user",
       id: "usr_123",

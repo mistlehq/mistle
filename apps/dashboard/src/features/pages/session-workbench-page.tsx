@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -12,7 +13,6 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
-import type { SessionStatusBadgeUi } from "./session-status-presentation.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
@@ -23,37 +23,17 @@ import { useSessionWorkbenchController } from "./use-session-workbench-controlle
 
 export function resolveSessionWorkbenchHeaderStatusUi(input: {
   workbenchStatus: SessionWorkbenchStatus;
-}): SessionStatusBadgeUi {
+}): SandboxStatusBadgeUi {
   switch (input.workbenchStatus.kind) {
-    case "loading":
-    case "starting":
+    case "not_connected":
       return {
         label: "Not connected",
         variant: "outline",
       };
-    case "stopped":
-      return {
-        label: "Not connected",
-        variant: "outline",
-      };
-    case "failed":
+    case "error":
       return {
         label: "Error",
         variant: "destructive",
-      };
-    case "connecting":
-      // The workbench header intentionally treats an available running sandbox as green,
-      // even while the session transport is still attaching.
-      return {
-        label: "Connecting",
-        variant: "secondary",
-        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-      };
-    case "reconnecting":
-      return {
-        label: "Reconnecting",
-        variant: "secondary",
-        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
       };
     case "connected":
       return {

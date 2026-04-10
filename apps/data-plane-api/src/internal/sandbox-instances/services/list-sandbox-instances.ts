@@ -62,7 +62,6 @@ async function resolveListedSandboxRuntimeState(
     persistedStatus: SandboxInstance["status"];
   },
 ): Promise<{
-  connectable: boolean;
   status: ListSandboxInstancesResponse["items"][number]["status"];
   keepaliveActive: boolean;
 }> {
@@ -71,7 +70,6 @@ async function resolveListedSandboxRuntimeState(
     input.persistedStatus !== SandboxInstanceStatuses.RUNNING
   ) {
     return {
-      connectable: false,
       status: input.persistedStatus,
       keepaliveActive: false,
     };
@@ -88,7 +86,6 @@ async function resolveListedSandboxRuntimeState(
   });
 
   return {
-    connectable: status === "running",
     status,
     keepaliveActive: status === "running" && runtimeStateSnapshot.keepalive.active,
   };
@@ -211,7 +208,6 @@ export async function listSandboxInstances(
           title: item.title,
           sandboxProfileVersion: item.sandboxProfileVersion,
           status: runtimeState.status,
-          connectable: runtimeState.connectable,
           keepaliveActive: runtimeState.keepaliveActive,
           startedBy: {
             kind: item.startedByKind,
