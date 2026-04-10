@@ -3,6 +3,7 @@ import type {
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
+import type { PublishedPortBootstrapTokenConfig } from "@mistle/published-port-auth";
 
 export type MintSandboxInstanceConnectionTokenInput = {
   organizationId: string;
@@ -15,6 +16,23 @@ export type MintSandboxInstanceConnectionTokenInput = {
 export type SandboxInstanceConnectionToken = {
   instanceId: string;
   url: string;
+  token: string;
+  expiresAt: string;
+};
+
+export type MintSandboxInstancePublishedPortInput = {
+  organizationId: string;
+  instanceId: string;
+  port: number;
+  gatewayWebsocketUrl: string;
+  publishBaseDomain: string;
+  tokenTtlSeconds: number;
+  tokenConfig: PublishedPortBootstrapTokenConfig;
+};
+
+export type SandboxInstancePublishedPort = {
+  host: string;
+  bootstrapUrl: string;
   token: string;
   expiresAt: string;
 };

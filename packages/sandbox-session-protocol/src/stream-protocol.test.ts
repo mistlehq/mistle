@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseBootstrapControlMessage,
+  parsePortsControlMessage,
   parseProcessesStreamMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
@@ -570,5 +571,67 @@ describe("processes stream message parser", () => {
         }),
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("ports control message parser", () => {
+  it("parses exact-port authorize requests", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "pta_123",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize",
+      requestId: "pta_123",
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+    });
+  });
+
+  it("parses successful authorize results", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "pta_123",
+          authorized: true,
+          protocol: "https",
+          websocketCapable: false,
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "pta_123",
+      authorized: true,
+      protocol: "https",
+      websocketCapable: false,
+    });
+  });
+
+  it("parses rejected authorize results", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "pta_123",
+          authorized: false,
+          reason: "unsupported_protocol",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "pta_123",
+      authorized: false,
+      reason: "unsupported_protocol",
+    });
   });
 });

@@ -11,6 +11,14 @@ const IntegrationConnectionTokenConfig = {
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
+const IntegrationPublishConfig = {
+  baseDomain: "mistle.example.test",
+  access: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-issuer",
+    tokenAudience: "integration-audience",
+  },
+} as const;
 
 const IntegrationSandboxRuntimeConfig = {
   defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
@@ -51,6 +59,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      publish: IntegrationPublishConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
 
@@ -84,6 +93,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      publish: IntegrationPublishConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
@@ -108,6 +118,7 @@ describe("runtime lifecycle integration", () => {
       app: fixture.config,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      publish: IntegrationPublishConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
 

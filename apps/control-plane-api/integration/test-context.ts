@@ -48,6 +48,15 @@ export type ControlPlaneApiIntegrationFixture = {
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
+const IntegrationPublishConfig = {
+  baseDomain: "mistle.example.test",
+  access: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-issuer",
+    tokenAudience: "integration-audience",
+  },
+} as const;
+
 async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
   return readTestContext({
     id: TestContextId,
@@ -239,6 +248,7 @@ export const it = vitestIt.extend<{
             issuer: "integration-issuer",
             audience: "integration-audience",
           },
+          publish: IntegrationPublishConfig,
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

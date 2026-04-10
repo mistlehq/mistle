@@ -299,6 +299,55 @@ pub enum ProcessesStreamMessage {
     Snapshot(ProcessesSnapshot),
 }
 
+/// Exact port target carried by browser-publishing control messages.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PublishPortTarget {
+    pub kind: String,
+    pub port: u16,
+}
+
+/// Inbound publish authorize request for one exact port.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTargetAuthorize {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub target: PublishPortTarget,
+}
+
+/// Successful publish authorize result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTargetAuthorizeSuccess {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub authorized: bool,
+    pub protocol: String,
+    pub websocket_capable: bool,
+}
+
+/// Failed publish authorize result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTargetAuthorizeFailure {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub authorized: bool,
+    pub reason: String,
+}
+
+/// Publish control messages carried as bootstrap websocket text payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PortsControlMessage {
+    TargetAuthorize(PortsTargetAuthorize),
+    TargetAuthorizeSuccess(PortsTargetAuthorizeSuccess),
+    TargetAuthorizeFailure(PortsTargetAuthorizeFailure),
+}
+
 /// PTY-specific control messages consumed by the PTY relay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PtyControlMessage {
@@ -655,6 +704,53 @@ pub fn parse_processes_stream_message(
     }
 }
 
+/// Parses one inbound or outbound publish control message.
+pub fn parse_ports_control_message(
+    payload: &str,
+) -> Result<Option<PortsControlMessage>, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "ports control message must be valid json: {error}"
+        ))
+    })?;
+    let message_type = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| TunnelProtocolError::new("ports control message type is required"))?;
+
+    match message_type {
+        "ports.target.authorize" => {
+            let message: PortsTargetAuthorize = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_target_authorize(&message)?;
+            Ok(Some(PortsControlMessage::TargetAuthorize(message)))
+        }
+        "ports.target.authorize.result" => {
+            let authorized = parsed_payload
+                .get("authorized")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| {
+                    TunnelProtocolError::new(
+                        "ports.target.authorize.result authorized is required",
+                    )
+                })?;
+
+            if authorized {
+                let message: PortsTargetAuthorizeSuccess = serde_json::from_value(parsed_payload)
+                    .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                validate_ports_target_authorize_success(&message)?;
+                Ok(Some(PortsControlMessage::TargetAuthorizeSuccess(message)))
+            } else {
+                let message: PortsTargetAuthorizeFailure = serde_json::from_value(parsed_payload)
+                    .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                validate_ports_target_authorize_failure(&message)?;
+                Ok(Some(PortsControlMessage::TargetAuthorizeFailure(message)))
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Parses one inbound bootstrap telemetry control message.
 pub fn parse_bootstrap_telemetry_control_message(
     payload: &str,
@@ -856,6 +952,31 @@ pub fn telemetry_close(stream_id: u32) -> String {
     serialize_json(&TelemetryClose {
         message_type: "telemetry.close".to_string(),
         stream_id,
+    })
+}
+
+/// Builds one successful `ports.target.authorize.result` payload.
+pub fn ports_target_authorize_success(
+    request_id: &str,
+    protocol: &str,
+    websocket_capable: bool,
+) -> String {
+    serialize_json(&PortsTargetAuthorizeSuccess {
+        message_type: "ports.target.authorize.result".to_string(),
+        request_id: request_id.to_string(),
+        authorized: true,
+        protocol: protocol.to_string(),
+        websocket_capable,
+    })
+}
+
+/// Builds one failed `ports.target.authorize.result` payload.
+pub fn ports_target_authorize_failure(request_id: &str, reason: &str) -> String {
+    serialize_json(&PortsTargetAuthorizeFailure {
+        message_type: "ports.target.authorize.result".to_string(),
+        request_id: request_id.to_string(),
+        authorized: false,
+        reason: reason.to_string(),
     })
 }
 
@@ -1156,16 +1277,101 @@ fn validate_telemetry_reset(message: &TelemetryReset) -> Result<(), TunnelProtoc
     Ok(())
 }
 
+fn validate_ports_target_authorize(
+    message: &PortsTargetAuthorize,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.target.authorize" {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize type must be 'ports.target.authorize'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize requestId is required",
+        ));
+    }
+    if message.target.kind != "port" {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize target.kind must be 'port'",
+        ));
+    }
+    if message.target.port == 0 {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize target.port must be greater than or equal to 1",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_ports_target_authorize_success(
+    message: &PortsTargetAuthorizeSuccess,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.target.authorize.result" {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result type must be 'ports.target.authorize.result'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result requestId is required",
+        ));
+    }
+    if !message.authorized {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result authorized must be true for success payloads",
+        ));
+    }
+    if !matches!(message.protocol.as_str(), "http" | "https") {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result protocol must be 'http' or 'https'",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_ports_target_authorize_failure(
+    message: &PortsTargetAuthorizeFailure,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.target.authorize.result" {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result type must be 'ports.target.authorize.result'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result requestId is required",
+        ));
+    }
+    if message.authorized {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result authorized must be false for failure payloads",
+        ));
+    }
+    if !matches!(
+        message.reason.as_str(),
+        "port_unreachable" | "unsupported_protocol"
+    ) {
+        return Err(TunnelProtocolError::new(
+            "ports.target.authorize.result reason is not supported",
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        ProcessesStreamMessage, PtyControlMessage, StreamControlMessage, StreamSendWindow,
-        decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+        PortsControlMessage, ProcessesStreamMessage, PtyControlMessage, StreamControlMessage,
+        StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
         file_upload_completed_event, parse_bootstrap_telemetry_control_message,
-        parse_processes_stream_message, parse_pty_control_message, parse_stream_control_message,
-        pty_exit_event, stream_complete, stream_open_error, stream_open_ok, stream_reset,
-        stream_window, telemetry_close, telemetry_open,
+        parse_ports_control_message, parse_processes_stream_message, parse_pty_control_message,
+        parse_stream_control_message, ports_target_authorize_failure,
+        ports_target_authorize_success, pty_exit_event, stream_complete, stream_open_error,
+        stream_open_ok, stream_reset, stream_window, telemetry_close, telemetry_open,
     };
 
     #[test]
@@ -1222,6 +1428,36 @@ mod tests {
         )
         .expect("processes.snapshot should parse");
         assert!(matches!(snapshot, ProcessesStreamMessage::Snapshot(_)));
+    }
+
+    #[test]
+    fn parses_valid_ports_control_messages() {
+        let authorize = parse_ports_control_message(
+            r#"{"type":"ports.target.authorize","requestId":"pta_123","target":{"kind":"port","port":5173}}"#,
+        )
+        .expect("ports.target.authorize should parse");
+        assert!(matches!(
+            authorize,
+            Some(PortsControlMessage::TargetAuthorize(_))
+        ));
+
+        let success = parse_ports_control_message(
+            r#"{"type":"ports.target.authorize.result","requestId":"pta_123","authorized":true,"protocol":"http","websocketCapable":true}"#,
+        )
+        .expect("authorized result should parse");
+        assert!(matches!(
+            success,
+            Some(PortsControlMessage::TargetAuthorizeSuccess(_))
+        ));
+
+        let failure = parse_ports_control_message(
+            r#"{"type":"ports.target.authorize.result","requestId":"pta_123","authorized":false,"reason":"unsupported_protocol"}"#,
+        )
+        .expect("rejected result should parse");
+        assert!(matches!(
+            failure,
+            Some(PortsControlMessage::TargetAuthorizeFailure(_))
+        ));
     }
 
     #[test]
@@ -1284,6 +1520,14 @@ mod tests {
         assert_eq!(
             telemetry_close(42),
             r#"{"type":"telemetry.close","streamId":42}"#
+        );
+        assert_eq!(
+            ports_target_authorize_success("pta_123", "http", true),
+            r#"{"type":"ports.target.authorize.result","requestId":"pta_123","authorized":true,"protocol":"http","websocketCapable":true}"#
+        );
+        assert_eq!(
+            ports_target_authorize_failure("pta_123", "port_unreachable"),
+            r#"{"type":"ports.target.authorize.result","requestId":"pta_123","authorized":false,"reason":"port_unreachable"}"#
         );
     }
 

@@ -1,5 +1,6 @@
 import {
   PayloadKindRawBytes,
+  parsePortsControlMessage,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
@@ -7,6 +8,7 @@ import {
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
+  type PortsTargetAuthorizeResult,
   type RuntimeReadyControlMessage,
   type StreamControlMessage,
   type TelemetryClose,
@@ -57,6 +59,10 @@ export type TunnelProtocolDelivery =
       kind: "telemetryInvalidData";
       payloadKind: number;
       streamId: number;
+    }
+  | {
+      kind: "portsTargetAuthorizeResult";
+      message: PortsTargetAuthorizeResult;
     };
 
 export type TunnelProtocolTranslation = {
@@ -586,6 +592,16 @@ export class TunnelProtocolTranslator {
   private async translateBootstrapTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "bootstrap" },
   ): Promise<TunnelProtocolTranslation> {
+    const portsControlMessage = parsePortsControlMessage(input.payload);
+    if (portsControlMessage?.type === "ports.target.authorize.result") {
+      return createTranslation({
+        delivery: {
+          kind: "portsTargetAuthorizeResult",
+          message: portsControlMessage,
+        },
+      });
+    }
+
     const controlMessage = parseBootstrapControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));

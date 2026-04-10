@@ -10,6 +10,8 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
+import { registerPublishedPortRoutes } from "../publishing/register-published-port-routes.js";
 import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -136,6 +138,10 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
+  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(
+    relayCoordinator,
+    systemScheduler,
+  );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
@@ -199,6 +205,7 @@ export function createDataPlaneGatewayRuntime(
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
+    portsTargetAuthorizeService,
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
@@ -210,6 +217,21 @@ export function createDataPlaneGatewayRuntime(
     telemetryIngressService,
     clock: systemClock,
     scheduler: systemScheduler,
+  });
+  registerPublishedPortRoutes({
+    app,
+    portsTargetAuthorizeService,
+    publishConfig: {
+      baseDomain: config.sandbox.publish.baseDomain,
+      access: {
+        tokenSecret: config.sandbox.publish.access.tokenSecret,
+        tokenIssuer: config.sandbox.publish.access.tokenIssuer,
+        tokenAudience: config.sandbox.publish.access.tokenAudience,
+      },
+      session: {
+        cookieSigningSecret: config.sandbox.publish.session.cookieSigningSecret,
+      },
+    },
   });
   registerSandboxTunnelTokenExchangeRoute({
     app,

@@ -6,6 +6,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
+import type { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
@@ -44,6 +45,7 @@ type RegisterSandboxTunnelRouteInput = {
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
+  portsTargetAuthorizeService: PortsTargetAuthorizeService;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
@@ -292,6 +294,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               },
               interactiveStreamRouter: input.interactiveStreamRouter,
               payload,
+              portsTargetAuthorizeService: input.portsTargetAuthorizeService,
               relayCoordinator: input.relayCoordinator,
               sandboxInstanceId,
               sourcePeerSide,

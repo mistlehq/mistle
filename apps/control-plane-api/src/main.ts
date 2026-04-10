@@ -50,6 +50,7 @@ export async function createControlPlaneApiRuntime(
       integrationRegistry: resources.integrationRegistry,
       dataPlaneClient,
       connectionTokenConfig: runtimeConfig.connectionToken,
+      publishConfig: runtimeConfig.publish,
       openWorkflow: resources.openWorkflow,
       auth,
     });

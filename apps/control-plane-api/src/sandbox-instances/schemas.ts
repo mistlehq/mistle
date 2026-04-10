@@ -38,6 +38,21 @@ export const sandboxInstanceConnectionTokenSchema = z
   })
   .strict();
 
+export const sandboxInstancePortParamsSchema = z
+  .object({
+    port: z.coerce.number().int().min(1).max(65_535),
+  })
+  .strict();
+
+export const sandboxInstancePublishedPortSchema = z
+  .object({
+    host: z.string().min(1),
+    bootstrapUrl: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
 export const sandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),

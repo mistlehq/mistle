@@ -1,5 +1,6 @@
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
+import type { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -52,6 +53,7 @@ export async function handleTunnelWebSocketMessage(input: {
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
+  portsTargetAuthorizeService?: PortsTargetAuthorizeService;
   relayCoordinator: TunnelRelayCoordinator;
   sandboxInstanceId: string;
   sourcePeerSide: RelayPeerSide;
@@ -107,6 +109,13 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleTelemetryDelivery(translation.delivery);
+  } else if (translation.delivery.kind === "portsTargetAuthorizeResult") {
+    if (input.portsTargetAuthorizeService === undefined) {
+      throw new Error("ports target authorize result requires an authorize service.");
+    }
+
+    input.portsTargetAuthorizeService.handleAuthorizeResult(translation.delivery.message);
+    return;
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {

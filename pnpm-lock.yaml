@@ -110,6 +110,9 @@ importers:
       '@mistle/object-store':
         specifier: workspace:*
         version: link:../../packages/object-store
+      '@mistle/published-port-auth':
+        specifier: workspace:*
+        version: link:../../packages/published-port-auth
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -483,6 +486,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/published-port-auth':
+        specifier: workspace:*
+        version: link:../../packages/published-port-auth
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract
@@ -851,6 +857,12 @@ importers:
         specifier: workspace:*
         version: link:../test-harness
 
+  packages/published-port-auth:
+    dependencies:
+      jose:
+        specifier: ^6.2.2
+        version: 6.2.2
+
   packages/sandbox:
     dependencies:
       '@mistle/time':
@@ -1153,6 +1165,9 @@ importers:
       '@mistle/integrations-definitions':
         specifier: workspace:*
         version: link:../packages/integrations-definitions
+      '@mistle/published-port-auth':
+        specifier: workspace:*
+        version: link:../packages/published-port-auth
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../packages/sandbox-session-protocol

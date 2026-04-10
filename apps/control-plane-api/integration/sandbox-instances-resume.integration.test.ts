@@ -75,6 +75,15 @@ afterEach(async () => {
   }
 });
 
+const IntegrationPublishConfig = {
+  baseDomain: "mistle.example.test",
+  access: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-issuer",
+    tokenAudience: "integration-audience",
+  },
+} as const;
+
 function createControlPlaneConfig(input: {
   baseConfig: ControlPlaneApiConfig;
   dataPlaneBaseUrl: string;
@@ -214,6 +223,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -299,6 +309,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -374,6 +385,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -458,6 +470,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -536,6 +549,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -635,6 +649,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      publish: IntegrationPublishConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

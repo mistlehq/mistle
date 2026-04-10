@@ -8,6 +8,14 @@ const IntegrationConnectionTokenConfig = {
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
+const IntegrationPublishConfig = {
+  baseDomain: "mistle.example.test",
+  access: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-issuer",
+    tokenAudience: "integration-audience",
+  },
+} as const;
 
 const IntegrationSandboxRuntimeConfig = {
   defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
@@ -33,6 +41,7 @@ export async function createRuntimeWithObjectStore(input: {
     },
     internalAuthServiceToken: input.internalAuthServiceToken,
     connectionToken: IntegrationConnectionTokenConfig,
+    publish: IntegrationPublishConfig,
     sandbox: IntegrationSandboxRuntimeConfig,
   });
 }

@@ -33,6 +33,15 @@ import {
 import { createAppResources, stopAppResources } from "../src/resources.js";
 import { it } from "./test-context.js";
 
+const IntegrationPublishConfig = {
+  baseDomain: "mistle.example.test",
+  access: {
+    tokenSecret: "integration-publish-token-secret",
+    tokenIssuer: "integration-issuer",
+    tokenAudience: "integration-audience",
+  },
+} as const;
+
 describe("integration connections device authorization integration", () => {
   it("returns 400 when a target does not support device authorization start", async ({
     fixture,
@@ -203,6 +212,7 @@ describe("integration connections device authorization integration", () => {
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
         },
+        publishConfig: IntegrationPublishConfig,
         internalAuthServiceToken: fixture.internalAuthServiceToken,
         db: resources.db,
         objectStore: resources.objectStore,
@@ -515,6 +525,7 @@ describe("integration connections device authorization integration", () => {
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
         },
+        publishConfig: IntegrationPublishConfig,
         internalAuthServiceToken: fixture.internalAuthServiceToken,
         db: resources.db,
         objectStore: resources.objectStore,

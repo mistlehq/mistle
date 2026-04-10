@@ -23,6 +23,7 @@
     "@mistle/gateway-connection-auth": "workspace:*",
     "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/published-port-auth": "workspace:*",
     "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",

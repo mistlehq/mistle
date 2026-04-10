@@ -193,4 +193,10 @@ export class TunnelRelayCoordinator {
       sessionId: input.sessionId,
     });
   }
+
+  public getBootstrapPeer(input: { sandboxInstanceId: string }): RelayTarget | undefined {
+    return this.peerRegistry.getBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+  }
 }
