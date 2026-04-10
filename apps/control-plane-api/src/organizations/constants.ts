@@ -1,1 +1,1 @@
-export const ORGANIZATIONS_ROUTE_BASE_PATH = "/v1/organizations";
+export const ORGANIZATION_ROUTE_BASE_PATH = "/v1/organization";

@@ -33,6 +33,50 @@ function createPtyLaunch(input: { runtimeId: string; displayName?: string; comma
 }
 
 describe("assembleCompiledRuntimePlan", () => {
+  it("accepts aws sigv4 egress routes in the shared runtime-plan schema", () => {
+    const plan = assembleCompiledRuntimePlan({
+      sandboxProfileId: "sbp_aws",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      compiledBindingResults: [
+        {
+          egressRoutes: [
+            {
+              egressRuleId: "egress_rule_aws",
+              bindingId: "ibd_aws",
+              match: {
+                hosts: ["sts.us-east-1.amazonaws.com"],
+                methods: ["POST"],
+              },
+              upstream: {
+                baseUrl: "https://sts.us-east-1.amazonaws.com",
+              },
+              authInjection: {
+                type: "aws_sigv4",
+                service: "sts",
+                region: "us-east-1",
+              },
+              credentialResolver: {
+                connectionId: "icn_aws",
+                secretType: "aws_secret_access_key",
+                resolverKey: "assume-role-session",
+              },
+            },
+          ],
+          artifacts: [],
+          runtimeClients: [],
+          workspaceSources: [],
+          agentRuntimes: [],
+        },
+      ],
+    });
+
+    expect(CompiledRuntimePlanSchema.parse(plan)).toEqual(plan);
+  });
+
   it("produces runtime plans accepted by the shared runtime-plan schema", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_123",

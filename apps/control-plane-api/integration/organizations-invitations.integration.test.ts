@@ -38,7 +38,7 @@ describe("organization invitations integration", () => {
     ]);
 
     const response = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=invite-`,
+      "/v1/organization/invitations?limit=25&offset=0&search=invite-",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -111,7 +111,7 @@ describe("organization invitations integration", () => {
     ]);
 
     const pendingResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=pending`,
+      "/v1/organization/invitations?limit=25&offset=0&search=pending",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -131,7 +131,7 @@ describe("organization invitations integration", () => {
     });
 
     const expiredResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=expired`,
+      "/v1/organization/invitations?limit=25&offset=0&search=expired",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -151,7 +151,7 @@ describe("organization invitations integration", () => {
     });
 
     const roleResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=admin`,
+      "/v1/organization/invitations?limit=25&offset=0&search=admin",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -170,7 +170,7 @@ describe("organization invitations integration", () => {
     });
 
     const memberRoleResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=member`,
+      "/v1/organization/invitations?limit=25&offset=0&search=member",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -235,7 +235,7 @@ describe("organization invitations integration", () => {
     });
 
     const adminResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      "/v1/organization/invitations?limit=25&offset=0&search=",
       {
         headers: {
           cookie: adminSession.cookie,
@@ -254,7 +254,7 @@ describe("organization invitations integration", () => {
     });
 
     const memberResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      "/v1/organization/invitations?limit=25&offset=0&search=",
       {
         headers: {
           cookie: memberSession.cookie,
@@ -295,7 +295,7 @@ describe("organization invitations integration", () => {
     });
 
     const response = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      "/v1/organization/invitations?limit=25&offset=0&search=",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -328,7 +328,7 @@ describe("organization invitations integration", () => {
     });
 
     const response = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      "/v1/organization/invitations?limit=25&offset=0&search=",
       {
         headers: {
           cookie: ownerSession.cookie,

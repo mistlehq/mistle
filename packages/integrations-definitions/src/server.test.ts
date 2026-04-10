@@ -9,6 +9,10 @@ import {
 describe("integrations-definitions server", () => {
   it("registers built-in server integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const awsDefinition = registry.getDefinition({
+      familyId: "aws",
+      variantId: "aws-cli-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -52,6 +56,9 @@ describe("integrations-definitions server", () => {
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
+    expect(awsDefinition?.credentialResolvers?.custom?.["assume-role-session"]).toBeDefined();
+    expect(awsDefinition?.webhookHandler).toBeUndefined();
+    expect(awsDefinition?.webhookSource).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -69,7 +76,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(6);
+    expect(definitions).toHaveLength(7);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

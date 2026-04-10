@@ -15,7 +15,7 @@ describe("jira webhook source helpers", () => {
         targetKey: "jira-default",
         endpointKey: "ep_jira_123",
       }),
-    ).toBe("https://control-plane.mistle.test/v1/integration/webhooks/jira-default/ep_jira_123");
+    ).toBe("https://control-plane.mistle.test/p/integration/webhooks/jira-default/ep_jira_123");
   });
 
   it("extracts Jira registration credentials from personal-token connections", () => {

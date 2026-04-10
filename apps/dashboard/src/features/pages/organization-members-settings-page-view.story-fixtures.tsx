@@ -215,7 +215,7 @@ export function createOrganizationMembersSettingsPageStoryViewModel(
     onRoleDialogOpenChange: overrides.onRoleDialogOpenChange ?? (() => {}),
     onRoleSelectValueChange: overrides.onRoleSelectValueChange ?? (() => {}),
     onSaveRole: overrides.onSaveRole ?? (() => {}),
-    organizationId: overrides.organizationId ?? "org_storybook",
+    activeOrganizationId: overrides.activeOrganizationId ?? "org_storybook",
     offset: overrides.offset ?? 0,
     pendingMemberOperation,
     roleChangeDialog,

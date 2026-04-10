@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket, accept, connect};
 use tungstenite::stream::MaybeTlsStream;
 
-use sandboxd::codex_proxy::start_codex_proxy;
+use sandboxd::codex_proxy::{CODEX_INITIALIZE_CLIENT_NAME, start_codex_proxy};
 use sandboxd::keepalive::KeepaliveManager;
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
@@ -34,9 +34,14 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
             .expect("raw server should accept the monitor connection");
         let mut monitor_socket = accept(monitor_stream).expect("monitor handshake should succeed");
 
+        let initialize_request = read_json_text_message(&mut monitor_socket);
         assert_eq!(
-            read_json_text_message(&mut monitor_socket)["method"],
+            initialize_request["method"],
             Value::String("initialize".to_string())
+        );
+        assert_eq!(
+            initialize_request["params"]["clientInfo"]["name"],
+            Value::String(CODEX_INITIALIZE_CLIENT_NAME.to_string())
         );
         monitor_socket
             .send(Message::Text(

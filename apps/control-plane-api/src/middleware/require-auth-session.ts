@@ -52,6 +52,7 @@ function parseSession(value: unknown): ParseSessionResult {
       user: {
         id: user.id,
       },
+      activeOrganizationId,
       session: {
         id: session.id,
         userId: session.userId,

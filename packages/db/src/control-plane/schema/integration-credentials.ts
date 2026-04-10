@@ -7,6 +7,7 @@ import { organizations } from "./organizations.js";
 
 export const IntegrationCredentialSecretKinds = {
   API_KEY: "api_key",
+  AWS_SECRET_ACCESS_KEY: "aws_secret_access_key",
   OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
   OAUTH2_CLIENT_SECRET: "oauth2_client_secret",
   OAUTH2_REFRESH_TOKEN: "oauth2_refresh_token",

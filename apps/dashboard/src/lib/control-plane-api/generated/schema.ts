@@ -163,6 +163,108 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/p/integration/webhooks/:targetKey/:endpointKey": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          endpointKey: string;
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses. */
+        "2XX": {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "*/*":
+              | string
+              | {
+                  [key: string]: unknown;
+                };
+          };
+        };
+        /** @description Webhook event accepted for processing. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              status: "received" | "duplicate";
+            };
+          };
+        };
+        /** @description Immediate integration-defined webhook response with no body. */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid webhook request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_WEBHOOK_REQUEST";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Integration target, source, or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/automations/webhooks": {
     parameters: {
       query?: never;
@@ -2831,108 +2933,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/webhooks/:targetKey/:endpointKey": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          endpointKey: string;
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses. */
-        "2XX": {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "*/*":
-              | string
-              | {
-                  [key: string]: unknown;
-                };
-          };
-        };
-        /** @description Webhook event accepted for processing. */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              status: "received" | "duplicate";
-            };
-          };
-        };
-        /** @description Immediate integration-defined webhook response with no body. */
-        204: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid webhook request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_WEBHOOK_REQUEST";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration target, source, or connection was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND" | "WEBHOOK_SOURCE_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/v1/me/profile-image": {
     parameters: {
       query?: never;
@@ -3206,7 +3206,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/invitations": {
+  "/v1/organization/invitations": {
     parameters: {
       query?: never;
       header?: never;
@@ -3221,9 +3221,7 @@ export interface paths {
           search?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3327,7 +3325,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/logo": {
+  "/v1/organization/logo": {
     parameters: {
       query?: never;
       header?: never;
@@ -3338,9 +3336,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3411,9 +3407,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody: {
@@ -3505,9 +3499,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3574,7 +3566,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/logo/content": {
+  "/v1/organization/logo/content": {
     parameters: {
       query?: never;
       header?: never;
@@ -3587,9 +3579,7 @@ export interface paths {
           v?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3660,7 +3650,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/members": {
+  "/v1/organization/members": {
     parameters: {
       query?: never;
       header?: never;
@@ -3675,9 +3665,7 @@ export interface paths {
           search?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3781,7 +3769,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/membership-capabilities": {
+  "/v1/organization/membership-capabilities": {
     parameters: {
       query?: never;
       header?: never;
@@ -3792,9 +3780,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -4111,12 +4097,34 @@ export interface paths {
                   additionalHeaders?: {
                     [key: string]: string;
                   };
-                  authInjection: {
-                    target: string;
-                    /** @enum {string} */
-                    type: "bearer" | "basic" | "header" | "query";
-                    username?: string;
-                  };
+                  authInjection:
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "bearer";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "basic";
+                        username?: string;
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "header";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "query";
+                      }
+                    | {
+                        region: string;
+                        service: string;
+                        /** @enum {string} */
+                        type: "aws_sigv4";
+                      };
                   bindingId: string;
                   credentialResolver: {
                     connectionId: string;
@@ -4542,12 +4550,34 @@ export interface paths {
                   additionalHeaders?: {
                     [key: string]: string;
                   };
-                  authInjection: {
-                    target: string;
-                    /** @enum {string} */
-                    type: "bearer" | "basic" | "header" | "query";
-                    username?: string;
-                  };
+                  authInjection:
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "bearer";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "basic";
+                        username?: string;
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "header";
+                      }
+                    | {
+                        target: string;
+                        /** @enum {string} */
+                        type: "query";
+                      }
+                    | {
+                        region: string;
+                        service: string;
+                        /** @enum {string} */
+                        type: "aws_sigv4";
+                      };
                   bindingId: string;
                   credentialResolver: {
                     connectionId: string;

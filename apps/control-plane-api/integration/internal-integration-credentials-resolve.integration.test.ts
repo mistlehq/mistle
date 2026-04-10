@@ -14,6 +14,7 @@ import {
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
+  IntegrationConnectionMethodIds,
   IntegrationRegistry,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
@@ -55,6 +56,8 @@ const DeviceAuthorizationRefreshSlotKeys = createOAuth2AuthorizationCodeCredenti
   familyId: DeviceAuthorizationRefreshFamilyId,
   variantId: DeviceAuthorizationRefreshVariantId,
 });
+const AwsAssumeRoleSecretSlotKey = "aws.aws-cli-default.aws-assume-role.secret-access-key";
+const AwsAssumeRoleResolverKey = "assume-role-session";
 
 function createClientCredentialsRegistry(): IntegrationRegistry {
   const registry = new IntegrationRegistry();
@@ -172,6 +175,96 @@ function createDeviceAuthorizationRefreshRegistry(input: {
         throw new Error("Not used in internal credential refresh tests.");
       },
       refreshAccessToken: input.refreshAccessToken,
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+
+  registry.register(definition);
+
+  return registry;
+}
+
+function createAwsSessionRegistry(): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  const definition: IntegrationDefinition<
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema,
+    z.ZodObject<{
+      defaultRegion: z.ZodString;
+    }>
+  > = {
+    familyId: "aws",
+    variantId: "aws-cli-default",
+    kind: "connector",
+    displayName: "AWS",
+    logoKey: "aws",
+    targetConfigSchema: EmptyConfigSchema,
+    targetSecretSchema: EmptyConfigSchema,
+    bindingConfigSchema: z
+      .object({
+        defaultRegion: z.string().min(1),
+      })
+      .strict(),
+    connectionMethods: [
+      {
+        id: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        label: "Access key + AssumeRole",
+        kind: "form",
+        secretFields: [
+          {
+            name: "secretAccessKey",
+            label: "Secret access key",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+            slotKey: AwsAssumeRoleSecretSlotKey,
+          },
+        ],
+        configSchema: z
+          .object({
+            connection_method: z.literal(IntegrationConnectionMethodIds.AWS_ASSUME_ROLE),
+            accessKeyId: z.string().min(1),
+            roleArn: z.string().min(1),
+          })
+          .strict(),
+      },
+    ],
+    credentialResolvers: {
+      custom: {
+        [AwsAssumeRoleResolverKey]: {
+          async resolve(input) {
+            if (input.binding === undefined) {
+              throw new Error("Expected binding context.");
+            }
+
+            const defaultRegion = input.binding.config["defaultRegion"];
+            if (typeof defaultRegion !== "string" || defaultRegion.length === 0) {
+              throw new Error("Expected binding defaultRegion.");
+            }
+
+            const accessKeyId = input.connection.config["accessKeyId"];
+            if (typeof accessKeyId !== "string" || accessKeyId.length === 0) {
+              throw new Error("Expected bootstrap accessKeyId.");
+            }
+
+            const secretAccessKey = input.connection.secrets?.["secretAccessKey"];
+            if (typeof secretAccessKey !== "string" || secretAccessKey.length === 0) {
+              throw new Error("Expected hydrated secretAccessKey.");
+            }
+
+            return {
+              kind: "aws_session",
+              accessKeyId,
+              secretAccessKey,
+              sessionToken: `session-token-for:${defaultRegion}`,
+              expiresAt: "2030-01-01T00:00:00.000Z",
+            };
+          },
+        },
+      },
     },
     compileBinding: () => ({
       egressRoutes: [],
@@ -323,7 +416,97 @@ describe("internal integration credentials resolve", () => {
 
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
       value: "sk-integration-test",
+    });
+  });
+
+  it("resolves persisted aws secret access keys for an active connection", async ({ fixture }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_aws_secret_default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        base_url: "https://api.openai.com/v1",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_aws_secret_access_key",
+      organizationId: authSession.organizationId,
+      targetKey: "openai_aws_secret_default",
+      displayName: "Stored AWS secret access key",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "aws-assume-role",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedAwsSecretAccessKey = encryptCredentialUtf8({
+        plaintext: "aws-secret-access-key-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values({
+        id: "icr_aws_secret_access_key",
+        organizationId: authSession.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        ciphertext: encryptedAwsSecretAccessKey.ciphertext,
+        nonce: encryptedAwsSecretAccessKey.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "openai",
+      });
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_aws_secret_access_key",
+      credentialId: "icr_aws_secret_access_key",
+      slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+    });
+
+    const resolveResponse = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          connectionId: "icn_aws_secret_access_key",
+          secretType: "aws_secret_access_key",
+          slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+        }),
+      },
+    );
+
+    expect(resolveResponse.status).toBe(200);
+    await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
+      value: "aws-secret-access-key-value",
     });
   });
 
@@ -416,6 +599,7 @@ describe("internal integration credentials resolve", () => {
 
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
       value: "oauth2-access-token-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
@@ -829,6 +1013,7 @@ describe("internal integration credentials resolve", () => {
     );
 
     expect(firstResolution).toEqual({
+      kind: "value",
       value: "access-token-for:client-secret-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
@@ -1072,6 +1257,123 @@ describe("internal integration credentials resolve", () => {
       code: "BINDING_CONNECTION_MISMATCH",
       message:
         "Integration binding 'ibd_github_binding_aware_mismatch' does not belong to connection 'icn_github_other_connection'.",
+    });
+  });
+
+  it("hydrates form secrets for custom resolvers and returns aws session credentials", async ({
+    fixture,
+  }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "aws_cli_default",
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {},
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_aws_assume_role",
+      organizationId: authSession.organizationId,
+      targetKey: "aws_cli_default",
+      displayName: "AWS assume-role connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        accessKeyId: "AKIAEXAMPLE",
+        roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+      },
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_aws_assume_role",
+      organizationId: authSession.organizationId,
+      displayName: "AWS assume-role profile",
+    });
+
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_aws_assume_role",
+      version: 1,
+    });
+
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_aws_assume_role",
+      sandboxProfileId: "sbp_aws_assume_role",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_aws_assume_role",
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        defaultRegion: "us-east-1",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial: masterKeyMaterial,
+    });
+
+    try {
+      const encryptedSecretAccessKey = encryptCredentialUtf8({
+        plaintext: "aws-secret-access-key-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values({
+        id: "icr_aws_secret_access_key_session",
+        organizationId: authSession.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        ciphertext: encryptedSecretAccessKey.ciphertext,
+        nonce: encryptedSecretAccessKey.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "aws",
+      });
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_aws_assume_role",
+      credentialId: "icr_aws_secret_access_key_session",
+      slotKey: AwsAssumeRoleSecretSlotKey,
+    });
+
+    const integrationRegistry = createAwsSessionRegistry();
+
+    const resolvedCredential = await resolveIntegrationCredential(
+      {
+        db: fixture.db,
+        integrationRegistry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        connectionId: "icn_aws_assume_role",
+        bindingId: "ibd_aws_assume_role",
+        secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        slotKey: AwsAssumeRoleSecretSlotKey,
+        resolverKey: AwsAssumeRoleResolverKey,
+      },
+    );
+
+    expect(resolvedCredential).toEqual({
+      kind: "aws_session",
+      accessKeyId: "AKIAEXAMPLE",
+      secretAccessKey: "aws-secret-access-key-value",
+      sessionToken: "session-token-for:us-east-1",
+      expiresAt: "2030-01-01T00:00:00.000Z",
     });
   });
 });

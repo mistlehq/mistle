@@ -46,15 +46,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     },
   );
 
-  return ctx.json(
-    {
-      value: resolvedCredential.value,
-      ...(resolvedCredential.expiresAt === undefined
-        ? {}
-        : { expiresAt: resolvedCredential.expiresAt }),
-    },
-    200,
-  );
+  return ctx.json(resolvedCredential, 200);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =

@@ -4,6 +4,7 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
+import { AwsDefinition } from "./aws/browser.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -11,6 +12,7 @@ import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { SlackDefinition } from "./slack/browser.js";
 
+export * from "./aws/browser.js";
 export * from "./jira/browser.js";
 export * from "./github/browser.js";
 export * from "./linear/index.js";
@@ -20,6 +22,7 @@ export * from "./forms/index.js";
 export * from "./registry/agent-runtimes.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
+  AwsDefinition,
   JiraDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,

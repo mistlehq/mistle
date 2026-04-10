@@ -48,7 +48,7 @@ function useMembersMutation<TVariables>(input: {
 }
 
 export function useMembersMutations(input: {
-  organizationId: string;
+  activeOrganizationId: string;
   api: MembersSettingsApi;
   queryClient: QueryClient;
   queryKeys: MembersQueryKeys;
@@ -68,7 +68,7 @@ export function useMembersMutations(input: {
   const resendInviteMutation = useMembersMutation({
     mutationFn: async (invitation: SettingsInvitation) =>
       input.api.inviteMember({
-        organizationId: input.organizationId,
+        organizationId: input.activeOrganizationId,
         email: invitation.email,
         role: invitation.role,
         resend: true,
@@ -121,7 +121,7 @@ export function useMembersMutations(input: {
   const updateRoleMutation = useMembersMutation({
     mutationFn: async (nextValue: { memberId: string; role: OrganizationRole }) =>
       input.api.updateMemberRole({
-        organizationId: input.organizationId,
+        organizationId: input.activeOrganizationId,
         memberId: nextValue.memberId,
         role: nextValue.role,
       }),
@@ -146,7 +146,7 @@ export function useMembersMutations(input: {
   const removeMemberMutation = useMembersMutation({
     mutationFn: async (member: SettingsMember) =>
       input.api.removeMember({
-        organizationId: input.organizationId,
+        organizationId: input.activeOrganizationId,
         memberIdOrEmail: member.id,
       }),
     invalidate: [

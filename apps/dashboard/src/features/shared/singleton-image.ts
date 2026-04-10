@@ -75,5 +75,6 @@ export function createSingletonImageContentUrl(input: {
 }
 
 export function createOrganizationLogoContentPath(organizationId: string): string {
-  return `/v1/organizations/${encodeURIComponent(organizationId)}/logo/content`;
+  void organizationId;
+  return "/v1/organization/logo/content";
 }

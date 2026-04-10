@@ -45,6 +45,7 @@ export type AppSession = {
   user: {
     id: string;
   };
+  activeOrganizationId: string;
   session: {
     id: string;
     userId: string;

@@ -75,6 +75,11 @@
       }
     },
     {
+      "targetKey": "aws-cli-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "jira-default",
       "enabled": true,
       "config": {}

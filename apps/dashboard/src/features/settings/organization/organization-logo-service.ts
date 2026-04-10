@@ -6,19 +6,14 @@ import {
 } from "../../shared/singleton-image.js";
 import { executeMembersOperation } from "../members/members-api-errors.js";
 
-function createOrganizationLogoUrl(organizationId: string): URL {
+function createOrganizationLogoUrl(): URL {
   const config = getDashboardConfig();
-  return new URL(
-    `/v1/organizations/${encodeURIComponent(organizationId)}/logo`,
-    config.controlPlaneApiOrigin,
-  );
+  return new URL("/v1/organization/logo", config.controlPlaneApiOrigin);
 }
 
-export async function getOrganizationLogo(input: {
-  organizationId: string;
-}): Promise<SingletonImageMetadata> {
+export async function getOrganizationLogo(): Promise<SingletonImageMetadata> {
   return executeMembersOperation("getOrganizationLogo", async () => {
-    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+    const response = await fetch(createOrganizationLogoUrl(), {
       method: "GET",
       credentials: "include",
       headers: {
@@ -46,14 +41,13 @@ export async function getOrganizationLogo(input: {
 }
 
 export async function uploadOrganizationLogo(input: {
-  organizationId: string;
   file: File;
 }): Promise<SingletonImageMetadata> {
   return executeMembersOperation("uploadOrganizationLogo", async () => {
     const formData = new FormData();
     formData.set("file", input.file);
 
-    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+    const response = await fetch(createOrganizationLogoUrl(), {
       method: "PUT",
       credentials: "include",
       headers: {
@@ -87,9 +81,9 @@ export async function uploadOrganizationLogo(input: {
   });
 }
 
-export async function deleteOrganizationLogo(input: { organizationId: string }): Promise<void> {
+export async function deleteOrganizationLogo(): Promise<void> {
   return executeMembersOperation("deleteOrganizationLogo", async () => {
-    const response = await fetch(createOrganizationLogoUrl(input.organizationId), {
+    const response = await fetch(createOrganizationLogoUrl(), {
       method: "DELETE",
       credentials: "include",
       headers: {

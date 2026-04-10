@@ -1,6 +1,6 @@
 import { MemberRoles, members, organizations, sessions } from "@mistle/db/control-plane";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
@@ -27,15 +27,12 @@ describe("organization logo endpoints integration", () => {
     });
 
     try {
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
@@ -85,16 +82,13 @@ describe("organization logo endpoints integration", () => {
         new File([new Uint8Array(sourceImage)], "logo.jpg", { type: "image/jpeg" }),
       );
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo`,
-        {
-          method: "PUT",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          body: formData,
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "PUT",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+        body: formData,
+      });
 
       expect(response.status).toBe(200);
 
@@ -123,7 +117,7 @@ describe("organization logo endpoints integration", () => {
       expect(payload.imageVersion).toBe(persistedOrganization?.logoObjectKey ?? null);
 
       const contentResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content?v=${encodeURIComponent(payload.imageVersion)}`,
+        `/v1/organization/logo/content?v=${encodeURIComponent(payload.imageVersion)}`,
         {
           method: "GET",
           headers: {
@@ -172,16 +166,13 @@ describe("organization logo endpoints integration", () => {
     });
 
     try {
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          redirect: "manual",
+      const response = await runtime.request("/v1/organization/logo/content", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+        redirect: "manual",
+      });
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toEqual({
@@ -224,16 +215,13 @@ describe("organization logo endpoints integration", () => {
         })
         .where(eq(organizations.id, authenticatedSession.organizationId));
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          redirect: "manual",
+      const response = await runtime.request("/v1/organization/logo/content", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+        redirect: "manual",
+      });
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toEqual({
@@ -278,7 +266,7 @@ describe("organization logo endpoints integration", () => {
         .where(eq(organizations.id, authenticatedSession.organizationId));
 
       const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content?v=${encodeURIComponent(`logos/organizations/${authenticatedSession.organizationId}/img_stale.webp`)}`,
+        `/v1/organization/logo/content?v=${encodeURIComponent(`logos/organizations/${authenticatedSession.organizationId}/img_stale.webp`)}`,
         {
           method: "GET",
           headers: {
@@ -316,16 +304,13 @@ describe("organization logo endpoints integration", () => {
     });
 
     try {
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo`,
-        {
-          method: "PUT",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          body: new FormData(),
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "PUT",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+        body: new FormData(),
+      });
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({
@@ -368,15 +353,12 @@ describe("organization logo endpoints integration", () => {
         })
         .where(eq(organizations.id, authenticatedSession.organizationId));
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo`,
-        {
-          method: "DELETE",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "DELETE",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+      });
 
       expect(response.status).toBe(204);
       expect(await response.text()).toBe("");
@@ -432,15 +414,12 @@ describe("organization logo endpoints integration", () => {
         })
         .where(eq(organizations.id, authenticatedSession.organizationId));
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
 
@@ -452,7 +431,7 @@ describe("organization logo endpoints integration", () => {
       });
 
       const contentResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(authenticatedSession.organizationId)}/logo/content?v=${encodeURIComponent(objectKey)}`,
+        `/v1/organization/logo/content?v=${encodeURIComponent(objectKey)}`,
         {
           method: "GET",
           headers: {
@@ -480,14 +459,11 @@ describe("organization logo endpoints integration", () => {
     }
   });
 
-  it("returns forbidden when the request targets a different organization than the active session organization", async ({
+  it("returns forbidden when the active organization membership has been revoked", async ({
     fixture,
   }) => {
-    const firstSession = await fixture.authSession({
-      email: "integration-organization-logo-endpoint-forbidden-first@example.com",
-    });
-    const secondSession = await fixture.authSession({
-      email: "integration-organization-logo-endpoint-forbidden-second@example.com",
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-organization-logo-endpoint-forbidden@example.com",
     });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
@@ -499,15 +475,21 @@ describe("organization logo endpoints integration", () => {
     });
 
     try {
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(firstSession.organizationId)}/logo`,
-        {
-          method: "GET",
-          headers: {
-            cookie: secondSession.cookie,
-          },
+      await runtime.db
+        .delete(members)
+        .where(
+          and(
+            eq(members.organizationId, authenticatedSession.organizationId),
+            eq(members.userId, authenticatedSession.userId),
+          ),
+        );
+
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+      });
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -520,14 +502,11 @@ describe("organization logo endpoints integration", () => {
     }
   });
 
-  it("returns forbidden from the content endpoint when the request targets a different organization than the active session organization", async ({
+  it("returns forbidden from the content endpoint when the active organization membership has been revoked", async ({
     fixture,
   }) => {
-    const firstSession = await fixture.authSession({
-      email: "integration-organization-logo-content-endpoint-forbidden-first@example.com",
-    });
-    const secondSession = await fixture.authSession({
-      email: "integration-organization-logo-content-endpoint-forbidden-second@example.com",
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-organization-logo-content-endpoint-forbidden@example.com",
     });
     const seaweedfs = await startSeaweedfsS3({
       bucketName: "mistle-assets",
@@ -539,16 +518,22 @@ describe("organization logo endpoints integration", () => {
     });
 
     try {
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(firstSession.organizationId)}/logo/content`,
-        {
-          method: "GET",
-          headers: {
-            cookie: secondSession.cookie,
-          },
-          redirect: "manual",
+      await runtime.db
+        .delete(members)
+        .where(
+          and(
+            eq(members.organizationId, authenticatedSession.organizationId),
+            eq(members.userId, authenticatedSession.userId),
+          ),
+        );
+
+      const response = await runtime.request("/v1/organization/logo/content", {
+        method: "GET",
+        headers: {
+          cookie: authenticatedSession.cookie,
         },
-      );
+        redirect: "manual",
+      });
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -607,16 +592,13 @@ describe("organization logo endpoints integration", () => {
         new File([new Uint8Array(sourceImage)], "logo.jpg", { type: "image/jpeg" }),
       );
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/logo`,
-        {
-          method: "PUT",
-          headers: {
-            cookie: memberSession.cookie,
-          },
-          body: formData,
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "PUT",
+        headers: {
+          cookie: memberSession.cookie,
         },
-      );
+        body: formData,
+      });
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({
@@ -667,15 +649,12 @@ describe("organization logo endpoints integration", () => {
         })
         .where(eq(organizations.id, ownerSession.organizationId));
 
-      const response = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/logo`,
-        {
-          method: "DELETE",
-          headers: {
-            cookie: memberSession.cookie,
-          },
+      const response = await runtime.request("/v1/organization/logo", {
+        method: "DELETE",
+        headers: {
+          cookie: memberSession.cookie,
         },
-      );
+      });
 
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toEqual({

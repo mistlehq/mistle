@@ -6,9 +6,9 @@ import { OrganizationMembersSettingsPageView } from "./organization-members-sett
 
 export function OrganizationMembersSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
-  const organizationId = useRequiredOrganizationId();
+  const activeOrganizationId = useRequiredOrganizationId();
   const membersState = useOrganizationMembersSettingsState({
-    organizationId,
+    activeOrganizationId,
   });
   const { title, description } = resolvePageFrameText(pageMeta, "Members");
 

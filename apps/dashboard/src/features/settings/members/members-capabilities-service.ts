@@ -3,22 +3,12 @@ import { normalizeHttpApiError } from "../../api/http-api-error.js";
 import { MembersApiError } from "./members-api-errors.js";
 import type { MembershipCapabilities } from "./members-api-types.js";
 
-export async function getMembershipCapabilities(input: {
-  organizationId: string;
-}): Promise<MembershipCapabilities> {
+export async function getMembershipCapabilities(): Promise<MembershipCapabilities> {
   try {
     const client = getControlPlaneApiClient();
-    const { data } = await client.GET(
-      "/v1/organizations/{organizationId}/membership-capabilities",
-      {
-        credentials: "include",
-        params: {
-          path: {
-            organizationId: input.organizationId,
-          },
-        },
-      },
-    );
+    const { data } = await client.GET("/v1/organization/membership-capabilities", {
+      credentials: "include",
+    });
 
     if (data === undefined) {
       throw new MembersApiError({

@@ -11,6 +11,7 @@ import {
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
+  type IntegrationCredentialResolverResult,
   type IntegrationOAuth2AuthorizationCodeCapability,
   type IntegrationOAuth2ClientCredentialsCapability,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
@@ -40,10 +41,7 @@ export type ResolveIntegrationCredentialInput = {
   resolverKey?: string | undefined;
 };
 
-export type ResolvedIntegrationCredential = {
-  value: string;
-  expiresAt?: string;
-};
+export type ResolvedIntegrationCredential = IntegrationCredentialResolverResult;
 
 type ResolvePersistedCredentialInput = {
   db: AppContext["var"]["db"];
@@ -100,6 +98,28 @@ type OAuth2ClientCredentialsManagedCredentialResolution = {
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
+
+function createValueCredential(input: {
+  value: string;
+  expiresAt?: string;
+}): ResolvedIntegrationCredential {
+  return {
+    kind: "value",
+    value: input.value,
+    ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+  };
+}
+
+function resolveValueCredentialValueOrThrow(
+  credential: ResolvedIntegrationCredential,
+  context: string,
+): string {
+  if (credential.kind !== "value") {
+    throw new Error(`${context} requires a string credential value.`);
+  }
+
+  return credential.value;
+}
 
 function resolveConnectionConfigOrThrow(input: {
   connectionId: string;
@@ -163,7 +183,10 @@ async function resolveResolverContextConnectionSecrets(input: {
         slotKey: field.slotKey,
       });
 
-      return [field.name, credential.value] as const;
+      return [
+        field.name,
+        resolveValueCredentialValueOrThrow(credential, "Connection secret hydration"),
+      ] as const;
     }),
   );
 
@@ -252,6 +275,10 @@ function resolveResolverContextBinding(input: {
 function parsePersistedSecretType(secretType: string): IntegrationCredentialSecretKind | undefined {
   if (secretType === IntegrationCredentialSecretKinds.API_KEY) {
     return IntegrationCredentialSecretKinds.API_KEY;
+  }
+
+  if (secretType === IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY) {
+    return IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY;
   }
 
   if (secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN) {
@@ -386,12 +413,12 @@ async function decryptLinkedActiveCredential(
       organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
 
-    return {
+    return createValueCredential({
       value,
       ...(input.credential.expiresAt === null
         ? {}
         : { expiresAt: normalizeCredentialExpiryOrThrow(input.credential.expiresAt) }),
-    };
+    });
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
   }
@@ -557,7 +584,10 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           targetKey: lockedConnection.targetKey,
           target: input.target,
           connection: lockedConnectionResolverContext,
-          refreshToken: decryptedRefreshToken.value,
+          refreshToken: resolveValueCredentialValueOrThrow(
+            decryptedRefreshToken,
+            "OAuth 2.0 refresh token resolution",
+          ),
         });
       } catch (error) {
         if (error instanceof IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError) {
@@ -730,12 +760,12 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
       return {
         kind: "resolved",
-        credential: {
+        credential: createValueCredential({
           value: refreshedAccessToken.accessToken,
           ...(refreshedAccessToken.accessTokenExpiresAt === undefined
             ? {}
             : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
-        },
+        }),
       };
     },
   );
@@ -882,7 +912,10 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
         targetKey: lockedConnection.targetKey,
         target: input.target,
         connection: connectionResolverContext,
-        clientSecret: clientSecret.value,
+        clientSecret: resolveValueCredentialValueOrThrow(
+          clientSecret,
+          "OAuth 2.0 client credentials exchange",
+        ),
       });
 
       const latestOrganizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
@@ -974,12 +1007,12 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
       }
 
       return {
-        credential: {
+        credential: createValueCredential({
           value: exchangedAccessToken.accessToken,
           ...(exchangedAccessToken.accessTokenExpiresAt
             ? { expiresAt: exchangedAccessToken.accessTokenExpiresAt }
             : {}),
-        },
+        }),
       };
     },
   );
@@ -1071,12 +1104,12 @@ async function resolvePersistedCredential(
       organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
 
-    return {
+    return createValueCredential({
       value,
       ...(credential.expiresAt === null
         ? {}
         : { expiresAt: normalizeCredentialExpiryOrThrow(credential.expiresAt) }),
-    };
+    });
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
   }

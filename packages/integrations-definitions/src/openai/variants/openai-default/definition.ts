@@ -32,7 +32,9 @@ import {
 } from "./model-capabilities.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
-  resolveOpenAiApiBaseUrlForConnectionMethod,
+  resolveOpenAiChatGptBaseUrlForConnectionMethod,
+  resolveOpenAiResponsesApiBaseUrlForConnectionMethod,
+  resolveOpenAiRouteBaseUrlForConnectionMethod,
 } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -114,7 +116,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
         agentProviderAccess: {
           providerFamilyId: input.target.familyId,
           providerVariantId: input.target.variantId,
-          apiBaseUrl: resolveOpenAiApiBaseUrlForConnectionMethod({
+          apiBaseUrl: resolveOpenAiRouteBaseUrlForConnectionMethod({
             targetConfig: input.target.config,
             connectionMethod: connectionConfig.connection_method,
           }),
@@ -128,7 +130,9 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
               connectionConfig: input.connection.config,
             }),
           },
-          ...(connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
+          ...(connectionConfig.connection_method ===
+            OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE &&
+          connectionConfig.chatgpt_account_id !== undefined
             ? {
                 additionalHeaders: {
                   "ChatGPT-Account-ID": connectionConfig.chatgpt_account_id,
@@ -136,11 +140,27 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
               }
             : {}),
           allowedMethods: ["GET", "POST"],
-          allowedPathPrefixes: ["/"],
+          allowedPathPrefixes:
+            connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
+              ? ["/"]
+              : ["/"],
           defaultModel: input.binding.config.model.defaultModel,
           allowedModels: [...capabilitySet.models],
           providerMetadata: {
             reasoningEffort: input.binding.config.model.options.reasoningEffort,
+            responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
+              targetConfig: input.target.config,
+              connectionMethod: connectionConfig.connection_method,
+            }),
+            ...(resolveOpenAiChatGptBaseUrlForConnectionMethod({
+              connectionMethod: connectionConfig.connection_method,
+            }) === undefined
+              ? {}
+              : {
+                  chatgptBaseUrl: resolveOpenAiChatGptBaseUrlForConnectionMethod({
+                    connectionMethod: connectionConfig.connection_method,
+                  }),
+                }),
             ...(input.binding.config.model.options.additionalInstructions === undefined
               ? {}
               : {

@@ -48,16 +48,18 @@ const OpenAiTokenExchangeResponseSchema = z
     id_token: z.string().min(1),
     access_token: z.string().min(1),
     refresh_token: z.string().min(1),
+    expires_in: StringOrNumberSchema.optional(),
   })
-  .strict();
+  .loose();
 
 const OpenAiRefreshResponseSchema = z
   .object({
     id_token: z.string().min(1).optional(),
     access_token: z.string().min(1).optional(),
     refresh_token: z.string().min(1).optional(),
+    expires_in: StringOrNumberSchema.optional(),
   })
-  .strict();
+  .loose();
 
 const OpenAiDeviceAuthorizationProviderStateSchema = z
   .object({
@@ -73,8 +75,11 @@ type OpenAiDeviceAuthorizationProviderState = z.infer<
 
 type OpenAiJwtClaims = Record<string, unknown>;
 
-const OpenAiAccountIdClaim = "https://api.openai.com/auth.chatgpt_account_id";
-const OpenAiPlanTypeClaim = "https://api.openai.com/auth.chatgpt_plan_type";
+const OpenAiAccountIdClaim = "chatgpt_account_id";
+const OpenAiPlanTypeClaim = "chatgpt_plan_type";
+const OpenAiNamespacedAccountIdClaim = "https://api.openai.com/auth.chatgpt_account_id";
+const OpenAiNamespacedPlanTypeClaim = "https://api.openai.com/auth.chatgpt_plan_type";
+const OpenAiAuthClaimsContainerKey = "https://api.openai.com/auth";
 
 function parsePositiveInteger(input: string | number): number {
   const value = typeof input === "number" ? input : Number(input.trim());
@@ -105,13 +110,12 @@ export function parseJwtClaimsOrThrow(token: string): OpenAiJwtClaims {
   return claims;
 }
 
-function resolveIsoTimestampFromExpClaim(claims: OpenAiJwtClaims): string | undefined {
-  const exp = claims["exp"];
-  if (typeof exp !== "number" || !Number.isFinite(exp)) {
-    return undefined;
-  }
-
-  return new Date(exp * 1_000).toISOString();
+function resolveIsoTimestampFromExpiresIn(input: {
+  expiresIn: string | number;
+  nowMs: number;
+}): string {
+  const expiresInSeconds = parsePositiveInteger(input.expiresIn);
+  return new Date(input.nowMs + expiresInSeconds * 1_000).toISOString();
 }
 
 type OpenAiRefreshFailure = {
@@ -241,6 +245,66 @@ export function classifyOpenAiRefreshFailure(input: {
   };
 }
 
+export function parseOpenAiTokenExchangeResponse(input: unknown): {
+  idToken: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn?: string | number;
+} {
+  const parsed = OpenAiTokenExchangeResponseSchema.parse(input);
+
+  return {
+    idToken: parsed.id_token,
+    accessToken: parsed.access_token,
+    refreshToken: parsed.refresh_token,
+    ...(parsed.expires_in === undefined ? {} : { expiresIn: parsed.expires_in }),
+  };
+}
+
+export function parseOpenAiRefreshResponse(
+  input: unknown,
+): z.infer<typeof OpenAiRefreshResponseSchema> {
+  return OpenAiRefreshResponseSchema.parse(input);
+}
+
+function resolveNestedOpenAiAuthClaims(input: OpenAiJwtClaims): OpenAiJwtClaims | undefined {
+  const authClaims = input[OpenAiAuthClaimsContainerKey];
+  if (typeof authClaims !== "object" || authClaims === null || Array.isArray(authClaims)) {
+    return undefined;
+  }
+
+  const claims: OpenAiJwtClaims = {};
+  for (const [key, value] of Object.entries(authClaims)) {
+    claims[key] = value;
+  }
+
+  return claims;
+}
+
+function resolveOpenAiAccountMetadataFromClaims(input: OpenAiJwtClaims): {
+  chatGptAccountId?: string;
+  chatGptPlanType?: string;
+} {
+  const nestedClaims = resolveNestedOpenAiAuthClaims(input);
+  const rawAccountId =
+    input[OpenAiAccountIdClaim] ??
+    input[OpenAiNamespacedAccountIdClaim] ??
+    nestedClaims?.[OpenAiAccountIdClaim];
+  const rawPlanType =
+    input[OpenAiPlanTypeClaim] ??
+    input[OpenAiNamespacedPlanTypeClaim] ??
+    nestedClaims?.[OpenAiPlanTypeClaim];
+
+  return {
+    ...(typeof rawAccountId === "string" && rawAccountId.length > 0
+      ? { chatGptAccountId: rawAccountId }
+      : {}),
+    ...(typeof rawPlanType === "string" && rawPlanType.length > 0
+      ? { chatGptPlanType: rawPlanType }
+      : {}),
+  };
+}
+
 function resolveOpenAiRefreshResult(input: {
   response: z.infer<typeof OpenAiRefreshResponseSchema>;
 }): IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult {
@@ -248,37 +312,36 @@ function resolveOpenAiRefreshResult(input: {
     throw new Error("OpenAI refresh response is missing access_token.");
   }
 
-  const accessTokenClaims = parseJwtClaimsOrThrow(input.response.access_token);
   const idTokenClaims =
     input.response.id_token === undefined
       ? undefined
       : parseJwtClaimsOrThrow(input.response.id_token);
-  const accessTokenExpiresAt = resolveIsoTimestampFromExpClaim(accessTokenClaims);
-  const refreshToken = input.response.refresh_token;
-  const refreshTokenExpiresAt =
-    refreshToken === undefined
+  const accessTokenExpiresAt =
+    input.response.expires_in === undefined
       ? undefined
-      : resolveIsoTimestampFromExpClaim(parseJwtClaimsOrThrow(refreshToken));
-  const chatGptAccountId =
-    idTokenClaims === undefined ? undefined : idTokenClaims[OpenAiAccountIdClaim];
-  const chatGptPlanType =
-    idTokenClaims !== undefined && typeof idTokenClaims[OpenAiPlanTypeClaim] === "string"
-      ? idTokenClaims[OpenAiPlanTypeClaim]
-      : undefined;
+      : resolveIsoTimestampFromExpiresIn({
+          expiresIn: input.response.expires_in,
+          nowMs: Date.now(),
+        });
+  const refreshToken = input.response.refresh_token;
+  const accountMetadata =
+    idTokenClaims === undefined ? {} : resolveOpenAiAccountMetadataFromClaims(idTokenClaims);
 
   return {
     accessToken: input.response.access_token,
     ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
     ...(refreshToken === undefined ? {} : { refreshToken }),
-    ...(refreshTokenExpiresAt === undefined ? {} : { refreshTokenExpiresAt }),
-    ...(chatGptAccountId === undefined && chatGptPlanType === undefined
+    ...(accountMetadata.chatGptAccountId === undefined &&
+    accountMetadata.chatGptPlanType === undefined
       ? {}
       : {
           credentialMetadata: {
-            ...(typeof chatGptAccountId === "string" && chatGptAccountId.length > 0
-              ? { chatgpt_account_id: chatGptAccountId }
-              : {}),
-            ...(chatGptPlanType === undefined ? {} : { chatgpt_plan_type: chatGptPlanType }),
+            ...(accountMetadata.chatGptAccountId === undefined
+              ? {}
+              : { chatgpt_account_id: accountMetadata.chatGptAccountId }),
+            ...(accountMetadata.chatGptPlanType === undefined
+              ? {}
+              : { chatgpt_plan_type: accountMetadata.chatGptPlanType }),
           },
         }),
   };
@@ -288,28 +351,15 @@ export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
   idToken: string;
   accessToken: string;
   refreshToken: string;
+  accessTokenExpiresAt?: string;
 }): Extract<
   IntegrationDeviceAuthorizationPollResult<OpenAiConnectionConfig>,
   { status: "completed" }
 > {
   const idTokenClaims = parseJwtClaimsOrThrow(input.idToken);
-  const accessTokenClaims = parseJwtClaimsOrThrow(input.accessToken);
-  const refreshTokenClaims = parseJwtClaimsOrThrow(input.refreshToken);
-  const accessTokenExpiresAt = resolveIsoTimestampFromExpClaim(accessTokenClaims);
-  const refreshTokenExpiresAt = resolveIsoTimestampFromExpClaim(refreshTokenClaims);
-  const chatGptAccountId = idTokenClaims[OpenAiAccountIdClaim];
-
-  if (typeof chatGptAccountId !== "string" || chatGptAccountId.length === 0) {
-    throw new Error(`OpenAI id_token is missing ${OpenAiAccountIdClaim}.`);
-  }
-
+  const accountMetadata = resolveOpenAiAccountMetadataFromClaims(idTokenClaims);
   const email = idTokenClaims["email"];
-  const chatGptPlanType =
-    typeof idTokenClaims[OpenAiPlanTypeClaim] === "string"
-      ? idTokenClaims[OpenAiPlanTypeClaim]
-      : typeof accessTokenClaims[OpenAiPlanTypeClaim] === "string"
-        ? accessTokenClaims[OpenAiPlanTypeClaim]
-        : undefined;
+  const chatGptPlanType = accountMetadata.chatGptPlanType;
 
   return {
     status: "completed",
@@ -317,13 +367,16 @@ export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
     connectionConfig: {
       connection_method: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
       auth_mode: "chatgpt",
-      chatgpt_account_id: chatGptAccountId,
+      ...(accountMetadata.chatGptAccountId === undefined
+        ? {}
+        : { chatgpt_account_id: accountMetadata.chatGptAccountId }),
       ...(chatGptPlanType === undefined ? {} : { chatgpt_plan_type: chatGptPlanType }),
     },
     accessToken: input.accessToken,
-    ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
+    ...(input.accessTokenExpiresAt === undefined
+      ? {}
+      : { accessTokenExpiresAt: input.accessTokenExpiresAt }),
     refreshToken: input.refreshToken,
-    ...(refreshTokenExpiresAt === undefined ? {} : { refreshTokenExpiresAt }),
   };
 }
 
@@ -378,6 +431,7 @@ async function exchangeAuthorizationCodeForTokens(input: {
   idToken: string;
   accessToken: string;
   refreshToken: string;
+  expiresIn?: string | number;
 }> {
   const form = new URLSearchParams();
   form.set("grant_type", "authorization_code");
@@ -398,12 +452,7 @@ async function exchangeAuthorizationCodeForTokens(input: {
     throw new Error(`OpenAI token exchange failed with status ${String(response.status)}.`);
   }
 
-  const parsed = OpenAiTokenExchangeResponseSchema.parse(await response.json());
-  return {
-    idToken: parsed.id_token,
-    accessToken: parsed.access_token,
-    refreshToken: parsed.refresh_token,
-  };
+  return parseOpenAiTokenExchangeResponse(await response.json());
 }
 
 async function refreshOpenAiAccessToken(input: {
@@ -435,7 +484,7 @@ async function refreshOpenAiAccessToken(input: {
     });
   }
 
-  const parsed = OpenAiRefreshResponseSchema.parse(await response.json());
+  const parsed = parseOpenAiRefreshResponse(await response.json());
   return resolveOpenAiRefreshResult({
     response: parsed,
   });
@@ -484,6 +533,14 @@ async function pollOpenAiDeviceAuthorization(
     idToken: tokens.idToken,
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
+    ...(tokens.expiresIn === undefined
+      ? {}
+      : {
+          accessTokenExpiresAt: resolveIsoTimestampFromExpiresIn({
+            expiresIn: tokens.expiresIn,
+            nowMs: Date.now(),
+          }),
+        }),
   });
 }
 

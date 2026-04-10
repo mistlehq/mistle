@@ -1,8 +1,12 @@
 export { OpenAiApiKeyDefinition } from "./definition.js";
 export {
   OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptBaseUrl,
+  OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
-  resolveOpenAiApiBaseUrlForConnectionMethod,
+  resolveOpenAiChatGptBaseUrlForConnectionMethod,
+  resolveOpenAiResponsesApiBaseUrlForConnectionMethod,
+  resolveOpenAiRouteBaseUrlForConnectionMethod,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
 export {

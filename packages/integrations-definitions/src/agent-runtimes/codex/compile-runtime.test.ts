@@ -30,6 +30,7 @@ describe("compileCodexRuntime", () => {
         allowedModels: ["gpt-5.3-codex"],
         providerMetadata: {
           reasoningEffort: "medium",
+          responsesApiBaseUrl: "https://api.openai.com",
           additionalInstructions: "Prefer concise answers.",
         },
       },
@@ -122,6 +123,8 @@ describe("compileCodexRuntime", () => {
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
       "Prefer concise answers.",
     );
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("[features]");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("apps = false");
     expect(compiled.agentRuntimes).toEqual([
       {
         runtimeId: "codex",
@@ -173,5 +176,81 @@ describe("compileCodexRuntime", () => {
         },
       },
     ]);
+  });
+
+  it("renders separate responses and ChatGPT backend bases for ChatGPT subscription mode", () => {
+    const compiled = compileCodexRuntime({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      bindingId: "bind_openai_agent",
+      connectionId: "conn_openai_org_123",
+      runtimeId: "codex",
+      runtimeConfig: {},
+      providerAccess: {
+        providerFamilyId: "openai",
+        providerVariantId: "openai-default",
+        apiBaseUrl: "https://chatgpt.com",
+        authScheme: "bearer",
+        credentialResolver: {
+          connectionId: "conn_openai_org_123",
+          secretType: "chatgpt_access_token",
+        },
+        additionalHeaders: {
+          "ChatGPT-Account-ID": "acct_123",
+        },
+        allowedMethods: ["GET", "POST"],
+        allowedPathPrefixes: ["/"],
+        defaultModel: "gpt-5.4",
+        allowedModels: ["gpt-5.4"],
+        providerMetadata: {
+          reasoningEffort: "medium",
+          responsesApiBaseUrl: "https://chatgpt.com/backend-api/codex",
+          chatgptBaseUrl: "https://chatgpt.com/backend-api",
+        },
+      },
+      mcpServers: [],
+      refs: {
+        sandboxPaths: {
+          userHomeDir: "/root",
+          workspaceDir: "/root",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/usr/local/bin",
+        },
+        artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+      },
+    });
+
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["chatgpt.com"],
+          pathPrefixes: ["/"],
+          methods: ["GET", "POST"],
+        },
+        upstream: {
+          baseUrl: "https://chatgpt.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        additionalHeaders: {
+          "ChatGPT-Account-ID": "acct_123",
+        },
+        credentialResolver: {
+          connectionId: "conn_openai_org_123",
+          secretType: "chatgpt_access_token",
+        },
+      },
+    ]);
+
+    const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain('base_url = "https://chatgpt.com/backend-api/codex"');
+    expect(configContent).toContain('chatgpt_base_url = "https://chatgpt.com/backend-api"');
+    expect(configContent).toContain("[features]");
+    expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("plugins = false");
   });
 });

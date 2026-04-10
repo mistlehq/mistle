@@ -1,4 +1,7 @@
-import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import type {
+  ControlPlaneInternalClient,
+  ResolveIntegrationCredentialOutput,
+} from "@mistle/control-plane-internal-client";
 import type {
   IntegrationConnection,
   IntegrationResourceCredentialRef,
@@ -15,7 +18,7 @@ export async function resolveResourceCredential(input: {
       }) => IntegrationResourceCredentialRef | undefined)
     | undefined;
   controlPlaneInternalClient: ControlPlaneInternalClient | undefined;
-}): Promise<{ value: string; expiresAt?: string } | undefined> {
+}): Promise<ResolveIntegrationCredentialOutput | undefined> {
   const credentialRequirement = resolveResourceCredentialRequirement({
     connection: input.connection,
     kind: input.kind,

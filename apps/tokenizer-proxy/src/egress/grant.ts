@@ -4,16 +4,13 @@ import {
   type EgressGrantConfig,
 } from "@mistle/sandbox-egress-auth";
 
-export type AuthorizedEgressGrant = {
+type AuthorizedEgressGrantBase = {
   sub: string;
   jti: string;
   bindingId: string;
   connectionId: string;
   secretType: string;
   upstreamBaseUrl: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
-  authInjectionUsername?: string;
   additionalHeaders?: Readonly<Record<string, string>>;
   slotKey?: string;
   resolverKey?: string;
@@ -21,6 +18,27 @@ export type AuthorizedEgressGrant = {
   allowedPathPrefixes?: ReadonlyArray<string>;
   egressRuleId: string;
 };
+
+export type AuthorizedEgressGrant =
+  | (AuthorizedEgressGrantBase & {
+      authInjectionType: "bearer" | "header" | "query";
+      authInjectionTarget: string;
+    })
+  | (AuthorizedEgressGrantBase & {
+      authInjectionType: "basic";
+      authInjectionTarget: string;
+      authInjectionUsername?: string;
+    })
+  | (AuthorizedEgressGrantBase & {
+      authInjectionType: "aws_sigv4";
+      authInjectionService: string;
+      authInjectionRegion: string;
+    });
+
+export type StaticAuthorizedEgressGrant = Exclude<
+  AuthorizedEgressGrant,
+  { authInjectionType: "aws_sigv4" }
+>;
 
 export type EgressGrantRequestErrorCode = "INVALID_EGRESS_GRANT" | "EGRESS_GRANT_SCOPE_VIOLATION";
 
@@ -69,7 +87,7 @@ export async function authorizeEgressGrant(input: {
   method: string;
   targetPath: string;
 }): Promise<AuthorizedEgressGrant> {
-  let verifiedGrant: Omit<AuthorizedEgressGrant, "egressRuleId">;
+  let verifiedGrant: Awaited<ReturnType<typeof verifyEgressGrant>>;
 
   try {
     verifiedGrant = await verifyEgressGrant({
@@ -111,8 +129,52 @@ export async function authorizeEgressGrant(input: {
     });
   }
 
+  if (verifiedGrant.authInjectionType === "aws_sigv4") {
+    return {
+      sub: verifiedGrant.sub,
+      jti: verifiedGrant.jti,
+      bindingId: verifiedGrant.bindingId,
+      connectionId: verifiedGrant.connectionId,
+      secretType: verifiedGrant.secretType,
+      upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
+      authInjectionType: verifiedGrant.authInjectionType,
+      authInjectionService: verifiedGrant.authInjectionService,
+      authInjectionRegion: verifiedGrant.authInjectionRegion,
+      ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
+      ...(verifiedGrant.resolverKey === undefined
+        ? {}
+        : { resolverKey: verifiedGrant.resolverKey }),
+      ...(verifiedGrant.allowedMethods === undefined
+        ? {}
+        : { allowedMethods: verifiedGrant.allowedMethods }),
+      ...(verifiedGrant.allowedPathPrefixes === undefined
+        ? {}
+        : { allowedPathPrefixes: verifiedGrant.allowedPathPrefixes }),
+      egressRuleId: verifiedGrant.jti,
+    };
+  }
+
   return {
-    ...verifiedGrant,
+    sub: verifiedGrant.sub,
+    jti: verifiedGrant.jti,
+    bindingId: verifiedGrant.bindingId,
+    connectionId: verifiedGrant.connectionId,
+    secretType: verifiedGrant.secretType,
+    upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
+    authInjectionType: verifiedGrant.authInjectionType,
+    authInjectionTarget: verifiedGrant.authInjectionTarget,
+    ...(verifiedGrant.authInjectionType !== "basic" ||
+    verifiedGrant.authInjectionUsername === undefined
+      ? {}
+      : { authInjectionUsername: verifiedGrant.authInjectionUsername }),
+    ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
+    ...(verifiedGrant.resolverKey === undefined ? {} : { resolverKey: verifiedGrant.resolverKey }),
+    ...(verifiedGrant.allowedMethods === undefined
+      ? {}
+      : { allowedMethods: verifiedGrant.allowedMethods }),
+    ...(verifiedGrant.allowedPathPrefixes === undefined
+      ? {}
+      : { allowedPathPrefixes: verifiedGrant.allowedPathPrefixes }),
     egressRuleId: verifiedGrant.jti,
   };
 }

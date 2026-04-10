@@ -28,6 +28,7 @@ pub struct CompiledEgressRoute {
     pub r#match: CompiledEgressRouteMatch,
     pub upstream: CompiledEgressRouteUpstream,
     pub auth_injection: CompiledEgressRouteAuthInjection,
+    pub additional_headers: Option<BTreeMap<String, String>>,
     pub credential_resolver: CompiledEgressRouteCredentialResolver,
 }
 

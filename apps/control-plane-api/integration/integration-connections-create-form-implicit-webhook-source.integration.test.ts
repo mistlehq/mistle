@@ -57,7 +57,7 @@ const ImplicitPathWebhookDefinition: IntegrationDefinition<
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Implicit path webhook",
-        callbackUrl: `${input.controlPlaneBaseUrl}/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
+        callbackUrl: `${input.controlPlaneBaseUrl}/p/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },

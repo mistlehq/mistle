@@ -49,6 +49,8 @@ const ManagedSandboxContext = [
 
 type CodexProviderMetadata = {
   reasoningEffort: string;
+  responsesApiBaseUrl: string;
+  chatgptBaseUrl?: string;
   additionalInstructions?: string;
 };
 
@@ -66,9 +68,22 @@ function resolveCodexProviderMetadata(
   }
 
   const additionalInstructions = providerMetadata["additionalInstructions"];
+  const responsesApiBaseUrl = providerMetadata["responsesApiBaseUrl"];
+  const chatgptBaseUrl = providerMetadata["chatgptBaseUrl"];
+
+  if (typeof responsesApiBaseUrl !== "string" || responsesApiBaseUrl.trim().length === 0) {
+    return null;
+  }
+
+  if (chatgptBaseUrl !== undefined && typeof chatgptBaseUrl !== "string") {
+    return null;
+  }
+
   if (additionalInstructions === undefined) {
     return {
       reasoningEffort,
+      responsesApiBaseUrl,
+      ...(chatgptBaseUrl === undefined ? {} : { chatgptBaseUrl }),
     };
   }
 
@@ -78,6 +93,8 @@ function resolveCodexProviderMetadata(
 
   return {
     reasoningEffort,
+    responsesApiBaseUrl,
+    ...(chatgptBaseUrl === undefined ? {} : { chatgptBaseUrl }),
     additionalInstructions,
   };
 }
@@ -99,7 +116,8 @@ function composeDeveloperInstructions(additionalInstructions?: string): string {
 function renderCodexConfig(input: {
   model: string;
   reasoningEffort: string;
-  apiBaseUrl: string;
+  responsesApiBaseUrl: string;
+  chatgptBaseUrl?: string;
   additionalInstructions?: string;
 }): string {
   return stringifyToml({
@@ -112,12 +130,17 @@ function renderCodexConfig(input: {
     model_providers: {
       [ProxyModelProviderKey]: {
         name: ProxyModelProviderName,
-        base_url: input.apiBaseUrl,
+        base_url: input.responsesApiBaseUrl,
         wire_api: "responses",
         requires_openai_auth: false,
         supports_websockets: false,
       },
     },
+    features: {
+      apps: false,
+      plugins: false,
+    },
+    ...(input.chatgptBaseUrl === undefined ? {} : { chatgpt_base_url: input.chatgptBaseUrl }),
     projects: {
       "/": {
         trust_level: "trusted",
@@ -196,7 +219,12 @@ export function compileCodexRuntime(
               content: renderCodexConfig({
                 model: input.providerAccess.defaultModel,
                 reasoningEffort: providerMetadata.reasoningEffort,
-                apiBaseUrl: input.providerAccess.apiBaseUrl,
+                responsesApiBaseUrl: providerMetadata.responsesApiBaseUrl,
+                ...(providerMetadata.chatgptBaseUrl === undefined
+                  ? {}
+                  : {
+                      chatgptBaseUrl: providerMetadata.chatgptBaseUrl,
+                    }),
                 ...(providerMetadata.additionalInstructions === undefined
                   ? {}
                   : {

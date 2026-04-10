@@ -65,7 +65,7 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Immediate response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
+        callbackUrl: `/p/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -143,7 +143,7 @@ const ImmediateManagedResponseWebhookDefinition: IntegrationDefinition<
 
       return {
         displayName: input.source.displayName ?? "Immediate managed response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+        callbackUrl: `/p/integration/webhooks/${input.targetKey}/${endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -155,7 +155,7 @@ const ImmediateManagedResponseWebhookDefinition: IntegrationDefinition<
 
       return {
         providerMetadata: {
-          callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${endpointKey}`,
+          callbackUrl: `/p/integration/webhooks/${input.targetKey}/${endpointKey}`,
         },
       };
     },
@@ -224,7 +224,7 @@ const VerifiedImmediateResponseWebhookDefinition: IntegrationDefinition<
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Verified response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
+        callbackUrl: `/p/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
@@ -320,14 +320,14 @@ const VerifiedManagedResponseWebhookDefinition: IntegrationDefinition<
     async describeSource(input) {
       return {
         displayName: input.source.displayName ?? "Verified managed response webhook",
-        callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
+        callbackUrl: `/p/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         providerMetadata: input.source.providerMetadata,
       };
     },
     async createRegistration(input) {
       return {
         providerMetadata: {
-          callbackUrl: `/v1/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
+          callbackUrl: `/p/integration/webhooks/${input.targetKey}/${input.source.endpointKey}`,
         },
       };
     },

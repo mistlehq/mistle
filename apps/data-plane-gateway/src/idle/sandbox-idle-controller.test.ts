@@ -445,6 +445,11 @@ describe("LocalSandboxIdleController", () => {
         1_000,
         "Timed out waiting for initial disconnect reconciliation request.",
       );
+      await waitForCondition(
+        () => scheduler.pendingCount() === 1,
+        1_000,
+        "Timed out waiting for disconnect reconciliation retry scheduling.",
+      );
 
       expect(disposeCount).toBe(0);
       expect(scheduler.pendingCount()).toBe(1);

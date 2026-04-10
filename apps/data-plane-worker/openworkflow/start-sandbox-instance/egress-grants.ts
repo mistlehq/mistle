@@ -27,13 +27,21 @@ export async function createEgressGrantByRuleId(input: {
           secretType: route.credentialResolver.secretType,
           upstreamBaseUrl: route.upstream.baseUrl,
           authInjectionType: route.authInjection.type,
-          authInjectionTarget: route.authInjection.target,
-          ...(route.authInjection.username === undefined
-            ? {}
-            : { authInjectionUsername: route.authInjection.username }),
           ...(route.additionalHeaders === undefined
             ? {}
             : { additionalHeaders: route.additionalHeaders }),
+          ...(route.authInjection.type === "aws_sigv4"
+            ? {
+                authInjectionService: route.authInjection.service,
+                authInjectionRegion: route.authInjection.region,
+              }
+            : {
+                authInjectionTarget: route.authInjection.target,
+                ...(route.authInjection.type !== "basic" ||
+                route.authInjection.username === undefined
+                  ? {}
+                  : { authInjectionUsername: route.authInjection.username }),
+              }),
           ...(route.credentialResolver.slotKey === undefined
             ? {}
             : { slotKey: route.credentialResolver.slotKey }),

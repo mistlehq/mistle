@@ -9,6 +9,10 @@ import {
 describe("integrations-definitions index", () => {
   it("registers built-in browser-safe integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const awsDefinition = registry.getDefinition({
+      familyId: "aws",
+      variantId: "aws-cli-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -34,6 +38,30 @@ describe("integrations-definitions index", () => {
       variantId: "slack-default",
     });
 
+    expect(awsDefinition).toMatchObject({
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      kind: "connector",
+      displayName: "AWS",
+      connectionMethods: [
+        {
+          id: "aws-assume-role",
+          label: "Access key + AssumeRole",
+          kind: "form",
+          secretFields: [
+            {
+              name: "secretAccessKey",
+              label: "Secret access key",
+              inputType: "password",
+              slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(awsDefinition?.credentialResolvers).toBeUndefined();
+    expect(awsDefinition?.webhookHandler).toBeUndefined();
+    expect(awsDefinition?.webhookSource).toBeUndefined();
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
       variantId: "jira-default",
@@ -309,10 +337,11 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(6);
+    expect(definitions).toHaveLength(7);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
+      "aws::aws-cli-default",
       "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",

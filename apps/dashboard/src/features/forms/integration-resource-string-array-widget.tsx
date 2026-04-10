@@ -1,7 +1,8 @@
 import { Input } from "@mistle/ui";
 import type { RJSFSchema, WidgetProps } from "@rjsf/utils";
+import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -15,6 +16,7 @@ import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
+const SearchDebounceMs = 300;
 const IntegrationResourceSummaryOptionSchema = z
   .object({
     kind: z.string().min(1),
@@ -87,7 +89,9 @@ export function IntegrationResourceStringArrayWidget(
   const options = resolveWidgetOptions(props.options);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const [debouncedSearch] = useDebouncedValue(search, {
+    wait: SearchDebounceMs,
+  });
   const selectedHandles = resolveSelectedHandles(props.value);
 
   const resourceQuery = useQuery({
@@ -96,13 +100,13 @@ export function IntegrationResourceStringArrayWidget(
       options.connectionId,
       "resources",
       options.kind,
-      deferredSearch,
+      debouncedSearch,
     ],
     queryFn: async ({ signal }) =>
       listIntegrationConnectionResources({
         connectionId: options.connectionId,
         kind: options.kind,
-        ...(deferredSearch.length === 0 ? {} : { search: deferredSearch }),
+        ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
         signal,
       }),
     retry: false,
@@ -133,7 +137,7 @@ export function IntegrationResourceStringArrayWidget(
   const visibleItems = resourceQuery.data?.items ?? [];
   const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
-    resourceQuery.data === undefined || deferredSearch.length > 0
+    resourceQuery.data === undefined || debouncedSearch.length > 0
       ? []
       : selectedHandles.filter((handle) => !availableHandles.has(handle));
 

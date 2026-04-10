@@ -106,6 +106,13 @@ export function resolvePersistedSecretRefOrThrow(input: {
     };
   }
 
+  if (input.secretType === IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY) {
+    return {
+      secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+      slotKey: input.slotKey,
+    };
+  }
+
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN) {
     return {
       secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,

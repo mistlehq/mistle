@@ -211,6 +211,19 @@ describe("resolvePersistedSecretRefOrThrow", () => {
     });
   });
 
+  it("maps aws_secret_access_key to persisted secret kind and slot key", () => {
+    expect(
+      resolvePersistedSecretRefOrThrow({
+        slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+        secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      }),
+    ).toEqual({
+      secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+      slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+    });
+  });
+
   it("maps oauth2_client_secret to persisted secret kind and slot key", () => {
     expect(
       resolvePersistedSecretRefOrThrow({

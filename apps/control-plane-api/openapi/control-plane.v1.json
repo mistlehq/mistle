@@ -6601,7 +6601,7 @@
         }
       }
     },
-    "/v1/integration/webhooks/:targetKey/:endpointKey": {
+    "/p/integration/webhooks/:targetKey/:endpointKey": {
       "post": {
         "tags": [
           "Integrations"
@@ -7184,22 +7184,9 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/logo": {
+    "/v1/organization/logo": {
       "get": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
+        "tags": ["Organizations"],
         "responses": {
           "200": {
             "description": "Read the active organization's current logo metadata.",
@@ -7323,20 +7310,7 @@
         }
       },
       "put": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
+        "tags": ["Organizations"],
         "requestBody": {
           "required": true,
           "content": {
@@ -7507,20 +7481,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
+        "tags": ["Organizations"],
         "responses": {
           "204": {
             "description": "Delete the active organization's uploaded logo."
@@ -7620,21 +7581,12 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/logo/content": {
+    "/v1/organization/logo/content": {
       "get": {
         "tags": [
           "Organizations"
         ],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "string",
@@ -7753,22 +7705,9 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/membership-capabilities": {
+    "/v1/organization/membership-capabilities": {
       "get": {
-        "tags": [
-          "Organizations"
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
+        "tags": ["Organizations"],
         "responses": {
           "200": {
             "description": "Membership capabilities for the current actor in the organization.",
@@ -7971,21 +7910,12 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/members": {
+    "/v1/organization/members": {
       "get": {
         "tags": [
           "Organizations"
         ],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "integer",
@@ -8240,21 +8170,12 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/invitations": {
+    "/v1/organization/invitations": {
       "get": {
         "tags": [
           "Organizations"
         ],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "integer",
@@ -9041,31 +8962,91 @@
                                 "additionalProperties": false
                               },
                               "authInjection": {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "bearer",
-                                      "basic",
-                                      "header",
-                                      "query"
-                                    ]
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["bearer"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "target": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["basic"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "username": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "username": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["header"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["query"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["aws_sigv4"]
+                                      },
+                                      "service": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "region": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "service", "region"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": [
-                                  "type",
-                                  "target"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "additionalHeaders": {
                                 "type": "object",
@@ -10313,31 +10294,91 @@
                                 "additionalProperties": false
                               },
                               "authInjection": {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": [
-                                      "bearer",
-                                      "basic",
-                                      "header",
-                                      "query"
-                                    ]
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["bearer"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "target": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["basic"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "username": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "username": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["header"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["query"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["aws_sigv4"]
+                                      },
+                                      "service": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "region": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "service", "region"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": [
-                                  "type",
-                                  "target"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "additionalHeaders": {
                                 "type": "object",

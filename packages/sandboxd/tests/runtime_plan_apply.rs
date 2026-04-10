@@ -116,7 +116,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 }
 
 #[test]
-fn accepts_runtime_plan_egress_routes_with_slot_key_credential_resolvers() {
+fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_credential_resolvers() {
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
         bootstrap_token: "bootstrap-token-value".to_string(),
@@ -145,6 +145,9 @@ fn accepts_runtime_plan_egress_routes_with_slot_key_credential_resolvers() {
                 "type": "bearer",
                 "target": "authorization"
               },
+              "additionalHeaders": {
+                "chatgpt-account-id": "acct_123"
+              },
               "credentialResolver": {
                 "connectionId": "icn_test",
                 "secretType": "api_key",
@@ -161,7 +164,7 @@ fn accepts_runtime_plan_egress_routes_with_slot_key_credential_resolvers() {
     };
 
     runtime::apply_runtime_plan(&startup_input)
-        .expect("runtime plan apply should accept slotKey credential resolvers");
+        .expect("runtime plan apply should accept additionalHeaders and slotKey resolvers");
 }
 
 fn create_git_repository(path: &Path) {

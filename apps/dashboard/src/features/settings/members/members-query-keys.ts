@@ -4,10 +4,10 @@ export type MembersQueryKeys = {
   capabilities: readonly ["settings", "membership-capabilities", string];
 };
 
-export function buildMembersQueryKeys(organizationId: string): MembersQueryKeys {
+export function buildMembersQueryKeys(activeOrganizationId: string): MembersQueryKeys {
   return {
-    members: ["settings", "members-directory", organizationId],
-    invitations: ["settings", "invitations-directory", organizationId],
-    capabilities: ["settings", "membership-capabilities", organizationId],
+    members: ["settings", "members-directory", activeOrganizationId],
+    invitations: ["settings", "invitations-directory", activeOrganizationId],
+    capabilities: ["settings", "membership-capabilities", activeOrganizationId],
   };
 }

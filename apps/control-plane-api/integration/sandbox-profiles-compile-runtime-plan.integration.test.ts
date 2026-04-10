@@ -10,6 +10,8 @@ import {
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   createOpenAiRawBindingCapabilitiesByConnectionMethod,
+  OpenAiChatGptBaseUrl,
+  OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
   OpenAiConnectionMethodIds,
 } from "@mistle/integrations-definitions";
@@ -198,6 +200,9 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain("supports_websockets = false");
     expect(configContent).toContain('[projects."/"]');
     expect(configContent).toContain('trust_level = "trusted"');
+    expect(configContent).toContain("[features]");
+    expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("plugins = false");
   });
 
   it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({
@@ -281,13 +286,18 @@ describe("sandbox profile compile runtime plan integration", () => {
       },
     );
 
-    expect(runtimePlan.egressRoutes[0]?.upstream.baseUrl).toBe(OpenAiChatGptResponsesApiBaseUrl);
+    expect(runtimePlan.egressRoutes[0]?.upstream.baseUrl).toBe(OpenAiChatGptOriginBaseUrl);
+    expect(runtimePlan.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
     expect(runtimePlan.egressRoutes[0]?.additionalHeaders).toEqual({
       "ChatGPT-Account-ID": "acct_123",
     });
 
     const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain(`base_url = "${OpenAiChatGptResponsesApiBaseUrl}"`);
+    expect(configContent).toContain(`chatgpt_base_url = "${OpenAiChatGptBaseUrl}"`);
+    expect(configContent).toContain("[features]");
+    expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("plugins = false");
   });
 
   it("omits optional github and jira cli artifacts when bindings do not select tools", async ({

@@ -23,10 +23,12 @@ export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
   OAUTH2_AUTHORIZATION_CODE: IntegrationConnectionMethodId;
   GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
+  AWS_ASSUME_ROLE: IntegrationConnectionMethodId;
 } = {
   API_KEY: "api-key",
   OAUTH2_AUTHORIZATION_CODE: "oauth2-authorization-code",
   GITHUB_APP_INSTALLATION: "github-app-installation",
+  AWS_ASSUME_ROLE: "aws-assume-role",
 };
 
 export function createOAuth2AuthorizationCodeCredentialSlotKeys(input: {
@@ -496,10 +498,23 @@ export type IntegrationCredentialResolverInput = {
   slotKey?: string;
 };
 
-export type IntegrationCredentialResolverResult = {
+export type IntegrationCredentialResolverValueResult = {
+  kind: "value";
   value: string;
-  expiresAt?: string;
+  expiresAt?: string | undefined;
 };
+
+export type IntegrationCredentialResolverAwsSessionResult = {
+  kind: "aws_session";
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken: string;
+  expiresAt: string;
+};
+
+export type IntegrationCredentialResolverResult =
+  | IntegrationCredentialResolverValueResult
+  | IntegrationCredentialResolverAwsSessionResult;
 
 export type IntegrationCredentialResolver = {
   resolve(
@@ -972,15 +987,33 @@ export type EgressCredentialRoute = {
   upstream: {
     baseUrl: string;
   };
-  authInjection: {
-    type: "bearer" | "basic" | "header" | "query";
-    target: string;
-    /**
-     * Optional fixed username used when the upstream expects Basic auth in the
-     * form of username:secret rather than just a secret value.
-     */
-    username?: string;
-  };
+  authInjection:
+    | {
+        type: "bearer";
+        target: string;
+      }
+    | {
+        type: "basic";
+        target: string;
+        /**
+         * Optional fixed username used when the upstream expects Basic auth in the
+         * form of username:secret rather than just a secret value.
+         */
+        username?: string;
+      }
+    | {
+        type: "header";
+        target: string;
+      }
+    | {
+        type: "query";
+        target: string;
+      }
+    | {
+        type: "aws_sigv4";
+        service: string;
+        region: string;
+      };
   additionalHeaders?: Readonly<Record<string, string>>;
   credentialResolver: EgressCredentialResolverRef;
 };

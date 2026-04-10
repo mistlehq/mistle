@@ -39,6 +39,8 @@ pub const DEFAULT_CODEX_PROXY_ACCEPT_POLL_INTERVAL: Duration = Duration::from_mi
 pub const DEFAULT_CODEX_PROXY_SOCKET_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Delay before the monitor reconnects after a dropped raw app-server connection.
 pub const DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL: Duration = Duration::from_millis(100);
+/// The Codex client identity accepted by ChatGPT-backed OpenAI endpoints.
+pub const CODEX_INITIALIZE_CLIENT_NAME: &str = "codex_cli_rs";
 
 /// Describes why Codex proxy startup, relay, or monitor handling failed.
 #[derive(Debug)]
@@ -448,7 +450,7 @@ pub fn run_codex_monitor_session(
             "id": 1,
             "params": {
                 "clientInfo": {
-                    "name": "mistle_sandboxd",
+                    "name": CODEX_INITIALIZE_CLIENT_NAME,
                     "title": "Mistle sandboxd Codex monitor",
                     "version": "0.0.0"
                 }

@@ -1,5 +1,6 @@
+import { useDebouncer } from "@tanstack/react-pacer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
@@ -17,13 +18,15 @@ import type { OrganizationMembersSettingsPageViewModel } from "./organization-me
 import { useMembersMutations } from "./use-members-mutations.js";
 
 type UseOrganizationMembersSettingsState = {
-  organizationId: string;
+  activeOrganizationId: string;
   api?: MembersSettingsApi;
 };
 
 type UseOrganizationMembersSettingsStateResult = {
   viewModel: OrganizationMembersSettingsPageViewModel;
 };
+
+const SearchDebounceMs = 300;
 
 export function resolvePostInviteDirectoryState(): {
   activeFilter: MembersDirectoryFilter;
@@ -51,38 +54,65 @@ export function useOrganizationMembersSettingsState(
   const [invitationActionState, setInvitationActionState] =
     useState<MembersDirectoryInvitationActionState>(null);
   const [roleUpdateErrorMessage, setRoleUpdateErrorMessage] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("members");
-  const [searchValue, setSearchValue] = useState("");
-  const [offset, setOffset] = useState(0);
+  const [searchInputValue, setSearchInputValue] = useState("");
+  const searchInputValueRef = useRef(searchInputValue);
+  const [directoryQueryInput, setDirectoryQueryInput] = useState<{
+    activeFilter: MembersDirectoryFilter;
+    offset: number;
+    searchValue: string;
+  }>({
+    activeFilter: "members",
+    offset: 0,
+    searchValue: "",
+  });
+  const { activeFilter, offset, searchValue: querySearchValue } = directoryQueryInput;
 
-  const queryKeys = buildMembersQueryKeys(input.organizationId);
+  useEffect(() => {
+    searchInputValueRef.current = searchInputValue;
+  }, [searchInputValue]);
+
+  const searchDebouncer = useDebouncer(
+    (nextValue: string) => {
+      setDirectoryQueryInput((currentValue) => {
+        if (currentValue.searchValue === nextValue && currentValue.offset === 0) {
+          return currentValue;
+        }
+
+        return {
+          ...currentValue,
+          offset: 0,
+          searchValue: nextValue,
+        };
+      });
+    },
+    {
+      wait: SearchDebounceMs,
+    },
+  );
+
+  const queryKeys = buildMembersQueryKeys(input.activeOrganizationId);
   const capabilitiesQuery = useQuery({
     queryKey: queryKeys.capabilities,
-    queryFn: async () =>
-      api.getMembershipCapabilities({
-        organizationId: input.organizationId,
-      }),
+    queryFn: async () => api.getMembershipCapabilities(),
   });
   const membersQuery = useQuery({
-    queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, searchValue],
+    queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, querySearchValue],
     queryFn: async () =>
       api.listMembersPage({
-        organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
         offset,
-        search: searchValue,
+        search: querySearchValue,
       }),
     enabled: activeFilter === "members",
     retry: false,
   });
   const invitationsQuery = useQuery({
-    queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, searchValue],
+    queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, querySearchValue],
     queryFn: async () =>
       api.listInvitationsPage({
-        organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
         offset,
-        search: searchValue,
+        search: querySearchValue,
       }),
     enabled: activeFilter === "invitations",
     retry: false,
@@ -94,7 +124,7 @@ export function useOrganizationMembersSettingsState(
     membersQuery,
   });
   const mutations = useMembersMutations({
-    organizationId: input.organizationId,
+    activeOrganizationId: input.activeOrganizationId,
     api,
     queryClient,
     queryKeys,
@@ -109,13 +139,22 @@ export function useOrganizationMembersSettingsState(
     capabilitiesQuery.isError || !canManageInvitations(directoryQueryState.capabilities);
 
   useEffect(() => {
+    if (directoryQueryState.activeListQuery.data === undefined) {
+      return;
+    }
+
     const nextOffset = clampMembersDirectoryOffset({
       limit: membersDirectoryPageLimit,
       offset,
       total: directoryQueryState.total,
     });
     if (nextOffset !== offset) {
-      setOffset(nextOffset);
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: nextOffset,
+        };
+      });
     }
   }, [directoryQueryState.total, offset]);
 
@@ -156,21 +195,39 @@ export function useOrganizationMembersSettingsState(
     },
     onInviteCompleted: async () => {
       const nextState = resolvePostInviteDirectoryState();
-      setActiveFilter(nextState.activeFilter);
-      setSearchValue(nextState.searchValue);
-      setOffset(nextState.offset);
+      searchDebouncer.cancel();
+      setSearchInputValue(nextState.searchValue);
+      searchInputValueRef.current = nextState.searchValue;
+      setDirectoryQueryInput(nextState);
       await mutations.onInviteCompleted();
     },
     onInviteDialogOpenChange: setInviteDialogOpen,
     onFilterChange: (nextValue) => {
-      setActiveFilter(nextValue);
-      setOffset(0);
+      searchDebouncer.cancel();
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          activeFilter: nextValue,
+          offset: 0,
+          searchValue: searchInputValueRef.current,
+        };
+      });
     },
     onNextPage: () => {
-      setOffset((currentValue) => currentValue + membersDirectoryPageLimit);
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: currentValue.offset + membersDirectoryPageLimit,
+        };
+      });
     },
     onPreviousPage: () => {
-      setOffset((currentValue) => Math.max(currentValue - membersDirectoryPageLimit, 0));
+      setDirectoryQueryInput((currentValue) => {
+        return {
+          ...currentValue,
+          offset: Math.max(currentValue.offset - membersDirectoryPageLimit, 0),
+        };
+      });
     },
     onRemoveMember: mutations.onRemoveMember,
     onResendInvite: mutations.onResendInvite,
@@ -207,15 +264,16 @@ export function useOrganizationMembersSettingsState(
     },
     onSaveRole: mutations.onSaveRole,
     onSearchValueChange: (nextValue) => {
-      setSearchValue(nextValue);
-      setOffset(0);
+      searchInputValueRef.current = nextValue;
+      setSearchInputValue(nextValue);
+      searchDebouncer.maybeExecute(nextValue);
     },
-    organizationId: input.organizationId,
+    activeOrganizationId: input.activeOrganizationId,
     offset,
     pendingMemberOperation,
     roleChangeDialog,
     roleUpdateErrorMessage,
-    searchValue,
+    searchValue: searchInputValue,
     total: directoryQueryState.total,
   };
 

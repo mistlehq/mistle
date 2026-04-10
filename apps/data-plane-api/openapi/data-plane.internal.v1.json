@@ -142,23 +142,91 @@
                               "additionalProperties": false
                             },
                             "authInjection": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "enum": ["bearer", "basic", "header", "query"]
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["bearer"]
+                                    },
+                                    "target": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["type", "target"],
+                                  "additionalProperties": false
                                 },
-                                "target": {
-                                  "type": "string",
-                                  "minLength": 1
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["basic"]
+                                    },
+                                    "target": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "username": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["type", "target"],
+                                  "additionalProperties": false
                                 },
-                                "username": {
-                                  "type": "string",
-                                  "minLength": 1
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["header"]
+                                    },
+                                    "target": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["type", "target"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["query"]
+                                    },
+                                    "target": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["type", "target"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "type": "string",
+                                      "enum": ["aws_sigv4"]
+                                    },
+                                    "service": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "region": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["type", "service", "region"],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": ["type", "target"],
-                              "additionalProperties": false
+                              ]
                             },
                             "additionalHeaders": {
                               "type": "object",
@@ -1270,23 +1338,91 @@
                                 "additionalProperties": false
                               },
                               "authInjection": {
-                                "type": "object",
-                                "properties": {
-                                  "type": {
-                                    "type": "string",
-                                    "enum": ["bearer", "basic", "header", "query"]
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["bearer"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "target": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["basic"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "username": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
                                   },
-                                  "username": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["header"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["query"]
+                                      },
+                                      "target": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "target"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "enum": ["aws_sigv4"]
+                                      },
+                                      "service": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "region": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["type", "service", "region"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": ["type", "target"],
-                                "additionalProperties": false
+                                ]
                               },
                               "additionalHeaders": {
                                 "type": "object",

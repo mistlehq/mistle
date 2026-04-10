@@ -76,7 +76,13 @@ function normalizeAdditionalHeaders(
 }
 
 export function parseAuthInjectionType(value: unknown): EgressGrantAuthInjectionType | undefined {
-  if (value === "bearer" || value === "basic" || value === "header" || value === "query") {
+  if (
+    value === "bearer" ||
+    value === "basic" ||
+    value === "header" ||
+    value === "query" ||
+    value === "aws_sigv4"
+  ) {
     return value;
   }
 
@@ -90,7 +96,7 @@ export function isStringArray(value: unknown): value is string[] {
 function requireClaim(
   value: string | undefined,
   code: EgressGrantErrorCodeType,
-  claimName: keyof EgressGrantClaims,
+  claimName: string,
 ): string {
   const normalized = toNonEmptyString(value);
   if (normalized === undefined) {
@@ -141,8 +147,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
 
   const slotKey = toNonEmptyString(input.slotKey);
   const resolverKey = toNonEmptyString(input.resolverKey);
-
-  return {
+  const baseClaims = {
     sub: requireClaim(input.sub, EgressGrantErrorCode.SUBJECT_REQUIRED, "sub"),
     jti: requireClaim(input.jti, EgressGrantErrorCode.JTI_REQUIRED, "jti"),
     bindingId: requireClaim(input.bindingId, EgressGrantErrorCode.BINDING_ID_REQUIRED, "bindingId"),
@@ -161,17 +166,40 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       EgressGrantErrorCode.UPSTREAM_BASE_URL_REQUIRED,
       "upstreamBaseUrl",
     ),
+    ...(slotKey === undefined ? {} : { slotKey }),
+    ...(resolverKey === undefined ? {} : { resolverKey }),
+    ...(allowedMethods === undefined ? {} : { allowedMethods }),
+    ...(allowedPathPrefixes === undefined ? {} : { allowedPathPrefixes }),
+  };
+
+  if (authInjectionType === "aws_sigv4") {
+    return {
+      ...baseClaims,
+      authInjectionType,
+      authInjectionService: requireClaim(
+        input.authInjectionService,
+        EgressGrantErrorCode.AUTH_INJECTION_SERVICE_REQUIRED,
+        "authInjectionService",
+      ),
+      authInjectionRegion: requireClaim(
+        input.authInjectionRegion,
+        EgressGrantErrorCode.AUTH_INJECTION_REGION_REQUIRED,
+        "authInjectionRegion",
+      ),
+    };
+  }
+
+  return {
+    ...baseClaims,
     authInjectionType,
     authInjectionTarget: requireClaim(
       input.authInjectionTarget,
       EgressGrantErrorCode.AUTH_INJECTION_TARGET_REQUIRED,
       "authInjectionTarget",
     ),
-    ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
     ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
-    ...(slotKey === undefined ? {} : { slotKey }),
-    ...(resolverKey === undefined ? {} : { resolverKey }),
-    ...(allowedMethods === undefined ? {} : { allowedMethods }),
-    ...(allowedPathPrefixes === undefined ? {} : { allowedPathPrefixes }),
+    ...(authInjectionType !== "basic" || authInjectionUsername === undefined
+      ? {}
+      : { authInjectionUsername }),
   };
 }

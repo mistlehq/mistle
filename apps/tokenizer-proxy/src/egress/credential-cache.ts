@@ -6,13 +6,22 @@ export type CredentialCacheKeyInput = {
   resolverKey?: string;
 };
 
-export type CachedCredential = {
-  value: string;
-  expiresAt?: string;
-};
+export type CachedCredential =
+  | {
+      kind: "value";
+      value: string;
+      expiresAt?: string | undefined;
+    }
+  | {
+      kind: "aws_session";
+      accessKeyId: string;
+      secretAccessKey: string;
+      sessionToken: string;
+      expiresAt: string;
+    };
 
 type CredentialCacheEntry = {
-  value: string;
+  credential: CachedCredential;
   expiresAtMs: number;
 };
 
@@ -64,7 +73,7 @@ export class CredentialCache {
     this.#now = input.now;
   }
 
-  get(input: CredentialCacheKeyInput): string | undefined {
+  get(input: CredentialCacheKeyInput): CachedCredential | undefined {
     const key = toCacheKey(input);
     const entry = this.#entries.get(key);
     if (entry === undefined) {
@@ -78,7 +87,7 @@ export class CredentialCache {
       return undefined;
     }
 
-    return entry.value;
+    return entry.credential;
   }
 
   set(input: CredentialCacheKeyInput, credential: CachedCredential): void {
@@ -103,7 +112,7 @@ export class CredentialCache {
     }
 
     this.#entries.set(key, {
-      value: credential.value,
+      credential,
       expiresAtMs,
     });
   }

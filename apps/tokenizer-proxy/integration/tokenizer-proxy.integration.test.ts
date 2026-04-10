@@ -32,21 +32,31 @@ const IntegrationEgressGrantConfig = {
   tokenAudience: "tokenizer-proxy",
 } as const;
 
-async function mintIntegrationEgressGrant(input: {
-  egressRuleId: string;
-  upstreamBaseUrl: string;
-  bindingId: string;
-  authInjectionType: "bearer" | "basic" | "header" | "query";
-  authInjectionTarget: string;
-  authInjectionUsername?: string;
-  additionalHeaders?: Readonly<Record<string, string>>;
-  connectionId: string;
-  secretType: string;
-  slotKey?: string;
-  resolverKey?: string;
-  allowedMethods?: ReadonlyArray<string>;
-  allowedPathPrefixes?: ReadonlyArray<string>;
-}): Promise<string> {
+async function mintIntegrationEgressGrant(
+  input: {
+    egressRuleId: string;
+    upstreamBaseUrl: string;
+    bindingId: string;
+    connectionId: string;
+    secretType: string;
+    additionalHeaders?: Readonly<Record<string, string>>;
+    slotKey?: string;
+    resolverKey?: string;
+    allowedMethods?: ReadonlyArray<string>;
+    allowedPathPrefixes?: ReadonlyArray<string>;
+  } & (
+    | {
+        authInjectionType: "bearer" | "basic" | "header" | "query";
+        authInjectionTarget: string;
+        authInjectionUsername?: string;
+      }
+    | {
+        authInjectionType: "aws_sigv4";
+        authInjectionService: string;
+        authInjectionRegion: string;
+      }
+  ),
+): Promise<string> {
   return await mintEgressGrant({
     config: IntegrationEgressGrantConfig,
     claims: {
@@ -57,13 +67,20 @@ async function mintIntegrationEgressGrant(input: {
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,
       authInjectionType: input.authInjectionType,
-      authInjectionTarget: input.authInjectionTarget,
-      ...(input.authInjectionUsername === undefined
-        ? {}
-        : { authInjectionUsername: input.authInjectionUsername }),
       ...(input.additionalHeaders === undefined
         ? {}
         : { additionalHeaders: input.additionalHeaders }),
+      ...("authInjectionTarget" in input
+        ? {
+            authInjectionTarget: input.authInjectionTarget,
+            ...(input.authInjectionUsername === undefined
+              ? {}
+              : { authInjectionUsername: input.authInjectionUsername }),
+          }
+        : {
+            authInjectionService: input.authInjectionService,
+            authInjectionRegion: input.authInjectionRegion,
+          }),
       ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
       ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
       ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
@@ -102,7 +119,7 @@ function writeJson(response: ServerResponse, statusCode: number, body: unknown):
 async function startControlPlaneCredentialServer(input: {
   host: string;
   serviceToken: string;
-  credentialValue: string;
+  credentialValue?: string;
   statusCode?: number;
   responseBody?: unknown;
 }): Promise<StartedControlPlaneCredentialServer> {
@@ -141,7 +158,8 @@ async function startControlPlaneCredentialServer(input: {
       response,
       input.statusCode ?? 200,
       input.responseBody ?? {
-        value: input.credentialValue,
+        kind: "value",
+        value: input.credentialValue ?? "test-secret",
       },
     );
   });
@@ -221,6 +239,7 @@ async function startGzipUpstream(input: {
 
 async function startWebSocketUpstream(input: { host: string; path: string }): Promise<{
   baseUrl: string;
+  capturedHeaders: () => Readonly<Record<string, string | ReadonlyArray<string>>> | undefined;
   capturedAuthorizationHeader: () => string | undefined;
   capturedChatGptAccountIdHeader: () => string | undefined;
   stop: () => Promise<void>;
@@ -228,6 +247,7 @@ async function startWebSocketUpstream(input: { host: string; path: string }): Pr
   const port = await reserveAvailablePort({ host: input.host });
   let authorizationHeader: string | undefined;
   let chatGptAccountIdHeader: string | undefined;
+  let capturedHeaders: Readonly<Record<string, string | ReadonlyArray<string>>> | undefined;
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url === input.path) {
@@ -245,6 +265,16 @@ async function startWebSocketUpstream(input: { host: string; path: string }): Pr
       socket.destroy();
       return;
     }
+
+    capturedHeaders = Object.fromEntries(
+      Object.entries(request.headers).flatMap(([headerName, headerValue]) => {
+        if (headerValue === undefined) {
+          return [];
+        }
+
+        return [[headerName, Array.isArray(headerValue) ? [...headerValue] : headerValue] as const];
+      }),
+    );
 
     authorizationHeader =
       typeof request.headers.authorization === "string"
@@ -278,6 +308,7 @@ async function startWebSocketUpstream(input: { host: string; path: string }): Pr
 
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
+    capturedHeaders: () => capturedHeaders,
     capturedAuthorizationHeader: () => authorizationHeader,
     capturedChatGptAccountIdHeader: () => chatGptAccountIdHeader,
     stop: async () => {
@@ -727,6 +758,83 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
+  it("strips proxy forwarding headers before forwarding HTTP egress upstream", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "sk-live-proxy",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_openai_http_forwarded",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      slotKey: "openai.openai-default.api-key.api-key",
+      resolverKey: "default",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/backend-api/codex"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/backend-api/codex/responses`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "cf-ray": "test-cf-ray",
+            "cdn-loop": "cloudflare; loops=1",
+            forwarded: "for=203.0.113.1;proto=https",
+            "x-forwarded-for": "203.0.113.1",
+            "x-forwarded-proto": "https",
+            "x-real-ip": "203.0.113.1",
+          },
+          body: JSON.stringify({ model: "gpt-5.4" }),
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed response headers.");
+      }
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer sk-live-proxy");
+      expect(readHeaderValue(body.headers, "chatgpt-account-id")).toBe("acct_from_grant");
+      expect(readHeaderValue(body.headers, "cf-ray")).toBeUndefined();
+      expect(readHeaderValue(body.headers, "cdn-loop")).toBeUndefined();
+      expect(readHeaderValue(body.headers, "forwarded")).toBeUndefined();
+      expect(readHeaderValue(body.headers, "x-forwarded-for")).toBeUndefined();
+      expect(readHeaderValue(body.headers, "x-forwarded-proto")).toBeUndefined();
+      expect(readHeaderValue(body.headers, "x-real-ip")).toBeUndefined();
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
   it("strips stale compression headers after forwarding a transparently decompressed upstream body", async () => {
     const upstreamService = await startGzipUpstream({
       host: "127.0.0.1",
@@ -795,6 +903,99 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
+  it("signs aws sigv4 requests with temporary session credentials", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      responseBody: {
+        kind: "aws_session",
+        accessKeyId: "ASIAEXAMPLEACCESS",
+        secretAccessKey: "example-secret-access-key",
+        sessionToken: "example-session-token",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_aws_sm",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_aws",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "secretsmanager",
+      authInjectionRegion: "us-east-1",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      resolverKey: "assume-role-session",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      for (const requestIndex of [1, 2]) {
+        const response = await fetch(`http://${host}:${String(port)}/tokenizer-proxy/egress/`, {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            requestIndex,
+          }),
+        });
+        const body: unknown = await response.json();
+
+        expect(response.status).toBe(200);
+        if (typeof body !== "object" || body === null || !("headers" in body)) {
+          throw new Error("Expected echoed response headers.");
+        }
+
+        const authorizationHeader = readHeaderValue(body.headers, "authorization");
+        if (authorizationHeader === undefined) {
+          throw new Error("Expected SigV4 authorization header.");
+        }
+        expect(authorizationHeader).toContain("AWS4-HMAC-SHA256");
+        expect(authorizationHeader).toContain("Credential=ASIAEXAMPLEACCESS/");
+        expect(authorizationHeader).toContain("/us-east-1/secretsmanager/aws4_request");
+        expect(authorizationHeader).toContain("SignedHeaders=");
+        expect(authorizationHeader).toContain("host");
+        expect(authorizationHeader).toContain("x-amz-content-sha256");
+        expect(authorizationHeader).toContain("x-amz-date");
+        expect(authorizationHeader).toContain("x-amz-security-token");
+        expect(readHeaderValue(body.headers, "x-amz-security-token")).toBe("example-session-token");
+        expect(readHeaderValue(body.headers, "x-amz-date")).toBeDefined();
+        expect(readHeaderValue(body.headers, "x-amz-content-sha256")).toBeDefined();
+      }
+
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_aws",
+          connectionId: "icn_aws",
+          resolverKey: "assume-role-session",
+          secretType: "aws_secret_access_key",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 15_000);
+
   it("forwards websocket upgrades to the upstream with injected auth and fixed headers", async () => {
     const upstreamService = await startWebSocketUpstream({
       host: "127.0.0.1",
@@ -846,12 +1047,24 @@ describe("tokenizer proxy integration", () => {
         headers: {
           [EgressRequestHeaders.GRANT]: egressGrant,
           "ChatGPT-Account-ID": "acct_from_request",
+          "cf-ray": "test-cf-ray",
+          "cdn-loop": "cloudflare; loops=1",
+          forwarded: "for=203.0.113.1;proto=https",
+          "x-forwarded-for": "203.0.113.1",
+          "x-forwarded-proto": "https",
+          "x-real-ip": "203.0.113.1",
         },
       });
 
       expect(message).toBe("pong\n");
       expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer sk-live-proxy");
       expect(upstreamService.capturedChatGptAccountIdHeader()).toBe("acct_from_grant");
+      expect(upstreamService.capturedHeaders()?.["cf-ray"]).toBeUndefined();
+      expect(upstreamService.capturedHeaders()?.["cdn-loop"]).toBeUndefined();
+      expect(upstreamService.capturedHeaders()?.forwarded).toBeUndefined();
+      expect(upstreamService.capturedHeaders()?.["x-forwarded-for"]).toBeUndefined();
+      expect(upstreamService.capturedHeaders()?.["x-forwarded-proto"]).toBeUndefined();
+      expect(upstreamService.capturedHeaders()?.["x-real-ip"]).toBeUndefined();
       expect(controlPlaneServer.requests).toEqual([
         {
           bindingId: "ibd_openai",

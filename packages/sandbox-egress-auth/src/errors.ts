@@ -1,5 +1,3 @@
-import type { EgressGrantClaims } from "./types.js";
-
 export const EgressGrantErrorCode = {
   TOKEN_REQUIRED: "TOKEN_REQUIRED",
   SUBJECT_REQUIRED: "SUBJECT_REQUIRED",
@@ -10,6 +8,8 @@ export const EgressGrantErrorCode = {
   UPSTREAM_BASE_URL_REQUIRED: "UPSTREAM_BASE_URL_REQUIRED",
   AUTH_INJECTION_TYPE_REQUIRED: "AUTH_INJECTION_TYPE_REQUIRED",
   AUTH_INJECTION_TARGET_REQUIRED: "AUTH_INJECTION_TARGET_REQUIRED",
+  AUTH_INJECTION_SERVICE_REQUIRED: "AUTH_INJECTION_SERVICE_REQUIRED",
+  AUTH_INJECTION_REGION_REQUIRED: "AUTH_INJECTION_REGION_REQUIRED",
   AUTH_INJECTION_USERNAME_INVALID: "AUTH_INJECTION_USERNAME_INVALID",
   ADDITIONAL_HEADERS_INVALID: "ADDITIONAL_HEADERS_INVALID",
   ALLOWED_METHODS_INVALID: "ALLOWED_METHODS_INVALID",
@@ -40,10 +40,7 @@ export class EgressGrantError extends Error {
   }
 }
 
-export function missingClaimError(
-  code: EgressGrantErrorCode,
-  claimName: keyof EgressGrantClaims,
-): EgressGrantError {
+export function missingClaimError(code: EgressGrantErrorCode, claimName: string): EgressGrantError {
   return new EgressGrantError({
     code,
     message: `Egress grant ${claimName} claim is required.`,

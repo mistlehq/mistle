@@ -236,6 +236,30 @@ describe("integrations page view model", () => {
     expect(item?.authMethodLabel).toBe("Bot token");
   });
 
+  it("builds detail items for AWS assume-role connections", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_aws_123",
+          targetKey: "aws-cli-default",
+          displayName: "AWS engineering",
+          status: "active",
+          config: {
+            connection_method: "aws-assume-role",
+            accessKeyId: "AKIAEXAMPLE",
+            roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authMethodId).toBe("aws-assume-role");
+    expect(item?.authMethodLabel).toBe("Access key + AssumeRole");
+  });
+
   it("marks pre-install GitHub App connections as setup incomplete", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
@@ -279,6 +303,18 @@ describe("integrations page view model", () => {
         value: "Pending",
       },
     ]);
+  });
+
+  it("resolves aws-assume-role as an editable connection method", () => {
+    expect(
+      resolveEditableConnectionMethodId({
+        id: "icn_aws_123",
+        targetKey: "aws-cli-default",
+        config: {
+          connection_method: "aws-assume-role",
+        },
+      }),
+    ).toBe("aws-assume-role");
   });
 
   it("includes GitHub App installation mutation state in detail items", () => {

@@ -18,7 +18,7 @@ Core route families in control-plane-api:
 
 - `/v1/integration/targets`
 - `/v1/integration/connections`
-- `/v1/integration/webhooks`
+- `/p/integration/webhooks`
 
 ## Personas And Ownership
 

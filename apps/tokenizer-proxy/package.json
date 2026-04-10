@@ -22,6 +22,9 @@
     "@mistle/sandbox-egress-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
+    "@smithy/hash-node": "^4.2.13",
+    "@smithy/protocol-http": "^5.3.13",
+    "@smithy/signature-v4": "^5.3.13",
     "hono": "^4.12.9"
   },
   "devDependencies": {

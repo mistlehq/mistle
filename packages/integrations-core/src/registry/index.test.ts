@@ -195,6 +195,7 @@ describe("integration registry", () => {
         custom: {
           github_installation_token: {
             resolve: async (input) => ({
+              kind: "value",
               value: `${input.connectionId}:${input.secretType}`,
             }),
           },
@@ -347,7 +348,7 @@ describe("integration registry", () => {
         async describeSource(input) {
           return {
             displayName: input.source.displayName ?? "GitHub App webhook",
-            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            callbackUrl: `/p/integration/webhooks/${input.targetKey}`,
             providerMetadata: input.source.providerMetadata,
           };
         },
@@ -386,7 +387,7 @@ describe("integration registry", () => {
         async describeSource(input) {
           return {
             displayName: input.source.displayName ?? "GitHub App webhook",
-            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            callbackUrl: `/p/integration/webhooks/${input.targetKey}`,
             providerMetadata: input.source.providerMetadata,
           };
         },

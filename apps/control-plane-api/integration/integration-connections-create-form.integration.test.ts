@@ -164,6 +164,104 @@ describe("integration connections create form integration", () => {
     expect(decryptedApiKey).toBe(requestBody.secrets.apiKey);
   });
 
+  it("creates AWS assume-role connections", async ({ fixture }) => {
+    await upsertAwsTarget({ fixture, targetKey: "aws-cli-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-aws-assume-role@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/aws-cli-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "AWS assume role",
+        methodId: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAEXAMPLE",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+          externalId: "mistle-external-id",
+          durationSeconds: 3600,
+        },
+        secrets: {
+          secretAccessKey: "aws-secret-access-key-value",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.targetKey).toBe("aws-cli-default");
+    expect(responseBody.displayName).toBe("AWS assume role");
+    expect(responseBody.status).toBe("active");
+    expect(responseBody.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
+      accessKeyId: "AKIAEXAMPLE",
+      roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
+      externalId: "mistle-external-id",
+      durationSeconds: 3600,
+    });
+    expect(responseBody.targetSnapshotConfig).toEqual({});
+
+    const createdLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.connectionId, responseBody.id),
+          eq(table.slotKey, "aws.aws-cli-default.aws-assume-role.secret-access-key"),
+        ),
+    });
+    expect(createdLink).toBeDefined();
+
+    if (createdLink === undefined) {
+      throw new Error("Expected AWS integration connection credential link.");
+    }
+
+    const createdCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, createdLink.credentialId),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(createdCredential).toBeDefined();
+
+    if (createdCredential === undefined) {
+      throw new Error("Expected AWS integration credential.");
+    }
+
+    expect(createdCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+    );
+    expect(createdCredential.intendedFamilyId).toBe("aws");
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.version, createdCredential.organizationCredentialKeyVersion),
+        ),
+    });
+    expect(organizationCredentialKey).toBeDefined();
+
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const decryptedSecretAccessKey = decryptStoredApiKey({
+      wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+      nonce: createdCredential.nonce,
+      ciphertext: createdCredential.ciphertext,
+    });
+
+    expect(decryptedSecretAccessKey).toBe("aws-secret-access-key-value");
+  });
+
   it("returns 404 when target does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-create-form-missing-target@example.com",
@@ -833,6 +931,30 @@ async function upsertJiraTarget(input: {
       set: {
         familyId: "jira",
         variantId: "jira-default",
+        enabled: true,
+        config: {},
+      },
+    });
+}
+
+async function upsertAwsTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "aws",
+        variantId: "aws-cli-default",
         enabled: true,
         config: {},
       },

@@ -4,6 +4,8 @@ import {
   classifyOpenAiRefreshFailure,
   extractOpenAiRefreshFailureCode,
   parseJwtClaimsOrThrow,
+  parseOpenAiRefreshResponse,
+  parseOpenAiTokenExchangeResponse,
   resolveOpenAiDeviceAuthorizationCompletionFromTokens,
 } from "./device-authorization.js";
 
@@ -19,35 +21,31 @@ function encodeJwt(payload: Record<string, unknown>): string {
 describe("OpenAI device authorization", () => {
   it("parses jwt claims from a token payload", () => {
     const token = encodeJwt({
-      "https://api.openai.com/auth.chatgpt_account_id": "acct_123",
+      chatgpt_account_id: "acct_123",
       email: "user@example.com",
     });
 
     expect(parseJwtClaimsOrThrow(token)).toEqual({
-      "https://api.openai.com/auth.chatgpt_account_id": "acct_123",
+      chatgpt_account_id: "acct_123",
       email: "user@example.com",
     });
   });
 
   it("derives connection completion output from exchanged tokens", () => {
     const idToken = encodeJwt({
-      "https://api.openai.com/auth.chatgpt_account_id": "acct_123",
-      "https://api.openai.com/auth.chatgpt_plan_type": "pro",
+      chatgpt_account_id: "acct_123",
+      chatgpt_plan_type: "pro",
       email: "user@example.com",
-      exp: 4_102_444_800,
     });
-    const accessToken = encodeJwt({
-      exp: 4_102_444_500,
-    });
-    const refreshToken = encodeJwt({
-      exp: 4_102_445_000,
-    });
+    const accessToken = "opaque-access-token";
+    const refreshToken = "opaque-refresh-token";
 
     expect(
       resolveOpenAiDeviceAuthorizationCompletionFromTokens({
         idToken,
         accessToken,
         refreshToken,
+        accessTokenExpiresAt: "2099-12-31T23:55:00.000Z",
       }),
     ).toEqual({
       status: "completed",
@@ -61,20 +59,57 @@ describe("OpenAI device authorization", () => {
       accessToken,
       accessTokenExpiresAt: "2099-12-31T23:55:00.000Z",
       refreshToken,
-      refreshTokenExpiresAt: "2100-01-01T00:03:20.000Z",
     });
   });
 
-  it("throws when id_token is missing chatgpt_account_id", () => {
-    expect(() =>
+  it("derives connection completion output from nested OpenAI auth claims", () => {
+    const idToken = encodeJwt({
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: "acct_nested",
+        chatgpt_plan_type: "business",
+      },
+      email: "nested@example.com",
+    });
+
+    expect(
+      resolveOpenAiDeviceAuthorizationCompletionFromTokens({
+        idToken,
+        accessToken: "opaque-access-token",
+        refreshToken: "opaque-refresh-token",
+      }),
+    ).toEqual({
+      status: "completed",
+      externalSubjectId: "nested@example.com",
+      connectionConfig: {
+        connection_method: "chatgpt-device-code",
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_nested",
+        chatgpt_plan_type: "business",
+      },
+      accessToken: "opaque-access-token",
+      refreshToken: "opaque-refresh-token",
+    });
+  });
+
+  it("allows completion when id_token is missing chatgpt_account_id", () => {
+    expect(
       resolveOpenAiDeviceAuthorizationCompletionFromTokens({
         idToken: encodeJwt({
           email: "user@example.com",
         }),
-        accessToken: encodeJwt({}),
-        refreshToken: encodeJwt({}),
+        accessToken: "opaque-access-token",
+        refreshToken: "opaque-refresh-token",
       }),
-    ).toThrow("OpenAI id_token is missing https://api.openai.com/auth.chatgpt_account_id.");
+    ).toEqual({
+      status: "completed",
+      externalSubjectId: "user@example.com",
+      connectionConfig: {
+        connection_method: "chatgpt-device-code",
+        auth_mode: "chatgpt",
+      },
+      accessToken: "opaque-access-token",
+      refreshToken: "opaque-refresh-token",
+    });
   });
 
   it("extracts refresh-token failure codes from string and object error payloads", () => {
@@ -124,6 +159,41 @@ describe("OpenAI device authorization", () => {
       classification: "temporary",
       code: "server_error",
       message: "temporary outage",
+    });
+  });
+
+  it("accepts additional oauth fields on the token exchange response", () => {
+    expect(
+      parseOpenAiTokenExchangeResponse({
+        id_token: "id-token",
+        access_token: "access-token",
+        refresh_token: "refresh-token",
+        expires_in: 3600,
+        scope: "openid profile offline_access",
+        token_type: "Bearer",
+      }),
+    ).toEqual({
+      idToken: "id-token",
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresIn: 3600,
+    });
+  });
+
+  it("accepts additional oauth fields on the refresh response", () => {
+    expect(
+      parseOpenAiRefreshResponse({
+        id_token: "next-id-token",
+        access_token: "next-access-token",
+        refresh_token: "next-refresh-token",
+        expires_in: 3600,
+        scope: "openid profile offline_access",
+        token_type: "Bearer",
+      }),
+    ).toMatchObject({
+      id_token: "next-id-token",
+      access_token: "next-access-token",
+      refresh_token: "next-refresh-token",
     });
   });
 });

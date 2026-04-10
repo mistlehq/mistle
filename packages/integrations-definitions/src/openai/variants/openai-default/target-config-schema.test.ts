@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "./model-capabilities.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptBaseUrl,
+  OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
-  resolveOpenAiApiBaseUrlForConnectionMethod,
+  resolveOpenAiChatGptBaseUrlForConnectionMethod,
+  resolveOpenAiResponsesApiBaseUrlForConnectionMethod,
+  resolveOpenAiRouteBaseUrlForConnectionMethod,
 } from "./target-config-schema.js";
 
 describe("OpenAiApiKeyTargetConfigSchema", () => {
@@ -60,11 +64,26 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
     });
 
     expect(
-      resolveOpenAiApiBaseUrlForConnectionMethod({
+      resolveOpenAiRouteBaseUrlForConnectionMethod({
         targetConfig: parsed,
         connectionMethod: "api-key",
       }),
     ).toBe("https://proxy.example.com/openai-v2");
+  });
+
+  it("resolves the ChatGPT route base URL for device-code connections", () => {
+    const parsed = OpenAiApiKeyTargetConfigSchema.parse({
+      api_base_url: "https://api.openai.com/v1",
+      binding_capabilities_by_connection_method:
+        createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+    });
+
+    expect(
+      resolveOpenAiRouteBaseUrlForConnectionMethod({
+        targetConfig: parsed,
+        connectionMethod: "chatgpt-device-code",
+      }),
+    ).toBe(OpenAiChatGptOriginBaseUrl);
   });
 
   it("resolves the ChatGPT responses base URL for device-code connections", () => {
@@ -75,10 +94,18 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
     });
 
     expect(
-      resolveOpenAiApiBaseUrlForConnectionMethod({
+      resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
         targetConfig: parsed,
         connectionMethod: "chatgpt-device-code",
       }),
     ).toBe(OpenAiChatGptResponsesApiBaseUrl);
+  });
+
+  it("resolves the ChatGPT backend base URL for device-code connections", () => {
+    expect(
+      resolveOpenAiChatGptBaseUrlForConnectionMethod({
+        connectionMethod: "chatgpt-device-code",
+      }),
+    ).toBe(OpenAiChatGptBaseUrl);
   });
 });

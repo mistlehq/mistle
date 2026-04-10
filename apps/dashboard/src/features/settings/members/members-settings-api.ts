@@ -14,15 +14,13 @@ import {
 } from "./members-api.js";
 
 export type MembersSettingsApi = {
-  getMembershipCapabilities: (input: { organizationId: string }) => Promise<MembershipCapabilities>;
+  getMembershipCapabilities: () => Promise<MembershipCapabilities>;
   listMembersPage: (input: {
-    organizationId: string;
     limit: number;
     offset: number;
     search: string;
   }) => Promise<MembersPage>;
   listInvitationsPage: (input: {
-    organizationId: string;
     limit: number;
     offset: number;
     search: string;

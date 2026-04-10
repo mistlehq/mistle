@@ -434,7 +434,7 @@ describe("integration webhooks ingest integration", () => {
 
     const payloadObject = createGitHubWebhookPayload();
     const payload = JSON.stringify(payloadObject);
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
+    const response = await fixture.request(`/p/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -520,7 +520,7 @@ describe("integration webhooks ingest integration", () => {
 
     const payloadObject = createGitHubWebhookPayload();
     const payload = JSON.stringify(payloadObject);
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
+    const response = await fixture.request(`/p/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -565,7 +565,7 @@ describe("integration webhooks ingest integration", () => {
     });
 
     const payload = JSON.stringify(createGitHubWebhookPayload());
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
+    const response = await fixture.request(`/p/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -621,7 +621,7 @@ describe("integration webhooks ingest integration", () => {
     };
 
     const firstResponse = await fixture.request(
-      `/v1/integration/webhooks/${targetKey}/${endpointKey}`,
+      `/p/integration/webhooks/${targetKey}/${endpointKey}`,
       {
         method: "POST",
         headers,
@@ -635,7 +635,7 @@ describe("integration webhooks ingest integration", () => {
     expect(firstResponseBody.status).toBe("received");
 
     const secondResponse = await fixture.request(
-      `/v1/integration/webhooks/${targetKey}/${endpointKey}`,
+      `/p/integration/webhooks/${targetKey}/${endpointKey}`,
       {
         method: "POST",
         headers,
@@ -757,7 +757,7 @@ describe("integration webhooks ingest integration", () => {
     const payloadObject = createSlackMessageWebhookPayload();
     const payload = JSON.stringify(payloadObject);
     const response = await fixture.request(
-      `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+      `/p/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
       {
         method: "POST",
         headers: {
@@ -919,7 +919,7 @@ describe("integration webhooks ingest integration", () => {
       const payloadObject = createSlackReactionWebhookPayload();
       const payload = JSON.stringify(payloadObject);
       const response = await fixture.request(
-        `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+        `/p/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
         {
           method: "POST",
           headers: {
@@ -1051,7 +1051,7 @@ describe("integration webhooks ingest integration", () => {
     const payloadObject = createSlackMessageDeletedWebhookPayload();
     const payload = JSON.stringify(payloadObject);
     const response = await fixture.request(
-      `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+      `/p/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
       {
         method: "POST",
         headers: {
@@ -1161,7 +1161,7 @@ describe("integration webhooks ingest integration", () => {
     const payloadObject = createSlackUrlVerificationPayload();
     const payload = JSON.stringify(payloadObject);
     const response = await fixture.request(
-      `/v1/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
+      `/p/integration/webhooks/${targetKey}/${createdSource.endpointKey}`,
       {
         method: "POST",
         headers: {
@@ -1271,7 +1271,7 @@ describe("integration webhooks ingest integration", () => {
       siteUrl,
     });
     const payload = JSON.stringify(payloadObject);
-    const response = await fixture.request(`/v1/integration/webhooks/${targetKey}/${endpointKey}`, {
+    const response = await fixture.request(`/p/integration/webhooks/${targetKey}/${endpointKey}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",

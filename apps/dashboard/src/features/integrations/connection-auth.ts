@@ -6,6 +6,7 @@ export function resolveConnectionMethodId(
   | "github-app-installation"
   | "slack-bot-token"
   | "chatgpt-device-code"
+  | "aws-assume-role"
   | null {
   if (config === null) {
     return null;
@@ -27,6 +28,9 @@ export function resolveConnectionMethodId(
   if (connectionMethod === "chatgpt-device-code") {
     return "chatgpt-device-code";
   }
+  if (connectionMethod === "aws-assume-role") {
+    return "aws-assume-role";
+  }
   return null;
 }
 
@@ -36,7 +40,8 @@ export function formatConnectionMethodLabel(
     | "oauth2-authorization-code"
     | "github-app-installation"
     | "slack-bot-token"
-    | "chatgpt-device-code",
+    | "chatgpt-device-code"
+    | "aws-assume-role",
 ): string {
   if (connectionMethod === "api-key") {
     return "API key";
@@ -49,6 +54,9 @@ export function formatConnectionMethodLabel(
   }
   if (connectionMethod === "chatgpt-device-code") {
     return "ChatGPT subscription";
+  }
+  if (connectionMethod === "aws-assume-role") {
+    return "Access key + AssumeRole";
   }
   return "GitHub App installation";
 }

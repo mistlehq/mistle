@@ -8,22 +8,19 @@ const ORGANIZATION_LOGO_QUERY_KEY_PREFIX: readonly ["organization", "logo"] = [
 ];
 
 export function organizationLogoQueryKey(
-  organizationId: string,
+  activeOrganizationId: string,
 ): readonly ["organization", "logo", string] {
   return [
     ORGANIZATION_LOGO_QUERY_KEY_PREFIX[0],
     ORGANIZATION_LOGO_QUERY_KEY_PREFIX[1],
-    organizationId,
+    activeOrganizationId,
   ];
 }
 
-export function useOrganizationLogoQuery(organizationId: string) {
+export function useOrganizationLogoQuery(activeOrganizationId: string) {
   return useQuery({
-    queryKey: organizationLogoQueryKey(organizationId),
-    queryFn: async () =>
-      getOrganizationLogo({
-        organizationId,
-      }),
+    queryKey: organizationLogoQueryKey(activeOrganizationId),
+    queryFn: async () => getOrganizationLogo(),
     staleTime: 15 * 60 * 1000,
   });
 }
