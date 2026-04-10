@@ -1,4 +1,4 @@
-import { invitations, users } from "@mistle/db/control-plane";
+import { invitations, members, sessions, users } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -186,6 +186,86 @@ describe("organization invitations integration", () => {
         }),
       ],
       total: 1,
+    });
+  });
+
+  it("allows admins and forbids members from listing invitations", async ({ fixture }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-invitations-authorization-owner@example.com",
+    });
+    const adminSession = await fixture.authSession({
+      email: "integration-org-invitations-authorization-admin@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "integration-org-invitations-authorization-member@example.com",
+    });
+
+    await fixture.db.insert(members).values([
+      {
+        organizationId: ownerSession.organizationId,
+        userId: adminSession.userId,
+        role: "admin",
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        userId: memberSession.userId,
+        role: "member",
+      },
+    ]);
+    await fixture.db
+      .update(sessions)
+      .set({
+        activeOrganizationId: ownerSession.organizationId,
+      })
+      .where(eq(sessions.userId, adminSession.userId));
+    await fixture.db
+      .update(sessions)
+      .set({
+        activeOrganizationId: ownerSession.organizationId,
+      })
+      .where(eq(sessions.userId, memberSession.userId));
+    await fixture.db.insert(invitations).values({
+      organizationId: ownerSession.organizationId,
+      email: "authorization-check@example.com",
+      role: "member",
+      inviterId: ownerSession.userId,
+      status: "pending",
+      expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+      createdAt: new Date("2026-03-04T00:00:00.000Z"),
+    });
+
+    const adminResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      {
+        headers: {
+          cookie: adminSession.cookie,
+        },
+      },
+    );
+
+    expect(adminResponse.status).toBe(200);
+    await expect(adminResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "authorization-check@example.com",
+        }),
+      ],
+      total: 1,
+    });
+
+    const memberResponse = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/invitations?limit=25&offset=0&search=`,
+      {
+        headers: {
+          cookie: memberSession.cookie,
+        },
+      },
+    );
+
+    expect(memberResponse.status).toBe(403);
+    await expect(memberResponse.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
     });
   });
 
