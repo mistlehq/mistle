@@ -293,7 +293,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     #[cfg(target_os = "linux")]
-    use crate::time::{format_rfc3339_timestamp, testing::MutableClock};
+    use crate::time::{Clock, format_rfc3339_timestamp, testing::MutableClock};
     #[cfg(target_os = "linux")]
     use crate::tunnel::runtime_processes::{
         collect_process_entries_for_proc_root, collect_processes_snapshot,
