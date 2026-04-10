@@ -186,6 +186,10 @@ export function buildInvitationActionDescriptors(input: {
   invitationId: string;
   invitationActionState: MembersDirectoryInvitationActionState;
 }): InvitationActionDescriptor[] {
+  if (!input.canManageInvitations) {
+    return [];
+  }
+
   const invitationActionsDisabled = isInvitationActionDisabled({
     canManageInvitations: input.canManageInvitations,
     invitationId: input.invitationId,

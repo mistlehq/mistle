@@ -65,6 +65,7 @@ describe("MembersDirectoryTable", () => {
     );
 
     expect(markup).not.toContain("Member actions");
+    expect(markup).not.toContain("Actions");
   });
 
   it("shows a member action menu for each member row when actions are available", () => {
@@ -205,5 +206,56 @@ describe("MembersDirectoryTable", () => {
     expect(markup).toContain(">Invited by<");
     expect(markup).toContain(">Expires<");
     expect(markup).not.toContain(">Name<");
+  });
+
+  it("hides the invitation actions column when the actor cannot manage invitations", () => {
+    const markup = renderMembersDirectoryTable(
+      <MembersDirectoryTable
+        activeFilter="invitations"
+        capabilities={{
+          organizationId: "org_1",
+          actorRole: "member",
+          invite: {
+            canExecute: false,
+            assignableRoles: [],
+          },
+          memberRoleUpdate: {
+            canExecute: false,
+            roleTransitionMatrix: {
+              owner: [],
+              admin: [],
+              member: [],
+            },
+          },
+        }}
+        canManageInvitations={false}
+        invitations={[
+          {
+            id: "inv_1",
+            organizationId: "org_1",
+            email: "invitee@example.com",
+            role: "member",
+            inviterId: "user_1",
+            inviterName: "Owner",
+            status: "pending",
+            expiresAt: "2026-01-02T00:00:00.000Z",
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ]}
+        memberAvatarsByUserId={new Map()}
+        members={[]}
+        onChangeRole={() => {}}
+        onRemoveMember={() => {}}
+        onResendInvite={() => {}}
+        onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
+        pendingMemberOperation={null}
+        searchValue=""
+        invitationActionState={null}
+      />,
+    );
+
+    expect(markup).not.toContain("Invitation actions");
+    expect(markup).not.toContain("More actions");
   });
 });

@@ -1,6 +1,7 @@
 import type {
   MemberAvatar,
   MembershipCapabilities,
+  OrganizationRole,
   SettingsInvitation,
   SettingsMember,
 } from "../settings/members/members-api.js";
@@ -11,22 +12,67 @@ import type {
 } from "../settings/members/members-directory-model.js";
 import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
 
-export const OrganizationMembersStoryCapabilities: MembershipCapabilities = {
-  organizationId: "org_storybook",
-  actorRole: "admin",
-  invite: {
-    canExecute: true,
-    assignableRoles: ["admin", "member"],
-  },
-  memberRoleUpdate: {
-    canExecute: true,
-    roleTransitionMatrix: {
+export type OrganizationMembersStoryViewerRole = "owner" | "admin" | "member";
+
+function buildRoleTransitionMatrix(
+  viewerRole: OrganizationMembersStoryViewerRole,
+): Record<OrganizationRole, OrganizationRole[]> {
+  if (viewerRole === "owner") {
+    return {
+      owner: ["owner", "admin", "member"],
+      admin: ["owner", "admin", "member"],
+      member: ["owner", "admin", "member"],
+    };
+  }
+
+  if (viewerRole === "admin") {
+    return {
       owner: [],
       admin: ["admin", "member"],
       member: ["admin", "member"],
+    };
+  }
+
+  return {
+    owner: [],
+    admin: [],
+    member: [],
+  };
+}
+
+function buildAssignableRoles(viewerRole: OrganizationMembersStoryViewerRole): OrganizationRole[] {
+  if (viewerRole === "owner") {
+    return ["owner", "admin", "member"];
+  }
+
+  if (viewerRole === "admin") {
+    return ["admin", "member"];
+  }
+
+  return [];
+}
+
+export function createOrganizationMembersStoryCapabilities(
+  viewerRole: OrganizationMembersStoryViewerRole,
+): MembershipCapabilities {
+  const assignableRoles = buildAssignableRoles(viewerRole);
+
+  return {
+    organizationId: "org_storybook",
+    actorRole: viewerRole,
+    invite: {
+      canExecute: assignableRoles.length > 0,
+      assignableRoles,
     },
-  },
-};
+    memberRoleUpdate: {
+      canExecute: viewerRole === "owner" || viewerRole === "admin",
+      roleTransitionMatrix: buildRoleTransitionMatrix(viewerRole),
+    },
+  };
+}
+
+export const OrganizationMembersStoryCapabilities: MembershipCapabilities =
+  createOrganizationMembersStoryCapabilities("admin");
 
 export const OrganizationMembersStoryMembers: SettingsMember[] = [
   {
@@ -115,8 +161,10 @@ export function createOrganizationMembersStoryRoleChangeDialog(
 }
 
 export function createOrganizationMembersSettingsPageStoryViewModel(
-  overrides: Partial<OrganizationMembersSettingsPageViewModel> = {},
+  input?: Partial<OrganizationMembersSettingsPageViewModel>,
 ): OrganizationMembersSettingsPageViewModel {
+  const overrides = input ?? {};
+  const viewerRole: OrganizationMembersStoryViewerRole = "admin";
   const invitationActionState: MembersDirectoryInvitationActionState =
     overrides.invitationActionState ?? null;
   const pendingMemberOperation: MembersDirectoryPendingMemberOperation =
@@ -134,7 +182,7 @@ export function createOrganizationMembersSettingsPageStoryViewModel(
 
   return {
     activeFilter,
-    capabilities: overrides.capabilities ?? OrganizationMembersStoryCapabilities,
+    capabilities: overrides.capabilities ?? createOrganizationMembersStoryCapabilities(viewerRole),
     capabilitiesErrorMessage: overrides.capabilitiesErrorMessage ?? null,
     hasNextPage: overrides.hasNextPage ?? false,
     hasPreviousPage: overrides.hasPreviousPage ?? false,
@@ -142,7 +190,9 @@ export function createOrganizationMembersSettingsPageStoryViewModel(
     invitations,
     inviteDialogOpen: overrides.inviteDialogOpen ?? false,
     inviteMemberRequest: overrides.inviteMemberRequest ?? inviteOrganizationMemberStoryRequest,
-    inviteMembersDisabled: overrides.inviteMembersDisabled ?? false,
+    inviteMembersDisabled:
+      overrides.inviteMembersDisabled ??
+      !createOrganizationMembersStoryCapabilities(viewerRole).invite.canExecute,
     isLoading: overrides.isLoading ?? false,
     isListFetching: overrides.isListFetching ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
@@ -173,4 +223,21 @@ export function createOrganizationMembersSettingsPageStoryViewModel(
     searchValue: overrides.searchValue ?? "",
     total: overrides.total ?? members.length + invitations.length,
   };
+}
+
+export function createOrganizationMembersSettingsPageStoryRoleViewModel(
+  input: {
+    viewerRole?: OrganizationMembersStoryViewerRole;
+    overrides?: Partial<OrganizationMembersSettingsPageViewModel>;
+  } = {},
+): OrganizationMembersSettingsPageViewModel {
+  return createOrganizationMembersSettingsPageStoryViewModel({
+    ...input.overrides,
+    capabilities:
+      input.overrides?.capabilities ??
+      createOrganizationMembersStoryCapabilities(input.viewerRole ?? "admin"),
+    inviteMembersDisabled:
+      input.overrides?.inviteMembersDisabled ??
+      !createOrganizationMembersStoryCapabilities(input.viewerRole ?? "admin").invite.canExecute,
+  });
 }

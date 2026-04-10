@@ -96,6 +96,7 @@ export function DirectoryTableRow(input: {
   showStatusColumn: boolean;
   showInvitedByColumn: boolean;
   showExpiresColumn: boolean;
+  showActionsColumn: boolean;
   date: string;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
@@ -137,16 +138,18 @@ export function DirectoryTableRow(input: {
       {input.showExpiresColumn ? (
         <TableCell className="whitespace-nowrap">{input.expiresAt}</TableCell>
       ) : null}
-      <TableCell className="whitespace-nowrap">
-        <MembersTableActions
-          actionFeedback={input.actionFeedback}
-          actions={input.actions}
-          triggerLabel={input.actionsLabel}
-          {...(input.actionsContentClassName === undefined
-            ? {}
-            : { contentClassName: input.actionsContentClassName })}
-        />
-      </TableCell>
+      {input.showActionsColumn ? (
+        <TableCell className="whitespace-nowrap">
+          <MembersTableActions
+            actionFeedback={input.actionFeedback}
+            actions={input.actions}
+            triggerLabel={input.actionsLabel}
+            {...(input.actionsContentClassName === undefined
+              ? {}
+              : { contentClassName: input.actionsContentClassName })}
+          />
+        </TableCell>
+      ) : null}
     </TableRow>
   );
 }

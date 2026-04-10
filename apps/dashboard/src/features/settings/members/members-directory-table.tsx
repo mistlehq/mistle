@@ -54,6 +54,9 @@ export function MembersDirectoryTable(input: {
       onRevokeInvite: input.onRevokeInvite,
     },
   });
+  const showActionsColumn = tableRows.some(
+    (row) => row.actions.length > 0 || row.actionFeedback !== null,
+  );
 
   return (
     <>
@@ -95,9 +98,11 @@ export function MembersDirectoryTable(input: {
                 Expires
               </TableHead>
             ) : null}
-            <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-              <span className="sr-only">Actions</span>
-            </TableHead>
+            {showActionsColumn ? (
+              <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -105,7 +110,7 @@ export function MembersDirectoryTable(input: {
             <TableRow>
               <TableCell
                 className="text-muted-foreground"
-                colSpan={input.activeFilter === "members" ? 5 : 7}
+                colSpan={(input.activeFilter === "members" ? 4 : 6) + (showActionsColumn ? 1 : 0)}
               >
                 {input.searchValue.length > 0
                   ? "No rows match the current search."
@@ -129,6 +134,7 @@ export function MembersDirectoryTable(input: {
                 showStatusColumn={showInvitationStatusColumn}
                 showInvitedByColumn={showInvitedByColumn}
                 showExpiresColumn={showExpiresColumn}
+                showActionsColumn={showActionsColumn}
                 memberAvatar={row.memberAvatar}
                 name={row.name}
                 status={row.status}
