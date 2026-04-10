@@ -67,8 +67,11 @@ describe("SessionWorkbenchPage", () => {
   it("maps loading read state to the loading badge regardless of lifecycle value", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "running",
-        sandboxStatusReadState: "loading",
+        workbenchStatus: {
+          tone: "not_connected",
+          label: "Not connected",
+          alert: null,
+        },
       }),
     ).toEqual({
       label: "Not connected",
@@ -79,8 +82,11 @@ describe("SessionWorkbenchPage", () => {
   it("maps ready running state to the connected badge", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "running",
-        sandboxStatusReadState: "ready",
+        workbenchStatus: {
+          tone: "connected",
+          label: "Connected",
+          alert: null,
+        },
       }),
     ).toEqual({
       label: "Connected",
@@ -92,8 +98,11 @@ describe("SessionWorkbenchPage", () => {
   it("maps ready non-running states to the not connected badge", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "starting",
-        sandboxStatusReadState: "ready",
+        workbenchStatus: {
+          tone: "not_connected",
+          label: "Not connected",
+          alert: null,
+        },
       }),
     ).toEqual({
       label: "Not connected",
@@ -104,8 +113,11 @@ describe("SessionWorkbenchPage", () => {
   it("maps failed state to the error badge", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
-        sandboxLifecycleStatus: "failed",
-        sandboxStatusReadState: "ready",
+        workbenchStatus: {
+          tone: "error",
+          label: "Error",
+          alert: null,
+        },
       }),
     ).toEqual({
       label: "Error",
@@ -146,20 +158,17 @@ describe("SessionWorkbenchPage", () => {
     expect(
       hasSessionTopAlert({
         hasSandboxStatusError: false,
-        lifecycleErrorMessage: null,
-        reconnectMessage: null,
-        sandboxFailureMessage: null,
-        stoppedSessionMessage: null,
+        workbenchStatusAlert: null,
       }),
     ).toBe(false);
 
     expect(
       hasSessionTopAlert({
         hasSandboxStatusError: false,
-        lifecycleErrorMessage: null,
-        reconnectMessage: "Reconnecting session.",
-        sandboxFailureMessage: null,
-        stoppedSessionMessage: null,
+        workbenchStatusAlert: {
+          title: "Reconnecting session",
+          description: "Reconnecting session.",
+        },
       }),
     ).toBe(true);
   });

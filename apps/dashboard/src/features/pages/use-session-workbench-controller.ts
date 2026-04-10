@@ -25,6 +25,7 @@ import {
   shouldShowResumeInFlightState,
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
+import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
@@ -65,20 +66,15 @@ type SessionWorkbenchState = {
     requiresManualResume: boolean;
   };
   isResumingStoppedSandbox: boolean;
-  sessionReconnectState: {
-    isRecovering: boolean;
-    message: string | null;
-  };
+  workbenchStatus: SessionWorkbenchStatus;
   shouldAutoResumeOnEntry: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   requestStoppedSandboxResume: () => Promise<void>;
   sandboxLifecycleStatus: ReturnType<
     typeof useSessionWorkbenchLifecycleState
   >["sandboxLifecycleStatus"];
-  sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
   lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
-  lifecycleErrorMessage: string | null;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
   primaryPanelState: {
     transitionState: MainPanelTransitionState;
@@ -243,16 +239,14 @@ export function useSessionWorkbenchController(input: {
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       stoppedSessionState: workbenchLifecycleState.stoppedSessionState,
       isResumingStoppedSandbox: workbenchLifecycleState.isResumingStoppedSandbox,
-      sessionReconnectState: workbenchLifecycleState.sessionReconnectState,
+      workbenchStatus: workbenchLifecycleState.workbenchStatus,
       shouldAutoResumeOnEntry: workbenchLifecycleState.shouldAutoResumeOnEntry,
       ptyState,
       cliPtyState,
       requestStoppedSandboxResume: workbenchLifecycleState.requestStoppedSandboxResume,
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
-      sandboxFailureMessage: workbenchLifecycleState.sandboxFailureMessage,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       lifecycleStep: lifecycle.step,
-      lifecycleErrorMessage: workbenchLifecycleState.lifecycleErrorMessage,
       primaryPanelState: {
         transitionState: handoff.transitionState,
         canEnterCli: enterCliDisabledReason === null,

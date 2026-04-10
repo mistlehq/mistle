@@ -16,6 +16,7 @@ import {
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveSessionWorkbenchStatus,
   resolveSandboxLifecycleStatusForWorkbenchEntryPhase,
   resolveSandboxStatusReadState,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
@@ -368,6 +369,15 @@ export function useSessionWorkbenchLifecycleState(input: {
       }),
     [stoppedResumeState.requestStoppedSandboxResume, trustedSandboxStatus],
   );
+  const sessionReconnectMessage = codexRecoveryState.sessionReconnectState.message;
+  const workbenchStatus = resolveSessionWorkbenchStatus({
+    sandboxStatusReadState,
+    sandboxLifecycleStatus: displaySandboxLifecycleStatus,
+    lifecycleErrorMessage: resolvedLifecycleErrorMessage,
+    reconnectMessage: sessionReconnectMessage,
+    sandboxFailureMessage,
+    stoppedSessionMessage,
+  });
 
   return {
     sessionSnapshot,
@@ -376,12 +386,10 @@ export function useSessionWorkbenchLifecycleState(input: {
     isResumingStoppedSandbox: isShowingResumeInFlightState,
     requestStoppedSandboxResume,
     sandboxLifecycleStatus: displaySandboxLifecycleStatus,
-    sandboxFailureMessage,
+    workbenchStatus,
     sandboxStatusQuery,
-    sessionReconnectState: codexRecoveryState.sessionReconnectState,
     shouldAutoResumeOnEntry:
       shouldAttemptInitialStoppedResume || shouldAttemptRecoverableStoppedResume,
-    lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     stoppedSessionState,
   };
 }

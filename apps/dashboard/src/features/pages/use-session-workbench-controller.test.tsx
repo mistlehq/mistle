@@ -77,9 +77,10 @@ describe("useSessionWorkbenchController", () => {
       message: null,
       requiresManualResume: false,
     });
-    expect(result.current.workbench.sessionReconnectState).toEqual({
-      isRecovering: false,
-      message: null,
+    expect(result.current.workbench.workbenchStatus).toEqual({
+      tone: "not_connected",
+      label: "Not connected",
+      alert: null,
     });
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
     expect(result.current.workbench.ptyState.lifecycle.state).toBe("idle");
@@ -89,9 +90,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.panelSize).toBe(42);
     expect(result.current.workbench.diffPanelState.patch).toBe("");
-    expect(result.current.workbench.lifecycleErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
-    expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({
       status: "unavailable",

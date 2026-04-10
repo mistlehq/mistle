@@ -18,57 +18,37 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
-import type {
-  SandboxStatusReadState,
-  WorkbenchSandboxLifecycleStatus,
-} from "./session-workbench-state.js";
+import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
-  lifecycleErrorMessage: string | null;
-  reconnectMessage: string | null;
-  sandboxFailureMessage: string | null;
-  stoppedSessionMessage: string | null;
+  workbenchStatusAlert: SessionWorkbenchAlert | null;
 }): boolean {
-  return (
-    input.hasSandboxStatusError ||
-    input.lifecycleErrorMessage !== null ||
-    input.reconnectMessage !== null ||
-    input.sandboxFailureMessage !== null ||
-    input.stoppedSessionMessage !== null
-  );
+  return input.hasSandboxStatusError || input.workbenchStatusAlert !== null;
 }
 
 export function resolveSessionWorkbenchHeaderStatusUi(input: {
-  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
-  sandboxStatusReadState: SandboxStatusReadState;
+  workbenchStatus: SessionWorkbenchStatus;
 }): SandboxStatusBadgeUi {
-  if (input.sandboxStatusReadState === "loading") {
+  if (input.workbenchStatus.tone === "not_connected") {
     return {
-      label: "Not connected",
+      label: input.workbenchStatus.label,
       variant: "outline",
     };
   }
 
-  if (input.sandboxLifecycleStatus === "failed") {
+  if (input.workbenchStatus.tone === "error") {
     return {
-      label: "Error",
+      label: input.workbenchStatus.label,
       variant: "destructive",
     };
   }
 
-  if (input.sandboxLifecycleStatus === "running") {
-    return {
-      label: "Connected",
-      variant: "secondary",
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-    };
-  }
-
   return {
-    label: "Not connected",
-    variant: "outline",
+    label: input.workbenchStatus.label,
+    variant: "secondary",
+    className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
   };
 }
 
@@ -115,8 +95,7 @@ function SessionWorkbenchPageContent(input: {
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
   const sandboxHeaderStatusUi = resolveSessionWorkbenchHeaderStatusUi({
-    sandboxLifecycleStatus: workbench.sandboxLifecycleStatus,
-    sandboxStatusReadState: workbench.sandboxStatusReadState,
+    workbenchStatus: workbench.workbenchStatus,
   });
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
@@ -310,29 +289,8 @@ function SessionWorkbenchPageContent(input: {
           : "Could not load sandbox status.",
     });
   }
-  if (workbench.lifecycleErrorMessage !== null) {
-    alerts.push({
-      title: "Session connection error",
-      description: workbench.lifecycleErrorMessage,
-    });
-  }
-  if (workbench.sessionReconnectState.message !== null) {
-    alerts.push({
-      title: "Reconnecting session",
-      description: workbench.sessionReconnectState.message,
-    });
-  }
-  if (workbench.stoppedSessionState.message !== null) {
-    alerts.push({
-      title: "Stopped sandbox",
-      description: workbench.stoppedSessionState.message,
-    });
-  }
-  if (workbench.sandboxFailureMessage !== null) {
-    alerts.push({
-      title: "Sandbox failed",
-      description: workbench.sandboxFailureMessage,
-    });
+  if (workbench.workbenchStatus.alert !== null) {
+    alerts.push(workbench.workbenchStatus.alert);
   }
   if (
     workbench.primaryPanelState.transitionState === "stable_chat" &&
@@ -352,13 +310,10 @@ function SessionWorkbenchPageContent(input: {
   }
   const hasTopAlert = hasSessionTopAlert({
     hasSandboxStatusError: workbench.sandboxStatusQuery.isError,
-    lifecycleErrorMessage: workbench.lifecycleErrorMessage,
-    reconnectMessage:
+    workbenchStatusAlert:
       workbench.primaryPanelState.transitionState === "stable_chat"
-        ? workbench.sessionReconnectState.message
+        ? workbench.workbenchStatus.alert
         : null,
-    sandboxFailureMessage: workbench.sandboxFailureMessage,
-    stoppedSessionMessage: workbench.stoppedSessionState.message,
   });
   if (input.sandboxInstanceId === null) {
     return (

@@ -19,6 +19,28 @@ export type WorkbenchEntryPhase =
   | "sandbox_failed"
   | "sandbox_starting";
 
+export type SessionWorkbenchStatusAlert = {
+  title: string;
+  description: string;
+};
+
+export type SessionWorkbenchStatus =
+  | {
+      tone: "connected";
+      label: "Connected";
+      alert: SessionWorkbenchStatusAlert | null;
+    }
+  | {
+      tone: "error";
+      label: "Error";
+      alert: SessionWorkbenchStatusAlert | null;
+    }
+  | {
+      tone: "not_connected";
+      label: "Not connected";
+      alert: SessionWorkbenchStatusAlert | null;
+    };
+
 export function shouldWaitForAutomationSessionThread(input: {
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
   automationConversation: SandboxAutomationConversation;
@@ -193,4 +215,97 @@ export function resolveStoppedSessionMessageForWorkbenchEntryPhase(input: {
     input.resumeActionErrorMessage ??
     "This sandbox is stopped. Resume it to reconnect chat and terminal."
   );
+}
+
+export function resolveSessionWorkbenchStatus(input: {
+  sandboxStatusReadState: SandboxStatusReadState;
+  sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+  lifecycleErrorMessage: string | null;
+  reconnectMessage: string | null;
+  sandboxFailureMessage: string | null;
+  stoppedSessionMessage: string | null;
+}): SessionWorkbenchStatus {
+  if (input.lifecycleErrorMessage !== null) {
+    return {
+      tone: "error",
+      label: "Error",
+      alert: {
+        title: "Session connection error",
+        description: input.lifecycleErrorMessage,
+      },
+    };
+  }
+
+  if (input.sandboxFailureMessage !== null) {
+    return {
+      tone: "error",
+      label: "Error",
+      alert: {
+        title: "Sandbox failed",
+        description: input.sandboxFailureMessage,
+      },
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "failed") {
+    return {
+      tone: "error",
+      label: "Error",
+      alert: null,
+    };
+  }
+
+  if (input.stoppedSessionMessage !== null) {
+    return {
+      tone: "not_connected",
+      label: "Not connected",
+      alert: {
+        title: "Stopped sandbox",
+        description: input.stoppedSessionMessage,
+      },
+    };
+  }
+
+  if (input.reconnectMessage !== null) {
+    if (input.sandboxLifecycleStatus === "running") {
+      return {
+        tone: "connected",
+        label: "Connected",
+        alert: {
+          title: "Reconnecting session",
+          description: input.reconnectMessage,
+        },
+      };
+    }
+
+    return {
+      tone: "not_connected",
+      label: "Not connected",
+      alert: {
+        title: "Reconnecting session",
+        description: input.reconnectMessage,
+      },
+    };
+  }
+
+  if (
+    input.sandboxStatusReadState === "loading" ||
+    input.sandboxLifecycleStatus === null ||
+    input.sandboxLifecycleStatus === "pending" ||
+    input.sandboxLifecycleStatus === "starting" ||
+    input.sandboxLifecycleStatus === "resuming" ||
+    input.sandboxLifecycleStatus === "stopped"
+  ) {
+    return {
+      tone: "not_connected",
+      label: "Not connected",
+      alert: null,
+    };
+  }
+
+  return {
+    tone: "connected",
+    label: "Connected",
+    alert: null,
+  };
 }
