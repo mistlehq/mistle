@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
-import { z } from "zod";
+import { ZodError, z } from "zod";
 
 import {
   encryptIntegrationTargetSecrets,
@@ -338,8 +338,33 @@ export async function provisionIntegrationTargets(input: {
       );
     }
 
-    definition.targetConfigSchema.parse(targetFromManifest.config);
-    definition.targetSecretSchema.parse(targetFromManifest.secrets);
+    try {
+      definition.targetConfigSchema.parse(targetFromManifest.config);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        throw new Error(
+          `Provision target '${targetFromManifest.targetKey}' has invalid config for definition '${existingTarget.familyId}::${existingTarget.variantId}'.`,
+          { cause: error },
+        );
+      }
+
+      throw error;
+    }
+
+    try {
+      definition.targetSecretSchema.parse(targetFromManifest.secrets);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        const targetSecretsMessage =
+          existingTarget.familyId === "github"
+            ? `Provision target '${targetFromManifest.targetKey}' has invalid target secrets for definition '${existingTarget.familyId}::${existingTarget.variantId}'. GitHub App private keys and webhook secrets must be stored on the connection, not the target.`
+            : `Provision target '${targetFromManifest.targetKey}' has invalid target secrets for definition '${existingTarget.familyId}::${existingTarget.variantId}'.`;
+
+        throw new Error(targetSecretsMessage, { cause: error });
+      }
+
+      throw error;
+    }
 
     const encryptedTargetSecrets =
       Object.keys(targetFromManifest.secrets).length === 0

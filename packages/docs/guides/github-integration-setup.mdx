@@ -11,7 +11,7 @@ Use this guide to:
 
 1. Create and configure a GitHub App for connect and webhook flows.
 2. Sync integration targets into the control-plane database.
-3. Provision a GitHub target using `integration-targets.provision.json` plus environment-backed secrets.
+3. Provision a GitHub target using `integration-targets.provision.json`.
 
 ## Prerequisites
 
@@ -20,9 +20,7 @@ Before configuring Mistle, create a new GitHub App dedicated to Mistle and colle
 1. App ID
 2. App slug
 3. Client ID, if your deployment uses it
-4. App private key PEM
-5. Webhook secret
-6. GitHub base URLs:
+4. GitHub base URLs:
 
 <CodeGroup>
 ```txt GitHub.com
@@ -89,7 +87,7 @@ https://<control-plane-base-url>/p/integration/webhooks/github-enterprise-server
 
 </CodeGroup>
 
-6. **Webhook secret** must match the provisioned target secret in Mistle.
+6. **Webhook secret** must match the value you will enter when creating the GitHub App installation connection in Mistle.
 7. **Repository permissions** should include at least:
 
 | Permission    | Access         | Enables                                                      |
@@ -101,7 +99,7 @@ https://<control-plane-base-url>/p/integration/webhooks/github-enterprise-server
 | Pull requests | Read and write | Open, update, review, and merge PRs subject to repo policies |
 
 8. Enable the webhook events you want Mistle to process.
-9. Generate and download a PEM private key.
+9. Generate and download a PEM private key for use when creating the GitHub App installation connection in Mistle.
 10. Copy the App ID, app slug, and optional client ID into your Mistle provision manifest.
 
 Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...`. GitHub then redirects directly to Mistle's control-plane callback endpoint at `/p/integration/callbacks/github-app-installation`, which processes callback query parameters such as `state`, `installation_id`, and `setup_action`, creates the integration connection, and redirects the browser to the dashboard integrations page.
@@ -113,7 +111,7 @@ The current codebase uses integration targets instead of the older provider-inst
 There are two setup steps:
 
 1. Sync definition-backed targets into the control-plane database.
-2. Provision config and secrets for the target key you want to enable.
+2. Provision config for the target key you want to enable.
 
 ### 1. Sync integration targets
 
@@ -130,7 +128,7 @@ This creates or updates built-in target records such as:
 
 ### 2. Provision a target manifest
 
-Create `integration-targets.provision.json` in the repository root. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage. For secret fields, reference environment variable names through `secretEnv` instead of embedding secret values in the manifest.
+Create `integration-targets.provision.json` in the repository root. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage.
 
 GitHub.com example:
 
@@ -147,10 +145,6 @@ GitHub.com example:
         "app_slug": "your-github-app-slug",
         "app_id": "123456",
         "client_id": "Iv1.yourclientid"
-      },
-      "secretEnv": {
-        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_APP_PRIVATE_KEY_PEM",
-        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_CLOUD_WEBHOOK_SECRET"
       }
     }
   ]
@@ -172,35 +166,31 @@ GHES example:
         "app_slug": "your-ghe-app-slug",
         "app_id": "7890",
         "client_id": "Iv1.yourgheclientid"
-      },
-      "secretEnv": {
-        "app_private_key_pem": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM",
-        "webhook_secret": "MISTLE_INTEGRATION_TARGET_GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET"
       }
     }
   ]
 }
 ```
 
-Export the referenced environment variables before running the sync command. For example, in local development you can inject them with your external secrets workflow and then run:
+Run the sync command after writing the manifest:
 
 ```bash
 pnpm --filter @mistle/control-plane-api integration-targets:sync
 ```
 
+GitHub App private keys and webhook secrets are no longer provisioned at the target level. They are stored per connection when you create a GitHub App installation connection.
+
 ## Config Field Reference
 
 For GitHub targets, the current schemas expect:
 
-| Field                 | Where             | Meaning                                        |
-| --------------------- | ----------------- | ---------------------------------------------- |
-| `api_base_url`        | config            | Base REST API URL                              |
-| `web_base_url`        | config            | Base web URL                                   |
-| `app_id`              | config            | GitHub App ID                                  |
-| `app_slug`            | config            | GitHub App slug                                |
-| `client_id`           | config            | Optional GitHub App client ID                  |
-| `app_private_key_pem` | secretEnv/secrets | GitHub App private key in PEM format           |
-| `webhook_secret`      | secretEnv/secrets | Shared secret for webhook signature validation |
+| Field          | Where  | Meaning                       |
+| -------------- | ------ | ----------------------------- |
+| `api_base_url` | config | Base REST API URL             |
+| `web_base_url` | config | Base web URL                  |
+| `app_id`       | config | GitHub App ID                 |
+| `app_slug`     | config | GitHub App slug               |
+| `client_id`    | config | Optional GitHub App client ID |
 
 ## GitHub.com vs GHES
 
