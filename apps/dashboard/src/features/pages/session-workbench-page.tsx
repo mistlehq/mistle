@@ -5,7 +5,6 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
-import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -18,31 +17,7 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
-import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
-
-export function resolveSessionWorkbenchHeaderStatusUi(input: {
-  workbenchStatus: SessionWorkbenchStatus;
-}): SandboxStatusBadgeUi {
-  switch (input.workbenchStatus.kind) {
-    case "not_connected":
-      return {
-        label: "Not connected",
-        variant: "outline",
-      };
-    case "error":
-      return {
-        label: "Error",
-        variant: "destructive",
-      };
-    case "connected":
-      return {
-        label: "Connected",
-        variant: "secondary",
-        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-      };
-  }
-}
 
 export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
   return input.requiresManualResume;
@@ -80,36 +55,24 @@ function SessionWorkbenchPageContent(input: {
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
-  const sandboxHeaderStatusUi = resolveSessionWorkbenchHeaderStatusUi({
-    workbenchStatus: workbench.workbenchStatus,
-  });
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
   });
-  const showHeaderStatusLabel = sandboxHeaderStatusUi.variant === "destructive";
+  const isErrorHeaderStatus = workbench.workbenchStatus.kind === "error";
+  const headerStatusLabel = isErrorHeaderStatus ? "Error" : "Not connected";
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        {showHeaderStatusLabel ? (
-          <Badge
-            aria-label={sandboxHeaderStatusUi.label}
-            className={sandboxHeaderStatusUi.className}
-            title={sandboxHeaderStatusUi.label}
-            variant={sandboxHeaderStatusUi.variant}
-          >
-            {sandboxHeaderStatusUi.label}
+        {isErrorHeaderStatus ? (
+          <Badge aria-label={headerStatusLabel} title={headerStatusLabel} variant="destructive">
+            {headerStatusLabel}
           </Badge>
         ) : (
           <span
-            aria-label={sandboxHeaderStatusUi.label}
-            className={[
-              "inline-block size-2.5 rounded-full border",
-              sandboxHeaderStatusUi.variant === "secondary"
-                ? "border-emerald-700 bg-emerald-600"
-                : "border-stone-300 bg-stone-300",
-            ].join(" ")}
+            aria-label={headerStatusLabel}
+            className="inline-block size-2.5 rounded-full border border-stone-300 bg-stone-300"
             role="status"
-            title={sandboxHeaderStatusUi.label}
+            title={headerStatusLabel}
           />
         )}
         <span aria-hidden className="h-5 w-px bg-stone-200" />
@@ -205,9 +168,10 @@ function SessionWorkbenchPageContent(input: {
       cliButtonTitle,
       diffButtonLabel,
       diffButtonTitle,
+      headerStatusLabel,
+      isErrorHeaderStatus,
       terminalButtonLabel,
       showResumeButton,
-      showHeaderStatusLabel,
       terminalButtonTitle,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
@@ -219,9 +183,6 @@ function SessionWorkbenchPageContent(input: {
       workbench.isResumingStoppedSandbox,
       workbench.ptyState.actions.disconnectPty,
       workbench.requestStoppedSandboxResume,
-      sandboxHeaderStatusUi.className,
-      sandboxHeaderStatusUi.label,
-      sandboxHeaderStatusUi.variant,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
