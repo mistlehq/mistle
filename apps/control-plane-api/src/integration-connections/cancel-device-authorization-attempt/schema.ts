@@ -12,6 +12,7 @@ import { IntegrationDeviceAuthorizationAttemptSchema } from "../schemas.js";
 
 export const CancelDeviceAuthorizationAttemptParamsSchema = z
   .object({
+    targetKey: z.string().min(1),
     attemptId: z.string().min(1),
   })
   .strict();

@@ -43,7 +43,7 @@ describe("integration connections device authorization integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/openai-default-device-auth-start/device-authorization/start",
+      "/v1/integration/connections/openai-default-device-auth-start/device-authorization/attempts",
       {
         method: "POST",
         headers: {
@@ -73,7 +73,7 @@ describe("integration connections device authorization integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/device-authorization/attempts/ida_missing",
+      "/v1/integration/connections/openai-default-device-auth-missing/device-authorization/attempts/ida_missing",
       {
         method: "GET",
         headers: {
@@ -212,7 +212,7 @@ describe("integration connections device authorization integration", () => {
       });
 
       const response = await app.request(
-        `/v1/integration/connections/${targetKey}/device-authorization/start`,
+        `/v1/integration/connections/${targetKey}/device-authorization/attempts`,
         {
           method: "POST",
           headers: {
@@ -305,7 +305,7 @@ describe("integration connections device authorization integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/device-authorization/attempts/ida_expired_attempt",
+      "/v1/integration/connections/openai-default-device-auth-expired/device-authorization/attempts/ida_expired_attempt",
       {
         method: "GET",
         headers: {
@@ -369,9 +369,9 @@ describe("integration connections device authorization integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/device-authorization/attempts/ida_cancel_attempt/cancel",
+      "/v1/integration/connections/openai-default-device-auth-cancel/device-authorization/attempts/ida_cancel_attempt",
       {
-        method: "POST",
+        method: "DELETE",
         headers: {
           cookie: authenticatedSession.cookie,
         },

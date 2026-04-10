@@ -9,8 +9,8 @@ import {
 } from "./schema.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/device-authorization/attempts/:attemptId/cancel",
+  method: "delete",
+  path: "/:targetKey/device-authorization/attempts/:attemptId",
   tags: ["Integrations"],
   request: {
     params: CancelDeviceAuthorizationAttemptParamsSchema,

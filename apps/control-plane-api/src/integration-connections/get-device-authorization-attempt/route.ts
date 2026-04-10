@@ -10,7 +10,7 @@ import {
 
 export const route = createRoute({
   method: "get",
-  path: "/device-authorization/attempts/:attemptId",
+  path: "/:targetKey/device-authorization/attempts/:attemptId",
   tags: ["Integrations"],
   request: {
     params: GetDeviceAuthorizationAttemptParamsSchema,

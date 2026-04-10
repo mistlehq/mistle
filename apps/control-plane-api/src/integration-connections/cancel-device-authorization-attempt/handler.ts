@@ -11,7 +11,7 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
-  const { attemptId } = ctx.req.valid("param");
+  const { attemptId, targetKey } = ctx.req.valid("param");
 
   const attempt = await cancelDeviceAuthorizationAttempt(
     {
@@ -19,6 +19,7 @@ const routeHandler = async (
     },
     {
       organizationId: session.activeOrganizationId,
+      targetKey,
       attemptId,
     },
   );

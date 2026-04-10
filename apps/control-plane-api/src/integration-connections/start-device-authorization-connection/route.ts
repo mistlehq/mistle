@@ -11,7 +11,7 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/:targetKey/device-authorization/start",
+  path: "/:targetKey/device-authorization/attempts",
   tags: ["Integrations"],
   request: {
     params: StartDeviceAuthorizationConnectionParamsSchema,

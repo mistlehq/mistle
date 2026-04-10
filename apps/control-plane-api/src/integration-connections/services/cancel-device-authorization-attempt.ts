@@ -33,12 +33,17 @@ export async function cancelDeviceAuthorizationAttempt(
   },
   input: {
     organizationId: string;
+    targetKey: string;
     attemptId: string;
   },
 ): Promise<CancelDeviceAuthorizationAttemptResponse> {
   const attempt = await ctx.db.query.integrationConnectionDeviceAuthorizationAttempts.findFirst({
     where: (table, { and, eq }) =>
-      and(eq(table.organizationId, input.organizationId), eq(table.id, input.attemptId)),
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.targetKey, input.targetKey),
+        eq(table.id, input.attemptId),
+      ),
   });
 
   if (attempt === undefined) {
