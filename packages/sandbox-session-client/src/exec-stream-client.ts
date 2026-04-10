@@ -4,7 +4,7 @@ import { systemScheduler } from "@mistle/time";
 import { SandboxSessionSocketReadyStates } from "./runtime.js";
 import { type SandboxSessionStream, type SandboxSessionTransport } from "./transport.js";
 
-const DefaultExecIdleTimeoutMs = 15_000;
+const DefaultExecIdleTimeoutMs = 60_000;
 
 export type ExecStreamClientInput = {
   idleTimeoutMs?: number;
