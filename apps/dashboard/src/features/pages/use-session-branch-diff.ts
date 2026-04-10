@@ -86,7 +86,7 @@ async function listUntrackedFiles(input: {
   sandboxInstanceId: string;
 }): Promise<string[]> {
   const result = await runGitCommand({
-    args: ["ls-files", "--others", "--exclude-standard"],
+    args: ["ls-files", "--others", "--exclude-standard", "-z"],
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -94,7 +94,7 @@ async function listUntrackedFiles(input: {
     throw new Error(formatGitFailureDetails(result));
   }
 
-  const paths = result.stdout.split("\n");
+  const paths = result.stdout.split("\0");
   if (paths.at(-1) === "") {
     paths.pop();
   }
