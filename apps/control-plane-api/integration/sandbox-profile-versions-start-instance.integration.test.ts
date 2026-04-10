@@ -71,11 +71,7 @@ describe("sandbox profile version start instance integration", () => {
         method: "POST",
         headers: {
           cookie: authenticatedSession.cookie,
-          "content-type": "application/json",
         },
-        body: JSON.stringify({
-          primaryRepositoryId: null,
-        }),
       },
     );
     expect(response.status).toBe(404);
@@ -145,11 +141,7 @@ describe("sandbox profile version start instance integration", () => {
         method: "POST",
         headers: {
           cookie: authenticatedSession.cookie,
-          "content-type": "application/json",
         },
-        body: JSON.stringify({
-          primaryRepositoryId: null,
-        }),
       },
     );
     expect(response.status).toBe(400);
@@ -183,11 +175,7 @@ describe("sandbox profile version start instance integration", () => {
         method: "POST",
         headers: {
           cookie: authenticatedSession.cookie,
-          "content-type": "application/json",
         },
-        body: JSON.stringify({
-          primaryRepositoryId: null,
-        }),
       },
     );
     expect(response.status).toBe(400);
