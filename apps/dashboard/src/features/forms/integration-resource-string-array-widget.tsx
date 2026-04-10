@@ -110,6 +110,13 @@ export function resolveIntegrationResourceListState(input: {
     };
   }
 
+  if (input.isError) {
+    return {
+      mode: "error",
+      message: input.errorMessage ?? "Could not load resources for this connection.",
+    };
+  }
+
   if (input.data !== undefined) {
     return {
       mode: "ready",
@@ -120,13 +127,6 @@ export function resolveIntegrationResourceListState(input: {
   if (input.isPending) {
     return {
       mode: "loading",
-    };
-  }
-
-  if (input.isError) {
-    return {
-      mode: "error",
-      message: input.errorMessage ?? "Could not load resources for this connection.",
     };
   }
 

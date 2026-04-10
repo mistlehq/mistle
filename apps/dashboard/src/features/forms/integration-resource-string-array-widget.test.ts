@@ -56,6 +56,24 @@ describe("resolveIntegrationResourceListState", () => {
     });
   });
 
+  it("preserves the error state when a refetch fails with stale cached results", () => {
+    const previousResults = createResources(["mistle", "mistle-docs"]);
+
+    expect(
+      resolveIntegrationResourceListState({
+        data: previousResults,
+        errorMessage: "Sync failed.",
+        isError: true,
+        isPending: false,
+        resourceOverridePresent: false,
+        visibleItems: previousResults.items,
+      }),
+    ).toEqual({
+      mode: "error",
+      message: "Sync failed.",
+    });
+  });
+
   it("uses the override items when the widget is running against local resource data", () => {
     const overrideResults = createResources(["octocat/hello-world"]);
 
