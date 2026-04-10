@@ -4364,8 +4364,8 @@
         }
       },
       "indexes": {
-        "integration_connection_device_authorization_attempts_organization_id_idx": {
-          "name": "integration_connection_device_authorization_attempts_organization_id_idx",
+        "int_conn_dev_auth_attempts_org_idx": {
+          "name": "int_conn_dev_auth_attempts_org_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -4379,8 +4379,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_connection_device_authorization_attempts_organization_id_target_key_idx": {
-          "name": "integration_connection_device_authorization_attempts_organization_id_target_key_idx",
+        "int_conn_dev_auth_attempts_org_target_idx": {
+          "name": "int_conn_dev_auth_attempts_org_target_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -4400,8 +4400,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_connection_device_authorization_attempts_organization_id_status_idx": {
-          "name": "integration_connection_device_authorization_attempts_organization_id_status_idx",
+        "int_conn_dev_auth_attempts_org_status_idx": {
+          "name": "int_conn_dev_auth_attempts_org_status_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -4421,8 +4421,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_connection_device_authorization_attempts_expires_at_idx": {
-          "name": "integration_connection_device_authorization_attempts_expires_at_idx",
+        "int_conn_dev_auth_attempts_expires_at_idx": {
+          "name": "int_conn_dev_auth_attempts_expires_at_idx",
           "columns": [
             {
               "expression": "expires_at",
@@ -4436,8 +4436,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_connection_device_authorization_attempts_poll_after_at_idx": {
-          "name": "integration_connection_device_authorization_attempts_poll_after_at_idx",
+        "int_conn_dev_auth_attempts_poll_after_at_idx": {
+          "name": "int_conn_dev_auth_attempts_poll_after_at_idx",
           "columns": [
             {
               "expression": "poll_after_at",
@@ -4451,8 +4451,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_connection_device_authorization_attempts_connection_id_idx": {
-          "name": "integration_connection_device_authorization_attempts_connection_id_idx",
+        "int_conn_dev_auth_attempts_connection_id_idx": {
+          "name": "int_conn_dev_auth_attempts_connection_id_idx",
           "columns": [
             {
               "expression": "connection_id",

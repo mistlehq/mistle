@@ -54,26 +54,12 @@ export const integrationConnectionDeviceAuthorizationAttempts = controlPlaneSche
       .defaultNow(),
   },
   (table) => [
-    index("integration_connection_device_authorization_attempts_organization_id_idx").on(
-      table.organizationId,
-    ),
-    index("integration_connection_device_authorization_attempts_organization_id_target_key_idx").on(
-      table.organizationId,
-      table.targetKey,
-    ),
-    index("integration_connection_device_authorization_attempts_organization_id_status_idx").on(
-      table.organizationId,
-      table.status,
-    ),
-    index("integration_connection_device_authorization_attempts_expires_at_idx").on(
-      table.expiresAt,
-    ),
-    index("integration_connection_device_authorization_attempts_poll_after_at_idx").on(
-      table.pollAfterAt,
-    ),
-    index("integration_connection_device_authorization_attempts_connection_id_idx").on(
-      table.connectionId,
-    ),
+    index("int_conn_dev_auth_attempts_org_idx").on(table.organizationId),
+    index("int_conn_dev_auth_attempts_org_target_idx").on(table.organizationId, table.targetKey),
+    index("int_conn_dev_auth_attempts_org_status_idx").on(table.organizationId, table.status),
+    index("int_conn_dev_auth_attempts_expires_at_idx").on(table.expiresAt),
+    index("int_conn_dev_auth_attempts_poll_after_at_idx").on(table.pollAfterAt),
+    index("int_conn_dev_auth_attempts_connection_id_idx").on(table.connectionId),
   ],
 );
 
