@@ -4,7 +4,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import {
   IntegrationConnectionsNotFoundCodes,
@@ -149,20 +149,29 @@ export async function getDeviceAuthorizationAttempt(
   if (attempt.expiresAt !== null && new Date(attempt.expiresAt).getTime() <= now.getTime()) {
     const errorMessage = "The device authorization attempt expired before approval completed.";
 
-    await ctx.db
+    const [updatedAttempt] = await ctx.db
       .update(integrationConnectionDeviceAuthorizationAttempts)
       .set({
         status: IntegrationDeviceAuthorizationAttemptStatuses.FAILED,
         errorCode: IntegrationDeviceAuthorizationAttemptErrorCodes.DEVICE_AUTH_EXPIRED,
         errorMessage,
-        updatedAt: now.toISOString(),
+        updatedAt: sql`now()`,
       })
       .where(
         and(
           eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
           eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
         ),
+      )
+      .returning({
+        id: integrationConnectionDeviceAuthorizationAttempts.id,
+      });
+
+    if (updatedAttempt === undefined) {
+      throw new Error(
+        `Failed to mark expired device authorization attempt '${input.attemptId}' as failed.`,
       );
+    }
 
     return {
       attemptId: attempt.id,

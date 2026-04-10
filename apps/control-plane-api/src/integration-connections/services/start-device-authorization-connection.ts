@@ -63,12 +63,11 @@ async function persistDeviceAuthorizationAttempt(input: {
       id: integrationConnectionDeviceAuthorizationAttempts.id,
     });
 
-  const insertedRow = insertedRows[0];
-  if (insertedRow === undefined) {
+  if (insertedRows[0] === undefined) {
     throw new Error("Failed to persist device authorization attempt.");
   }
 
-  return insertedRow.id;
+  return insertedRows[0].id;
 }
 
 export async function startDeviceAuthorizationConnection(

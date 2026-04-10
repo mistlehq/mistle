@@ -4,7 +4,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { IntegrationConnectionsNotFoundCodes } from "../constants.js";
 
@@ -86,21 +86,28 @@ export async function cancelDeviceAuthorizationAttempt(
     };
   }
 
-  const now = new Date().toISOString();
-
-  await ctx.db
+  const [updatedAttempt] = await ctx.db
     .update(integrationConnectionDeviceAuthorizationAttempts)
     .set({
       status: IntegrationDeviceAuthorizationAttemptStatuses.CANCELLED,
-      cancelledAt: now,
-      updatedAt: now,
+      cancelledAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(
       and(
         eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
         eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
       ),
+    )
+    .returning({
+      id: integrationConnectionDeviceAuthorizationAttempts.id,
+    });
+
+  if (updatedAttempt === undefined) {
+    throw new Error(
+      `Failed to mark device authorization attempt '${input.attemptId}' as cancelled.`,
     );
+  }
 
   return {
     attemptId: attempt.id,
