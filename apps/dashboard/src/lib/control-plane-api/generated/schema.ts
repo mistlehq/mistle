@@ -3206,7 +3206,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/invitations": {
+  "/v1/organization/invitations": {
     parameters: {
       query?: never;
       header?: never;
@@ -3221,9 +3221,7 @@ export interface paths {
           search?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3327,7 +3325,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/logo": {
+  "/v1/organization/logo": {
     parameters: {
       query?: never;
       header?: never;
@@ -3338,9 +3336,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3411,9 +3407,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody: {
@@ -3505,9 +3499,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3574,7 +3566,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/logo/content": {
+  "/v1/organization/logo/content": {
     parameters: {
       query?: never;
       header?: never;
@@ -3587,9 +3579,7 @@ export interface paths {
           v?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3660,7 +3650,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/members": {
+  "/v1/organization/members": {
     parameters: {
       query?: never;
       header?: never;
@@ -3675,9 +3665,7 @@ export interface paths {
           search?: string;
         };
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
@@ -3781,7 +3769,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/membership-capabilities": {
+  "/v1/organization/membership-capabilities": {
     parameters: {
       query?: never;
       header?: never;
@@ -3792,9 +3780,7 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path: {
-          organizationId: string;
-        };
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;

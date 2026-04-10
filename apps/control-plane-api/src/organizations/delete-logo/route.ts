@@ -5,15 +5,10 @@ import {
   UnauthorizedResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { OrganizationLogoParamsSchema } from "../organization-logo-schema.js";
-
 export const route = createRoute({
   method: "delete",
-  path: "/{organizationId}/logo",
+  path: "/logo",
   tags: ["Organizations"],
-  request: {
-    params: OrganizationLogoParamsSchema,
-  },
   responses: {
     204: {
       description: "Delete the active organization's uploaded logo.",

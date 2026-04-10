@@ -7,14 +7,13 @@ import {
 } from "@mistle/http/errors.js";
 
 import { InvitationsPageResponseSchema } from "../schemas.js";
-import { ListInvitationsParamsSchema, ListInvitationsQuerySchema } from "./schema.js";
+import { ListInvitationsQuerySchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/{organizationId}/invitations",
+  path: "/invitations",
   tags: ["Organizations"],
   request: {
-    params: ListInvitationsParamsSchema,
     query: ListInvitationsQuerySchema,
   },
   responses: {

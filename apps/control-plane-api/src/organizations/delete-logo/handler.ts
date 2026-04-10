@@ -13,7 +13,7 @@ const routeHandler = async (
   session: AppSession,
 ) => {
   const db = ctx.get("db");
-  const { organizationId } = ctx.req.valid("param");
+  const organizationId = session.session.activeOrganizationId;
 
   await requireOrganizationPermission({
     db,

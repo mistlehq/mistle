@@ -8,10 +8,8 @@ import { executeMembersOperation } from "../members/members-api-errors.js";
 
 function createOrganizationLogoUrl(organizationId: string): URL {
   const config = getDashboardConfig();
-  return new URL(
-    `/v1/organizations/${encodeURIComponent(organizationId)}/logo`,
-    config.controlPlaneApiOrigin,
-  );
+  void organizationId;
+  return new URL("/v1/organization/logo", config.controlPlaneApiOrigin);
 }
 
 export async function getOrganizationLogo(input: {

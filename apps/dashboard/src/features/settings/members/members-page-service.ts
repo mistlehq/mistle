@@ -11,13 +11,11 @@ export async function listMembersPage(input: {
   search: string;
 }): Promise<MembersPage> {
   try {
+    void input.organizationId;
     const client = getControlPlaneApiClient();
-    const response = await client.GET("/v1/organizations/{organizationId}/members", {
+    const response = await client.GET("/v1/organization/members", {
       credentials: "include",
       params: {
-        path: {
-          organizationId: input.organizationId,
-        },
         query: {
           limit: input.limit,
           offset: input.offset,

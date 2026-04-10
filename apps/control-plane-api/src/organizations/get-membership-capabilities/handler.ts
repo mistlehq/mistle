@@ -11,7 +11,6 @@ const routeHandler = async (
   { session, user }: AppSession,
 ) => {
   const db = ctx.get("db");
-  const { organizationId } = ctx.req.valid("param");
 
   const result = await getMembershipCapabilities(
     {
@@ -20,7 +19,7 @@ const routeHandler = async (
     {
       actorUserId: user.id,
       activeOrganizationId: session.activeOrganizationId,
-      organizationId,
+      organizationId: session.activeOrganizationId,
     },
   );
 

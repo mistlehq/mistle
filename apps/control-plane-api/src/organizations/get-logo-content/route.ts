@@ -6,14 +6,12 @@ import {
 } from "@mistle/http/errors.js";
 
 import { RedirectLocationHeaderSchema } from "../../integration-connections/schemas.js";
-import { OrganizationLogoParamsSchema } from "../organization-logo-schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/{organizationId}/logo/content",
+  path: "/logo/content",
   tags: ["Organizations"],
   request: {
-    params: OrganizationLogoParamsSchema,
     query: z
       .object({
         v: z.string().min(1).optional(),

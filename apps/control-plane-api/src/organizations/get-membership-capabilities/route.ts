@@ -6,15 +6,11 @@ import {
 } from "@mistle/http/errors.js";
 
 import { MembershipCapabilitiesSchema } from "../schemas.js";
-import { GetMembershipCapabilitiesParamsSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/{organizationId}/membership-capabilities",
+  path: "/membership-capabilities",
   tags: ["Organizations"],
-  request: {
-    params: GetMembershipCapabilitiesParamsSchema,
-  },
   responses: {
     200: {
       description: "Membership capabilities for the current actor in the organization.",

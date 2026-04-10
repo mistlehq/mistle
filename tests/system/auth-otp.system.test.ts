@@ -39,14 +39,11 @@ describe("system auth otp", () => {
       slug: `system-otp-smoke-${randomUUID()}`,
     });
 
-    const capabilitiesResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(organizationId)}/membership-capabilities`,
-      {
-        headers: {
-          cookie,
-        },
+    const capabilitiesResponse = await fixture.request("/v1/organization/membership-capabilities", {
+      headers: {
+        cookie,
       },
-    );
+    });
     expect(capabilitiesResponse.status).toBe(200);
 
     const capabilities = MembershipCapabilitiesSchema.parse(await capabilitiesResponse.json());

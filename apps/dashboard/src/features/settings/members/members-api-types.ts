@@ -1,7 +1,7 @@
 import type { paths } from "../../../lib/control-plane-api/generated/schema.js";
 
 export type MembershipCapabilitiesResponse =
-  paths["/v1/organizations/{organizationId}/membership-capabilities"]["get"]["responses"][200]["content"]["application/json"];
+  paths["/v1/organization/membership-capabilities"]["get"]["responses"][200]["content"]["application/json"];
 export type MembershipCapabilities = MembershipCapabilitiesResponse;
 export type OrganizationRole = MembershipCapabilities["actorRole"];
 export type MemberAvatar = {

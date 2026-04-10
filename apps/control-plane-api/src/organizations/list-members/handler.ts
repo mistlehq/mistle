@@ -15,7 +15,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const objectStore = ctx.get("objectStore");
-  const { organizationId } = ctx.req.valid("param");
+  const organizationId = session.session.activeOrganizationId;
   const { limit, offset, search } = ctx.req.valid("query");
 
   await requireOrganizationPermission({

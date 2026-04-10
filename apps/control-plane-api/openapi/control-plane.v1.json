@@ -6093,20 +6093,9 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/logo": {
+    "/v1/organization/logo": {
       "get": {
         "tags": ["Organizations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
         "responses": {
           "200": {
             "description": "Read the active organization's current logo metadata.",
@@ -6210,17 +6199,6 @@
       },
       "put": {
         "tags": ["Organizations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -6364,17 +6342,6 @@
       },
       "delete": {
         "tags": ["Organizations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
         "responses": {
           "204": {
             "description": "Delete the active organization's uploaded logo."
@@ -6459,19 +6426,10 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/logo/content": {
+    "/v1/organization/logo/content": {
       "get": {
         "tags": ["Organizations"],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "string",
@@ -6575,20 +6533,9 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/membership-capabilities": {
+    "/v1/organization/membership-capabilities": {
       "get": {
         "tags": ["Organizations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          }
-        ],
         "responses": {
           "200": {
             "description": "Membership capabilities for the current actor in the organization.",
@@ -6745,19 +6692,10 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/members": {
+    "/v1/organization/members": {
       "get": {
         "tags": ["Organizations"],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "integer",
@@ -6966,19 +6904,10 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/invitations": {
+    "/v1/organization/invitations": {
       "get": {
         "tags": ["Organizations"],
         "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "organizationId",
-            "in": "path"
-          },
           {
             "schema": {
               "type": "integer",

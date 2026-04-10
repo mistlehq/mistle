@@ -7,18 +7,11 @@ export async function getMembershipCapabilities(input: {
   organizationId: string;
 }): Promise<MembershipCapabilities> {
   try {
+    void input.organizationId;
     const client = getControlPlaneApiClient();
-    const { data } = await client.GET(
-      "/v1/organizations/{organizationId}/membership-capabilities",
-      {
-        credentials: "include",
-        params: {
-          path: {
-            organizationId: input.organizationId,
-          },
-        },
-      },
-    );
+    const { data } = await client.GET("/v1/organization/membership-capabilities", {
+      credentials: "include",
+    });
 
     if (data === undefined) {
       throw new MembersApiError({
