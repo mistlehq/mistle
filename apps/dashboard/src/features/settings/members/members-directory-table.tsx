@@ -140,6 +140,7 @@ export function MembersDirectoryTable(input: {
                 status={row.status}
                 invitedBy={row.invitedBy}
                 expiresAt={row.expiresAt}
+                expiresAtDateTime={row.expiresAtDateTime}
                 actionFeedback={row.actionFeedback}
                 {...(row.actionsContentClassName === undefined
                   ? {}

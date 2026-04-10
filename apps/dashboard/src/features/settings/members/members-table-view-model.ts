@@ -27,6 +27,7 @@ export type MembersDirectoryTableRowViewModel = {
   date: string;
   invitedBy: string | null;
   expiresAt: string | null;
+  expiresAtDateTime: string | null;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
   actionsLabel: string;
@@ -118,6 +119,7 @@ export function buildMembersDirectoryTableRowViewModels(input: {
       date: formattedRow.date,
       invitedBy: formattedRow.invitedBy,
       expiresAt: formattedRow.expiresAt,
+      expiresAtDateTime: formattedRow.expiresAtDateTime,
       showMemberAvatar: row.kind === "member",
       memberAvatar:
         row.kind === "member" ? (input.memberAvatarsByUserId.get(row.member.userId) ?? null) : null,

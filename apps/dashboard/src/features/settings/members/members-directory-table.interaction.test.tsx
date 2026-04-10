@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
-import { formatDate } from "./members-formatters.js";
 
 describe("MembersDirectoryTable interaction", () => {
   afterEach(() => {
@@ -158,8 +157,13 @@ describe("MembersDirectoryTable interaction", () => {
     );
 
     const invitationRow = getInvitationRow();
+    const expiryTime = invitationRow.querySelector("time");
+    if (expiryTime === null) {
+      throw new Error("Expected invitation expiry time element.");
+    }
+
     expect(within(invitationRow).getByText("Inviter Name")).toBeTruthy();
-    expect(within(invitationRow).getByText(formatDate("2099-01-02T00:00:00.000Z"))).toBeTruthy();
+    expect(expiryTime.getAttribute("dateTime")).toBe("2099-01-02T00:00:00.000Z");
   });
 
   it("shows sending state in place of invitation actions while resend is pending", () => {

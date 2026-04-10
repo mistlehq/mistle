@@ -92,6 +92,7 @@ export function DirectoryTableRow(input: {
   status: string | null;
   invitedBy: string | null;
   expiresAt: string | null;
+  expiresAtDateTime: string | null;
   showNameColumn: boolean;
   showStatusColumn: boolean;
   showInvitedByColumn: boolean;
@@ -136,7 +137,11 @@ export function DirectoryTableRow(input: {
       ) : null}
       <TableCell className="whitespace-nowrap">{input.date}</TableCell>
       {input.showExpiresColumn ? (
-        <TableCell className="whitespace-nowrap">{input.expiresAt}</TableCell>
+        <TableCell className="whitespace-nowrap">
+          {input.expiresAt === null || input.expiresAtDateTime === null ? null : (
+            <time dateTime={input.expiresAtDateTime}>{input.expiresAt}</time>
+          )}
+        </TableCell>
       ) : null}
       {input.showActionsColumn ? (
         <TableCell className="whitespace-nowrap">

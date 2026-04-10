@@ -310,6 +310,7 @@ export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
   date: string;
   invitedBy: string | null;
   expiresAt: string | null;
+  expiresAtDateTime: string | null;
 } {
   return {
     name: row.name,
@@ -319,6 +320,7 @@ export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
     date: formatDate(row.date),
     invitedBy: row.invitedBy,
     expiresAt: row.expiresAt === null ? null : formatDate(row.expiresAt),
+    expiresAtDateTime: row.expiresAt,
   };
 }
 
