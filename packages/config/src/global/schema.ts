@@ -87,6 +87,9 @@ export const GlobalSandboxPublishConfigSchema = z
     session: GlobalSandboxPublishSessionConfigSchema,
   })
   .strict();
+// Reserved for browser publishing phases. Phase 1 process inventory does not
+// consume this config yet, but keeping the shape stable avoids speculative
+// churn before the browser-publishing auth/bootstrap path lands.
 
 export const PartialGlobalSandboxPublishConfigSchema = z
   .object({
