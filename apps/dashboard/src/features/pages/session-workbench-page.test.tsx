@@ -11,6 +11,7 @@ import {
   hasSessionTopAlert,
   resolveSessionWorkbenchHeaderStatusUi,
   SessionWorkbenchPage,
+  shouldShowSessionWorkbenchHeaderStatusLabel,
   shouldShowResumeAction,
 } from "./session-workbench-page.js";
 import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-controller.js";
@@ -70,22 +71,75 @@ describe("SessionWorkbenchPage", () => {
         sandboxStatusReadState: "loading",
       }),
     ).toEqual({
-      label: "Loading status",
+      label: "Not connected",
       variant: "outline",
     });
   });
 
-  it("maps ready read state through sandbox lifecycle badge presentation", () => {
+  it("maps ready running state to the connected badge", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         sandboxLifecycleStatus: "running",
         sandboxStatusReadState: "ready",
       }),
     ).toEqual({
-      label: "Running",
+      label: "Connected",
       variant: "secondary",
       className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
     });
+  });
+
+  it("maps ready non-running states to the not connected badge", () => {
+    expect(
+      resolveSessionWorkbenchHeaderStatusUi({
+        sandboxLifecycleStatus: "starting",
+        sandboxStatusReadState: "ready",
+      }),
+    ).toEqual({
+      label: "Not connected",
+      variant: "outline",
+    });
+  });
+
+  it("maps failed state to the error badge", () => {
+    expect(
+      resolveSessionWorkbenchHeaderStatusUi({
+        sandboxLifecycleStatus: "failed",
+        sandboxStatusReadState: "ready",
+      }),
+    ).toEqual({
+      label: "Error",
+      variant: "destructive",
+    });
+  });
+
+  it("shows visible header text only for the error badge", () => {
+    expect(
+      shouldShowSessionWorkbenchHeaderStatusLabel({
+        headerStatusUi: {
+          label: "Connected",
+          variant: "secondary",
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowSessionWorkbenchHeaderStatusLabel({
+        headerStatusUi: {
+          label: "Not connected",
+          variant: "outline",
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldShowSessionWorkbenchHeaderStatusLabel({
+        headerStatusUi: {
+          label: "Error",
+          variant: "destructive",
+        },
+      }),
+    ).toBe(true);
   });
 
   it("shows top alerts only when one of the alert sources is present", () => {

@@ -4,11 +4,11 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   resolveSandboxStatusBadgeUi,
-  type WorkbenchSandboxLifecycleStatus,
+  type SandboxLifecycleStatus,
 } from "./sandbox-status-presentation.js";
 
 function SandboxStatusBadgePreview(input: {
-  statuses: readonly WorkbenchSandboxLifecycleStatus[];
+  statuses: readonly SandboxLifecycleStatus[];
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -33,11 +33,11 @@ function SandboxStatusBadgePreview(input: {
 }
 
 const meta = {
-  title: "Dashboard/Sessions/SessionWorkbench/StatusPresentation",
+  title: "Dashboard/Sessions/SessionList/StatusPresentation",
   component: SandboxStatusBadgePreview,
   tags: ["autodocs"],
   args: {
-    statuses: ["pending", "starting", "running", "stopped", "failed", "resuming", null],
+    statuses: ["pending", "starting", "running", "stopped", "failed"],
   },
   parameters: {
     layout: "fullscreen",
@@ -49,16 +49,4 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const AllStates: Story = {};
-
-export const SessionListStates: Story = {
-  args: {
-    statuses: ["pending", "starting", "running", "stopped", "failed"],
-  },
-};
-
-export const WorkbenchOnlyStates: Story = {
-  args: {
-    statuses: ["resuming", null],
-  },
-};
+export const LifecycleStates: Story = {};

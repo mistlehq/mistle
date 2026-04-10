@@ -69,19 +69,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const ConnectingHeader: Story = {
+export const NotConnectedHeader: Story = {
   args: {
     headerStatusUi: {
-      label: "Connecting",
-      variant: "outline",
-    },
-  },
-};
-
-export const ReconnectingHeader: Story = {
-  args: {
-    headerStatusUi: {
-      label: "Reconnecting",
+      label: "Not connected",
       variant: "outline",
     },
   },
@@ -90,7 +81,7 @@ export const ReconnectingHeader: Story = {
 export const SessionErrorHeader: Story = {
   args: {
     headerStatusUi: {
-      label: "Session error",
+      label: "Error",
       variant: "destructive",
     },
   },

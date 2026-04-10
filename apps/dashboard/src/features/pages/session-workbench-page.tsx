@@ -5,10 +5,7 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
-import {
-  resolveSandboxStatusBadgeUi,
-  type SandboxStatusBadgeUi,
-} from "./sandbox-status-presentation.js";
+import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -47,13 +44,42 @@ export function resolveSessionWorkbenchHeaderStatusUi(input: {
   sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
   sandboxStatusReadState: SandboxStatusReadState;
 }): SandboxStatusBadgeUi {
-  return input.sandboxStatusReadState === "loading"
-    ? resolveSandboxStatusBadgeUi(null)
-    : resolveSandboxStatusBadgeUi(input.sandboxLifecycleStatus);
+  if (input.sandboxStatusReadState === "loading") {
+    return {
+      label: "Not connected",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "failed") {
+    return {
+      label: "Error",
+      variant: "destructive",
+    };
+  }
+
+  if (input.sandboxLifecycleStatus === "running") {
+    return {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  return {
+    label: "Not connected",
+    variant: "outline",
+  };
 }
 
 export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
   return input.requiresManualResume;
+}
+
+export function shouldShowSessionWorkbenchHeaderStatusLabel(input: {
+  headerStatusUi: SandboxStatusBadgeUi;
+}): boolean {
+  return input.headerStatusUi.variant === "destructive";
 }
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -95,12 +121,34 @@ function SessionWorkbenchPageContent(input: {
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
   });
+  const showHeaderStatusLabel = shouldShowSessionWorkbenchHeaderStatusLabel({
+    headerStatusUi: sandboxHeaderStatusUi,
+  });
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
-        <Badge className={sandboxHeaderStatusUi.className} variant={sandboxHeaderStatusUi.variant}>
-          {sandboxHeaderStatusUi.label}
-        </Badge>
+        {showHeaderStatusLabel ? (
+          <Badge
+            aria-label={sandboxHeaderStatusUi.label}
+            className={sandboxHeaderStatusUi.className}
+            title={sandboxHeaderStatusUi.label}
+            variant={sandboxHeaderStatusUi.variant}
+          >
+            {sandboxHeaderStatusUi.label}
+          </Badge>
+        ) : (
+          <span
+            aria-label={sandboxHeaderStatusUi.label}
+            className={[
+              "inline-block size-2.5 rounded-full border",
+              sandboxHeaderStatusUi.variant === "secondary"
+                ? "border-emerald-700 bg-emerald-600"
+                : "border-stone-300 bg-stone-300",
+            ].join(" ")}
+            role="status"
+            title={sandboxHeaderStatusUi.label}
+          />
+        )}
         <span aria-hidden className="h-5 w-px bg-stone-200" />
         {showResumeButton ? (
           <Button
@@ -196,6 +244,7 @@ function SessionWorkbenchPageContent(input: {
       diffButtonTitle,
       terminalButtonLabel,
       showResumeButton,
+      showHeaderStatusLabel,
       terminalButtonTitle,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
