@@ -211,7 +211,7 @@ export async function startDeviceAuthorizationIntegrationConnection(input: {
     const response = await requestControlPlane({
       operation: "startDeviceAuthorizationIntegrationConnection",
       method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/device-authorization/start`,
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/device-authorization/attempts`,
       body: {
         methodId: input.methodId,
         ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
@@ -234,13 +234,14 @@ export async function startDeviceAuthorizationIntegrationConnection(input: {
 }
 
 export async function getDeviceAuthorizationAttempt(input: {
+  targetKey: string;
   attemptId: string;
 }): Promise<DeviceAuthorizationAttemptResponse> {
   try {
     const response = await requestControlPlane({
       operation: "getDeviceAuthorizationAttempt",
       method: "GET",
-      pathname: `/v1/integration/connections/device-authorization/attempts/${encodeURIComponent(input.attemptId)}`,
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/device-authorization/attempts/${encodeURIComponent(input.attemptId)}`,
       fallbackMessage: "Could not read integration connection status.",
     });
 
@@ -259,13 +260,14 @@ export async function getDeviceAuthorizationAttempt(input: {
 }
 
 export async function cancelDeviceAuthorizationAttempt(input: {
+  targetKey: string;
   attemptId: string;
 }): Promise<DeviceAuthorizationAttemptResponse> {
   try {
     const response = await requestControlPlane({
       operation: "cancelDeviceAuthorizationAttempt",
-      method: "POST",
-      pathname: `/v1/integration/connections/device-authorization/attempts/${encodeURIComponent(input.attemptId)}/cancel`,
+      method: "DELETE",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/device-authorization/attempts/${encodeURIComponent(input.attemptId)}`,
       fallbackMessage: "Could not cancel integration connection.",
     });
 

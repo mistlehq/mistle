@@ -337,6 +337,7 @@ describe("IntegrationConnectionDialog", () => {
   it("renders device-authorization pending instructions and controls", () => {
     renderDialog({
       deviceAuthorizationPending: {
+        targetKey: "openai-default",
         attemptId: "ida_123",
         verificationUrl: "https://auth.openai.com/codex/device",
         userCode: "ABCD-1234",

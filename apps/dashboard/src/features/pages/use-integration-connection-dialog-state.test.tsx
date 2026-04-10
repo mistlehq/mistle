@@ -141,7 +141,7 @@ describe("useIntegrationConnectionDialogState", () => {
         if (
           request.method === "POST" &&
           request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/start"
+            "/v1/integration/connections/openai-default/device-authorization/attempts"
         ) {
           return {
             status: 200,
@@ -158,7 +158,7 @@ describe("useIntegrationConnectionDialogState", () => {
         if (
           request.method === "GET" &&
           request.pathname ===
-            "/v1/integration/connections/device-authorization/attempts/ida_complete"
+            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete"
         ) {
           return {
             status: 200,
@@ -213,7 +213,7 @@ describe("useIntegrationConnectionDialogState", () => {
       expect(server.requests).toEqual([
         {
           method: "POST",
-          pathname: "/v1/integration/connections/openai-default/device-authorization/start",
+          pathname: "/v1/integration/connections/openai-default/device-authorization/attempts",
           body: {
             methodId: "chatgpt-device-code",
             displayName: "OpenAI Personal",
@@ -221,7 +221,8 @@ describe("useIntegrationConnectionDialogState", () => {
         },
         {
           method: "GET",
-          pathname: "/v1/integration/connections/device-authorization/attempts/ida_complete",
+          pathname:
+            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete",
           body: null,
         },
       ]);
@@ -236,7 +237,7 @@ describe("useIntegrationConnectionDialogState", () => {
         if (
           request.method === "POST" &&
           request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/start"
+            "/v1/integration/connections/openai-default/device-authorization/attempts"
         ) {
           return {
             status: 200,
@@ -253,7 +254,7 @@ describe("useIntegrationConnectionDialogState", () => {
         if (
           request.method === "GET" &&
           request.pathname ===
-            "/v1/integration/connections/device-authorization/attempts/ida_failed"
+            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_failed"
         ) {
           return {
             status: 200,
@@ -318,7 +319,7 @@ describe("useIntegrationConnectionDialogState", () => {
         if (
           request.method === "POST" &&
           request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/start"
+            "/v1/integration/connections/openai-default/device-authorization/attempts"
         ) {
           return {
             status: 200,
@@ -333,9 +334,9 @@ describe("useIntegrationConnectionDialogState", () => {
         }
 
         if (
-          request.method === "POST" &&
+          request.method === "DELETE" &&
           request.pathname ===
-            "/v1/integration/connections/device-authorization/attempts/ida_cancel/cancel"
+            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel"
         ) {
           return {
             status: 200,
@@ -386,8 +387,9 @@ describe("useIntegrationConnectionDialogState", () => {
       });
 
       expect(server.requests).toContainEqual({
-        method: "POST",
-        pathname: "/v1/integration/connections/device-authorization/attempts/ida_cancel/cancel",
+        method: "DELETE",
+        pathname:
+          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel",
         body: null,
       });
     } finally {

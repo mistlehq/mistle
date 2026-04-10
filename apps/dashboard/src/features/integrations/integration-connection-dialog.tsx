@@ -62,6 +62,7 @@ export type IntegrationConnectionDialogState =
   | UpdateIntegrationConnectionDialogState;
 
 export type IntegrationConnectionDeviceAuthorizationPendingState = {
+  targetKey: string;
   attemptId: string;
   verificationUrl: string;
   userCode: string;

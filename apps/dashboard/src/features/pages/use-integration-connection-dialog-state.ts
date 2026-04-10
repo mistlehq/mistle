@@ -92,7 +92,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
   });
 
   const cancelDeviceAuthorizationMutation = useMutation({
-    mutationFn: async (mutationInput: { attemptId: string }) =>
+    mutationFn: async (mutationInput: { targetKey: string; attemptId: string }) =>
       cancelDeviceAuthorizationAttempt(mutationInput),
   });
 
@@ -153,6 +153,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     }
 
     await cancelDeviceAuthorizationMutation.mutateAsync({
+      targetKey: deviceAuthorizationPending.targetKey,
       attemptId: deviceAuthorizationPending.attemptId,
     });
 
@@ -172,6 +173,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     const timer: TimerHandle = systemScheduler.schedule(
       () => {
         void getDeviceAuthorizationAttempt({
+          targetKey: deviceAuthorizationPending.targetKey,
           attemptId: deviceAuthorizationPending.attemptId,
         })
           .then(async (attempt) => {
@@ -334,6 +336,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       });
 
       setDeviceAuthorizationPending({
+        targetKey: dialog.targetKey,
         attemptId: started.attemptId,
         verificationUrl: started.verificationUrl,
         userCode: started.userCode,
