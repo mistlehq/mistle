@@ -293,7 +293,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     #[cfg(target_os = "linux")]
-    use crate::time::testing::MutableClock;
+    use crate::time::{format_rfc3339_timestamp, testing::MutableClock};
     #[cfg(target_os = "linux")]
     use crate::tunnel::runtime_processes::{
         collect_process_entries_for_proc_root, collect_processes_snapshot,
@@ -370,7 +370,11 @@ mod tests {
             })
             .expect("idle process should be present");
         assert_eq!(idle_process.listeners, Vec::new());
-        assert_eq!(snapshot.observed_at, "2025-04-10T00:00:00Z");
+        assert_eq!(
+            snapshot.observed_at,
+            format_rfc3339_timestamp(clock.now_system_time())
+                .expect("mutable clock timestamp should format")
+        );
 
         terminate_child(&mut server);
         terminate_child(&mut idle);

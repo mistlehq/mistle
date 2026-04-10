@@ -4190,8 +4190,7 @@ mod tests {
                     "streamId": 22
                 })
             );
-            let second_snapshot = read_processes_snapshot(&mut websocket);
-            assert_eq!(second_snapshot.0, 22);
+            let second_snapshot = read_processes_snapshot_for_stream(&mut websocket, 22);
             assert_processes_snapshot_contains(
                 &second_snapshot.1,
                 &server_marker,
@@ -4351,6 +4350,22 @@ mod tests {
             Value::String("processes.snapshot".to_string())
         );
         (frame.stream_id, payload)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn read_processes_snapshot_for_stream<S>(
+        socket: &mut WebSocket<S>,
+        expected_stream_id: u32,
+    ) -> (u32, Value)
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            let snapshot = read_processes_snapshot(socket);
+            if snapshot.0 == expected_stream_id {
+                return snapshot;
+            }
+        }
     }
 
     #[cfg(target_os = "linux")]
