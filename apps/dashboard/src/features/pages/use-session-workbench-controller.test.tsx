@@ -549,13 +549,23 @@ describe("useSessionWorkbenchController", () => {
       expected: "loading",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: null,
+      },
+    },
+    {
+      expected: "resume_pending",
+      input: {
+        connectedSession: false,
+        hasResumeInFlightState: true,
+        sandboxStatus: "stopped" as const,
       },
     },
     {
       expected: "sandbox_stopped",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: "stopped" as const,
       },
     },
@@ -563,6 +573,7 @@ describe("useSessionWorkbenchController", () => {
       expected: "sandbox_starting",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: "pending" as const,
       },
     },
@@ -570,6 +581,7 @@ describe("useSessionWorkbenchController", () => {
       expected: "sandbox_starting",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: "starting" as const,
       },
     },
@@ -577,6 +589,7 @@ describe("useSessionWorkbenchController", () => {
       expected: "connecting",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: "running" as const,
       },
     },
@@ -584,6 +597,7 @@ describe("useSessionWorkbenchController", () => {
       expected: "ready",
       input: {
         connectedSession: true,
+        hasResumeInFlightState: false,
         sandboxStatus: "running" as const,
       },
     },
@@ -591,6 +605,7 @@ describe("useSessionWorkbenchController", () => {
       expected: "sandbox_failed",
       input: {
         connectedSession: false,
+        hasResumeInFlightState: false,
         sandboxStatus: "failed" as const,
       },
     },
@@ -626,12 +641,21 @@ describe("useSessionWorkbenchController", () => {
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {
     expect(
       resolveStoppedSessionMessageForWorkbenchEntryPhase({
+        autoResumeErrorMessage: "Could not resume sandbox session.",
+        phase: "sandbox_stopped",
+      }),
+    ).toBe("Could not resume sandbox session.");
+
+    expect(
+      resolveStoppedSessionMessageForWorkbenchEntryPhase({
+        autoResumeErrorMessage: null,
         phase: "sandbox_stopped",
       }),
     ).toBe("This sandbox is stopped. Chat and terminal are unavailable.");
 
     expect(
       resolveStoppedSessionMessageForWorkbenchEntryPhase({
+        autoResumeErrorMessage: null,
         phase: "ready",
       }),
     ).toBeNull();

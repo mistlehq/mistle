@@ -7,7 +7,7 @@ import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
-import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
+import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
@@ -55,6 +55,9 @@ export function useSessionWorkbenchLifecycleState(input: {
   queryClient: QueryClient;
 }) {
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
+  const [hasAttemptedAutoResume, setHasAttemptedAutoResume] = useState(false);
+  const [isAutoResumingStoppedSandbox, setIsAutoResumingStoppedSandbox] = useState(false);
+  const [autoResumeErrorMessage, setAutoResumeErrorMessage] = useState<string | null>(null);
   const [automationPendingSinceMs, setAutomationPendingSinceMs] = useState<number | null>(null);
   const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
     null,
@@ -106,6 +109,10 @@ export function useSessionWorkbenchLifecycleState(input: {
         return AutomationSessionStatusRefetchIntervalMs;
       }
 
+      if (isAutoResumingStoppedSandbox && status === "stopped") {
+        return 1_000;
+      }
+
       return connectable === true || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
@@ -134,8 +141,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusReadState,
     sandboxStatus: sandboxStatusQuery.data?.status ?? null,
   });
+  const shouldAttemptAutoResume =
+    input.sandboxInstanceId !== null &&
+    trustedSandboxStatus === "stopped" &&
+    !hasAttemptedAutoResume;
   const workbenchEntryPhase = resolveWorkbenchEntryPhase({
     connectedSession: sessionSnapshot !== null,
+    hasResumeInFlightState: shouldAttemptAutoResume || isAutoResumingStoppedSandbox,
     sandboxStatus: trustedSandboxStatus,
   });
   const displaySandboxLifecycleStatus =
@@ -152,6 +164,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({
+    autoResumeErrorMessage,
     phase: workbenchEntryPhase,
   });
 
@@ -165,6 +178,9 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
+    setHasAttemptedAutoResume(false);
+    setIsAutoResumingStoppedSandbox(false);
+    setAutoResumeErrorMessage(null);
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
     initialSandboxStatusDataUpdatedAtRef.current = null;
@@ -176,6 +192,63 @@ export function useSessionWorkbenchLifecycleState(input: {
       setHasAttemptedAutoConnect(false);
     }
   }, [input.mainPanelTransitionState]);
+
+  useEffect(() => {
+    if (!shouldAttemptAutoResume || input.sandboxInstanceId === null) {
+      return;
+    }
+
+    let isActive = true;
+    setHasAttemptedAutoResume(true);
+    setIsAutoResumingStoppedSandbox(true);
+    setAutoResumeErrorMessage(null);
+    clearLifecycleErrorMessage();
+
+    void resumeSandboxInstance({
+      instanceId: input.sandboxInstanceId,
+    })
+      .then((sandboxStatus) => {
+        if (!isActive) {
+          return;
+        }
+
+        input.queryClient.setQueryData(
+          getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+          sandboxStatus,
+        );
+        setHasAttemptedAutoConnect(false);
+        clearLifecycleErrorMessage();
+        void sandboxStatusQuery.refetch().catch(() => {});
+      })
+      .catch((error: unknown) => {
+        if (!isActive) {
+          return;
+        }
+
+        setAutoResumeErrorMessage(
+          error instanceof Error && error.message.length > 0
+            ? error.message
+            : "Could not resume sandbox session.",
+        );
+      })
+      .finally(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setIsAutoResumingStoppedSandbox(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    clearLifecycleErrorMessage,
+    input.queryClient,
+    input.sandboxInstanceId,
+    sandboxStatusQuery,
+    shouldAttemptAutoResume,
+  ]);
 
   useEffect(() => {
     if (!isWaitingForAutomationThread) {

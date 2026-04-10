@@ -101,7 +101,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
   }, [errorMessage, lifecycleState, outputChunks]);
 
   return renderSessionWorkbenchContentStory({
-    alerts: [],
+    alert: null,
     bottomPanel: (
       <SessionTerminalPanel
         isConnectionReady={true}

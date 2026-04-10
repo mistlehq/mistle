@@ -14,6 +14,7 @@ export type WorkbenchEntryPhase =
   | "connecting"
   | "loading"
   | "ready"
+  | "resume_pending"
   | "sandbox_failed"
   | "sandbox_stopped"
   | "sandbox_starting";
@@ -118,6 +119,7 @@ export function resolveTrustedSandboxStatus(input: {
 
 export function resolveWorkbenchEntryPhase(input: {
   connectedSession: boolean;
+  hasResumeInFlightState: boolean;
   sandboxStatus: SandboxLifecycleStatus | null;
 }): WorkbenchEntryPhase {
   if (input.sandboxStatus === "failed") {
@@ -133,7 +135,7 @@ export function resolveWorkbenchEntryPhase(input: {
   }
 
   if (input.sandboxStatus === "stopped") {
-    return "sandbox_stopped";
+    return input.hasResumeInFlightState ? "resume_pending" : "sandbox_stopped";
   }
 
   return "loading";
@@ -150,6 +152,10 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
     return "starting";
   }
 
+  if (phase === "resume_pending") {
+    return "resuming";
+  }
+
   if (phase === "connecting" || phase === "ready") {
     return "running";
   }
@@ -162,13 +168,16 @@ export function resolveSandboxLifecycleStatusForWorkbenchEntryPhase(
 }
 
 export function resolveStoppedSessionMessageForWorkbenchEntryPhase(input: {
+  autoResumeErrorMessage: string | null;
   phase: WorkbenchEntryPhase;
 }): string | null {
   if (input.phase !== "sandbox_stopped") {
     return null;
   }
 
-  return "This sandbox is stopped. Chat and terminal are unavailable.";
+  return (
+    input.autoResumeErrorMessage ?? "This sandbox is stopped. Chat and terminal are unavailable."
+  );
 }
 
 export function resolveSessionWorkbenchStatus(input: {
