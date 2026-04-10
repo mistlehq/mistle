@@ -3858,7 +3858,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/device-authorization/start": {
+    "/v1/integration/connections/:targetKey/device-authorization/attempts": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
@@ -4047,10 +4047,19 @@
         }
       }
     },
-    "/v1/integration/connections/device-authorization/attempts/:attemptId": {
+    "/v1/integration/connections/:targetKey/device-authorization/attempts/:attemptId": {
       "get": {
         "tags": ["Integrations"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "targetKey",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4276,12 +4285,19 @@
             }
           }
         }
-      }
-    },
-    "/v1/integration/connections/device-authorization/attempts/:attemptId/cancel": {
-      "post": {
+      },
+      "delete": {
         "tags": ["Integrations"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "targetKey",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
