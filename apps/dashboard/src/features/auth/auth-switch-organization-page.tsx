@@ -6,6 +6,8 @@ import { clearAuthenticatedSessionCache } from "../shell/session-cache.js";
 import { fetchSession, SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { AuthSwitchOrganizationPageView } from "./auth-switch-organization-page-view.js";
 
+export const AUTH_SWITCH_ORGANIZATION_PATH = "/auth/switching-organization";
+
 const SWITCH_ORGANIZATION_LOGIN_ERROR = "Something went wrong. Please sign in again.";
 
 export function AuthSwitchOrganizationPage(): React.JSX.Element {
@@ -30,7 +32,7 @@ export function AuthSwitchOrganizationPage(): React.JSX.Element {
         }
 
         if (session === null) {
-          await navigate(buildSwitchOrganizationLoginPath(), { replace: true });
+          await navigate(resolveSwitchOrganizationLoginPath(), { replace: true });
           return;
         }
 
@@ -40,7 +42,7 @@ export function AuthSwitchOrganizationPage(): React.JSX.Element {
           return;
         }
 
-        await navigate(buildSwitchOrganizationLoginPath(), { replace: true });
+        await navigate(resolveSwitchOrganizationLoginPath(), { replace: true });
       }
     }
 
@@ -54,7 +56,7 @@ export function AuthSwitchOrganizationPage(): React.JSX.Element {
   return <AuthSwitchOrganizationPageView />;
 }
 
-function buildSwitchOrganizationLoginPath(): string {
+export function resolveSwitchOrganizationLoginPath(): string {
   return `/auth/login?error=server_error&error_description=${encodeURIComponent(
     SWITCH_ORGANIZATION_LOGIN_ERROR,
   )}`;

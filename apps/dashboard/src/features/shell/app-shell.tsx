@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
 import { authClient } from "../../lib/auth/client.js";
+import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
@@ -120,7 +121,7 @@ export function AppShell(): React.JSX.Element {
       await switchActiveOrganization({
         organizationId,
       });
-      globalThis.location.replace("/auth/switching-organization");
+      globalThis.location.replace(AUTH_SWITCH_ORGANIZATION_PATH);
       return;
     } catch (error) {
       setSwitchOrganizationError(
