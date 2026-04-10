@@ -2,14 +2,19 @@ import { ForbiddenResponseSchema, NotFoundResponseSchema } from "@mistle/http/er
 import { describe, expect } from "vitest";
 
 import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
-import { createOrganizationActor } from "./helpers/organization-fixture.js";
+import {
+  buildOrganizationActor,
+  createPersistedOrganizationActor,
+} from "./helpers/organization-fixture.js";
 import { it } from "./test-context.js";
 
 describe("organization membership capabilities integration", () => {
   it("returns capabilities for an authenticated organization member", async ({ fixture }) => {
-    const authenticatedSession = await createOrganizationActor({
+    const authenticatedSession = await createPersistedOrganizationActor({
       fixture,
-      email: "integration-membership-capabilities-owner@example.com",
+      actor: buildOrganizationActor({
+        email: "integration-membership-capabilities-owner@example.com",
+      }),
     });
 
     const response = await fixture.request(
@@ -45,13 +50,17 @@ describe("organization membership capabilities integration", () => {
   it("returns 403 for an authenticated actor without organization membership", async ({
     fixture,
   }) => {
-    const firstSession = await createOrganizationActor({
+    const firstSession = await createPersistedOrganizationActor({
       fixture,
-      email: "integration-membership-capabilities-forbidden-a@example.com",
+      actor: buildOrganizationActor({
+        email: "integration-membership-capabilities-forbidden-a@example.com",
+      }),
     });
-    const secondSession = await createOrganizationActor({
+    const secondSession = await createPersistedOrganizationActor({
       fixture,
-      email: "integration-membership-capabilities-forbidden-b@example.com",
+      actor: buildOrganizationActor({
+        email: "integration-membership-capabilities-forbidden-b@example.com",
+      }),
     });
 
     const response = await fixture.request(
@@ -73,9 +82,11 @@ describe("organization membership capabilities integration", () => {
   });
 
   it("returns 404 for an organization that does not exist", async ({ fixture }) => {
-    const authenticatedSession = await createOrganizationActor({
+    const authenticatedSession = await createPersistedOrganizationActor({
       fixture,
-      email: "integration-membership-capabilities-not-found@example.com",
+      actor: buildOrganizationActor({
+        email: "integration-membership-capabilities-not-found@example.com",
+      }),
     });
 
     const response = await fixture.request(
