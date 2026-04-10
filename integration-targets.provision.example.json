@@ -90,6 +90,16 @@
       "config": {}
     },
     {
+      "targetKey": "planetscale-default",
+      "enabled": true,
+      "config": {
+        "client_id": "ps_client_example"
+      },
+      "secrets": {
+        "client_secret": "ps_secret_example"
+      }
+    },
+    {
       "targetKey": "slack-default",
       "enabled": true,
       "config": {

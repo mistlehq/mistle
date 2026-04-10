@@ -29,6 +29,10 @@ describe("integrations-definitions server", () => {
       familyId: "slack",
       variantId: "slack-default",
     });
+    const planetScaleDefinition = registry.getDefinition({
+      familyId: "planetscale",
+      variantId: "planetscale-default",
+    });
 
     expect(jiraDefinition?.webhookSource).toMatchObject({
       lifecycle: "managed",
@@ -71,12 +75,13 @@ describe("integrations-definitions server", () => {
     expect(slackDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
     });
+    expect(planetScaleDefinition?.oauth2AuthorizationCode).toBeDefined();
   });
 
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(7);
+    expect(definitions).toHaveLength(8);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

@@ -9,6 +9,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "jira" })).toBe("/integration-logos/jira.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "google" })).toBe("/integration-logos/google.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "linear" })).toBe("/integration-logos/linear.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "planetscale" })).toBe(
+      "/integration-logos/planetscale.svg",
+    );
     expect(resolveIntegrationLogoPath({ logoKey: "slack" })).toBe("/integration-logos/slack.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
   });

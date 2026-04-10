@@ -52,6 +52,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "planetscale-default",
+        familyId: "planetscale",
+        variantId: "planetscale-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "slack-default",
         familyId: "slack",
         variantId: "slack-default",

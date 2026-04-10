@@ -37,6 +37,10 @@ describe("integrations-definitions index", () => {
       familyId: "slack",
       variantId: "slack-default",
     });
+    const planetScaleDefinition = registry.getDefinition({
+      familyId: "planetscale",
+      variantId: "planetscale-default",
+    });
 
     expect(awsDefinition).toMatchObject({
       familyId: "aws",
@@ -287,6 +291,26 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(linearDefinition?.mcp).toBeDefined();
+    expect(planetScaleDefinition).toMatchObject({
+      familyId: "planetscale",
+      variantId: "planetscale-default",
+      kind: "connector",
+      displayName: "PlanetScale",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect with PlanetScale",
+              helperText: "Authorize this workspace with PlanetScale using OAuth.",
+            },
+          },
+        },
+      ],
+    });
+    expect(planetScaleDefinition?.mcp).toBeDefined();
     expect(slackDefinition).toMatchObject({
       familyId: "slack",
       variantId: "slack-default",
@@ -337,7 +361,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(7);
+    expect(definitions).toHaveLength(8);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -347,6 +371,7 @@ describe("integrations-definitions index", () => {
       "github::github-enterprise-server",
       "linear::linear-default",
       "openai::openai-default",
+      "planetscale::planetscale-default",
       "slack::slack-default",
     ]);
   });
