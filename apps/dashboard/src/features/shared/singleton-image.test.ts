@@ -122,7 +122,7 @@ describe("createSingletonImageContentUrl", () => {
         },
       }),
     ).toBe(
-      "http://localhost:3000/v1/organizations/org_123/logo/content?v=logos%2Forganizations%2Forg_123%2Fimg_123.webp",
+      "http://localhost:3000/v1/organization/logo/content?v=logos%2Forganizations%2Forg_123%2Fimg_123.webp",
     );
   });
 });

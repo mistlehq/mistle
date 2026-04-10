@@ -7,15 +7,13 @@ import {
 } from "@mistle/http/errors.js";
 
 import { profileImageUploadFormSchema } from "../../me/schemas.js";
-import { OrganizationLogoParamsSchema } from "../organization-logo-schema.js";
 import { organizationLogoResponseSchema } from "../schemas.js";
 
 export const route = createRoute({
   method: "put",
-  path: "/{organizationId}/logo",
+  path: "/logo",
   tags: ["Organizations"],
   request: {
-    params: OrganizationLogoParamsSchema,
     body: {
       required: true,
       content: {

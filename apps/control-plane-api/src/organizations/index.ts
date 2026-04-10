@@ -1,5 +1,5 @@
-export { createOrganizationsRoutes } from "./routes.js";
-export { ORGANIZATIONS_ROUTE_BASE_PATH } from "./constants.js";
+export { createOrganizationRoutes } from "./routes.js";
+export { ORGANIZATION_ROUTE_BASE_PATH } from "./constants.js";
 export { route as deleteLogoRoute } from "./delete-logo/route.js";
 export { route as getLogoRoute } from "./get-logo/route.js";
 export { route as getLogoContentRoute } from "./get-logo-content/route.js";

@@ -1,7 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
+import { requireActiveOrganizationPermission } from "../../auth/services/organization-authorization.js";
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
@@ -13,14 +13,13 @@ const routeHandler = async (
   session: AppSession,
 ) => {
   const db = ctx.get("db");
-  const { organizationId } = ctx.req.valid("param");
+  const organizationId = session.activeOrganizationId;
   const { limit, offset, search } = ctx.req.valid("query");
 
-  await requireOrganizationPermission({
+  await requireActiveOrganizationPermission({
     db,
     actorUserId: session.user.id,
-    activeOrganizationId: session.session.activeOrganizationId,
-    organizationId,
+    activeOrganizationId: session.activeOrganizationId,
     permission: OrganizationPermissions.ORGANIZATION_MEMBERSHIP_READ,
   });
 

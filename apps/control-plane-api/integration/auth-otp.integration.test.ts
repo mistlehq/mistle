@@ -231,14 +231,11 @@ describe("auth otp integration", () => {
       slug: `integration-otp-${randomUUID()}`,
     });
 
-    const capabilitiesResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(organizationId)}/membership-capabilities`,
-      {
-        headers: {
-          cookie: requestCookie,
-        },
+    const capabilitiesResponse = await fixture.request("/v1/organization/membership-capabilities", {
+      headers: {
+        cookie: requestCookie,
       },
-    );
+    });
     expect(capabilitiesResponse.status).toBe(200);
 
     const capabilities = MembershipCapabilitiesSchema.parse(await capabilitiesResponse.json());

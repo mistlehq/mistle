@@ -68,7 +68,7 @@ describe("organization members integration", () => {
       });
 
       const firstPageResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=members-case`,
+        "/v1/organization/members?limit=1&offset=0&search=members-case",
         {
           headers: {
             cookie: ownerSession.cookie,
@@ -98,7 +98,7 @@ describe("organization members integration", () => {
       });
 
       const emailSearchResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=25&offset=0&search=${encodeURIComponent(searchedEmail)}`,
+        `/v1/organization/members?limit=25&offset=0&search=${encodeURIComponent(searchedEmail)}`,
         {
           headers: {
             cookie: ownerSession.cookie,
@@ -129,7 +129,7 @@ describe("organization members integration", () => {
       });
 
       const roleSearchResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=25&offset=0&search=admin`,
+        "/v1/organization/members?limit=25&offset=0&search=admin",
         {
           headers: {
             cookie: ownerSession.cookie,
@@ -159,7 +159,7 @@ describe("organization members integration", () => {
       });
 
       const avatarResponse = await runtime.request(
-        `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=members-case-alpha@example.com`,
+        "/v1/organization/members?limit=1&offset=0&search=members-case-alpha@example.com",
         {
           headers: {
             cookie: ownerSession.cookie,
@@ -306,7 +306,7 @@ describe("organization members integration", () => {
       .where(eq(users.id, namedSession.userId));
 
     const firstPageResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=0&search=`,
+      "/v1/organization/members?limit=1&offset=0&search=",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -335,7 +335,7 @@ describe("organization members integration", () => {
     });
 
     const secondPageResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=1&search=`,
+      "/v1/organization/members?limit=1&offset=1&search=",
       {
         headers: {
           cookie: ownerSession.cookie,
@@ -364,7 +364,7 @@ describe("organization members integration", () => {
     });
 
     const thirdPageResponse = await fixture.request(
-      `/v1/organizations/${encodeURIComponent(ownerSession.organizationId)}/members?limit=1&offset=2&search=`,
+      "/v1/organization/members?limit=1&offset=2&search=",
       {
         headers: {
           cookie: ownerSession.cookie,

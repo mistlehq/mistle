@@ -11,7 +11,6 @@ import {
 
 export type OrganizationAuthorizationContext = {
   actorUserId: string;
-  activeOrganizationId: string;
   organizationId: string;
   membershipRole: OrganizationRole;
   permissions: readonly OrganizationPermission[];
@@ -36,13 +35,8 @@ async function requireExistingOrganization(input: {
 export async function requireOrganizationAccess(input: {
   db: ControlPlaneDatabase;
   actorUserId: string;
-  activeOrganizationId: string;
   organizationId: string;
 }): Promise<OrganizationAuthorizationContext> {
-  if (input.organizationId !== input.activeOrganizationId) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
-  }
-
   const membership = await input.db.query.members.findFirst({
     columns: {
       role: true,
@@ -67,7 +61,6 @@ export async function requireOrganizationAccess(input: {
 
   return {
     actorUserId: input.actorUserId,
-    activeOrganizationId: input.activeOrganizationId,
     organizationId: input.organizationId,
     membershipRole,
     permissions: getOrganizationPermissions(membershipRole),
@@ -80,7 +73,8 @@ export async function requireActiveOrganizationAccess(input: {
   activeOrganizationId: string;
 }): Promise<OrganizationAuthorizationContext> {
   return requireOrganizationAccess({
-    ...input,
+    actorUserId: input.actorUserId,
+    db: input.db,
     organizationId: input.activeOrganizationId,
   });
 }
@@ -88,7 +82,6 @@ export async function requireActiveOrganizationAccess(input: {
 export async function requireOrganizationPermission(input: {
   db: ControlPlaneDatabase;
   actorUserId: string;
-  activeOrganizationId: string;
   organizationId: string;
   permission: OrganizationPermission;
 }): Promise<OrganizationAuthorizationContext> {
@@ -99,4 +92,18 @@ export async function requireOrganizationPermission(input: {
   }
 
   return authorization;
+}
+
+export async function requireActiveOrganizationPermission(input: {
+  db: ControlPlaneDatabase;
+  actorUserId: string;
+  activeOrganizationId: string;
+  permission: OrganizationPermission;
+}): Promise<OrganizationAuthorizationContext> {
+  return requireOrganizationPermission({
+    actorUserId: input.actorUserId,
+    db: input.db,
+    organizationId: input.activeOrganizationId,
+    permission: input.permission,
+  });
 }

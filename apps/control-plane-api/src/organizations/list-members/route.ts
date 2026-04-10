@@ -7,14 +7,13 @@ import {
 } from "@mistle/http/errors.js";
 
 import { MembersPageResponseSchema } from "../schemas.js";
-import { ListMembersParamsSchema, ListMembersQuerySchema } from "./schema.js";
+import { ListMembersQuerySchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/{organizationId}/members",
+  path: "/members",
   tags: ["Organizations"],
   request: {
-    params: ListMembersParamsSchema,
     query: ListMembersQuerySchema,
   },
   responses: {

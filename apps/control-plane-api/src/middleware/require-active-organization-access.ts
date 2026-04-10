@@ -16,7 +16,7 @@ export function createRequireActiveOrganizationAccessMiddleware(): MiddlewareHan
       await requireActiveOrganizationAccess({
         db: ctx.get("db"),
         actorUserId: session.user.id,
-        activeOrganizationId: session.session.activeOrganizationId,
+        activeOrganizationId: session.activeOrganizationId,
       });
     } catch (error) {
       return handleHttpError(ctx, error);

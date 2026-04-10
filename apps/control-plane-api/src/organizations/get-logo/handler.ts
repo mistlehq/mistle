@@ -2,7 +2,7 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
-import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
+import { requireActiveOrganizationPermission } from "../../auth/services/organization-authorization.js";
 import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { createSingletonImageMetadataResponse } from "../../lib/singleton-image-metadata.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
@@ -14,13 +14,12 @@ const routeHandler = async (
   session: AppSession,
 ) => {
   const db = ctx.get("db");
-  const { organizationId } = ctx.req.valid("param");
+  const organizationId = session.activeOrganizationId;
 
-  await requireOrganizationPermission({
+  await requireActiveOrganizationPermission({
     db,
     actorUserId: session.user.id,
-    activeOrganizationId: session.session.activeOrganizationId,
-    organizationId,
+    activeOrganizationId: session.activeOrganizationId,
     permission: OrganizationPermissions.ORGANIZATION_LOGO_READ,
   });
 

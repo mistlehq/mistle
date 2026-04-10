@@ -1,11 +1,5 @@
 import { z } from "@hono/zod-openapi";
 
-export const ListMembersParamsSchema = z
-  .object({
-    organizationId: z.string().min(1),
-  })
-  .strict();
-
 export const ListMembersQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(25),
