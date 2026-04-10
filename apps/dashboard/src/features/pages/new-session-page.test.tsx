@@ -9,7 +9,7 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { NewSessionPage } from "./new-session-page.js";
+import { NewSessionPage, type NewSessionPagePreviewState } from "./new-session-page.js";
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 
 function installMatchMediaStub(): void {
@@ -56,7 +56,7 @@ function createNewSessionPageQueryClient(input?: {
 
 function renderNewSessionPage(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
-  previewState?: Parameters<typeof NewSessionPage>[0]["previewState"];
+  previewState?: NewSessionPagePreviewState;
 }) {
   const queryClient = createNewSessionPageQueryClient(input);
 
