@@ -9,8 +9,8 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
-import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
+import type { SessionStatusBadgeUi } from "./session-status-presentation.js";
 import {
   createStoryLongCliOutput,
   createStoryWorkbenchCliPtyState,
@@ -23,7 +23,7 @@ import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
-  headerStatusUi: SandboxStatusBadgeUi;
+  headerStatusUi: SessionStatusBadgeUi;
 };
 
 const meta = {

@@ -33,6 +33,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                connectable: boolean;
                 createdAt: string;
                 failureCode: string | null;
                 failureMessage: string | null;

@@ -18,6 +18,7 @@ export type LaunchedSandboxSession = {
   workflowRunId: string;
   createdAtIso: string;
   status: SandboxInstanceStatusResult["status"];
+  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
 };
@@ -49,6 +50,7 @@ function applySessionStatus(
   return {
     ...session,
     status: status.status,
+    connectable: status.connectable,
     failureCode: status.failureCode,
     failureMessage: status.failureMessage,
   };
@@ -129,6 +131,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
           workflowRunId: result.workflowRunId,
           createdAtIso: new Date().toISOString(),
           status: "pending",
+          connectable: false,
           failureCode: null,
           failureMessage: null,
         },

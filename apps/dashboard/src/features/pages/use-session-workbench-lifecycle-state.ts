@@ -373,6 +373,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const workbenchStatus = resolveSessionWorkbenchStatus({
     sandboxStatusReadState,
     sandboxLifecycleStatus: displaySandboxLifecycleStatus,
+    hasConnectedSession: sessionConnectionState === "connected",
     lifecycleErrorMessage: resolvedLifecycleErrorMessage,
     reconnectMessage: sessionReconnectMessage,
     sandboxFailureMessage,

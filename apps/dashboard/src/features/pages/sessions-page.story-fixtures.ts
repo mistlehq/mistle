@@ -56,6 +56,8 @@ export function buildSandboxInstanceListItemFixture(
   overrides: Partial<SandboxInstanceListItem> & Pick<SandboxInstanceListItem, "id">,
 ): SandboxInstanceListItem {
   const { id, ...restOverrides } = overrides;
+  const status = restOverrides.status ?? "running";
+  const connectable = restOverrides.connectable ?? status === "running";
 
   return {
     id,
@@ -63,7 +65,8 @@ export function buildSandboxInstanceListItemFixture(
     sandboxProfileId: "sbp_profile_alpha",
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,
-    status: "running",
+    status,
+    connectable,
     keepaliveActive: false,
     startedBy: {
       kind: "user",

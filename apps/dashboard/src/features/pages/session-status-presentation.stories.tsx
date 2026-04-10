@@ -2,18 +2,16 @@ import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
-import {
-  resolveSandboxStatusBadgeUi,
-  type SandboxLifecycleStatus,
-} from "./sandbox-status-presentation.js";
+import type { SessionStatusKind } from "../sessions/session-status.js";
+import { resolveSessionStatusBadgeUi } from "./session-status-presentation.js";
 
-function SandboxStatusBadgePreview(input: {
-  statuses: readonly SandboxLifecycleStatus[];
+function SessionStatusBadgePreview(input: {
+  statuses: readonly SessionStatusKind[];
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 p-6">
       {input.statuses.map((status) => {
-        const badgeUi = resolveSandboxStatusBadgeUi(status);
+        const badgeUi = resolveSessionStatusBadgeUi(status);
         const statusLabel = status ?? "null";
 
         return (
@@ -34,19 +32,27 @@ function SandboxStatusBadgePreview(input: {
 
 const meta = {
   title: "Dashboard/Sessions/SessionList/StatusPresentation",
-  component: SandboxStatusBadgePreview,
+  component: SessionStatusBadgePreview,
   tags: ["autodocs"],
   args: {
-    statuses: ["pending", "starting", "running", "stopped", "failed"],
+    statuses: [
+      "loading",
+      "starting",
+      "connecting",
+      "connected",
+      "reconnecting",
+      "stopped",
+      "failed",
+    ],
   },
   parameters: {
     layout: "fullscreen",
   },
   decorators: [withDashboardWorkspaceStory],
-} satisfies Meta<typeof SandboxStatusBadgePreview>;
+} satisfies Meta<typeof SessionStatusBadgePreview>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const LifecycleStates: Story = {};
+export const SessionStates: Story = {};

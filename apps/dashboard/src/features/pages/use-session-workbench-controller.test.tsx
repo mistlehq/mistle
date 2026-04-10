@@ -77,7 +77,7 @@ describe("useSessionWorkbenchController", () => {
       requiresManualResume: false,
     });
     expect(result.current.workbench.workbenchStatus).toEqual({
-      kind: "not_connected",
+      kind: "loading",
       alert: null,
     });
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();

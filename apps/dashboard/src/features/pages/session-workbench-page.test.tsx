@@ -66,7 +66,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          kind: "not_connected",
+          kind: "loading",
           alert: null,
         },
       }),
@@ -95,7 +95,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          kind: "not_connected",
+          kind: "starting",
           alert: null,
         },
       }),
@@ -109,7 +109,7 @@ describe("SessionWorkbenchPage", () => {
     expect(
       resolveSessionWorkbenchHeaderStatusUi({
         workbenchStatus: {
-          kind: "error",
+          kind: "failed",
           alert: null,
         },
       }),

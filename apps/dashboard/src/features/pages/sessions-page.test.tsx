@@ -8,9 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { resolveSessionStatus } from "../sessions/session-status.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
-import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
+import { resolveSessionStatusBadgeUi } from "./session-status-presentation.js";
 import {
   buildOptimisticSessions,
   resolveSessionResultsSummary,
@@ -107,6 +108,7 @@ describe("SessionsPage", () => {
           sandboxInstanceId: "sbi_optimistic",
           createdAtIso: "2026-03-10T00:00:00.000Z",
           status: "starting",
+          connectable: false,
           failureCode: null,
           failureMessage: null,
         },
@@ -124,6 +126,7 @@ describe("SessionsPage", () => {
         sandboxProfileDisplayName: "Alpha Profile",
         sandboxProfileVersion: 3,
         status: "starting",
+        connectable: false,
         keepaliveActive: false,
         startedBy: {
           kind: "user",
@@ -283,6 +286,7 @@ describe("SessionsPage", () => {
   it("renders a compact failure indicator with tooltip details", () => {
     const markup = renderToStaticMarkup(
       <SandboxSessionStatusBadge
+        connectable={false}
         status="failed"
         failureCode="sandbox_start_failed"
         failureMessage="Failed to start sandbox runtime."
@@ -297,12 +301,31 @@ describe("SessionsPage", () => {
   });
 
   it("uses the same badge labels as the workbench header mapper", () => {
-    expect(resolveSandboxStatusBadgeUi(null).label).toBe("Loading status");
-    expect(resolveSandboxStatusBadgeUi("pending").label).toBe("Pending");
-    expect(resolveSandboxStatusBadgeUi("starting").label).toBe("Starting");
-    expect(resolveSandboxStatusBadgeUi("running").label).toBe("Running");
-    expect(resolveSandboxStatusBadgeUi("stopped").label).toBe("Stopped");
-    expect(resolveSandboxStatusBadgeUi("failed").label).toBe("Failed");
+    expect(resolveSessionStatusBadgeUi("loading").label).toBe("Loading status");
+    expect(resolveSessionStatusBadgeUi("starting").label).toBe("Starting");
+    expect(resolveSessionStatusBadgeUi("connecting").label).toBe("Connecting");
+    expect(resolveSessionStatusBadgeUi("connected").label).toBe("Connected");
+    expect(resolveSessionStatusBadgeUi("stopped").label).toBe("Stopped");
+    expect(resolveSessionStatusBadgeUi("failed").label).toBe("Failed");
+  });
+
+  it("distinguishes connecting from connected in the shared session status model", () => {
+    expect(
+      resolveSessionStatus({
+        sandboxLifecycleStatus: "running",
+        sandboxConnectable: false,
+        isStatusLoading: false,
+        isReconnecting: false,
+      }),
+    ).toBe("connecting");
+    expect(
+      resolveSessionStatus({
+        sandboxLifecycleStatus: "running",
+        sandboxConnectable: true,
+        isStatusLoading: false,
+        isReconnecting: false,
+      }),
+    ).toBe("connected");
   });
 
   it("routes stopped sessions into the workbench route directly", () => {

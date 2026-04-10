@@ -1,3 +1,5 @@
+import { resolveSessionStatus, type SessionStatusKind } from "../sessions/session-status.js";
+
 export type SandboxStatusReadState = "error" | "loading" | "ready";
 
 export type SandboxLifecycleStatus = "pending" | "starting" | "running" | "stopped" | "failed";
@@ -24,19 +26,10 @@ export type SessionWorkbenchStatusAlert = {
   description: string;
 };
 
-export type SessionWorkbenchStatus =
-  | {
-      kind: "connected";
-      alert: SessionWorkbenchStatusAlert | null;
-    }
-  | {
-      kind: "error";
-      alert: SessionWorkbenchStatusAlert | null;
-    }
-  | {
-      kind: "not_connected";
-      alert: SessionWorkbenchStatusAlert | null;
-    };
+export type SessionWorkbenchStatus = {
+  kind: SessionStatusKind;
+  alert: SessionWorkbenchStatusAlert | null;
+};
 
 export function shouldWaitForAutomationSessionThread(input: {
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
@@ -217,6 +210,7 @@ export function resolveStoppedSessionMessageForWorkbenchEntryPhase(input: {
 export function resolveSessionWorkbenchStatus(input: {
   sandboxStatusReadState: SandboxStatusReadState;
   sandboxLifecycleStatus: WorkbenchSandboxLifecycleStatus;
+  hasConnectedSession: boolean;
   lifecycleErrorMessage: string | null;
   reconnectMessage: string | null;
   sandboxFailureMessage: string | null;
@@ -224,7 +218,7 @@ export function resolveSessionWorkbenchStatus(input: {
 }): SessionWorkbenchStatus {
   if (input.lifecycleErrorMessage !== null) {
     return {
-      kind: "error",
+      kind: "failed",
       alert: {
         title: "Session connection error",
         description: input.lifecycleErrorMessage,
@@ -234,7 +228,7 @@ export function resolveSessionWorkbenchStatus(input: {
 
   if (input.sandboxFailureMessage !== null) {
     return {
-      kind: "error",
+      kind: "failed",
       alert: {
         title: "Sandbox failed",
         description: input.sandboxFailureMessage,
@@ -244,14 +238,14 @@ export function resolveSessionWorkbenchStatus(input: {
 
   if (input.sandboxLifecycleStatus === "failed") {
     return {
-      kind: "error",
+      kind: "failed",
       alert: null,
     };
   }
 
   if (input.stoppedSessionMessage !== null) {
     return {
-      kind: "not_connected",
+      kind: "stopped",
       alert: {
         title: "Stopped sandbox",
         description: input.stoppedSessionMessage,
@@ -262,7 +256,7 @@ export function resolveSessionWorkbenchStatus(input: {
   if (input.reconnectMessage !== null) {
     if (input.sandboxLifecycleStatus === "running") {
       return {
-        kind: "connected",
+        kind: "reconnecting",
         alert: {
           title: "Reconnecting session",
           description: input.reconnectMessage,
@@ -271,7 +265,7 @@ export function resolveSessionWorkbenchStatus(input: {
     }
 
     return {
-      kind: "not_connected",
+      kind: "reconnecting",
       alert: {
         title: "Reconnecting session",
         description: input.reconnectMessage,
@@ -279,22 +273,13 @@ export function resolveSessionWorkbenchStatus(input: {
     };
   }
 
-  if (
-    input.sandboxStatusReadState === "loading" ||
-    input.sandboxLifecycleStatus === null ||
-    input.sandboxLifecycleStatus === "pending" ||
-    input.sandboxLifecycleStatus === "starting" ||
-    input.sandboxLifecycleStatus === "resuming" ||
-    input.sandboxLifecycleStatus === "stopped"
-  ) {
-    return {
-      kind: "not_connected",
-      alert: null,
-    };
-  }
-
   return {
-    kind: "connected",
+    kind: resolveSessionStatus({
+      sandboxLifecycleStatus: input.sandboxLifecycleStatus,
+      sandboxConnectable: input.hasConnectedSession,
+      isStatusLoading: input.sandboxStatusReadState === "loading",
+      isReconnecting: false,
+    }),
     alert: null,
   };
 }
