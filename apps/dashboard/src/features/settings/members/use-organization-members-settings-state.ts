@@ -1,7 +1,8 @@
+import { useDebouncer } from "@tanstack/react-pacer";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import { useDebouncedCallback } from "../../shared/use-debounced-callback.js";
+import { DEFAULT_SEARCH_DEBOUNCE_MS } from "../../shared/use-debounced-value.js";
 import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
 import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
@@ -69,19 +70,24 @@ export function useOrganizationMembersSettingsState(
     searchInputValueRef.current = searchInputValue;
   }, [searchInputValue]);
 
-  const commitSearchValue = useDebouncedCallback((nextValue: string) => {
-    setDirectoryQueryInput((currentValue) => {
-      if (currentValue.searchValue === nextValue && currentValue.offset === 0) {
-        return currentValue;
-      }
+  const searchDebouncer = useDebouncer(
+    (nextValue: string) => {
+      setDirectoryQueryInput((currentValue) => {
+        if (currentValue.searchValue === nextValue && currentValue.offset === 0) {
+          return currentValue;
+        }
 
-      return {
-        ...currentValue,
-        offset: 0,
-        searchValue: nextValue,
-      };
-    });
-  });
+        return {
+          ...currentValue,
+          offset: 0,
+          searchValue: nextValue,
+        };
+      });
+    },
+    {
+      wait: DEFAULT_SEARCH_DEBOUNCE_MS,
+    },
+  );
 
   const queryKeys = buildMembersQueryKeys(input.organizationId);
   const capabilitiesQuery = useQuery({
@@ -193,7 +199,7 @@ export function useOrganizationMembersSettingsState(
     },
     onInviteCompleted: async () => {
       const nextState = resolvePostInviteDirectoryState();
-      commitSearchValue.cancel();
+      searchDebouncer.cancel();
       setSearchInputValue(nextState.searchValue);
       searchInputValueRef.current = nextState.searchValue;
       setDirectoryQueryInput(nextState);
@@ -201,7 +207,7 @@ export function useOrganizationMembersSettingsState(
     },
     onInviteDialogOpenChange: setInviteDialogOpen,
     onFilterChange: (nextValue) => {
-      commitSearchValue.cancel();
+      searchDebouncer.cancel();
       setDirectoryQueryInput((currentValue) => {
         return {
           ...currentValue,
@@ -264,7 +270,7 @@ export function useOrganizationMembersSettingsState(
     onSearchValueChange: (nextValue) => {
       searchInputValueRef.current = nextValue;
       setSearchInputValue(nextValue);
-      commitSearchValue(nextValue);
+      searchDebouncer.maybeExecute(nextValue);
     },
     organizationId: input.organizationId,
     offset,
