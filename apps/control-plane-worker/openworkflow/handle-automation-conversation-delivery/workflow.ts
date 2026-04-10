@@ -194,6 +194,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
             acquireAutomationConnection(
               {
                 controlPlaneInternalClient,
+                dataPlaneClient,
               },
               {
                 preparedAutomationRun,

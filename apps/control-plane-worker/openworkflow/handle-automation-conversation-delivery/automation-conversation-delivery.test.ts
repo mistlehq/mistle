@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createAutomationSandboxResumeIdempotencyKey } from "./acquire-automation-connection.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,
@@ -15,6 +16,19 @@ import {
 } from "./conversation-delivery-planning.js";
 
 describe("conversation delivery plans", () => {
+  describe("createAutomationSandboxResumeIdempotencyKey", () => {
+    it("returns a stable key for the same conversation and sandbox", () => {
+      expect(
+        createAutomationSandboxResumeIdempotencyKey({
+          conversationId: "cnv_01knvnba9vecvv73bsw8aqbxan",
+          sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
+        }),
+      ).toBe(
+        "automation-conversation-resume:cnv_01knvnba9vecvv73bsw8aqbxan:sbi_01knvnbakhfevv29xs862a8txe",
+      );
+    });
+  });
+
   describe("resolveAutomationConversationDeliverySandboxAction", () => {
     it("starts a new sandbox when no route sandbox is persisted", () => {
       expect(
@@ -25,7 +39,7 @@ describe("conversation delivery plans", () => {
       ).toBe(AutomationConversationDeliverySandboxActions.START_NEW);
     });
 
-    it("reuses the persisted sandbox when it is still running", () => {
+    it("reuses the persisted sandbox when it is already running", () => {
       expect(
         resolveAutomationConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
@@ -34,16 +48,34 @@ describe("conversation delivery plans", () => {
       ).toBe(AutomationConversationDeliverySandboxActions.REUSE_EXISTING);
     });
 
-    it("fails closed when a persisted provider conversation is bound to a stopped sandbox", () => {
+    it("reuses the persisted sandbox when it is still starting", () => {
+      expect(
+        resolveAutomationConversationDeliverySandboxAction({
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "starting",
+        }),
+      ).toBe(AutomationConversationDeliverySandboxActions.REUSE_EXISTING);
+    });
+
+    it("reuses the persisted sandbox when provisioning is still pending", () => {
+      expect(
+        resolveAutomationConversationDeliverySandboxAction({
+          sandboxInstanceId: "sbi_123",
+          sandboxStatus: "pending",
+        }),
+      ).toBe(AutomationConversationDeliverySandboxActions.REUSE_EXISTING);
+    });
+
+    it("reuses the persisted sandbox when it is stopped but resumable", () => {
       expect(
         resolveAutomationConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "stopped",
         }),
-      ).toBe(AutomationConversationDeliverySandboxActions.FAIL);
+      ).toBe(AutomationConversationDeliverySandboxActions.REUSE_EXISTING);
     });
 
-    it("fails closed when a pending route sandbox is no longer running", () => {
+    it("fails closed when a persisted sandbox has failed", () => {
       expect(
         resolveAutomationConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",

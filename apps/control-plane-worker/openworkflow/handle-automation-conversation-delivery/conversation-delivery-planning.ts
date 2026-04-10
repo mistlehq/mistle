@@ -14,7 +14,12 @@ export function resolveAutomationConversationDeliverySandboxAction(input: {
   if (input.sandboxInstanceId === null) {
     return AutomationConversationDeliverySandboxActions.START_NEW;
   }
-  if (input.sandboxStatus === "running") {
+  if (
+    input.sandboxStatus === "pending" ||
+    input.sandboxStatus === "starting" ||
+    input.sandboxStatus === "running" ||
+    input.sandboxStatus === "stopped"
+  ) {
     return AutomationConversationDeliverySandboxActions.REUSE_EXISTING;
   }
 

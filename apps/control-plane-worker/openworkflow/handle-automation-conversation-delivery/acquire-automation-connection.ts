@@ -1,4 +1,5 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { systemSleeper } from "@mistle/time";
 
 import type {
@@ -14,9 +15,17 @@ import type { AcquiredAutomationConnection } from "./types.js";
 const SandboxStartTimeoutMs = 5 * 60 * 1000;
 const SandboxStartPollIntervalMs = 1_000;
 
+export function createAutomationSandboxResumeIdempotencyKey(input: {
+  conversationId: string;
+  sandboxInstanceId: string;
+}): string {
+  return `automation-conversation-resume:${input.conversationId}:${input.sandboxInstanceId}`;
+}
+
 export async function acquireAutomationConnection(
   ctx: {
     controlPlaneInternalClient: ControlPlaneInternalClient;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "resumeSandboxInstance">;
   },
   input: {
     preparedAutomationRun: PreparedAutomationRun;
@@ -32,6 +41,7 @@ export async function acquireAutomationConnection(
 
   const deadline = Date.now() + SandboxStartTimeoutMs;
   let isSandboxRunning = false;
+  let hasRequestedResume = false;
   while (Date.now() < deadline) {
     const sandboxInstance = await ctx.controlPlaneInternalClient.getSandboxInstance({
       organizationId: input.preparedAutomationRun.organizationId,
@@ -43,13 +53,25 @@ export async function acquireAutomationConnection(
       break;
     }
 
-    if (sandboxInstance.status === "failed" || sandboxInstance.status === "stopped") {
+    if (sandboxInstance.status === "failed") {
       throw createAutomationRunExecutionError({
         code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
         message:
           sandboxInstance.failureMessage ??
           `Sandbox instance '${sandboxInstance.id}' entered terminal status '${sandboxInstance.status}' before it became ready.`,
       });
+    }
+
+    if (sandboxInstance.status === "stopped" && !hasRequestedResume) {
+      await ctx.dataPlaneClient.resumeSandboxInstance({
+        organizationId: input.preparedAutomationRun.organizationId,
+        instanceId: sandboxInstance.id,
+        idempotencyKey: createAutomationSandboxResumeIdempotencyKey({
+          conversationId: input.preparedAutomationRun.conversationId,
+          sandboxInstanceId: sandboxInstance.id,
+        }),
+      });
+      hasRequestedResume = true;
     }
 
     await systemSleeper.sleep(SandboxStartPollIntervalMs);
