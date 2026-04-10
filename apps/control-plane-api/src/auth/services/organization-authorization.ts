@@ -33,11 +33,16 @@ async function requireExistingOrganization(input: {
   }
 }
 
-async function requireLiveOrganizationMembership(input: {
+export async function requireOrganizationAccess(input: {
   db: ControlPlaneDatabase;
   actorUserId: string;
+  activeOrganizationId: string;
   organizationId: string;
-}): Promise<OrganizationRole> {
+}): Promise<OrganizationAuthorizationContext> {
+  if (input.organizationId !== input.activeOrganizationId) {
+    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+  }
+
   const membership = await input.db.query.members.findFirst({
     columns: {
       role: true,
@@ -59,21 +64,6 @@ async function requireLiveOrganizationMembership(input: {
   if (membershipRole === null) {
     throw new Error("Unexpected organization role was found.");
   }
-
-  return membershipRole;
-}
-
-export async function requireOrganizationAccess(input: {
-  db: ControlPlaneDatabase;
-  actorUserId: string;
-  activeOrganizationId: string;
-  organizationId: string;
-}): Promise<OrganizationAuthorizationContext> {
-  if (input.organizationId !== input.activeOrganizationId) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
-  }
-
-  const membershipRole = await requireLiveOrganizationMembership(input);
 
   return {
     actorUserId: input.actorUserId,
