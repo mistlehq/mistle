@@ -118,7 +118,50 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     ]);
   });
 
-  it("returns no summary items when a binding has no additional config", () => {
+  it("renders Linear MCP tool selections with human-readable labels", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-linear",
+      displayName: "Linear Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-linear",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {
+        tools: ["linear-mcp"],
+      },
+    };
+
+    expect(
+      formatSandboxProfileBindingSummaryItems({
+        row,
+        availableConnections: [connection],
+        availableTargets: [target],
+      }),
+    ).toEqual([
+      {
+        label: "Tools",
+        value: "Linear MCP",
+      },
+    ]);
+  });
+
+  it("renders an explicit empty tool summary when no Linear tools are selected", () => {
     const target: IntegrationTargetSummary = {
       targetKey: "target-linear",
       displayName: "Linear",
@@ -151,6 +194,11 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
         availableConnections: [connection],
         availableTargets: [target],
       }),
-    ).toEqual([]);
+    ).toEqual([
+      {
+        label: "Tools",
+        value: "None",
+      },
+    ]);
   });
 });

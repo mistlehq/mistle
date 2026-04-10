@@ -349,4 +349,97 @@ describe("SandboxProfileBindingConfigEditor", () => {
     const jiraCliCheckbox = screen.getByRole("checkbox", { name: /Jira CLI/ });
     expect(jiraCliCheckbox.getAttribute("aria-checked")).toBe("true");
   });
+
+  it("resolves Linear binding config to an optional tools checkbox list", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-linear",
+      displayName: "Linear Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-linear",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    const resolvedUiModel = resolveBindingConfigUiModel({
+      row,
+      connections: [connection],
+      targets: [target],
+    });
+
+    expect(resolvedUiModel).toMatchObject({
+      mode: "form",
+      schema: {
+        properties: {
+          tools: {
+            title: "Tools",
+            default: [],
+          },
+        },
+      },
+      uiSchema: {
+        tools: {
+          "ui:widget": "checkboxes",
+          "ui:options": {
+            inline: false,
+          },
+        },
+      },
+    });
+  });
+
+  it("renders the Linear MCP checkbox with the display label", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-linear",
+      displayName: "Linear",
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-linear",
+      displayName: "Linear Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-linear",
+      connectionId: connection.id,
+      kind: "connector",
+      config: {},
+    };
+
+    renderBindingEditor({
+      row,
+      connections: [connection],
+      targets: [target],
+    });
+
+    expect(screen.getByText("Linear MCP")).toBeDefined();
+    expect(screen.queryByText("linear-mcp")).toBeNull();
+    const linearMcpCheckbox = screen.getByRole("checkbox", { name: /Linear MCP/ });
+    expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("false");
+  });
 });

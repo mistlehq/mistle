@@ -597,6 +597,261 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(slackInstallCommand?.args[2]).toContain("/usr/local/bin/slack");
   });
 
+  it("includes Linear API egress without MCP config when the binding does not select Linear MCP", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-linear-api-only@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_linear_api_only",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Linear API Only Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_linear_api_only",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "openai-default-compile-linear-api-only",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com/v1",
+            binding_capabilities_by_connection_method:
+              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+          },
+        },
+        {
+          targetKey: "linear-default-compile-linear-api-only",
+          familyId: "linear",
+          variantId: "linear-default",
+          enabled: true,
+          config: {},
+        },
+      ])
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_compile_linear_api_only_openai",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-default-compile-linear-api-only",
+        displayName: "Compile Linear API Only OpenAI Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_compile_linear_api_only_linear",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "linear-default-compile-linear-api-only",
+        displayName: "Compile Linear API Only Linear Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_compile_linear_api_only_openai",
+        sandboxProfileId: "sbp_compile_linear_api_only",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_linear_api_only_openai",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
+        },
+      },
+      {
+        id: "ibd_compile_linear_api_only_linear",
+        sandboxProfileId: "sbp_compile_linear_api_only",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_linear_api_only_linear",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: [],
+        },
+      },
+    ]);
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_linear_api_only",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(
+      runtimePlan.egressRoutes.some(
+        (route) =>
+          route.upstream.baseUrl === "https://api.linear.app" &&
+          route.match.hosts.includes("api.linear.app") &&
+          route.match.pathPrefixes?.includes("/graphql") === true,
+      ),
+    ).toBe(true);
+    expect(
+      runtimePlan.egressRoutes.some((route) => route.match.hosts.includes("mcp.linear.app")),
+    ).toBe(false);
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).not.toContain(
+      "[mcp_servers.linear]",
+    );
+  });
+
+  it("includes Linear MCP config and egress when the binding selects Linear MCP", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-linear-mcp@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_linear_mcp",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Linear MCP Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_linear_mcp",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "openai-default-compile-linear-mcp",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com/v1",
+            binding_capabilities_by_connection_method:
+              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+          },
+        },
+        {
+          targetKey: "linear-default-compile-linear-mcp",
+          familyId: "linear",
+          variantId: "linear-default",
+          enabled: true,
+          config: {},
+        },
+      ])
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_compile_linear_mcp_openai",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-default-compile-linear-mcp",
+        displayName: "Compile Linear MCP OpenAI Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_compile_linear_mcp_linear",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "linear-default-compile-linear-mcp",
+        displayName: "Compile Linear MCP Linear Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_compile_linear_mcp_openai",
+        sandboxProfileId: "sbp_compile_linear_mcp",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_linear_mcp_openai",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
+        },
+      },
+      {
+        id: "ibd_compile_linear_mcp_linear",
+        sandboxProfileId: "sbp_compile_linear_mcp",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_linear_mcp_linear",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: ["linear-mcp"],
+        },
+      },
+    ]);
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_linear_mcp",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(
+      runtimePlan.egressRoutes.some(
+        (route) =>
+          route.upstream.baseUrl === "https://api.linear.app" &&
+          route.match.hosts.includes("api.linear.app") &&
+          route.match.pathPrefixes?.includes("/graphql") === true,
+      ),
+    ).toBe(true);
+    expect(
+      runtimePlan.egressRoutes.some((route) => route.match.hosts.includes("mcp.linear.app")),
+    ).toBe(true);
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "[mcp_servers.linear]",
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'url = "https://mcp.linear.app/mcp"',
+    );
+  });
+
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-compile-missing-profile@example.com",

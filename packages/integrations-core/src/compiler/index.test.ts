@@ -5,6 +5,7 @@ import { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
 import {
+  type CompileBindingResult,
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
   type IntegrationDefinition,
@@ -30,6 +31,10 @@ const AgentBindingConfigSchema = z.object({
 
 const ConnectorBindingConfigSchema = z.object({
   defaultModel: z.string().min(1),
+});
+
+const LinearConnectorBindingConfigSchema = z.object({
+  tools: z.array(z.literal("linear-mcp")).default([]),
 });
 
 const ApiKeyConnectionMethods = [
@@ -404,8 +409,31 @@ function createJsonAgentDefinition(): IntegrationDefinition<
 function createLinearMcpDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
-  typeof ConnectorBindingConfigSchema
+  typeof LinearConnectorBindingConfigSchema
 > {
+  function createLinearMcpRoute(input: {
+    connectionId: string;
+  }): CompileBindingResult["egressRoutes"][number] {
+    return {
+      match: {
+        hosts: ["linear.app"],
+        methods: ["POST"],
+        pathPrefixes: ["/mcp"],
+      },
+      upstream: {
+        baseUrl: "https://linear.app",
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        connectionId: input.connectionId,
+        secretType: "api_key",
+      },
+    };
+  }
+
   return {
     familyId: "linear",
     variantId: "linear-default",
@@ -414,27 +442,32 @@ function createLinearMcpDefinition(): IntegrationDefinition<
     logoKey: "linear",
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: ConnectorBindingConfigSchema,
+    bindingConfigSchema: LinearConnectorBindingConfigSchema,
     connectionMethods: ApiKeyConnectionMethods,
-    mcp: () => ({
-      serverId: "linear-default",
-      serverName: "linear",
-      transport: "streamable-http",
-      url: "https://linear.app/mcp",
-    }),
+    mcp: (input) =>
+      input.binding.config.tools.includes("linear-mcp")
+        ? [
+            {
+              serverId: "linear-default",
+              serverName: "linear",
+              transport: "streamable-http",
+              url: "https://linear.app/mcp",
+            },
+          ]
+        : [],
     compileBinding: (input) => ({
       egressRoutes: [
         {
           match: {
-            hosts: ["linear.app"],
+            hosts: ["api.linear.app"],
             methods: ["POST"],
-            pathPrefixes: ["/mcp"],
+            pathPrefixes: ["/graphql"],
           },
           upstream: {
-            baseUrl: "https://linear.app",
+            baseUrl: "https://api.linear.app",
           },
           authInjection: {
-            type: "bearer",
+            type: "header",
             target: "authorization",
           },
           credentialResolver: {
@@ -442,6 +475,13 @@ function createLinearMcpDefinition(): IntegrationDefinition<
             secretType: "api_key",
           },
         },
+        ...(input.binding.config.tools.includes("linear-mcp")
+          ? [
+              createLinearMcpRoute({
+                connectionId: input.connection.id,
+              }),
+            ]
+          : []),
       ],
       artifacts: [],
       runtimeClients: [],
@@ -452,7 +492,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
 function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
-  typeof ConnectorBindingConfigSchema
+  typeof LinearConnectorBindingConfigSchema
 > {
   return {
     familyId: "linear",
@@ -462,14 +502,19 @@ function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
     logoKey: "linear",
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: ConnectorBindingConfigSchema,
+    bindingConfigSchema: LinearConnectorBindingConfigSchema,
     connectionMethods: ApiKeyConnectionMethods,
-    mcp: {
-      serverId: "linear-duplicate-name",
-      serverName: "linear",
-      transport: "streamable-http",
-      url: "https://duplicate.example.com/mcp",
-    },
+    mcp: (input) =>
+      input.binding.config.tools.includes("linear-mcp")
+        ? [
+            {
+              serverId: "linear-duplicate-name",
+              serverName: "linear",
+              transport: "streamable-http",
+              url: "https://duplicate.example.com/mcp",
+            },
+          ]
+        : [],
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [],
@@ -881,7 +926,7 @@ describe("compileRuntimePlan", () => {
             kind: "connector",
             connectionId: "conn_linear_org_123",
             config: {
-              defaultModel: "unused",
+              tools: ["linear-mcp"],
             },
           },
         },
@@ -964,7 +1009,7 @@ describe("compileRuntimePlan", () => {
             kind: "connector",
             connectionId: "conn_linear_org_123",
             config: {
-              defaultModel: "unused",
+              tools: ["linear-mcp"],
             },
           },
         },
@@ -1049,7 +1094,7 @@ describe("compileRuntimePlan", () => {
               kind: "connector",
               connectionId: "conn_linear_org_123",
               config: {
-                defaultModel: "unused",
+                tools: ["linear-mcp"],
               },
             },
           },
@@ -1074,7 +1119,7 @@ describe("compileRuntimePlan", () => {
               kind: "connector",
               connectionId: "conn_linear_duplicate_org_123",
               config: {
-                defaultModel: "unused",
+                tools: ["linear-mcp"],
               },
             },
           },
@@ -1147,7 +1192,7 @@ describe("compileRuntimePlan", () => {
               kind: "connector",
               connectionId: "conn_linear_org_123",
               config: {
-                defaultModel: "unused",
+                tools: ["linear-mcp"],
               },
             },
           },
@@ -1172,7 +1217,7 @@ describe("compileRuntimePlan", () => {
               kind: "connector",
               connectionId: "conn_linear_duplicate_org_123",
               config: {
-                defaultModel: "unused",
+                tools: ["linear-mcp"],
               },
             },
           },
@@ -2051,7 +2096,7 @@ describe("compileRuntimePlan", () => {
               kind: "connector",
               connectionId: "conn_linear_org_123",
               config: {
-                defaultModel: "unused",
+                tools: ["linear-mcp"],
               },
             },
           },

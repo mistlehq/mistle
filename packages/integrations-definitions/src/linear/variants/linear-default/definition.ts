@@ -11,10 +11,12 @@ import {
   LinearConnectionConfigSchema,
   LinearCredentialSlotKeys,
 } from "./auth.js";
+import { resolveLinearBindingConfigForm } from "./binding-config-form.js";
 import { LinearBindingConfigSchema } from "./binding-config-schema.js";
 import { compileLinearBinding } from "./compile-binding.js";
 import { LinearConnectionConfigForm } from "./connection-config-form.js";
 import { LinearTargetConfigSchema } from "./target-config-schema.js";
+import { LinearToolIds } from "./tool-ids.js";
 
 type LinearIntegrationDefinition = IntegrationDefinition<
   typeof LinearTargetConfigSchema,
@@ -35,6 +37,7 @@ export const LinearDefinition: LinearIntegrationDefinition = {
   targetConfigSchema: LinearTargetConfigSchema,
   targetSecretSchema: LinearTargetSecretSchema,
   bindingConfigSchema: LinearBindingConfigSchema,
+  bindingConfigForm: resolveLinearBindingConfigForm,
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -54,12 +57,17 @@ export const LinearDefinition: LinearIntegrationDefinition = {
       configForm: LinearConnectionConfigForm,
     },
   ],
-  mcp: () => ({
-    serverId: "linear-default",
-    serverName: "linear",
-    transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-    url: "https://mcp.linear.app/mcp",
-    description: "Linear MCP",
-  }),
+  mcp: (input) =>
+    input.binding.config.tools.includes(LinearToolIds.LINEAR_MCP)
+      ? [
+          {
+            serverId: "linear-default",
+            serverName: "linear",
+            transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+            url: "https://mcp.linear.app/mcp",
+            description: "Linear MCP",
+          },
+        ]
+      : [],
   compileBinding: compileLinearBinding,
 };
