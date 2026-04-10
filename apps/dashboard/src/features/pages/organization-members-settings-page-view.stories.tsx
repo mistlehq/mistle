@@ -13,9 +13,9 @@ import { OrganizationMembersSettingsPageView } from "./organization-members-sett
 import {
   createOrganizationMembersStoryRoleChangeDialog,
   createOrganizationMembersSettingsPageStoryRoleViewModel,
+  OrganizationMembersStoryInvitations,
   OrganizationMembersStoryMembers,
   type OrganizationMembersStoryViewerRole,
-  OrganizationMembersStoryInvitations,
 } from "./organization-members-settings-page-view.story-fixtures.js";
 
 type OrganizationMembersSettingsPageStoryProps = {
@@ -202,17 +202,6 @@ export const LoadError: Story = {
 
 export const Default: Story = {
   render: renderInteractiveStory,
-};
-
-export const Invited: Story = {
-  args: {
-    viewModelOverrides: {
-      activeFilter: "invitations",
-      invitations: OrganizationMembersStoryInvitations,
-      members: [],
-      total: OrganizationMembersStoryInvitations.length,
-    },
-  },
 };
 
 export const CapabilitiesWarning: Story = {

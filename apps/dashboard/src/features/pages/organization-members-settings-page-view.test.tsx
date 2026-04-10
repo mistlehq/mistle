@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
+  createOrganizationMembersSettingsPageStoryRoleViewModel,
   createOrganizationMembersSettingsPageStoryViewModel,
   OrganizationMembersStoryInvitations,
 } from "./organization-members-settings-page-view.story-fixtures.js";
@@ -24,6 +25,18 @@ describe("OrganizationMembersSettingsPageView", () => {
     expect(screen.getByRole("tab", { name: "Active" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Invited" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Invite members" })).toBeTruthy();
+  });
+
+  it("hides the invite action for members who cannot manage invitations", () => {
+    render(
+      <OrganizationMembersSettingsPageView
+        viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
+          viewerRole: "member",
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Invite members" })).toBeNull();
   });
 
   it("switches tabs through the page-level filter handler", () => {

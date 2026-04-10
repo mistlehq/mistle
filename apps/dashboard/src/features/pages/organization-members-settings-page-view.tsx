@@ -17,6 +17,7 @@ export function OrganizationMembersSettingsPageView(input: {
   viewModel: OrganizationMembersSettingsPageViewModel;
 }): React.JSX.Element {
   const props = input.viewModel;
+  const canInviteMembers = canManageInvitations(props.capabilities);
   const visibleRowCount = props.members.length + props.invitations.length;
   const visibleOffset = clampMembersDirectoryOffset({
     limit: props.limit,
@@ -62,21 +63,23 @@ export function OrganizationMembersSettingsPageView(input: {
             <TabsTrigger value="invitations">Invited</TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          disabled={props.inviteMembersDisabled}
-          onClick={() => {
-            props.onInviteDialogOpenChange(true);
-          }}
-          type="button"
-        >
-          Invite members
-        </Button>
+        {canInviteMembers ? (
+          <Button
+            disabled={props.inviteMembersDisabled}
+            onClick={() => {
+              props.onInviteDialogOpenChange(true);
+            }}
+            type="button"
+          >
+            Invite members
+          </Button>
+        ) : null}
       </div>
 
       <MembersDirectoryTable
         activeFilter={props.activeFilter}
         capabilities={props.capabilities}
-        canManageInvitations={canManageInvitations(props.capabilities)}
+        canManageInvitations={canInviteMembers}
         invitationActionState={props.invitationActionState}
         invitations={props.invitations}
         memberAvatarsByUserId={props.memberAvatarsByUserId}
@@ -114,7 +117,7 @@ export function OrganizationMembersSettingsPageView(input: {
 
       <MemberInviteDialog
         assignableRoles={props.capabilities?.invite.assignableRoles ?? []}
-        canExecute={canManageInvitations(props.capabilities)}
+        canExecute={canInviteMembers}
         inviteMemberRequest={props.inviteMemberRequest}
         onCompleted={props.onInviteCompleted}
         onOpenChange={props.onInviteDialogOpenChange}
