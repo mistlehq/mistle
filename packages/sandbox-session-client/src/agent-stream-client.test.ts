@@ -28,6 +28,7 @@ type TestServer = {
   openRequest: Promise<string>;
   openRequests: string[];
   payload: Promise<{ streamId: number; payload: string }>;
+  payloadAt: (index: number) => Promise<{ streamId: number; payload: string }>;
   receivedPayloads: Array<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
   windowUpdate: Promise<{ bytes: number; streamId: number }>;
@@ -123,6 +124,32 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   let activeStreamId: number | null = null;
   const openRequests: string[] = [];
   const receivedPayloads: Array<{ streamId: number; payload: string }> = [];
+  const payloadDeferredsByIndex = new Map<
+    number,
+    Deferred<{ streamId: number; payload: string }>
+  >();
+
+  function payloadAt(index: number): Promise<{ streamId: number; payload: string }> {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error(
+        `Expected payload index to be a non-negative integer, received ${String(index)}.`,
+      );
+    }
+
+    const existingPayload = receivedPayloads[index];
+    if (existingPayload !== undefined) {
+      return Promise.resolve(existingPayload);
+    }
+
+    const existingDeferred = payloadDeferredsByIndex.get(index);
+    if (existingDeferred !== undefined) {
+      return existingDeferred.promise;
+    }
+
+    const deferred = createDeferred<{ streamId: number; payload: string }>();
+    payloadDeferredsByIndex.set(index, deferred);
+    return deferred.promise;
+  }
 
   wsServer.on("connection", (socket) => {
     connectedSocket = socket;
@@ -189,6 +216,11 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
       try {
         const decodedPayload = decodeAgentTextDataFrame(message);
         receivedPayloads.push(decodedPayload);
+        const payloadDeferredByIndex = payloadDeferredsByIndex.get(receivedPayloads.length - 1);
+        if (payloadDeferredByIndex !== undefined) {
+          payloadDeferredsByIndex.delete(receivedPayloads.length - 1);
+          payloadDeferredByIndex.resolve(decodedPayload);
+        }
         if (receivedPayloads.length === 1) {
           payloadDeferred.resolve(decodedPayload);
         }
@@ -222,6 +254,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
     openRequest: openRequestDeferred.promise,
     openRequests,
     payload: payloadDeferred.promise,
+    payloadAt,
     receivedPayloads,
     socketClosed: socketClosedDeferred.promise,
     windowUpdate: windowUpdateDeferred.promise,
@@ -570,6 +603,7 @@ describe("agent stream client", () => {
     });
 
     let exhaustionError: Error | null = null;
+    let successfulSendCount = 0;
     const largePayload = {
       payload: "x".repeat(1024),
     };
@@ -581,6 +615,7 @@ describe("agent stream client", () => {
     ) {
       try {
         await client.sendJson(largePayload);
+        successfulSendCount += 1;
       } catch (error) {
         if (!(error instanceof Error)) {
           throw error;
@@ -592,24 +627,18 @@ describe("agent stream client", () => {
 
     expect(exhaustionError?.message).toBe("Sandbox session stream send window is exhausted.");
 
+    if (successfulSendCount > 0) {
+      await server.payloadAt(successfulSendCount - 1);
+    }
+
+    const recoveredPayloadPromise = server.payloadAt(successfulSendCount);
     server.sendWindowUpdate(MaxStreamWindowBytes);
 
     await client.sendJson({
       payload: "recovered",
     });
 
-    await waitForCondition({
-      description: "recovered payload to reach the server",
-      timeoutMs: 500,
-      evaluate: () =>
-        server.receivedPayloads.at(-1)?.payload ===
-        JSON.stringify({
-          payload: "recovered",
-        }),
-    });
-
-    const recoveredPayload = server.receivedPayloads.at(-1);
-    expect(recoveredPayload).toEqual({
+    expect(await recoveredPayloadPromise).toEqual({
       streamId: 1,
       payload: JSON.stringify({
         payload: "recovered",
@@ -719,19 +748,14 @@ describe("agent stream client", () => {
       },
     });
 
+    const reopenedPayloadPromise = server.payloadAt(server.receivedPayloads.length);
     await client.sendJson({
       jsonrpc: "2.0",
       id: "req-2",
       method: "ping",
     });
 
-    await waitForCondition({
-      description: "reopened stream payload to reach the server",
-      timeoutMs: 500,
-      evaluate: () => server.receivedPayloads.length >= 1,
-    });
-
-    expect(server.receivedPayloads.at(-1)).toEqual({
+    expect(await reopenedPayloadPromise).toEqual({
       streamId: 2,
       payload: JSON.stringify({
         jsonrpc: "2.0",
