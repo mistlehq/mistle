@@ -198,6 +198,12 @@ export const ROUTE_HANDLES = {
     title: "Sandbox Profiles",
     description: "Manage sandbox profile configuration.",
   },
+  sandboxProfilesNew: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Create",
+    title: "Create",
+    description: "Create a sandbox profile.",
+  },
   sandboxProfilesDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveSandboxProfileDetailBreadcrumb,

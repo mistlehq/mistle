@@ -45,10 +45,17 @@ export function SandboxProfilesStoryHarness(
       createRoutesFromElements(
         <Route element={<StoryRouteOutlet />}>
           <Route
-            element={<SandboxProfilesPage />}
+            element={<Outlet />}
             handle={ROUTE_HANDLES.sandboxProfiles}
             path="/sandbox-profiles"
-          />
+          >
+            <Route element={<SandboxProfilesPage />} index />
+            <Route
+              element={<SandboxProfilesPage />}
+              handle={ROUTE_HANDLES.sandboxProfilesNew}
+              path="new"
+            />
+          </Route>
         </Route>,
       ),
       {
