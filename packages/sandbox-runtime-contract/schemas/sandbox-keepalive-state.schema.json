@@ -15,10 +15,6 @@
       "type": "boolean"
     }
   },
-  "required": [
-    "type",
-    "ttlMs",
-    "active"
-  ],
+  "required": ["type", "ttlMs", "active"],
   "additionalProperties": false
 }
