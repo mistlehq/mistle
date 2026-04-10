@@ -5465,7 +5465,7 @@ export interface paths {
         content: {
           "application/json": {
             idempotencyKey?: string;
-            primaryRepositoryId: string | null;
+            primaryRepositoryId?: string | null;
           };
         };
       };

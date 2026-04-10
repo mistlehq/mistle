@@ -64,28 +64,6 @@ export async function startProfileInstance(
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const idempotencyKey = serviceInput.idempotencyKey ?? randomUUID();
-  const repositoryOptions = await listProfileVersionRepositoryOptions(
-    {
-      db,
-    },
-    {
-      organizationId: serviceInput.organizationId,
-      profileId: serviceInput.profileId,
-      profileVersion: serviceInput.profileVersion,
-    },
-  );
-  const primaryRepositoryPath =
-    serviceInput.primaryRepositoryId === null
-      ? DefaultSandboxWorkspaceDir
-      : (repositoryOptions.find((option) => option.id === serviceInput.primaryRepositoryId)?.path ??
-        null);
-  if (primaryRepositoryPath === null) {
-    throw new SandboxProfilesBadRequestError(
-      SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
-      `Primary repository '${serviceInput.primaryRepositoryId}' is not available for sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)}.`,
-    );
-  }
-
   const compiledRuntimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
@@ -105,6 +83,27 @@ export async function startProfileInstance(
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
       `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
+    );
+  }
+  const repositoryOptions = await listProfileVersionRepositoryOptions(
+    {
+      db,
+    },
+    {
+      organizationId: serviceInput.organizationId,
+      profileId: serviceInput.profileId,
+      profileVersion: serviceInput.profileVersion,
+    },
+  );
+  const primaryRepositoryPath =
+    serviceInput.primaryRepositoryId === null
+      ? DefaultSandboxWorkspaceDir
+      : (repositoryOptions.find((option) => option.id === serviceInput.primaryRepositoryId)?.path ??
+        null);
+  if (primaryRepositoryPath === null) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+      `Primary repository '${serviceInput.primaryRepositoryId}' is not available for sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)}.`,
     );
   }
   const runtimePlan = applyRuntimePlanWorkingDirectory(compiledRuntimePlan, primaryRepositoryPath);

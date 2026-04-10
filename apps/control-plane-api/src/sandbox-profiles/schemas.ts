@@ -128,10 +128,14 @@ export const sandboxProfileVersionParamsSchema = z
 
 export const startSandboxProfileInstanceBodySchema = z
   .object({
-    primaryRepositoryId: z.string().min(1).nullable(),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
     idempotencyKey: z.string().min(1).max(255).optional(),
   })
-  .strict();
+  .strict()
+  .transform((value) => ({
+    idempotencyKey: value.idempotencyKey,
+    primaryRepositoryId: value.primaryRepositoryId ?? null,
+  }));
 
 export const sandboxProfileDeletionAcceptedResponseSchema = z
   .object({
