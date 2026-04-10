@@ -4,9 +4,14 @@ import {
   createCodeMessageErrorSchema,
 } from "@mistle/http/errors.js";
 
-import { SandboxProfilesCompileErrorCodes, SandboxProfilesNotFoundCodes } from "../errors.js";
+import {
+  SandboxProfilesBadRequestCodes,
+  SandboxProfilesCompileErrorCodes,
+  SandboxProfilesNotFoundCodes,
+} from "../errors.js";
 
 export const badRequestResponseSchema = z.union([
+  createCodeMessageErrorSchema(z.enum([SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY])),
   createCodeMessageErrorSchema(
     z.enum([
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,

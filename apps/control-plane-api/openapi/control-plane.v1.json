@@ -11279,12 +11279,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "primaryRepositoryId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
                   "idempotencyKey": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
                   }
                 },
+                "required": ["primaryRepositoryId"],
                 "additionalProperties": false
               }
             }
@@ -11323,6 +11328,21 @@
               "application/json": {
                 "schema": {
                   "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_PRIMARY_REPOSITORY"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
                     {
                       "type": "object",
                       "properties": {

@@ -27,6 +27,7 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
+      primaryRepositoryId: body.primaryRepositoryId,
       startedBy: {
         kind: "user",
         id: user.id,

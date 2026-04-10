@@ -3,6 +3,7 @@ import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 export const SandboxProfilesBadRequestCodes = {
   INVALID_LIST_PROFILES_INPUT: "INVALID_LIST_PROFILES_INPUT",
   INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
+  INVALID_PRIMARY_REPOSITORY: "INVALID_PRIMARY_REPOSITORY",
 } as const;
 
 export type SandboxProfilesBadRequestCode =

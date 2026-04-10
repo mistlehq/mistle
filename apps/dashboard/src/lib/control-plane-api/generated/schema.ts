@@ -5465,6 +5465,7 @@ export interface paths {
         content: {
           "application/json": {
             idempotencyKey?: string;
+            primaryRepositoryId: string | null;
           };
         };
       };
@@ -5490,6 +5491,11 @@ export interface paths {
           };
           content: {
             "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
               | {
                   /** @enum {string} */
                   code:

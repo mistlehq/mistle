@@ -113,6 +113,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
         return await startSandboxInstanceFromProfileVersion({
           profileId: input.profileId,
           profileVersion: input.profileVersion,
+          primaryRepositoryId: null,
           idempotencyKey: crypto.randomUUID(),
         });
       } catch (error) {

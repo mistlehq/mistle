@@ -80,11 +80,15 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
       ? null
       : (repositoryOptions.find((option) => option.value === selectedRepositoryValue) ?? null);
   const startSessionMutation = useMutation({
-    mutationFn: async (profile: LaunchableSandboxProfile) => {
+    mutationFn: async (input: {
+      profile: LaunchableSandboxProfile;
+      primaryRepositoryId: string | null;
+    }) => {
       try {
         return await startSandboxInstanceFromProfileVersion({
-          profileId: profile.id,
-          profileVersion: profile.latestVersion,
+          profileId: input.profile.id,
+          profileVersion: input.profile.latestVersion,
+          primaryRepositoryId: input.primaryRepositoryId,
           idempotencyKey: crypto.randomUUID(),
         });
       } catch (error) {
@@ -110,6 +114,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   });
   const canStartSession =
     selectedProfile !== null &&
+    selectedRepositoryOption !== null &&
     !selectableProfilesQuery.isPending &&
     !startSessionMutation.isPending;
   const selectableProfilesErrorMessage = selectableProfilesQuery.isError
@@ -171,12 +176,18 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   function handleCreateSessionSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    if (selectedProfile === null) {
+    if (selectedProfile === null || selectedRepositoryOption === null) {
       return;
     }
 
     setStartErrorMessage(null);
-    startSessionMutation.mutate(selectedProfile);
+    startSessionMutation.mutate({
+      profile: selectedProfile,
+      primaryRepositoryId:
+        selectedRepositoryOption.value === WorkspaceRootOption.value
+          ? null
+          : selectedRepositoryOption.value,
+    });
   }
 
   return (

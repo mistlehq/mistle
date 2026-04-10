@@ -129,6 +129,7 @@ export async function listSandboxInstances(input: {
 export async function startSandboxInstanceFromProfileVersion(input: {
   profileId: string;
   profileVersion: number;
+  primaryRepositoryId: string | null;
   idempotencyKey?: string;
   signal?: AbortSignal;
 }): Promise<StartSandboxInstanceResult> {
@@ -137,12 +138,10 @@ export async function startSandboxInstanceFromProfileVersion(input: {
       operation: "startSandboxInstanceFromProfileVersion",
       method: "POST",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(input.profileVersion)}/instances`,
-      body:
-        input.idempotencyKey === undefined
-          ? {}
-          : {
-              idempotencyKey: input.idempotencyKey,
-            },
+      body: {
+        primaryRepositoryId: input.primaryRepositoryId,
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not start sandbox session.",
     });

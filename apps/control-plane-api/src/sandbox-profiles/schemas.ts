@@ -128,6 +128,7 @@ export const sandboxProfileVersionParamsSchema = z
 
 export const startSandboxProfileInstanceBodySchema = z
   .object({
+    primaryRepositoryId: z.string().min(1).nullable(),
     idempotencyKey: z.string().min(1).max(255).optional(),
   })
   .strict();
