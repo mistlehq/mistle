@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { useDebouncedValue } from "../../shared/use-debounced-value.js";
 import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
 import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
@@ -54,6 +55,25 @@ export function useOrganizationMembersSettingsState(
   const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("members");
   const [searchValue, setSearchValue] = useState("");
   const [offset, setOffset] = useState(0);
+  const debouncedSearchValue = useDebouncedValue(searchValue);
+  const committedSearchQueryStateRef = useRef({
+    offset,
+    searchValue,
+  });
+
+  useLayoutEffect(() => {
+    if (debouncedSearchValue !== searchValue) {
+      return;
+    }
+
+    committedSearchQueryStateRef.current = {
+      offset,
+      searchValue,
+    };
+  }, [debouncedSearchValue, offset, searchValue]);
+
+  const queryOffset =
+    debouncedSearchValue === searchValue ? offset : committedSearchQueryStateRef.current.offset;
 
   const queryKeys = buildMembersQueryKeys(input.organizationId);
   const capabilitiesQuery = useQuery({
@@ -64,25 +84,30 @@ export function useOrganizationMembersSettingsState(
       }),
   });
   const membersQuery = useQuery({
-    queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, searchValue],
+    queryKey: [...queryKeys.members, membersDirectoryPageLimit, queryOffset, debouncedSearchValue],
     queryFn: async () =>
       api.listMembersPage({
         organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
-        offset,
-        search: searchValue,
+        offset: queryOffset,
+        search: debouncedSearchValue,
       }),
     enabled: activeFilter === "members",
     retry: false,
   });
   const invitationsQuery = useQuery({
-    queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, searchValue],
+    queryKey: [
+      ...queryKeys.invitations,
+      membersDirectoryPageLimit,
+      queryOffset,
+      debouncedSearchValue,
+    ],
     queryFn: async () =>
       api.listInvitationsPage({
         organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
-        offset,
-        search: searchValue,
+        offset: queryOffset,
+        search: debouncedSearchValue,
       }),
     enabled: activeFilter === "invitations",
     retry: false,
