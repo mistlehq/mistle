@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "./model-capabilities.js";
-import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
+import {
+  OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptResponsesApiBaseUrl,
+  resolveOpenAiApiBaseUrlForConnectionMethod,
+} from "./target-config-schema.js";
 
 describe("OpenAiApiKeyTargetConfigSchema", () => {
   it("preserves root path without adding defaults", () => {
@@ -46,5 +50,35 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
         api_base_url: "https://api.openai.com",
       }),
     ).toThrow(/Invalid input/);
+  });
+
+  it("resolves the target-config API base URL for API key connections", () => {
+    const parsed = OpenAiApiKeyTargetConfigSchema.parse({
+      api_base_url: "https://proxy.example.com/openai-v2/",
+      binding_capabilities_by_connection_method:
+        createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+    });
+
+    expect(
+      resolveOpenAiApiBaseUrlForConnectionMethod({
+        targetConfig: parsed,
+        connectionMethod: "api-key",
+      }),
+    ).toBe("https://proxy.example.com/openai-v2");
+  });
+
+  it("resolves the ChatGPT responses base URL for device-code connections", () => {
+    const parsed = OpenAiApiKeyTargetConfigSchema.parse({
+      api_base_url: "https://api.openai.com/v1",
+      binding_capabilities_by_connection_method:
+        createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+    });
+
+    expect(
+      resolveOpenAiApiBaseUrlForConnectionMethod({
+        targetConfig: parsed,
+        connectionMethod: "chatgpt-device-code",
+      }),
+    ).toBe(OpenAiChatGptResponsesApiBaseUrl);
   });
 });

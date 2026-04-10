@@ -5,7 +5,10 @@ import {
   createOpenAiRawBindingCapabilities,
   createOpenAiRawBindingCapabilitiesByConnectionMethod,
 } from "./model-capabilities.js";
-import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
+import {
+  OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptResponsesApiBaseUrl,
+} from "./target-config-schema.js";
 
 describe("OpenAiApiKeyDefinition", () => {
   it("resolves allowed models from the selected connection method capability set", () => {
@@ -86,5 +89,8 @@ describe("OpenAiApiKeyDefinition", () => {
     expect(resolvedCapabilities.agentProviderAccess?.additionalHeaders).toEqual({
       "ChatGPT-Account-ID": "acct_123",
     });
+    expect(resolvedCapabilities.agentProviderAccess?.apiBaseUrl).toBe(
+      OpenAiChatGptResponsesApiBaseUrl,
+    );
   });
 });

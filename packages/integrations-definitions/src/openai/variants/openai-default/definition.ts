@@ -30,7 +30,10 @@ import {
   OpenAiConnectionMethodIds,
   resolveOpenAiCapabilitySetForConnectionMethod,
 } from "./model-capabilities.js";
-import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
+import {
+  OpenAiApiKeyTargetConfigSchema,
+  resolveOpenAiApiBaseUrlForConnectionMethod,
+} from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
@@ -111,7 +114,10 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
         agentProviderAccess: {
           providerFamilyId: input.target.familyId,
           providerVariantId: input.target.variantId,
-          apiBaseUrl: input.target.config.apiBaseUrl,
+          apiBaseUrl: resolveOpenAiApiBaseUrlForConnectionMethod({
+            targetConfig: input.target.config,
+            connectionMethod: connectionConfig.connection_method,
+          }),
           authScheme: "bearer",
           credentialResolver: {
             connectionId: input.connection.id,

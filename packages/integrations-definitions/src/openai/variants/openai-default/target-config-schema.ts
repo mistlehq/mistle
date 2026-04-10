@@ -4,6 +4,7 @@ import {
   OpenAiCapabilitiesSchema,
   OpenAiConnectionMethodIds,
   OpenAiModelIds,
+  isOpenAiConnectionMethodId,
 } from "./model-capabilities.js";
 
 const OpenAiApiBaseUrlSchema = z.url().transform((input) => {
@@ -49,6 +50,8 @@ const OpenAiBindingCapabilitiesByConnectionMethodSchema = z
   })
   .strict();
 
+export const OpenAiChatGptResponsesApiBaseUrl = "https://chatgpt.com/backend-api/codex";
+
 export const OpenAiApiKeyTargetConfigSchema = z
   .object({
     api_base_url: OpenAiApiBaseUrlSchema,
@@ -61,3 +64,22 @@ export const OpenAiApiKeyTargetConfigSchema = z
   }));
 
 export type OpenAiApiKeyTargetConfig = z.output<typeof OpenAiApiKeyTargetConfigSchema>;
+
+export function resolveOpenAiApiBaseUrlForConnectionMethod(input: {
+  targetConfig: OpenAiApiKeyTargetConfig;
+  connectionMethod: string;
+}): string {
+  if (!isOpenAiConnectionMethodId(input.connectionMethod)) {
+    throw new Error(`Unsupported OpenAI connection method '${input.connectionMethod}'.`);
+  }
+
+  if (input.connectionMethod === OpenAiConnectionMethodIds.API_KEY) {
+    return input.targetConfig.apiBaseUrl;
+  }
+
+  if (input.connectionMethod === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE) {
+    return OpenAiChatGptResponsesApiBaseUrl;
+  }
+
+  throw new Error("Unsupported OpenAI connection method.");
+}

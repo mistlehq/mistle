@@ -8,7 +8,11 @@ import {
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
+import {
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
+  OpenAiChatGptResponsesApiBaseUrl,
+  OpenAiConnectionMethodIds,
+} from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -194,6 +198,96 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain("supports_websockets = false");
     expect(configContent).toContain('[projects."/"]');
     expect(configContent).toContain('trust_level = "trusted"');
+  });
+
+  it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-chatgpt-base-url@example.com",
+    });
+    const targetKey = "openai-default-compile-runtime-plan-chatgpt";
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_chatgpt_base_url",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile ChatGPT Base URL Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_chatgpt_base_url",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        },
+      })
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_compile_chatgpt_base_url",
+      organizationId: authenticatedSession.organizationId,
+      targetKey,
+      displayName: "Compile ChatGPT Base URL Connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_123",
+        chatgpt_plan_type: "pro",
+      },
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_compile_chatgpt_base_url",
+      sandboxProfileId: "sbp_compile_chatgpt_base_url",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_compile_chatgpt_base_url",
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
+      },
+    });
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_chatgpt_base_url",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(runtimePlan.egressRoutes[0]?.upstream.baseUrl).toBe(OpenAiChatGptResponsesApiBaseUrl);
+    expect(runtimePlan.egressRoutes[0]?.additionalHeaders).toEqual({
+      "ChatGPT-Account-ID": "acct_123",
+    });
+
+    const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain(`base_url = "${OpenAiChatGptResponsesApiBaseUrl}"`);
   });
 
   it("omits optional github and jira cli artifacts when bindings do not select tools", async ({
