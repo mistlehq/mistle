@@ -3,6 +3,25 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { withDashboardCenteredStory } from "../../../storybook/decorators.js";
 import { MemberInviteDialog } from "./member-invite-dialog.js";
 
+const defaultArgs = {
+  activeOrganizationId: "org_storybook_001",
+  assignableRoles: ["admin", "member"],
+  canExecute: true,
+  inviteMemberRequest: async (_request: {
+    organizationId: string;
+    email: string;
+    role: "owner" | "admin" | "member";
+  }) => ({
+    status: "accepted",
+    message: null,
+    code: null,
+    raw: null,
+  }),
+  onCompleted: async () => {},
+  onOpenChange: () => {},
+  open: true,
+} satisfies React.ComponentProps<typeof MemberInviteDialog>;
+
 const meta = {
   title: "Dashboard/Settings/OrganizationMembers/InviteDialog",
   component: MemberInviteDialog,
@@ -10,30 +29,20 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  args: {
-    assignableRoles: ["admin", "member"],
-    canExecute: true,
-    inviteMemberRequest: async () => ({
-      status: "accepted",
-      message: null,
-      code: null,
-      raw: null,
-    }),
-    onCompleted: async () => {},
-    onOpenChange: () => {},
-    open: true,
-    organizationId: "org_storybook_001",
-  },
+  args: defaultArgs,
 } satisfies Meta<typeof MemberInviteDialog>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: defaultArgs,
+};
 
 export const InvitesDisabled: Story = {
   args: {
+    ...defaultArgs,
     canExecute: false,
   },
 };
