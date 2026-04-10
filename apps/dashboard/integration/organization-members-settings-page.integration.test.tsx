@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import "./helpers/bootstrap-test-env.js";
 import { systemSleeper } from "@mistle/time";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
