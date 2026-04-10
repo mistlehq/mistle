@@ -6,7 +6,7 @@ import {
 } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 
-const DefaultConnectTimeoutMs = 15_000;
+const DefaultConnectTimeoutMs = 30_000;
 const DefaultCloseCode = 1000;
 const DefaultCloseReason = "automation payload delivered";
 

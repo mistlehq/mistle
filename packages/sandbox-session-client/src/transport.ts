@@ -23,7 +23,7 @@ import {
   type SandboxSessionSocket,
 } from "./runtime.js";
 
-const DefaultConnectTimeoutMs = 15_000;
+const DefaultConnectTimeoutMs = 30_000;
 const ProtocolViolationCloseCode = 4008;
 
 export type SandboxSessionTransportEvent =
