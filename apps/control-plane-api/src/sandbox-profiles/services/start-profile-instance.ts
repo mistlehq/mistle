@@ -32,23 +32,54 @@ type StartProfileInstanceOutput = {
   sandboxInstanceId: string;
 };
 
-function applyRuntimePlanWorkingDirectory(
-  runtimePlan: CompiledRuntimePlan,
-  cwd: string,
-): CompiledRuntimePlan {
+async function resolveEffectiveRuntimePlan(
+  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    primaryRepositoryId?: string | null;
+    compiledRuntimePlan: CompiledRuntimePlan;
+  },
+): Promise<CompiledRuntimePlan> {
+  if (input.primaryRepositoryId === undefined) {
+    return input.compiledRuntimePlan;
+  }
+
+  const repositoryOptions = await listProfileVersionRepositoryOptions(
+    {
+      db,
+    },
+    {
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    },
+  );
+  const primaryRepositoryPath =
+    input.primaryRepositoryId === null
+      ? DefaultSandboxWorkspaceDir
+      : (repositoryOptions.find((option) => option.id === input.primaryRepositoryId)?.path ?? null);
+  if (primaryRepositoryPath === null) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+      `Primary repository '${input.primaryRepositoryId}' is not available for sandbox profile '${input.profileId}' version ${String(input.profileVersion)}.`,
+    );
+  }
+
   return {
-    ...runtimePlan,
-    agentRuntimes: runtimePlan.agentRuntimes.map((agentRuntime) => ({
+    ...input.compiledRuntimePlan,
+    agentRuntimes: input.compiledRuntimePlan.agentRuntimes.map((agentRuntime) => ({
       ...agentRuntime,
       ptyLaunch: {
         ...agentRuntime.ptyLaunch,
         newLaunch: {
           ...agentRuntime.ptyLaunch.newLaunch,
-          cwd,
+          cwd: primaryRepositoryPath,
         },
         resumeLaunch: {
           ...agentRuntime.ptyLaunch.resumeLaunch,
-          cwd,
+          cwd: primaryRepositoryPath,
         },
       },
     })),
@@ -85,26 +116,7 @@ export async function startProfileInstance(
       `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
     );
   }
-  if (serviceInput.primaryRepositoryId === undefined) {
-    const startedSandbox = await dataPlaneClient.startSandboxInstance({
-      organizationId: serviceInput.organizationId,
-      sandboxProfileId: serviceInput.profileId,
-      sandboxProfileVersion: serviceInput.profileVersion,
-      idempotencyKey,
-      runtimePlan: compiledRuntimePlan,
-      startedBy: serviceInput.startedBy,
-      source: serviceInput.source,
-      image: serviceInput.image,
-    });
-
-    return {
-      status: startedSandbox.status,
-      workflowRunId: startedSandbox.workflowRunId,
-      sandboxInstanceId: startedSandbox.sandboxInstanceId,
-    };
-  }
-
-  const repositoryOptions = await listProfileVersionRepositoryOptions(
+  const runtimePlan = await resolveEffectiveRuntimePlan(
     {
       db,
     },
@@ -112,20 +124,12 @@ export async function startProfileInstance(
       organizationId: serviceInput.organizationId,
       profileId: serviceInput.profileId,
       profileVersion: serviceInput.profileVersion,
+      compiledRuntimePlan,
+      ...(serviceInput.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: serviceInput.primaryRepositoryId }),
     },
   );
-  const primaryRepositoryPath =
-    serviceInput.primaryRepositoryId === null
-      ? DefaultSandboxWorkspaceDir
-      : (repositoryOptions.find((option) => option.id === serviceInput.primaryRepositoryId)?.path ??
-        null);
-  if (primaryRepositoryPath === null) {
-    throw new SandboxProfilesBadRequestError(
-      SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
-      `Primary repository '${serviceInput.primaryRepositoryId}' is not available for sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)}.`,
-    );
-  }
-  const runtimePlan = applyRuntimePlanWorkingDirectory(compiledRuntimePlan, primaryRepositoryPath);
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: serviceInput.organizationId,
