@@ -133,8 +133,11 @@ describe("aws credential resolver helpers", () => {
       connectionId: "icn_aws_test_with/really.long-id.segment",
       bindingId: "ibd_aws_test_with.another:segment_and_more_characters",
     });
+    const truncatedAnother = "another".slice(0, 6);
 
-    expect(sessionName).toBe("mistle-icn-aws-test-with-really-ibd-aws-test-with.anothe");
+    expect(sessionName).toBe(
+      `mistle-icn-aws-test-with-really-ibd-aws-test-with.${truncatedAnother}`,
+    );
     expect(sessionName.length).toBeLessThanOrEqual(64);
   });
 });
