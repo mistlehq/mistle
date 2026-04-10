@@ -28,10 +28,16 @@ function OrganizationMembersSettingsPageStory(
 ): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
-      viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
-        viewerRole: input.viewerRole,
-        overrides: input.viewModelOverrides,
-      })}
+      viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel(
+        input.viewModelOverrides === undefined
+          ? {
+              viewerRole: input.viewerRole,
+            }
+          : {
+              viewerRole: input.viewerRole,
+              overrides: input.viewModelOverrides,
+            },
+      )}
     />
   );
 }
