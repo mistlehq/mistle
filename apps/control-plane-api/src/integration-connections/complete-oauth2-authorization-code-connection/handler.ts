@@ -6,12 +6,6 @@ import type { AppContextBindings } from "../../types.js";
 import { completeOAuth2AuthorizationCodeConnection } from "../services/complete-oauth2-authorization-code-connection.js";
 import { route } from "./route.js";
 
-const DashboardOrganizationIntegrationsPath = "/integrations";
-
-function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
-  return buildDashboardUrl(dashboardBaseUrl, DashboardOrganizationIntegrationsPath);
-}
-
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
   const config = ctx.get("config");
   const db = ctx.get("db");
@@ -32,7 +26,10 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
   );
 
-  return ctx.redirect(buildDashboardIntegrationsUrl(config.dashboard.baseUrl), 302);
+  return ctx.redirect(
+    buildDashboardUrl(config.dashboard.baseUrl, `/integrations/${encodeURIComponent(targetKey)}`),
+    302,
+  );
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =
