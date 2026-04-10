@@ -6,7 +6,7 @@ import {
   SidebarMenuItem,
 } from "@mistle/ui";
 import { Badge } from "@mistle/ui";
-import { CpuIcon, HouseIcon, LightningIcon } from "@phosphor-icons/react";
+import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useEffect, useState } from "react";
 import { MemoryRouter, NavLink } from "react-router";
@@ -37,6 +37,13 @@ function AutomationsNavIcon(props: {
   "aria-hidden"?: boolean;
 }): React.JSX.Element {
   return <LightningIcon {...props} />;
+}
+
+function IntegrationsNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <PuzzlePieceIcon {...props} />;
 }
 
 function StorySidebarContent(input: {
