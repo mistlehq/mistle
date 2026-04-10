@@ -7,7 +7,7 @@ import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 
 import { logger } from "../logger.js";
 import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
-import { CredentialCache } from "./credential-cache.js";
+import { CredentialCache, type CachedCredential } from "./credential-cache.js";
 import {
   authorizeEgressGrant,
   EgressGrantRequestError,
@@ -124,7 +124,7 @@ function toBearerAuthorizationValue(secretValue: string): string {
 }
 
 function resolveStaticCredentialValueOrThrow(input: {
-  credential: Awaited<ReturnType<ControlPlaneInternalClient["resolveIntegrationCredential"]>>;
+  credential: CachedCredential;
   context: string;
 }): string {
   if (input.credential.kind !== "value") {
