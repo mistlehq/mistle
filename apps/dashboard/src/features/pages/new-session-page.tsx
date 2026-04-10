@@ -32,12 +32,12 @@ type NewSessionPageRepositoryOption = {
   path: string;
 };
 
-const NoPrimaryRepositoryDescription = "profile default working directory";
+const WorkspaceRootDescription = "workspace root";
 
 const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   value: "__workspace_root__",
   label: "None",
-  path: NoPrimaryRepositoryDescription,
+  path: WorkspaceRootDescription,
 };
 
 export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
@@ -320,7 +320,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
                 <div className="text-muted-foreground flex flex-col gap-1 text-sm">
                   <p>
                     {selectedNoneOption ? (
-                      "The agent will start its session using the profile's default working directory."
+                      "The agent will start its session at the workspace root."
                     ) : (
                       <>
                         The agent will start its session in{" "}
@@ -330,7 +330,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
                   </p>
                   <p>
                     {selectedNoneOption
-                      ? "No primary repository override will be applied for this session."
+                      ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
                       : "Git, diffs, and repo-local instructions will use this repository by default."}
                   </p>
                 </div>
