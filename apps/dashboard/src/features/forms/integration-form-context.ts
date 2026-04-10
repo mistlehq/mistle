@@ -1,5 +1,3 @@
-import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
-
 /**
  * Global layout mode for schema-driven integration forms.
  *
@@ -10,15 +8,6 @@ import type { IntegrationConnectionResource } from "../integrations/integrations
  *   `ui:options.layout` to `"stacked"` in their uiSchema.
  */
 export type IntegrationFormLayout = "vertical" | "horizontal";
-
-export type IntegrationFormResourceOverride = {
-  connectionId: string;
-  kind: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
-  lastSyncedAt?: string | undefined;
-  lastErrorMessage?: string | undefined;
-  items: readonly IntegrationConnectionResource[];
-};
 
 export type IntegrationFormContext = {
   /**
@@ -31,5 +20,4 @@ export type IntegrationFormContext = {
    *   should remain vertical inside an otherwise horizontal form
    */
   layout?: IntegrationFormLayout;
-  resourceOverrides?: readonly IntegrationFormResourceOverride[] | undefined;
 };

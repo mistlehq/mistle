@@ -12,6 +12,7 @@ import {
   StoryIntegrationConnections,
   StoryIntegrationTargets,
   StoryOpenAiConnection,
+  seedStoryIntegrationResources,
 } from "./integrations-editor-section-story-support.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
@@ -43,7 +44,14 @@ function SandboxProfileBindingDialogStory(input: {
   error: string | null;
   row: SandboxProfileBindingEditorRow;
 }): React.JSX.Element {
-  const [queryClient] = useState(() => createIntegrationsEditorSectionStoryQueryClient());
+  const [queryClient] = useState(() => {
+    const client = createIntegrationsEditorSectionStoryQueryClient();
+    seedStoryIntegrationResources({
+      queryClient: client,
+      resources: StoryGithubResources,
+    });
+    return client;
+  });
   const [state, setState] = useState<SandboxProfileBindingDialogState>({
     mode: "add",
     row: input.row,
@@ -56,13 +64,6 @@ function SandboxProfileBindingDialogStory(input: {
         availableConnections={StoryIntegrationConnections}
         availableConnectionsByKind={AvailableConnectionsByKind}
         availableTargets={StoryIntegrationTargets}
-        bindingFormContext={
-          input.row.kind === SandboxIntegrationBindingKinds.GIT
-            ? {
-                resourceOverrides: [StoryGithubResources],
-              }
-            : undefined
-        }
         isSubmittingIntegrationBindings={false}
         onClose={() => {}}
         onConnectionIdChange={(nextConnectionId) => {

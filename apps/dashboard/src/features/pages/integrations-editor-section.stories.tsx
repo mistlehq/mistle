@@ -7,10 +7,11 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   StoryGithubConnection,
-  StoryGithubResources,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
   StoryOpenAiConnection,
+  StoryGithubResources,
+  seedStoryIntegrationResources,
 } from "./integrations-editor-section-story-support.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import { IntegrationsEditorSection } from "./sandbox-profile-editor-page.js";
@@ -18,6 +19,10 @@ import { IntegrationsEditorSection } from "./sandbox-profile-editor-page.js";
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {
     const client = createIntegrationsEditorSectionStoryQueryClient();
+    seedStoryIntegrationResources({
+      queryClient: client,
+      resources: StoryGithubResources,
+    });
     return client;
   });
   const [rows, setRows] = useState<readonly SandboxProfileBindingEditorRow[]>([]);
@@ -43,9 +48,6 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
         integrationRows={rows}
         integrationSaveError={integrationSaveError}
         isSubmittingIntegrationBindings={isSubmittingIntegrationBindings}
-        bindingFormContext={{
-          resourceOverrides: [StoryGithubResources],
-        }}
         onAddIntegrationBindingRow={async (input) => {
           setRows((currentRows) => [
             ...currentRows,

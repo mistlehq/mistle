@@ -30,8 +30,6 @@ describe("resolveIntegrationResourceListState", () => {
         errorMessage: null,
         isError: false,
         isPending: true,
-        resourceOverridePresent: false,
-        visibleItems: [],
       }),
     ).toEqual({
       mode: "loading",
@@ -47,8 +45,6 @@ describe("resolveIntegrationResourceListState", () => {
         errorMessage: null,
         isError: false,
         isPending: true,
-        resourceOverridePresent: false,
-        visibleItems: previousResults.items,
       }),
     ).toEqual({
       mode: "ready",
@@ -65,30 +61,10 @@ describe("resolveIntegrationResourceListState", () => {
         errorMessage: "Sync failed.",
         isError: true,
         isPending: false,
-        resourceOverridePresent: false,
-        visibleItems: previousResults.items,
       }),
     ).toEqual({
       mode: "error",
       message: "Sync failed.",
-    });
-  });
-
-  it("uses the override items when the widget is running against local resource data", () => {
-    const overrideResults = createResources(["octocat/hello-world"]);
-
-    expect(
-      resolveIntegrationResourceListState({
-        data: undefined,
-        errorMessage: null,
-        isError: false,
-        isPending: true,
-        resourceOverridePresent: true,
-        visibleItems: overrideResults.items,
-      }),
-    ).toEqual({
-      mode: "ready",
-      items: overrideResults.items,
     });
   });
 });

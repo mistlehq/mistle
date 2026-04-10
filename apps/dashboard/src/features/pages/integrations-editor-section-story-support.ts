@@ -2,6 +2,7 @@ import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/in
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-string-array-widget-story-support.js";
+import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -16,6 +17,22 @@ export function createIntegrationsEditorSectionStoryQueryClient(): QueryClient {
       },
     },
   });
+}
+
+export function seedStoryIntegrationResources(input: {
+  queryClient: QueryClient;
+  resources: IntegrationConnectionResources;
+}): void {
+  input.queryClient.setQueryData(
+    [
+      "integration-connections",
+      input.resources.connectionId,
+      "resources",
+      input.resources.kind,
+      "",
+    ],
+    input.resources,
+  );
 }
 
 export const StoryOpenAiTarget: IntegrationTargetSummary = {

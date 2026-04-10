@@ -82,34 +82,15 @@ function formatSyncMetadata(input: {
   return `Last synced ${input.lastSyncedAt}`;
 }
 
-function resolveResourceOverride(input: {
-  formContext: IntegrationFormContext | undefined;
-  connectionId: string;
-  kind: string;
-}) {
-  return input.formContext?.resourceOverrides?.find(
-    (override) => override.connectionId === input.connectionId && override.kind === input.kind,
-  );
-}
-
 export function resolveIntegrationResourceListState(input: {
   data: IntegrationConnectionResources | undefined;
   errorMessage: string | null;
   isError: boolean;
   isPending: boolean;
-  resourceOverridePresent: boolean;
-  visibleItems: IntegrationConnectionResources["items"];
 }):
   | { mode: "loading" }
   | { mode: "error"; message: string }
   | { mode: "ready"; items: IntegrationConnectionResources["items"] } {
-  if (input.resourceOverridePresent) {
-    return {
-      mode: "ready",
-      items: input.visibleItems,
-    };
-  }
-
   if (input.isError) {
     return {
       mode: "error",
@@ -144,11 +125,6 @@ export function IntegrationResourceStringArrayWidget(
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const selectedHandles = resolveSelectedHandles(props.value);
-  const resourceOverride = resolveResourceOverride({
-    formContext: props.registry.formContext,
-    connectionId: options.connectionId,
-    kind: options.kind,
-  });
 
   const resourceQuery = useQuery({
     queryKey: [
@@ -165,7 +141,6 @@ export function IntegrationResourceStringArrayWidget(
         ...(deferredSearch.length === 0 ? {} : { search: deferredSearch }),
         signal,
       }),
-    enabled: resourceOverride === undefined,
     placeholderData: (previousData) => previousData,
     retry: false,
   });
@@ -192,16 +167,10 @@ export function IntegrationResourceStringArrayWidget(
     return <Input disabled id={props.id} value={selectedHandles.join(", ")} />;
   }
 
-  const visibleItems =
-    resourceOverride === undefined
-      ? (resourceQuery.data?.items ?? [])
-      : resourceOverride.items.filter((item) =>
-          item.handle.toLowerCase().includes(deferredSearch.trim().toLowerCase()),
-        );
+  const visibleItems = resourceQuery.data?.items ?? [];
   const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
-    (resourceOverride === undefined && resourceQuery.data === undefined) ||
-    deferredSearch.length > 0
+    resourceQuery.data === undefined || deferredSearch.length > 0
       ? []
       : selectedHandles.filter((handle) => !availableHandles.has(handle));
 
@@ -228,47 +197,30 @@ export function IntegrationResourceStringArrayWidget(
   }
 
   function triggerRefresh(): void {
-    if (resourceOverride !== undefined) {
-      return;
-    }
-
     refreshMutation.mutate();
   }
 
   const refreshLabel = options.refreshLabel ?? `Refresh ${options.title ?? "resources"}`;
-  const syncState =
-    resourceOverride?.syncState ??
-    resourceQuery.data?.syncState ??
-    options.resourceSummary?.syncState;
+  const syncState = resourceQuery.data?.syncState ?? options.resourceSummary?.syncState;
   const syncMetadata =
-    resourceOverride !== undefined
-      ? formatSyncMetadata({
-          syncState: resourceOverride.syncState,
-          ...(resourceOverride.lastSyncedAt === undefined
-            ? {}
-            : { lastSyncedAt: resourceOverride.lastSyncedAt }),
-          ...(resourceOverride.lastErrorMessage === undefined
-            ? {}
-            : { lastErrorMessage: resourceOverride.lastErrorMessage }),
-        })
-      : resourceQuery.data === undefined
-        ? options.resourceSummary === undefined
-          ? null
-          : formatSyncMetadata({
-              syncState: options.resourceSummary.syncState,
-              ...(options.resourceSummary.lastSyncedAt === undefined
-                ? {}
-                : { lastSyncedAt: options.resourceSummary.lastSyncedAt }),
-            })
+    resourceQuery.data === undefined
+      ? options.resourceSummary === undefined
+        ? null
         : formatSyncMetadata({
-            syncState: resourceQuery.data.syncState,
-            ...(resourceQuery.data.lastSyncedAt === undefined
+            syncState: options.resourceSummary.syncState,
+            ...(options.resourceSummary.lastSyncedAt === undefined
               ? {}
-              : { lastSyncedAt: resourceQuery.data.lastSyncedAt }),
-            ...(resourceQuery.data.lastErrorMessage === undefined
-              ? {}
-              : { lastErrorMessage: resourceQuery.data.lastErrorMessage }),
-          });
+              : { lastSyncedAt: options.resourceSummary.lastSyncedAt }),
+          })
+      : formatSyncMetadata({
+          syncState: resourceQuery.data.syncState,
+          ...(resourceQuery.data.lastSyncedAt === undefined
+            ? {}
+            : { lastSyncedAt: resourceQuery.data.lastSyncedAt }),
+          ...(resourceQuery.data.lastErrorMessage === undefined
+            ? {}
+            : { lastErrorMessage: resourceQuery.data.lastErrorMessage }),
+        });
   const formattedSyncMetadata =
     syncMetadata === null
       ? null
@@ -276,9 +228,7 @@ export function IntegrationResourceStringArrayWidget(
         ? `Last synced ${formatDateTime(syncMetadata.slice("Last synced ".length))}`
         : syncMetadata;
   const refreshErrorMessage =
-    resourceOverride !== undefined ||
-    refreshMutation.error === null ||
-    refreshMutation.error === undefined
+    refreshMutation.error === null || refreshMutation.error === undefined
       ? null
       : resolveApiErrorMessage({
           error: refreshMutation.error,
@@ -295,13 +245,8 @@ export function IntegrationResourceStringArrayWidget(
     errorMessage: resourceListErrorMessage,
     isError: resourceQuery.isError,
     isPending: resourceQuery.isPending,
-    resourceOverridePresent: resourceOverride !== undefined,
-    visibleItems,
   });
-  const availableCount =
-    resourceOverride?.items.length ??
-    resourceQuery.data?.items.length ??
-    options.resourceSummary?.count;
+  const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
   const widgetViewModel = buildIntegrationResourceWidgetViewModel({
     title: options.title,
     availableCount,

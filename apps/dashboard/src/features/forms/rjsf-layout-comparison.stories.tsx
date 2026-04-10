@@ -23,7 +23,10 @@ import type React from "react";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
-import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
+import {
+  createGithubRepositoryResources,
+  RepositoryItems,
+} from "./integration-resource-string-array-widget-story-support.js";
 import type { IntegrationResourceListViewState } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
@@ -32,10 +35,20 @@ type JsonObject = Record<string, unknown>;
 function RjsfExampleForm(input: {
   formContext: IntegrationFormContext;
   formData: JsonObject;
+  initialQueryData?: ReadonlyArray<{
+    queryKey: readonly unknown[];
+    data: unknown;
+  }>;
   schema: RJSFSchema;
   uiSchema: UiSchema<JsonObject, RJSFSchema, IntegrationFormContext>;
 }): React.JSX.Element {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => {
+    const client = new QueryClient();
+    for (const entry of input.initialQueryData ?? []) {
+      client.setQueryData(entry.queryKey, entry.data);
+    }
+    return client;
+  });
   const [formData, setFormData] = useState<JsonObject>(input.formData);
 
   return (
@@ -475,19 +488,18 @@ function RjsfResourcePicker(): React.JSX.Element {
     <RjsfExampleForm
       formContext={{
         layout: "vertical",
-        resourceOverrides: [
-          {
-            connectionId: "storybook-github",
-            kind: "repository",
-            syncState: "ready",
-            lastSyncedAt: "2026-03-09T12:00:00.000Z",
-            items: RepositoryItems,
-          },
-        ],
       }}
       formData={{
         repositories: ["mistle/main-dashboard", "mistle/control-plane-api"],
       }}
+      initialQueryData={[
+        {
+          queryKey: ["integration-connections", "storybook-github", "resources", "repository", ""],
+          data: createGithubRepositoryResources({
+            connectionId: "storybook-github",
+          }),
+        },
+      ]}
       schema={{
         type: "object",
         properties: {
