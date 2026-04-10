@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
+import { formatDate } from "./members-formatters.js";
 
 describe("MembersDirectoryTable interaction", () => {
   afterEach(() => {
@@ -158,7 +159,7 @@ describe("MembersDirectoryTable interaction", () => {
 
     const invitationRow = getInvitationRow();
     expect(within(invitationRow).getByText("Inviter Name")).toBeTruthy();
-    expect(within(invitationRow).getByText("Jan 2, 2099")).toBeTruthy();
+    expect(within(invitationRow).getByText(formatDate("2099-01-02T00:00:00.000Z"))).toBeTruthy();
   });
 
   it("shows sending state in place of invitation actions while resend is pending", () => {
