@@ -44,19 +44,23 @@ use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
-    CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
+    CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
+    CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
+    FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
     STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
-    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
-    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-    exec_result_event, file_upload_completed_event, parse_stream_control_message, pty_exit_event,
-    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
+    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
+    STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+    file_upload_completed_event, parse_processes_stream_message, parse_stream_control_message,
+    pty_exit_event, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+    stream_window,
 };
+use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
@@ -83,6 +87,7 @@ static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
+const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
 #[derive(Debug)]
@@ -103,6 +108,7 @@ pub enum TunnelSessionError {
     AgentSocket(String),
     AgentRead(String),
     AgentWrite(String),
+    Processes(String),
     Pty(String),
     FileUpload(String),
     SessionPanicked,
@@ -154,6 +160,9 @@ impl Display for TunnelSessionError {
             }
             Self::AgentRead(error) => write!(f, "failed to read agent runtime socket: {error}"),
             Self::AgentWrite(error) => write!(f, "failed to write agent runtime socket: {error}"),
+            Self::Processes(error) => {
+                write!(f, "failed to service processes tunnel stream: {error}")
+            }
             Self::Pty(error) => write!(f, "failed to handle PTY tunnel stream: {error}"),
             Self::FileUpload(error) => write!(f, "failed to handle file upload stream: {error}"),
             Self::SessionPanicked => write!(f, "bootstrap tunnel session thread panicked"),
@@ -379,6 +388,8 @@ struct TunnelSessionMutableState {
     pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
     pending_exec_opens: BTreeMap<u32, PendingExecOpenState>,
     agent_streams: BTreeMap<u32, AgentStreamState>,
+    processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
+    last_processes_snapshot_at_ms: Option<u64>,
     pty_sessions: BTreeMap<String, PtySessionState>,
     file_uploads: BTreeMap<u32, FileUploadState>,
 }
@@ -426,6 +437,8 @@ async fn run_tunnel_session(
         pending_agent_opens: BTreeMap::new(),
         pending_exec_opens: BTreeMap::new(),
         agent_streams: BTreeMap::new(),
+        processes_stream_send_windows: BTreeMap::new(),
+        last_processes_snapshot_at_ms: None,
         pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
     };
@@ -835,8 +848,12 @@ fn spawn_exec_task(
     event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
 ) {
     tokio::task::spawn_blocking(move || {
-        let result =
-            run_exec_command(&message, &runtime_env, &cancel_requested, Arc::clone(&child_pid));
+        let result = run_exec_command(
+            &message,
+            &runtime_env,
+            &cancel_requested,
+            Arc::clone(&child_pid),
+        );
         let _ = event_sender.send(TunnelSessionEvent::ExecCompleted {
             stream_id: message.stream_id,
             result: Box::new(result),
@@ -999,8 +1016,10 @@ fn decode_bounded_output(output: Vec<u8>, truncated: bool) -> Result<BoundedOutp
         Err(error) if truncated => {
             let valid_up_to = error.utf8_error().valid_up_to();
             let bytes = error.into_bytes();
-            let text = String::from_utf8(bytes[..valid_up_to].to_vec())
-                .map_err(|decode_error| format!("command output was not valid utf-8: {decode_error}"))?;
+            let text =
+                String::from_utf8(bytes[..valid_up_to].to_vec()).map_err(|decode_error| {
+                    format!("command output was not valid utf-8: {decode_error}")
+                })?;
             Ok(BoundedOutput {
                 text,
                 truncated: true,
@@ -1135,6 +1154,112 @@ fn poll_pty_sessions(
     Ok(did_work)
 }
 
+fn send_processes_snapshot(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+) -> Result<(), TunnelSessionError> {
+    send_processes_snapshot_to_streams(
+        tunnel_writer_sender,
+        &mut session_state.processes_stream_send_windows,
+        clock,
+    )?;
+    session_state.last_processes_snapshot_at_ms = Some(clock.now_ms());
+    Ok(())
+}
+
+fn poll_processes_streams(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
+    last_processes_snapshot_at_ms: &mut Option<u64>,
+    clock: &dyn Clock,
+) -> Result<(), TunnelSessionError> {
+    if processes_stream_send_windows.is_empty() {
+        *last_processes_snapshot_at_ms = None;
+        return Ok(());
+    }
+
+    let now_ms = clock.now_ms();
+    let should_send = last_processes_snapshot_at_ms.is_none_or(|last_snapshot_at_ms| {
+        now_ms.saturating_sub(last_snapshot_at_ms)
+            >= DEFAULT_PROCESSES_SNAPSHOT_INTERVAL.as_millis() as u64
+    });
+    if !should_send {
+        return Ok(());
+    }
+
+    send_processes_snapshot_to_streams(tunnel_writer_sender, processes_stream_send_windows, clock)?;
+    *last_processes_snapshot_at_ms = Some(now_ms);
+    Ok(())
+}
+
+fn send_processes_snapshot_to_streams(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
+    clock: &dyn Clock,
+) -> Result<(), TunnelSessionError> {
+    if processes_stream_send_windows.is_empty() {
+        return Ok(());
+    }
+
+    let snapshot = collect_processes_snapshot(clock)
+        .map_err(|error| TunnelSessionError::Processes(error.to_string()))?;
+    let payload = serde_json::to_string(&snapshot)
+        .map_err(|error| TunnelSessionError::Processes(error.to_string()))?;
+    let mut exhausted_stream_ids = Vec::new();
+
+    for (stream_id, send_window) in processes_stream_send_windows.iter_mut() {
+        if !send_window.try_consume(payload.len()) {
+            exhausted_stream_ids.push(*stream_id);
+            continue;
+        }
+
+        let encoded =
+            encode_stream_data_frame(*stream_id, PAYLOAD_KIND_WEBSOCKET_TEXT, payload.as_bytes())
+                .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+        write_tunnel_binary(tunnel_writer_sender, encoded)?;
+    }
+
+    for stream_id in exhausted_stream_ids {
+        write_tunnel_text(
+            tunnel_writer_sender,
+            stream_reset(
+                stream_id,
+                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                "processes stream send window is exhausted",
+            ),
+        )?;
+        processes_stream_send_windows.remove(&stream_id);
+    }
+
+    Ok(())
+}
+
+fn reset_processes_streams(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
+    message: String,
+) -> Result<(), TunnelSessionError> {
+    let stream_ids = processes_stream_send_windows
+        .keys()
+        .copied()
+        .collect::<Vec<_>>();
+    processes_stream_send_windows.clear();
+
+    for stream_id in stream_ids {
+        write_tunnel_text(
+            tunnel_writer_sender,
+            stream_reset(
+                stream_id,
+                STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
+                message.clone(),
+            ),
+        )?;
+    }
+
+    Ok(())
+}
+
 async fn handle_tunnel_session_event(
     event: TunnelSessionEvent,
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
@@ -1155,6 +1280,18 @@ async fn handle_tunnel_session_event(
                 context.clock,
                 context.sleeper,
             )?;
+            if let Err(error) = poll_processes_streams(
+                tunnel_writer_sender,
+                &mut session_state.processes_stream_send_windows,
+                &mut session_state.last_processes_snapshot_at_ms,
+                context.clock,
+            ) {
+                reset_processes_streams(
+                    tunnel_writer_sender,
+                    &mut session_state.processes_stream_send_windows,
+                    error.to_string(),
+                )?;
+            }
             Ok(())
         }
         TunnelSessionEvent::AgentDialed { stream_id, result } => {
@@ -1252,9 +1389,8 @@ async fn handle_tunnel_session_event(
                 handle_tunnel_binary_frame(
                     tunnel_writer_sender,
                     frame,
-                    &mut session_state.agent_streams,
-                    &mut session_state.pty_sessions,
-                    &mut session_state.file_uploads,
+                    session_state,
+                    context.clock,
                 )
             }
             Message::Ping(payload) => write_tunnel_pong(tunnel_writer_sender, payload.to_vec()),
@@ -1491,6 +1627,32 @@ async fn handle_tunnel_control_message(
                 },
             );
         }
+        StreamControlMessage::OpenProcesses(message) => {
+            if let Err(error) = collect_processes_snapshot(context.clock) {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_open_error(
+                        message.stream_id,
+                        CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
+                        error.to_string(),
+                    ),
+                )?;
+                return Ok(());
+            }
+            session_state
+                .processes_stream_send_windows
+                .insert(message.stream_id, StreamSendWindow::default());
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
+            if let Err(error) =
+                send_processes_snapshot(tunnel_writer_sender, session_state, context.clock)
+            {
+                reset_processes_streams(
+                    tunnel_writer_sender,
+                    &mut session_state.processes_stream_send_windows,
+                    error.to_string(),
+                )?;
+            }
+        }
         StreamControlMessage::OpenPty(message) => {
             let mut pty_open_context = PtyOpenContext {
                 cgroup_root: context.cgroup_root,
@@ -1578,6 +1740,13 @@ async fn handle_tunnel_control_message(
                 let _ = agent_stream.sender.send(Message::Close(None));
                 return Ok(());
             }
+            if session_state
+                .processes_stream_send_windows
+                .remove(&message.stream_id)
+                .is_some()
+            {
+                return Ok(());
+            }
             if let Some(pending_exec_open) =
                 session_state.pending_exec_opens.remove(&message.stream_id)
             {
@@ -1621,6 +1790,15 @@ async fn handle_tunnel_control_message(
             if let Some(agent_stream) = session_state.agent_streams.get_mut(&message.stream_id) {
                 agent_stream
                     .send_window
+                    .add(message.bytes)
+                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+                return Ok(());
+            }
+            if let Some(send_window) = session_state
+                .processes_stream_send_windows
+                .get_mut(&message.stream_id)
+            {
+                send_window
                     .add(message.bytes)
                     .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
                 return Ok(());
@@ -1674,11 +1852,10 @@ async fn handle_tunnel_control_message(
 fn handle_tunnel_binary_frame(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     frame: crate::tunnel::protocol::StreamDataFrame,
-    agent_streams: &mut BTreeMap<u32, AgentStreamState>,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    file_uploads: &mut BTreeMap<u32, FileUploadState>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
 ) -> Result<(), TunnelSessionError> {
-    if let Some(agent_stream) = agent_streams.get_mut(&frame.stream_id) {
+    if let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id) {
         match frame.payload_kind {
             PAYLOAD_KIND_WEBSOCKET_TEXT => {
                 let payload = String::from_utf8(frame.payload)
@@ -1708,7 +1885,79 @@ fn handle_tunnel_binary_frame(
         return Ok(());
     }
 
-    if let Some(pty_state) = pty_sessions
+    if session_state
+        .processes_stream_send_windows
+        .contains_key(&frame.stream_id)
+    {
+        if frame.payload_kind != PAYLOAD_KIND_WEBSOCKET_TEXT {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    frame.stream_id,
+                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                    "processes stream only accepts websocket text payloads",
+                ),
+            )?;
+            session_state
+                .processes_stream_send_windows
+                .remove(&frame.stream_id);
+            return Ok(());
+        }
+
+        let payload = String::from_utf8(frame.payload)
+            .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+        match parse_processes_stream_message(&payload) {
+            Ok(crate::tunnel::protocol::ProcessesStreamMessage::Refresh(_)) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_window(frame.stream_id, payload.len()),
+                )?;
+                if let Err(error) = send_processes_snapshot_to_streams(
+                    tunnel_writer_sender,
+                    &mut session_state.processes_stream_send_windows,
+                    clock,
+                ) {
+                    reset_processes_streams(
+                        tunnel_writer_sender,
+                        &mut session_state.processes_stream_send_windows,
+                        error.to_string(),
+                    )?;
+                } else {
+                    session_state.last_processes_snapshot_at_ms = Some(clock.now_ms());
+                }
+            }
+            Ok(crate::tunnel::protocol::ProcessesStreamMessage::Snapshot(_)) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        frame.stream_id,
+                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                        "processes stream does not accept processes.snapshot payloads from the gateway",
+                    ),
+                )?;
+                session_state
+                    .processes_stream_send_windows
+                    .remove(&frame.stream_id);
+            }
+            Err(error) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        frame.stream_id,
+                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                        error.to_string(),
+                    ),
+                )?;
+                session_state
+                    .processes_stream_send_windows
+                    .remove(&frame.stream_id);
+            }
+        }
+        return Ok(());
+    }
+
+    if let Some(pty_state) = session_state
+        .pty_sessions
         .values_mut()
         .find(|pty_state| pty_state.attached_stream_ids.contains(&frame.stream_id))
     {
@@ -1735,7 +1984,7 @@ fn handle_tunnel_binary_frame(
         return Ok(());
     }
 
-    if let Some(upload_state) = file_uploads.get_mut(&frame.stream_id) {
+    if let Some(upload_state) = session_state.file_uploads.get_mut(&frame.stream_id) {
         if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
             write_tunnel_text(
                 tunnel_writer_sender,
@@ -1760,7 +2009,7 @@ fn handle_tunnel_binary_frame(
                     "received more bytes than declared by the upload metadata",
                 ),
             )?;
-            file_uploads.remove(&frame.stream_id);
+            session_state.file_uploads.remove(&frame.stream_id);
             return Ok(());
         }
 
@@ -2300,9 +2549,13 @@ mod tests {
     use std::fs;
     use std::net::TcpListener;
     use std::path::PathBuf;
+    #[cfg(target_os = "linux")]
+    use std::process::{Child, Command, Stdio};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
+    #[cfg(target_os = "linux")]
+    use std::time::{Duration, Instant};
 
     use serde_json::{Value, json};
     use tungstenite::{Error as WebSocketError, Message, WebSocket, accept};
@@ -2342,6 +2595,8 @@ mod tests {
                     send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
                 },
             )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -3834,6 +4089,213 @@ mod tests {
             .expect("gateway thread should exit cleanly");
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn starts_live_tunnel_session_for_processes_streams() {
+        let listener_port = reserve_available_port();
+        let server_marker = format!("mistle_processes_stream_server_{}", std::process::id());
+        let idle_marker = format!("mistle_processes_stream_idle_{}", std::process::id());
+        let mut server = spawn_node_process(&format!(
+            "const tag='{server_marker}'; require('node:net').createServer(() => {{}}).listen({listener_port}, '127.0.0.1'); setInterval(() => {{ void tag; }}, 1000);"
+        ));
+        let mut idle = spawn_node_process(&format!(
+            "const tag='{idle_marker}'; setInterval(() => {{ void tag; }}, 1000);"
+        ));
+        wait_until_listening(listener_port);
+
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let mut saw_keepalive = false;
+            while !saw_keepalive {
+                let control_message = read_json_text_message(&mut websocket);
+                if control_message["type"] == Value::String("keepalive.state".to_string()) {
+                    saw_keepalive = true;
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 21,
+                        "channel": {
+                            "kind": "processes"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the first processes stream");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 21
+                })
+            );
+            let first_snapshot = read_processes_snapshot(&mut websocket);
+            assert_eq!(first_snapshot.0, 21);
+            assert_processes_snapshot_contains(
+                &first_snapshot.1,
+                &server_marker,
+                &idle_marker,
+                listener_port,
+            );
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 22,
+                        "channel": {
+                            "kind": "processes"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the second processes stream");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 22
+                })
+            );
+            let second_snapshot = read_processes_snapshot(&mut websocket);
+            assert_eq!(second_snapshot.0, 22);
+            assert_processes_snapshot_contains(
+                &second_snapshot.1,
+                &server_marker,
+                &idle_marker,
+                listener_port,
+            );
+
+            websocket
+                .get_mut()
+                .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+                .expect("gateway bootstrap socket should accept a read timeout");
+            let periodic_snapshot_a = read_processes_snapshot(&mut websocket);
+            let periodic_snapshot_b = read_processes_snapshot(&mut websocket);
+            assert_eq!(
+                stream_ids_from_snapshots(&[periodic_snapshot_a.0, periodic_snapshot_b.0]),
+                vec![21, 22]
+            );
+
+            let refresh_payload = encode_stream_data_frame(
+                21,
+                PAYLOAD_KIND_WEBSOCKET_TEXT,
+                json!({
+                    "type": "processes.refresh"
+                })
+                .to_string()
+                .as_bytes(),
+            )
+            .expect("processes.refresh frame should encode");
+            let refresh_payload_len = refresh_payload.len() - 6;
+            websocket
+                .send(Message::Binary(refresh_payload.into()))
+                .expect("gateway should send processes.refresh");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.window",
+                    "streamId": 21,
+                    "bytes": refresh_payload_len
+                })
+            );
+
+            let refresh_snapshot_a = read_processes_snapshot(&mut websocket);
+            let refresh_snapshot_b = read_processes_snapshot(&mut websocket);
+            assert_eq!(
+                stream_ids_from_snapshots(&[refresh_snapshot_a.0, refresh_snapshot_b.0]),
+                vec![21, 22]
+            );
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the processes stream interaction");
+
+        tunnel_session
+            .close()
+            .expect("tunnel session should stop cleanly");
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+        terminate_child(&mut server);
+        terminate_child(&mut idle);
+    }
+
     fn read_json_text_message<S>(socket: &mut WebSocket<S>) -> Value
     where
         S: std::io::Read + std::io::Write,
@@ -3873,6 +4335,118 @@ mod tests {
         };
 
         decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
+    }
+
+    #[cfg(target_os = "linux")]
+    fn read_processes_snapshot<S>(socket: &mut WebSocket<S>) -> (u32, Value)
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        let frame = read_binary_frame(socket);
+        assert_eq!(frame.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
+        let payload = serde_json::from_slice::<Value>(&frame.payload)
+            .expect("snapshot payload should be json");
+        assert_eq!(
+            payload["type"],
+            Value::String("processes.snapshot".to_string())
+        );
+        (frame.stream_id, payload)
+    }
+
+    #[cfg(target_os = "linux")]
+    fn assert_processes_snapshot_contains(
+        snapshot: &Value,
+        server_marker: &str,
+        idle_marker: &str,
+        listener_port: u16,
+    ) {
+        let processes = snapshot["processes"]
+            .as_array()
+            .expect("processes snapshot should include a processes array");
+        let server_process = processes
+            .iter()
+            .find(|process| {
+                process["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains(server_marker))
+            })
+            .expect("snapshot should include the listening server process");
+        assert!(
+            server_process["listeners"]
+                .as_array()
+                .expect("server listeners should be an array")
+                .iter()
+                .any(|listener| {
+                    listener["port"] == Value::Number(listener_port.into())
+                        && listener["bindAddress"] == Value::String("127.0.0.1".to_string())
+                }),
+            "server process should expose the expected loopback listener"
+        );
+
+        let idle_process = processes
+            .iter()
+            .find(|process| {
+                process["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains(idle_marker))
+            })
+            .expect("snapshot should include the idle process");
+        assert_eq!(
+            idle_process["listeners"],
+            Value::Array(Vec::new()),
+            "idle process should not report loopback listeners"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    fn stream_ids_from_snapshots(stream_ids: &[u32]) -> Vec<u32> {
+        let mut stream_ids = stream_ids.to_vec();
+        stream_ids.sort_unstable();
+        stream_ids
+    }
+
+    #[cfg(target_os = "linux")]
+    fn spawn_node_process(source: &str) -> Child {
+        Command::new("node")
+            .args(["-e", source])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("node process should spawn")
+    }
+
+    #[cfg(target_os = "linux")]
+    fn reserve_available_port() -> u16 {
+        let listener =
+            TcpListener::bind("127.0.0.1:0").expect("port reservation listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("reserved listener should expose its address")
+            .port();
+        drop(listener);
+        port
+    }
+
+    #[cfg(target_os = "linux")]
+    fn wait_until_listening(port: u16) {
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for the test listener on port {port} to accept connections"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn terminate_child(child: &mut Child) {
+        let _ = child.kill();
+        let _ = child.wait();
     }
 
     fn read_telemetry_log_line<S>(socket: &mut WebSocket<S>) -> Value

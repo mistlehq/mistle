@@ -43,6 +43,8 @@ pub const CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE: &str = "pty_session_unavai
 pub const CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED: &str = "exec_command_rejected";
 /// `stream.open.error` code for one-shot exec requests that cannot be started.
 pub const CONNECT_ERROR_CODE_EXEC_COMMAND_START_FAILED: &str = "exec_command_start_failed";
+/// `stream.open.error` code for processes streams that cannot be serviced.
+pub const CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE: &str = "processes_stream_unavailable";
 
 /// `stream.reset` code for invalid `stream.signal` messages.
 pub const STREAM_RESET_CODE_INVALID_STREAM_SIGNAL: &str = "invalid_stream_signal";
@@ -60,6 +62,8 @@ pub const STREAM_RESET_CODE_TARGET_CLOSED: &str = "target_closed";
 pub const STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED: &str = "stream_window_exhausted";
 /// `stream.reset` code for one-shot exec requests that fail after opening.
 pub const STREAM_RESET_CODE_EXEC_COMMAND_FAILED: &str = "exec_command_failed";
+/// `stream.reset` code for processes streams whose snapshot cannot be produced.
+pub const STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED: &str = "processes_snapshot_failed";
 
 /// `stream.reset` code for file uploads whose declared size is exceeded.
 pub const FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED: &str = "byte_count_exceeded";
@@ -121,6 +125,13 @@ pub struct AgentStreamChannel {
     pub kind: String,
 }
 
+/// Processes channel payload accepted by `stream.open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessesStreamChannel {
+    pub kind: String,
+}
+
 /// File-upload channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -162,6 +173,16 @@ pub struct AgentStreamOpen {
     pub message_type: String,
     pub stream_id: u32,
     pub channel: AgentStreamChannel,
+}
+
+/// Processes `stream.open` message accepted by the relay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessesStreamOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub channel: ProcessesStreamChannel,
 }
 
 /// File-upload `stream.open` message accepted by the relay.
@@ -227,12 +248,55 @@ pub struct StreamWindow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StreamControlMessage {
     OpenAgent(AgentStreamOpen),
+    OpenProcesses(ProcessesStreamOpen),
     OpenPty(PtyStreamOpen),
     OpenFileUpload(FileUploadStreamOpen),
     OpenExec(ExecStreamOpen),
     Signal(PtyStreamSignal),
     Close(StreamClose),
     Window(StreamWindow),
+}
+
+/// One loopback listener attached to a running process.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessListener {
+    pub port: u16,
+    pub bind_address: String,
+}
+
+/// One running process plus any discovered loopback listeners.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessEntry {
+    pub pid: u32,
+    pub command: Option<String>,
+    pub listeners: Vec<ProcessListener>,
+}
+
+/// Inbound refresh request accepted on a `processes` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessesRefresh {
+    #[serde(rename = "type")]
+    pub message_type: String,
+}
+
+/// Outbound snapshot payload sent on a `processes` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProcessesSnapshot {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub observed_at: String,
+    pub processes: Vec<ProcessEntry>,
+}
+
+/// Application messages carried over a `processes` stream's text data frames.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessesStreamMessage {
+    Refresh(ProcessesRefresh),
+    Snapshot(ProcessesSnapshot),
 }
 
 /// PTY-specific control messages consumed by the PTY relay.
@@ -491,6 +555,12 @@ pub fn parse_stream_control_message(
                     validate_agent_stream_open(&message)?;
                     Ok(StreamControlMessage::OpenAgent(message))
                 }
+                "processes" => {
+                    let message: ProcessesStreamOpen = serde_json::from_value(parsed_payload)
+                        .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                    validate_processes_stream_open(&message)?;
+                    Ok(StreamControlMessage::OpenProcesses(message))
+                }
                 "pty" => {
                     let message: PtyStreamOpen = serde_json::from_value(parsed_payload)
                         .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
@@ -546,10 +616,42 @@ pub fn parse_pty_control_message(payload: &str) -> Result<PtyControlMessage, Tun
         StreamControlMessage::Close(message) => Ok(PtyControlMessage::Close(message)),
         StreamControlMessage::Window(message) => Ok(PtyControlMessage::Window(message)),
         StreamControlMessage::OpenAgent(_)
+        | StreamControlMessage::OpenProcesses(_)
         | StreamControlMessage::OpenFileUpload(_)
         | StreamControlMessage::OpenExec(_) => Err(TunnelProtocolError::new(
             "expected PTY control message, got a different channel kind",
         )),
+    }
+}
+
+/// Parses one inbound `processes` stream text payload.
+pub fn parse_processes_stream_message(
+    payload: &str,
+) -> Result<ProcessesStreamMessage, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "processes stream message must be valid json: {error}"
+        ))
+    })?;
+    let message_type = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| TunnelProtocolError::new("processes stream message type is required"))?;
+
+    match message_type {
+        "processes.refresh" => {
+            let message: ProcessesRefresh = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            Ok(ProcessesStreamMessage::Refresh(message))
+        }
+        "processes.snapshot" => {
+            let message: ProcessesSnapshot = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            Ok(ProcessesStreamMessage::Snapshot(message))
+        }
+        _ => Err(TunnelProtocolError::new(format!(
+            "unsupported processes stream message type '{message_type}'"
+        ))),
     }
 }
 
@@ -801,6 +903,24 @@ fn validate_agent_stream_open(message: &AgentStreamOpen) -> Result<(), TunnelPro
     Ok(())
 }
 
+fn validate_processes_stream_open(
+    message: &ProcessesStreamOpen,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "stream.open" {
+        return Err(TunnelProtocolError::new(
+            "processes stream.open request type must be 'stream.open'",
+        ));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.channel.kind != "processes" {
+        return Err(TunnelProtocolError::new(
+            "processes stream.open request channel.kind must be 'processes'",
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_pty_stream_open(message: &PtyStreamOpen) -> Result<(), TunnelProtocolError> {
     if message.message_type != "stream.open" {
         return Err(TunnelProtocolError::new(
@@ -1040,11 +1160,12 @@ fn validate_telemetry_reset(message: &TelemetryReset) -> Result<(), TunnelProtoc
 mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        PtyControlMessage, StreamControlMessage, StreamSendWindow, decode_stream_data_frame,
-        encode_stream_data_frame, exec_result_event, file_upload_completed_event,
-        parse_bootstrap_telemetry_control_message, parse_pty_control_message,
-        parse_stream_control_message, pty_exit_event, stream_complete, stream_open_error,
-        stream_open_ok, stream_reset, stream_window, telemetry_close, telemetry_open,
+        ProcessesStreamMessage, PtyControlMessage, StreamControlMessage, StreamSendWindow,
+        decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
+        parse_processes_stream_message, parse_pty_control_message, parse_stream_control_message,
+        pty_exit_event, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+        stream_window, telemetry_close, telemetry_open,
     };
 
     #[test]
@@ -1060,6 +1181,12 @@ mod tests {
         )
         .expect("pty stream.open should parse");
         assert!(matches!(pty, StreamControlMessage::OpenPty(_)));
+
+        let processes = parse_stream_control_message(
+            r#"{"type":"stream.open","streamId":11,"channel":{"kind":"processes"}}"#,
+        )
+        .expect("processes stream.open should parse");
+        assert!(matches!(processes, StreamControlMessage::OpenProcesses(_)));
 
         let upload = parse_stream_control_message(
             r#"{"type":"stream.open","streamId":7,"channel":{"kind":"fileUpload","threadId":"thread_123","mimeType":"image/png","originalFilename":"image.png","sizeBytes":8}}"#,
@@ -1082,6 +1209,19 @@ mod tests {
         .expect("pty stream.open should parse");
 
         assert!(matches!(message, PtyControlMessage::Open(_)));
+    }
+
+    #[test]
+    fn parses_valid_processes_stream_messages() {
+        let refresh = parse_processes_stream_message(r#"{"type":"processes.refresh"}"#)
+            .expect("processes.refresh should parse");
+        assert!(matches!(refresh, ProcessesStreamMessage::Refresh(_)));
+
+        let snapshot = parse_processes_stream_message(
+            r#"{"type":"processes.snapshot","observedAt":"2026-04-10T00:00:00Z","processes":[{"pid":7,"command":"node server","listeners":[{"port":5173,"bindAddress":"127.0.0.1"}]}]}"#,
+        )
+        .expect("processes.snapshot should parse");
+        assert!(matches!(snapshot, ProcessesStreamMessage::Snapshot(_)));
     }
 
     #[test]
