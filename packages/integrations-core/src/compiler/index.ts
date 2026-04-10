@@ -30,9 +30,11 @@ import {
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "../validation/index.js";
 
+export const DefaultSandboxWorkspaceDir = "/root";
+
 const SandboxPaths: SandboxPathRefs = {
   userHomeDir: "/root",
-  workspaceDir: "/root",
+  workspaceDir: DefaultSandboxWorkspaceDir,
   runtimeDataDir: "/var/lib/mistle",
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
   runtimeArtifactBinDir: "/usr/local/bin",

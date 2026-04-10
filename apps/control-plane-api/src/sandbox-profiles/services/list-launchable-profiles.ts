@@ -6,12 +6,12 @@ import {
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
-const WorkspaceRootPrefix = "/root/";
 const GitBindingConfigSchema = z.looseObject({
   repositories: z.array(z.string().min(1)),
 });
@@ -28,7 +28,7 @@ export type LaunchableSandboxProfile = typeof sandboxProfiles.$inferSelect & {
 };
 
 function toRepositoryWorkspacePath(repository: string): string {
-  return `${WorkspaceRootPrefix}${repository}`;
+  return `${DefaultSandboxWorkspaceDir}/${repository}`;
 }
 
 function toRepositoryOptions(input: {
