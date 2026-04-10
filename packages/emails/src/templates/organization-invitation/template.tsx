@@ -12,7 +12,7 @@ export type OrganizationInvitationTemplateProps = {
 };
 
 const paragraphStyle: CSSProperties = {
-  color: "#374151",
+  color: "#4b5563",
   fontSize: "15px",
   lineHeight: "22px",
   margin: "0 0 18px",
@@ -25,9 +25,10 @@ const buttonSectionStyle: CSSProperties = {
 };
 
 const buttonStyle: CSSProperties = {
-  backgroundColor: "#111827",
+  backgroundColor: "#1f2937",
+  border: "1px solid #374151",
   borderRadius: "10px",
-  color: "#ffffff",
+  color: "#fdfcf9",
   display: "inline-block",
   fontSize: "15px",
   fontWeight: 700,
@@ -48,7 +49,7 @@ const fallbackPromptStyle: CSSProperties = {
 };
 
 const fallbackLinkStyle: CSSProperties = {
-  color: "#111827",
+  color: "#355f8a",
   fontSize: "13px",
   lineHeight: "20px",
   margin: "0 0 18px",

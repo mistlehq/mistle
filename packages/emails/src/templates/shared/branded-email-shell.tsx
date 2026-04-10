@@ -4,23 +4,19 @@ import type { CSSProperties, ReactElement, ReactNode } from "react";
 const MistleLogoUrl = "https://mistle.dev/mistle-logo-email.png";
 
 const bodyStyle: CSSProperties = {
-  backgroundColor: "#f6f7fb",
+  backgroundColor: "#f3f1eb",
   fontFamily: "Helvetica, Arial, sans-serif",
   margin: 0,
   padding: "32px 0",
 };
 
 const containerStyle: CSSProperties = {
-  backgroundColor: "#ffffff",
+  backgroundColor: "#fdfcf9",
+  border: "1px solid #ded8cc",
   borderRadius: "16px",
   margin: "0 auto",
   maxWidth: "520px",
   overflow: "hidden",
-};
-
-const topAccentStyle: CSSProperties = {
-  backgroundColor: "#111827",
-  height: "8px",
 };
 
 const contentStyle: CSSProperties = {
@@ -42,7 +38,7 @@ const brandLogoStyle: CSSProperties = {
 };
 
 const headingStyle: CSSProperties = {
-  color: "#111827",
+  color: "#1f2937",
   fontSize: "24px",
   fontWeight: 700,
   lineHeight: "32px",
@@ -51,7 +47,7 @@ const headingStyle: CSSProperties = {
 };
 
 const footerStyle: CSSProperties = {
-  borderTop: "1px solid #e5e7eb",
+  borderTop: "1px solid #e7e2d8",
   color: "#6b7280",
   fontSize: "13px",
   lineHeight: "20px",
@@ -61,7 +57,7 @@ const footerStyle: CSSProperties = {
 };
 
 const footerLinkStyle: CSSProperties = {
-  color: "#111827",
+  color: "#355f8a",
   textDecoration: "none",
 };
 
@@ -74,11 +70,13 @@ type BrandedEmailShellProps = {
 export function BrandedEmailShell(props: BrandedEmailShellProps): ReactElement {
   return (
     <Html>
-      <Head />
+      <Head>
+        <meta content="light dark" name="color-scheme" />
+        <meta content="light dark" name="supported-color-schemes" />
+      </Head>
       <Preview>{props.preview}</Preview>
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
-          <Section style={topAccentStyle} />
           <Section style={contentStyle}>
             <Section style={brandRowStyle}>
               <img alt="Mistle logo" src={MistleLogoUrl} style={brandLogoStyle} />

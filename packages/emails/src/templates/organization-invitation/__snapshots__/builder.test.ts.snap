@@ -12,25 +12,20 @@ exports[`emails organization invitation > matches snapshot for a stable organiza
     <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
     <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
     <meta name="x-apple-disable-message-reformatting">
-    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no"><!--[if mso]><xml><o:OfficeDocumentSettings><o:AllowPNG /><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]/-->
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+    <meta content="light dark" name="color-scheme">
+    <meta content="light dark" name="supported-color-schemes"><!--[if mso]><xml><o:OfficeDocumentSettings><o:AllowPNG /><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]/-->
   </head>
 
-  <body style="background-color:#f6f7fb;font-family:Helvetica, Arial, sans-serif;margin:0;padding:32px 0">
+  <body style="background-color:#f3f1eb;font-family:Helvetica, Arial, sans-serif;margin:0;padding:32px 0">
     <div data-skip="true" style="display:none;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">Jane Doe invited you to join Acme as admin.<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div>
     </div>
     <div style="table-layout:fixed;width:100%">
       <div style="margin:0 auto;max-width:600px"><span><!--[if mso]><table align="center" width="600" style="border-spacing: 0; width:600px;" role="presentation"><tr><td><![endif]--></span>
-        <table align="center" width="100%" role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#ffffff;border-radius:16px;margin:0 auto;overflow:hidden">
+        <table align="center" width="100%" role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#fdfcf9;border:1px solid #ded8cc;border-radius:16px;margin:0 auto;overflow:hidden">
           <tbody>
             <tr style="width:100%">
               <td align="center">
-                <table align="center" width="100%" style="background-color:#111827;height:8px" border="0" cellpadding="0" cellspacing="0" role="presentation">
-                  <tbody>
-                    <tr>
-                      <td></td>
-                    </tr>
-                  </tbody>
-                </table>
                 <table align="center" width="100%" style="padding:28px;text-align:center" border="0" cellpadding="0" cellspacing="0" role="presentation">
                   <tbody>
                     <tr>
@@ -42,19 +37,19 @@ exports[`emails organization invitation > matches snapshot for a stable organiza
                             </tr>
                           </tbody>
                         </table>
-                        <p style="font-size:24px;line-height:32px;margin:0 0 18px;color:#111827;font-weight:700;text-align:center">Join Acme on Mistle</p>
-                        <p style="font-size:15px;line-height:22px;margin:0 0 18px;color:#374151;text-align:center">Jane Doe invited you to join Acme as admin.</p>
+                        <p style="font-size:24px;line-height:32px;margin:0 0 18px;color:#1f2937;font-weight:700;text-align:center">Join Acme on Mistle</p>
+                        <p style="font-size:15px;line-height:22px;margin:0 0 18px;color:#4b5563;text-align:center">Jane Doe invited you to join Acme as admin.</p>
                         <table align="center" width="100%" style="margin:20px 0 28px;text-align:center" border="0" cellpadding="0" cellspacing="0" role="presentation">
                           <tbody>
                             <tr>
-                              <td><a href="https://example.com/accept?invitationId=inv_123" style="background-color:#111827;border-radius:10px;color:#ffffff;display:inline-block;font-size:15px;font-weight:700;padding:14px 22px;text-decoration:none">Accept invitation</a></td>
+                              <td><a href="https://example.com/accept?invitationId=inv_123" style="background-color:#1f2937;border:1px solid #374151;border-radius:10px;color:#fdfcf9;display:inline-block;font-size:15px;font-weight:700;padding:14px 22px;text-decoration:none">Accept invitation</a></td>
                             </tr>
                           </tbody>
                         </table>
                         <p style="font-size:13px;line-height:20px;margin:0 0 4px;color:#6b7280;text-align:center">If the button does not work, use this link:</p>
-                        <p style="font-size:13px;line-height:20px;margin:0 0 18px;color:#111827;text-align:center;word-break:break-all">https://example.com/accept?invitationId=inv_123</p>
+                        <p style="font-size:13px;line-height:20px;margin:0 0 18px;color:#355f8a;text-align:center;word-break:break-all">https://example.com/accept?invitationId=inv_123</p>
                         <p style="font-size:13px;line-height:20px;margin:0;color:#6b7280;text-align:center">If you did not expect this invitation, you can ignore this email.</p>
-                        <p style="font-size:13px;line-height:20px;margin:16px 0;border-top:1px solid #e5e7eb;color:#6b7280;margin-top:24px;padding-top:18px;text-align:center">This email was sent by Mistle. Learn more at <a href="https://mistle.dev" style="color:#111827;text-decoration:none">mistle.dev</a>.</p>
+                        <p style="font-size:13px;line-height:20px;margin:16px 0;border-top:1px solid #e7e2d8;color:#6b7280;margin-top:24px;padding-top:18px;text-align:center">This email was sent by Mistle. Learn more at <a href="https://mistle.dev" style="color:#355f8a;text-decoration:none">mistle.dev</a>.</p>
                       </td>
                     </tr>
                   </tbody>

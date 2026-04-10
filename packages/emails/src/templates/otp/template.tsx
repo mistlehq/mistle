@@ -12,7 +12,7 @@ export type EmailOTPTemplateProps = {
 };
 
 const paragraphStyle: CSSProperties = {
-  color: "#374151",
+  color: "#4b5563",
   fontSize: "15px",
   lineHeight: "22px",
   margin: "0 0 16px",
@@ -20,7 +20,7 @@ const paragraphStyle: CSSProperties = {
 };
 
 const otpCodeStyle: CSSProperties = {
-  color: "#111827",
+  color: "#1f2937",
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   fontSize: "30px",
   fontWeight: 700,
@@ -30,8 +30,8 @@ const otpCodeStyle: CSSProperties = {
 };
 
 const otpCodeContainerStyle: CSSProperties = {
-  backgroundColor: "#f9fafb",
-  border: "1px solid #e5e7eb",
+  backgroundColor: "#f5f1e8",
+  border: "1px solid #ded8cc",
   borderRadius: "10px",
   margin: "12px 0 18px",
   padding: "16px",
