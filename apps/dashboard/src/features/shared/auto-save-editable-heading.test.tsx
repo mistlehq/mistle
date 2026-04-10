@@ -395,12 +395,6 @@ describe("AutoSaveEditableHeading", () => {
       expect(getSaveState({ label: "Heading" })).toBe("saved");
     });
 
-    const textbox = screen.queryByRole("textbox", { name: "Heading" });
-    if (textbox !== null) {
-      expect(textbox).toHaveProperty("value", "New Title");
-      return;
-    }
-
-    expect(screen.getByRole("heading", { name: "New Title" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty("value", "New Title");
   });
 });
