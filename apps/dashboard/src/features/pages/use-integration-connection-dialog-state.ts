@@ -1,15 +1,20 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type {
+  IntegrationConnectionDeviceAuthorizationPendingState,
   IntegrationConnectionDialogState,
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import {
+  cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
+  getDeviceAuthorizationAttempt,
+  startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
   updateIntegrationConnection,
@@ -32,6 +37,12 @@ function isRedirectConnectionMethodId(
   return methodId === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE;
 }
 
+function isDeviceAuthorizationMethod(
+  method: IntegrationConnectionMethod | null,
+): method is Extract<IntegrationConnectionMethod, { kind: "device-authorization" }> {
+  return method?.kind === "device-authorization";
+}
+
 function resolveSelectedMethod(input: {
   dialog: IntegrationConnectionDialogState;
   methodId: IntegrationConnectionMethodId;
@@ -43,9 +54,13 @@ function resolveSelectedMethod(input: {
   return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
+const DeviceAuthorizationPollFloorMs = 2_000;
+
 export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<IntegrationConnectionDialogState | null>(null);
+  const [deviceAuthorizationPending, setDeviceAuthorizationPending] =
+    useState<IntegrationConnectionDeviceAuthorizationPendingState | null>(null);
   const [draft, setDraft] = useState(() =>
     createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
   );
@@ -66,6 +81,19 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       methodId: "oauth2-authorization-code";
       displayName?: string;
     }) => startRedirectIntegrationConnection(mutationInput),
+  });
+
+  const startDeviceAuthorizationMutation = useMutation({
+    mutationFn: async (mutationInput: {
+      targetKey: string;
+      methodId: IntegrationConnectionMethodId;
+      displayName?: string;
+    }) => startDeviceAuthorizationIntegrationConnection(mutationInput),
+  });
+
+  const cancelDeviceAuthorizationMutation = useMutation({
+    mutationFn: async (mutationInput: { targetKey: string; attemptId: string }) =>
+      cancelDeviceAuthorizationAttempt(mutationInput),
   });
 
   const updateConnectionMetadataMutation = useMutation({
@@ -95,6 +123,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
 
   function closeDialog(): void {
     setDialog(null);
+    setDeviceAuthorizationPending(null);
     setDraft(createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY));
   }
 
@@ -107,8 +136,119 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       openInput,
     });
     setDialog(nextState.dialog);
+    setDeviceAuthorizationPending(null);
     setDraft(nextState.draft);
   }
+
+  function closeDialogWithoutCancellingPendingAttempt(): void {
+    setDialog(null);
+    setDeviceAuthorizationPending(null);
+    setDraft(createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY));
+  }
+
+  async function cancelPendingDeviceAuthorizationAndClose(): Promise<void> {
+    if (deviceAuthorizationPending === null) {
+      closeDialogWithoutCancellingPendingAttempt();
+      return;
+    }
+
+    await cancelDeviceAuthorizationMutation.mutateAsync({
+      targetKey: deviceAuthorizationPending.targetKey,
+      attemptId: deviceAuthorizationPending.attemptId,
+    });
+
+    await queryClient.invalidateQueries({
+      queryKey: input.queryKey,
+    });
+
+    closeDialogWithoutCancellingPendingAttempt();
+  }
+
+  useEffect(() => {
+    if (dialog === null || deviceAuthorizationPending === null) {
+      return;
+    }
+
+    let disposed = false;
+    const timer: TimerHandle = systemScheduler.schedule(
+      () => {
+        void getDeviceAuthorizationAttempt({
+          targetKey: deviceAuthorizationPending.targetKey,
+          attemptId: deviceAuthorizationPending.attemptId,
+        })
+          .then(async (attempt) => {
+            if (disposed) {
+              return;
+            }
+
+            if (attempt.status === "pending") {
+              setDeviceAuthorizationPending((currentPending) => {
+                if (
+                  currentPending === null ||
+                  currentPending.attemptId !== deviceAuthorizationPending.attemptId
+                ) {
+                  return currentPending;
+                }
+
+                return {
+                  ...currentPending,
+                  ...(attempt.pollAfterMs === undefined
+                    ? {}
+                    : { pollAfterMs: attempt.pollAfterMs }),
+                  ...(attempt.expiresAt === undefined ? {} : { expiresAt: attempt.expiresAt }),
+                };
+              });
+              return;
+            }
+
+            if (attempt.status === "completed") {
+              await queryClient.invalidateQueries({
+                queryKey: input.queryKey,
+              });
+              if (!disposed) {
+                closeDialogWithoutCancellingPendingAttempt();
+              }
+              return;
+            }
+
+            if (attempt.status === "failed") {
+              setDeviceAuthorizationPending(null);
+              setDraft((currentDraft) => ({
+                ...currentDraft,
+                error: attempt.error.message,
+              }));
+              return;
+            }
+
+            setDeviceAuthorizationPending(null);
+            closeDialogWithoutCancellingPendingAttempt();
+          })
+          .catch((pollError: unknown) => {
+            if (disposed) {
+              return;
+            }
+
+            setDeviceAuthorizationPending(null);
+            setDraft((currentDraft) => ({
+              ...currentDraft,
+              error: resolveApiErrorMessage({
+                error: pollError,
+                fallbackMessage: "Could not read integration connection status.",
+              }),
+            }));
+          });
+      },
+      Math.max(
+        deviceAuthorizationPending.pollAfterMs ?? DeviceAuthorizationPollFloorMs,
+        DeviceAuthorizationPollFloorMs,
+      ),
+    );
+
+    return () => {
+      disposed = true;
+      systemScheduler.cancel(timer);
+    };
+  }, [deviceAuthorizationPending, dialog, input.queryKey, queryClient]);
 
   async function runSubmit(): Promise<void> {
     if (dialog === null) {
@@ -186,6 +326,27 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       return;
     }
 
+    if (isDeviceAuthorizationMethod(selectedMethod)) {
+      const started = await startDeviceAuthorizationMutation.mutateAsync({
+        targetKey: dialog.targetKey,
+        methodId: draft.methodId,
+        ...(normalizedConnectionDisplayName.length === 0
+          ? {}
+          : { displayName: normalizedConnectionDisplayName }),
+      });
+
+      setDeviceAuthorizationPending({
+        targetKey: dialog.targetKey,
+        attemptId: started.attemptId,
+        verificationUrl: started.verificationUrl,
+        userCode: started.userCode,
+        method: selectedMethod,
+        ...(started.pollAfterMs === undefined ? {} : { pollAfterMs: started.pollAfterMs }),
+        ...(started.expiresAt === undefined ? {} : { expiresAt: started.expiresAt }),
+      });
+      return;
+    }
+
     if (!isRedirectConnectionMethodId(draft.methodId)) {
       throw new Error(`Unsupported redirect connection method '${draft.methodId}'.`);
     }
@@ -228,9 +389,12 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     connectionDisplayNameValue: draft.connectionDisplayNameValue,
     secrets: draft.secrets,
     error: draft.error,
+    deviceAuthorizationPending,
     pending:
       createFormMutation.isPending ||
+      startDeviceAuthorizationMutation.isPending ||
       startRedirectMutation.isPending ||
+      cancelDeviceAuthorizationMutation.isPending ||
       updateConnectionMetadataMutation.isPending ||
       updateFormMutation.isPending,
     hasChanges: hasIntegrationConnectionDialogChanges({
@@ -248,7 +412,22 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
     }),
     openDialog,
-    closeDialog,
+    closeDialog: (): void => {
+      if (deviceAuthorizationPending !== null) {
+        void cancelPendingDeviceAuthorizationAndClose().catch((cancelError: unknown) => {
+          setDraft((currentDraft) => ({
+            ...currentDraft,
+            error: resolveApiErrorMessage({
+              error: cancelError,
+              fallbackMessage: "Could not cancel integration connection.",
+            }),
+          }));
+        });
+        return;
+      }
+
+      closeDialog();
+    },
     submitDialog,
     onConfigChange: (value: Record<string, unknown>): void => {
       setDraft((currentDraft) => ({

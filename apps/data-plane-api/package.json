@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
-    "@hono/zod-openapi": "^1.2.2",
+    "@hono/zod-openapi": "^1.2.4",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/http": "workspace:*",

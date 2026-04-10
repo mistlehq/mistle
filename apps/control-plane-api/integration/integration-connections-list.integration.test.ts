@@ -355,6 +355,53 @@ describe("integration connections list integration", () => {
     );
   });
 
+  it("reports webhook-source support for Slack implicit webhook connections", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-list-slack-webhook-support@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "slack-default",
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_slack_support",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "slack-default",
+      displayName: "Slack webhook connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "slack-bot-token",
+      },
+    });
+
+    const response = await fixture.request("/v1/integration/connections", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
+
+    expect(body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "icn_slack_support",
+          supportsWebhookSources: true,
+        }),
+      ]),
+    );
+  });
+
   it("returns 400 for invalid list query payload", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-list-validation@example.com",

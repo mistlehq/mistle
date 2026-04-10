@@ -7,10 +7,12 @@ import {
 import { z } from "zod";
 
 import {
-  resolveOpenAiCredentialSecretType,
-  type OpenAiConnectionConfig,
+  OpenAiApiKeyConnectionConfigSchema,
   OpenAiConnectionConfigSchema,
   OpenAiCredentialSlotKeys,
+  resolveOpenAiCredentialSlotKey,
+  resolveOpenAiCredentialSecretType,
+  type OpenAiConnectionConfig,
 } from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
@@ -20,7 +22,18 @@ import {
   OpenAiAllowedRuntimeIds,
   OpenAiApiKeyBindingConfigSchema,
 } from "./binding-config-schema.js";
-import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
+import {
+  OpenAiDeviceAuthorizationCapability,
+  OpenAiDeviceAuthorizationOAuth2Capability,
+} from "./device-authorization.js";
+import {
+  OpenAiConnectionMethodIds,
+  resolveOpenAiCapabilitySetForConnectionMethod,
+} from "./model-capabilities.js";
+import {
+  OpenAiApiKeyTargetConfigSchema,
+  resolveOpenAiApiBaseUrlForConnectionMethod,
+} from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
@@ -43,7 +56,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   variantId: "openai-default",
   kind: IntegrationKinds.AGENT,
   displayName: "OpenAI",
-  description: "Enable OpenAI model access with API key authentication.",
+  description: "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
   logoKey: "openai",
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
@@ -65,28 +78,67 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           slotKey: OpenAiCredentialSlotKeys.API_KEY,
         },
       ],
-      configSchema: OpenAiConnectionConfigSchema,
+      configSchema: OpenAiApiKeyConnectionConfigSchema,
       configForm: OpenAiConnectionConfigForm,
+    },
+    {
+      id: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
+      label: "ChatGPT subscription",
+      kind: "device-authorization",
+      ui: {
+        create: {
+          submitLabel: "Connect",
+          helperText: "Connect with your ChatGPT subscription using a device code.",
+        },
+        pending: {
+          title: "Approve In ChatGPT",
+          description:
+            "Open the verification link, enter the device code, and approve access in ChatGPT.",
+        },
+      },
     },
   ],
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  deviceAuthorization: OpenAiDeviceAuthorizationCapability,
+  oauth2AuthorizationCode: OpenAiDeviceAuthorizationOAuth2Capability,
   capabilities: {
     resolveCapabilities: (input) => {
+      const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
+      const capabilitySet = resolveOpenAiCapabilitySetForConnectionMethod({
+        bindingCapabilitiesByConnectionMethod:
+          input.target.config.bindingCapabilitiesByConnectionMethod,
+        connectionMethod: connectionConfig.connection_method,
+      });
+
       return {
         agentProviderAccess: {
           providerFamilyId: input.target.familyId,
           providerVariantId: input.target.variantId,
-          apiBaseUrl: input.target.config.apiBaseUrl,
+          apiBaseUrl: resolveOpenAiApiBaseUrlForConnectionMethod({
+            targetConfig: input.target.config,
+            connectionMethod: connectionConfig.connection_method,
+          }),
           authScheme: "bearer",
           credentialResolver: {
             connectionId: input.connection.id,
             secretType: resolveOpenAiCredentialSecretType(input.connection.config),
-            slotKey: OpenAiCredentialSlotKeys.API_KEY,
+            slotKey: resolveOpenAiCredentialSlotKey({
+              familyId: input.target.familyId,
+              variantId: input.target.variantId,
+              connectionConfig: input.connection.config,
+            }),
           },
+          ...(connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
+            ? {
+                additionalHeaders: {
+                  "ChatGPT-Account-ID": connectionConfig.chatgpt_account_id,
+                },
+              }
+            : {}),
           allowedMethods: ["GET", "POST"],
           allowedPathPrefixes: ["/"],
           defaultModel: input.binding.config.model.defaultModel,
-          allowedModels: [...input.target.config.bindingCapabilities.models],
+          allowedModels: [...capabilitySet.models],
           providerMetadata: {
             reasoningEffort: input.binding.config.model.options.reasoningEffort,
             ...(input.binding.config.model.options.additionalInstructions === undefined

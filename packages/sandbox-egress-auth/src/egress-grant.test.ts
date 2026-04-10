@@ -25,6 +25,9 @@ const defaultClaims: EgressGrantClaims = {
   upstreamBaseUrl: "https://api.openai.com/v1",
   authInjectionType: "bearer",
   authInjectionTarget: "authorization",
+  additionalHeaders: {
+    "chatgpt-account-id": "acct_123",
+  },
   slotKey: "openai.openai-default.api-key.api-key",
   resolverKey: "default",
   allowedMethods: ["GET", "POST"],
@@ -171,6 +174,50 @@ describe("egress-grant", () => {
       }),
     ).rejects.toMatchObject({
       code: EgressGrantErrorCode.ALLOWED_PATH_PREFIXES_INVALID,
+    });
+  });
+
+  it("normalizes additional header names and values during minting", async () => {
+    const token = await mintEgressGrant({
+      config: defaultConfig,
+      claims: {
+        ...defaultClaims,
+        additionalHeaders: {
+          " ChatGPT-Account-ID ": " acct_123 ",
+          "X-Trace-ID": " trace_123 ",
+        },
+      },
+      ttlSeconds: 60,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).resolves.toMatchObject({
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_123",
+        "x-trace-id": "trace_123",
+      },
+    });
+  });
+
+  it("rejects invalid additional headers during minting", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...defaultClaims,
+          additionalHeaders: {
+            " ChatGPT-Account-ID ": "acct_123",
+            "chatgpt-account-id": "acct_456",
+          },
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.ADDITIONAL_HEADERS_INVALID,
     });
   });
 

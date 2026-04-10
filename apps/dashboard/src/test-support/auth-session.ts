@@ -33,6 +33,22 @@ export function createAuthenticatedSessionFixture(
   };
 }
 
-export function seedAuthenticatedSession(queryClient: QueryClient): void {
-  queryClient.setQueryData(SESSION_QUERY_KEY, createAuthenticatedSessionFixture());
+export function createAuthenticatedSessionForOrganization(
+  activeOrganizationId: string,
+  overrides: Partial<AuthenticatedSession> = {},
+): AuthenticatedSession {
+  return createAuthenticatedSessionFixture({
+    ...overrides,
+    session: {
+      ...(overrides.session ?? {}),
+      activeOrganizationId,
+    },
+  });
+}
+
+export function seedAuthenticatedSession(
+  queryClient: QueryClient,
+  session: AuthenticatedSession = createAuthenticatedSessionFixture(),
+): void {
+  queryClient.setQueryData(SESSION_QUERY_KEY, session);
 }

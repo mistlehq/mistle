@@ -276,7 +276,11 @@ function SessionWorkbenchPageContent(input: {
     return (
       <SessionWorkbenchPageView
         alerts={[]}
+        bottomPanel={<></>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
+        onBottomPanelResize={function onBottomPanelResize() {}}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={
           <SessionConversationBottomPanel
@@ -316,7 +320,26 @@ function SessionWorkbenchPageContent(input: {
         workbench.primaryPanelState.transitionState === "switching_to_cli" ||
         workbench.primaryPanelState.transitionState === "restoring_chat"
       }
-      isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
+      bottomPanel={
+        <SessionTerminalPanel
+          key={terminalPanelKey}
+          isResumingSandbox={workbench.isResumingStoppedSandbox}
+          isConnectionReady={workbench.connectionReadiness.canConnect}
+          isVisible={workbench.terminalPanelState.isVisible}
+          onHide={workbench.terminalPanelState.closePanel}
+          onDisconnectTerminal={async (): Promise<void> => {
+            workbench.terminalPanelState.closePanel();
+            await workbench.ptyState.actions.disconnectPty();
+          }}
+          onRequestSandboxResume={workbench.requestStoppedSandboxResume}
+          ptyState={workbench.ptyState}
+          sandboxStatus={workbench.sandboxLifecycleStatus}
+          sandboxInstanceId={input.sandboxInstanceId}
+        />
+      }
+      bottomPanelSize={workbench.terminalPanelState.panelSize}
+      isBottomPanelVisible={workbench.terminalPanelState.isVisible}
+      isSecondaryPanelVisible={false}
       mainContentLayout={
         workbench.primaryPanelState.transitionState === "stable_cli"
           ? { scroll: "contained", width: "full" }
@@ -332,10 +355,13 @@ function SessionWorkbenchPageContent(input: {
         },
         cli: {
           ptyState: workbench.cliPtyState,
-          refitKey: workbench.terminalPanelState.isVisible ? "cli:split" : "cli:solo",
+          refitKey: workbench.terminalPanelState.isVisible
+            ? "cli:terminal-open"
+            : "cli:terminal-closed",
         },
         transitionState: workbench.primaryPanelState.transitionState,
       })}
+      onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
       primaryBottomPanel={
         workbench.primaryPanelState.showsChatComposer ? (
@@ -358,23 +384,7 @@ function SessionWorkbenchPageContent(input: {
           </>
         ) : null
       }
-      secondaryPanel={
-        <SessionTerminalPanel
-          key={terminalPanelKey}
-          isResumingSandbox={workbench.isResumingStoppedSandbox}
-          isConnectionReady={workbench.connectionReadiness.canConnect}
-          isVisible={workbench.terminalPanelState.isVisible}
-          onHide={workbench.terminalPanelState.closePanel}
-          onDisconnectTerminal={async (): Promise<void> => {
-            workbench.terminalPanelState.closePanel();
-            await workbench.ptyState.actions.disconnectPty();
-          }}
-          onRequestSandboxResume={workbench.requestStoppedSandboxResume}
-          ptyState={workbench.ptyState}
-          sandboxStatus={workbench.sandboxLifecycleStatus}
-          sandboxInstanceId={input.sandboxInstanceId}
-        />
-      }
+      secondaryPanel={<></>}
       secondaryPanelSize={workbench.terminalPanelState.panelSize}
       sandboxInstanceId={input.sandboxInstanceId}
     />

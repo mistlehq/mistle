@@ -46,37 +46,32 @@ export type InvitationDisplayStatus =
   | { kind: "accepted" }
   | { kind: "canceled" }
   | { kind: "rejected" }
-  | { kind: "revoked" }
-  | { kind: "unknown"; rawStatus: string };
+  | { kind: "revoked" };
 
-export function invitationStatusLabel(
-  role: OrganizationRole,
-  displayStatus: InvitationDisplayStatus,
-): string {
-  const roleLabel = formatRoleLabel(role);
+export function invitationStatusLabel(displayStatus: InvitationDisplayStatus): string {
   if (displayStatus.kind === "pending") {
-    return `${roleLabel} (Invited)`;
+    return "Pending";
   }
 
   if (displayStatus.kind === "expired") {
-    return `${roleLabel} (Invite expired)`;
+    return "Expired";
   }
 
   if (displayStatus.kind === "accepted") {
-    return `${roleLabel} (Accepted)`;
+    return "Accepted";
   }
 
   if (displayStatus.kind === "canceled") {
-    return `${roleLabel} (Canceled)`;
+    return "Canceled";
   }
 
   if (displayStatus.kind === "rejected") {
-    return `${roleLabel} (Rejected)`;
+    return "Rejected";
   }
 
   if (displayStatus.kind === "revoked") {
-    return `${roleLabel} (Revoked)`;
+    return "Revoked";
   }
 
-  return `${roleLabel} (${displayStatus.rawStatus})`;
+  throw new Error("Unhandled invitation display status.");
 }

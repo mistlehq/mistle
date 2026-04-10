@@ -124,6 +124,12 @@ export const EmailError: Story = {
   },
 };
 
+export const OrganizationSwitchRefreshError: Story = {
+  args: {
+    authError: "Unable to refresh session.",
+  },
+};
+
 export const OtpEntry: Story = {
   args: {
     authStep: "otp",

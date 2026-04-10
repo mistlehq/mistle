@@ -8,7 +8,11 @@ import {
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import {
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
+  OpenAiChatGptResponsesApiBaseUrl,
+  OpenAiConnectionMethodIds,
+} from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -52,7 +56,8 @@ describe("sandbox profile compile runtime plan integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities: createOpenAiRawBindingCapabilities(),
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       })
       .onConflictDoNothing();
@@ -195,6 +200,96 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain('trust_level = "trusted"');
   });
 
+  it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-chatgpt-base-url@example.com",
+    });
+    const targetKey = "openai-default-compile-runtime-plan-chatgpt";
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_chatgpt_base_url",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile ChatGPT Base URL Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_chatgpt_base_url",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        },
+      })
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_compile_chatgpt_base_url",
+      organizationId: authenticatedSession.organizationId,
+      targetKey,
+      displayName: "Compile ChatGPT Base URL Connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_123",
+        chatgpt_plan_type: "pro",
+      },
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_compile_chatgpt_base_url",
+      sandboxProfileId: "sbp_compile_chatgpt_base_url",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_compile_chatgpt_base_url",
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
+      },
+    });
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_chatgpt_base_url",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(runtimePlan.egressRoutes[0]?.upstream.baseUrl).toBe(OpenAiChatGptResponsesApiBaseUrl);
+    expect(runtimePlan.egressRoutes[0]?.additionalHeaders).toEqual({
+      "ChatGPT-Account-ID": "acct_123",
+    });
+
+    const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain(`base_url = "${OpenAiChatGptResponsesApiBaseUrl}"`);
+  });
+
   it("omits optional github and jira cli artifacts when bindings do not select tools", async ({
     fixture,
   }) => {
@@ -301,7 +396,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.artifacts).toEqual([]);
   });
 
-  it("installs selected github and jira cli artifacts once each in the compiled runtime plan", async ({
+  it("installs selected github, jira, and slack cli artifacts once each in the compiled runtime plan", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -337,6 +432,15 @@ describe("sandbox profile compile runtime plan integration", () => {
           variantId: "jira-default",
           enabled: true,
           config: {},
+        },
+        {
+          targetKey: "slack-default-compile-selected-tools",
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
         },
       ])
       .onConflictDoNothing();
@@ -375,6 +479,16 @@ describe("sandbox profile compile runtime plan integration", () => {
           email: "user+dev@example.com",
         },
       },
+      {
+        id: "icn_compile_selected_tools_slack",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "slack-default-compile-selected-tools",
+        displayName: "Compile Selected Tools Slack Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "slack-bot-token",
+        },
+      },
     ]);
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
       {
@@ -408,6 +522,16 @@ describe("sandbox profile compile runtime plan integration", () => {
           tools: ["jira-cli"],
         },
       },
+      {
+        id: "ibd_compile_selected_tools_slack",
+        sandboxProfileId: "sbp_compile_selected_tools",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_selected_tools_slack",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: ["slack-cli"],
+        },
+      },
     ]);
 
     const runtimePlan = await compileProfileVersionRuntimePlan(
@@ -426,10 +550,11 @@ describe("sandbox profile compile runtime plan integration", () => {
       },
     );
 
-    expect(runtimePlan.artifacts).toHaveLength(2);
+    expect(runtimePlan.artifacts).toHaveLength(3);
     expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
       "gh-cli",
       "jira-cli",
+      "slack-cli",
     ]);
     expect(runtimePlan.artifacts[0]?.env).toEqual({
       GH_TOKEN: "dummy-value",
@@ -449,6 +574,17 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(jiraInstallCommand?.args[2]).toContain("release_tag_prefix=jira/");
     expect(jiraInstallCommand?.args[2]).toContain("asset_name=jira-linux-amd64");
     expect(jiraInstallCommand?.args[2]).toContain("/usr/local/bin/jira");
+
+    const slackInstallCommand = runtimePlan.artifacts[2]?.lifecycle.install[0];
+    expect(runtimePlan.artifacts[2]?.env).toEqual({
+      SLACK_BASE_URL: "https://slack.com/api",
+    });
+    expect(slackInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(slackInstallCommand?.timeoutMs).toBe(120_000);
+    expect(slackInstallCommand?.args[2]).toContain("repo=mistlehq/tools");
+    expect(slackInstallCommand?.args[2]).toContain("release_tag_prefix=slack/");
+    expect(slackInstallCommand?.args[2]).toContain("asset_name=slack-linux-amd64");
+    expect(slackInstallCommand?.args[2]).toContain("/usr/local/bin/slack");
   });
 
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {

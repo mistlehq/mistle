@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route } from "react-router";
+import { Navigate, Outlet, Route, useLocation } from "react-router";
 
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SETTINGS_DEFAULT_PATH } from "./model.js";
@@ -7,9 +7,6 @@ export type SettingsRouteElements = {
   personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
-  organizationIntegrations: React.JSX.Element;
-  organizationIntegrationDetail: React.JSX.Element;
-  organizationIntegrationCallbackResult: React.JSX.Element;
 };
 
 export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX.Element {
@@ -36,23 +33,7 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
           handle={ROUTE_HANDLES.settingsOrganizationMembers}
           path="members"
         />
-        <Route
-          element={<RouteOutlet />}
-          handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
-          path="integrations"
-        >
-          <Route element={elements.organizationIntegrations} index />
-          <Route
-            element={elements.organizationIntegrationDetail}
-            handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
-            path=":targetKey"
-          />
-          <Route
-            element={elements.organizationIntegrationCallbackResult}
-            handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
-            path=":targetKey/callback-result"
-          />
-        </Route>
+        <Route element={<LegacyOrganizationIntegrationsRedirect />} path="integrations/*" />
       </Route>
     </Route>
   );
@@ -60,4 +41,23 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
+}
+
+function LegacyOrganizationIntegrationsRedirect(): React.JSX.Element {
+  const location = useLocation();
+  const legacyPrefix = "/settings/organization/integrations";
+  const pathname = location.pathname.startsWith(legacyPrefix)
+    ? `/integrations${location.pathname.slice(legacyPrefix.length)}`
+    : "/integrations";
+
+  return (
+    <Navigate
+      replace
+      to={{
+        pathname,
+        search: location.search,
+        hash: location.hash,
+      }}
+    />
+  );
 }

@@ -73,7 +73,7 @@ export function useMembersMutations(input: {
         role: invitation.role,
         resend: true,
       }),
-    invalidate: [input.queryKeys.invitations],
+    invalidate: [input.queryKeys.members, input.queryKeys.invitations],
     queryClient: input.queryClient,
     onSuccess: (invitation) => {
       input.setInvitationActionState({
@@ -98,7 +98,7 @@ export function useMembersMutations(input: {
       input.api.revokeInvitation({
         invitationId: invitation.id,
       }),
-    invalidate: [input.queryKeys.invitations],
+    invalidate: [input.queryKeys.members, input.queryKeys.invitations],
     queryClient: input.queryClient,
     onSuccess: (invitation) => {
       input.setInvitationActionState({
@@ -125,7 +125,11 @@ export function useMembersMutations(input: {
         memberId: nextValue.memberId,
         role: nextValue.role,
       }),
-    invalidate: [input.queryKeys.members, input.queryKeys.capabilities],
+    invalidate: [
+      input.queryKeys.members,
+      input.queryKeys.invitations,
+      input.queryKeys.capabilities,
+    ],
     queryClient: input.queryClient,
     onSuccess: () => {
       input.setRoleUpdateErrorMessage(null);
@@ -145,7 +149,11 @@ export function useMembersMutations(input: {
         organizationId: input.organizationId,
         memberIdOrEmail: member.id,
       }),
-    invalidate: [input.queryKeys.members, input.queryKeys.capabilities],
+    invalidate: [
+      input.queryKeys.members,
+      input.queryKeys.invitations,
+      input.queryKeys.capabilities,
+    ],
     queryClient: input.queryClient,
     onSettled: () => {
       input.setPendingMemberOperation(null);

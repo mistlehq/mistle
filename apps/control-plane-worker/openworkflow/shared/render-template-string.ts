@@ -22,6 +22,7 @@ function serializeTemplateOutput(value: unknown): string {
 }
 
 const TemplateEngine = new Liquid({
+  lenientIf: true,
   strictVariables: true,
   strictFilters: true,
   outputEscape: serializeTemplateOutput,

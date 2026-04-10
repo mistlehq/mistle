@@ -334,6 +334,40 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
   });
 
+  it("renders device-authorization pending instructions and controls", () => {
+    renderDialog({
+      deviceAuthorizationPending: {
+        targetKey: "openai-default",
+        attemptId: "ida_123",
+        verificationUrl: "https://auth.openai.com/codex/device",
+        userCode: "ABCD-1234",
+        expiresAt: "2099-04-01T00:00:00.000Z",
+        method: {
+          id: "chatgpt-device-code",
+          label: "ChatGPT subscription",
+          kind: "device-authorization",
+          ui: {
+            create: {
+              submitLabel: "Connect",
+              helperText: "Connect with device authorization",
+            },
+            pending: {
+              title: "Approve In ChatGPT",
+              description: "Open the verification link and enter the code.",
+            },
+          },
+        },
+      },
+    });
+
+    expect(screen.getByText("Approve In ChatGPT")).toBeTruthy();
+    expect(screen.getByText("Open the verification link and enter the code.")).toBeTruthy();
+    expect(screen.getByDisplayValue("ABCD-1234")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "https://auth.openai.com/codex/device" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cancel authorization" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Create connection" })).toBeNull();
+  });
+
   it("hides GitHub API key discriminator config and the nested rjsf submit button", () => {
     const dialog: IntegrationConnectionDialogState = {
       methods: [

@@ -3,23 +3,32 @@ import { describe, expect, it } from "vitest";
 
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
+import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
+    const locationPathname = "/sessions/sbi_123";
+    const routeState = resolveAppShellRouteState(locationPathname);
     const frame = resolveAppShellFrame({
       handleBackToApp: () => {},
       handleNavigateToSettings: () => {},
       handleSignOut: () => {},
-      inAutomations: false,
-      inDashboardRoot: false,
-      inSandboxProfiles: false,
-      inSessionDetail: true,
-      inSessions: true,
-      inSettings: false,
+      handleSwitchOrganization: () => {},
+      inAutomations: routeState.inAutomations,
+      inDashboardRoot: routeState.inDashboardRoot,
+      inIntegrations: routeState.inIntegrations,
+      inSandboxProfiles: routeState.inSandboxProfiles,
+      inSessionDetail: routeState.inSessionDetail,
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
       isSigningOut: false,
-      locationPathname: "/sessions/sbi_123",
-      organizationErrorMessage: null,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
       organizationImageUrl: null,
+      activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
         appShellInsetOwner: "app-shell",
@@ -52,20 +61,28 @@ describe("resolveAppShellFrame", () => {
   });
 
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
+    const locationPathname = "/sessions/sbi_123";
+    const routeState = resolveAppShellRouteState(locationPathname);
     const frame = resolveAppShellFrame({
       handleBackToApp: () => {},
       handleNavigateToSettings: () => {},
       handleSignOut: () => {},
-      inAutomations: false,
-      inDashboardRoot: false,
-      inSandboxProfiles: false,
-      inSessionDetail: true,
-      inSessions: true,
-      inSettings: false,
+      handleSwitchOrganization: () => {},
+      inAutomations: routeState.inAutomations,
+      inDashboardRoot: routeState.inDashboardRoot,
+      inIntegrations: routeState.inIntegrations,
+      inSandboxProfiles: routeState.inSandboxProfiles,
+      inSessionDetail: routeState.inSessionDetail,
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
       isSigningOut: false,
-      locationPathname: "/sessions/sbi_123",
-      organizationErrorMessage: null,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
       organizationImageUrl: null,
+      activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
         appShellInsetOwner: "app-shell",

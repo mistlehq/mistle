@@ -80,6 +80,46 @@ describe("resolveFormConnectionMethodOrThrow", () => {
       "Integration target 'oauth2-only-target' does not support form connection method 'oauth2-authorization-code'.",
     );
   });
+
+  it("throws when the selected method is a device-authorization method", () => {
+    let thrownError: unknown = null;
+
+    try {
+      resolveFormConnectionMethodOrThrow({
+        targetKey: "openai-device-auth-only-target",
+        methodId: "chatgpt-device-code",
+        connectionMethods: [
+          {
+            id: "chatgpt-device-code",
+            label: "ChatGPT subscription",
+            kind: "device-authorization",
+            ui: {
+              create: {
+                submitLabel: "Continue",
+                helperText: "Continue to device authorization.",
+              },
+              pending: {
+                title: "Waiting for approval",
+                description: "Finish approval in your browser.",
+              },
+            },
+          },
+        ],
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
+      throw new Error("Expected device-authorization method to throw.");
+    }
+    expect(thrownError.code).toBe("FORM_CONNECTION_METHOD_NOT_SUPPORTED");
+    expect(thrownError.message).toBe(
+      "Integration target 'openai-device-auth-only-target' does not support form connection method 'chatgpt-device-code'.",
+    );
+  });
 });
 
 describe("parseFormConnectionConfigOrThrow", () => {

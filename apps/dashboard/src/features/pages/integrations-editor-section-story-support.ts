@@ -1,4 +1,4 @@
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions/openai";
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions/openai";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-string-array-widget-story-support.js";
@@ -25,7 +25,8 @@ export const StoryOpenAiTarget: IntegrationTargetSummary = {
   variantId: "openai-default",
   config: {
     api_base_url: "https://api.openai.com",
-    binding_capabilities: createOpenAiRawBindingCapabilities(),
+    binding_capabilities_by_connection_method:
+      createOpenAiRawBindingCapabilitiesByConnectionMethod(),
   },
   targetHealth: {
     configStatus: "valid",

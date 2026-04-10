@@ -8,6 +8,5 @@ export {
 
 const membersInvitationsService = createMembersInvitationsService(authClient);
 
-export const listInvitations = membersInvitationsService.listInvitations;
 export const inviteMember = membersInvitationsService.inviteMember;
 export const revokeInvitation = membersInvitationsService.revokeInvitation;

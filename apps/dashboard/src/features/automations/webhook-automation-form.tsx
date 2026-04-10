@@ -405,6 +405,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 {hasSelectedTrigger ? (
                   <FieldDescription>
                     Type <InlineCode variant="muted">{"{{"}</InlineCode> to insert available fields.
+                    Use Liquid filters like{" "}
+                    <InlineCode variant="muted">
+                      {`{{ payload.event.thread_ts | default: payload.event.ts }}`}
+                    </InlineCode>{" "}
+                    for optional values.
                   </FieldDescription>
                 ) : (
                   <FieldDescription>

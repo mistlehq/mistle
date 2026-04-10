@@ -160,6 +160,12 @@
                               "required": ["type", "target"],
                               "additionalProperties": false
                             },
+                            "additionalHeaders": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            },
                             "credentialResolver": {
                               "type": "object",
                               "properties": {
@@ -1281,6 +1287,12 @@
                                 },
                                 "required": ["type", "target"],
                                 "additionalProperties": false
+                              },
+                              "additionalHeaders": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                }
                               },
                               "credentialResolver": {
                                 "type": "object",

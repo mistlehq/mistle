@@ -354,6 +354,22 @@ function ConnectionAuthSection(input: {
     );
   }
 
+  if (input.authMethodId === "slack-bot-token") {
+    return (
+      <div
+        aria-label="Connection authentication"
+        className="gap-1 flex flex-col"
+        data-auth-method-id="slack-bot-token"
+      >
+        <InlineField label="Auth method" value={input.authMethodLabel} />
+        <div aria-label="Masked Slack credential values" className="gap-1 flex flex-col text-sm">
+          <InlineField label="Bot token" value="**********" />
+          <InlineField label="Signing secret" value="**********" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center justify-between gap-3">
       <InlineField label="Auth method" value={input.authMethodLabel} />

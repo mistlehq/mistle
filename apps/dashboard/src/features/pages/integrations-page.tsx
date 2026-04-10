@@ -109,6 +109,7 @@ export function IntegrationsPage() {
             }
             connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
             connectError={connectionDialogState.error}
+            deviceAuthorizationPending={connectionDialogState.deviceAuthorizationPending}
             dialog={connectionDialogState.dialog}
             hasChanges={connectionDialogState.hasChanges}
             isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}

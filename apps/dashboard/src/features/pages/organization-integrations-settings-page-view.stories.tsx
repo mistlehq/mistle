@@ -58,7 +58,7 @@ const AvailableCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
 ] as const;
 
 const meta = {
-  title: "Dashboard/Settings/OrganizationIntegrations/PageView",
+  title: "Dashboard/Integrations/PageView",
   component: OrganizationIntegrationsSettingsPageView,
   decorators: [withDashboardPageStory],
   args: {

@@ -8,6 +8,7 @@ export type AgentProviderAccess = {
     secretType: string;
     slotKey?: string;
   };
+  additionalHeaders?: Readonly<Record<string, string>>;
   allowedMethods: readonly ("GET" | "POST")[];
   allowedPathPrefixes: readonly string[];
   defaultModel: string;

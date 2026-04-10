@@ -1,4 +1,4 @@
-import { PuzzlePieceIcon, SlidersHorizontalIcon, UserIcon, UsersIcon } from "@phosphor-icons/react";
+import { SlidersHorizontalIcon, UserIcon, UsersIcon } from "@phosphor-icons/react";
 import { createElement } from "react";
 
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
@@ -23,11 +23,6 @@ export const SETTINGS_NAV_GROUPS: readonly SidebarNavGroup[] = [
         to: "/settings/organization/members",
         label: "Members",
         icon: MembersNavIcon,
-      },
-      {
-        to: "/settings/organization/integrations",
-        label: "Integrations",
-        icon: IntegrationsNavIcon,
       },
     ],
   },
@@ -55,11 +50,4 @@ function GeneralNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
 
 function MembersNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return createElement(UsersIcon, props);
-}
-
-function IntegrationsNavIcon(props: {
-  className?: string;
-  "aria-hidden"?: boolean;
-}): React.JSX.Element {
-  return createElement(PuzzlePieceIcon, props);
 }

@@ -148,6 +148,15 @@
                 "required": ["type", "target"],
                 "additionalProperties": false
               },
+              "additionalHeaders": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "credentialResolver": {
                 "type": "object",
                 "properties": {

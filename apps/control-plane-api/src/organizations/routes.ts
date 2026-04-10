@@ -7,7 +7,8 @@ import * as deleteLogo from "./delete-logo/index.js";
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
-import * as listMemberAvatars from "./list-member-avatars/index.js";
+import * as listInvitations from "./list-invitations/index.js";
+import * as listMembers from "./list-members/index.js";
 import * as putLogo from "./put-logo/index.js";
 
 export function createOrganizationsRoutes(): AppRoutes<typeof ORGANIZATIONS_ROUTE_BASE_PATH> {
@@ -20,7 +21,8 @@ export function createOrganizationsRoutes(): AppRoutes<typeof ORGANIZATIONS_ROUT
   routes.openapi(putLogo.route, putLogo.handler);
   routes.openapi(deleteLogo.route, deleteLogo.handler);
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
-  routes.openapi(listMemberAvatars.route, listMemberAvatars.handler);
+  routes.openapi(listMembers.route, listMembers.handler);
+  routes.openapi(listInvitations.route, listInvitations.handler);
 
   return {
     basePath: ORGANIZATIONS_ROUTE_BASE_PATH,

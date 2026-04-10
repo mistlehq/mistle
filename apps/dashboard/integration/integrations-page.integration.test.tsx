@@ -64,29 +64,17 @@ function createIntegrationsRouter(): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
-        <Route element={<Outlet />} handle={ROUTE_HANDLES.settings} path="settings">
+        <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
           <Route
-            element={<Outlet />}
-            handle={ROUTE_HANDLES.settingsOrganization}
-            path="organization"
-          >
-            <Route
-              element={<Outlet />}
-              handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
-              path="integrations"
-            >
-              <Route
-                element={<IntegrationsPage />}
-                handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
-                path=":targetKey"
-              />
-            </Route>
-          </Route>
+            element={<IntegrationsPage />}
+            handle={ROUTE_HANDLES.integrationDetail}
+            path=":targetKey"
+          />
         </Route>
       </Route>,
     ),
     {
-      initialEntries: ["/settings/organization/integrations/github"],
+      initialEntries: ["/integrations/github"],
     },
   );
 }

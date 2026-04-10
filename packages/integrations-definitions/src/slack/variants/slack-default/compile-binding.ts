@@ -22,7 +22,7 @@ function createSlackCliArtifact(
     artifactKey: SlackCliArtifactKey,
     name: SlackCliArtifactName,
     env: {
-      SLACK_API_BASE_URL: upstreamBaseUrl,
+      SLACK_BASE_URL: upstreamBaseUrl,
     },
     lifecycle: {
       install: ({ refs }) => [

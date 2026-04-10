@@ -5,7 +5,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import { CpuIcon, HouseIcon, LightningIcon } from "@phosphor-icons/react";
+import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -18,6 +18,7 @@ import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
+import type { OrganizationSwitcherOption } from "./organization-switcher.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
 function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
@@ -38,6 +39,13 @@ function AutomationsNavIcon(props: {
   return <LightningIcon {...props} />;
 }
 
+function IntegrationsNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <PuzzlePieceIcon {...props} />;
+}
+
 export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
   | "breadcrumbs"
@@ -55,16 +63,22 @@ export function resolveAppShellFrame(input: {
   handleBackToApp: () => void;
   handleNavigateToSettings: () => void;
   handleSignOut: () => void;
+  handleSwitchOrganization: (organizationId: string) => void;
   inAutomations: boolean;
   inDashboardRoot: boolean;
+  inIntegrations: boolean;
   inSandboxProfiles: boolean;
   inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
   isSigningOut: boolean;
+  isSwitchingOrganization: boolean;
   locationPathname: string;
-  organizationErrorMessage: string | null;
+  organizationOptions: OrganizationSwitcherOption[];
+  organizationSummaryErrorMessage: string | null;
+  organizationSwitcherErrorMessage: string | null;
   organizationImageUrl: string | null;
+  activeOrganizationId: string;
   organizationName: string;
   pageMeta: AppPageMeta;
   signOutError: string | null;
@@ -75,6 +89,7 @@ export function resolveAppShellFrame(input: {
     input.inSettings ||
     input.inSandboxProfiles ||
     input.inAutomations ||
+    input.inIntegrations ||
     input.inDashboardRoot ||
     input.inSessions;
 
@@ -116,12 +131,17 @@ export function resolveAppShellFrame(input: {
     sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
     sidebarHeaderContent: showDedicatedSessionsSidebar ? null : (
       <OrganizationMenuTrigger
+        activeOrganizationId={input.activeOrganizationId}
         isSigningOut={input.isSigningOut}
+        isSwitchingOrganization={input.isSwitchingOrganization}
         onNavigateToSettings={input.handleNavigateToSettings}
         onSignOut={input.handleSignOut}
-        organizationErrorMessage={input.organizationErrorMessage}
+        onSwitchOrganization={input.handleSwitchOrganization}
+        organizationSummaryErrorMessage={input.organizationSummaryErrorMessage}
+        organizationSwitcherErrorMessage={input.organizationSwitcherErrorMessage}
         organizationImageUrl={input.organizationImageUrl}
         organizationName={input.organizationName}
+        organizations={input.organizationOptions}
       />
     ),
     topLoadingBar: <TopLoadingBar />,
@@ -169,6 +189,18 @@ function MainSidebarContent(input: {
             >
               <SandboxProfilesNavIcon aria-hidden className="size-4 shrink-0" />
               <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/integrations" ||
+                input.locationPathname.startsWith("/integrations/")
+              }
+              render={<NavLink to="/integrations" />}
+            >
+              <IntegrationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Integrations</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SessionsNavToggleItem

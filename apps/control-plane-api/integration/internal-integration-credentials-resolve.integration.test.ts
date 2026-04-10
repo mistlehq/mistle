@@ -15,6 +15,8 @@ import {
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
   IntegrationRegistry,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
+  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
@@ -24,8 +26,10 @@ import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
 } from "../src/internal/integration-credentials/index.js";
+import { InternalIntegrationCredentialsErrorCodes } from "../src/internal/integration-credentials/services/errors.js";
 import { resolveIntegrationCredential } from "../src/internal/integration-credentials/services/resolve-credential.js";
 import {
+  decryptCredentialUtf8,
   encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
@@ -44,6 +48,13 @@ const ClientCredentialsClientSecretSlotKey =
   "oauth2.client-credentials-test.oauth2-client-credentials-test.client-secret";
 const ClientCredentialsAccessTokenSlotKey =
   "oauth2.client-credentials-test.oauth2-client-credentials-test.access-token";
+const DeviceAuthorizationRefreshFamilyId = "device-auth";
+const DeviceAuthorizationRefreshVariantId = "refresh-test";
+const DeviceAuthorizationRefreshConnectionMethodId = "chatgpt-device-code";
+const DeviceAuthorizationRefreshSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+  familyId: DeviceAuthorizationRefreshFamilyId,
+  variantId: DeviceAuthorizationRefreshVariantId,
+});
 
 function createClientCredentialsRegistry(): IntegrationRegistry {
   const registry = new IntegrationRegistry();
@@ -86,6 +97,81 @@ function createClientCredentialsRegistry(): IntegrationRegistry {
         accessToken: `access-token-for:${input.clientSecret}`,
         accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
       }),
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+
+  registry.register(definition);
+
+  return registry;
+}
+
+function createDeviceAuthorizationRefreshRegistry(input: {
+  refreshAccessToken: NonNullable<
+    IntegrationDefinition<
+      typeof EmptyConfigSchema,
+      typeof EmptyConfigSchema,
+      typeof EmptyConfigSchema,
+      {
+        connection_method: "chatgpt-device-code";
+        auth_mode: "chatgpt";
+        chatgpt_account_id: string;
+      }
+    >["oauth2AuthorizationCode"]
+  >["refreshAccessToken"];
+}): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  const definition: IntegrationDefinition<
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema,
+    {
+      connection_method: "chatgpt-device-code";
+      auth_mode: "chatgpt";
+      chatgpt_account_id: string;
+    }
+  > = {
+    familyId: DeviceAuthorizationRefreshFamilyId,
+    variantId: DeviceAuthorizationRefreshVariantId,
+    kind: "agent",
+    displayName: "Device Authorization Refresh Test",
+    logoKey: "openai",
+    targetConfigSchema: EmptyConfigSchema,
+    targetSecretSchema: EmptyConfigSchema,
+    bindingConfigSchema: EmptyConfigSchema,
+    connectionMethods: [
+      {
+        id: DeviceAuthorizationRefreshConnectionMethodId,
+        label: "ChatGPT subscription",
+        kind: "device-authorization",
+        ui: {
+          create: {
+            submitLabel: "Connect",
+            helperText: "Connect with device authorization",
+          },
+        },
+      },
+    ],
+    deviceAuthorization: {
+      startDeviceAuthorization: async () => {
+        throw new Error("Not used in internal credential refresh tests.");
+      },
+      pollDeviceAuthorization: async () => {
+        throw new Error("Not used in internal credential refresh tests.");
+      },
+    },
+    oauth2AuthorizationCode: {
+      startAuthorization: async () => {
+        throw new Error("Not used in internal credential refresh tests.");
+      },
+      completeAuthorizationCodeGrant: async () => {
+        throw new Error("Not used in internal credential refresh tests.");
+      },
+      refreshAccessToken: input.refreshAccessToken,
     },
     compileBinding: () => ({
       egressRoutes: [],
@@ -333,6 +419,334 @@ describe("internal integration credentials resolve", () => {
       value: "oauth2-access-token-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
+  });
+
+  it("refreshes expired device-authorization access tokens through the managed path", async ({
+    fixture,
+  }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "device_auth_refresh_target",
+      familyId: DeviceAuthorizationRefreshFamilyId,
+      variantId: DeviceAuthorizationRefreshVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_device_auth_refresh",
+      organizationId: authSession.organizationId,
+      targetKey: "device_auth_refresh_target",
+      displayName: "Device auth refresh",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_123",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedExpiredAccessToken = encryptCredentialUtf8({
+        plaintext: "expired-access-token",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+      const encryptedRefreshToken = encryptCredentialUtf8({
+        plaintext: "valid-refresh-token",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values([
+        {
+          id: "icr_device_auth_access_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+          ciphertext: encryptedExpiredAccessToken.ciphertext,
+          nonce: encryptedExpiredAccessToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2000-01-01T00:00:00.000Z",
+        },
+        {
+          id: "icr_device_auth_refresh_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+          ciphertext: encryptedRefreshToken.ciphertext,
+          nonce: encryptedRefreshToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        },
+      ]);
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values([
+      {
+        connectionId: "icn_device_auth_refresh",
+        credentialId: "icr_device_auth_access_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+      },
+      {
+        connectionId: "icn_device_auth_refresh",
+        credentialId: "icr_device_auth_refresh_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
+      },
+    ]);
+
+    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
+      refreshAccessToken: async (input) => {
+        expect(input.refreshToken).toBe("valid-refresh-token");
+        return {
+          accessToken: "rotated-access-token",
+          accessTokenExpiresAt: "2030-01-02T00:00:00.000Z",
+          refreshToken: "rotated-refresh-token",
+          refreshTokenExpiresAt: "2030-01-03T00:00:00.000Z",
+          credentialMetadata: {
+            provider: "openai",
+          },
+        };
+      },
+    });
+
+    const resolvedCredential = await resolveIntegrationCredential(
+      {
+        db: fixture.db,
+        integrationRegistry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        connectionId: "icn_device_auth_refresh",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+      },
+    );
+
+    expect(resolvedCredential).toEqual({
+      value: "rotated-access-token",
+      expiresAt: "2030-01-02T00:00:00.000Z",
+    });
+
+    const activeConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_device_auth_refresh"),
+    });
+    expect(activeConnection?.status).toBe(IntegrationConnectionStatuses.ACTIVE);
+
+    const accessCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.connectionId, "icn_device_auth_refresh"),
+          eq(table.slotKey, DeviceAuthorizationRefreshSlotKeys.accessToken),
+        ),
+    });
+    const refreshCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst(
+      {
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.connectionId, "icn_device_auth_refresh"),
+            eq(table.slotKey, DeviceAuthorizationRefreshSlotKeys.refreshToken),
+          ),
+      },
+    );
+
+    if (accessCredentialLink === undefined || refreshCredentialLink === undefined) {
+      throw new Error("Expected refreshed credential links.");
+    }
+
+    expect(accessCredentialLink.credentialId).not.toBe("icr_device_auth_access_old");
+    expect(refreshCredentialLink.credentialId).not.toBe("icr_device_auth_refresh_old");
+
+    const activeAccessCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, accessCredentialLink.credentialId),
+    });
+    const activeRefreshCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, refreshCredentialLink.credentialId),
+    });
+    const revokedAccessCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "icr_device_auth_access_old"),
+    });
+    const revokedRefreshCredential = await fixture.db.query.integrationCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "icr_device_auth_refresh_old"),
+    });
+
+    if (activeAccessCredential === undefined || activeRefreshCredential === undefined) {
+      throw new Error("Expected active refreshed credentials.");
+    }
+
+    expect(revokedAccessCredential?.revokedAt).not.toBeNull();
+    expect(revokedRefreshCredential?.revokedAt).not.toBeNull();
+    expect(activeAccessCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    );
+    expect(activeRefreshCredential.secretKind).toBe(
+      IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+    );
+
+    expect(
+      decryptStoredCredential({
+        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        nonce: activeAccessCredential.nonce,
+        ciphertext: activeAccessCredential.ciphertext,
+      }),
+    ).toBe("rotated-access-token");
+    expect(
+      decryptStoredCredential({
+        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        nonce: activeRefreshCredential.nonce,
+        ciphertext: activeRefreshCredential.ciphertext,
+      }),
+    ).toBe("rotated-refresh-token");
+  });
+
+  it("marks the connection errored when device-authorization refresh fails permanently", async ({
+    fixture,
+  }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "device_auth_refresh_failure_target",
+      familyId: DeviceAuthorizationRefreshFamilyId,
+      variantId: DeviceAuthorizationRefreshVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_device_auth_refresh_failure",
+      organizationId: authSession.organizationId,
+      targetKey: "device_auth_refresh_failure_target",
+      displayName: "Device auth refresh failure",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_456",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedExpiredAccessToken = encryptCredentialUtf8({
+        plaintext: "expired-access-token",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+      const encryptedRefreshToken = encryptCredentialUtf8({
+        plaintext: "revoked-refresh-token",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values([
+        {
+          id: "icr_device_auth_access_failure_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+          ciphertext: encryptedExpiredAccessToken.ciphertext,
+          nonce: encryptedExpiredAccessToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2000-01-01T00:00:00.000Z",
+        },
+        {
+          id: "icr_device_auth_refresh_failure_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+          ciphertext: encryptedRefreshToken.ciphertext,
+          nonce: encryptedRefreshToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        },
+      ]);
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values([
+      {
+        connectionId: "icn_device_auth_refresh_failure",
+        credentialId: "icr_device_auth_access_failure_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+      },
+      {
+        connectionId: "icn_device_auth_refresh_failure",
+        credentialId: "icr_device_auth_refresh_failure_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
+      },
+    ]);
+
+    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
+      refreshAccessToken: async () => {
+        throw new IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError({
+          message: "refresh token expired",
+          classification:
+            IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
+          code: "refresh_token_expired",
+        });
+      },
+    });
+
+    await expect(
+      resolveIntegrationCredential(
+        {
+          db: fixture.db,
+          integrationRegistry,
+          integrationsConfig: fixture.config.integrations,
+        },
+        {
+          connectionId: "icn_device_auth_refresh_failure",
+          secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+          slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: InternalIntegrationCredentialsErrorCodes.OAUTH2_REFRESH_FAILED,
+      status: 400,
+      message: "refresh token expired",
+    });
+
+    const erroredConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_device_auth_refresh_failure"),
+    });
+    expect(erroredConnection?.status).toBe(IntegrationConnectionStatuses.ERROR);
   });
 
   it("mints and reuses OAuth2 client-credentials access tokens", async ({ fixture }) => {
@@ -661,3 +1075,30 @@ describe("internal integration credentials resolve", () => {
     });
   });
 });
+
+function decryptStoredCredential(input: {
+  wrappedOrganizationKeyCiphertext: string;
+  masterKeyVersion: number;
+  masterEncryptionKeys: Record<string, string>;
+  nonce: string;
+  ciphertext: string;
+}): string {
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: input.masterKeyVersion,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+  const organizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: input.wrappedOrganizationKeyCiphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    return decryptCredentialUtf8({
+      nonce: input.nonce,
+      ciphertext: input.ciphertext,
+      organizationCredentialKey,
+    });
+  } finally {
+    organizationCredentialKey.fill(0);
+  }
+}

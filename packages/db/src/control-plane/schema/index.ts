@@ -103,6 +103,13 @@ export {
   type IntegrationConnectionRedirectSession,
 } from "./integration-connection-redirect-sessions.js";
 export {
+  integrationConnectionDeviceAuthorizationAttempts,
+  IntegrationDeviceAuthorizationAttemptStatuses,
+  type InsertIntegrationConnectionDeviceAuthorizationAttempt,
+  type IntegrationConnectionDeviceAuthorizationAttempt,
+  type IntegrationDeviceAuthorizationAttemptStatus,
+} from "./integration-connection-device-authorization-attempts.js";
+export {
   scheduleAutomations,
   type InsertScheduleAutomation,
   type ScheduleAutomation,

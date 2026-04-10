@@ -39,6 +39,7 @@ async function mintIntegrationEgressGrant(input: {
   authInjectionType: "bearer" | "basic" | "header" | "query";
   authInjectionTarget: string;
   authInjectionUsername?: string;
+  additionalHeaders?: Readonly<Record<string, string>>;
   connectionId: string;
   secretType: string;
   slotKey?: string;
@@ -60,6 +61,9 @@ async function mintIntegrationEgressGrant(input: {
       ...(input.authInjectionUsername === undefined
         ? {}
         : { authInjectionUsername: input.authInjectionUsername }),
+      ...(input.additionalHeaders === undefined
+        ? {}
+        : { additionalHeaders: input.additionalHeaders }),
       ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
       ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
       ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
@@ -218,10 +222,12 @@ async function startGzipUpstream(input: {
 async function startWebSocketUpstream(input: { host: string; path: string }): Promise<{
   baseUrl: string;
   capturedAuthorizationHeader: () => string | undefined;
+  capturedChatGptAccountIdHeader: () => string | undefined;
   stop: () => Promise<void>;
 }> {
   const port = await reserveAvailablePort({ host: input.host });
   let authorizationHeader: string | undefined;
+  let chatGptAccountIdHeader: string | undefined;
 
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     if (request.url === input.path) {
@@ -244,6 +250,10 @@ async function startWebSocketUpstream(input: { host: string; path: string }): Pr
       typeof request.headers.authorization === "string"
         ? request.headers.authorization
         : request.headers.authorization?.[0];
+    chatGptAccountIdHeader =
+      typeof request.headers["chatgpt-account-id"] === "string"
+        ? request.headers["chatgpt-account-id"]
+        : request.headers["chatgpt-account-id"]?.[0];
 
     socket.write(
       "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
@@ -269,6 +279,7 @@ async function startWebSocketUpstream(input: { host: string; path: string }): Pr
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
     capturedAuthorizationHeader: () => authorizationHeader,
+    capturedChatGptAccountIdHeader: () => chatGptAccountIdHeader,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -634,7 +645,7 @@ describe("tokenizer proxy integration", () => {
     }
   }, 15_000);
 
-  it("supports the grant-authorized egress endpoint", async () => {
+  it("supports the grant-authorized egress endpoint with fixed additional headers", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -651,6 +662,9 @@ describe("tokenizer proxy integration", () => {
       authInjectionType: "basic",
       authInjectionTarget: "authorization",
       authInjectionUsername: "x-access-token",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
       connectionId: "icn_github",
       secretType: "github_app_installation_token",
       resolverKey: "github_app_installation_token",
@@ -679,6 +693,7 @@ describe("tokenizer proxy integration", () => {
           method: "GET",
           headers: {
             [EgressRequestHeaders.GRANT]: egressGrant,
+            "ChatGPT-Account-ID": "acct_from_request",
           },
         },
       );
@@ -698,6 +713,7 @@ describe("tokenizer proxy integration", () => {
       expect(readHeaderValue(body.headers, "authorization")).toBe(
         "Basic eC1hY2Nlc3MtdG9rZW46Z2hzX3Rlc3RfdG9rZW4=",
       );
+      expect(readHeaderValue(body.headers, "chatgpt-account-id")).toBe("acct_from_grant");
       expect(controlPlaneServer.requests).toEqual([
         {
           bindingId: "ibd_github",
@@ -779,7 +795,7 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
-  it("forwards websocket upgrades to the upstream with injected auth", async () => {
+  it("forwards websocket upgrades to the upstream with injected auth and fixed headers", async () => {
     const upstreamService = await startWebSocketUpstream({
       host: "127.0.0.1",
       path: "/v1/responses?stream=true",
@@ -798,6 +814,9 @@ describe("tokenizer proxy integration", () => {
       bindingId: "ibd_openai",
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
       connectionId: "icn_openai",
       secretType: "api_key",
       slotKey: "openai.openai-default.api-key.api-key",
@@ -826,11 +845,13 @@ describe("tokenizer proxy integration", () => {
         path: "/tokenizer-proxy/egress/v1/responses?stream=true",
         headers: {
           [EgressRequestHeaders.GRANT]: egressGrant,
+          "ChatGPT-Account-ID": "acct_from_request",
         },
       });
 
       expect(message).toBe("pong\n");
       expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer sk-live-proxy");
+      expect(upstreamService.capturedChatGptAccountIdHeader()).toBe("acct_from_grant");
       expect(controlPlaneServer.requests).toEqual([
         {
           bindingId: "ibd_openai",

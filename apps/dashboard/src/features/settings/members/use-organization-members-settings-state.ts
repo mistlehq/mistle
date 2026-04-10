@@ -1,19 +1,20 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
-import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
+import type { MembersDirectoryFilter } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
 import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
 import type {
   MembersDirectoryInvitationActionState,
   MembersDirectoryPendingMemberOperation,
 } from "./members-directory-model.js";
+import { resolveMembersDirectoryQueryState } from "./members-directory-query-state.js";
 import { parseRoleSelectValue } from "./members-formatters.js";
+import { clampMembersDirectoryOffset } from "./members-pagination.js";
 import { buildMembersQueryKeys } from "./members-query-keys.js";
 import { defaultMembersSettingsApi, type MembersSettingsApi } from "./members-settings-api.js";
-import { toMembersErrorMessage } from "./members-status-messages.js";
+import type { OrganizationMembersSettingsPageViewModel } from "./organization-members-settings-view-model.js";
 import { useMembersMutations } from "./use-members-mutations.js";
-import { useMembersQueries } from "./use-members-queries.js";
 
 type UseOrganizationMembersSettingsState = {
   organizationId: string;
@@ -21,35 +22,25 @@ type UseOrganizationMembersSettingsState = {
 };
 
 type UseOrganizationMembersSettingsStateResult = {
-  inviteDialogOpen: boolean;
-  setInviteDialogOpen: (nextOpen: boolean) => void;
-  roleChangeDialog: RoleChangeDialogState | null;
-  capabilitiesQuery: ReturnType<typeof useMembersQueries>["capabilitiesQuery"];
-  membersQuery: ReturnType<typeof useMembersQueries>["membersQuery"];
-  invitationsQuery: ReturnType<typeof useMembersQueries>["invitationsQuery"];
-  capabilities: MembershipCapabilities | null;
-  members: SettingsMember[];
-  invitations: SettingsInvitation[];
-  canManageInvitations: boolean;
-  inviteMembersDisabled: boolean;
-  pendingMemberOperation: MembersDirectoryPendingMemberOperation;
-  invitationActionState: MembersDirectoryInvitationActionState;
-  isUpdatingRole: boolean;
-  roleUpdateErrorMessage: string | null;
-  onChangeRole: (member: SettingsMember) => void;
-  onRoleDialogOpenChange: (nextOpen: boolean) => void;
-  onRoleSelectValueChange: (nextRoleValue: string | null) => void;
-  onSaveRole: () => void;
-  onRemoveMember: (member: SettingsMember) => void;
-  onResendInvite: (invitation: SettingsInvitation) => void;
-  onRevokeInvite: (invitation: SettingsInvitation) => void;
-  resolveInviterDisplayName: (inviterId: string) => string;
-  onInviteCompleted: () => Promise<void>;
+  viewModel: OrganizationMembersSettingsPageViewModel;
 };
+
+export function resolvePostInviteDirectoryState(): {
+  activeFilter: MembersDirectoryFilter;
+  searchValue: string;
+  offset: number;
+} {
+  return {
+    activeFilter: "invitations",
+    searchValue: "",
+    offset: 0,
+  };
+}
 
 export function useOrganizationMembersSettingsState(
   input: UseOrganizationMembersSettingsState,
 ): UseOrganizationMembersSettingsStateResult {
+  const membersDirectoryPageLimit = 25;
   const queryClient = useQueryClient();
   const api = input.api ?? defaultMembersSettingsApi;
 
@@ -60,12 +51,47 @@ export function useOrganizationMembersSettingsState(
   const [invitationActionState, setInvitationActionState] =
     useState<MembersDirectoryInvitationActionState>(null);
   const [roleUpdateErrorMessage, setRoleUpdateErrorMessage] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<MembersDirectoryFilter>("members");
+  const [searchValue, setSearchValue] = useState("");
+  const [offset, setOffset] = useState(0);
 
   const queryKeys = buildMembersQueryKeys(input.organizationId);
-  const queries = useMembersQueries({
-    organizationId: input.organizationId,
-    api,
-    queryKeys,
+  const capabilitiesQuery = useQuery({
+    queryKey: queryKeys.capabilities,
+    queryFn: async () =>
+      api.getMembershipCapabilities({
+        organizationId: input.organizationId,
+      }),
+  });
+  const membersQuery = useQuery({
+    queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, searchValue],
+    queryFn: async () =>
+      api.listMembersPage({
+        organizationId: input.organizationId,
+        limit: membersDirectoryPageLimit,
+        offset,
+        search: searchValue,
+      }),
+    enabled: activeFilter === "members",
+    retry: false,
+  });
+  const invitationsQuery = useQuery({
+    queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, searchValue],
+    queryFn: async () =>
+      api.listInvitationsPage({
+        organizationId: input.organizationId,
+        limit: membersDirectoryPageLimit,
+        offset,
+        search: searchValue,
+      }),
+    enabled: activeFilter === "invitations",
+    retry: false,
+  });
+  const directoryQueryState = resolveMembersDirectoryQueryState({
+    activeFilter,
+    capabilitiesQuery,
+    invitationsQuery,
+    membersQuery,
   });
   const mutations = useMembersMutations({
     organizationId: input.organizationId,
@@ -80,27 +106,45 @@ export function useOrganizationMembersSettingsState(
   });
 
   const inviteMembersDisabled =
-    queries.capabilitiesQuery.isError || !canManageInvitations(queries.capabilities);
+    capabilitiesQuery.isError || !canManageInvitations(directoryQueryState.capabilities);
 
-  return {
-    inviteDialogOpen,
-    setInviteDialogOpen,
-    roleChangeDialog,
-    capabilitiesQuery: queries.capabilitiesQuery,
-    membersQuery: queries.membersQuery,
-    invitationsQuery: queries.invitationsQuery,
-    capabilities: queries.capabilities,
-    members: queries.members,
-    invitations: queries.invitations,
-    canManageInvitations: canManageInvitations(queries.capabilities),
-    inviteMembersDisabled,
-    pendingMemberOperation,
+  useEffect(() => {
+    const nextOffset = clampMembersDirectoryOffset({
+      limit: membersDirectoryPageLimit,
+      offset,
+      total: directoryQueryState.total,
+    });
+    if (nextOffset !== offset) {
+      setOffset(nextOffset);
+    }
+  }, [directoryQueryState.total, offset]);
+
+  const viewModel: OrganizationMembersSettingsPageViewModel = {
+    activeFilter,
+    capabilities: directoryQueryState.capabilities,
+    capabilitiesErrorMessage: capabilitiesQuery.isError
+      ? "Membership permissions could not be loaded."
+      : null,
+    hasNextPage:
+      offset + directoryQueryState.members.length + directoryQueryState.invitations.length <
+      directoryQueryState.total,
+    hasPreviousPage: offset > 0,
     invitationActionState,
+    invitations: directoryQueryState.invitations,
+    inviteDialogOpen,
+    inviteMemberRequest: api.inviteMember,
+    inviteMembersDisabled,
+    isLoading: directoryQueryState.isPageLoading,
+    isListFetching: directoryQueryState.isListFetching,
     isUpdatingRole: mutations.isUpdatingRole,
-    roleUpdateErrorMessage,
+    limit: membersDirectoryPageLimit,
+    listErrorNoticeMessage: directoryQueryState.listErrorNoticeMessage,
+    loadErrorMessage: directoryQueryState.loadErrorMessage,
+    memberAvatarsByUserId: directoryQueryState.memberAvatarsByUserId,
+    members: directoryQueryState.members,
     onChangeRole: (member) => {
       const nextRoleChangeDialog = buildRoleChangeDialogState({
-        capabilities: queries.capabilities,
+        capabilities: directoryQueryState.capabilities,
         member,
       });
       if (nextRoleChangeDialog === null) {
@@ -109,6 +153,33 @@ export function useOrganizationMembersSettingsState(
 
       setRoleUpdateErrorMessage(null);
       setRoleChangeDialog(nextRoleChangeDialog);
+    },
+    onInviteCompleted: async () => {
+      const nextState = resolvePostInviteDirectoryState();
+      setActiveFilter(nextState.activeFilter);
+      setSearchValue(nextState.searchValue);
+      setOffset(nextState.offset);
+      await mutations.onInviteCompleted();
+    },
+    onInviteDialogOpenChange: setInviteDialogOpen,
+    onFilterChange: (nextValue) => {
+      setActiveFilter(nextValue);
+      setOffset(0);
+    },
+    onNextPage: () => {
+      setOffset((currentValue) => currentValue + membersDirectoryPageLimit);
+    },
+    onPreviousPage: () => {
+      setOffset((currentValue) => Math.max(currentValue - membersDirectoryPageLimit, 0));
+    },
+    onRemoveMember: mutations.onRemoveMember,
+    onResendInvite: mutations.onResendInvite,
+    onRevokeInvite: mutations.onRevokeInvite,
+    onRoleDialogCancel: () => {
+      if (!mutations.isUpdatingRole) {
+        setRoleUpdateErrorMessage(null);
+        setRoleChangeDialog(null);
+      }
     },
     onRoleDialogOpenChange: (nextOpen) => {
       if (!nextOpen && !mutations.isUpdatingRole) {
@@ -135,21 +206,18 @@ export function useOrganizationMembersSettingsState(
       });
     },
     onSaveRole: mutations.onSaveRole,
-    onRemoveMember: mutations.onRemoveMember,
-    onResendInvite: mutations.onResendInvite,
-    onRevokeInvite: mutations.onRevokeInvite,
-    resolveInviterDisplayName: (inviterId) =>
-      queries.inviterDisplayNames.get(inviterId) ?? inviterId,
-    onInviteCompleted: mutations.onInviteCompleted,
+    onSearchValueChange: (nextValue) => {
+      setSearchValue(nextValue);
+      setOffset(0);
+    },
+    organizationId: input.organizationId,
+    offset,
+    pendingMemberOperation,
+    roleChangeDialog,
+    roleUpdateErrorMessage,
+    searchValue,
+    total: directoryQueryState.total,
   };
-}
 
-export function toMembersLoadErrorMessage(input: {
-  membersError: unknown;
-  invitationsError: unknown;
-  hasMembersError: boolean;
-}): string {
-  return input.hasMembersError
-    ? toMembersErrorMessage(input.membersError, "Failed to load members.")
-    : toMembersErrorMessage(input.invitationsError, "Failed to load invitations.");
+  return { viewModel };
 }

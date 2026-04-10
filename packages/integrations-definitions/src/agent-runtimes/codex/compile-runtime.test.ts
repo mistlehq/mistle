@@ -21,6 +21,9 @@ describe("compileCodexRuntime", () => {
           connectionId: "conn_openai_org_123",
           secretType: "api_key",
         },
+        additionalHeaders: {
+          "ChatGPT-Account-ID": "acct_123",
+        },
         allowedMethods: ["GET", "POST"],
         allowedPathPrefixes: ["/"],
         defaultModel: "gpt-5.3-codex",
@@ -56,6 +59,9 @@ describe("compileCodexRuntime", () => {
         authInjection: {
           type: "bearer",
           target: "authorization",
+        },
+        additionalHeaders: {
+          "ChatGPT-Account-ID": "acct_123",
         },
         credentialResolver: {
           connectionId: "conn_openai_org_123",

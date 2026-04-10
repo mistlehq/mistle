@@ -3,17 +3,13 @@ import type {
   SandboxPtyResetInfo,
   SandboxPtyState,
 } from "@mistle/sandbox-session-client";
-import { Button, cn } from "@mistle/ui";
+import { Button } from "@mistle/ui";
 import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useReducer, useRef } from "react";
 
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { SessionPtyPanelHeader } from "./session-pty-panel-header.js";
 import { SessionPtyPanelShell } from "./session-pty-panel-shell.js";
-import {
-  resolveSessionTerminalStatusPresentation,
-  sessionTerminalStatusDotClassName,
-} from "./session-terminal-status.js";
 import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
 const MaxTerminalReconnectAttempts = 3;
 
@@ -243,19 +239,15 @@ function SessionTerminalToolbarStatus(input: {
   isRecovering: boolean;
   state: SandboxPtyState;
 }): React.JSX.Element {
-  const presentation = resolveSessionTerminalStatusPresentation({
-    state: input.state,
-    isRecovering: input.isRecovering,
-  });
-  const dotClass = sessionTerminalStatusDotClassName(presentation.tone);
+  const label = input.isRecovering
+    ? "Reconnecting"
+    : input.state === "open"
+      ? "Active"
+      : "Inactive";
   const liveStatusText =
     input.errorMessage === null
-      ? `Terminal status: ${presentation.label}`
-      : `Terminal status: ${presentation.label}. ${input.errorMessage}`;
-  const indicatorTitle =
-    input.errorMessage === null
-      ? `Terminal ${presentation.label.toLowerCase()}`
-      : `Terminal ${presentation.label.toLowerCase()}: ${input.errorMessage}`;
+      ? `Terminal status: ${label}`
+      : `Terminal status: ${label}. ${input.errorMessage}`;
 
   return (
     <div
@@ -266,15 +258,10 @@ function SessionTerminalToolbarStatus(input: {
     >
       <span className="sr-only">{liveStatusText}</span>
       <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
-        <SessionPtyPanelHeader
-          indicatorTitle={indicatorTitle}
-          isActive={presentation.tone === "live"}
-          title="Terminal"
-        />
-        {presentation.showSpinner ? (
+        <SessionPtyPanelHeader title="Terminal" />
+        {input.isRecovering ? (
           <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
         ) : null}
-        <span className={cn("size-2.5 shrink-0 rounded-full", dotClass)} />
       </div>
     </div>
   );

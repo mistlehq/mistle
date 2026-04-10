@@ -1,6 +1,8 @@
 export { OpenAiApiKeyDefinition } from "./definition.js";
 export {
   OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptResponsesApiBaseUrl,
+  resolveOpenAiApiBaseUrlForConnectionMethod,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
 export {
@@ -15,6 +17,7 @@ export {
 } from "./binding-config-form.js";
 export {
   createOpenAiRawBindingCapabilities,
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiCapabilities,
   OpenAiCapabilitiesSchema,
   OpenAiConnectionMethodIds,
@@ -22,7 +25,9 @@ export {
   OpenAiModelIds,
   OpenAiReasoningEffortLabelByValue,
   isOpenAiModelSupported,
+  isOpenAiConnectionMethodId,
   isOpenAiReasoningEffortSupported,
+  resolveOpenAiCapabilitySetForConnectionMethod,
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
 export { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";

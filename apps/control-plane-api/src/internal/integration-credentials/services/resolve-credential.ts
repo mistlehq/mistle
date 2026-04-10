@@ -11,7 +11,6 @@ import {
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
-  IntegrationConnectionMethodIds,
   type IntegrationOAuth2AuthorizationCodeCapability,
   type IntegrationOAuth2ClientCredentialsCapability,
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
@@ -1243,8 +1242,9 @@ export async function resolveIntegrationCredential(
   }
 
   if (
-    connectionMethodId === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE &&
     definition.oauth2AuthorizationCode !== undefined &&
+    connectionMethod !== undefined &&
+    (connectionMethod.kind === "redirect" || connectionMethod.kind === "device-authorization") &&
     (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
       input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN)
   ) {

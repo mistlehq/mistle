@@ -44,14 +44,16 @@ export function createOAuth2AuthorizationCodeCredentialSlotKeys(input: {
   };
 }
 
-export type IntegrationConnectionMethodKind = "form" | "redirect";
+export type IntegrationConnectionMethodKind = "form" | "redirect" | "device-authorization";
 
 export const IntegrationConnectionMethodKinds: {
   FORM: IntegrationConnectionMethodKind;
   REDIRECT: IntegrationConnectionMethodKind;
+  DEVICE_AUTHORIZATION: IntegrationConnectionMethodKind;
 } = {
   FORM: "form",
   REDIRECT: "redirect",
+  DEVICE_AUTHORIZATION: "device-authorization",
 };
 
 export type IntegrationConnectionMethodSecretField = {
@@ -298,6 +300,11 @@ export type IntegrationConnectionMethodCreateUi = {
   helperText: string;
 };
 
+export type IntegrationConnectionMethodPendingUi = {
+  title?: string;
+  description?: string;
+};
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -351,6 +358,25 @@ export type IntegrationRedirectConnectionMethodDefinition<
   };
 };
 
+export type IntegrationDeviceAuthorizationConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = IntegrationConnectionMethodDefinitionBase<
+  TTargetConfig,
+  TTargetSecrets,
+  TBindingConfig,
+  TConnectionConfig
+> & {
+  kind: "device-authorization";
+  secretFields?: never;
+  ui: {
+    create: IntegrationConnectionMethodCreateUi;
+    pending?: IntegrationConnectionMethodPendingUi;
+  };
+};
+
 export type IntegrationConnectionMethodDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -364,6 +390,12 @@ export type IntegrationConnectionMethodDefinition<
       TConnectionConfig
     >
   | IntegrationRedirectConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >
+  | IntegrationDeviceAuthorizationConnectionMethodDefinition<
       TTargetConfig,
       TTargetSecrets,
       TBindingConfig,
@@ -516,6 +548,88 @@ export type IntegrationRedirectCompleteResult = {
   externalSubjectId?: string;
   connectionConfig: Record<string, unknown>;
   credentialMaterials: ReadonlyArray<IntegrationRedirectCredentialMaterial>;
+};
+
+export type IntegrationDeviceAuthorizationStartInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  methodId: IntegrationConnectionMethodId;
+  displayName?: string;
+};
+
+export type IntegrationDeviceAuthorizationStartResult = {
+  verificationUrl: string;
+  userCode: string;
+  verificationUrlComplete?: string;
+  expiresAt?: string;
+  pollAfterMs?: number;
+  providerState: Record<string, unknown>;
+};
+
+export type IntegrationDeviceAuthorizationPollInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  methodId: IntegrationConnectionMethodId;
+  providerState: Record<string, unknown>;
+};
+
+export type IntegrationDeviceAuthorizationPollResult<TConnectionConfig = Record<string, unknown>> =
+  | {
+      status: "pending";
+      providerState: Record<string, unknown>;
+      expiresAt?: string;
+      pollAfterMs?: number;
+    }
+  | {
+      status: "completed";
+      externalSubjectId?: string;
+      connectionConfig: TConnectionConfig;
+      accessToken: string;
+      accessTokenExpiresAt?: string;
+      refreshToken: string;
+      refreshTokenExpiresAt?: string;
+      credentialMetadata?: Record<string, unknown>;
+    }
+  | {
+      status: "failed";
+      code: string;
+      message: string;
+      permanent: boolean;
+    };
+
+export type IntegrationDeviceAuthorizationCancelInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  methodId: IntegrationConnectionMethodId;
+  providerState: Record<string, unknown>;
+};
+
+export type IntegrationDeviceAuthorizationCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  startDeviceAuthorization(
+    input: IntegrationDeviceAuthorizationStartInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationDeviceAuthorizationStartResult>;
+  pollDeviceAuthorization(
+    input: IntegrationDeviceAuthorizationPollInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationDeviceAuthorizationPollResult<TConnectionConfig>>;
+  cancelDeviceAuthorization?(
+    input: IntegrationDeviceAuthorizationCancelInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<void>;
 };
 
 export type IntegrationRedirectHandler<
@@ -867,6 +981,7 @@ export type EgressCredentialRoute = {
      */
     username?: string;
   };
+  additionalHeaders?: Readonly<Record<string, string>>;
   credentialResolver: EgressCredentialResolverRef;
 };
 
@@ -1439,6 +1554,11 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
+  deviceAuthorization?: IntegrationDeviceAuthorizationCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
   redirectHandler?: IntegrationRedirectHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>
@@ -1551,6 +1671,23 @@ export type IntegrationBrowserSafeRedirectConnectionMethodDefinition<
   configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
 
+export type IntegrationBrowserSafeDeviceAuthorizationConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = Omit<
+  IntegrationDeviceAuthorizationConnectionMethodDefinition<
+    TTargetConfig,
+    TTargetSecrets,
+    TBindingConfig,
+    TConnectionConfig
+  >,
+  "configSchema"
+> & {
+  configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+};
+
 export type IntegrationBrowserSafeConnectionMethodDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -1564,6 +1701,12 @@ export type IntegrationBrowserSafeConnectionMethodDefinition<
       TConnectionConfig
     >
   | IntegrationBrowserSafeRedirectConnectionMethodDefinition<
+      TTargetConfig,
+      TTargetSecrets,
+      TBindingConfig,
+      TConnectionConfig
+    >
+  | IntegrationBrowserSafeDeviceAuthorizationConnectionMethodDefinition<
       TTargetConfig,
       TTargetSecrets,
       TBindingConfig,

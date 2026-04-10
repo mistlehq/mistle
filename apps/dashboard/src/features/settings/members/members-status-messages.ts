@@ -1,4 +1,4 @@
-import { MembersApiError } from "./members-api.js";
+import { MembersApiError } from "./members-api-errors.js";
 
 export function toMembersErrorMessage(error: unknown, fallbackMessage: string): string {
   if (error instanceof MembersApiError) {

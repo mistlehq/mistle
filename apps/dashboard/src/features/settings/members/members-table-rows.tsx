@@ -88,7 +88,15 @@ function MembersTableActions(input: {
 export function DirectoryTableRow(input: {
   name: string;
   email: string;
-  status: string;
+  role: string;
+  status: string | null;
+  invitedBy: string | null;
+  expiresAt: string | null;
+  showNameColumn: boolean;
+  showStatusColumn: boolean;
+  showInvitedByColumn: boolean;
+  showExpiresColumn: boolean;
+  showActionsColumn: boolean;
   date: string;
   showMemberAvatar: boolean;
   memberAvatar: MemberAvatar | null;
@@ -99,34 +107,49 @@ export function DirectoryTableRow(input: {
 }): React.JSX.Element {
   return (
     <TableRow>
-      <TableCell className="font-medium whitespace-normal break-words">
-        {!input.showMemberAvatar ? (
-          input.name
-        ) : (
-          <div className="flex items-center gap-3">
-            <Avatar className="bg-muted h-8 w-8 shrink-0">
-              {input.memberAvatar === null || input.memberAvatar.imageUrl === null ? null : (
-                <AvatarImage alt={`${input.name} avatar`} src={input.memberAvatar.imageUrl} />
-              )}
-              <AvatarFallback>{deriveInitials({ name: input.name, fallback: "?" })}</AvatarFallback>
-            </Avatar>
-            <span>{input.name}</span>
-          </div>
-        )}
-      </TableCell>
+      {input.showNameColumn ? (
+        <TableCell className="font-medium whitespace-normal break-words">
+          {!input.showMemberAvatar ? (
+            input.name
+          ) : (
+            <div className="flex items-center gap-3">
+              <Avatar className="bg-muted h-8 w-8 shrink-0">
+                {input.memberAvatar === null || input.memberAvatar.imageUrl === null ? null : (
+                  <AvatarImage alt={`${input.name} avatar`} src={input.memberAvatar.imageUrl} />
+                )}
+                <AvatarFallback>
+                  {deriveInitials({ name: input.name, fallback: "?" })}
+                </AvatarFallback>
+              </Avatar>
+              <span>{input.name}</span>
+            </div>
+          )}
+        </TableCell>
+      ) : null}
       <TableCell className="whitespace-normal break-words">{input.email}</TableCell>
-      <TableCell className="whitespace-nowrap">{input.status}</TableCell>
+      <TableCell className="whitespace-nowrap">{input.role}</TableCell>
+      {input.showStatusColumn ? (
+        <TableCell className="whitespace-nowrap">{input.status}</TableCell>
+      ) : null}
+      {input.showInvitedByColumn ? (
+        <TableCell className="whitespace-nowrap">{input.invitedBy}</TableCell>
+      ) : null}
       <TableCell className="whitespace-nowrap">{input.date}</TableCell>
-      <TableCell className="whitespace-nowrap">
-        <MembersTableActions
-          actionFeedback={input.actionFeedback}
-          actions={input.actions}
-          triggerLabel={input.actionsLabel}
-          {...(input.actionsContentClassName === undefined
-            ? {}
-            : { contentClassName: input.actionsContentClassName })}
-        />
-      </TableCell>
+      {input.showExpiresColumn ? (
+        <TableCell className="whitespace-nowrap">{input.expiresAt}</TableCell>
+      ) : null}
+      {input.showActionsColumn ? (
+        <TableCell className="whitespace-nowrap">
+          <MembersTableActions
+            actionFeedback={input.actionFeedback}
+            actions={input.actions}
+            triggerLabel={input.actionsLabel}
+            {...(input.actionsContentClassName === undefined
+              ? {}
+              : { contentClassName: input.actionsContentClassName })}
+          />
+        </TableCell>
+      ) : null}
     </TableRow>
   );
 }

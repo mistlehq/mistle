@@ -34,4 +34,54 @@ export const MemberAvatarSchema = z
   })
   .strict();
 
-export const MemberAvatarsResponseSchema = z.array(MemberAvatarSchema);
+export const MembersPageEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    userId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.string().min(1),
+    role: OrganizationRoleSchema,
+    joinedAt: z.iso.datetime(),
+    avatar: MemberAvatarSchema.omit({ userId: true }),
+  })
+  .strict();
+
+export const InvitationStatusSchema = z.enum([
+  "pending",
+  "accepted",
+  "canceled",
+  "rejected",
+  "revoked",
+]);
+
+export const InvitationsPageEntrySchema = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    email: z.string().min(1),
+    role: OrganizationRoleSchema,
+    inviterId: z.string().min(1),
+    inviterName: z.string().min(1),
+    status: InvitationStatusSchema,
+    expiresAt: z.iso.datetime(),
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const MembersPageResponseSchema = z
+  .object({
+    members: z.array(MembersPageEntrySchema),
+    limit: z.number().int().min(1),
+    offset: z.number().int().min(0),
+    total: z.number().int().min(0),
+  })
+  .strict();
+
+export const InvitationsPageResponseSchema = z
+  .object({
+    invitations: z.array(InvitationsPageEntrySchema),
+    limit: z.number().int().min(1),
+    offset: z.number().int().min(0),
+    total: z.number().int().min(0),
+  })
+  .strict();

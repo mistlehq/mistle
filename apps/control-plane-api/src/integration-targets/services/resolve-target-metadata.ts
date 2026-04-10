@@ -103,6 +103,21 @@ export type ResolvedIntegrationTargetMetadata = {
           };
         };
       }
+    | {
+        id: string;
+        label: string;
+        kind: "device-authorization";
+        ui: {
+          create: {
+            submitLabel: string;
+            helperText: string;
+          };
+          pending?: {
+            title?: string;
+            description?: string;
+          };
+        };
+      }
   )[];
   webhookSource?: {
     lifecycle: IntegrationWebhookSourceLifecycle;
@@ -127,6 +142,15 @@ function resolveConnectionMethod(
         inputType: field.inputType,
         slotKey: field.slotKey,
       })),
+    };
+  }
+
+  if (method.kind === "device-authorization") {
+    return {
+      id: method.id,
+      label: method.label,
+      kind: "device-authorization",
+      ui: method.ui,
     };
   }
 

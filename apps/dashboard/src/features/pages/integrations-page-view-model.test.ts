@@ -214,6 +214,28 @@ describe("integrations page view model", () => {
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });
 
+  it("builds detail items for Slack bot token connections", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_slack_123",
+          targetKey: "slack-default",
+          displayName: "Slack Engineering",
+          status: "active",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authMethodId).toBe("slack-bot-token");
+    expect(item?.authMethodLabel).toBe("Bot token");
+  });
+
   it("marks pre-install GitHub App connections as setup incomplete", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [

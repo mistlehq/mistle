@@ -63,7 +63,7 @@ export function useIntegrationsDirectoryState(input: {
   const connectedViewCards = buildConnectedIntegrationViewCards({
     connectedCards: connectedIntegrationCards,
     onOpenTarget: (targetKey) => {
-      void navigate(`/settings/organization/integrations/${targetKey}`);
+      void navigate(`/integrations/${targetKey}`);
     },
   });
 

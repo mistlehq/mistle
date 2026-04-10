@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   createOpenAiRawBindingCapabilities,
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
   isOpenAiModelSupported,
+  resolveOpenAiCapabilitySetForConnectionMethod,
   isOpenAiReasoningEffortSupported,
   OpenAiCapabilities,
   OpenAiCapabilitiesSchema,
@@ -63,5 +65,45 @@ describe("OpenAI model capabilities", () => {
     expect(raw.models[0]).toBe(OpenAiDefaultModelId);
     expect(raw.default_reasoning_by_model["gpt-5.4"]).toBe("medium");
     expect(raw.default_reasoning_by_model["gpt-5.4-mini"]).toBe("medium");
+  });
+
+  it("builds per-method raw target-config payload shape for seeding", () => {
+    const raw = createOpenAiRawBindingCapabilitiesByConnectionMethod();
+    expect(raw["api-key"].models[0]).toBe(OpenAiDefaultModelId);
+    expect(raw["chatgpt-device-code"].default_reasoning_by_model["gpt-5.4"]).toBe("medium");
+  });
+
+  it("resolves capability sets by connection method", () => {
+    const capabilitySet = resolveOpenAiCapabilitySetForConnectionMethod({
+      bindingCapabilitiesByConnectionMethod: {
+        "api-key": {
+          models: ["gpt-5.4"],
+          allowedReasoningByModel: {
+            "gpt-5.4": ["medium"],
+            "gpt-5.4-mini": ["low"],
+            "gpt-5.3-codex": ["low"],
+            "gpt-5.3-codex-spark": ["low"],
+            "gpt-5.2-codex": ["low"],
+            "gpt-5.1-codex-max": ["low"],
+            "gpt-5.2": ["low"],
+            "gpt-5.1-codex-mini": ["medium"],
+          },
+          defaultReasoningByModel: {
+            "gpt-5.4": "medium",
+            "gpt-5.4-mini": "low",
+            "gpt-5.3-codex": "low",
+            "gpt-5.3-codex-spark": "low",
+            "gpt-5.2-codex": "low",
+            "gpt-5.1-codex-max": "low",
+            "gpt-5.2": "low",
+            "gpt-5.1-codex-mini": "medium",
+          },
+        },
+        "chatgpt-device-code": OpenAiCapabilities,
+      },
+      connectionMethod: "api-key",
+    });
+
+    expect(capabilitySet.models).toEqual(["gpt-5.4"]);
   });
 });

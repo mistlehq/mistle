@@ -34,7 +34,7 @@ function createDefinitionKey(input: { familyId: string; variantId: string }): st
 function toBrowserSafeConnectionMethod(
   method: AnyIntegrationDefinition["connectionMethods"][number],
 ): IntegrationBrowserSafeConnectionMethodDefinition {
-  if (method.kind === "redirect") {
+  if (method.kind !== "form") {
     return method;
   }
 

@@ -1,6 +1,5 @@
 import {
   decodeDataFrame,
-  DefaultStreamWindowBytes,
   encodeDataFrame,
   MaxStreamWindowBytes,
   parseStreamControlMessage,
@@ -571,11 +570,17 @@ describe("agent stream client", () => {
     });
 
     let exhaustionError: Error | null = null;
-    for (let iteration = 0; iteration < DefaultStreamWindowBytes; iteration += 1) {
+    const largePayload = {
+      payload: "x".repeat(1024),
+    };
+    const largePayloadBytes = Buffer.byteLength(JSON.stringify(largePayload));
+    for (
+      let sentBytes = 0;
+      sentBytes <= MaxStreamWindowBytes + largePayloadBytes;
+      sentBytes += largePayloadBytes
+    ) {
       try {
-        await client.sendJson({
-          payload: "x".repeat(1024),
-        });
+        await client.sendJson(largePayload);
       } catch (error) {
         if (!(error instanceof Error)) {
           throw error;
@@ -596,7 +601,11 @@ describe("agent stream client", () => {
     await waitForCondition({
       description: "recovered payload to reach the server",
       timeoutMs: 500,
-      evaluate: () => server.receivedPayloads.length >= 2,
+      evaluate: () =>
+        server.receivedPayloads.at(-1)?.payload ===
+        JSON.stringify({
+          payload: "recovered",
+        }),
     });
 
     const recoveredPayload = server.receivedPayloads.at(-1);

@@ -132,7 +132,7 @@ describe("compileSlackBinding", () => {
     expect(artifact?.artifactKey).toBe("slack-cli");
     expect(artifact?.name).toBe("Slack CLI");
     expect(artifact?.env).toEqual({
-      SLACK_API_BASE_URL: "https://slack.com/api",
+      SLACK_BASE_URL: "https://slack.com/api",
     });
     if (artifact === undefined) {
       throw new Error("Expected compiled Slack CLI artifact.");
