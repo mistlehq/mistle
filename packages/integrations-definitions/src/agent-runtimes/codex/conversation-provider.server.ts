@@ -7,6 +7,7 @@ import type {
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 
 import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
+import { CodexConversationProviderInitializeClientInfo } from "./initialize-client-info.js";
 import {
   connectSandboxAgentConnection,
   type SandboxAgentConnection,
@@ -64,12 +65,6 @@ type CodexRequestFailureCause = {
   errorMessage: string;
   errorData?: unknown;
 };
-
-const CodexInitializeClientInfo = {
-  name: "mistle_control_plane_worker",
-  title: "Mistle Control Plane Worker",
-  version: "0.1.0",
-} as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -302,7 +297,7 @@ async function sendJsonRpcRequest(
 
 async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<void> {
   const initializeHandle = rpcClient.callWithHandle("initialize", {
-    clientInfo: CodexInitializeClientInfo,
+    clientInfo: CodexConversationProviderInitializeClientInfo,
   });
   const initializeResult = await withRequestTimeout("initialize", initializeHandle).catch(
     (error: unknown) => {

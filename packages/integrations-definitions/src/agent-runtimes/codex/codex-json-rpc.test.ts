@@ -30,6 +30,7 @@ type TestServerMode =
   | "stay_open";
 
 type TestServer = {
+  initializeRequest: Promise<string>;
   url: string;
   initializedNotification: Promise<string>;
   threadListRequest: Promise<string>;
@@ -122,6 +123,7 @@ function encodeAgentTextPayload(input: { payload: unknown; streamId: number }): 
 }
 
 async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer> {
+  const initializeRequestDeferred = createDeferred<string>();
   const initializedNotificationDeferred = createDeferred<string>();
   const threadListRequestDeferred = createDeferred<string>();
   const socketClosedDeferred = createDeferred<void>();
@@ -188,6 +190,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       if (payload.method === "initialize") {
+        initializeRequestDeferred.resolve(JSON.stringify(payload));
         if (activeStreamId === null) {
           initializedNotificationDeferred.reject(new Error("Expected active stream id."));
           return;
@@ -288,6 +291,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
   }
 
   return {
+    initializeRequest: initializeRequestDeferred.promise,
     url: `ws://127.0.0.1:${String(address.port)}`,
     initializedNotification: initializedNotificationDeferred.promise,
     threadListRequest: threadListRequestDeferred.promise,
@@ -431,6 +435,15 @@ describe("openai codex json-rpc client", () => {
 
     await rpcClient.initialize();
 
+    expect(JSON.parse(await server.initializeRequest)).toMatchObject({
+      method: "initialize",
+      params: {
+        clientInfo: {
+          name: "codex_cli_rs",
+          version: "0.1.0",
+        },
+      },
+    });
     expect(JSON.parse(await server.initializedNotification)).toMatchObject({
       method: "initialized",
     });

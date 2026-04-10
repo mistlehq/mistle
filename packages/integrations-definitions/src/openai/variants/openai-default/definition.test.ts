@@ -7,6 +7,8 @@ import {
 } from "./model-capabilities.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
+  OpenAiChatGptBaseUrl,
+  OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
 } from "./target-config-schema.js";
 
@@ -89,8 +91,12 @@ describe("OpenAiApiKeyDefinition", () => {
     expect(resolvedCapabilities.agentProviderAccess?.additionalHeaders).toEqual({
       "ChatGPT-Account-ID": "acct_123",
     });
-    expect(resolvedCapabilities.agentProviderAccess?.apiBaseUrl).toBe(
-      OpenAiChatGptResponsesApiBaseUrl,
-    );
+    expect(resolvedCapabilities.agentProviderAccess?.apiBaseUrl).toBe(OpenAiChatGptOriginBaseUrl);
+    expect(resolvedCapabilities.agentProviderAccess?.allowedPathPrefixes).toEqual(["/"]);
+    expect(resolvedCapabilities.agentProviderAccess?.providerMetadata).toMatchObject({
+      reasoningEffort: "high",
+      responsesApiBaseUrl: OpenAiChatGptResponsesApiBaseUrl,
+      chatgptBaseUrl: OpenAiChatGptBaseUrl,
+    });
   });
 });

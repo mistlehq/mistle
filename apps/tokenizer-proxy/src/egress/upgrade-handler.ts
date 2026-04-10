@@ -177,6 +177,30 @@ function appendHeader(headers: Headers, headerName: string, headerValue: string 
   headers.append(headerName, headerValue);
 }
 
+function removeForwardingHeaders(headers: Headers): void {
+  const explicitlyBlockedHeaders = [
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-port",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "cdn-loop",
+    "via",
+  ] as const;
+
+  for (const headerName of explicitlyBlockedHeaders) {
+    headers.delete(headerName);
+  }
+
+  for (const headerName of [...headers.keys()]) {
+    const normalizedHeaderName = headerName.toLowerCase();
+    if (normalizedHeaderName.startsWith("cf-")) {
+      headers.delete(headerName);
+    }
+  }
+}
+
 function buildOutgoingRequestHeaders(headers: IncomingHttpHeaders): Headers {
   const outgoingHeaders = new Headers();
   for (const [headerName, headerValue] of Object.entries(headers)) {
@@ -202,6 +226,8 @@ function buildOutgoingRequestHeaders(headers: IncomingHttpHeaders): Headers {
   for (const headerName of blockedHeaderNames) {
     outgoingHeaders.delete(headerName);
   }
+
+  removeForwardingHeaders(outgoingHeaders);
 
   return outgoingHeaders;
 }

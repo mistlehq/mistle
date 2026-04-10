@@ -13,6 +13,8 @@ import type {
   SandboxSessionEvent as CodexSessionEvent,
 } from "@mistle/sandbox-session-client";
 
+import { CodexDashboardInitializeClientInfo } from "./initialize-client-info.js";
+
 type PendingRequest = {
   method: string;
   settled: boolean;
@@ -88,10 +90,7 @@ export class CodexJsonRpcClient {
   async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<unknown> {
     this.#sessionClient.markInitializing();
     const initializeResult = await this.call("initialize", {
-      clientInfo: input?.clientInfo ?? {
-        name: "mistle-dashboard",
-        version: "0.1.0",
-      },
+      clientInfo: input?.clientInfo ?? CodexDashboardInitializeClientInfo,
     });
     const sendGuarantee = this.#sessionClient.sendGuarantee;
     await this.notify("initialized", {});

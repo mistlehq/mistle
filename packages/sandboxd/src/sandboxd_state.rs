@@ -458,6 +458,7 @@ mod tests {
                         target: "authorization".to_string(),
                         username: None,
                     },
+                    additional_headers: None,
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_test".to_string(),
                         secret_type: "api_key".to_string(),
@@ -481,6 +482,7 @@ mod tests {
                         target: "authorization".to_string(),
                         username: Some("x-access-token".to_string()),
                     },
+                    additional_headers: None,
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_github".to_string(),
                         secret_type: "github_app_installation_token".to_string(),

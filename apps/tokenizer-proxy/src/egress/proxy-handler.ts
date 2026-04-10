@@ -211,6 +211,31 @@ function removeHopByHopHeaders(headers: Headers): void {
   }
 }
 
+function removeForwardingHeaders(headers: Headers): void {
+  const explicitlyBlockedHeaders = [
+    "content-length",
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-port",
+    "x-forwarded-proto",
+    "x-real-ip",
+    "cdn-loop",
+    "via",
+  ] as const;
+
+  for (const headerName of explicitlyBlockedHeaders) {
+    headers.delete(headerName);
+  }
+
+  for (const headerName of [...headers.keys()]) {
+    const normalizedHeaderName = headerName.toLowerCase();
+    if (normalizedHeaderName.startsWith("cf-")) {
+      headers.delete(headerName);
+    }
+  }
+}
+
 function removeInternalHeaders(headers: Headers): void {
   const internalHeaderNames = [...Object.values(EgressRequestHeaders)];
 
@@ -232,6 +257,7 @@ async function readOutgoingRequestBody(
 function buildOutgoingRequestHeaders(ctx: Context<AppContextBindings>): Headers {
   const outgoingHeaders = new Headers(ctx.req.raw.headers);
   removeHopByHopHeaders(outgoingHeaders);
+  removeForwardingHeaders(outgoingHeaders);
   removeInternalHeaders(outgoingHeaders);
 
   return outgoingHeaders;
@@ -246,6 +272,32 @@ function copyResponseHeaders(source: Headers): Headers {
   copiedHeaders.delete("content-encoding");
   copiedHeaders.delete("content-length");
   return copiedHeaders;
+}
+
+function extractDebugHeaders(headers: Headers): Record<string, string> {
+  const allowedHeaderNames = [
+    "authorization",
+    "chatgpt-account-id",
+    "content-type",
+    "originator",
+    "session_id",
+    "user-agent",
+  ] as const;
+
+  const extractedHeaders: Record<string, string> = {};
+
+  for (const headerName of allowedHeaderNames) {
+    const headerValue = headers.get(headerName);
+    if (headerValue !== null) {
+      extractedHeaders[headerName] = headerName === "authorization" ? "<redacted>" : headerValue;
+    }
+  }
+
+  return extractedHeaders;
+}
+
+function truncateForDebug(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
 }
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
@@ -486,6 +538,29 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         }
 
         span.setAttribute("http.response.status_code", upstreamResponse.status);
+
+        if (upstreamResponse.status >= 400) {
+          const upstreamResponseClone = upstreamResponse.clone();
+          const upstreamResponseBody = truncateForDebug(await upstreamResponseClone.text(), 500);
+          const outgoingBodyText =
+            outgoingBody === undefined
+              ? undefined
+              : truncateForDebug(Buffer.from(outgoingBody).toString("utf8"), 500);
+          logger.warn(
+            {
+              statusCode: upstreamResponse.status,
+              upstreamUrl: upstreamUrl.toString(),
+              outgoingHeaders: extractDebugHeaders(outgoingHeaders),
+              outgoingBody: outgoingBodyText,
+              upstreamResponseBody,
+              egressRuleId: egressGrant.egressRuleId,
+              bindingId: egressGrant.bindingId,
+              connectionId: egressGrant.connectionId,
+            },
+            "Upstream egress request returned non-success status",
+          );
+        }
+
         return new Response(upstreamResponse.body, {
           status: upstreamResponse.status,
           headers: copyResponseHeaders(upstreamResponse.headers),
