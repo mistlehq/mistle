@@ -203,6 +203,7 @@ function ManualResourcePicker(): React.JSX.Element {
       emptyMessage="No repositories available for this connection."
       id="manual-repositories"
       isRefreshing={false}
+      isUpdatingSearchResults={false}
       label="Repositories"
       listState={createReadyState(RepositoryItems)}
       onBlur={() => {}}

@@ -246,6 +246,8 @@ export function IntegrationResourceStringArrayWidget(
     isError: resourceQuery.isError,
     isPending: resourceQuery.isPending,
   });
+  const isUpdatingSearchResults =
+    resourceQuery.isFetching && resourceQuery.isPlaceholderData && resourceQuery.data !== undefined;
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
   const widgetViewModel = buildIntegrationResourceWidgetViewModel({
     title: options.title,
@@ -273,6 +275,7 @@ export function IntegrationResourceStringArrayWidget(
       emptyMessage={widgetViewModel.emptyMessage}
       id={props.id}
       isRefreshing={refreshMutation.isPending}
+      isUpdatingSearchResults={isUpdatingSearchResults}
       label={props.label}
       listState={listState}
       onBlur={() => {
