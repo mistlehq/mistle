@@ -4,6 +4,165 @@
  */
 
 export interface paths {
+  "/p/integration/callbacks/:targetKey/oauth2-authorization-code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          code?: string;
+          error?: string;
+          error_description?: string;
+          error_uri?: string;
+          state?: string;
+        };
+        header?: never;
+        path: {
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Complete OAuth 2.0 (Authorization Code) connection creation and redirect to dashboard integrations. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_OAUTH2_COMPLETE_INPUT"
+                    | "OAUTH2_NOT_SUPPORTED"
+                    | "OAUTH2_CAPABILITY_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Integration target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/p/integration/callbacks/github-app-installation": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          code?: string;
+          error?: string;
+          error_description?: string;
+          error_uri?: string;
+          installation_id?: string;
+          setup_action?: string;
+          state?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Complete GitHub App installation on an existing connection and redirect to dashboard integrations. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/automations/webhooks": {
     parameters: {
       query?: never;
@@ -602,165 +761,6 @@ export interface paths {
           };
           content: {
             "text/plain": string;
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/integration/callbacks/:targetKey/oauth2-authorization-code": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          code?: string;
-          error?: string;
-          error_description?: string;
-          error_uri?: string;
-          state?: string;
-        };
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Complete OAuth 2.0 (Authorization Code) connection creation and redirect to dashboard integrations. */
-        302: {
-          headers: {
-            Location: string;
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_OAUTH2_COMPLETE_INPUT"
-                    | "OAUTH2_NOT_SUPPORTED"
-                    | "OAUTH2_CAPABILITY_NOT_CONFIGURED"
-                    | "REDIRECT_STATE_INVALID"
-                    | "REDIRECT_STATE_EXPIRED"
-                    | "REDIRECT_STATE_ALREADY_USED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration target was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/integration/callbacks/github-app-installation": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          code?: string;
-          error?: string;
-          error_description?: string;
-          error_uri?: string;
-          installation_id?: string;
-          setup_action?: string;
-          state?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Complete GitHub App installation on an existing connection and redirect to dashboard integrations. */
-        302: {
-          headers: {
-            Location: string;
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
-                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                    | "REDIRECT_STATE_INVALID"
-                    | "REDIRECT_STATE_EXPIRED"
-                    | "REDIRECT_STATE_ALREADY_USED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration connection was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "CONNECTION_NOT_FOUND";
-              message: string;
-            };
           };
         };
       };

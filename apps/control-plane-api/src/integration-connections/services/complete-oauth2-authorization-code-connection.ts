@@ -48,7 +48,7 @@ function buildOAuth2AuthorizationCodeCompleteUrl(input: {
   targetKey: string;
 }): string {
   return new URL(
-    `/v1/integration/callbacks/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code`,
+    `/p/integration/callbacks/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code`,
     input.controlPlaneBaseUrl,
   ).toString();
 }

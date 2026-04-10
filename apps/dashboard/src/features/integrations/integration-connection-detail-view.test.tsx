@@ -423,7 +423,7 @@ describe("IntegrationConnectionDetailView", () => {
             canDelete: true,
             displayName: "GitHub Production",
             postInstallationSetupUrl:
-              "http://localhost:5100/v1/integration/connections/github-app-installation/complete",
+              "http://localhost:5100/p/integration/callbacks/github-app-installation",
             installActionLabel: "Install GitHub App",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
@@ -485,7 +485,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Post-installation setup URL")).toBeTruthy();
     expect(
       screen.getByText(
-        "https://control-plane.example.com/v1/integration/connections/github-app-installation/complete",
+        "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
       ),
     ).toBeTruthy();
     expect(

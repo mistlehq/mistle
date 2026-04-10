@@ -61,7 +61,7 @@ describe("integration connections GitHub App installation integration", () => {
   }): string {
     const query = CompleteGitHubAppInstallationConnectionQuerySchema.parse(input.query);
     const searchParams = new URLSearchParams(query);
-    return `/v1/integration/callbacks/github-app-installation?${searchParams.toString()}`;
+    return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
   }
 
   it("creates a GitHub App installation authorization URL for an existing connection and persists redirect session state", async ({

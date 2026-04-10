@@ -455,7 +455,7 @@ function resolveGitHubPostInstallationSetupUrl(input: {
   if (input.callbackUrl !== undefined) {
     try {
       return new URL(
-        "/v1/integration/connections/github-app-installation/complete",
+        "/p/integration/callbacks/github-app-installation",
         input.callbackUrl,
       ).toString();
     } catch {

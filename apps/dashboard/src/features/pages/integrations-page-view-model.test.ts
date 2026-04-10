@@ -263,7 +263,7 @@ describe("integrations page view model", () => {
       "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
     );
     expect(item?.postInstallationSetupUrl).toBe(
-      "https://control-plane.example.com/v1/integration/connections/github-app-installation/complete",
+      "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
     );
     expect(item?.contextItems).toEqual([
       {

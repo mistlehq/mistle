@@ -1,5 +1,5 @@
 export const INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH = "/v1/integration/connections";
-export const INTEGRATION_CALLBACKS_ROUTE_BASE_PATH = "/v1/integration/callbacks";
+export const INTEGRATION_CALLBACKS_ROUTE_BASE_PATH = "/p/integration/callbacks";
 
 export const IntegrationConnectionsBadRequestCodes = {
   INVALID_LIST_CONNECTIONS_INPUT: "INVALID_LIST_CONNECTIONS_INPUT",

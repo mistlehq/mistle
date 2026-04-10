@@ -17,8 +17,7 @@ import type {
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 
-const GitHubAppInstallationCompletePath =
-  "/v1/integration/connections/github-app-installation/complete";
+const GitHubAppInstallationCompletePath = "/p/integration/callbacks/github-app-installation";
 
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
