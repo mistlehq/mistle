@@ -37,12 +37,19 @@ export function AuthSwitchOrganizationPage(): React.JSX.Element {
         }
 
         await navigate("/", { replace: true });
-      } catch {
+      } catch (error) {
         if (cancelled) {
           return;
         }
 
-        await navigate(resolveSwitchOrganizationLoginPath(), { replace: true });
+        await navigate(
+          resolveSwitchOrganizationLoginPath(
+            error instanceof Error && error.message.trim().length > 0 ? error.message : undefined,
+          ),
+          {
+            replace: true,
+          },
+        );
       }
     }
 
@@ -56,8 +63,8 @@ export function AuthSwitchOrganizationPage(): React.JSX.Element {
   return <AuthSwitchOrganizationPageView />;
 }
 
-export function resolveSwitchOrganizationLoginPath(): string {
+export function resolveSwitchOrganizationLoginPath(errorMessage?: string): string {
   return `/auth/login?error=server_error&error_description=${encodeURIComponent(
-    SWITCH_ORGANIZATION_LOGIN_ERROR,
+    errorMessage ?? SWITCH_ORGANIZATION_LOGIN_ERROR,
   )}`;
 }
