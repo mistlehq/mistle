@@ -1,56 +1,29 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
-import { buildMembersQueryKeys } from "./members-query-keys.js";
 
 function renderMembersDirectoryTable(element: React.JSX.Element): string {
-  const queryClient = new QueryClient();
-  seedMemberAvatarsQueryCache({
-    queryClient,
-    element,
-  });
-
-  return renderToStaticMarkup(
-    <QueryClientProvider client={queryClient}>{element}</QueryClientProvider>,
-  );
-}
-
-function seedMemberAvatarsQueryCache(input: {
-  queryClient: QueryClient;
-  element: React.JSX.Element;
-}): void {
-  const props = input.element.props as {
-    organizationId?: string;
-    members?: Array<{ userId: string }>;
-  };
-  if (typeof props.organizationId !== "string" || !Array.isArray(props.members)) {
-    return;
-  }
-
-  const userIds = props.members.map((member) => member.userId);
-  input.queryClient.setQueryData(
-    [...buildMembersQueryKeys(props.organizationId).memberAvatars, ...userIds],
-    [],
-  );
+  return renderToStaticMarkup(element);
 }
 
 describe("MembersDirectoryTable", () => {
   it("uses a scrollable table with explicit column wrapping choices", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
+        memberAvatarsByUserId={new Map()}
         members={[]}
-        organizationId="org_1"
         onChangeRole={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
+        onSearchValueChange={() => {}}
         pendingMemberOperation={null}
+        searchValue=""
         invitationActionState={null}
       />,
     );
@@ -65,9 +38,11 @@ describe("MembersDirectoryTable", () => {
   it("hides role and removal actions when capabilities are unavailable", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
+        memberAvatarsByUserId={new Map()}
         members={[
           {
             id: "mem_1",
@@ -78,13 +53,13 @@ describe("MembersDirectoryTable", () => {
             joinedAt: "2026-01-01T00:00:00.000Z",
           },
         ]}
-        organizationId="org_1"
         onChangeRole={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
+        onSearchValueChange={() => {}}
         pendingMemberOperation={null}
+        searchValue=""
         invitationActionState={null}
       />,
     );
@@ -95,6 +70,7 @@ describe("MembersDirectoryTable", () => {
   it("shows a member action menu for each member row when actions are available", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
+        activeFilter="members"
         capabilities={{
           organizationId: "org_1",
           actorRole: "admin",
@@ -113,6 +89,7 @@ describe("MembersDirectoryTable", () => {
         }}
         canManageInvitations
         invitations={[]}
+        memberAvatarsByUserId={new Map()}
         members={[
           {
             id: "mem_1",
@@ -131,13 +108,13 @@ describe("MembersDirectoryTable", () => {
             joinedAt: "2026-01-01T00:00:00.000Z",
           },
         ]}
-        organizationId="org_1"
         onChangeRole={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
+        onSearchValueChange={() => {}}
         pendingMemberOperation={null}
+        searchValue=""
         invitationActionState={null}
       />,
     );
@@ -150,9 +127,11 @@ describe("MembersDirectoryTable", () => {
   it("renders member avatar fallback markup in the name column", () => {
     const markup = renderMembersDirectoryTable(
       <MembersDirectoryTable
+        activeFilter="members"
         capabilities={null}
         canManageInvitations
         invitations={[]}
+        memberAvatarsByUserId={new Map()}
         members={[
           {
             id: "mem_1",
@@ -163,17 +142,68 @@ describe("MembersDirectoryTable", () => {
             joinedAt: "2026-01-01T00:00:00.000Z",
           },
         ]}
-        organizationId="org_1"
         onChangeRole={() => {}}
         onRemoveMember={() => {}}
         onResendInvite={() => {}}
         onRevokeInvite={() => {}}
-        resolveInviterDisplayName={(inviterId) => inviterId}
+        onSearchValueChange={() => {}}
         pendingMemberOperation={null}
+        searchValue=""
         invitationActionState={null}
       />,
     );
 
     expect(markup).toContain("MO");
+  });
+
+  it("uses a role column header on the active members tab", () => {
+    const markup = renderMembersDirectoryTable(
+      <MembersDirectoryTable
+        activeFilter="members"
+        capabilities={null}
+        canManageInvitations
+        invitations={[]}
+        memberAvatarsByUserId={new Map()}
+        members={[]}
+        onChangeRole={() => {}}
+        onRemoveMember={() => {}}
+        onResendInvite={() => {}}
+        onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
+        pendingMemberOperation={null}
+        searchValue=""
+        invitationActionState={null}
+      />,
+    );
+
+    expect(markup).toContain(">Role<");
+    expect(markup).not.toContain(">Status<");
+  });
+
+  it("uses invitation detail column headers on the invited tab", () => {
+    const markup = renderMembersDirectoryTable(
+      <MembersDirectoryTable
+        activeFilter="invitations"
+        capabilities={null}
+        canManageInvitations
+        invitations={[]}
+        memberAvatarsByUserId={new Map()}
+        members={[]}
+        onChangeRole={() => {}}
+        onRemoveMember={() => {}}
+        onResendInvite={() => {}}
+        onRevokeInvite={() => {}}
+        onSearchValueChange={() => {}}
+        pendingMemberOperation={null}
+        searchValue=""
+        invitationActionState={null}
+      />,
+    );
+
+    expect(markup).toContain(">Role<");
+    expect(markup).toContain(">Status<");
+    expect(markup).toContain(">Invited by<");
+    expect(markup).toContain(">Expires<");
+    expect(markup).not.toContain(">Name<");
   });
 });

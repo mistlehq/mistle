@@ -1,51 +1,48 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
 
-import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
-import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
+import type {
+  MemberAvatar,
+  MembersDirectoryFilter,
+  MembershipCapabilities,
+  SettingsInvitation,
+  SettingsMember,
+} from "./members-api.js";
 import {
   type MembersDirectoryInvitationActionState,
   type MembersDirectoryPendingMemberOperation,
 } from "./members-directory-model.js";
+import { buildMembersDirectoryRows } from "./members-directory-model.js";
 import { MembersDirectoryToolbar } from "./members-directory-toolbar.js";
 import { DirectoryTableRow } from "./members-table-rows.js";
 import { buildMembersDirectoryTableRowViewModels } from "./members-table-view-model.js";
-import { useMemberAvatars } from "./use-member-avatars.js";
-import { useMembersDirectoryTableState } from "./use-members-directory-table-state.js";
 
 export function MembersDirectoryTable(input: {
-  organizationId: string;
+  activeFilter: MembersDirectoryFilter;
   members: SettingsMember[];
+  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
   invitations: SettingsInvitation[];
   capabilities: MembershipCapabilities | null;
   canManageInvitations: boolean;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
   invitationActionState: MembersDirectoryInvitationActionState;
-  resolveInviterDisplayName: (inviterId: string) => string;
+  searchValue: string;
+  onSearchValueChange: (nextValue: string) => void;
   onChangeRole: (member: SettingsMember) => void;
   onRemoveMember: (member: SettingsMember) => void;
   onRevokeInvite: (invitation: SettingsInvitation) => void;
   onResendInvite: (invitation: SettingsInvitation) => void;
 }): React.JSX.Element {
-  const {
-    selectedInvitationForDetails,
-    setSelectedInvitationForDetails,
-    activeFilter,
-    setActiveFilter,
-    searchValue,
-    setSearchValue,
-    hasRows,
-    visibleRows,
-  } = useMembersDirectoryTableState({
+  const showNameColumn = input.activeFilter === "members";
+  const showInvitationStatusColumn = input.activeFilter === "invitations";
+  const showInvitedByColumn = input.activeFilter === "invitations";
+  const showExpiresColumn = input.activeFilter === "invitations";
+  const rows = buildMembersDirectoryRows({
     members: input.members,
     invitations: input.invitations,
   });
-  const memberAvatarsByUserId = useMemberAvatars({
-    organizationId: input.organizationId,
-    rows: visibleRows,
-  });
   const tableRows = buildMembersDirectoryTableRowViewModels({
-    rows: visibleRows,
-    memberAvatarsByUserId,
+    rows,
+    memberAvatarsByUserId: input.memberAvatarsByUserId,
     capabilities: input.capabilities,
     canManageInvitations: input.canManageInvitations,
     pendingMemberOperation: input.pendingMemberOperation,
@@ -53,7 +50,6 @@ export function MembersDirectoryTable(input: {
     handlers: {
       onChangeRole: input.onChangeRole,
       onRemoveMember: input.onRemoveMember,
-      onViewInvitationDetails: setSelectedInvitationForDetails,
       onResendInvite: input.onResendInvite,
       onRevokeInvite: input.onRevokeInvite,
     },
@@ -62,39 +58,60 @@ export function MembersDirectoryTable(input: {
   return (
     <>
       <MembersDirectoryToolbar
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
-        onSearchValueChange={setSearchValue}
-        searchValue={searchValue}
+        activeFilter={input.activeFilter}
+        onSearchValueChange={input.onSearchValueChange}
+        searchValue={input.searchValue}
       />
 
       <Table className="min-w-[48rem]">
         <TableHeader className="bg-muted/60">
           <TableRow className="h-9 border-b">
-            <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-              Name
-            </TableHead>
+            {showNameColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                Name
+              </TableHead>
+            ) : null}
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
               Email
             </TableHead>
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-              Status
+              Role
             </TableHead>
+            {showInvitationStatusColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Status
+              </TableHead>
+            ) : null}
+            {showInvitedByColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Invited by
+              </TableHead>
+            ) : null}
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               Date
             </TableHead>
+            {showExpiresColumn ? (
+              <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                Expires
+              </TableHead>
+            ) : null}
             <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {visibleRows.length === 0 ? (
+          {rows.length === 0 ? (
             <TableRow>
-              <TableCell className="text-muted-foreground" colSpan={5}>
-                {hasRows
-                  ? "No rows match the current search or filter."
-                  : "No members or invitations were found."}
+              <TableCell
+                className="text-muted-foreground"
+                colSpan={input.activeFilter === "members" ? 5 : 7}
+              >
+                {input.searchValue.length > 0
+                  ? "No rows match the current search."
+                  : input.activeFilter === "members"
+                    ? "No members were found."
+                    : "No invitations were found."}
               </TableCell>
             </TableRow>
           ) : null}
@@ -106,10 +123,17 @@ export function MembersDirectoryTable(input: {
                 date={row.date}
                 email={row.email}
                 key={row.key}
+                role={row.role}
                 showMemberAvatar={row.showMemberAvatar}
+                showNameColumn={showNameColumn}
+                showStatusColumn={showInvitationStatusColumn}
+                showInvitedByColumn={showInvitedByColumn}
+                showExpiresColumn={showExpiresColumn}
                 memberAvatar={row.memberAvatar}
                 name={row.name}
                 status={row.status}
+                invitedBy={row.invitedBy}
+                expiresAt={row.expiresAt}
                 actionFeedback={row.actionFeedback}
                 {...(row.actionsContentClassName === undefined
                   ? {}
@@ -119,17 +143,6 @@ export function MembersDirectoryTable(input: {
           })}
         </TableBody>
       </Table>
-
-      <InvitationDetailsDialog
-        invitation={selectedInvitationForDetails}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setSelectedInvitationForDetails(null);
-          }
-        }}
-        open={selectedInvitationForDetails !== null}
-        resolveInviterDisplayName={input.resolveInviterDisplayName}
-      />
     </>
   );
 }

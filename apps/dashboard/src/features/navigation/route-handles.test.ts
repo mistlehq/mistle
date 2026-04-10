@@ -10,6 +10,15 @@ describe("route handles", () => {
   it("defines titles and descriptions for settings leaf pages", () => {
     expect(ROUTE_HANDLES.dashboard.title).toBe("Home");
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
+    expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
+    expect(ROUTE_HANDLES.integrations.description).toBe("");
+    expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
+    expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
+    expect(ROUTE_HANDLES.integrationDetail.headerIcon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationCallbackResult.title).toBe("Integration callback result");
+    expect(ROUTE_HANDLES.integrationCallbackResult.description).toBe(
+      "Review integration connection callback outcome.",
+    );
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
     expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
@@ -81,14 +90,11 @@ describe("route handles", () => {
   });
 
   it("normalizes callback breadcrumb labels for known and unknown integration target keys", () => {
-    const callbackBreadcrumb =
-      ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.breadcrumb;
+    const callbackBreadcrumb = ROUTE_HANDLES.integrationCallbackResult.breadcrumb;
     expect(typeof callbackBreadcrumb).toBe("function");
 
     if (typeof callbackBreadcrumb !== "function") {
-      throw new Error(
-        "settingsOrganizationIntegrationCallbackResult breadcrumb must be a function",
-      );
+      throw new Error("integrationCallbackResult breadcrumb must be a function");
     }
 
     expect(callbackBreadcrumb({ params: { targetKey: "github" } })).toBe("Github callback");
@@ -99,11 +105,11 @@ describe("route handles", () => {
   });
 
   it("normalizes integration detail breadcrumb labels for known and unknown target keys", () => {
-    const detailBreadcrumb = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.breadcrumb;
+    const detailBreadcrumb = ROUTE_HANDLES.integrationDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
     if (typeof detailBreadcrumb !== "function") {
-      throw new Error("settingsOrganizationIntegrationDetail breadcrumb must be a function");
+      throw new Error("integrationDetail breadcrumb must be a function");
     }
 
     expect(detailBreadcrumb({ params: { targetKey: "github" } })).toBe("Github");
@@ -113,11 +119,11 @@ describe("route handles", () => {
   });
 
   it("resolves integration detail titles from known definitions and unknown target keys", () => {
-    const detailTitle = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title;
+    const detailTitle = ROUTE_HANDLES.integrationDetail.title;
     expect(typeof detailTitle).toBe("function");
 
     if (typeof detailTitle !== "function") {
-      throw new Error("settingsOrganizationIntegrationDetail title must be a function");
+      throw new Error("integrationDetail title must be a function");
     }
 
     expect(detailTitle({ params: { targetKey: "github-cloud" } })).toBe("GitHub");
@@ -127,11 +133,11 @@ describe("route handles", () => {
   });
 
   it("resolves integration detail supporting text from the target key", () => {
-    const detailDescription = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description;
+    const detailDescription = ROUTE_HANDLES.integrationDetail.description;
     expect(typeof detailDescription).toBe("function");
 
     if (typeof detailDescription !== "function") {
-      throw new Error("settingsOrganizationIntegrationDetail description must be a function");
+      throw new Error("integrationDetail description must be a function");
     }
 
     expect(detailDescription({ params: { targetKey: "github-cloud" } })).toBe("github-cloud");

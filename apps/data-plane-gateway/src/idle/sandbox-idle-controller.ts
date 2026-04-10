@@ -24,6 +24,7 @@ export type SandboxIdleControllerDependencies = {
   ownerLeaseId: string;
   timeoutMs: number;
   disconnectGraceMs: number;
+  requestRetryMs: number;
   clock: Clock;
   scheduler: Scheduler;
   ownerStore: SandboxOwnerStore;
@@ -220,6 +221,30 @@ export class LocalSandboxIdleController implements SandboxIdleController {
     });
   }
 
+  private scheduleRequestRetry(
+    nextRetryAtMs: number,
+    trigger: "idle_stop_retry" | "disconnect_reconcile_retry",
+  ): void {
+    logger.warn(
+      {
+        event: "sandbox_idle_request_retry_scheduled",
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        trigger,
+        dueAtMs: nextRetryAtMs,
+      },
+      "Scheduled sandbox idle controller retry",
+    );
+    this.scheduleTimer(nextRetryAtMs, () => {
+      if (trigger === "idle_stop_retry") {
+        void this.handleIdleDeadlineElapsed();
+        return;
+      }
+
+      void this.handleDisconnectGraceElapsed();
+    });
+  }
+
   private scheduleTimer(dueMs: number, callback: () => void): void {
     this.cancelCurrentTimer();
 
@@ -318,6 +343,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         },
         "Failed to request fenced idle sandbox stop",
       );
+      this.scheduleRequestRetry(nowMs + this.dependencies.requestRetryMs, "idle_stop_retry");
       return;
     }
 
@@ -412,6 +438,10 @@ export class LocalSandboxIdleController implements SandboxIdleController {
           ownerLeaseId: this.ownerLeaseId,
         },
         "Failed to request fenced disconnected sandbox reconciliation",
+      );
+      this.scheduleRequestRetry(
+        nowMs + this.dependencies.requestRetryMs,
+        "disconnect_reconcile_retry",
       );
       return;
     }

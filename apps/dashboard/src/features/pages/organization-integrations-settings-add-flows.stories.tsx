@@ -9,7 +9,7 @@ import {
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 
 const meta = {
-  title: "Dashboard/Settings/OrganizationIntegrations/AddFlows",
+  title: "Dashboard/Integrations/AddFlows",
   component: OrganizationIntegrationsSettingsPageView,
   decorators: [withDashboardPageStory],
   args: {

@@ -301,7 +301,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.artifacts).toEqual([]);
   });
 
-  it("installs selected github and jira cli artifacts once each in the compiled runtime plan", async ({
+  it("installs selected github, jira, and slack cli artifacts once each in the compiled runtime plan", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -337,6 +337,15 @@ describe("sandbox profile compile runtime plan integration", () => {
           variantId: "jira-default",
           enabled: true,
           config: {},
+        },
+        {
+          targetKey: "slack-default-compile-selected-tools",
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
         },
       ])
       .onConflictDoNothing();
@@ -375,6 +384,16 @@ describe("sandbox profile compile runtime plan integration", () => {
           email: "user+dev@example.com",
         },
       },
+      {
+        id: "icn_compile_selected_tools_slack",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "slack-default-compile-selected-tools",
+        displayName: "Compile Selected Tools Slack Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "slack-bot-token",
+        },
+      },
     ]);
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
       {
@@ -408,6 +427,16 @@ describe("sandbox profile compile runtime plan integration", () => {
           tools: ["jira-cli"],
         },
       },
+      {
+        id: "ibd_compile_selected_tools_slack",
+        sandboxProfileId: "sbp_compile_selected_tools",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_selected_tools_slack",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: ["slack-cli"],
+        },
+      },
     ]);
 
     const runtimePlan = await compileProfileVersionRuntimePlan(
@@ -426,10 +455,11 @@ describe("sandbox profile compile runtime plan integration", () => {
       },
     );
 
-    expect(runtimePlan.artifacts).toHaveLength(2);
+    expect(runtimePlan.artifacts).toHaveLength(3);
     expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
       "gh-cli",
       "jira-cli",
+      "slack-cli",
     ]);
     expect(runtimePlan.artifacts[0]?.env).toEqual({
       GH_TOKEN: "dummy-value",
@@ -449,6 +479,17 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(jiraInstallCommand?.args[2]).toContain("release_tag_prefix=jira/");
     expect(jiraInstallCommand?.args[2]).toContain("asset_name=jira-linux-amd64");
     expect(jiraInstallCommand?.args[2]).toContain("/usr/local/bin/jira");
+
+    const slackInstallCommand = runtimePlan.artifacts[2]?.lifecycle.install[0];
+    expect(runtimePlan.artifacts[2]?.env).toEqual({
+      SLACK_BASE_URL: "https://slack.com/api",
+    });
+    expect(slackInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(slackInstallCommand?.timeoutMs).toBe(120_000);
+    expect(slackInstallCommand?.args[2]).toContain("repo=mistlehq/tools");
+    expect(slackInstallCommand?.args[2]).toContain("release_tag_prefix=slack/");
+    expect(slackInstallCommand?.args[2]).toContain("asset_name=slack-linux-amd64");
+    expect(slackInstallCommand?.args[2]).toContain("/usr/local/bin/slack");
   });
 
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {

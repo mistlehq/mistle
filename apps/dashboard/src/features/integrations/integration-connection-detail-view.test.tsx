@@ -266,6 +266,32 @@ describe("IntegrationConnectionDetailView", () => {
     expect(editedConnectionId).toBe("icn_openai_primary");
   });
 
+  it("renders masked Slack bot token credentials for Slack connections", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_slack_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Slack Engineering",
+            authMethodId: "slack-bot-token",
+            authMethodLabel: "Bot token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+      />,
+    );
+
+    const authSection = screen.getByLabelText("Connection authentication");
+    expect(authSection.getAttribute("data-auth-method-id")).toBe("slack-bot-token");
+    expect(screen.getByLabelText("Masked Slack credential values")).toBeTruthy();
+    expect(screen.getByText("Bot token:")).toBeTruthy();
+    expect(screen.getByText("Signing secret:")).toBeTruthy();
+    expect(screen.getAllByText("**********")).toHaveLength(2);
+  });
+
   it("shows delete only for unbound connections", () => {
     let deletedConnectionId: string | null = null;
 

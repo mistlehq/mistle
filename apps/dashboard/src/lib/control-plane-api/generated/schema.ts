@@ -2761,6 +2761,127 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/organizations/{organizationId}/invitations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          limit?: number;
+          offset?: number | null;
+          search?: string;
+        };
+        header?: never;
+        path: {
+          organizationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Paginated organization invitations. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              invitations: {
+                /** Format: date-time */
+                createdAt: string;
+                email: string;
+                /** Format: date-time */
+                expiresAt: string;
+                id: string;
+                inviterId: string;
+                inviterName: string;
+                organizationId: string;
+                /** @enum {string} */
+                role: "owner" | "admin" | "member";
+                /** @enum {string} */
+                status: "pending" | "accepted" | "canceled" | "rejected" | "revoked";
+              }[];
+              limit: number;
+              offset: number;
+              total: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Organization was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/organizations/{organizationId}/logo": {
     parameters: {
       query?: never;
@@ -3094,44 +3215,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/organizations/{organizationId}/member-avatars": {
+  "/v1/organizations/{organizationId}/members": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: {
+    get: {
       parameters: {
-        query?: never;
+        query?: {
+          limit?: number;
+          offset?: number | null;
+          search?: string;
+        };
         header?: never;
         path: {
           organizationId: string;
         };
         cookie?: never;
       };
-      requestBody: {
-        content: {
-          "application/json": {
-            userIds: string[];
-          };
-        };
-      };
+      requestBody?: never;
       responses: {
-        /** @description Batch avatar state for organization members. */
+        /** @description Paginated organization members. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              hasImage: boolean;
-              /** Format: uri */
-              imageUrl: string | null;
-              userId: string;
-            }[];
+              limit: number;
+              members: {
+                avatar: {
+                  hasImage: boolean;
+                  /** Format: uri */
+                  imageUrl: string | null;
+                };
+                email: string;
+                id: string;
+                /** Format: date-time */
+                joinedAt: string;
+                name: string;
+                /** @enum {string} */
+                role: "owner" | "admin" | "member";
+                userId: string;
+              }[];
+              offset: number;
+              total: number;
+            };
           };
         };
         /** @description Invalid request. */
@@ -3197,6 +3328,8 @@ export interface paths {
         };
       };
     };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

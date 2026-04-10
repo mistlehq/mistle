@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
@@ -10,8 +10,12 @@ describe("SessionWorkbenchPageView", () => {
     const { container } = render(
       <SessionWorkbenchPageView
         alerts={[]}
+        bottomPanel={<div>Terminal</div>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
+        onBottomPanelResize={function onBottomPanelResize() {}}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
@@ -32,12 +36,16 @@ describe("SessionWorkbenchPageView", () => {
   });
 
   it("does not reserve scrollbar gutter for full-width layouts", () => {
-    render(
+    const { container } = render(
       <SessionWorkbenchPageView
         alerts={[]}
+        bottomPanel={<div>Terminal</div>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
         mainContentLayout={{ scroll: "contained", width: "full" }}
+        onBottomPanelResize={function onBottomPanelResize() {}}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
@@ -46,8 +54,8 @@ describe("SessionWorkbenchPageView", () => {
       />,
     );
 
-    expect(screen.getByRole("region", { name: "Conversation chat" }).className).not.toContain(
-      "scrollbar-gutter",
-    );
+    expect(
+      within(container).getByRole("region", { name: "Conversation chat" }).className,
+    ).not.toContain("scrollbar-gutter");
   });
 });

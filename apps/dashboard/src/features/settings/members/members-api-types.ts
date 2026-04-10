@@ -10,6 +10,8 @@ export type MemberAvatar = {
   imageUrl: string | null;
 };
 
+export type MembersDirectoryFilter = "members" | "invitations";
+
 export type SettingsMember = {
   id: string;
   userId: string;
@@ -25,23 +27,32 @@ export type SettingsInvitation = {
   email: string;
   role: OrganizationRole;
   inviterId: string;
+  inviterName: string;
   status: InvitationStatus;
-  rawStatus: string | null;
   expiresAt: string;
   createdAt: string;
 };
 
-export type InvitationStatus =
-  | "pending"
-  | "accepted"
-  | "canceled"
-  | "rejected"
-  | "revoked"
-  | "unknown";
+export type InvitationStatus = "pending" | "accepted" | "canceled" | "rejected" | "revoked";
 
 export type InviteMemberResponse = {
   status: string | null;
   message: string | null;
   code: string | null;
   raw: unknown;
+};
+
+export type MembersPage = {
+  members: SettingsMember[];
+  memberAvatarsByUserId: ReadonlyMap<string, MemberAvatar>;
+  limit: number;
+  offset: number;
+  total: number;
+};
+
+export type InvitationsPage = {
+  invitations: SettingsInvitation[];
+  limit: number;
+  offset: number;
+  total: number;
 };

@@ -741,6 +741,142 @@ describe("handleAutomationRun integration", () => {
   );
 
   it(
+    "prepares Slack automations when the input template uses an explicit Liquid fallback",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_slack_input_fallback_prepare";
+        const sandboxProfileId = "sbp_worker_slack_input_fallback_prepare";
+        const automationId = "atm_worker_slack_input_fallback_prepare";
+        const automationTargetId = "atg_worker_slack_input_fallback_prepare";
+        const webhookEventId = "iwe_worker_slack_input_fallback_prepare";
+        const automationRunId = "aru_worker_slack_input_fallback_prepare";
+        const connectionId = "icn_worker_slack_input_fallback_prepare";
+        const webhookSourceId = "iws_worker_slack_input_fallback_prepare";
+        const targetKey = "slack-default-worker-automation-input-fallback";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Slack Input Fallback Prepare",
+          slug: "worker-slack-input-fallback-prepare",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Slack Input Fallback Prepare Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          suffix: "worker_slack_input_fallback_prepare",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker Slack input fallback connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Slack Input Fallback Prepare",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationWebhookSourceId: webhookSourceId,
+          eventTypes: ["slack:message"],
+          payloadFilter: null,
+          inputTemplate:
+            "Handle thread {{payload.event.thread_ts | default: payload.event.ts}}: {{payload.event.text}}",
+          conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalEventId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
+          targetKey,
+          externalEventId: "evt_slack_input_fallback_prepare",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0002",
+          providerEventType: "message",
+          eventType: "slack:message",
+          payload: {
+            event: {
+              channel: "C123",
+              ts: "1710000000.000100",
+              text: "@mistlebot prepare",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.QUEUED,
+        });
+
+        const preparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+
+        expect(preparedRun).toMatchObject({
+          automationRunId,
+          renderedInput: "Handle thread 1710000000.000100: @mistlebot prepare",
+          renderedConversationKey: "slack:channel:C123",
+          renderedIdempotencyKey: "evt_slack_input_fallback_prepare",
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "reuses the persisted rendered snapshot when replaying a running run",
     async ({ fixture }) => {
       const database = await createTestDatabase({

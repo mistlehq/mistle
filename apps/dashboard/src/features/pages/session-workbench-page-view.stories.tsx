@@ -36,8 +36,12 @@ const meta = {
   args: {
     sandboxInstanceId: StorySandboxInstanceId,
     alerts: [],
+    bottomPanel: <div className="h-full w-full border-t bg-white" />,
+    bottomPanelSize: 32,
+    isBottomPanelVisible: false,
     isSecondaryPanelVisible: false,
     mainContent: createStorySessionMainContent(),
+    onBottomPanelResize: noop,
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: <div className="h-full w-full border-t bg-white" />,
     secondaryPanelSize: 38,
@@ -176,7 +180,7 @@ export const MissingSessionId: Story = {
 
 export const CliSplitWithTerminal: Story = {
   args: {
-    isSecondaryPanelVisible: true,
+    isBottomPanelVisible: true,
     mainContent: (
       <SessionCliPanel
         ptyState={createStoryWorkbenchCliPtyState(createStoryLongCliOutput("task"))}
@@ -184,7 +188,7 @@ export const CliSplitWithTerminal: Story = {
     ),
     mainContentLayout: { scroll: "contained", width: "full" },
     primaryBottomPanel: null,
-    secondaryPanel: (
+    bottomPanel: (
       <SessionTerminalPanel
         isConnectionReady={true}
         isResumingSandbox={false}
@@ -207,5 +211,6 @@ export const CliSplitWithTerminal: Story = {
         sandboxStatus="running"
       />
     ),
+    bottomPanelSize: 32,
   },
 };

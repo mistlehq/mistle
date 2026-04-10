@@ -28,13 +28,6 @@ export function resolveInvitationDisplayStatus(
     return { kind: "revoked" };
   }
 
-  if (invitation.status === "unknown") {
-    return {
-      kind: "unknown",
-      rawStatus: invitation.rawStatus ?? "unknown",
-    };
-  }
-
   const expiresAtEpochMs = Date.parse(invitation.expiresAt);
   if (!Number.isFinite(expiresAtEpochMs)) {
     return { kind: "pending" };
@@ -48,6 +41,10 @@ export function resolveInvitationDisplayStatus(
 }
 
 export function canResendInvitation(displayStatus: InvitationDisplayStatus): boolean {
+  return displayStatus.kind === "pending" || displayStatus.kind === "expired";
+}
+
+export function canRevokeInvitation(displayStatus: InvitationDisplayStatus): boolean {
   return displayStatus.kind === "pending" || displayStatus.kind === "expired";
 }
 
@@ -74,7 +71,7 @@ export type MembersDirectoryActionFeedback = {
 
 const INVITATION_PENDING_ACTION_LABEL: Record<"resend_invite" | "revoke_invitation", string> = {
   resend_invite: "Resending invite...",
-  revoke_invitation: "Revoking invitation...",
+  revoke_invitation: "Canceling invitation...",
 };
 
 const INVITATION_FEEDBACK_BY_PHASE_AND_ACTION: Record<
@@ -107,7 +104,7 @@ const INVITATION_FEEDBACK_BY_PHASE_AND_ACTION: Record<
       tone: "success",
     },
     revoke_invitation: {
-      label: "Revoked",
+      label: "Canceled",
       state: "revoke_invitation_completed",
       tone: "destructive",
     },
@@ -177,7 +174,7 @@ export function buildMemberActionDescriptors(input: {
 }
 
 export type InvitationActionDescriptor = {
-  key: "view_details" | "resend_invite" | "revoke_invitation";
+  key: "resend_invite" | "revoke_invitation";
   label: string;
   disabled: boolean;
   destructive: boolean;
@@ -203,14 +200,7 @@ export function buildInvitationActionDescriptors(input: {
     input.invitationActionState.action === "revoke_invitation" &&
     input.invitationActionState.invitationId === input.invitationId;
 
-  const descriptors: InvitationActionDescriptor[] = [
-    {
-      key: "view_details",
-      label: "View details",
-      disabled: false,
-      destructive: false,
-    },
-  ];
+  const descriptors: InvitationActionDescriptor[] = [];
 
   if (canResendInvitation(input.displayStatus)) {
     descriptors.push({
@@ -221,12 +211,16 @@ export function buildInvitationActionDescriptors(input: {
     });
   }
 
-  descriptors.push({
-    key: "revoke_invitation",
-    label: revokePending ? INVITATION_PENDING_ACTION_LABEL.revoke_invitation : "Revoke invitation",
-    disabled: invitationActionsDisabled,
-    destructive: true,
-  });
+  if (canRevokeInvitation(input.displayStatus)) {
+    descriptors.push({
+      key: "revoke_invitation",
+      label: revokePending
+        ? INVITATION_PENDING_ACTION_LABEL.revoke_invitation
+        : "Cancel invitation",
+      disabled: invitationActionsDisabled,
+      destructive: true,
+    });
+  }
 
   return descriptors;
 }
@@ -253,8 +247,11 @@ export type MembersDirectoryRow =
       id: string;
       name: string;
       email: string;
-      status: string;
+      role: string;
+      status: null;
       date: string;
+      invitedBy: null;
+      expiresAt: null;
       member: SettingsMember;
     }
   | {
@@ -262,8 +259,11 @@ export type MembersDirectoryRow =
       id: string;
       name: string;
       email: string;
+      role: string;
       status: string;
       date: string;
+      invitedBy: string;
+      expiresAt: string;
       invitation: SettingsInvitation;
       displayStatus: InvitationDisplayStatus;
     };
@@ -284,13 +284,6 @@ export type MembersDirectoryActionDescriptor =
       member: SettingsMember;
     }
   | {
-      key: "view_details";
-      label: string;
-      disabled: boolean;
-      destructive: boolean;
-      invitation: SettingsInvitation;
-    }
-  | {
       key: "resend_invite";
       label: string;
       disabled: boolean;
@@ -305,67 +298,24 @@ export type MembersDirectoryActionDescriptor =
       invitation: SettingsInvitation;
     };
 
-export type MembersDirectoryTableFilter = "all" | "members" | "invitations";
-
-export const MEMBERS_DIRECTORY_TABLE_FILTER_OPTIONS: ReadonlyArray<{
-  value: MembersDirectoryTableFilter;
-  label: string;
-}> = [
-  { value: "all", label: "All" },
-  { value: "members", label: "Members" },
-  { value: "invitations", label: "Invitations" },
-];
-
-const MEMBERS_DIRECTORY_TABLE_FILTER_LABELS: Record<MembersDirectoryTableFilter, string> = {
-  all: "All",
-  members: "Members",
-  invitations: "Invitations",
-};
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected value: ${String(value)}`);
-}
-
-export function formatMembersDirectoryTableFilter(value: MembersDirectoryTableFilter): string {
-  return MEMBERS_DIRECTORY_TABLE_FILTER_LABELS[value];
-}
-
-export function toMembersDirectoryTableFilter(value: string | null): MembersDirectoryTableFilter {
-  if (value === null) {
-    throw new Error("Members directory filter value must not be null.");
-  }
-
-  if (value === "all" || value === "members" || value === "invitations") {
-    return value;
-  }
-
-  throw new Error(`Unexpected members directory filter value: "${value}".`);
-}
-
 export function formatMembersDirectoryRow(row: MembersDirectoryRow): {
   name: string;
   email: string;
-  status: string;
+  role: string;
+  status: string | null;
   date: string;
+  invitedBy: string | null;
+  expiresAt: string | null;
 } {
   return {
     name: row.name,
     email: row.email,
+    role: row.role,
     status: row.status,
     date: formatDate(row.date),
+    invitedBy: row.invitedBy,
+    expiresAt: row.expiresAt === null ? null : formatDate(row.expiresAt),
   };
-}
-
-function compareDateDesc(leftIsoDate: string, rightIsoDate: string): number {
-  const leftEpochMs = Date.parse(leftIsoDate);
-  const rightEpochMs = Date.parse(rightIsoDate);
-  const leftValue = Number.isFinite(leftEpochMs) ? leftEpochMs : Number.NEGATIVE_INFINITY;
-  const rightValue = Number.isFinite(rightEpochMs) ? rightEpochMs : Number.NEGATIVE_INFINITY;
-  return rightValue - leftValue;
-}
-
-function compareTextAsc(left: string, right: string): number {
-  return left.localeCompare(right, undefined, { sensitivity: "base" });
 }
 
 export function buildMembersDirectoryRows(input: {
@@ -380,8 +330,11 @@ export function buildMembersDirectoryRows(input: {
       email: member.email,
     }),
     email: member.email,
-    status: formatRoleLabel(member.role),
+    role: formatRoleLabel(member.role),
+    status: null,
     date: member.joinedAt,
+    invitedBy: null,
+    expiresAt: null,
     member,
   }));
 
@@ -392,26 +345,17 @@ export function buildMembersDirectoryRows(input: {
       id: invitation.id,
       name: invitation.email,
       email: invitation.email,
-      status: invitationStatusLabel(invitation.role, displayStatus),
+      role: formatRoleLabel(invitation.role),
+      status: invitationStatusLabel(displayStatus),
       date: invitation.createdAt,
+      invitedBy: invitation.inviterName,
+      expiresAt: invitation.expiresAt,
       invitation,
       displayStatus,
     };
   });
 
-  return [...memberRows, ...invitationRows].sort((left, right) => {
-    const byDate = compareDateDesc(left.date, right.date);
-    if (byDate !== 0) {
-      return byDate;
-    }
-
-    const byName = compareTextAsc(left.name, right.name);
-    if (byName !== 0) {
-      return byName;
-    }
-
-    return compareTextAsc(left.email, right.email);
-  });
+  return [...memberRows, ...invitationRows];
 }
 
 export function buildMembersDirectoryRowActionDescriptors(input: {
@@ -463,49 +407,4 @@ export function directoryRowActionsContentClassName(row: MembersDirectoryRow): s
   }
 
   return undefined;
-}
-
-function normalizeSearch(value: string): string {
-  return value.trim().toLocaleLowerCase();
-}
-
-function includesSearchValue(haystack: string, searchValue: string): boolean {
-  return haystack.toLocaleLowerCase().includes(searchValue);
-}
-
-function filterByTableMode(row: MembersDirectoryRow, filter: MembersDirectoryTableFilter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "members":
-      return row.kind === "member";
-    case "invitations":
-      return row.kind === "invitation";
-    default:
-      return assertNever(filter);
-  }
-}
-
-export function filterMembersDirectoryRows(input: {
-  rows: MembersDirectoryRow[];
-  filter: MembersDirectoryTableFilter;
-  search: string;
-}): MembersDirectoryRow[] {
-  const searchValue = normalizeSearch(input.search);
-
-  return input.rows.filter((row) => {
-    if (!filterByTableMode(row, input.filter)) {
-      return false;
-    }
-
-    if (searchValue.length === 0) {
-      return true;
-    }
-
-    return (
-      includesSearchValue(row.name, searchValue) ||
-      includesSearchValue(row.email, searchValue) ||
-      includesSearchValue(row.status, searchValue)
-    );
-  });
 }

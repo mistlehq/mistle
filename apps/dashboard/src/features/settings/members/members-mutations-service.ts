@@ -1,39 +1,6 @@
 import { authClient } from "../../../lib/auth/client.js";
 import { executeMembersOperation } from "./members-api-errors.js";
-import type { OrganizationRole, SettingsMember } from "./members-api-types.js";
-import { parseMembersPageResponse } from "./members-directory-parser.js";
-
-export async function listMembers(input: { organizationId: string }): Promise<SettingsMember[]> {
-  return executeMembersOperation("listMembers", async () => {
-    const limit = 100;
-    let offset = 0;
-    let total = Number.POSITIVE_INFINITY;
-    const members: SettingsMember[] = [];
-
-    while (offset < total) {
-      const page = await authClient.$fetch("/organization/list-members", {
-        method: "GET",
-        throw: true,
-        query: {
-          organizationId: input.organizationId,
-          limit,
-          offset,
-        },
-      });
-      const parsedPage = parseMembersPageResponse(page);
-      members.push(...parsedPage.members);
-      total = parsedPage.total;
-
-      if (parsedPage.rawCount === 0) {
-        break;
-      }
-
-      offset += parsedPage.rawCount;
-    }
-
-    return members;
-  });
-}
+import type { OrganizationRole } from "./members-api-types.js";
 
 export async function updateMemberRole(input: {
   organizationId: string;

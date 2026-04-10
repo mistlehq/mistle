@@ -5,7 +5,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import { CpuIcon, HouseIcon, LightningIcon } from "@phosphor-icons/react";
+import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -39,6 +39,13 @@ function AutomationsNavIcon(props: {
   return <LightningIcon {...props} />;
 }
 
+function IntegrationsNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <PuzzlePieceIcon {...props} />;
+}
+
 export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
   | "breadcrumbs"
@@ -59,6 +66,7 @@ export function resolveAppShellFrame(input: {
   handleSwitchOrganization: (organizationId: string) => void;
   inAutomations: boolean;
   inDashboardRoot: boolean;
+  inIntegrations: boolean;
   inSandboxProfiles: boolean;
   inSessionDetail: boolean;
   inSessions: boolean;
@@ -81,6 +89,7 @@ export function resolveAppShellFrame(input: {
     input.inSettings ||
     input.inSandboxProfiles ||
     input.inAutomations ||
+    input.inIntegrations ||
     input.inDashboardRoot ||
     input.inSessions;
 
@@ -180,6 +189,18 @@ function MainSidebarContent(input: {
             >
               <SandboxProfilesNavIcon aria-hidden className="size-4 shrink-0" />
               <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={
+                input.locationPathname === "/integrations" ||
+                input.locationPathname.startsWith("/integrations/")
+              }
+              render={<NavLink to="/integrations" />}
+            >
+              <IntegrationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <span>Integrations</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SessionsNavToggleItem

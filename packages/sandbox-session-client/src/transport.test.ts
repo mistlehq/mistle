@@ -1,4 +1,5 @@
 import {
+  DefaultStreamWindowBytes,
   decodeDataFrame,
   encodeDataFrame,
   parseStreamControlMessage,
@@ -297,6 +298,44 @@ describe("SandboxSessionTransport", () => {
         );
       }),
     ).toBe(true);
+  });
+
+  it("allows agent streams to send a single payload larger than the generic default window", async () => {
+    const server = await createManagedTestServer();
+    const transport = new SandboxSessionTransport({
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await transport.connect({
+      connectionUrl: server.url,
+    });
+
+    const agentStream = await transport.openStream({
+      channel: {
+        kind: "agent",
+      },
+    });
+    const payload = new TextEncoder().encode("x".repeat(DefaultStreamWindowBytes + 1024));
+
+    await expect(
+      agentStream.sendDataFrame({
+        payload,
+        payloadKind: PayloadKindWebSocketText,
+      }),
+    ).resolves.toBeUndefined();
+
+    await waitForCondition({
+      description: "agent frame to reach the server",
+      evaluate: () => server.receivedDataFrames.length > 0,
+      timeoutMs: 1_000,
+    });
+
+    expect(server.receivedDataFrames.at(-1)).toEqual({
+      frameKind: 0x01,
+      streamId: agentStream.streamId,
+      payloadKind: PayloadKindWebSocketText,
+      payload,
+    });
   });
 
   it("marks every active stream as transport_closed when the websocket closes", async () => {

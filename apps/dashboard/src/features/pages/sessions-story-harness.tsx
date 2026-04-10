@@ -118,6 +118,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     handleSwitchOrganization: () => {},
     inAutomations: routeState.inAutomations,
     inDashboardRoot: routeState.inDashboardRoot,
+    inIntegrations: routeState.inIntegrations,
     inSandboxProfiles: routeState.inSandboxProfiles,
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,

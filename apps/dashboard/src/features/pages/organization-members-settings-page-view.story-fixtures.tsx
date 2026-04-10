@@ -1,4 +1,5 @@
 import type {
+  MemberAvatar,
   MembershipCapabilities,
   SettingsInvitation,
   SettingsMember,
@@ -8,7 +9,7 @@ import type {
   MembersDirectoryInvitationActionState,
   MembersDirectoryPendingMemberOperation,
 } from "../settings/members/members-directory-model.js";
-import type { OrganizationMembersSettingsPageViewProps } from "./organization-members-settings-page-view.js";
+import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
 
 export const OrganizationMembersStoryCapabilities: MembershipCapabilities = {
   organizationId: "org_storybook",
@@ -61,8 +62,8 @@ export const OrganizationMembersStoryInvitations: SettingsInvitation[] = [
     email: "pending@mistle.so",
     role: "member",
     inviterId: "user_product",
+    inviterName: "Product Lead",
     status: "pending",
-    rawStatus: null,
     expiresAt: "2026-12-31T00:00:00.000Z",
     createdAt: "2026-03-01T00:00:00.000Z",
   },
@@ -72,8 +73,8 @@ export const OrganizationMembersStoryInvitations: SettingsInvitation[] = [
     email: "revoked@mistle.so",
     role: "admin",
     inviterId: "user_owner",
+    inviterName: "Mistle Owner",
     status: "revoked",
-    rawStatus: null,
     expiresAt: "2026-03-05T00:00:00.000Z",
     createdAt: "2026-02-20T00:00:00.000Z",
   },
@@ -102,11 +103,6 @@ export function requireOrganizationMembersStoryMember(memberId: string): Setting
   return member;
 }
 
-export function resolveOrganizationMembersStoryInviterDisplayName(inviterId: string): string {
-  const inviter = OrganizationMembersStoryMembers.find((member) => member.userId === inviterId);
-  return inviter?.name ?? inviterId;
-}
-
 export function createOrganizationMembersStoryRoleChangeDialog(
   memberId: string,
   selectedRole: "admin" | "member",
@@ -118,29 +114,50 @@ export function createOrganizationMembersStoryRoleChangeDialog(
   };
 }
 
-export function createOrganizationMembersSettingsPageStoryArgs(
-  overrides: Partial<OrganizationMembersSettingsPageViewProps> = {},
-): OrganizationMembersSettingsPageViewProps {
+export function createOrganizationMembersSettingsPageStoryViewModel(
+  overrides: Partial<OrganizationMembersSettingsPageViewModel> = {},
+): OrganizationMembersSettingsPageViewModel {
   const invitationActionState: MembersDirectoryInvitationActionState =
     overrides.invitationActionState ?? null;
   const pendingMemberOperation: MembersDirectoryPendingMemberOperation =
     overrides.pendingMemberOperation ?? null;
   const roleChangeDialog = overrides.roleChangeDialog ?? null;
+  const activeFilter = overrides.activeFilter ?? "members";
+  const defaultMembers =
+    activeFilter === "members" ? OrganizationMembersStoryMembers : ([] as SettingsMember[]);
+  const defaultInvitations =
+    activeFilter === "invitations"
+      ? OrganizationMembersStoryInvitations
+      : ([] as SettingsInvitation[]);
+  const members = overrides.members ?? defaultMembers;
+  const invitations = overrides.invitations ?? defaultInvitations;
 
   return {
+    activeFilter,
     capabilities: overrides.capabilities ?? OrganizationMembersStoryCapabilities,
     capabilitiesErrorMessage: overrides.capabilitiesErrorMessage ?? null,
+    hasNextPage: overrides.hasNextPage ?? false,
+    hasPreviousPage: overrides.hasPreviousPage ?? false,
     invitationActionState,
-    invitations: overrides.invitations ?? OrganizationMembersStoryInvitations,
+    invitations,
     inviteDialogOpen: overrides.inviteDialogOpen ?? false,
     inviteMemberRequest: overrides.inviteMemberRequest ?? inviteOrganizationMemberStoryRequest,
+    inviteMembersDisabled: overrides.inviteMembersDisabled ?? false,
     isLoading: overrides.isLoading ?? false,
+    isListFetching: overrides.isListFetching ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
+    limit: overrides.limit ?? 25,
+    listErrorNoticeMessage: overrides.listErrorNoticeMessage ?? null,
     loadErrorMessage: overrides.loadErrorMessage ?? null,
-    members: overrides.members ?? OrganizationMembersStoryMembers,
+    memberAvatarsByUserId: overrides.memberAvatarsByUserId ?? new Map<string, MemberAvatar>(),
+    members,
     onChangeRole: overrides.onChangeRole ?? (() => {}),
     onInviteCompleted: overrides.onInviteCompleted ?? (async () => {}),
     onInviteDialogOpenChange: overrides.onInviteDialogOpenChange ?? (() => {}),
+    onFilterChange: overrides.onFilterChange ?? (() => {}),
+    onNextPage: overrides.onNextPage ?? (() => {}),
+    onPreviousPage: overrides.onPreviousPage ?? (() => {}),
+    onSearchValueChange: overrides.onSearchValueChange ?? (() => {}),
     onRemoveMember: overrides.onRemoveMember ?? (() => {}),
     onResendInvite: overrides.onResendInvite ?? (() => {}),
     onRevokeInvite: overrides.onRevokeInvite ?? (() => {}),
@@ -149,10 +166,11 @@ export function createOrganizationMembersSettingsPageStoryArgs(
     onRoleSelectValueChange: overrides.onRoleSelectValueChange ?? (() => {}),
     onSaveRole: overrides.onSaveRole ?? (() => {}),
     organizationId: overrides.organizationId ?? "org_storybook",
+    offset: overrides.offset ?? 0,
     pendingMemberOperation,
-    resolveInviterDisplayName:
-      overrides.resolveInviterDisplayName ?? resolveOrganizationMembersStoryInviterDisplayName,
     roleChangeDialog,
     roleUpdateErrorMessage: overrides.roleUpdateErrorMessage ?? null,
+    searchValue: overrides.searchValue ?? "",
+    total: overrides.total ?? members.length + invitations.length,
   };
 }

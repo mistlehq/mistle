@@ -4,6 +4,7 @@ import { isExistingSandboxSessionPath, isSessionsPath } from "./app-shell-sessio
 export function resolveAppShellRouteState(pathname: string): {
   inAutomations: boolean;
   inDashboardRoot: boolean;
+  inIntegrations: boolean;
   inSandboxProfiles: boolean;
   inSessionDetail: boolean;
   inSessions: boolean;
@@ -12,6 +13,7 @@ export function resolveAppShellRouteState(pathname: string): {
   return {
     inAutomations: pathname === "/automations" || pathname.startsWith("/automations/"),
     inDashboardRoot: pathname === "/",
+    inIntegrations: pathname === "/integrations" || pathname.startsWith("/integrations/"),
     inSandboxProfiles:
       pathname === "/sandbox-profiles" || pathname.startsWith("/sandbox-profiles/"),
     inSessionDetail: isExistingSandboxSessionPath(pathname),

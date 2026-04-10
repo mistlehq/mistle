@@ -154,6 +154,24 @@ export const ROUTE_HANDLES = {
     title: "Home",
     description: "",
   },
+  integrations: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Integrations",
+    title: "Integrations",
+    description: "",
+  },
+  integrationDetail: {
+    appShellInsetOwner: "child",
+    breadcrumb: resolveIntegrationDetailBreadcrumb,
+    title: resolveIntegrationDetailTitle,
+    description: resolveIntegrationDetailSubtitle,
+    headerIcon: resolveIntegrationDetailHeaderIcon,
+  },
+  integrationCallbackResult: {
+    breadcrumb: resolveIntegrationCallbackBreadcrumb,
+    title: "Integration callback result",
+    description: "Review integration connection callback outcome.",
+  },
   sessions: {
     breadcrumb: "Sessions",
     title: "Sessions",

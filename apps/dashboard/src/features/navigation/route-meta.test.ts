@@ -53,19 +53,18 @@ describe("route breadcrumb metadata", () => {
     const breadcrumbs = resolveAppBreadcrumbsFromMatches([
       {
         handle: {
-          breadcrumb: "Settings",
-          breadcrumbClickable: false,
+          breadcrumb: "Integrations",
         },
         params: {},
-        pathname: "/settings",
+        pathname: "/integrations",
       },
       {
         handle: {
-          breadcrumb: "Integrations",
-          breadcrumbTo: "/settings/organization/integrations",
+          breadcrumb: "Github",
+          breadcrumbTo: "/integrations/github",
         },
         params: {},
-        pathname: "/settings/organization/integrations",
+        pathname: "/integrations/github",
       },
       {
         handle: {
@@ -76,20 +75,20 @@ describe("route breadcrumb metadata", () => {
         params: {
           targetKey: "github",
         },
-        pathname: "/settings/organization/integrations/github/callback-result",
+        pathname: "/integrations/github/callback-result",
       },
     ]);
 
     expect(breadcrumbs).toEqual([
       {
         isCurrent: false,
-        label: "Settings",
-        to: null,
+        label: "Integrations",
+        to: "/integrations",
       },
       {
         isCurrent: false,
-        label: "Integrations",
-        to: "/settings/organization/integrations",
+        label: "Github",
+        to: "/integrations/github",
       },
       {
         isCurrent: true,
@@ -140,7 +139,7 @@ describe("route breadcrumb metadata", () => {
             description: "",
           },
           params: {},
-          pathname: "/settings/organization/integrations",
+          pathname: "/integrations",
         },
       ]),
     ).toEqual({
@@ -162,7 +161,7 @@ describe("route breadcrumb metadata", () => {
             headerIcon: () => "Custom icon",
           },
           params: {},
-          pathname: "/settings/organization/integrations/github-cloud",
+          pathname: "/integrations/github-cloud",
         },
       ]),
     ).toEqual({

@@ -38,12 +38,12 @@ use crate::pty::{
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
-    AGENT_STREAM_WINDOW_BYTES,
-    CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
-    CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
+    CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
+    CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
+    FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
     STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
     STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
@@ -180,6 +180,10 @@ enum TunnelSessionEvent {
     AgentMessage {
         stream_id: u32,
         message: Message,
+    },
+    AgentWriteCompleted {
+        stream_id: u32,
+        bytes: usize,
     },
     AgentClosed {
         stream_id: u32,
@@ -721,12 +725,23 @@ fn spawn_agent_stream_task(
                         });
                         return;
                     };
+                    let written_bytes = match &message {
+                        Message::Text(payload) => Some(payload.len()),
+                        Message::Binary(payload) => Some(payload.len()),
+                        _ => None,
+                    };
                     if let Err(error) = writer.send(message).await {
                         let _ = event_sender.send(TunnelSessionEvent::AgentClosed {
                             stream_id,
                             reason: Some(error.to_string()),
                         });
                         return;
+                    }
+                    if let Some(bytes) = written_bytes {
+                        let _ = event_sender.send(TunnelSessionEvent::AgentWriteCompleted {
+                            stream_id,
+                            bytes,
+                        });
                     }
                 }
                 message = reader.next() => {
@@ -923,13 +938,13 @@ async fn handle_tunnel_session_event(
                 Ok(runtime_socket) => {
                     let sender =
                         spawn_agent_stream_task(stream_id, runtime_socket, event_sender.clone());
-                        session_state.agent_streams.insert(
-                            stream_id,
-                            AgentStreamState {
-                                sender,
-                                send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
-                            },
-                        );
+                    session_state.agent_streams.insert(
+                        stream_id,
+                        AgentStreamState {
+                            sender,
+                            send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                        },
+                    );
                     write_tunnel_text(tunnel_writer_sender, stream_open_ok(stream_id))
                 }
                 Err(error) => write_tunnel_text(
@@ -1083,6 +1098,13 @@ async fn handle_tunnel_session_event(
             }
             _ => Ok(()),
         },
+        TunnelSessionEvent::AgentWriteCompleted { stream_id, bytes } => {
+            if !session_state.agent_streams.contains_key(&stream_id) {
+                return Ok(());
+            }
+
+            write_tunnel_text(tunnel_writer_sender, stream_window(stream_id, bytes))
+        }
         TunnelSessionEvent::AgentClosed { stream_id, reason } => {
             if session_state.agent_streams.remove(&stream_id).is_some() {
                 write_tunnel_text(
@@ -1961,6 +1983,11 @@ fn matches_signature(bytes: &[u8], offset: usize, signature: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::{
+        AgentStreamState, TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
+        TunnelWriterMessage, handle_tunnel_session_event,
+    };
+
     use std::collections::BTreeMap;
     use std::fs;
     use std::net::TcpListener;
@@ -1978,14 +2005,77 @@ mod tests {
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
-        DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        decode_stream_data_frame,
+        AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
+        PAYLOAD_KIND_WEBSOCKET_TEXT, StreamSendWindow, decode_stream_data_frame,
         encode_stream_data_frame,
     };
     use crate::tunnel::session::TunnelSession;
-    use crate::tunnel::telemetry::decode_telemetry_data_frame;
+    use crate::tunnel::telemetry::{TelemetryRelay, decode_telemetry_data_frame};
 
     static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(900);
+
+    #[tokio::test]
+    async fn restores_agent_stream_window_credit_after_runtime_writes_complete() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let runtime_env = BTreeMap::new();
+        let clock = SystemClock;
+        let sleeper = ThreadSleeper;
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_agent_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::from([(
+                7,
+                AgentStreamState {
+                    sender: agent_sender,
+                    send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                },
+            )]),
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+        let context = TunnelSessionLoopContext {
+            agent_endpoint_url: None,
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            runtime_env: &runtime_env,
+            sandbox_instance_id: "sbi_test",
+            clock: &clock,
+            sleeper: &sleeper,
+        };
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::AgentWriteCompleted {
+                stream_id: 7,
+                bytes: 512,
+            },
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("agent write completion should restore send credit");
+
+        let writer_message = tunnel_writer_receiver
+            .recv()
+            .await
+            .expect("window update should be queued");
+        let TunnelWriterMessage::Text(payload) = writer_message else {
+            panic!("expected a text stream.window update");
+        };
+        assert_eq!(
+            serde_json::from_str::<Value>(&payload).expect("window payload should be json"),
+            json!({
+                "type": "stream.window",
+                "streamId": 7,
+                "bytes": 512
+            })
+        );
+    }
+
     #[test]
     fn starts_live_tunnel_session_for_agent_and_file_upload_streams() {
         let upload_thread_id = format!(
@@ -2165,9 +2255,20 @@ mod tests {
                 .as_bytes(),
             )
             .expect("agent request frame should encode");
+            let request_payload_len = encoded_request.len() - 6;
             websocket
                 .send(Message::Binary(encoded_request.into()))
                 .expect("gateway should send agent request data");
+
+            let request_window = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                request_window,
+                json!({
+                    "type": "stream.window",
+                    "streamId": 7,
+                    "bytes": request_payload_len
+                })
+            );
 
             let agent_response = read_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);
@@ -2580,9 +2681,20 @@ mod tests {
                 .as_bytes(),
             )
             .expect("agent request frame should encode");
+            let request_payload_len = encoded_request.len() - 6;
             websocket
                 .send(Message::Binary(encoded_request.into()))
                 .expect("gateway should send agent request data");
+
+            let request_window = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                request_window,
+                json!({
+                    "type": "stream.window",
+                    "streamId": 7,
+                    "bytes": request_payload_len
+                })
+            );
 
             let agent_response = read_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);

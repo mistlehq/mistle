@@ -197,13 +197,13 @@ export async function listIntegrationConnections(
           const supportsWebhookSources =
             connection.config === null || definition?.webhookSource === undefined
               ? undefined
-              : await definition.webhookSource.supportsConnection?.({
+              : ((await definition.webhookSource.supportsConnection?.({
                   connection: {
                     id: connection.id,
                     status: connection.status,
                     config: connection.config,
                   },
-                });
+                })) ?? true);
 
           return {
             ...buildResourceSummary(connection, {

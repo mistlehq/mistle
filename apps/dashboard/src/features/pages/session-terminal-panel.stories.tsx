@@ -102,11 +102,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
 
   return renderSessionWorkbenchContentStory({
     alerts: [],
-    isSecondaryPanelVisible: isTerminalVisible,
-    mainContent: createStorySessionMainContent(),
-    onSecondaryPanelResize: setPanelSize,
-    primaryBottomPanel: createStorySessionBottomPanel(),
-    secondaryPanel: (
+    bottomPanel: (
       <SessionTerminalPanel
         isResumingSandbox={false}
         isConnectionReady={true}
@@ -125,7 +121,11 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
         sandboxInstanceId={StorySandboxInstanceId}
       />
     ),
-    secondaryPanelSize: panelSize,
+    bottomPanelSize: panelSize,
+    isBottomPanelVisible: isTerminalVisible,
+    mainContent: createStorySessionMainContent(),
+    onBottomPanelResize: setPanelSize,
+    primaryBottomPanel: createStorySessionBottomPanel(),
     sandboxInstanceId: StorySandboxInstanceId,
   });
 }

@@ -6,30 +6,23 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { MemberAvatarsResponseSchema } from "../schemas.js";
-import { ListMemberAvatarsParamsSchema, ListMemberAvatarsRequestBodySchema } from "./schema.js";
+import { InvitationsPageResponseSchema } from "../schemas.js";
+import { ListInvitationsParamsSchema, ListInvitationsQuerySchema } from "./schema.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/{organizationId}/member-avatars",
+  method: "get",
+  path: "/{organizationId}/invitations",
   tags: ["Organizations"],
   request: {
-    params: ListMemberAvatarsParamsSchema,
-    body: {
-      content: {
-        "application/json": {
-          schema: ListMemberAvatarsRequestBodySchema,
-        },
-      },
-      required: true,
-    },
+    params: ListInvitationsParamsSchema,
+    query: ListInvitationsQuerySchema,
   },
   responses: {
     200: {
-      description: "Batch avatar state for organization members.",
+      description: "Paginated organization invitations.",
       content: {
         "application/json": {
-          schema: MemberAvatarsResponseSchema,
+          schema: InvitationsPageResponseSchema,
         },
       },
     },

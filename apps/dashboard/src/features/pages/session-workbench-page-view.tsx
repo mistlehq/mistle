@@ -17,6 +17,10 @@ type SessionWorkbenchPageViewProps = {
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
+  bottomPanel: React.ReactNode;
+  bottomPanelSize: number;
+  onBottomPanelResize: (size: number) => void;
+  isBottomPanelVisible: boolean;
   secondaryPanel: React.ReactNode;
   secondaryPanelSize: number;
   onSecondaryPanelResize: (size: number) => void;
@@ -36,6 +40,10 @@ export function SessionWorkbenchPageView({
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContent,
   primaryBottomPanel,
+  bottomPanel,
+  bottomPanelSize,
+  onBottomPanelResize,
+  isBottomPanelVisible,
   secondaryPanel,
   secondaryPanelSize,
   onSecondaryPanelResize,
@@ -64,6 +72,47 @@ export function SessionWorkbenchPageView({
   const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
     ? "opacity-0 transition-opacity duration-200 ease-out"
     : "opacity-100 transition-opacity duration-200 ease-in";
+  const mainWorkspace = (
+    <div
+      className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
+    >
+      <div
+        aria-label="Conversation chat"
+        className={mainContentRegionClassName}
+        role="region"
+        style={mainContentScrollbarGutterStyle}
+      >
+        <div className={mainContentContainerClassName}>{mainContent}</div>
+      </div>
+
+      {!hasPrimaryBottomPanel ? null : (
+        <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+          <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+        </div>
+      )}
+    </div>
+  );
+  const workspaceWithBottomPanel = isBottomPanelVisible ? (
+    <ResizablePanelGroup className="min-h-0 h-full" orientation="vertical">
+      <ResizablePanel defaultSize={100 - bottomPanelSize} minSize={25}>
+        {mainWorkspace}
+      </ResizablePanel>
+      <ResizableHandle />
+      <ResizablePanel
+        defaultSize={bottomPanelSize}
+        minSize={15}
+        onResize={(panelSize) => {
+          onBottomPanelResize(panelSize.asPercentage);
+        }}
+      >
+        <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
+          <div className="h-full w-full">{bottomPanel}</div>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
+  ) : (
+    mainWorkspace
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -81,27 +130,10 @@ export function SessionWorkbenchPageView({
         <ResizablePanelGroup
           className="min-h-0 flex-1"
           key={sandboxInstanceId}
-          orientation="vertical"
+          orientation="horizontal"
         >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
-            <div
-              className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
-            >
-              <div
-                aria-label="Conversation chat"
-                className={mainContentRegionClassName}
-                role="region"
-                style={mainContentScrollbarGutterStyle}
-              >
-                <div className={mainContentContainerClassName}>{mainContent}</div>
-              </div>
-
-              {!hasPrimaryBottomPanel ? null : (
-                <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-                  <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-                </div>
-              )}
-            </div>
+            {workspaceWithBottomPanel}
           </ResizablePanel>
           <ResizableHandle />
           <ResizablePanel
@@ -117,24 +149,7 @@ export function SessionWorkbenchPageView({
           </ResizablePanel>
         </ResizablePanelGroup>
       ) : (
-        <>
-          <div
-            aria-label="Conversation chat"
-            className={`${mainContentRegionClassName} ${primaryPanelTransitionClassName}`}
-            role="region"
-            style={mainContentScrollbarGutterStyle}
-          >
-            <div className={mainContentContainerClassName}>{mainContent}</div>
-          </div>
-
-          {!hasPrimaryBottomPanel ? null : (
-            <div
-              className={`bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm ${primaryPanelTransitionClassName}`}
-            >
-              <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
-            </div>
-          )}
-        </>
+        workspaceWithBottomPanel
       )}
     </div>
   );

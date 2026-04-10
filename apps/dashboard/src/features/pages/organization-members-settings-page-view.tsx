@@ -1,64 +1,29 @@
-import { Notice } from "@mistle/ui";
+import { Button, Notice, Tabs, TabsList, TabsTrigger } from "@mistle/ui";
 
 import { MemberInviteDialog } from "../settings/members/member-invite-dialog.js";
 import { MemberRoleChangeDialog } from "../settings/members/member-role-change-dialog.js";
-import type {
-  MembershipCapabilities,
-  SettingsInvitation,
-  SettingsMember,
-} from "../settings/members/members-api.js";
 import { canManageInvitations } from "../settings/members/members-capability-policy.js";
-import type { RoleChangeDialogState } from "../settings/members/members-capability-policy.js";
-import type {
-  MembersDirectoryInvitationActionState,
-  MembersDirectoryPendingMemberOperation,
-} from "../settings/members/members-directory-model.js";
 import { MembersDirectoryTable } from "../settings/members/members-directory-table.js";
+import { clampMembersDirectoryOffset } from "../settings/members/members-pagination.js";
 import {
   MembersLoadErrorState,
   MembersLoadingState,
 } from "../settings/members/members-query-states.js";
+import type { OrganizationMembersSettingsPageViewModel } from "../settings/members/organization-members-settings-view-model.js";
+import { TableListingFooter } from "../shared/table-listing-footer.js";
+import { TablePagination } from "../shared/table-pagination.js";
 
-export type OrganizationMembersSettingsPageViewProps = {
-  capabilities: MembershipCapabilities | null;
-  capabilitiesErrorMessage: string | null;
-  invitationActionState: MembersDirectoryInvitationActionState;
-  invitations: SettingsInvitation[];
-  inviteDialogOpen: boolean;
-  inviteMemberRequest: (request: {
-    organizationId: string;
-    email: string;
-    role: MembershipCapabilities["actorRole"];
-  }) => Promise<{
-    status: string | null;
-    message: string | null;
-    code: string | null;
-    raw: unknown;
-  }>;
-  isLoading: boolean;
-  isUpdatingRole: boolean;
-  loadErrorMessage: string | null;
-  members: SettingsMember[];
-  onChangeRole: (member: SettingsMember) => void;
-  onInviteCompleted: () => Promise<void>;
-  onInviteDialogOpenChange: (nextOpen: boolean) => void;
-  onRemoveMember: (member: SettingsMember) => void;
-  onResendInvite: (invitation: SettingsInvitation) => void;
-  onRevokeInvite: (invitation: SettingsInvitation) => void;
-  onRoleDialogCancel: () => void;
-  onRoleDialogOpenChange: (nextOpen: boolean) => void;
-  onRoleSelectValueChange: (nextRoleValue: string | null) => void;
-  onSaveRole: () => void;
-  organizationId: string;
-  pendingMemberOperation: MembersDirectoryPendingMemberOperation;
-  resolveInviterDisplayName: (inviterId: string) => string;
-  roleChangeDialog: RoleChangeDialogState | null;
-  roleUpdateErrorMessage: string | null;
-};
+export function OrganizationMembersSettingsPageView(input: {
+  viewModel: OrganizationMembersSettingsPageViewModel;
+}): React.JSX.Element {
+  const props = input.viewModel;
+  const visibleRowCount = props.members.length + props.invitations.length;
+  const visibleOffset = clampMembersDirectoryOffset({
+    limit: props.limit,
+    offset: props.offset,
+    total: props.total,
+  });
 
-export function OrganizationMembersSettingsPageView(
-  props: OrganizationMembersSettingsPageViewProps,
-): React.JSX.Element {
   if (props.isLoading) {
     return <MembersLoadingState />;
   }
@@ -77,20 +42,74 @@ export function OrganizationMembersSettingsPageView(
           </Notice>
         </div>
       ) : null}
+      {props.listErrorNoticeMessage ? (
+        <Notice title="Could not refresh directory" variant="alert">
+          {props.listErrorNoticeMessage} Please try again later.
+        </Notice>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-3">
+        <Tabs
+          onValueChange={(nextValue) => {
+            if (nextValue === "members" || nextValue === "invitations") {
+              props.onFilterChange(nextValue);
+            }
+          }}
+          value={props.activeFilter}
+        >
+          <TabsList variant="line">
+            <TabsTrigger value="members">Active</TabsTrigger>
+            <TabsTrigger value="invitations">Invited</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Button
+          disabled={props.inviteMembersDisabled}
+          onClick={() => {
+            props.onInviteDialogOpenChange(true);
+          }}
+          type="button"
+        >
+          Invite members
+        </Button>
+      </div>
 
       <MembersDirectoryTable
+        activeFilter={props.activeFilter}
         capabilities={props.capabilities}
         canManageInvitations={canManageInvitations(props.capabilities)}
         invitationActionState={props.invitationActionState}
         invitations={props.invitations}
+        memberAvatarsByUserId={props.memberAvatarsByUserId}
         members={props.members}
-        organizationId={props.organizationId}
         onChangeRole={props.onChangeRole}
         onRemoveMember={props.onRemoveMember}
         onResendInvite={props.onResendInvite}
         onRevokeInvite={props.onRevokeInvite}
+        onSearchValueChange={props.onSearchValueChange}
         pendingMemberOperation={props.pendingMemberOperation}
-        resolveInviterDisplayName={props.resolveInviterDisplayName}
+        searchValue={props.searchValue}
+      />
+      <TableListingFooter
+        pagination={
+          <TablePagination
+            hasNextPage={props.hasNextPage}
+            hasPreviousPage={props.hasPreviousPage}
+            nextPageDisabled={props.isListFetching}
+            onNextPage={props.onNextPage}
+            onPreviousPage={props.onPreviousPage}
+            previousPageDisabled={props.isListFetching}
+          />
+        }
+        resultsCount={
+          <p className="text-muted-foreground text-sm">
+            {props.total === 0
+              ? "Showing 0 results"
+              : `Showing ${visibleOffset + 1}-${Math.min(
+                  visibleOffset + visibleRowCount,
+                  props.total,
+                )} of ${props.total}`}
+          </p>
+        }
       />
 
       <MemberInviteDialog
