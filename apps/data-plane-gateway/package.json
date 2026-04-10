@@ -27,7 +27,7 @@
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
-    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api": "^1.9.1",
     "hono": "^4.12.9",
     "pg": "^8.20.0",
     "redis": "^5.11.0",
