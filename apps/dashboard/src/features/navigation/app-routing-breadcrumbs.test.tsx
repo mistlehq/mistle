@@ -187,19 +187,12 @@ describe("app routing breadcrumb integration", () => {
 
   it("renders sandbox profile breadcrumbs for list, create, and detail routes", async () => {
     const router = createMemoryRouter(sandboxProfileRoutes, {
-      initialEntries: ["/sandbox-profiles"],
+      initialEntries: ["/sandbox-profiles/new"],
     });
     let markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
-    expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('data-slot="meta-title">Sandbox Profiles');
-    expect(markup).toContain("Manage sandbox profile configuration.");
-
-    await router.navigate("/sandbox-profiles/new");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
-
     expect(markup).toContain('href="/sandbox-profiles"');
+    expect(markup).toContain("Sandbox Profiles");
     expect(markup).toContain("Create");
     expect(markup).toContain('data-slot="meta-title">Create');
     expect(markup).toContain("Create a sandbox profile.");

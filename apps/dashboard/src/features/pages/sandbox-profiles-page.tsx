@@ -23,8 +23,8 @@ import {
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SyntheticEvent } from "react";
-import { useEffect, useState } from "react";
-import { useMatch, useNavigate, useSearchParams } from "react-router";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatSandboxProfileUpdatedAt } from "../sandbox-profiles/sandbox-profiles-formatters.js";
@@ -73,9 +73,9 @@ export function SandboxProfilesPage(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [createProfileDisplayName, setCreateProfileDisplayName] = useState("");
   const [createProfileError, setCreateProfileError] = useState<string | null>(null);
-  const isCreateDialogOpen = useMatch("/sandbox-profiles/new") !== null;
 
   const limit = parseListLimit(searchParams.get("limit"));
   const after = parseCursor(searchParams.get("after"));
@@ -106,6 +106,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
     onSuccess: async (createdProfile) => {
       setCreateProfileError(null);
       setCreateProfileDisplayName("");
+      setIsCreateDialogOpen(false);
       await queryClient.invalidateQueries({
         queryKey: ["sandbox-profiles"],
       });
@@ -124,10 +125,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
   function openCreateDialog(): void {
     setCreateProfileDisplayName("");
     setCreateProfileError(null);
-    void navigate({
-      pathname: "/sandbox-profiles/new",
-      search: searchParams.toString(),
-    });
+    setIsCreateDialogOpen(true);
   }
 
   function closeCreateDialog(): void {
@@ -137,20 +135,8 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
     setCreateProfileDisplayName("");
     setCreateProfileError(null);
-    void navigate({
-      pathname: "/sandbox-profiles",
-      search: searchParams.toString(),
-    });
+    setIsCreateDialogOpen(false);
   }
-
-  useEffect(() => {
-    if (!isCreateDialogOpen) {
-      return;
-    }
-
-    setCreateProfileDisplayName("");
-    setCreateProfileError(null);
-  }, [isCreateDialogOpen]);
 
   function onCreateProfileDisplayNameChange(nextValue: string): void {
     setCreateProfileDisplayName(nextValue);
