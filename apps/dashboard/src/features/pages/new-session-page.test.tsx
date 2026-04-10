@@ -56,6 +56,7 @@ function createNewSessionPageQueryClient(input?: {
 
 function renderNewSessionPage(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+  previewState?: Parameters<typeof NewSessionPage>[0]["previewState"];
 }) {
   const queryClient = createNewSessionPageQueryClient(input);
 
@@ -63,7 +64,18 @@ function renderNewSessionPage(input?: {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/sessions/new"]}>
         <Routes>
-          <Route element={<NewSessionPage />} path="/sessions/new" />
+          <Route
+            element={
+              <NewSessionPage
+                {...(input?.previewState === undefined
+                  ? {}
+                  : {
+                      previewState: input.previewState,
+                    })}
+              />
+            }
+            path="/sessions/new"
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -82,7 +94,7 @@ describe("NewSessionPage", () => {
 
     expect(screen.getByRole("heading", { name: "Start new session" })).toBeDefined();
     expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
   });
 
   it("shows the selected profile display name in the combobox input", () => {
@@ -111,5 +123,125 @@ describe("NewSessionPage", () => {
     expect(screen.getByText("No launchable sandbox profiles are available yet.")).toBeDefined();
     expect(screen.queryByRole("combobox", { name: "Sandbox profile" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Start" })).toBeNull();
+  });
+
+  it("shows the starting repository picker in preview mode for a selected multi-repo profile", () => {
+    renderNewSessionPage({
+      previewState: {
+        initialSelectedProfileId: "sbp_profile_alpha",
+        repositoryOptionsByProfileId: {
+          sbp_profile_alpha: [
+            {
+              value: "/start/repo-1",
+              label: "acme/repo-1",
+            },
+            {
+              value: "/start/repo-2",
+              label: "acme/repo-2",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
+    expect(
+      (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
+    ).toBe("acme/repo-1");
+    expect(
+      screen.getByText((content) => content.includes("The agent will start its session in")),
+    ).toBeDefined();
+    expect(screen.getByText("/start/repo-1")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Git, diffs, and repo-local instructions will use this repository by default.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("preselects the only repository when the selected profile has a single repo", () => {
+    renderNewSessionPage({
+      previewState: {
+        initialSelectedProfileId: "sbp_profile_alpha",
+        repositoryOptionsByProfileId: {
+          sbp_profile_alpha: [
+            {
+              value: "/start/repo-1",
+              label: "acme/repo-1",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(
+      (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
+    ).toBe("acme/repo-1");
+    expect(screen.getByText("/start/repo-1")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Git, diffs, and repo-local instructions will use this repository by default.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("shows none as the only starting location when the selected profile has no repositories", () => {
+    renderNewSessionPage({
+      previewState: {
+        initialSelectedProfileId: "sbp_profile_alpha",
+        repositoryOptionsByProfileId: {},
+      },
+    });
+
+    expect(
+      (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
+    ).toBe("None");
+    expect(screen.getByText("/root")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Git, diffs, and repo-local instructions will not be tied to a specific repository by default.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("shows the selected repository sandbox path when a repository is chosen", () => {
+    const rendered = renderNewSessionPage({
+      previewState: {
+        initialSelectedProfileId: "sbp_profile_alpha",
+        repositoryOptionsByProfileId: {
+          sbp_profile_alpha: [
+            {
+              value: "/root/acme/repo-1",
+              label: "acme/repo-1",
+            },
+            {
+              value: "/root/acme/repo-2",
+              label: "acme/repo-2",
+            },
+          ],
+        },
+      },
+    });
+
+    const locationTriggerButton = rendered.container.querySelectorAll(
+      'button[data-slot="input-group-button"]',
+    )[1];
+
+    if (locationTriggerButton === undefined) {
+      throw new Error("Expected starting location trigger button.");
+    }
+
+    fireEvent.click(locationTriggerButton);
+    fireEvent.click(screen.getByRole("option", { name: "acme/repo-2" }));
+
+    expect(
+      (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement).value,
+    ).toBe("acme/repo-2");
+    expect(screen.getByText("/root/acme/repo-2")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Git, diffs, and repo-local instructions will use this repository by default.",
+      ),
+    ).toBeDefined();
   });
 });
