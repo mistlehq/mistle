@@ -24,7 +24,7 @@ describe("MemberInviteDialog interaction", () => {
         onCompleted={async () => {}}
         onOpenChange={() => {}}
         open
-        organizationId="org_1"
+        activeOrganizationId="org_1"
       />,
     );
 

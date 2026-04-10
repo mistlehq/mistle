@@ -122,7 +122,7 @@ export function OrganizationMembersSettingsPageView(input: {
         onCompleted={props.onInviteCompleted}
         onOpenChange={props.onInviteDialogOpenChange}
         open={props.inviteDialogOpen}
-        organizationId={props.organizationId}
+        activeOrganizationId={props.activeOrganizationId}
       />
 
       <MemberRoleChangeDialog

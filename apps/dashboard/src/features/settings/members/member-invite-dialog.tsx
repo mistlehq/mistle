@@ -32,7 +32,7 @@ export { canRetryFailedInvites, canSendInvites } from "./use-member-invite-form.
 export function MemberInviteDialog(input: {
   open: boolean;
   canExecute: boolean;
-  organizationId: string;
+  activeOrganizationId: string;
   assignableRoles: OrganizationRole[];
   inviteMemberRequest: (request: {
     organizationId: string;
@@ -59,7 +59,7 @@ export function MemberInviteDialog(input: {
 
   return (
     <OpenMemberInviteDialog
-      key={`${input.organizationId}:${input.assignableRoles.join(",")}`}
+      key={`${input.activeOrganizationId}:${input.assignableRoles.join(",")}`}
       {...input}
     />
   );
@@ -67,7 +67,7 @@ export function MemberInviteDialog(input: {
 
 function OpenMemberInviteDialog(input: {
   canExecute: boolean;
-  organizationId: string;
+  activeOrganizationId: string;
   assignableRoles: OrganizationRole[];
   inviteMemberRequest: (request: {
     organizationId: string;
@@ -80,7 +80,7 @@ function OpenMemberInviteDialog(input: {
   const form = useMemberInviteForm({
     canExecute: input.canExecute,
     assignableRoles: input.assignableRoles,
-    organizationId: input.organizationId,
+    activeOrganizationId: input.activeOrganizationId,
     inviteMemberRequest: input.inviteMemberRequest,
   });
 

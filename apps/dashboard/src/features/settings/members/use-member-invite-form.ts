@@ -103,7 +103,7 @@ export function resolveDefaultInviteRole(
 export function useMemberInviteForm(input: {
   canExecute: boolean;
   assignableRoles: OrganizationRole[];
-  organizationId: string;
+  activeOrganizationId: string;
   inviteMemberRequest: (request: {
     organizationId: string;
     email: string;
@@ -231,7 +231,7 @@ export function useMemberInviteForm(input: {
 
         try {
           const response = await input.inviteMemberRequest({
-            organizationId: input.organizationId,
+            organizationId: input.activeOrganizationId,
             email: target.normalizedEmail,
             role: selectedRole,
           });
