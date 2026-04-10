@@ -17,7 +17,7 @@ export function buildGitHubWebhookCallbackUrl(input: {
   targetKey: string;
   endpointKey: string;
 }): string {
-  return `${input.controlPlaneBaseUrl}/v1/integration/webhooks/${input.targetKey}/${input.endpointKey}`;
+  return `${input.controlPlaneBaseUrl}/p/integration/webhooks/${input.targetKey}/${input.endpointKey}`;
 }
 
 export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<

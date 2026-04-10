@@ -102,7 +102,7 @@ describe("integration connection webhook sources integration", () => {
       targetKey,
       integrationConnectionId: createdConnection.id,
     });
-    expect(body[0]?.callbackUrl).toContain(`/v1/integration/webhooks/${targetKey}/`);
+    expect(body[0]?.callbackUrl).toContain(`/p/integration/webhooks/${targetKey}/`);
     expect(body[0]?.endpointKey).toBeTruthy();
 
     const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({

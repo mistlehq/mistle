@@ -347,7 +347,7 @@ describe("integration registry", () => {
         async describeSource(input) {
           return {
             displayName: input.source.displayName ?? "GitHub App webhook",
-            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            callbackUrl: `/p/integration/webhooks/${input.targetKey}`,
             providerMetadata: input.source.providerMetadata,
           };
         },
@@ -386,7 +386,7 @@ describe("integration registry", () => {
         async describeSource(input) {
           return {
             displayName: input.source.displayName ?? "GitHub App webhook",
-            callbackUrl: `/v1/integration/webhooks/${input.targetKey}`,
+            callbackUrl: `/p/integration/webhooks/${input.targetKey}`,
             providerMetadata: input.source.providerMetadata,
           };
         },

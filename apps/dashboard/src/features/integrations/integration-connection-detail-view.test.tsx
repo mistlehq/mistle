@@ -374,7 +374,7 @@ describe("IntegrationConnectionDetailView", () => {
                     displayName: "Primary Jira webhook",
                     endpointKey: "ep_jira_123",
                     callbackUrl:
-                      "https://control-plane.example.com/v1/integration/webhooks/jira-default/ep_jira_123",
+                      "https://control-plane.example.com/p/integration/webhooks/jira-default/ep_jira_123",
                     remoteRegistrationId: "10001",
                     status: "active",
                     providerMetadata: {},
@@ -458,7 +458,7 @@ describe("IntegrationConnectionDetailView", () => {
                     displayName: "GitHub App webhook",
                     endpointKey: "ep_github_123",
                     callbackUrl:
-                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
+                      "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
                     status: "active",
                     providerMetadata: {},
                     createdAt: "2026-04-03T00:00:00.000Z",
@@ -490,7 +490,7 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
     expect(
       screen.getAllByText(
-        "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
+        "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
       ),
     ).toHaveLength(2);
     expect(
@@ -546,7 +546,7 @@ describe("IntegrationConnectionDetailView", () => {
                     displayName: "GitHub App webhook",
                     endpointKey: "ep_github_123",
                     callbackUrl:
-                      "https://control-plane.example.com/v1/integration/webhooks/github-cloud/ep_github_123",
+                      "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
                     status: "active",
                     providerMetadata: {},
                     createdAt: "2026-04-03T00:00:00.000Z",

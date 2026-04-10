@@ -1,4 +1,4 @@
-export const INTEGRATION_WEBHOOKS_ROUTE_BASE_PATH = "/v1/integration/webhooks";
+export const INTEGRATION_WEBHOOKS_ROUTE_BASE_PATH = "/p/integration/webhooks";
 
 export const IntegrationWebhooksBadRequestCodes = {
   INVALID_WEBHOOK_REQUEST: "INVALID_WEBHOOK_REQUEST",

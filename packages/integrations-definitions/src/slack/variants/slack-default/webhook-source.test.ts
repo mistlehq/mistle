@@ -10,6 +10,6 @@ describe("slack webhook source helpers", () => {
         targetKey: "slack-default",
         endpointKey: "ep_slack_123",
       }),
-    ).toBe("https://control-plane.mistle.test/v1/integration/webhooks/slack-default/ep_slack_123");
+    ).toBe("https://control-plane.mistle.test/p/integration/webhooks/slack-default/ep_slack_123");
   });
 });

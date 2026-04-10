@@ -54,7 +54,7 @@ function createDirectoryData(input?: {
         displayName: "Linear Workspace webhook",
         endpointKey: "ep_linear",
         callbackUrl:
-          "https://control-plane.example.com/v1/integration/webhooks/linear-cloud/ep_linear",
+          "https://control-plane.example.com/p/integration/webhooks/linear-cloud/ep_linear",
         remoteRegistrationId: "whk_linear",
         status: "active" as const,
         providerMetadata: {},

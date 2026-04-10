@@ -5597,7 +5597,7 @@
         }
       }
     },
-    "/v1/integration/webhooks/:targetKey/:endpointKey": {
+    "/p/integration/webhooks/:targetKey/:endpointKey": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
