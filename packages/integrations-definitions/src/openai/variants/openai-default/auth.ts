@@ -27,7 +27,7 @@ export const OpenAiChatGptDeviceCodeConnectionConfigSchema = z
   .object({
     connection_method: z.literal(OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE),
     auth_mode: z.literal("chatgpt"),
-    chatgpt_account_id: z.string().min(1),
+    chatgpt_account_id: z.string().min(1).optional(),
     chatgpt_plan_type: z.string().min(1).optional(),
   })
   .strict();

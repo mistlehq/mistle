@@ -128,7 +128,9 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
               connectionConfig: input.connection.config,
             }),
           },
-          ...(connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
+          ...(connectionConfig.connection_method ===
+            OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE &&
+          connectionConfig.chatgpt_account_id !== undefined
             ? {
                 additionalHeaders: {
                   "ChatGPT-Account-ID": connectionConfig.chatgpt_account_id,
