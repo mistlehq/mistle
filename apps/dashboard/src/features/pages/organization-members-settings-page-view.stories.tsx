@@ -13,6 +13,7 @@ import { OrganizationMembersSettingsPageView } from "./organization-members-sett
 import {
   createOrganizationMembersStoryRoleChangeDialog,
   createOrganizationMembersSettingsPageStoryRoleViewModel,
+  OrganizationMembersStoryMembers,
   type OrganizationMembersStoryViewerRole,
   OrganizationMembersStoryInvitations,
 } from "./organization-members-settings-page-view.story-fixtures.js";
@@ -73,6 +74,116 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+function filterStoryMembers(searchValue: string) {
+  const normalizedSearch = searchValue.trim().toLowerCase();
+  if (normalizedSearch.length === 0) {
+    return OrganizationMembersStoryMembers;
+  }
+
+  return OrganizationMembersStoryMembers.filter((member) => {
+    return (
+      member.name.toLowerCase().includes(normalizedSearch) ||
+      member.email.toLowerCase().includes(normalizedSearch) ||
+      member.role.toLowerCase().includes(normalizedSearch)
+    );
+  });
+}
+
+function filterStoryInvitations(searchValue: string) {
+  const normalizedSearch = searchValue.trim().toLowerCase();
+  if (normalizedSearch.length === 0) {
+    return OrganizationMembersStoryInvitations;
+  }
+
+  return OrganizationMembersStoryInvitations.filter((invitation) => {
+    return (
+      invitation.email.toLowerCase().includes(normalizedSearch) ||
+      invitation.role.toLowerCase().includes(normalizedSearch) ||
+      invitation.status.toLowerCase().includes(normalizedSearch) ||
+      invitation.inviterName.toLowerCase().includes(normalizedSearch)
+    );
+  });
+}
+
+function renderInteractiveStory(
+  args: OrganizationMembersSettingsPageStoryProps,
+): React.JSX.Element {
+  const [activeFilter, setActiveFilter] = useState<"members" | "invitations">(
+    args.viewModelOverrides?.activeFilter ?? "members",
+  );
+  const [searchValue, setSearchValue] = useState(args.viewModelOverrides?.searchValue ?? "");
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(
+    args.viewModelOverrides?.inviteDialogOpen ?? false,
+  );
+  const [roleChangeDialog, setRoleChangeDialog] = useState<RoleChangeDialogState | null>(
+    args.viewModelOverrides?.roleChangeDialog ?? null,
+  );
+  const [invitationActionState, setInvitationActionState] =
+    useState<MembersDirectoryInvitationActionState>(
+      args.viewModelOverrides?.invitationActionState ?? null,
+    );
+
+  const filteredMembers = filterStoryMembers(searchValue);
+  const filteredInvitations = filterStoryInvitations(searchValue);
+  const visibleMembers = activeFilter === "members" ? filteredMembers : [];
+  const visibleInvitations = activeFilter === "invitations" ? filteredInvitations : [];
+  const total = activeFilter === "members" ? filteredMembers.length : filteredInvitations.length;
+
+  return (
+    <OrganizationMembersSettingsPageView
+      viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
+        viewerRole: args.viewerRole,
+        overrides: {
+          ...args.viewModelOverrides,
+          activeFilter,
+          invitations: visibleInvitations,
+          invitationActionState,
+          inviteDialogOpen,
+          members: visibleMembers,
+          onChangeRole: (member) => {
+            setRoleChangeDialog({
+              member,
+              selectedRole: member.role === "member" ? "admin" : member.role,
+              allowedRoles: ["admin", "member"],
+            });
+          },
+          onFilterChange: setActiveFilter,
+          onInviteDialogOpenChange: setInviteDialogOpen,
+          onResendInvite: (invitation) => {
+            setInvitationActionState({
+              invitationId: invitation.id,
+              action: "resend_invite",
+              phase: "completed",
+            });
+          },
+          onRevokeInvite: (invitation) => {
+            setInvitationActionState({
+              invitationId: invitation.id,
+              action: "revoke_invitation",
+              phase: "completed",
+            });
+          },
+          onRoleDialogCancel: () => {
+            setRoleChangeDialog(null);
+          },
+          onRoleDialogOpenChange: (nextOpen) => {
+            if (!nextOpen) {
+              setRoleChangeDialog(null);
+            }
+          },
+          onSaveRole: () => {
+            setRoleChangeDialog(null);
+          },
+          onSearchValueChange: setSearchValue,
+          roleChangeDialog,
+          searchValue,
+          total,
+        },
+      })}
+    />
+  );
+}
+
 export const Loading: Story = {
   args: {
     viewModelOverrides: {
@@ -89,24 +200,8 @@ export const LoadError: Story = {
   },
 };
 
-export const Default: Story = {};
-
-export const Owner: Story = {
-  args: {
-    viewerRole: "owner",
-  },
-};
-
-export const Admin: Story = {
-  args: {
-    viewerRole: "admin",
-  },
-};
-
-export const Member: Story = {
-  args: {
-    viewerRole: "member",
-  },
+export const Default: Story = {
+  render: renderInteractiveStory,
 };
 
 export const Invited: Story = {
@@ -165,58 +260,7 @@ export const PendingActions: Story = {
 };
 
 export const InteractiveFiltering: Story = {
-  render: function RenderStory(args): React.JSX.Element {
-    const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-    const [roleChangeDialog, setRoleChangeDialog] = useState<RoleChangeDialogState | null>(null);
-    const [invitationActionState, setInvitationActionState] =
-      useState<MembersDirectoryInvitationActionState>(null);
-
-    return (
-      <OrganizationMembersSettingsPageView
-        viewModel={createOrganizationMembersSettingsPageStoryRoleViewModel({
-          viewerRole: args.viewerRole,
-          overrides: {
-            invitationActionState,
-            inviteDialogOpen,
-            onChangeRole: (member) => {
-              setRoleChangeDialog({
-                member,
-                selectedRole: member.role === "member" ? "admin" : member.role,
-                allowedRoles: ["admin", "member"],
-              });
-            },
-            onInviteDialogOpenChange: setInviteDialogOpen,
-            onResendInvite: (invitation) => {
-              setInvitationActionState({
-                invitationId: invitation.id,
-                action: "resend_invite",
-                phase: "completed",
-              });
-            },
-            onRevokeInvite: (invitation) => {
-              setInvitationActionState({
-                invitationId: invitation.id,
-                action: "revoke_invitation",
-                phase: "completed",
-              });
-            },
-            onRoleDialogCancel: () => {
-              setRoleChangeDialog(null);
-            },
-            onRoleDialogOpenChange: (nextOpen) => {
-              if (!nextOpen) {
-                setRoleChangeDialog(null);
-              }
-            },
-            onSaveRole: () => {
-              setRoleChangeDialog(null);
-            },
-            roleChangeDialog,
-          },
-        })}
-      />
-    );
-  },
+  render: renderInteractiveStory,
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
 
