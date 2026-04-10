@@ -17,7 +17,7 @@ import type { OrganizationMembersSettingsPageViewModel } from "./organization-me
 import { useMembersMutations } from "./use-members-mutations.js";
 
 type UseOrganizationMembersSettingsState = {
-  organizationId: string;
+  activeOrganizationId: string;
   api?: MembersSettingsApi;
 };
 
@@ -55,19 +55,15 @@ export function useOrganizationMembersSettingsState(
   const [searchValue, setSearchValue] = useState("");
   const [offset, setOffset] = useState(0);
 
-  const queryKeys = buildMembersQueryKeys(input.organizationId);
+  const queryKeys = buildMembersQueryKeys(input.activeOrganizationId);
   const capabilitiesQuery = useQuery({
     queryKey: queryKeys.capabilities,
-    queryFn: async () =>
-      api.getMembershipCapabilities({
-        organizationId: input.organizationId,
-      }),
+    queryFn: async () => api.getMembershipCapabilities(),
   });
   const membersQuery = useQuery({
     queryKey: [...queryKeys.members, membersDirectoryPageLimit, offset, searchValue],
     queryFn: async () =>
       api.listMembersPage({
-        organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
         offset,
         search: searchValue,
@@ -79,7 +75,6 @@ export function useOrganizationMembersSettingsState(
     queryKey: [...queryKeys.invitations, membersDirectoryPageLimit, offset, searchValue],
     queryFn: async () =>
       api.listInvitationsPage({
-        organizationId: input.organizationId,
         limit: membersDirectoryPageLimit,
         offset,
         search: searchValue,
@@ -94,7 +89,7 @@ export function useOrganizationMembersSettingsState(
     membersQuery,
   });
   const mutations = useMembersMutations({
-    organizationId: input.organizationId,
+    activeOrganizationId: input.activeOrganizationId,
     api,
     queryClient,
     queryKeys,
@@ -210,7 +205,7 @@ export function useOrganizationMembersSettingsState(
       setSearchValue(nextValue);
       setOffset(0);
     },
-    organizationId: input.organizationId,
+    activeOrganizationId: input.activeOrganizationId,
     offset,
     pendingMemberOperation,
     roleChangeDialog,

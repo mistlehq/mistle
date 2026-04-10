@@ -33,31 +33,31 @@ type OrganizationFormState = {
 };
 
 function settingsOrganizationGeneralQueryKey(
-  organizationId: string,
+  activeOrganizationId: string,
 ): readonly ["settings", "organization-general", string] {
   return [
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[0],
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[1],
-    organizationId,
+    activeOrganizationId,
   ];
 }
 
 export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
-  const organizationId = useRequiredOrganizationId();
+  const activeOrganizationId = useRequiredOrganizationId();
   const [organizationLogoOperationErrorMessage, setOrganizationLogoOperationErrorMessage] =
     useState<string | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "General");
 
   const organizationQuery = useQuery({
-    queryKey: settingsOrganizationGeneralQueryKey(organizationId),
+    queryKey: settingsOrganizationGeneralQueryKey(activeOrganizationId),
     queryFn: async () =>
       getOrganizationGeneral({
-        organizationId,
+        organizationId: activeOrganizationId,
       }),
   });
-  const organizationLogoQuery = useOrganizationLogoQuery(organizationId);
+  const organizationLogoQuery = useOrganizationLogoQuery(activeOrganizationId);
 
   const saveMutation = useMutation({
     mutationFn: async (nextState: OrganizationFormState) => {
@@ -67,7 +67,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       }
 
       return updateOrganizationGeneral({
-        organizationId,
+        organizationId: activeOrganizationId,
         name: nextState.name,
         slug: currentOrganization.slug,
       });
@@ -78,7 +78,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         throw new Error("Organization settings data is required.");
       }
 
-      queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
+      queryClient.setQueryData(organizationSummaryQueryKey(activeOrganizationId), {
         name: variables.name,
         slug: currentOrganization.slug,
       });
@@ -86,28 +86,24 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       const refetched = await organizationQuery.refetch();
       const latest = refetched.data;
       if (latest) {
-        queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
+        queryClient.setQueryData(organizationSummaryQueryKey(activeOrganizationId), {
           name: latest.name,
           slug: latest.slug,
         });
       }
 
       await queryClient.invalidateQueries({
-        queryKey: organizationSummaryQueryKey(organizationId),
+        queryKey: organizationSummaryQueryKey(activeOrganizationId),
       });
     },
   });
   const uploadOrganizationLogoMutation = useMutation({
-    mutationFn: async (file: File) =>
-      uploadOrganizationLogo({
-        organizationId,
-        file,
-      }),
+    mutationFn: async (file: File) => uploadOrganizationLogo({ file }),
     onMutate: async () => {
       setOrganizationLogoOperationErrorMessage(null);
     },
     onSuccess: async (result) => {
-      queryClient.setQueryData(organizationLogoQueryKey(organizationId), result);
+      queryClient.setQueryData(organizationLogoQueryKey(activeOrganizationId), result);
       setOrganizationLogoOperationErrorMessage(null);
     },
     onError: (error) => {
@@ -120,15 +116,12 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     },
   });
   const deleteOrganizationLogoMutation = useMutation({
-    mutationFn: async () =>
-      deleteOrganizationLogo({
-        organizationId,
-      }),
+    mutationFn: async () => deleteOrganizationLogo(),
     onMutate: async () => {
       setOrganizationLogoOperationErrorMessage(null);
     },
     onSuccess: async () => {
-      queryClient.setQueryData(organizationLogoQueryKey(organizationId), {
+      queryClient.setQueryData(organizationLogoQueryKey(activeOrganizationId), {
         hasImage: false,
         imageVersion: null,
       });
@@ -158,8 +151,8 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       <OrganizationGeneralSettingsPageView
         key={
           organizationQuery.data === undefined
-            ? `loading:${organizationId}`
-            : `${organizationId}:${organizationQuery.data.slug}`
+            ? `loading:${activeOrganizationId}`
+            : `${activeOrganizationId}:${organizationQuery.data.slug}`
         }
         isLoading={organizationQuery.isPending}
         isSaving={saveMutation.isPending}
@@ -169,7 +162,7 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         logoErrorMessage={logoErrorMessage}
         logoUrl={createSingletonImageContentUrl({
           resourceName: "Organization logo",
-          path: createOrganizationLogoContentPath(organizationId),
+          path: createOrganizationLogoContentPath(activeOrganizationId),
           image: organizationLogoQuery.data,
         })}
         loadErrorMessage={

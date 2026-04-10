@@ -5,13 +5,11 @@ import type { InvitationsPage } from "./members-api-types.js";
 import { parseInvitationsPage } from "./members-invitations-page-parser.js";
 
 export async function listInvitationsPage(input: {
-  organizationId: string;
   limit: number;
   offset: number;
   search: string;
 }): Promise<InvitationsPage> {
   try {
-    void input.organizationId;
     const client = getControlPlaneApiClient();
     const response = await client.GET("/v1/organization/invitations", {
       credentials: "include",

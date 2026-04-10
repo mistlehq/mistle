@@ -53,7 +53,7 @@ export type OrganizationMembersSettingsPageViewModel = {
   onRoleDialogOpenChange: (nextOpen: boolean) => void;
   onRoleSelectValueChange: (nextRoleValue: string | null) => void;
   onSaveRole: () => void;
-  organizationId: string;
+  activeOrganizationId: string;
   offset: number;
   pendingMemberOperation: MembersDirectoryPendingMemberOperation;
   roleChangeDialog: RoleChangeDialogState | null;
