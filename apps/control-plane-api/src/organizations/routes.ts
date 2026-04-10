@@ -2,7 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
-import { ORGANIZATIONS_ROUTE_BASE_PATH } from "./constants.js";
+import { ACTIVE_ORGANIZATION_ROUTE_BASE_PATH } from "./constants.js";
 import * as deleteLogo from "./delete-logo/index.js";
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
@@ -11,7 +11,9 @@ import * as listInvitations from "./list-invitations/index.js";
 import * as listMembers from "./list-members/index.js";
 import * as putLogo from "./put-logo/index.js";
 
-export function createOrganizationsRoutes(): AppRoutes<typeof ORGANIZATIONS_ROUTE_BASE_PATH> {
+export function createActiveOrganizationRoutes(): AppRoutes<
+  typeof ACTIVE_ORGANIZATION_ROUTE_BASE_PATH
+> {
   const routes = new OpenAPIHono<AppContextBindings>({
     defaultHook: OpenApiValidationHook,
   });
@@ -25,7 +27,7 @@ export function createOrganizationsRoutes(): AppRoutes<typeof ORGANIZATIONS_ROUT
   routes.openapi(listInvitations.route, listInvitations.handler);
 
   return {
-    basePath: ORGANIZATIONS_ROUTE_BASE_PATH,
+    basePath: ACTIVE_ORGANIZATION_ROUTE_BASE_PATH,
     routes,
   };
 }

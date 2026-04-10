@@ -18,7 +18,6 @@ const routeHandler = async (
     },
     {
       actorUserId: user.id,
-      activeOrganizationId: session.activeOrganizationId,
       organizationId: session.activeOrganizationId,
     },
   );

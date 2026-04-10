@@ -10,7 +10,6 @@ export type GetMembershipCapabilitiesCtx = {
 
 export type GetMembershipCapabilitiesInput = {
   actorUserId: string;
-  activeOrganizationId: string;
   organizationId: string;
 };
 
@@ -32,7 +31,6 @@ export async function getMembershipCapabilities(
   const authorization = await requireOrganizationAccess({
     db: ctx.db,
     actorUserId: input.actorUserId,
-    activeOrganizationId: input.activeOrganizationId,
     organizationId: input.organizationId,
   });
 
