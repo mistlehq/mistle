@@ -21,45 +21,31 @@ import {
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
-export function hasSessionTopAlert(input: {
-  hasSandboxStatusError: boolean;
-  workbenchStatusAlert: SessionWorkbenchAlert | null;
-}): boolean {
-  return input.hasSandboxStatusError || input.workbenchStatusAlert !== null;
-}
-
 export function resolveSessionWorkbenchHeaderStatusUi(input: {
   workbenchStatus: SessionWorkbenchStatus;
 }): SandboxStatusBadgeUi {
-  if (input.workbenchStatus.kind === "not_connected") {
-    return {
-      label: "Not connected",
-      variant: "outline",
-    };
+  switch (input.workbenchStatus.kind) {
+    case "not_connected":
+      return {
+        label: "Not connected",
+        variant: "outline",
+      };
+    case "error":
+      return {
+        label: "Error",
+        variant: "destructive",
+      };
+    case "connected":
+      return {
+        label: "Connected",
+        variant: "secondary",
+        className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+      };
   }
-
-  if (input.workbenchStatus.kind === "error") {
-    return {
-      label: "Error",
-      variant: "destructive",
-    };
-  }
-
-  return {
-    label: "Connected",
-    variant: "secondary",
-    className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-  };
 }
 
 export function shouldShowResumeAction(input: { requiresManualResume: boolean }): boolean {
   return input.requiresManualResume;
-}
-
-export function shouldShowSessionWorkbenchHeaderStatusLabel(input: {
-  headerStatusUi: SandboxStatusBadgeUi;
-}): boolean {
-  return input.headerStatusUi.variant === "destructive";
 }
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -100,9 +86,7 @@ function SessionWorkbenchPageContent(input: {
   const showResumeButton = shouldShowResumeAction({
     requiresManualResume: workbench.stoppedSessionState.requiresManualResume,
   });
-  const showHeaderStatusLabel = shouldShowSessionWorkbenchHeaderStatusLabel({
-    headerStatusUi: sandboxHeaderStatusUi,
-  });
+  const showHeaderStatusLabel = sandboxHeaderStatusUi.variant === "destructive";
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
@@ -308,13 +292,10 @@ function SessionWorkbenchPageContent(input: {
           : "Could not start Codex CLI."),
     });
   }
-  const hasTopAlert = hasSessionTopAlert({
-    hasSandboxStatusError: workbench.sandboxStatusQuery.isError,
-    workbenchStatusAlert:
-      workbench.primaryPanelState.transitionState === "stable_chat"
-        ? workbench.workbenchStatus.alert
-        : null,
-  });
+  const hasTopAlert =
+    workbench.sandboxStatusQuery.isError ||
+    (workbench.primaryPanelState.transitionState === "stable_chat" &&
+      workbench.workbenchStatus.alert !== null);
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView

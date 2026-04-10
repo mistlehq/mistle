@@ -8,10 +8,8 @@ import { describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import {
-  hasSessionTopAlert,
   resolveSessionWorkbenchHeaderStatusUi,
   SessionWorkbenchPage,
-  shouldShowSessionWorkbenchHeaderStatusLabel,
   shouldShowResumeAction,
 } from "./session-workbench-page.js";
 import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-controller.js";
@@ -119,54 +117,6 @@ describe("SessionWorkbenchPage", () => {
       label: "Error",
       variant: "destructive",
     });
-  });
-
-  it("shows visible header text only for the error badge", () => {
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Connected",
-          variant: "secondary",
-        },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Not connected",
-          variant: "outline",
-        },
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldShowSessionWorkbenchHeaderStatusLabel({
-        headerStatusUi: {
-          label: "Error",
-          variant: "destructive",
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it("shows top alerts only when one of the alert sources is present", () => {
-    expect(
-      hasSessionTopAlert({
-        hasSandboxStatusError: false,
-        workbenchStatusAlert: null,
-      }),
-    ).toBe(false);
-
-    expect(
-      hasSessionTopAlert({
-        hasSandboxStatusError: false,
-        workbenchStatusAlert: {
-          title: "Reconnecting session",
-          description: "Reconnecting session.",
-        },
-      }),
-    ).toBe(true);
   });
 
   it("shows the resume action only when manual resume is required", () => {
