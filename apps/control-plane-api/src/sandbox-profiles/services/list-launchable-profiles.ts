@@ -5,13 +5,17 @@ import {
   integrationTargets,
   sandboxProfiles,
 } from "@mistle/db/control-plane";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
+import { z } from "zod";
 
-import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
-import { SandboxProfilesCompileError, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const WorkspaceRootPrefix = "/root/";
+const GitBindingConfigSchema = z
+  .object({
+    repositories: z.array(z.string().min(1)),
+  })
+  .strict();
 
 export type LaunchableSandboxProfileRepositoryOption = {
   id: string;
@@ -24,50 +28,42 @@ export type LaunchableSandboxProfile = typeof sandboxProfiles.$inferSelect & {
   repositoryOptions: LaunchableSandboxProfileRepositoryOption[];
 };
 
-function toRepositoryOptionLabel(path: string): string {
-  if (path.startsWith(WorkspaceRootPrefix)) {
-    return path.slice(WorkspaceRootPrefix.length);
-  }
-
-  return path;
+function toRepositoryWorkspacePath(repository: string): string {
+  return `${WorkspaceRootPrefix}${repository}`;
 }
 
 function toRepositoryOptions(input: {
-  workspaceSources: ReadonlyArray<{
-    resourceKind: string;
-    path: string;
+  gitBindings: ReadonlyArray<{
+    config: Record<string, unknown>;
   }>;
 }): LaunchableSandboxProfileRepositoryOption[] {
-  const repositoryOptionsByPath = new Map<string, LaunchableSandboxProfileRepositoryOption>();
+  const repositoryOptionsById = new Map<string, LaunchableSandboxProfileRepositoryOption>();
 
-  for (const workspaceSource of input.workspaceSources) {
-    if (workspaceSource.resourceKind !== "repository") {
-      continue;
+  for (const gitBinding of input.gitBindings) {
+    const parsedConfig = GitBindingConfigSchema.parse(gitBinding.config);
+
+    for (const repository of parsedConfig.repositories) {
+      repositoryOptionsById.set(repository, {
+        id: repository,
+        label: repository,
+        path: toRepositoryWorkspacePath(repository),
+      });
     }
-
-    repositoryOptionsByPath.set(workspaceSource.path, {
-      id: workspaceSource.path,
-      label: toRepositoryOptionLabel(workspaceSource.path),
-      path: workspaceSource.path,
-    });
   }
 
-  return [...repositoryOptionsByPath.values()].sort((left, right) =>
+  return [...repositoryOptionsById.values()].sort((left, right) =>
     left.label.localeCompare(right.label),
   );
 }
 
 export async function listLaunchableProfiles(
-  { db, integrationsConfig }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig">,
+  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: {
     organizationId: string;
-    imageRef: string;
   },
 ): Promise<{
   items: LaunchableSandboxProfile[];
 }> {
-  // This endpoint feeds the dashboard session picker. Compile each candidate so the
-  // response reflects the actual repository workspace sources the sandbox would use.
   const latestVersionSql = sql<number>`(
     select max(spv.version)::int
     from "control_plane"."sandbox_profile_versions" as spv
@@ -120,47 +116,47 @@ export async function listLaunchableProfiles(
     )
     .orderBy(desc(sandboxProfiles.createdAt), desc(sandboxProfiles.id));
 
-  const compiledCandidates = await Promise.all(
-    candidates.map(async (candidate) => {
-      try {
-        const runtimePlan = await compileProfileVersionRuntimePlan(
-          {
-            db,
-            integrationsConfig,
-          },
-          {
-            organizationId: input.organizationId,
-            profileId: candidate.id,
-            profileVersion: candidate.latestVersion,
-            image: {
-              source: "base",
-              imageRef: input.imageRef,
-            },
-          },
-        );
-
-        return {
-          ...candidate,
-          createdAt: new Date(candidate.createdAt).toISOString(),
-          updatedAt: new Date(candidate.updatedAt).toISOString(),
-          repositoryOptions: toRepositoryOptions({
-            workspaceSources: runtimePlan.workspaceSources,
-          }),
-        } satisfies LaunchableSandboxProfile;
-      } catch (error) {
-        if (
-          error instanceof SandboxProfilesCompileError ||
-          error instanceof SandboxProfilesNotFoundError
-        ) {
-          return null;
-        }
-
-        throw error;
-      }
-    }),
+  const candidateIds = candidates.map((candidate) => candidate.id);
+  const latestVersionByProfileId = new Map(
+    candidates.map((candidate) => [candidate.id, candidate.latestVersion]),
   );
+  const gitBindings =
+    candidateIds.length === 0
+      ? []
+      : await db.query.sandboxProfileVersionIntegrationBindings.findMany({
+          columns: {
+            sandboxProfileId: true,
+            sandboxProfileVersion: true,
+            config: true,
+          },
+          where: (table) =>
+            sql`${inArray(table.sandboxProfileId, candidateIds)} and ${eq(table.kind, IntegrationBindingKinds.GIT)}`,
+          orderBy: (table, { asc }) => [asc(table.id)],
+        });
+
+  const gitBindingsByProfileId = new Map<string, Array<{ config: Record<string, unknown> }>>();
+  for (const gitBinding of gitBindings) {
+    if (
+      latestVersionByProfileId.get(gitBinding.sandboxProfileId) !== gitBinding.sandboxProfileVersion
+    ) {
+      continue;
+    }
+
+    const existingBindings = gitBindingsByProfileId.get(gitBinding.sandboxProfileId) ?? [];
+    existingBindings.push({
+      config: gitBinding.config,
+    });
+    gitBindingsByProfileId.set(gitBinding.sandboxProfileId, existingBindings);
+  }
 
   return {
-    items: compiledCandidates.filter((candidate) => candidate !== null),
+    items: candidates.map((candidate) => ({
+      ...candidate,
+      createdAt: new Date(candidate.createdAt).toISOString(),
+      updatedAt: new Date(candidate.updatedAt).toISOString(),
+      repositoryOptions: toRepositoryOptions({
+        gitBindings: gitBindingsByProfileId.get(candidate.id) ?? [],
+      }),
+    })),
   };
 }

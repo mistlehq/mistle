@@ -29,11 +29,13 @@ import { shouldClearSelectedProfile } from "./sessions-page.js";
 type NewSessionPageRepositoryOption = {
   value: string;
   label: string;
+  path: string;
 };
 
 const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   value: "__workspace_root__",
   label: "None",
+  path: "/root",
 };
 
 export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
@@ -57,8 +59,9 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
       : (selectableProfiles.find((profile) => profile.id === selectedProfileId) ?? null);
   const repositoryOptionsForProfile =
     selectedProfile?.repositoryOptions.map((option) => ({
-      value: option.path,
+      value: option.id,
       label: option.label,
+      path: option.path,
     })) ?? [];
   const repositoryOptions =
     selectedProfile === null
@@ -118,12 +121,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
     !selectableProfilesQuery.isError &&
     selectableProfiles.length === 0;
   const showsRepositoryPicker = selectedProfile !== null;
-  const selectedLocationPath =
-    selectedRepositoryOption === null
-      ? null
-      : selectedRepositoryOption.value === WorkspaceRootOption.value
-        ? "/root"
-        : selectedRepositoryOption.value;
+  const selectedLocationPath = selectedRepositoryOption?.path ?? null;
   const selectedNoneOption = selectedRepositoryOption?.value === WorkspaceRootOption.value;
 
   useEffect(() => {

@@ -11,17 +11,13 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
-  const integrationsConfig = ctx.get("config").integrations;
-  const sandboxConfig = ctx.get("sandboxConfig");
 
   const result = await listLaunchableProfiles(
     {
       db,
-      integrationsConfig,
     },
     {
       organizationId: session.activeOrganizationId,
-      imageRef: sandboxConfig.defaultBaseImage,
     },
   );
 
