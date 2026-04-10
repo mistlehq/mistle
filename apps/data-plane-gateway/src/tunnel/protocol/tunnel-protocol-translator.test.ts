@@ -1,5 +1,6 @@
 import {
   PayloadKindRawBytes,
+  PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   encodeDataFrame,
 } from "@mistle/sandbox-session-protocol";
@@ -71,6 +72,21 @@ async function openFileUploadStream(translator: TunnelProtocolTranslator): Promi
         mimeType: "image/png",
         originalFilename: "upload.png",
         sizeBytes: 3,
+      },
+    }),
+    sandboxInstanceId: SandboxInstanceId,
+    sourcePeerSide: "connection",
+  });
+}
+
+async function openProcessesStream(translator: TunnelProtocolTranslator): Promise<void> {
+  await translator.translateInboundMessage({
+    clientSessionId: "conn_1",
+    payload: JSON.stringify({
+      type: "stream.open",
+      streamId: 52,
+      channel: {
+        kind: "processes",
       },
     }),
     sandboxInstanceId: SandboxInstanceId,
@@ -228,6 +244,36 @@ describe("TunnelProtocolTranslator", () => {
           streamId: 2,
           channel: {
             kind: "agent",
+          },
+        }),
+      },
+    });
+  });
+
+  it("maps a processes stream.open to the bootstrap stream id", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 52,
+          channel: {
+            kind: "processes",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "processes",
           },
         }),
       },
@@ -866,6 +912,47 @@ describe("TunnelProtocolTranslator", () => {
       releaseInteractiveStream: {
         clientSessionId: "conn_1",
         clientStreamId: 42,
+      },
+    });
+  });
+
+  it("responds with a reset and releases the binding when processes data is not websocket text", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await openProcessesStream(translator);
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: toArrayBuffer(
+          encodeDataFrame({
+            streamId: 52,
+            payloadKind: PayloadKindWebSocketBinary,
+            payload: new Uint8Array([1, 2, 3]),
+          }),
+        ),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "respond",
+        payload: JSON.stringify({
+          type: "stream.reset",
+          streamId: 52,
+          code: "invalid_stream_data",
+          message: "Processes streams only accept websocket text data frames.",
+        }),
+      },
+      notifyBootstrapPeerOfReleasedStream: {
+        channelKind: "processes",
+        clientSessionId: "conn_1",
+        clientStreamId: 52,
+        tunnelStreamId: 1,
+      },
+      releaseInteractiveStream: {
+        clientSessionId: "conn_1",
+        clientStreamId: 52,
       },
     });
   });

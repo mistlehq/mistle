@@ -1531,6 +1531,178 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
+    "routes processes stream opens and websocket-text frames through gateway bindings",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 83;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "processes",
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "processes",
+          },
+        });
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const forwardedOpenOk = await forwardedOpenOkPromise;
+
+        expect(forwardedOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+
+        const forwardedRefreshPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          Buffer.from(
+            encodeWebSocketTextDataFrame({
+              streamId: clientStreamId,
+              payload: JSON.stringify({
+                type: "processes.refresh",
+              }),
+            }),
+          ),
+        );
+        const forwardedRefresh = await forwardedRefreshPromise;
+
+        expect(forwardedRefresh.isBinary).toBe(true);
+        expect(parseDataFrame(forwardedRefresh.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: 1,
+          payloadKind: PayloadKindWebSocketText,
+          payload: new Uint8Array(
+            Buffer.from(
+              JSON.stringify({
+                type: "processes.refresh",
+              }),
+              "utf8",
+            ),
+          ),
+        });
+
+        const forwardedSnapshotPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeWebSocketTextDataFrame({
+              streamId: 1,
+              payload: JSON.stringify({
+                type: "processes.snapshot",
+                observedAt: "2026-04-10T12:00:00.000Z",
+                processes: [
+                  {
+                    pid: 123,
+                    command: "vite",
+                    listeners: [
+                      {
+                        port: 5173,
+                        bindAddress: "127.0.0.1",
+                      },
+                    ],
+                  },
+                ],
+              }),
+            }),
+          ),
+        );
+        const forwardedSnapshot = await forwardedSnapshotPromise;
+
+        expect(forwardedSnapshot.isBinary).toBe(true);
+        expect(parseDataFrame(forwardedSnapshot.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: clientStreamId,
+          payloadKind: PayloadKindWebSocketText,
+          payload: new Uint8Array(
+            Buffer.from(
+              JSON.stringify({
+                type: "processes.snapshot",
+                observedAt: "2026-04-10T12:00:00.000Z",
+                processes: [
+                  {
+                    pid: 123,
+                    command: "vite",
+                    listeners: [
+                      {
+                        port: 5173,
+                        bindAddress: "127.0.0.1",
+                      },
+                    ],
+                  },
+                ],
+              }),
+              "utf8",
+            ),
+          ),
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "remaps stream.window credits between the client and bootstrap peers",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();

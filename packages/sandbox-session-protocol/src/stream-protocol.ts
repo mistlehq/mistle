@@ -17,6 +17,10 @@ const AgentStreamChannelSchema = z.object({
   kind: z.literal("agent"),
 });
 
+const ProcessesStreamChannelSchema = z.object({
+  kind: z.literal("processes"),
+});
+
 const PTYStreamChannelSchema = z.object({
   kind: z.literal("pty"),
   session: z.enum(["create", "attach"]),
@@ -47,6 +51,7 @@ const ExecStreamChannelSchema = z.object({
 
 const StreamChannelSchema = z.discriminatedUnion("kind", [
   AgentStreamChannelSchema,
+  ProcessesStreamChannelSchema,
   PTYStreamChannelSchema,
   FileUploadStreamChannelSchema,
   ExecStreamChannelSchema,
@@ -94,6 +99,32 @@ const StreamEventSchema = z.discriminatedUnion("type", [
   PTYExitEventSchema,
   FileUploadCompletedEventSchema,
   ExecResultEventSchema,
+]);
+
+const ProcessListenerSchema = z.object({
+  port: PositiveIntegerSchema,
+  bindAddress: NonEmptyStringSchema,
+});
+
+const ProcessEntrySchema = z.object({
+  pid: PositiveIntegerSchema,
+  command: NonEmptyStringSchema.optional(),
+  listeners: z.array(ProcessListenerSchema),
+});
+
+const ProcessesRefreshSchema = z.object({
+  type: z.literal("processes.refresh"),
+});
+
+const ProcessesSnapshotSchema = z.object({
+  type: z.literal("processes.snapshot"),
+  observedAt: NonEmptyStringSchema,
+  processes: z.array(ProcessEntrySchema),
+});
+
+const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
+  ProcessesRefreshSchema,
+  ProcessesSnapshotSchema,
 ]);
 
 const StreamOpenSchema = z.object({
@@ -236,6 +267,7 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
+export type ProcessesStreamChannel = z.infer<typeof ProcessesStreamChannelSchema>;
 export type PTYStreamChannel = z.infer<typeof PTYStreamChannelSchema>;
 export type FileUploadStreamChannel = z.infer<typeof FileUploadStreamChannelSchema>;
 export type ExecStreamChannel = z.infer<typeof ExecStreamChannelSchema>;
@@ -248,6 +280,11 @@ export type PTYExitEvent = z.infer<typeof PTYExitEventSchema>;
 export type FileUploadCompletedEvent = z.infer<typeof FileUploadCompletedEventSchema>;
 export type ExecResultEvent = z.infer<typeof ExecResultEventSchema>;
 export type StreamEvent = z.infer<typeof StreamEventSchema>;
+export type ProcessListener = z.infer<typeof ProcessListenerSchema>;
+export type ProcessEntry = z.infer<typeof ProcessEntrySchema>;
+export type ProcessesRefresh = z.infer<typeof ProcessesRefreshSchema>;
+export type ProcessesSnapshot = z.infer<typeof ProcessesSnapshotSchema>;
+export type ProcessesStreamMessage = z.infer<typeof ProcessesStreamMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -311,6 +348,16 @@ export function parseBootstrapControlMessage(payload: string): BootstrapControlM
   }
 
   const result = BootstrapControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parseProcessesStreamMessage(payload: string): ProcessesStreamMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = ProcessesStreamMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 export type SandboxSessionControlMessage =

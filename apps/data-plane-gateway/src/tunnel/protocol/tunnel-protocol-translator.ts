@@ -99,6 +99,15 @@ function parseAgentStreamOpen(payload: string) {
   return message;
 }
 
+function parseProcessesStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "processes") {
+    return undefined;
+  }
+
+  return message;
+}
+
 function parseFileUploadStreamOpen(payload: string) {
   const message = parseStreamControlMessage(payload);
   if (message?.type !== "stream.open" || message.channel.kind !== "fileUpload") {
@@ -186,7 +195,9 @@ function createInvalidStreamDataResetPayload(input: {
       ? "PTY streams only accept raw-bytes data frames."
       : input.channelKind === "fileUpload"
         ? "File upload streams only accept raw-bytes data frames."
-        : "Agent streams only accept websocket text or websocket binary data frames.";
+        : input.channelKind === "processes"
+          ? "Processes streams only accept websocket text data frames."
+          : "Agent streams only accept websocket text or websocket binary data frames.";
 
   return createStreamResetPayload({
     code: "invalid_stream_data",
@@ -311,6 +322,10 @@ function isPayloadKindAllowedForChannel(input: {
 }): boolean {
   if (input.channelKind === "pty" || input.channelKind === "fileUpload") {
     return input.payloadKind === PayloadKindRawBytes;
+  }
+
+  if (input.channelKind === "processes") {
+    return input.payloadKind === PayloadKindWebSocketText;
   }
 
   return (
@@ -455,6 +470,16 @@ export class TunnelProtocolTranslator {
         channelKind: "agent",
         clientSessionId: input.clientSessionId,
         message: agentStreamOpen,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    const processesStreamOpen = parseProcessesStreamOpen(input.payload);
+    if (processesStreamOpen !== undefined) {
+      return this.translateConnectionStreamOpen({
+        channelKind: "processes",
+        clientSessionId: input.clientSessionId,
+        message: processesStreamOpen,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseBootstrapControlMessage,
+  parseProcessesStreamMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
 } from "./stream-protocol.js";
@@ -468,6 +469,104 @@ describe("stream control message parser", () => {
           channel: {
             kind: "agent",
           },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("parses processes stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 31,
+          channel: {
+            kind: "processes",
+            ignored: true,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.open",
+      streamId: 31,
+      channel: {
+        kind: "processes",
+      },
+    });
+  });
+});
+
+describe("processes stream message parser", () => {
+  it("parses processes snapshots", () => {
+    expect(
+      parseProcessesStreamMessage(
+        JSON.stringify({
+          type: "processes.snapshot",
+          observedAt: "2026-04-10T10:15:00.000Z",
+          processes: [
+            {
+              pid: 123,
+              command: "vite",
+              listeners: [
+                {
+                  port: 5173,
+                  bindAddress: "127.0.0.1",
+                },
+              ],
+            },
+            {
+              pid: 456,
+              listeners: [],
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      type: "processes.snapshot",
+      observedAt: "2026-04-10T10:15:00.000Z",
+      processes: [
+        {
+          pid: 123,
+          command: "vite",
+          listeners: [
+            {
+              port: 5173,
+              bindAddress: "127.0.0.1",
+            },
+          ],
+        },
+        {
+          pid: 456,
+          listeners: [],
+        },
+      ],
+    });
+  });
+
+  it("parses refresh requests", () => {
+    expect(
+      parseProcessesStreamMessage(
+        JSON.stringify({
+          type: "processes.refresh",
+        }),
+      ),
+    ).toEqual({
+      type: "processes.refresh",
+    });
+  });
+
+  it("rejects malformed process entries", () => {
+    expect(
+      parseProcessesStreamMessage(
+        JSON.stringify({
+          type: "processes.snapshot",
+          observedAt: "2026-04-10T10:15:00.000Z",
+          processes: [
+            {
+              pid: "123",
+              listeners: [],
+            },
+          ],
         }),
       ),
     ).toBeUndefined();

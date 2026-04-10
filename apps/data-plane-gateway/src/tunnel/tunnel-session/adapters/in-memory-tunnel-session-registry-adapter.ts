@@ -1,3 +1,5 @@
+import type { StreamChannel } from "@mistle/sandbox-session-protocol";
+
 import type { RelayTarget } from "../../types.js";
 import { SandboxTunnelSession, type ClientStreamBinding } from "../sandbox-tunnel-session.js";
 import type {
@@ -61,7 +63,7 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
 
   public bindClientStream(input: {
     sandboxInstanceId: string;
-    channelKind: "agent" | "pty";
+    channelKind: StreamChannel["kind"];
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding {
