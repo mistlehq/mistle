@@ -6,16 +6,6 @@ import type { AppContextBindings } from "../../types.js";
 import { completeGitHubAppInstallationConnection } from "../services/complete-github-app-installation-connection.js";
 import { route } from "./route.js";
 
-function buildDashboardIntegrationDetailUrl(input: {
-  dashboardBaseUrl: string;
-  targetKey: string;
-}): string {
-  return buildDashboardUrl(
-    input.dashboardBaseUrl,
-    `/integrations/${encodeURIComponent(input.targetKey)}`,
-  );
-}
-
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
   const config = ctx.get("config");
   const db = ctx.get("db");
@@ -33,10 +23,10 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   );
 
   return ctx.redirect(
-    buildDashboardIntegrationDetailUrl({
-      dashboardBaseUrl: config.dashboard.baseUrl,
-      targetKey: completedConnection.targetKey,
-    }),
+    buildDashboardUrl(
+      config.dashboard.baseUrl,
+      `/integrations/${encodeURIComponent(completedConnection.targetKey)}`,
+    ),
     302,
   );
 };
