@@ -2,11 +2,12 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { getOrganizationLogo } from "../../auth/services/get-organization-logo.js";
+import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { requireCurrentSingletonImageObjectKey } from "../../lib/singleton-image-content.js";
 import { PROFILE_IMAGE_READ_URL_TTL_SECONDS } from "../../me/constants.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -17,11 +18,12 @@ const routeHandler = async (
   const { organizationId } = ctx.req.valid("param");
   const { v: requestedImageVersion } = ctx.req.valid("query");
 
-  await getActiveOrganizationRole({
+  await requireOrganizationPermission({
     db,
     actorUserId: session.user.id,
     activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
+    permission: OrganizationPermissions.ORGANIZATION_LOGO_READ,
   });
 
   const organizationLogo = await getOrganizationLogo({

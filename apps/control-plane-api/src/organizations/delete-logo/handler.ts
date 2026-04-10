@@ -1,11 +1,11 @@
 import type { RouteHandler } from "@hono/zod-openapi";
-import { ForbiddenError, withHttpErrorHandler } from "@mistle/http/errors.js";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { deleteOrganizationLogo } from "../../auth/services/delete-organization-logo.js";
-import { canManageOrganization } from "../../auth/services/organization-policy.js";
+import { requireOrganizationPermission } from "../../auth/services/organization-authorization.js";
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { getActiveOrganizationRole } from "../services/get-active-organization-role.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -15,15 +15,13 @@ const routeHandler = async (
   const db = ctx.get("db");
   const { organizationId } = ctx.req.valid("param");
 
-  const actorRole = await getActiveOrganizationRole({
+  await requireOrganizationPermission({
     db,
     actorUserId: session.user.id,
     activeOrganizationId: session.session.activeOrganizationId,
     organizationId,
+    permission: OrganizationPermissions.ORGANIZATION_LOGO_UPDATE,
   });
-  if (!canManageOrganization(actorRole)) {
-    throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
-  }
 
   await deleteOrganizationLogo(
     {

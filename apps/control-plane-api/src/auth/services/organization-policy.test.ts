@@ -3,8 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildMembershipCapabilities,
   canManageOrganization,
+  getOrganizationPermissions,
   getInviteAssignableRoles,
   getRoleTransitionMatrix,
+  OrganizationPermissions,
+  hasOrganizationPermission,
   parseOrganizationRole,
 } from "./organization-policy.js";
 
@@ -67,6 +70,23 @@ describe("organization policy", () => {
       expect(canManageOrganization("owner")).toBe(true);
       expect(canManageOrganization("admin")).toBe(true);
       expect(canManageOrganization("member")).toBe(false);
+    });
+  });
+
+  describe("organization permissions", () => {
+    it("grants membership read without membership management to members", () => {
+      expect(getOrganizationPermissions("member")).toContain(
+        OrganizationPermissions.ORGANIZATION_MEMBERSHIP_READ,
+      );
+      expect(
+        hasOrganizationPermission("member", OrganizationPermissions.ORGANIZATION_MEMBERSHIP_READ),
+      ).toBe(true);
+      expect(
+        hasOrganizationPermission("member", OrganizationPermissions.ORGANIZATION_MEMBERSHIP_CREATE),
+      ).toBe(false);
+      expect(
+        hasOrganizationPermission("member", OrganizationPermissions.ORGANIZATION_MEMBERSHIP_UPDATE),
+      ).toBe(false);
     });
   });
 

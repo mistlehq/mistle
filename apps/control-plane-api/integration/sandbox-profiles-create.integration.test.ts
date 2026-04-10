@@ -1,4 +1,5 @@
-import { SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { members, SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
@@ -148,5 +149,39 @@ describe("sandbox profiles create integration", () => {
       throw new Error("Expected created sandbox profile to exist.");
     }
     expect(firstOrgProfile.organizationId).toBe(firstOrgSession.organizationId);
+  });
+
+  it("returns 403 when the active organization membership has been revoked", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profiles-create-revoked-membership@example.com",
+    });
+
+    await fixture.db
+      .delete(members)
+      .where(
+        and(
+          eq(members.organizationId, authenticatedSession.organizationId),
+          eq(members.userId, authenticatedSession.userId),
+        ),
+      );
+
+    const response = await fixture.request("/v1/sandbox/profiles", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Should Fail",
+      }),
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 });

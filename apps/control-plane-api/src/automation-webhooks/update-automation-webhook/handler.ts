@@ -1,6 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
+import { requireActiveOrganizationAccess } from "../../auth/services/organization-authorization.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { updateAutomationWebhook } from "../services/update-automation-webhook.js";
@@ -8,12 +9,18 @@ import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
-  { session }: AppSession,
+  { session, user }: AppSession,
 ) => {
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
   const { automationId } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
+
+  await requireActiveOrganizationAccess({
+    db,
+    actorUserId: user.id,
+    activeOrganizationId: session.activeOrganizationId,
+  });
 
   const automationWebhook = await updateAutomationWebhook(
     {

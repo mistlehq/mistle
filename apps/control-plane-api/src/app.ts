@@ -17,6 +17,7 @@ import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/i
 import { createMeRoutes } from "./me/index.js";
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
+import { withActiveOrganizationAccess } from "./middleware/with-active-organization-access.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
 import { createOrganizationsRoutes } from "./organizations/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
@@ -106,15 +107,15 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
-  const automationWebhooksRoutes = withAuthSession(createAutomationWebhooksRoutes());
+  const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
   const homeRoutes = withAuthSession(createHomeRoutes());
   const integrationConnectionsRoutes = createIntegrationConnectionsRoutes();
   const integrationTargetsRoutes = withAuthSession(createIntegrationTargetsRoutes());
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
   const meRoutes = withAuthSession(createMeRoutes());
-  const organizationsRoutes = withAuthSession(createOrganizationsRoutes());
-  const sandboxInstancesRoutes = withAuthSession(createSandboxInstancesRoutes());
-  const sandboxProfilesRoutes = withAuthSession(createSandboxProfilesRoutes());
+  const organizationsRoutes = withActiveOrganizationAccess(createOrganizationsRoutes());
+  const sandboxInstancesRoutes = withActiveOrganizationAccess(createSandboxInstancesRoutes());
+  const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
   app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);

@@ -189,7 +189,7 @@ describe("organization invitations integration", () => {
     });
   });
 
-  it("allows admins and forbids members from listing invitations", async ({ fixture }) => {
+  it("allows admins and members to list invitations", async ({ fixture }) => {
     const ownerSession = await fixture.authSession({
       email: "integration-org-invitations-authorization-owner@example.com",
     });
@@ -262,10 +262,14 @@ describe("organization invitations integration", () => {
       },
     );
 
-    expect(memberResponse.status).toBe(403);
-    await expect(memberResponse.json()).resolves.toEqual({
-      code: "FORBIDDEN",
-      message: "Forbidden API request.",
+    expect(memberResponse.status).toBe(200);
+    await expect(memberResponse.json()).resolves.toMatchObject({
+      invitations: [
+        expect.objectContaining({
+          email: "authorization-check@example.com",
+        }),
+      ],
+      total: 1,
     });
   });
 

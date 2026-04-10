@@ -2,6 +2,104 @@ export const ORGANIZATION_ROLES = ["owner", "admin", "member"] as const;
 
 export type OrganizationRole = (typeof ORGANIZATION_ROLES)[number];
 
+export const OrganizationPermissions = {
+  ORGANIZATION_READ: "organization:read",
+  ORGANIZATION_UPDATE: "organization:update",
+  ORGANIZATION_LOGO_READ: "organizationLogo:read",
+  ORGANIZATION_LOGO_UPDATE: "organizationLogo:update",
+  ORGANIZATION_MEMBERSHIP_READ: "organizationMembership:read",
+  ORGANIZATION_MEMBERSHIP_CREATE: "organizationMembership:create",
+  ORGANIZATION_MEMBERSHIP_UPDATE: "organizationMembership:update",
+  ORGANIZATION_MEMBERSHIP_DELETE: "organizationMembership:delete",
+  SANDBOX_PROFILE_READ: "sandboxProfile:read",
+  SANDBOX_PROFILE_CREATE: "sandboxProfile:create",
+  SANDBOX_PROFILE_UPDATE: "sandboxProfile:update",
+  SANDBOX_PROFILE_DELETE: "sandboxProfile:delete",
+  SANDBOX_SESSION_CREATE: "sandboxSession:create",
+  SANDBOX_SESSION_READ: "sandboxSession:read",
+  SANDBOX_SESSION_RESUME: "sandboxSession:resume",
+  SANDBOX_SESSION_CONNECT: "sandboxSession:connect",
+  INTEGRATION_CONNECTION_READ: "integrationConnection:read",
+  INTEGRATION_CONNECTION_CREATE: "integrationConnection:create",
+  INTEGRATION_CONNECTION_UPDATE: "integrationConnection:update",
+  INTEGRATION_CONNECTION_DELETE: "integrationConnection:delete",
+  INTEGRATION_WEBHOOK_SOURCE_READ: "integrationWebhookSource:read",
+  INTEGRATION_WEBHOOK_SOURCE_CREATE: "integrationWebhookSource:create",
+  INTEGRATION_WEBHOOK_SOURCE_UPDATE: "integrationWebhookSource:update",
+  INTEGRATION_WEBHOOK_SOURCE_DELETE: "integrationWebhookSource:delete",
+  CREDENTIAL_KEY_READ: "credentialKey:read",
+  CREDENTIAL_KEY_MANAGE: "credentialKey:manage",
+  AUTOMATION_WEBHOOK_READ: "automationWebhook:read",
+  AUTOMATION_WEBHOOK_CREATE: "automationWebhook:create",
+  AUTOMATION_WEBHOOK_UPDATE: "automationWebhook:update",
+  AUTOMATION_WEBHOOK_DELETE: "automationWebhook:delete",
+} as const;
+
+export type OrganizationPermission =
+  (typeof OrganizationPermissions)[keyof typeof OrganizationPermissions];
+
+const OWNER_PERMISSIONS: readonly OrganizationPermission[] = [
+  OrganizationPermissions.ORGANIZATION_READ,
+  OrganizationPermissions.ORGANIZATION_UPDATE,
+  OrganizationPermissions.ORGANIZATION_LOGO_READ,
+  OrganizationPermissions.ORGANIZATION_LOGO_UPDATE,
+  OrganizationPermissions.ORGANIZATION_MEMBERSHIP_READ,
+  OrganizationPermissions.ORGANIZATION_MEMBERSHIP_CREATE,
+  OrganizationPermissions.ORGANIZATION_MEMBERSHIP_UPDATE,
+  OrganizationPermissions.ORGANIZATION_MEMBERSHIP_DELETE,
+  OrganizationPermissions.SANDBOX_PROFILE_READ,
+  OrganizationPermissions.SANDBOX_PROFILE_CREATE,
+  OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+  OrganizationPermissions.SANDBOX_PROFILE_DELETE,
+  OrganizationPermissions.SANDBOX_SESSION_CREATE,
+  OrganizationPermissions.SANDBOX_SESSION_READ,
+  OrganizationPermissions.SANDBOX_SESSION_RESUME,
+  OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+  OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+  OrganizationPermissions.INTEGRATION_CONNECTION_CREATE,
+  OrganizationPermissions.INTEGRATION_CONNECTION_UPDATE,
+  OrganizationPermissions.INTEGRATION_CONNECTION_DELETE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_READ,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_CREATE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_UPDATE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_DELETE,
+  OrganizationPermissions.CREDENTIAL_KEY_READ,
+  OrganizationPermissions.CREDENTIAL_KEY_MANAGE,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_READ,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_CREATE,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_UPDATE,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_DELETE,
+];
+
+const ADMIN_PERMISSIONS: readonly OrganizationPermission[] = OWNER_PERMISSIONS;
+
+const MEMBER_PERMISSIONS: readonly OrganizationPermission[] = [
+  OrganizationPermissions.ORGANIZATION_READ,
+  OrganizationPermissions.ORGANIZATION_LOGO_READ,
+  OrganizationPermissions.ORGANIZATION_MEMBERSHIP_READ,
+  OrganizationPermissions.SANDBOX_PROFILE_READ,
+  OrganizationPermissions.SANDBOX_PROFILE_CREATE,
+  OrganizationPermissions.SANDBOX_PROFILE_UPDATE,
+  OrganizationPermissions.SANDBOX_PROFILE_DELETE,
+  OrganizationPermissions.SANDBOX_SESSION_CREATE,
+  OrganizationPermissions.SANDBOX_SESSION_READ,
+  OrganizationPermissions.SANDBOX_SESSION_RESUME,
+  OrganizationPermissions.SANDBOX_SESSION_CONNECT,
+  OrganizationPermissions.INTEGRATION_CONNECTION_READ,
+  OrganizationPermissions.INTEGRATION_CONNECTION_CREATE,
+  OrganizationPermissions.INTEGRATION_CONNECTION_UPDATE,
+  OrganizationPermissions.INTEGRATION_CONNECTION_DELETE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_READ,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_CREATE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_UPDATE,
+  OrganizationPermissions.INTEGRATION_WEBHOOK_SOURCE_DELETE,
+  OrganizationPermissions.CREDENTIAL_KEY_READ,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_READ,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_CREATE,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_UPDATE,
+  OrganizationPermissions.AUTOMATION_WEBHOOK_DELETE,
+];
+
 function normalizeRole(value: string): OrganizationRole | null {
   if (value === "owner" || value === "admin" || value === "member") {
     return value;
@@ -39,19 +137,42 @@ export function parseOrganizationRole(value: string): OrganizationRole | null {
 }
 
 export function getInviteAssignableRoles(actorRole: OrganizationRole): OrganizationRole[] {
+  if (
+    !hasOrganizationPermission(actorRole, OrganizationPermissions.ORGANIZATION_MEMBERSHIP_CREATE)
+  ) {
+    return [];
+  }
+
   if (actorRole === "owner") {
     return ["owner", "admin", "member"];
   }
 
-  if (actorRole === "admin") {
-    return ["admin", "member"];
+  return ["admin", "member"];
+}
+
+export function getOrganizationPermissions(
+  actorRole: OrganizationRole,
+): readonly OrganizationPermission[] {
+  if (actorRole === "owner") {
+    return OWNER_PERMISSIONS;
   }
 
-  return [];
+  if (actorRole === "admin") {
+    return ADMIN_PERMISSIONS;
+  }
+
+  return MEMBER_PERMISSIONS;
+}
+
+export function hasOrganizationPermission(
+  actorRole: OrganizationRole,
+  permission: OrganizationPermission,
+): boolean {
+  return getOrganizationPermissions(actorRole).includes(permission);
 }
 
 export function canManageOrganization(actorRole: OrganizationRole): boolean {
-  return actorRole === "owner" || actorRole === "admin";
+  return hasOrganizationPermission(actorRole, OrganizationPermissions.ORGANIZATION_UPDATE);
 }
 
 export function getRoleTransitionMatrix(
@@ -105,7 +226,10 @@ export function buildMembershipCapabilities(input: {
       assignableRoles,
     },
     memberRoleUpdate: {
-      canExecute: canManageOrganization(input.actorRole),
+      canExecute: hasOrganizationPermission(
+        input.actorRole,
+        OrganizationPermissions.ORGANIZATION_MEMBERSHIP_UPDATE,
+      ),
       roleTransitionMatrix: getRoleTransitionMatrix(input.actorRole),
     },
   };

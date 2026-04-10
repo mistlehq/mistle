@@ -1,3 +1,4 @@
+import { members } from "@mistle/db/control-plane";
 import { ForbiddenResponseSchema, NotFoundResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
@@ -63,6 +64,38 @@ describe("organization membership capabilities integration", () => {
     const body = ForbiddenResponseSchema.parse(await response.json());
 
     expect(body).toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+  });
+
+  it("returns 403 when the requested organization is not the actor's active organization", async ({
+    fixture,
+  }) => {
+    const primarySession = await fixture.authSession({
+      email: "integration-membership-capabilities-active-org-primary@example.com",
+    });
+    const secondarySession = await fixture.authSession({
+      email: "integration-membership-capabilities-active-org-secondary@example.com",
+    });
+
+    await fixture.db.insert(members).values({
+      organizationId: secondarySession.organizationId,
+      userId: primarySession.userId,
+      role: "member",
+    });
+
+    const response = await fixture.request(
+      `/v1/organizations/${encodeURIComponent(secondarySession.organizationId)}/membership-capabilities`,
+      {
+        headers: {
+          cookie: primarySession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
       code: "FORBIDDEN",
       message: "Forbidden API request.",
     });

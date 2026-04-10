@@ -8,7 +8,7 @@ import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
-  { user }: AppSession,
+  { session, user }: AppSession,
 ) => {
   const db = ctx.get("db");
   const { organizationId } = ctx.req.valid("param");
@@ -19,6 +19,7 @@ const routeHandler = async (
     },
     {
       actorUserId: user.id,
+      activeOrganizationId: session.activeOrganizationId,
       organizationId,
     },
   );
