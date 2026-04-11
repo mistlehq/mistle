@@ -300,6 +300,7 @@ export function registerPortAccessRoutes(input: {
           browserVisibleHost: resolvedRequest.parsedHost.host,
           requestHeaders: ctx.req.raw.headers,
           targetPort: resolvedRequest.verifiedSession.port,
+          upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
         }),
       },
     });
