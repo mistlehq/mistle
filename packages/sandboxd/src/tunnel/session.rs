@@ -2894,6 +2894,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     use std::time::{Duration, Instant};
 
+    #[cfg(target_os = "linux")]
+    use base64::Engine;
     use serde_json::{Value, json};
     use tungstenite::{Error as WebSocketError, Message, WebSocket, accept};
 
@@ -5940,12 +5942,10 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn assert_no_websocket_message_for_duration<S>(
-        socket: &mut WebSocket<S>,
+    fn assert_no_websocket_message_for_duration(
+        socket: &mut WebSocket<std::net::TcpStream>,
         duration: std::time::Duration,
-    ) where
-        S: std::io::Read + std::io::Write,
-    {
+    ) {
         socket
             .get_mut()
             .set_read_timeout(Some(duration))
