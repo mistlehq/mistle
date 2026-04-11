@@ -390,13 +390,43 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn proc_root_scan_returns_entries_for_running_processes() {
-        let processes = collect_process_entries_for_proc_root(Path::new("/proc"))
-            .expect("proc scan should run");
-        assert!(
-            !processes.is_empty(),
-            "proc scan should discover at least the current test process"
-        );
+    fn proc_root_scan_returns_entries_for_local_bind_processes() {
+        let port = reserve_available_port();
+        let server_marker = format!("mistle_proc_root_scan_server_{}", std::process::id());
+        let mut server = spawn_node_process(&format!(
+            "const tag='{server_marker}'; require('node:net').createServer(() => {{}}).listen({port}, '127.0.0.1'); setInterval(() => {{ void tag; }}, 1000);"
+        ));
+
+        wait_until_listening(port);
+
+        let deadline = Instant::now() + Duration::from_secs(3);
+        loop {
+            let processes = collect_process_entries_for_proc_root(Path::new("/proc"))
+                .expect("proc scan should run");
+            let maybe_server = processes.iter().find(|process| {
+                process
+                    .command
+                    .as_deref()
+                    .is_some_and(|command| command.contains(&server_marker))
+            });
+            if let Some(server_process) = maybe_server {
+                assert!(
+                    server_process.listeners.iter().any(|listener| {
+                        listener.port == port && listener.bind_address == "127.0.0.1"
+                    }),
+                    "proc scan should include the expected local-bind listener"
+                );
+                break;
+            }
+
+            assert!(
+                Instant::now() < deadline,
+                "proc scan should discover the spawned local-bind server process"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+
+        terminate_child(&mut server);
     }
 
     #[cfg(target_os = "linux")]

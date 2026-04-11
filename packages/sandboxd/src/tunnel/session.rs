@@ -4436,8 +4436,10 @@ mod tests {
         let listener_port = reserve_available_port();
         let server_marker = format!("mistle_processes_stream_server_{}", std::process::id());
         let idle_marker = format!("mistle_processes_stream_idle_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("http-listener.js", &[&listener_port.to_string(), &server_marker]);
+        let mut server = spawn_node_fixture(
+            "http-listener.js",
+            &[&listener_port.to_string(), &server_marker, "0.0.0.0"],
+        );
         let mut idle = spawn_node_fixture("idle-process.js", &[&idle_marker]);
         wait_until_listening(listener_port);
 
@@ -6049,15 +6051,12 @@ mod tests {
             "server process should expose the expected local-bind listener"
         );
 
-        assert_eq!(
-            processes
-                .iter()
-                .any(|process| {
-                    process["command"]
-                        .as_str()
-                        .is_some_and(|command| command.contains(idle_marker))
-                }),
-            false,
+        assert!(
+            !processes.iter().any(|process| {
+                process["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains(idle_marker))
+            }),
             "snapshot should omit processes without local-bind listeners"
         );
     }
