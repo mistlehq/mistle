@@ -1,9 +1,160 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { integrationTargets } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationRegistry,
+  type IntegrationDefinition,
+  type IntegrationOAuth2AuthorizationCodeCapability,
+} from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
+import { createApp } from "../src/app.js";
+import { createControlPlaneAuth } from "../src/auth/index.js";
 import { CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/complete-oauth2-authorization-code-connection/schema.js";
+import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
+import { decryptRedirectSessionSecretUtf8 } from "../src/lib/crypto.js";
+import { createAppResources, stopAppResources } from "../src/resources.js";
 import { it } from "./test-context.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+
+const EmptyConfigSchema = z.object({}).strict();
+const OAuth2AuthorizationCodeTestFamilyId = "oauth2-auth-code-test";
+const OAuth2AuthorizationCodeTestVariantId = "oauth2-auth-code-default";
+
+type OAuth2AuthorizationCodeTestCapability = IntegrationOAuth2AuthorizationCodeCapability<
+  Record<string, unknown>,
+  Record<string, string>,
+  Record<string, unknown>
+>;
+
+function createOAuth2AuthorizationCodeTestRegistry(input: {
+  startAuthorization: OAuth2AuthorizationCodeTestCapability["startAuthorization"];
+  completeAuthorizationCodeGrant: OAuth2AuthorizationCodeTestCapability["completeAuthorizationCodeGrant"];
+}): IntegrationRegistry {
+  const registry = new IntegrationRegistry();
+  const definition: IntegrationDefinition<
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema,
+    typeof EmptyConfigSchema
+  > = {
+    familyId: OAuth2AuthorizationCodeTestFamilyId,
+    variantId: OAuth2AuthorizationCodeTestVariantId,
+    kind: "connector",
+    displayName: "OAuth2 Authorization Code Test",
+    logoKey: "oauth2",
+    targetConfigSchema: EmptyConfigSchema,
+    targetSecretSchema: EmptyConfigSchema,
+    bindingConfigSchema: EmptyConfigSchema,
+    connectionMethods: [
+      {
+        id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        label: "OAuth 2.0 Authorization Code",
+        kind: "redirect",
+        ui: {
+          create: {
+            submitLabel: "Connect",
+            helperText: "Connect with OAuth 2.0 Authorization Code.",
+          },
+        },
+      },
+    ],
+    oauth2AuthorizationCode: {
+      startAuthorization: input.startAuthorization,
+      completeAuthorizationCodeGrant: input.completeAuthorizationCodeGrant,
+      refreshAccessToken: async () => {
+        throw new Error("Not used in OAuth 2.0 (Authorization Code) start/complete tests.");
+      },
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+
+  registry.register(definition);
+
+  return registry;
+}
+
+async function createOAuth2AuthorizationCodeTestApp(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  registry: IntegrationRegistry;
+}) {
+  const resources = await createAppResources(input.fixture.config);
+  for (const definition of input.registry.listDefinitions()) {
+    resources.integrationRegistry.register(definition);
+  }
+
+  const auth = createControlPlaneAuth({
+    config: {
+      authBaseUrl: input.fixture.config.auth.baseUrl,
+      dashboardBaseUrl: input.fixture.config.dashboard.baseUrl,
+      authSecret: input.fixture.config.auth.secret,
+      authTrustedOrigins: input.fixture.config.auth.trustedOrigins,
+      authOTPLength: input.fixture.config.auth.otpLength,
+      authOTPExpiresInSeconds: input.fixture.config.auth.otpExpiresInSeconds,
+      authOTPAllowedAttempts: input.fixture.config.auth.otpAllowedAttempts,
+      authGoogleClientId: input.fixture.config.auth.google?.clientId ?? null,
+      authGoogleClientSecret: input.fixture.config.auth.google?.clientSecret ?? null,
+      activeMasterEncryptionKeyVersion:
+        input.fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
+    },
+    db: resources.db,
+    openWorkflow: resources.openWorkflow,
+  });
+  const app = createApp({
+    config: input.fixture.config,
+    sandboxConfig: {
+      defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+    },
+    internalAuthServiceToken: input.fixture.internalAuthServiceToken,
+    db: resources.db,
+    objectStore: resources.objectStore,
+    integrationRegistry: resources.integrationRegistry,
+    dataPlaneClient: createDataPlaneSandboxInstancesClient({
+      baseUrl: input.fixture.config.dataPlaneApi.baseUrl,
+      serviceToken: input.fixture.internalAuthServiceToken,
+    }),
+    connectionTokenConfig: {
+      secret: "integration-connection-secret",
+      issuer: "integration-issuer",
+      audience: "integration-audience",
+    },
+    openWorkflow: resources.openWorkflow,
+    auth,
+  });
+
+  return {
+    app,
+    resources,
+  };
+}
+
+function decryptRedirectProviderState(input: {
+  ciphertext: string;
+  masterEncryptionKeys: Record<string, string>;
+}): Record<string, unknown> {
+  const plaintext = decryptRedirectSessionSecretUtf8({
+    ciphertext: input.ciphertext,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+  const parsed = JSON.parse(plaintext);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("Expected redirect provider state to decode to an object.");
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    record[key] = value;
+  }
+
+  return record;
+}
 
 describe("integration connections OAuth 2.0 authorization-code integration", () => {
   it("returns 400 when a target does not support OAuth 2.0 (Authorization Code) start", async ({
@@ -71,5 +222,292 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
           "Integration target 'openai-default-oauth2-complete' does not support OAuth 2.0 (Authorization Code).",
       }),
     );
+  });
+
+  it("starts an OAuth 2.0 (Authorization Code) connection and persists encrypted provider state", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-auth-code-provider-state-start";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth2-authorization-code-provider-state-start@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startAuthorization: async (input) => ({
+        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
+        providerState: {
+          client_id: "client_123",
+          client_secret: "secret_456",
+        },
+      }),
+      completeAuthorizationCodeGrant: async () => {
+        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
+      },
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const response = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            displayName: "PlanetScale Hosted MCP",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await response.json(),
+      );
+      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      if (state === null || state.length === 0) {
+        throw new Error("Expected authorization URL to include redirect state.");
+      }
+
+      const redirectSession =
+        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, state),
+        });
+
+      expect(redirectSession?.organizationId).toBe(authenticatedSession.organizationId);
+      expect(redirectSession?.targetKey).toBe(targetKey);
+      expect(redirectSession?.pkceVerifierEncrypted).toBeTruthy();
+      expect(redirectSession?.providerStateEncrypted).toBeTruthy();
+      expect(redirectSession?.providerStateEncrypted).not.toContain("client_123");
+      expect(redirectSession?.providerStateEncrypted).not.toContain("secret_456");
+
+      const decryptedProviderState = decryptRedirectProviderState({
+        ciphertext: redirectSession?.providerStateEncrypted ?? "",
+        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+      });
+
+      expect(decryptedProviderState).toEqual({
+        client_id: "client_123",
+        client_secret: "secret_456",
+      });
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
+  it("completes an OAuth 2.0 (Authorization Code) connection with decrypted provider state", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-auth-code-provider-state-complete";
+    const authenticatedSession = await fixture.authSession({
+      email:
+        "integration-connections-oauth2-authorization-code-provider-state-complete@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    let completedProviderState: Record<string, unknown> | undefined;
+    let completedPkceVerifier: string | undefined;
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startAuthorization: async (input) => ({
+        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
+        providerState: {
+          client_id: "client_complete_123",
+          client_secret: "secret_complete_456",
+        },
+      }),
+      completeAuthorizationCodeGrant: async (input) => {
+        completedProviderState = input.providerState;
+        completedPkceVerifier = input.pkceVerifier;
+
+        return {
+          connectionConfig: {
+            account_id: "acct_123",
+          },
+          accessToken: "access-token-123",
+        };
+      },
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const startResponse = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      expect(startResponse.status).toBe(200);
+      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      if (state === null || state.length === 0) {
+        throw new Error("Expected authorization URL to include redirect state.");
+      }
+
+      const completeResponse = await app.request(
+        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_123`,
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+
+      expect(completeResponse.status).toBe(302);
+      expect(completeResponse.headers.get("location")).toBe(
+        `http://localhost:5173/integrations/${encodeURIComponent(targetKey)}`,
+      );
+      expect(completedProviderState).toEqual({
+        client_id: "client_complete_123",
+        client_secret: "secret_complete_456",
+      });
+      expect(typeof completedPkceVerifier).toBe("string");
+      expect(completedPkceVerifier?.length).toBeGreaterThan(0);
+
+      const createdConnection = await resources.db.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authenticatedSession.organizationId),
+            eq(table.targetKey, targetKey),
+          ),
+      });
+      expect(createdConnection?.displayName).toBe(targetKey);
+      expect(createdConnection?.status).toBe("active");
+      expect(createdConnection?.config).toMatchObject({
+        connection_method: "oauth2-authorization-code",
+        account_id: "acct_123",
+      });
+
+      const redirectSession =
+        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, state),
+        });
+      expect(redirectSession?.usedAt).toBeTruthy();
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
+  it("keeps existing OAuth 2.0 (Authorization Code) flows working when provider state is omitted", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-auth-code-provider-state-omitted";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth2-authorization-code-provider-state-omitted@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    let completedProviderState: Record<string, unknown> | undefined;
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startAuthorization: async (input) => ({
+        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
+      }),
+      completeAuthorizationCodeGrant: async (input) => {
+        completedProviderState = input.providerState;
+
+        return {
+          connectionConfig: {
+            account_id: "acct_omit_123",
+          },
+          accessToken: "access-token-omit-123",
+        };
+      },
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const startResponse = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      expect(startResponse.status).toBe(200);
+      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      if (state === null || state.length === 0) {
+        throw new Error("Expected authorization URL to include redirect state.");
+      }
+
+      const redirectSession =
+        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, state),
+        });
+      expect(redirectSession?.providerStateEncrypted).toBeNull();
+
+      const completeResponse = await app.request(
+        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_omit_123`,
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+
+      expect(completeResponse.status).toBe(302);
+      expect(completedProviderState).toBeUndefined();
+
+      const createdConnection = await resources.db.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authenticatedSession.organizationId),
+            eq(table.targetKey, targetKey),
+          ),
+      });
+      expect(createdConnection?.config).toMatchObject({
+        connection_method: "oauth2-authorization-code",
+        account_id: "acct_omit_123",
+      });
+    } finally {
+      await stopAppResources(resources);
+    }
   });
 });

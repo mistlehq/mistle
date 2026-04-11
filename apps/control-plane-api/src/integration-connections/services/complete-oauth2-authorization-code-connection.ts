@@ -79,6 +79,31 @@ function resolvePkceVerifier(input: {
   });
 }
 
+function resolveProviderState(input: {
+  providerStateEncrypted: string | null;
+  masterEncryptionKeys: Record<string, string>;
+}): Record<string, unknown> | undefined {
+  if (input.providerStateEncrypted === null) {
+    return undefined;
+  }
+
+  const plaintext = decryptRedirectSessionSecretUtf8({
+    ciphertext: input.providerStateEncrypted,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+  const parsed = JSON.parse(plaintext);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("OAuth 2.0 (Authorization Code) provider state must decode to an object.");
+  }
+
+  const providerState: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(parsed)) {
+    providerState[key] = value;
+  }
+
+  return providerState;
+}
+
 export async function completeOAuth2AuthorizationCodeConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -149,6 +174,10 @@ export async function completeOAuth2AuthorizationCodeConnection(
     pkceVerifierEncrypted: redirectSession.pkceVerifierEncrypted,
     masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
   });
+  const providerState = resolveProviderState({
+    providerStateEncrypted: redirectSession.providerStateEncrypted,
+    masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
+  });
   const completedOAuth2AuthorizationCodeConnection =
     await resolved.oauth2AuthorizationCode.completeAuthorizationCodeGrant({
       organizationId: redirectSession.organizationId,
@@ -157,6 +186,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
       query: queryParams,
       redirectUrl,
       ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
+      ...(providerState === undefined ? {} : { providerState }),
     });
 
   return db.transaction(async (tx) => {

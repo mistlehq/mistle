@@ -120,6 +120,7 @@ CREATE TABLE "control_plane"."integration_connection_redirect_sessions" (
 	"target_key" text NOT NULL,
 	"state" text NOT NULL,
 	"pkce_verifier_encrypted" text,
+	"provider_state_encrypted" text,
 	"expires_at" timestamp with time zone NOT NULL,
 	"used_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL

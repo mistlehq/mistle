@@ -51,6 +51,7 @@ async function persistRedirectSession(input: {
   targetKey: string;
   state: string;
   pkceVerifierEncrypted: string;
+  providerStateEncrypted?: string;
   expiresAt: string;
 }): Promise<void> {
   const insertedRows = await input.db
@@ -60,6 +61,9 @@ async function persistRedirectSession(input: {
       targetKey: input.targetKey,
       state: input.state,
       pkceVerifierEncrypted: input.pkceVerifierEncrypted,
+      ...(input.providerStateEncrypted === undefined
+        ? {}
+        : { providerStateEncrypted: input.providerStateEncrypted }),
       expiresAt: input.expiresAt,
     })
     .onConflictDoNothing({
@@ -130,6 +134,14 @@ export async function startOAuth2AuthorizationCodeConnection(
         challengeMethod: PKCE_CHALLENGE_METHOD,
       },
     });
+  const providerStateEncrypted =
+    startedOAuth2AuthorizationCodeConnection.providerState === undefined
+      ? undefined
+      : encryptRedirectSessionSecretUtf8({
+          plaintext: JSON.stringify(startedOAuth2AuthorizationCodeConnection.providerState),
+          masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
+          masterEncryptionKeyMaterial,
+        });
 
   await persistRedirectSession({
     db,
@@ -137,6 +149,7 @@ export async function startOAuth2AuthorizationCodeConnection(
     targetKey: input.targetKey,
     state,
     pkceVerifierEncrypted,
+    ...(providerStateEncrypted === undefined ? {} : { providerStateEncrypted }),
     expiresAt: createRedirectSessionExpiryTimestamp(),
   });
 

@@ -19,6 +19,7 @@ export const integrationConnectionRedirectSessions = controlPlaneSchema.table(
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
     state: text("state").notNull(),
     pkceVerifierEncrypted: text("pkce_verifier_encrypted"),
+    providerStateEncrypted: text("provider_state_encrypted"),
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

@@ -676,6 +676,7 @@ export type IntegrationOAuth2AuthorizationCodeStartAuthorizationInput<
 
 export type IntegrationOAuth2AuthorizationCodeStartAuthorizationResult = {
   authorizationUrl: string;
+  providerState?: Record<string, unknown>;
 };
 
 export type IntegrationOAuth2AuthorizationCodeCompleteGrantInput<
@@ -688,6 +689,7 @@ export type IntegrationOAuth2AuthorizationCodeCompleteGrantInput<
   query: URLSearchParams;
   redirectUrl: string;
   pkceVerifier?: string;
+  providerState?: Record<string, unknown>;
 };
 
 export type IntegrationOAuth2AuthorizationCodeCompleteGrantResult = {
