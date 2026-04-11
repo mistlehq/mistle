@@ -25,6 +25,10 @@ describe("integrations-definitions server", () => {
       familyId: "github",
       variantId: "github-enterprise-server",
     });
+    const planetscaleDefinition = registry.getDefinition({
+      familyId: "planetscale",
+      variantId: "planetscale-mcp",
+    });
     const slackDefinition = registry.getDefinition({
       familyId: "slack",
       variantId: "slack-default",
@@ -67,6 +71,9 @@ describe("integrations-definitions server", () => {
         }),
       ]),
     );
+    expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
+    expect(planetscaleDefinition?.webhookSource).toBeUndefined();
     expect(slackDefinition?.webhookHandler).toBeDefined();
     expect(slackDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
@@ -76,7 +83,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(7);
+    expect(definitions).toHaveLength(8);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

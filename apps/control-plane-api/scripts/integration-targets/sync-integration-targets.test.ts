@@ -52,6 +52,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "planetscale-mcp",
+        familyId: "planetscale",
+        variantId: "planetscale-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "slack-default",
         familyId: "slack",
         variantId: "slack-default",
