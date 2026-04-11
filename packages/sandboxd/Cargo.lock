@@ -345,6 +345,7 @@ dependencies = [
  "http",
  "http-body",
  "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -829,6 +830,7 @@ dependencies = [
 name = "sandboxd"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "bytes",
  "futures-util",
  "http-body-util",

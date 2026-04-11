@@ -15,6 +15,7 @@ use url::Url;
 pub mod agent_stream;
 pub mod file_upload;
 pub mod port_access;
+pub mod port_access_transport;
 pub mod protocol;
 pub mod pty_stream;
 pub mod runtime_processes;
