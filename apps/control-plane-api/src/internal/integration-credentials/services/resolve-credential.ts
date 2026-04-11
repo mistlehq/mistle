@@ -509,6 +509,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
   slotKey?: string;
   accessTokenSlotKey: string;
   refreshTokenSlotKey: string;
+  clientSecretSlotKey: string;
 }): Promise<ResolvedIntegrationCredential> {
   if (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
     return resolvePersistedCredential({
@@ -618,6 +619,19 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
         integrationsConfig: input.integrationsConfig,
         credential: refreshCredential,
       });
+      const clientSecretCredential = await resolveLinkedActiveCredential(tx, {
+        connectionId: lockedConnection.id,
+        slotKey: input.clientSecretSlotKey,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      });
+      const decryptedClientSecret =
+        clientSecretCredential === undefined
+          ? undefined
+          : await decryptLinkedActiveCredential(tx, {
+              organizationId: lockedConnection.organizationId,
+              integrationsConfig: input.integrationsConfig,
+              credential: clientSecretCredential,
+            });
 
       let refreshedAccessToken;
       try {
@@ -630,6 +644,14 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
             decryptedRefreshToken,
             "OAuth 2.0 refresh token resolution",
           ),
+          ...(decryptedClientSecret === undefined
+            ? {}
+            : {
+                clientSecret: resolveValueCredentialValueOrThrow(
+                  decryptedClientSecret,
+                  "OAuth 2.0 client secret resolution",
+                ),
+              }),
         });
       } catch (error) {
         if (error instanceof IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError) {
@@ -1391,6 +1413,7 @@ export async function resolveIntegrationCredential(
             ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
             accessTokenSlotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
             refreshTokenSlotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
+            clientSecretSlotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
           });
           span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
 

@@ -343,6 +343,41 @@ export async function completeOAuth2AuthorizationCodeConnection(
           slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
         });
       }
+
+      if (completedOAuth2AuthorizationCodeConnection.clientSecret !== undefined) {
+        const encryptedClientSecret = encryptCredentialUtf8({
+          plaintext: completedOAuth2AuthorizationCodeConnection.clientSecret,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
+        });
+        const [createdClientSecretCredential] = await tx
+          .insert(integrationCredentials)
+          .values({
+            organizationId: redirectSession.organizationId,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+            ciphertext: encryptedClientSecret.ciphertext,
+            nonce: encryptedClientSecret.nonce,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            intendedFamilyId: resolved.target.familyId,
+            ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
+              ? {}
+              : { metadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata }),
+          })
+          .returning({
+            id: integrationCredentials.id,
+          });
+
+        if (createdClientSecretCredential === undefined) {
+          throw new Error(
+            "Failed to create OAuth 2.0 (Authorization Code) client secret credential.",
+          );
+        }
+
+        await tx.insert(integrationConnectionCredentials).values({
+          connectionId: createdConnection.id,
+          credentialId: createdClientSecretCredential.id,
+          slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
+        });
+      }
     } finally {
       unwrappedOrganizationCredentialKey.fill(0);
     }

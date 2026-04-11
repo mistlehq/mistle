@@ -1,5 +1,5 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
-import { integrationTargets } from "@mistle/db/control-plane";
+import { IntegrationCredentialSecretKinds, integrationTargets } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   IntegrationRegistry,
@@ -14,7 +14,12 @@ import { createControlPlaneAuth } from "../src/auth/index.js";
 import { CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/complete-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
-import { decryptRedirectSessionSecretUtf8 } from "../src/lib/crypto.js";
+import {
+  decryptCredentialUtf8,
+  decryptRedirectSessionSecretUtf8,
+  resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
+} from "../src/lib/crypto.js";
 import { createAppResources, stopAppResources } from "../src/resources.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
@@ -154,6 +159,33 @@ function decryptRedirectProviderState(input: {
   }
 
   return record;
+}
+
+function decryptStoredCredential(input: {
+  wrappedOrganizationKeyCiphertext: string;
+  masterKeyVersion: number;
+  masterEncryptionKeys: Record<string, string>;
+  nonce: string;
+  ciphertext: string;
+}): string {
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: input.masterKeyVersion,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+  const organizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: input.wrappedOrganizationKeyCiphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    return decryptCredentialUtf8({
+      nonce: input.nonce,
+      ciphertext: input.ciphertext,
+      organizationCredentialKey,
+    });
+  } finally {
+    organizationCredentialKey.fill(0);
+  }
 }
 
 describe("integration connections OAuth 2.0 authorization-code integration", () => {
@@ -413,6 +445,124 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
           where: (table, { eq }) => eq(table.state, state),
         });
       expect(redirectSession?.usedAt).toBeTruthy();
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
+  it("persists an optional OAuth 2.0 client secret returned during completion", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-auth-code-client-secret-complete";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth2-authorization-code-client-secret-complete@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startAuthorization: async (input) => ({
+        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
+      }),
+      completeAuthorizationCodeGrant: async () => ({
+        connectionConfig: {
+          account_id: "acct_client_secret_123",
+        },
+        accessToken: "access-token-client-secret-123",
+        clientSecret: "oauth-client-secret-123",
+      }),
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const startResponse = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      expect(startResponse.status).toBe(200);
+      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      if (state === null || state.length === 0) {
+        throw new Error("Expected authorization URL to include redirect state.");
+      }
+
+      const completeResponse = await app.request(
+        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_client_secret_123`,
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+
+      expect(completeResponse.status).toBe(302);
+
+      const createdConnection = await resources.db.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, authenticatedSession.organizationId),
+            eq(table.targetKey, targetKey),
+          ),
+      });
+      if (createdConnection === undefined) {
+        throw new Error("Expected completed OAuth 2.0 connection.");
+      }
+
+      const linkedCredentials = await resources.db.query.integrationConnectionCredentials.findMany({
+        where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      });
+      expect(linkedCredentials).toHaveLength(2);
+
+      const credentialIds = linkedCredentials.map((link) => link.credentialId);
+      const storedCredentials = await resources.db.query.integrationCredentials.findMany({
+        where: (table, { inArray }) => inArray(table.id, credentialIds),
+      });
+
+      const clientSecretCredential = storedCredentials.find(
+        (credential) =>
+          credential.secretKind === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      );
+      if (clientSecretCredential === undefined) {
+        throw new Error("Expected OAuth 2.0 client secret credential to be stored.");
+      }
+
+      const organizationCredentialKey =
+        await resources.db.query.organizationCredentialKeys.findFirst({
+          where: (table, { eq }) => eq(table.organizationId, authenticatedSession.organizationId),
+          orderBy: (table, { desc }) => [desc(table.version)],
+        });
+      if (organizationCredentialKey === undefined) {
+        throw new Error("Expected organization credential key.");
+      }
+
+      expect(
+        decryptStoredCredential({
+          wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
+          masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+          nonce: clientSecretCredential.nonce,
+          ciphertext: clientSecretCredential.ciphertext,
+        }),
+      ).toBe("oauth-client-secret-123");
     } finally {
       await stopAppResources(resources);
     }

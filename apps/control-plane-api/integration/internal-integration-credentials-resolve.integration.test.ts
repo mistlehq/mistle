@@ -805,6 +805,148 @@ describe("internal integration credentials resolve", () => {
     ).toBe("rotated-refresh-token");
   });
 
+  it("forwards an optional OAuth 2.0 client secret during managed refresh", async ({ fixture }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "device_auth_refresh_client_secret_target",
+      familyId: DeviceAuthorizationRefreshFamilyId,
+      variantId: DeviceAuthorizationRefreshVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_device_auth_refresh_client_secret",
+      organizationId: authSession.organizationId,
+      targetKey: "device_auth_refresh_client_secret_target",
+      displayName: "Device auth refresh client secret",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
+        auth_mode: "chatgpt",
+        chatgpt_account_id: "acct_789",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedExpiredAccessToken = encryptCredentialUtf8({
+        plaintext: "expired-access-token-client-secret",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+      const encryptedRefreshToken = encryptCredentialUtf8({
+        plaintext: "valid-refresh-token-client-secret",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+      const encryptedClientSecret = encryptCredentialUtf8({
+        plaintext: "oauth-client-secret-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values([
+        {
+          id: "icr_device_auth_access_client_secret_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+          ciphertext: encryptedExpiredAccessToken.ciphertext,
+          nonce: encryptedExpiredAccessToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2000-01-01T00:00:00.000Z",
+        },
+        {
+          id: "icr_device_auth_refresh_client_secret_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+          ciphertext: encryptedRefreshToken.ciphertext,
+          nonce: encryptedRefreshToken.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+          expiresAt: "2030-01-01T00:00:00.000Z",
+        },
+        {
+          id: "icr_device_auth_client_secret_old",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+          ciphertext: encryptedClientSecret.ciphertext,
+          nonce: encryptedClientSecret.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
+        },
+      ]);
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values([
+      {
+        connectionId: "icn_device_auth_refresh_client_secret",
+        credentialId: "icr_device_auth_access_client_secret_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+      },
+      {
+        connectionId: "icn_device_auth_refresh_client_secret",
+        credentialId: "icr_device_auth_refresh_client_secret_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
+      },
+      {
+        connectionId: "icn_device_auth_refresh_client_secret",
+        credentialId: "icr_device_auth_client_secret_old",
+        slotKey: DeviceAuthorizationRefreshSlotKeys.clientSecret,
+      },
+    ]);
+
+    let observedClientSecret: string | undefined;
+    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
+      refreshAccessToken: async (input) => {
+        observedClientSecret = input.clientSecret;
+        expect(input.refreshToken).toBe("valid-refresh-token-client-secret");
+
+        return {
+          accessToken: "rotated-access-token-client-secret",
+          accessTokenExpiresAt: "2030-01-04T00:00:00.000Z",
+        };
+      },
+    });
+
+    const resolvedCredential = await resolveIntegrationCredential(
+      {
+        db: fixture.db,
+        integrationRegistry,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        connectionId: "icn_device_auth_refresh_client_secret",
+        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+      },
+    );
+
+    expect(resolvedCredential).toEqual({
+      kind: "value",
+      value: "rotated-access-token-client-secret",
+      expiresAt: "2030-01-04T00:00:00.000Z",
+    });
+    expect(observedClientSecret).toBe("oauth-client-secret-value");
+  });
+
   it("marks the connection errored when device-authorization refresh fails permanently", async ({
     fixture,
   }) => {
