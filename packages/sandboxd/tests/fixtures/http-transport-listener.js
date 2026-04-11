@@ -14,7 +14,8 @@ const server = http.createServer((request, response) => {
       "x-fixture": marker,
     });
     response.flushHeaders();
-    response.write("partial:", () => {
+    response.write("partial:");
+    setImmediate(() => {
       response.socket?.destroy();
     });
     return;
