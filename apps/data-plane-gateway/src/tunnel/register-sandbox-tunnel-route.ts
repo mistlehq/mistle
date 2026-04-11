@@ -6,6 +6,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
+import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
@@ -42,6 +43,7 @@ type RegisterSandboxTunnelRouteInput = {
   gatewayNodeId: string;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
+  portAccessTransportService: PortAccessTransportService;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
@@ -85,6 +87,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(
     input.interactiveStreamRouter,
     input.portsTargetAuthorizeService,
+    input.portAccessTransportService,
   );
   const sandboxKeepaliveRepository = new SandboxKeepaliveRepository(
     input.sandboxKeepaliveStore,
@@ -336,6 +339,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           onClose: (event) => {
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
+                input.portAccessTransportService.rejectPendingStreamsForSandbox({
+                  sandboxInstanceId,
+                });
                 input.portsTargetAuthorizeService.rejectPendingRequestsForSandbox({
                   sandboxInstanceId,
                 });

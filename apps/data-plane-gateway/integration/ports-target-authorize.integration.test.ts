@@ -10,6 +10,7 @@ import { typeid } from "typeid-js";
 import { afterEach, describe, expect, it as vitestIt } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
+import { PortAccessTransportService } from "../src/publishing/port-access-transport.js";
 import {
   PortsTargetAuthorizeBootstrapDisconnectedError,
   PortsTargetAuthorizeService,
@@ -236,8 +237,13 @@ async function createTranslator(input: {
     new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
     forwardingClient,
   );
+  const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
 
-  return new TunnelProtocolTranslator(router, input.portsTargetAuthorizeService);
+  return new TunnelProtocolTranslator(
+    router,
+    input.portsTargetAuthorizeService,
+    new PortAccessTransportService(relayCoordinator),
+  );
 }
 
 afterEach(async () => {

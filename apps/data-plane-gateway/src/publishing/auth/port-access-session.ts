@@ -18,6 +18,7 @@ export type VerifiedPortAccessSession = {
   sandboxInstanceId: string;
   port: number;
   host: string;
+  upstreamProtocol: "http" | "https";
 };
 
 export const PortAccessSessionErrorCode = {
@@ -55,6 +56,7 @@ const PortAccessSessionClaimsSchema = z.object({
   sandboxInstanceId: z.string().trim().min(1),
   port: z.number().int().min(1).max(65535),
   host: z.string().trim().min(1),
+  upstreamProtocol: z.enum(["http", "https"]),
 });
 
 function trimToUndefined(value: string | undefined): string | undefined {
@@ -84,6 +86,7 @@ function parseClaims(input: {
   sandboxInstanceId: string;
   port: number;
   host: string;
+  upstreamProtocol: "http" | "https";
 }): z.infer<typeof PortAccessSessionClaimsSchema> {
   try {
     return PortAccessSessionClaimsSchema.parse(input);
@@ -122,12 +125,14 @@ export async function mintPortAccessSession(input: {
   sandboxInstanceId: string;
   port: number;
   host: string;
+  upstreamProtocol: "http" | "https";
 }): Promise<string> {
   const config = validateConfig(input.config);
   const claims = parseClaims({
     sandboxInstanceId: input.sandboxInstanceId,
     port: input.port,
     host: input.host,
+    upstreamProtocol: input.upstreamProtocol,
   });
   const nowEpochSeconds = Math.floor(input.clock.nowMs() / 1000);
 

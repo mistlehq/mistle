@@ -24,6 +24,7 @@ describe("port access session", () => {
       sandboxInstanceId: "sbi_session_roundtrip",
       port: 5173,
       host: "p-5173--onrgsx3sn52w4zduojuxaxzqgayq.mistle.localhost",
+      upstreamProtocol: "https",
     });
 
     await expect(
@@ -36,6 +37,7 @@ describe("port access session", () => {
       sandboxInstanceId: "sbi_session_roundtrip",
       port: 5173,
       host: "p-5173--onrgsx3sn52w4zduojuxaxzqgayq.mistle.localhost",
+      upstreamProtocol: "https",
     });
   });
 
@@ -47,6 +49,7 @@ describe("port access session", () => {
       sandboxInstanceId: "sbi_session_expired",
       port: 3000,
       host: "p-3000--onrgsx3sn52w4zduojuxaxzqgayq.mistle.localhost",
+      upstreamProtocol: "http",
     });
 
     clock.advanceMs((PortAccessSessionTtlSeconds + 1) * 1000);

@@ -164,6 +164,7 @@ export async function bootstrapPortAccess(input: {
       sandboxInstanceId: verifiedBootstrapToken.sandboxInstanceId,
       port: verifiedBootstrapToken.port,
       host: verifiedBootstrapToken.host,
+      upstreamProtocol: authorizeResult.upstreamProtocol,
     });
 
     return {

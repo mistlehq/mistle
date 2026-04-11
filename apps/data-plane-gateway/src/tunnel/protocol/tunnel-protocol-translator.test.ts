@@ -8,6 +8,7 @@ import { systemClock } from "@mistle/time";
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { PortAccessTransportService } from "../../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../../publishing/ports-target-authorize-service.js";
 import { createInMemoryTunnelRelayCoordinator } from "../create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -58,14 +59,17 @@ async function createTranslatorHarness() {
     new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
     forwardingClient,
   );
-  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(
-    createInMemoryTunnelRelayCoordinator(LocalNodeId),
-    scheduler,
-  );
+  const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(relayCoordinator, scheduler);
+  const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
 
   return {
     router,
-    translator: new TunnelProtocolTranslator(router, portsTargetAuthorizeService),
+    translator: new TunnelProtocolTranslator(
+      router,
+      portsTargetAuthorizeService,
+      portAccessTransportService,
+    ),
   };
 }
 
