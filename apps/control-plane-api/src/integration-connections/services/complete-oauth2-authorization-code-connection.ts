@@ -298,11 +298,22 @@ export async function completeOAuth2AuthorizationCodeConnection(
         throw new Error("Failed to create OAuth 2.0 (Authorization Code) access token credential.");
       }
 
-      await tx.insert(integrationConnectionCredentials).values({
-        connectionId: createdConnection.id,
-        credentialId: createdAccessTokenCredential.id,
-        slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
-      });
+      const [createdAccessTokenCredentialLink] = await tx
+        .insert(integrationConnectionCredentials)
+        .values({
+          connectionId: createdConnection.id,
+          credentialId: createdAccessTokenCredential.id,
+          slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
+        })
+        .returning({
+          connectionId: integrationConnectionCredentials.connectionId,
+        });
+
+      if (createdAccessTokenCredentialLink === undefined) {
+        throw new Error(
+          "Failed to link OAuth 2.0 (Authorization Code) access token credential to the connection.",
+        );
+      }
 
       if (completedOAuth2AuthorizationCodeConnection.refreshToken !== undefined) {
         const encryptedRefreshToken = encryptCredentialUtf8({
@@ -337,11 +348,22 @@ export async function completeOAuth2AuthorizationCodeConnection(
           );
         }
 
-        await tx.insert(integrationConnectionCredentials).values({
-          connectionId: createdConnection.id,
-          credentialId: createdRefreshTokenCredential.id,
-          slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
-        });
+        const [createdRefreshTokenCredentialLink] = await tx
+          .insert(integrationConnectionCredentials)
+          .values({
+            connectionId: createdConnection.id,
+            credentialId: createdRefreshTokenCredential.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
+          })
+          .returning({
+            connectionId: integrationConnectionCredentials.connectionId,
+          });
+
+        if (createdRefreshTokenCredentialLink === undefined) {
+          throw new Error(
+            "Failed to link OAuth 2.0 (Authorization Code) refresh token credential to the connection.",
+          );
+        }
       }
 
       if (completedOAuth2AuthorizationCodeConnection.clientSecret !== undefined) {
@@ -372,11 +394,22 @@ export async function completeOAuth2AuthorizationCodeConnection(
           );
         }
 
-        await tx.insert(integrationConnectionCredentials).values({
-          connectionId: createdConnection.id,
-          credentialId: createdClientSecretCredential.id,
-          slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
-        });
+        const [createdClientSecretCredentialLink] = await tx
+          .insert(integrationConnectionCredentials)
+          .values({
+            connectionId: createdConnection.id,
+            credentialId: createdClientSecretCredential.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
+          })
+          .returning({
+            connectionId: integrationConnectionCredentials.connectionId,
+          });
+
+        if (createdClientSecretCredentialLink === undefined) {
+          throw new Error(
+            "Failed to link OAuth 2.0 (Authorization Code) client secret credential to the connection.",
+          );
+        }
       }
     } finally {
       unwrappedOrganizationCredentialKey.fill(0);
