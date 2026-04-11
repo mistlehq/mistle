@@ -11,15 +11,6 @@ import type { PortsTargetAuthorizeService } from "./ports-target-authorize-servi
 
 const PortAccessBootstrapPath = "/_mistle/access/bootstrap";
 
-function textResponse(message: string, status: 400 | 401 | 403 | 409 | 502): Response {
-  return new Response(message, {
-    status,
-    headers: {
-      "content-type": "text/plain; charset=utf-8",
-    },
-  });
-}
-
 export function registerPortAccessRoutes(input: {
   app: DataPlaneGatewayApp;
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
@@ -42,7 +33,12 @@ export function registerPortAccessRoutes(input: {
     });
 
     if (result.kind === "failure") {
-      return textResponse(result.message, result.status);
+      return new Response(result.message, {
+        status: result.status,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
     }
 
     const response = ctx.redirect(result.location, 302);

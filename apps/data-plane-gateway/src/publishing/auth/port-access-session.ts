@@ -80,10 +80,6 @@ function validateConfig(config: PortAccessSessionConfig): PortAccessSessionConfi
   };
 }
 
-function toSecretKey(secret: string): ReturnType<typeof createSecretKey> {
-  return createSecretKey(JwtSecretEncoder.encode(secret));
-}
-
 function parseClaims(input: {
   sandboxInstanceId: string;
   port: number;
@@ -140,7 +136,7 @@ export async function mintPortAccessSession(input: {
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt(nowEpochSeconds)
       .setExpirationTime(nowEpochSeconds + PortAccessSessionTtlSeconds)
-      .sign(toSecretKey(config.cookieSigningSecret));
+      .sign(createSecretKey(JwtSecretEncoder.encode(config.cookieSigningSecret)));
   } catch (error) {
     throw new PortAccessSessionError({
       code: PortAccessSessionErrorCode.COOKIE_SIGNING_FAILED,
@@ -165,10 +161,14 @@ export async function verifyPortAccessSession(input: {
   }
 
   try {
-    const verified = await jwtVerify(cookie, toSecretKey(config.cookieSigningSecret), {
-      algorithms: AllowedPortAccessSessionAlgorithms,
-      currentDate: input.clock.nowDate(),
-    });
+    const verified = await jwtVerify(
+      cookie,
+      createSecretKey(JwtSecretEncoder.encode(config.cookieSigningSecret)),
+      {
+        algorithms: AllowedPortAccessSessionAlgorithms,
+        currentDate: input.clock.nowDate(),
+      },
+    );
     return PortAccessSessionClaimsSchema.parse(verified.payload);
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
