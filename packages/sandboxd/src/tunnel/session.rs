@@ -2082,6 +2082,30 @@ fn handle_ports_transport_message(
                 message.stream_id
             )));
         }
+        crate::tunnel::protocol::PortsTransportMessage::WsOpen(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.open streamId {} is not supported until websocket transport is implemented",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsAccept(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.accept streamId {} must not be sent from the gateway to sandboxd",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsFrame(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.frame streamId {} must not be sent from the gateway to sandboxd before websocket transport is implemented",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsClose(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.close streamId {} must not be sent from the gateway to sandboxd before websocket transport is implemented",
+                message.stream_id
+            )));
+        }
         crate::tunnel::protocol::PortsTransportMessage::StreamError(message) => {
             return Err(TunnelSessionError::PortAccess(format!(
                 "ports.stream.error streamId {} must not be sent from the gateway to sandboxd",

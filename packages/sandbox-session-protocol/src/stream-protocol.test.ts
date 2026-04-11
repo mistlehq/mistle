@@ -652,7 +652,7 @@ describe("ports control message parser", () => {
   });
 });
 
-describe("ports http transport message parser", () => {
+describe("ports transport message parser", () => {
   it("parses ports.http.open messages", () => {
     expect(
       parsePortsTransportMessage(
@@ -779,6 +779,116 @@ describe("ports http transport message parser", () => {
     });
   });
 
+  it("parses ports.ws messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.open",
+          streamId: 55,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "https",
+          request: {
+            path: "/hmr",
+            query: "token=1",
+            headers: {
+              connection: ["Upgrade"],
+              upgrade: ["websocket"],
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.open",
+      streamId: 55,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "https",
+      request: {
+        path: "/hmr",
+        query: "token=1",
+        headers: {
+          connection: ["Upgrade"],
+          upgrade: ["websocket"],
+        },
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.accept",
+          streamId: 55,
+          headers: {
+            "sec-websocket-accept": ["digest"],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.accept",
+      streamId: 55,
+      headers: {
+        "sec-websocket-accept": ["digest"],
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.frame",
+          streamId: 55,
+          direction: "response",
+          opcode: "text",
+          bytes: "SGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.frame",
+      streamId: 55,
+      direction: "response",
+      opcode: "text",
+      bytes: "SGVsbG8=",
+      encoding: "base64",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.close",
+          streamId: 55,
+          direction: "request",
+          code: 1000,
+          reason: "normal",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.close",
+      streamId: 55,
+      direction: "request",
+      code: 1000,
+      reason: "normal",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.close",
+          streamId: 56,
+          direction: "response",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.close",
+      streamId: 56,
+      direction: "response",
+    });
+  });
+
   it("rejects malformed ports.http messages", () => {
     expect(
       parsePortsTransportMessage(
@@ -797,6 +907,52 @@ describe("ports http transport message parser", () => {
               accept: "text/plain",
             },
           },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects malformed ports.ws messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.open",
+          streamId: 55,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "tcp",
+          request: {
+            path: "/hmr",
+            headers: {
+              upgrade: ["websocket"],
+            },
+          },
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.frame",
+          streamId: 55,
+          direction: "response",
+          opcode: "continuation",
+          bytes: "SGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.close",
+          streamId: 55,
+          direction: "response",
+          reason: "normal",
         }),
       ),
     ).toBeUndefined();

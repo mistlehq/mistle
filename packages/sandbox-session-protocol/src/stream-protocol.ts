@@ -199,6 +199,45 @@ const PortsHttpBodyEndSchema = z.object({
   direction: z.enum(["request", "response"]),
 });
 
+const PortsWsOpenSchema = z.object({
+  type: z.literal("ports.ws.open"),
+  streamId: PositiveIntegerSchema,
+  target: PortAccessTargetSchema,
+  upstreamProtocol: z.enum(["http", "https"]),
+  request: z.object({
+    path: NonEmptyStringSchema,
+    query: NonEmptyStringSchema.optional(),
+    headers: RepeatedHeaderValuesSchema,
+  }),
+});
+
+const PortsWsAcceptSchema = z.object({
+  type: z.literal("ports.ws.accept"),
+  streamId: PositiveIntegerSchema,
+  headers: RepeatedHeaderValuesSchema,
+});
+
+const PortsWsFrameSchema = z.object({
+  type: z.literal("ports.ws.frame"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  opcode: z.enum(["text", "binary", "ping", "pong"]),
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const PortsWsCloseSchema = z
+  .object({
+    type: z.literal("ports.ws.close"),
+    streamId: PositiveIntegerSchema,
+    direction: z.enum(["request", "response"]),
+    code: PositiveIntegerSchema.optional(),
+    reason: NonEmptyStringSchema.optional(),
+  })
+  .refine((message) => message.reason === undefined || message.code !== undefined, {
+    message: "ports.ws.close reason requires a close code",
+  });
+
 const PortsStreamCloseSchema = z.object({
   type: z.literal("ports.stream.close"),
   streamId: PositiveIntegerSchema,
@@ -216,6 +255,10 @@ const PortsTransportMessageSchema = z.union([
   PortsHttpResponseStartSchema,
   PortsHttpBodyChunkSchema,
   PortsHttpBodyEndSchema,
+  PortsWsOpenSchema,
+  PortsWsAcceptSchema,
+  PortsWsFrameSchema,
+  PortsWsCloseSchema,
   PortsStreamCloseSchema,
   PortsStreamErrorSchema,
 ]);
@@ -394,6 +437,10 @@ export type PortsHttpOpen = z.infer<typeof PortsHttpOpenSchema>;
 export type PortsHttpResponseStart = z.infer<typeof PortsHttpResponseStartSchema>;
 export type PortsHttpBodyChunk = z.infer<typeof PortsHttpBodyChunkSchema>;
 export type PortsHttpBodyEnd = z.infer<typeof PortsHttpBodyEndSchema>;
+export type PortsWsOpen = z.infer<typeof PortsWsOpenSchema>;
+export type PortsWsAccept = z.infer<typeof PortsWsAcceptSchema>;
+export type PortsWsFrame = z.infer<typeof PortsWsFrameSchema>;
+export type PortsWsClose = z.infer<typeof PortsWsCloseSchema>;
 export type PortsStreamClose = z.infer<typeof PortsStreamCloseSchema>;
 export type PortsStreamError = z.infer<typeof PortsStreamErrorSchema>;
 export type PortsTransportMessage = z.infer<typeof PortsTransportMessageSchema>;

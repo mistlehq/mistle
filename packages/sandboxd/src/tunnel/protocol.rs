@@ -403,6 +403,64 @@ pub struct PortsHttpBodyEnd {
     pub direction: String,
 }
 
+/// Inbound `ports.ws.open` request from the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsWsOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub target: PortAccessTarget,
+    pub upstream_protocol: String,
+    pub request: PortsWsRequest,
+}
+
+/// Websocket handshake metadata carried by `ports.ws.open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsWsRequest {
+    pub path: String,
+    pub query: Option<String>,
+    pub headers: RepeatedHeaderValues,
+}
+
+/// Outbound `ports.ws.accept` payload sent by sandboxd after upstream upgrade.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsWsAccept {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub headers: RepeatedHeaderValues,
+}
+
+/// One base64-encoded websocket frame.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsWsFrame {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub direction: String,
+    pub opcode: String,
+    pub bytes: String,
+    pub encoding: String,
+}
+
+/// One websocket close signal propagated through the tunnel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsWsClose {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub direction: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
 /// One transport-close signal shared by `ports.http.*` and `ports.ws.*`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -436,6 +494,10 @@ pub enum PortsTransportMessage {
     HttpResponseStart(PortsHttpResponseStart),
     HttpBodyChunk(PortsHttpBodyChunk),
     HttpBodyEnd(PortsHttpBodyEnd),
+    WsOpen(PortsWsOpen),
+    WsAccept(PortsWsAccept),
+    WsFrame(PortsWsFrame),
+    WsClose(PortsWsClose),
     StreamClose(PortsStreamClose),
     StreamError(PortsStreamError),
 }
@@ -820,7 +882,7 @@ pub fn parse_ports_control_message(
     }
 }
 
-/// Parses one inbound `ports.http.*` transport message.
+/// Parses one inbound `ports.http.*` / `ports.ws.*` transport message.
 pub fn parse_ports_transport_message(
     payload: &str,
 ) -> Result<Option<PortsTransportMessage>, TunnelProtocolError> {
@@ -857,6 +919,30 @@ pub fn parse_ports_transport_message(
                 .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
             validate_ports_http_body_end(&message)?;
             Ok(Some(PortsTransportMessage::HttpBodyEnd(message)))
+        }
+        "ports.ws.open" => {
+            let message: PortsWsOpen = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_ws_open(&message)?;
+            Ok(Some(PortsTransportMessage::WsOpen(message)))
+        }
+        "ports.ws.accept" => {
+            let message: PortsWsAccept = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_ws_accept(&message)?;
+            Ok(Some(PortsTransportMessage::WsAccept(message)))
+        }
+        "ports.ws.frame" => {
+            let message: PortsWsFrame = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_ws_frame(&message)?;
+            Ok(Some(PortsTransportMessage::WsFrame(message)))
+        }
+        "ports.ws.close" => {
+            let message: PortsWsClose = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_ws_close(&message)?;
+            Ok(Some(PortsTransportMessage::WsClose(message)))
         }
         "ports.stream.close" => {
             let message: PortsStreamClose = serde_json::from_value(parsed_payload)
@@ -1479,6 +1565,111 @@ fn validate_ports_http_body_end(message: &PortsHttpBodyEnd) -> Result<(), Tunnel
     Ok(())
 }
 
+fn validate_ports_ws_open(message: &PortsWsOpen) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.ws.open" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.open message type must be 'ports.ws.open', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_port_access_target(&message.target)?;
+    validate_stream_id(message.stream_id)?;
+    if message.upstream_protocol != "http" && message.upstream_protocol != "https" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.open upstreamProtocol must be 'http' or 'https', got '{}'",
+            message.upstream_protocol
+        )));
+    }
+    if message.request.path.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "ports.ws.open request path is required",
+        ));
+    }
+    if let Some(query) = &message.request.query
+        && query.trim().is_empty()
+    {
+        return Err(TunnelProtocolError::new(
+            "ports.ws.open request query must be non-empty when present",
+        ));
+    }
+    validate_repeated_header_values(&message.request.headers, "ports.ws.open request")
+}
+
+fn validate_ports_ws_accept(message: &PortsWsAccept) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.ws.accept" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.accept message type must be 'ports.ws.accept', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_repeated_header_values(&message.headers, "ports.ws.accept")
+}
+
+fn validate_ports_ws_frame(message: &PortsWsFrame) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.ws.frame" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.frame message type must be 'ports.ws.frame', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.direction != "request" && message.direction != "response" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.frame direction must be 'request' or 'response', got '{}'",
+            message.direction
+        )));
+    }
+    if message.opcode != "text"
+        && message.opcode != "binary"
+        && message.opcode != "ping"
+        && message.opcode != "pong"
+    {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.frame opcode must be 'text', 'binary', 'ping', or 'pong', got '{}'",
+            message.opcode
+        )));
+    }
+    if message.encoding != "base64" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.frame encoding must be 'base64', got '{}'",
+            message.encoding
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_ports_ws_close(message: &PortsWsClose) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.ws.close" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.close message type must be 'ports.ws.close', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.direction != "request" && message.direction != "response" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.ws.close direction must be 'request' or 'response', got '{}'",
+            message.direction
+        )));
+    }
+    if message.reason.is_some() && message.code.is_none() {
+        return Err(TunnelProtocolError::new(
+            "ports.ws.close reason requires a close code",
+        ));
+    }
+    if let Some(reason) = &message.reason
+        && reason.trim().is_empty()
+    {
+        return Err(TunnelProtocolError::new(
+            "ports.ws.close reason must be non-empty when present",
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_ports_stream_close(message: &PortsStreamClose) -> Result<(), TunnelProtocolError> {
     if message.message_type != "ports.stream.close" {
         return Err(TunnelProtocolError::new(format!(
@@ -1721,6 +1912,54 @@ mod tests {
     }
 
     #[test]
+    fn parses_valid_ports_websocket_transport_messages() {
+        let ws_open = parse_ports_transport_message(
+            r#"{"type":"ports.ws.open","streamId":55,"target":{"kind":"port","port":5173},"upstreamProtocol":"https","request":{"path":"/hmr","query":"token=1","headers":{"connection":["Upgrade"],"upgrade":["websocket"]}}}"#,
+        )
+        .expect("ports.ws.open should parse");
+        assert!(matches!(
+            ws_open,
+            Some(crate::tunnel::protocol::PortsTransportMessage::WsOpen(_))
+        ));
+
+        let ws_accept = parse_ports_transport_message(
+            r#"{"type":"ports.ws.accept","streamId":55,"headers":{"sec-websocket-accept":["digest"]}}"#,
+        )
+        .expect("ports.ws.accept should parse");
+        assert!(matches!(
+            ws_accept,
+            Some(crate::tunnel::protocol::PortsTransportMessage::WsAccept(_))
+        ));
+
+        let ws_frame = parse_ports_transport_message(
+            r#"{"type":"ports.ws.frame","streamId":55,"direction":"response","opcode":"text","bytes":"SGVsbG8=","encoding":"base64"}"#,
+        )
+        .expect("ports.ws.frame should parse");
+        assert!(matches!(
+            ws_frame,
+            Some(crate::tunnel::protocol::PortsTransportMessage::WsFrame(_))
+        ));
+
+        let ws_close = parse_ports_transport_message(
+            r#"{"type":"ports.ws.close","streamId":55,"direction":"request","code":1000,"reason":"normal"}"#,
+        )
+        .expect("ports.ws.close should parse");
+        assert!(matches!(
+            ws_close,
+            Some(crate::tunnel::protocol::PortsTransportMessage::WsClose(_))
+        ));
+
+        let ws_close_without_code = parse_ports_transport_message(
+            r#"{"type":"ports.ws.close","streamId":56,"direction":"response"}"#,
+        )
+        .expect("ports.ws.close without a code should parse");
+        assert!(matches!(
+            ws_close_without_code,
+            Some(crate::tunnel::protocol::PortsTransportMessage::WsClose(_))
+        ));
+    }
+
+    #[test]
     fn round_trips_data_frames() {
         let encoded = encode_stream_data_frame(9, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello")
             .expect("frame should encode");
@@ -1859,6 +2098,72 @@ mod tests {
                 message: "upstream closed early".to_string(),
             }),
             r#"{"type":"ports.stream.error","streamId":41,"code":"upstream_io_error","message":"upstream closed early"}"#
+        );
+    }
+
+    #[test]
+    fn serializes_ports_websocket_transport_messages() {
+        assert_eq!(
+            super::serialize_json(&super::PortsWsOpen {
+                message_type: "ports.ws.open".to_string(),
+                stream_id: 55,
+                target: super::PortAccessTarget {
+                    kind: "port".to_string(),
+                    port: 5173,
+                },
+                upstream_protocol: "https".to_string(),
+                request: super::PortsWsRequest {
+                    path: "/hmr".to_string(),
+                    query: Some("token=1".to_string()),
+                    headers: std::collections::BTreeMap::from([
+                        ("connection".to_string(), vec!["Upgrade".to_string()]),
+                        ("upgrade".to_string(), vec!["websocket".to_string()]),
+                    ]),
+                },
+            }),
+            r#"{"type":"ports.ws.open","streamId":55,"target":{"kind":"port","port":5173},"upstreamProtocol":"https","request":{"path":"/hmr","query":"token=1","headers":{"connection":["Upgrade"],"upgrade":["websocket"]}}}"#
+        );
+        assert_eq!(
+            super::serialize_json(&super::PortsWsAccept {
+                message_type: "ports.ws.accept".to_string(),
+                stream_id: 55,
+                headers: std::collections::BTreeMap::from([(
+                    "sec-websocket-accept".to_string(),
+                    vec!["digest".to_string()],
+                )]),
+            }),
+            r#"{"type":"ports.ws.accept","streamId":55,"headers":{"sec-websocket-accept":["digest"]}}"#
+        );
+        assert_eq!(
+            super::serialize_json(&super::PortsWsFrame {
+                message_type: "ports.ws.frame".to_string(),
+                stream_id: 55,
+                direction: "response".to_string(),
+                opcode: "text".to_string(),
+                bytes: "SGVsbG8=".to_string(),
+                encoding: "base64".to_string(),
+            }),
+            r#"{"type":"ports.ws.frame","streamId":55,"direction":"response","opcode":"text","bytes":"SGVsbG8=","encoding":"base64"}"#
+        );
+        assert_eq!(
+            super::serialize_json(&super::PortsWsClose {
+                message_type: "ports.ws.close".to_string(),
+                stream_id: 55,
+                direction: "request".to_string(),
+                code: Some(1000),
+                reason: Some("normal".to_string()),
+            }),
+            r#"{"type":"ports.ws.close","streamId":55,"direction":"request","code":1000,"reason":"normal"}"#
+        );
+        assert_eq!(
+            super::serialize_json(&super::PortsWsClose {
+                message_type: "ports.ws.close".to_string(),
+                stream_id: 56,
+                direction: "response".to_string(),
+                code: None,
+                reason: None,
+            }),
+            r#"{"type":"ports.ws.close","streamId":56,"direction":"response"}"#
         );
     }
 

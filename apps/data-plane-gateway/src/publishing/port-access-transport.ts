@@ -296,6 +296,10 @@ export class PortAccessTransportService {
         return true;
       }
       case "ports.http.open":
+      case "ports.ws.open":
+      case "ports.ws.accept":
+      case "ports.ws.frame":
+      case "ports.ws.close":
       case "ports.stream.close": {
         return false;
       }
