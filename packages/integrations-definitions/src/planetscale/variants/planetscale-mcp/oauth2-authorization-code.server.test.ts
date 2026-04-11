@@ -9,10 +9,8 @@ import {
   classifyPlanetScaleRefreshFailure,
   createPlanetScaleRefreshTransportFailure,
   parsePlanetScaleDynamicClientRegistrationResponse,
-  parsePlanetScaleTokenResponse,
   resolvePlanetScaleAuthorizationCodeOrThrow,
   resolvePlanetScaleCompleteGrantResult,
-  resolvePlanetScaleProviderState,
   resolvePlanetScaleRefreshResult,
 } from "./oauth2-authorization-code.server.js";
 
@@ -108,37 +106,6 @@ describe("PlanetScale OAuth 2.0 authorization code", () => {
         body: '{"client_id":"pscale_app_123","client_secret":"pscale_secret_456"}',
       }),
     ).not.toThrow();
-  });
-
-  it("parses the token response with extra provider fields", () => {
-    expect(
-      parsePlanetScaleTokenResponse({
-        access_token: "access_123",
-        refresh_token: "refresh_456",
-        expires_in: 3600,
-        scope: "openid profile",
-        token_type: "Bearer",
-      }),
-    ).toMatchObject({
-      access_token: "access_123",
-      refresh_token: "refresh_456",
-      expires_in: 3600,
-      scope: "openid profile",
-    });
-  });
-
-  it("requires object provider state with client credentials", () => {
-    expect(
-      resolvePlanetScaleProviderState({
-        clientId: "pscale_app_123",
-        clientSecret: "pscale_secret_456",
-      }),
-    ).toEqual({
-      clientId: "pscale_app_123",
-      clientSecret: "pscale_secret_456",
-    });
-
-    expect(() => resolvePlanetScaleProviderState(undefined)).toThrow(/Invalid input/);
   });
 
   it("resolves the authorization code and surfaces callback errors", () => {

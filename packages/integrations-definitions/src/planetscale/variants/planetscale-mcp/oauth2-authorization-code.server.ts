@@ -151,14 +151,6 @@ export function buildPlanetScaleRefreshRequestBody(input: {
   return params;
 }
 
-export function parsePlanetScaleTokenResponse(input: unknown): PlanetScaleTokenResponse {
-  return PlanetScaleTokenResponseSchema.parse(input);
-}
-
-export function resolvePlanetScaleProviderState(input: unknown): PlanetScaleProviderState {
-  return PlanetScaleProviderStateSchema.parse(input);
-}
-
 export function resolvePlanetScaleAuthorizationCodeOrThrow(query: URLSearchParams): string {
   const error = query.get("error");
   if (error !== null && error.length > 0) {
@@ -361,7 +353,7 @@ async function exchangePlanetScaleToken(input: {
     );
   }
 
-  return parsePlanetScaleTokenResponse(await response.json());
+  return PlanetScaleTokenResponseSchema.parse(await response.json());
 }
 
 export const PlanetScaleMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2AuthorizationCodeCapability<
@@ -414,7 +406,7 @@ export const PlanetScaleMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2A
       throw new Error("PlanetScale OAuth callback is missing PKCE verifier.");
     }
 
-    const providerState = resolvePlanetScaleProviderState(input.providerState);
+    const providerState = PlanetScaleProviderStateSchema.parse(input.providerState);
     const code = resolvePlanetScaleAuthorizationCodeOrThrow(input.query);
     const response = await exchangePlanetScaleToken({
       requestBody: buildPlanetScaleAuthorizationCodeExchangeRequestBody({
@@ -473,7 +465,7 @@ export const PlanetScaleMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2A
     }
 
     return resolvePlanetScaleRefreshResult({
-      response: parsePlanetScaleTokenResponse(await response.json()),
+      response: PlanetScaleTokenResponseSchema.parse(await response.json()),
       issuedAt: new Date(),
     });
   },
