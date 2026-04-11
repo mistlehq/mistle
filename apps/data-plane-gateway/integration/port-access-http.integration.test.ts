@@ -245,6 +245,7 @@ describe("port access http integration", () => {
         headers: {
           cookie: `${createCookieHeader(sessionToken)}; theme=dark`,
           host,
+          origin: `http://${host}`,
           "x-request-marker": "req-123",
         },
       });
@@ -272,6 +273,7 @@ describe("port access http integration", () => {
           query: "color=blue&mode=full",
           headers: expect.objectContaining({
             host: [`127.0.0.1:${String(port)}`],
+            origin: [`http://127.0.0.1:${String(port)}`],
             "x-forwarded-host": [host],
             "x-forwarded-port": ["80"],
             "x-forwarded-proto": ["http"],
