@@ -3,7 +3,7 @@
 //! The tunnel has two layers of responsibility:
 //! - establish and close the outer websocket connection to the gateway
 //! - host the stream-level channel implementations that run over that socket
-//!   for PTY, agent runtime, file upload, and telemetry traffic
+//!   for PTY, agent runtime, file upload, telemetry, and port-access traffic
 
 use std::fmt::{self, Display};
 use std::net::TcpStream;
