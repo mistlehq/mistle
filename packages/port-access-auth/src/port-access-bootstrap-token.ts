@@ -107,10 +107,6 @@ function validateConfig(config: PortAccessBootstrapTokenConfig): PortAccessBoots
   };
 }
 
-function toSecretKey(secret: string): ReturnType<typeof createSecretKey> {
-  return createSecretKey(JwtSecretEncoder.encode(secret));
-}
-
 function mapClaimValidationErrorCode(
   error: JoseErrors.JWTClaimValidationFailed,
 ): PortAccessBootstrapTokenErrorCode {
@@ -187,7 +183,7 @@ export async function mintPortAccessBootstrapToken(input: {
       .setAudience(config.tokenAudience)
       .setIssuedAt(nowEpochSeconds)
       .setExpirationTime(nowEpochSeconds + input.ttlSeconds)
-      .sign(toSecretKey(config.tokenSecret));
+      .sign(createSecretKey(JwtSecretEncoder.encode(config.tokenSecret)));
   } catch (error) {
     throw new PortAccessBootstrapTokenError({
       code: PortAccessBootstrapTokenErrorCode.TOKEN_SIGNING_FAILED,
@@ -212,11 +208,15 @@ export async function verifyPortAccessBootstrapToken(input: {
 
   let payload: z.infer<typeof VerifiedClaimsSchema>;
   try {
-    const verified = await jwtVerify(token, toSecretKey(config.tokenSecret), {
-      algorithms: AllowedPortAccessBootstrapTokenAlgorithms,
-      issuer: config.tokenIssuer,
-      audience: config.tokenAudience,
-    });
+    const verified = await jwtVerify(
+      token,
+      createSecretKey(JwtSecretEncoder.encode(config.tokenSecret)),
+      {
+        algorithms: AllowedPortAccessBootstrapTokenAlgorithms,
+        issuer: config.tokenIssuer,
+        audience: config.tokenAudience,
+      },
+    );
     payload = VerifiedClaimsSchema.parse(verified.payload);
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
