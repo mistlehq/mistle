@@ -4,9 +4,15 @@ import {
   type PortsHttpBodyEnd,
   type PortsHttpOpen,
   type PortsHttpResponseStart,
+  type PortsWsAccept,
+  type PortsWsClose,
+  type PortsWsFrame,
+  type PortsWsOpen,
   type PortsStreamError,
   type PortsTransportMessage,
 } from "@mistle/sandbox-session-protocol";
+import type { WSContext } from "hono/ws";
+import type WebSocket from "ws";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
@@ -32,12 +38,36 @@ type ActivePortAccessHttpStream = {
   responseBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
 };
 
+type PortAccessWebSocketPendingEvent =
+  | { kind: "frame"; message: PortsWsFrame }
+  | { kind: "close"; message: PortsWsClose };
+
+type ActivePortAccessWebSocketStream = {
+  accepted: boolean;
+  browserClosed: boolean;
+  pendingEvents: PortAccessWebSocketPendingEvent[];
+  rejectAccept: (error: Error) => void;
+  resolveAccept: (accept: PortsWsAccept) => void;
+  socket?: WSContext<WebSocket>;
+};
+
 export type PortAccessHttpRequestHandle = {
   close: () => Promise<void>;
   finishRequestBody: () => Promise<void>;
   responseBody: ReadableStream<Uint8Array>;
   responseStart: Promise<PortsHttpResponseStart>;
   sendRequestBodyChunk: (bytes: Uint8Array) => Promise<void>;
+};
+
+export type PortAccessWebSocketHandle = {
+  accepted: Promise<PortsWsAccept>;
+  attachSocket: (socket: WSContext<WebSocket>) => void;
+  notifyBrowserClose: (input: { code: number; reason: string }) => Promise<void>;
+  notifyBrowserError: (error: Error) => Promise<void>;
+  notifyBrowserFrame: (input: {
+    bytes: Uint8Array;
+    opcode: PortsWsFrame["opcode"];
+  }) => Promise<void>;
 };
 
 export class PortAccessTransportBootstrapDisconnectedError extends Error {
@@ -130,6 +160,10 @@ export class PortAccessTransportService {
   readonly #activeHttpStreamsBySandboxInstanceId = new Map<
     string,
     Map<number, ActivePortAccessHttpStream>
+  >();
+  readonly #activeWebSocketStreamsBySandboxInstanceId = new Map<
+    string,
+    Map<number, ActivePortAccessWebSocketStream>
   >();
   #nextStreamId = 1;
 
@@ -240,25 +274,129 @@ export class PortAccessTransportService {
     };
   }
 
+  public async openWebSocketStream(input: {
+    request: PortsWsOpen["request"];
+    sandboxInstanceId: string;
+    target: PortAccessTarget;
+    upstreamProtocol: "http" | "https";
+  }): Promise<PortAccessWebSocketHandle> {
+    if (
+      this.relayCoordinator.getBootstrapPeer({
+        sandboxInstanceId: input.sandboxInstanceId,
+      }) === undefined
+    ) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    const streamId = this.allocateStreamId();
+    let resolveAccept: ((accept: PortsWsAccept) => void) | undefined;
+    let rejectAccept: ((error: Error) => void) | undefined;
+    const accepted = new Promise<PortsWsAccept>((resolve, reject) => {
+      resolveAccept = resolve;
+      rejectAccept = reject;
+    });
+    if (resolveAccept === undefined || rejectAccept === undefined) {
+      throw new Error("Port access websocket accept promise callbacks were not initialized.");
+    }
+
+    this.setActiveWebSocketStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId,
+      stream: {
+        accepted: false,
+        browserClosed: false,
+        pendingEvents: [],
+        rejectAccept,
+        resolveAccept,
+      },
+    });
+
+    try {
+      await this.forwardMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        payload: JSON.stringify({
+          type: "ports.ws.open",
+          streamId,
+          target: input.target,
+          upstreamProtocol: input.upstreamProtocol,
+          request: input.request,
+        } satisfies PortsWsOpen),
+      });
+    } catch (error) {
+      this.deleteActiveWebSocketStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        streamId,
+      });
+      rejectAccept(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
+
+    return {
+      accepted,
+      attachSocket: (socket) => {
+        this.attachWebSocket({
+          sandboxInstanceId: input.sandboxInstanceId,
+          socket,
+          streamId,
+        });
+      },
+      notifyBrowserClose: async ({ code, reason }) => {
+        await this.closeWebSocketFromBrowser({
+          code,
+          reason,
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
+      },
+      notifyBrowserError: async (error) => {
+        await this.failWebSocketFromBrowser({
+          error,
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
+      },
+      notifyBrowserFrame: async ({ bytes, opcode }) => {
+        await this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          payload: JSON.stringify({
+            type: "ports.ws.frame",
+            streamId,
+            direction: "request",
+            opcode,
+            bytes: Buffer.from(bytes).toString("base64"),
+            encoding: "base64",
+          } satisfies PortsWsFrame),
+        });
+      },
+    };
+  }
+
   public async handleBootstrapTransportMessage(input: {
     message: PortsTransportMessage;
     sandboxInstanceId: string;
   }): Promise<boolean> {
-    const activeStream = this.getActiveHttpStream({
+    const activeHttpStream = this.getActiveHttpStream({
       sandboxInstanceId: input.sandboxInstanceId,
       streamId: input.message.streamId,
     });
-    if (activeStream === undefined) {
-      return false;
-    }
+    const activeWebSocketStream = this.getActiveWebSocketStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId: input.message.streamId,
+    });
 
     switch (input.message.type) {
       case "ports.http.response.start": {
-        activeStream.responseStarted = true;
-        activeStream.resolveResponseStart(input.message);
+        if (activeHttpStream === undefined) {
+          return false;
+        }
+        activeHttpStream.responseStarted = true;
+        activeHttpStream.resolveResponseStart(input.message);
         return true;
       }
       case "ports.http.body.chunk": {
+        if (activeHttpStream === undefined) {
+          return false;
+        }
         if (input.message.direction !== "response") {
           await this.failHttpStream({
             error: new PortAccessTransportStreamError({
@@ -271,35 +409,114 @@ export class PortAccessTransportService {
           return true;
         }
 
-        await activeStream.responseBodyWriter.write(
+        await activeHttpStream.responseBodyWriter.write(
           Uint8Array.from(Buffer.from(input.message.bytes, "base64")),
         );
         return true;
       }
       case "ports.http.body.end": {
+        if (activeHttpStream === undefined) {
+          return false;
+        }
         this.deleteActiveHttpStream({
           sandboxInstanceId: input.sandboxInstanceId,
           streamId: input.message.streamId,
         });
-        await activeStream.responseBodyWriter.close();
+        await activeHttpStream.responseBodyWriter.close();
         return true;
       }
-      case "ports.stream.error": {
-        await this.failHttpStream({
-          error: new PortAccessTransportStreamError({
-            code: input.message.code,
-            message: input.message.message,
-          }),
-          sandboxInstanceId: input.sandboxInstanceId,
-          streamId: input.message.streamId,
+      case "ports.ws.accept": {
+        if (activeWebSocketStream === undefined) {
+          return false;
+        }
+
+        activeWebSocketStream.accepted = true;
+        activeWebSocketStream.resolveAccept(input.message);
+        return true;
+      }
+      case "ports.ws.frame": {
+        if (activeWebSocketStream === undefined) {
+          return false;
+        }
+        if (input.message.direction !== "response") {
+          await this.failWebSocketStream({
+            error: new PortAccessTransportStreamError({
+              code: "upstream_io_error",
+              message: "Gateway received a non-response websocket frame from sandboxd.",
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
+        this.deliverWebSocketEvent({
+          event: {
+            kind: "frame",
+            message: input.message,
+          },
+          stream: activeWebSocketStream,
         });
         return true;
       }
+      case "ports.ws.close": {
+        if (activeWebSocketStream === undefined) {
+          return false;
+        }
+        if (input.message.direction !== "response") {
+          await this.failWebSocketStream({
+            error: new PortAccessTransportStreamError({
+              code: "upstream_io_error",
+              message: "Gateway received a non-response websocket close from sandboxd.",
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
+        this.deleteActiveWebSocketStream({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId: input.message.streamId,
+        });
+        this.deliverWebSocketEvent({
+          event: {
+            kind: "close",
+            message: input.message,
+          },
+          stream: activeWebSocketStream,
+        });
+        return true;
+      }
+      case "ports.stream.error": {
+        if (activeHttpStream !== undefined) {
+          await this.failHttpStream({
+            error: new PortAccessTransportStreamError({
+              code: input.message.code,
+              message: input.message.message,
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
+        if (activeWebSocketStream !== undefined) {
+          await this.failWebSocketStream({
+            error: new PortAccessTransportStreamError({
+              code: input.message.code,
+              message: input.message.message,
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
+        return false;
+      }
       case "ports.http.open":
       case "ports.ws.open":
-      case "ports.ws.accept":
-      case "ports.ws.frame":
-      case "ports.ws.close":
       case "ports.stream.close": {
         return false;
       }
@@ -321,6 +538,38 @@ export class PortAccessTransportService {
         stream.rejectResponseStart(disconnectError);
       }
       void stream.responseBodyWriter.abort(disconnectError);
+      void this.forwardMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        payload: JSON.stringify({
+          type: "ports.stream.close",
+          streamId,
+        }),
+      }).catch(() => undefined);
+    }
+
+    const activeWebSocketStreams = this.#activeWebSocketStreamsBySandboxInstanceId.get(
+      input.sandboxInstanceId,
+    );
+    if (activeWebSocketStreams === undefined) {
+      return;
+    }
+
+    this.#activeWebSocketStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    for (const [streamId, stream] of activeWebSocketStreams) {
+      const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
+        input.sandboxInstanceId,
+      );
+      if (!stream.accepted) {
+        stream.rejectAccept(disconnectError);
+        continue;
+      }
+
+      if (stream.socket !== undefined) {
+        closeBrowserWebSocket(stream.socket, {
+          code: 1011,
+          reason: disconnectError.message,
+        });
+      }
       void this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         payload: JSON.stringify({
@@ -366,6 +615,119 @@ export class PortAccessTransportService {
     await activeStream.responseBodyWriter.abort(input.error);
   }
 
+  private attachWebSocket(input: {
+    sandboxInstanceId: string;
+    socket: WSContext<WebSocket>;
+    streamId: number;
+  }): void {
+    const activeStream = this.getActiveWebSocketStream(input);
+    if (activeStream === undefined) {
+      closeBrowserWebSocket(input.socket, {
+        code: 1011,
+        reason: "Port Access websocket stream is no longer active.",
+      });
+      return;
+    }
+
+    if (input.socket.raw === undefined) {
+      throw new Error("Expected raw websocket for Port Access browser attachment.");
+    }
+    Reflect.set(input.socket.raw, "_autoPong", false);
+    activeStream.socket = input.socket;
+
+    const pendingEvents = [...activeStream.pendingEvents];
+    activeStream.pendingEvents = [];
+    for (const event of pendingEvents) {
+      this.deliverWebSocketEvent({
+        event,
+        stream: activeStream,
+      });
+    }
+  }
+
+  private async closeWebSocketFromBrowser(input: {
+    code: number;
+    reason: string;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const activeStream = this.getActiveWebSocketStream(input);
+    if (activeStream === undefined || activeStream.browserClosed) {
+      return;
+    }
+
+    activeStream.browserClosed = true;
+    if (input.code === 1006) {
+      await this.forwardMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        payload: JSON.stringify({
+          type: "ports.stream.close",
+          streamId: input.streamId,
+        }),
+      });
+      return;
+    }
+
+    await this.forwardMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: JSON.stringify({
+        type: "ports.ws.close",
+        streamId: input.streamId,
+        direction: "request",
+        ...(input.code === 1005
+          ? {}
+          : {
+              code: input.code,
+              ...(input.reason.length === 0 ? {} : { reason: input.reason }),
+            }),
+      } satisfies PortsWsClose),
+    });
+  }
+
+  private async failWebSocketFromBrowser(input: {
+    error: Error;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const activeStream = this.getActiveWebSocketStream(input);
+    if (activeStream === undefined || activeStream.browserClosed) {
+      return;
+    }
+
+    activeStream.browserClosed = true;
+    await this.forwardMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      payload: JSON.stringify({
+        type: "ports.stream.close",
+        streamId: input.streamId,
+      }),
+    }).catch(() => undefined);
+  }
+
+  private async failWebSocketStream(input: {
+    error: Error;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const activeStream = this.getActiveWebSocketStream(input);
+    if (activeStream === undefined) {
+      return;
+    }
+
+    this.deleteActiveWebSocketStream(input);
+    if (!activeStream.accepted) {
+      activeStream.rejectAccept(input.error);
+      return;
+    }
+
+    if (activeStream.socket !== undefined) {
+      closeBrowserWebSocket(activeStream.socket, {
+        code: 1011,
+        reason: "Port Access upstream websocket failed.",
+      });
+    }
+  }
+
   private async forwardMessage(input: {
     payload: string;
     sandboxInstanceId: string;
@@ -396,4 +758,147 @@ export class PortAccessTransportService {
     sandboxStreams.set(input.streamId, input.stream);
     this.#activeHttpStreamsBySandboxInstanceId.set(input.sandboxInstanceId, sandboxStreams);
   }
+
+  private deleteActiveWebSocketStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): void {
+    const sandboxStreams = this.#activeWebSocketStreamsBySandboxInstanceId.get(
+      input.sandboxInstanceId,
+    );
+    if (sandboxStreams === undefined) {
+      return;
+    }
+
+    sandboxStreams.delete(input.streamId);
+    if (sandboxStreams.size === 0) {
+      this.#activeWebSocketStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    }
+  }
+
+  private deliverWebSocketEvent(input: {
+    event: PortAccessWebSocketPendingEvent;
+    stream: ActivePortAccessWebSocketStream;
+  }): void {
+    if (input.stream.socket === undefined) {
+      input.stream.pendingEvents.push(input.event);
+      return;
+    }
+
+    switch (input.event.kind) {
+      case "frame": {
+        sendBrowserWebSocketFrame(input.stream.socket, input.event.message);
+        return;
+      }
+      case "close": {
+        closeBrowserWebSocket(input.stream.socket, {
+          code: input.event.message.code,
+          reason: input.event.message.reason,
+        });
+      }
+    }
+  }
+
+  private getActiveWebSocketStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): ActivePortAccessWebSocketStream | undefined {
+    return this.#activeWebSocketStreamsBySandboxInstanceId
+      .get(input.sandboxInstanceId)
+      ?.get(input.streamId);
+  }
+
+  private setActiveWebSocketStream(input: {
+    sandboxInstanceId: string;
+    stream: ActivePortAccessWebSocketStream;
+    streamId: number;
+  }): void {
+    const sandboxStreams =
+      this.#activeWebSocketStreamsBySandboxInstanceId.get(input.sandboxInstanceId) ?? new Map();
+    sandboxStreams.set(input.streamId, input.stream);
+    this.#activeWebSocketStreamsBySandboxInstanceId.set(input.sandboxInstanceId, sandboxStreams);
+  }
+}
+
+function sendBrowserWebSocketFrame(socket: WSContext<WebSocket>, message: PortsWsFrame): void {
+  const bytes = Uint8Array.from(Buffer.from(message.bytes, "base64"));
+
+  switch (message.opcode) {
+    case "text":
+      socket.send(Buffer.from(bytes).toString("utf8"));
+      return;
+    case "binary":
+      socket.send(bytes);
+      return;
+    case "ping":
+      socket.raw?.ping(bytes);
+      return;
+    case "pong":
+      socket.raw?.pong(bytes);
+      return;
+  }
+}
+
+function closeBrowserWebSocket(
+  socket: WSContext<WebSocket>,
+  input: { code: number | undefined; reason: string | undefined },
+): void {
+  if (input.code === undefined) {
+    socket.close();
+    return;
+  }
+
+  socket.close(input.code, input.reason);
+}
+
+export function buildPortAccessWebSocketRequestHeaders(input: {
+  browserEdgePort: string;
+  browserEdgeProto: "http" | "https";
+  browserVisibleHost: string;
+  requestHeaders: Headers;
+  targetPort: number;
+  upstreamProtocol: "http" | "https";
+}): RepeatedHeaderValues {
+  const tunneledHeaders: RepeatedHeaderValues = {};
+
+  for (const [headerName, value] of input.requestHeaders.entries()) {
+    const normalizedHeaderName = headerName.toLowerCase();
+    if (normalizedHeaderName === "host") {
+      continue;
+    }
+
+    if (normalizedHeaderName === "cookie") {
+      const sanitizedCookieHeader = stripPortAccessSessionCookie(value);
+      if (sanitizedCookieHeader === undefined) {
+        continue;
+      }
+
+      tunneledHeaders.cookie = [sanitizedCookieHeader];
+      continue;
+    }
+
+    if (normalizedHeaderName === "origin") {
+      tunneledHeaders.origin = [
+        `${input.upstreamProtocol}://127.0.0.1:${String(input.targetPort)}`,
+      ];
+      continue;
+    }
+
+    if (
+      HopByHopHeaderNames.has(normalizedHeaderName) &&
+      normalizedHeaderName !== "connection" &&
+      normalizedHeaderName !== "upgrade"
+    ) {
+      continue;
+    }
+
+    tunneledHeaders[normalizedHeaderName] = [value];
+  }
+
+  tunneledHeaders.host = [`127.0.0.1:${String(input.targetPort)}`];
+  tunneledHeaders["x-forwarded-host"] = [input.browserVisibleHost];
+  tunneledHeaders["x-forwarded-proto"] = [input.browserEdgeProto];
+  tunneledHeaders["x-forwarded-port"] = [input.browserEdgePort];
+
+  return tunneledHeaders;
 }

@@ -1,3 +1,4 @@
+import type { NodeWebSocket } from "@hono/node-ws";
 import type {
   PortAccessBootstrapTokenConfig,
   PortAccessHostConfig,
@@ -8,6 +9,8 @@ import {
   parsePortAccessHost,
 } from "@mistle/port-access-auth";
 import type { Clock } from "@mistle/time";
+import type { WSEvents } from "hono/ws";
+import type WebSocket from "ws";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -20,7 +23,9 @@ import {
 import { bootstrapPortAccess } from "./port-access-bootstrap.js";
 import {
   buildPortAccessRequestHeaders,
+  buildPortAccessWebSocketRequestHeaders,
   type PortAccessHttpRequestHandle,
+  type PortAccessWebSocketHandle,
   PortAccessTransportBootstrapDisconnectedError,
   PortAccessTransportService,
   PortAccessTransportStreamError,
@@ -145,6 +150,7 @@ function neverSettlingPromise<T>(): Promise<T> {
 }
 export function registerPortAccessRoutes(input: {
   app: DataPlaneGatewayApp;
+  upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
   hostConfig: PortAccessHostConfig;
   portAccessTransportService: PortAccessTransportService;
@@ -179,121 +185,61 @@ export function registerPortAccessRoutes(input: {
     return response;
   });
 
-  input.app.all("*", async (ctx, next) => {
-    if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
-      return next();
-    }
-
-    const requestHost = ctx.req.header("host");
-    if (requestHost === undefined) {
-      return next();
-    }
-
-    let parsedHost;
-    try {
-      parsedHost = parsePortAccessHost({
-        config: input.hostConfig,
-        host: requestHost,
-      });
-    } catch (error) {
-      if (error instanceof PortAccessHostError) {
-        if (error.code === PortAccessHostErrorCode.BASE_DOMAIN_REQUIRED) {
-          throw error;
-        }
-
+  input.app.get(
+    "*",
+    async (ctx, next) => {
+      if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
+        return next();
+      }
+      if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
         return next();
       }
 
-      throw error;
-    }
-
-    const cookie = readCookieValue({
-      cookieHeader: ctx.req.header("cookie"),
-      cookieName: PortAccessSessionCookieName,
-    });
-    try {
-      const verifiedSession = await verifyPortAccessSession({
-        config: input.sessionConfig,
-        clock: input.clock,
-        cookie: cookie ?? "",
-      });
-      if (
-        verifiedSession.host !== parsedHost.host ||
-        verifiedSession.sandboxInstanceId !== parsedHost.sandboxInstanceId ||
-        verifiedSession.port !== parsedHost.port
-      ) {
-        return new Response("Invalid or expired Port Access session.", {
-          status: 401,
-          headers: {
-            "content-type": "text/plain; charset=utf-8",
-          },
-        });
+      const requestHost = ctx.req.header("host");
+      if (requestHost === undefined) {
+        return next();
       }
 
-      const browserEdgeProto = resolveBrowserEdgeProto({
-        forwardedProto: ctx.req.header("x-forwarded-proto"),
-        requestUrl: ctx.req.url,
-      });
-      const requestUrl = new URL(ctx.req.url);
-      const browserEdgePort = resolveBrowserEdgePort({
-        browserEdgeProto,
+      const resolvedRequest = await resolvePortAccessRequest({
+        clock: input.clock,
+        hostConfig: input.hostConfig,
         requestHost,
         requestUrl: ctx.req.url,
+        forwardedProto: ctx.req.header("x-forwarded-proto"),
+        sessionConfig: input.sessionConfig,
+        cookieHeader: ctx.req.header("cookie"),
       });
-      const requestHandle = await input.portAccessTransportService.openHttpStream({
-        sandboxInstanceId: verifiedSession.sandboxInstanceId,
-        target: {
-          kind: "port",
-          port: verifiedSession.port,
-        },
-        upstreamProtocol: verifiedSession.upstreamProtocol,
-        request: {
-          method: ctx.req.method,
-          path: requestUrl.pathname,
-          query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
-          headers: buildPortAccessRequestHeaders({
-            browserEdgePort,
-            browserEdgeProto,
-            browserVisibleHost: parsedHost.host,
-            requestHeaders: ctx.req.raw.headers,
-            targetPort: verifiedSession.port,
-            upstreamProtocol: verifiedSession.upstreamProtocol,
-          }),
-        },
-      });
+      if (resolvedRequest.kind === "not-port-access-host") {
+        return new Response("Not Found", { status: 404 });
+      }
+      if (resolvedRequest.kind === "failure") {
+        return resolvedRequest.response;
+      }
 
-      const requestBodyFailureSignal = pipeBrowserRequestBody({
-        requestBody: ctx.req.raw.body,
-        sendChunk: requestHandle.sendRequestBodyChunk,
-        sendEnd: requestHandle.finishRequestBody,
-      }).then(
-        () => neverSettlingPromise<Awaited<PortAccessHttpRequestHandle["responseStart"]>>(),
-        async (error: unknown) => {
-          await requestHandle.close();
-          if (error instanceof Error) {
-            throw error;
-          }
-
-          throw new Error(String(error));
-        },
-      );
-      void requestBodyFailureSignal.catch(() => undefined);
-
+      const requestUrl = new URL(ctx.req.url);
       try {
-        const responseStart = await Promise.race([
-          requestHandle.responseStart,
-          requestBodyFailureSignal,
-        ]);
-        return new Response(
-          wrapPortAccessResponseBody({
-            close: requestHandle.close,
-            responseBody: requestHandle.responseBody,
-          }),
-          {
-            status: responseStart.status,
-            headers: toPortAccessResponseHeaders(responseStart.headers),
+        const webSocketHandle = await input.portAccessTransportService.openWebSocketStream({
+          sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
+          target: {
+            kind: "port",
+            port: resolvedRequest.verifiedSession.port,
           },
-        );
+          upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+          request: {
+            path: requestUrl.pathname,
+            query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
+            headers: buildPortAccessWebSocketRequestHeaders({
+              browserEdgePort: resolvedRequest.browserEdgePort,
+              browserEdgeProto: resolvedRequest.browserEdgeProto,
+              browserVisibleHost: resolvedRequest.parsedHost.host,
+              requestHeaders: ctx.req.raw.headers,
+              targetPort: resolvedRequest.verifiedSession.port,
+              upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+            }),
+          },
+        });
+        await webSocketHandle.accepted;
+        ctx.set("portAccessWebSocketHandle", webSocketHandle);
       } catch (error) {
         if (
           error instanceof BootstrapTunnelNotConnectedError ||
@@ -310,10 +256,107 @@ export function registerPortAccessRoutes(input: {
 
         throw error;
       }
+
+      return next();
+    },
+    input.upgradeWebSocket((ctx) => {
+      const webSocketHandle = ctx.get("portAccessWebSocketHandle");
+      if (webSocketHandle === undefined) {
+        throw new Error("Expected validated Port Access websocket handle.");
+      }
+
+      return createPortAccessWebSocketEvents(webSocketHandle);
+    }),
+  );
+
+  input.app.all("*", async (ctx, next) => {
+    if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
+      return next();
+    }
+
+    const requestHost = ctx.req.header("host");
+    if (requestHost === undefined) {
+      return next();
+    }
+
+    const resolvedRequest = await resolvePortAccessRequest({
+      clock: input.clock,
+      cookieHeader: ctx.req.header("cookie"),
+      forwardedProto: ctx.req.header("x-forwarded-proto"),
+      hostConfig: input.hostConfig,
+      requestHost,
+      requestUrl: ctx.req.url,
+      sessionConfig: input.sessionConfig,
+    });
+    if (resolvedRequest.kind === "not-port-access-host") {
+      return next();
+    }
+    if (resolvedRequest.kind === "failure") {
+      return resolvedRequest.response;
+    }
+
+    const requestUrl = new URL(ctx.req.url);
+    const requestHandle = await input.portAccessTransportService.openHttpStream({
+      sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
+      target: {
+        kind: "port",
+        port: resolvedRequest.verifiedSession.port,
+      },
+      upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+      request: {
+        method: ctx.req.method,
+        path: requestUrl.pathname,
+        query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
+        headers: buildPortAccessRequestHeaders({
+          browserEdgePort: resolvedRequest.browserEdgePort,
+          browserEdgeProto: resolvedRequest.browserEdgeProto,
+          browserVisibleHost: resolvedRequest.parsedHost.host,
+          requestHeaders: ctx.req.raw.headers,
+          targetPort: resolvedRequest.verifiedSession.port,
+        }),
+      },
+    });
+
+    const requestBodyFailureSignal = pipeBrowserRequestBody({
+      requestBody: ctx.req.raw.body,
+      sendChunk: requestHandle.sendRequestBodyChunk,
+      sendEnd: requestHandle.finishRequestBody,
+    }).then(
+      () => neverSettlingPromise<Awaited<PortAccessHttpRequestHandle["responseStart"]>>(),
+      async (error: unknown) => {
+        await requestHandle.close();
+        if (error instanceof Error) {
+          throw error;
+        }
+
+        throw new Error(String(error));
+      },
+    );
+    void requestBodyFailureSignal.catch(() => undefined);
+
+    try {
+      const responseStart = await Promise.race([
+        requestHandle.responseStart,
+        requestBodyFailureSignal,
+      ]);
+      return new Response(
+        wrapPortAccessResponseBody({
+          close: requestHandle.close,
+          responseBody: requestHandle.responseBody,
+        }),
+        {
+          status: responseStart.status,
+          headers: toPortAccessResponseHeaders(responseStart.headers),
+        },
+      );
     } catch (error) {
-      if (error instanceof PortAccessSessionError) {
-        return new Response("Invalid or expired Port Access session.", {
-          status: 401,
+      if (
+        error instanceof BootstrapTunnelNotConnectedError ||
+        error instanceof PortAccessTransportBootstrapDisconnectedError ||
+        error instanceof PortAccessTransportStreamError
+      ) {
+        return new Response("Port Access upstream request failed.", {
+          status: 502,
           headers: {
             "content-type": "text/plain; charset=utf-8",
           },
@@ -323,4 +366,157 @@ export function registerPortAccessRoutes(input: {
       throw error;
     }
   });
+}
+
+async function resolvePortAccessRequest(input: {
+  clock: Clock;
+  cookieHeader: string | undefined;
+  forwardedProto: string | undefined;
+  hostConfig: PortAccessHostConfig;
+  requestHost: string;
+  requestUrl: string;
+  sessionConfig: PortAccessSessionConfig;
+}): Promise<
+  | { kind: "not-port-access-host" }
+  | { kind: "failure"; response: Response }
+  | {
+      kind: "resolved";
+      browserEdgePort: string;
+      browserEdgeProto: "http" | "https";
+      parsedHost: ReturnType<typeof parsePortAccessHost>;
+      verifiedSession: Awaited<ReturnType<typeof verifyPortAccessSession>>;
+    }
+> {
+  let parsedHost;
+  try {
+    parsedHost = parsePortAccessHost({
+      config: input.hostConfig,
+      host: input.requestHost,
+    });
+  } catch (error) {
+    if (error instanceof PortAccessHostError) {
+      if (error.code === PortAccessHostErrorCode.BASE_DOMAIN_REQUIRED) {
+        throw error;
+      }
+
+      return {
+        kind: "not-port-access-host",
+      };
+    }
+
+    throw error;
+  }
+
+  const cookie = readCookieValue({
+    cookieHeader: input.cookieHeader,
+    cookieName: PortAccessSessionCookieName,
+  });
+
+  let verifiedSession;
+  try {
+    verifiedSession = await verifyPortAccessSession({
+      config: input.sessionConfig,
+      clock: input.clock,
+      cookie: cookie ?? "",
+    });
+  } catch (error) {
+    if (error instanceof PortAccessSessionError) {
+      return {
+        kind: "failure",
+        response: new Response("Invalid or expired Port Access session.", {
+          status: 401,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+          },
+        }),
+      };
+    }
+
+    throw error;
+  }
+
+  if (
+    verifiedSession.host !== parsedHost.host ||
+    verifiedSession.sandboxInstanceId !== parsedHost.sandboxInstanceId ||
+    verifiedSession.port !== parsedHost.port
+  ) {
+    return {
+      kind: "failure",
+      response: new Response("Invalid or expired Port Access session.", {
+        status: 401,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      }),
+    };
+  }
+
+  const browserEdgeProto = resolveBrowserEdgeProto({
+    forwardedProto: input.forwardedProto,
+    requestUrl: input.requestUrl,
+  });
+  return {
+    kind: "resolved",
+    browserEdgePort: resolveBrowserEdgePort({
+      browserEdgeProto,
+      requestHost: input.requestHost,
+      requestUrl: input.requestUrl,
+    }),
+    browserEdgeProto,
+    parsedHost,
+    verifiedSession,
+  };
+}
+
+function createPortAccessWebSocketEvents(
+  webSocketHandle: PortAccessWebSocketHandle,
+): WSEvents<WebSocket> {
+  return {
+    onOpen: (_event, ws) => {
+      webSocketHandle.attachSocket(ws);
+      if (ws.raw === undefined) {
+        throw new Error("Expected raw websocket for Port Access upgrade handling.");
+      }
+      ws.raw.on("ping", (data: Buffer) => {
+        void webSocketHandle.notifyBrowserFrame({
+          bytes: Uint8Array.from(data),
+          opcode: "ping",
+        });
+      });
+      ws.raw.on("pong", (data: Buffer) => {
+        void webSocketHandle.notifyBrowserFrame({
+          bytes: Uint8Array.from(data),
+          opcode: "pong",
+        });
+      });
+    },
+    onMessage: (event, _ws) => {
+      if (typeof event.data === "string") {
+        void webSocketHandle.notifyBrowserFrame({
+          bytes: Buffer.from(event.data, "utf8"),
+          opcode: "text",
+        });
+        return;
+      }
+      if (event.data instanceof Blob) {
+        throw new Error("Port Access websocket Blob messages are not supported.");
+      }
+
+      void webSocketHandle.notifyBrowserFrame({
+        bytes: Uint8Array.from(Buffer.from(event.data)),
+        opcode: "binary",
+      });
+    },
+    onClose: (event) => {
+      void webSocketHandle.notifyBrowserClose({
+        code: event.code,
+        reason: event.reason,
+      });
+    },
+    onError: (event) => {
+      void webSocketHandle.notifyBrowserError(
+        new Error(`Port Access websocket emitted an error event: ${String(event.type)}`),
+      );
+    },
+  };
 }

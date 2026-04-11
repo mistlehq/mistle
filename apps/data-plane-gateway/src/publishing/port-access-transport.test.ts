@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPortAccessRequestHeaders,
+  buildPortAccessWebSocketRequestHeaders,
   toPortAccessResponseHeaders,
 } from "./port-access-transport.js";
 
@@ -70,5 +71,65 @@ describe("port access transport helpers", () => {
     expect(responseHeaders.get("cache-control")).toBe("no-store");
     expect(responseHeaders.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/"]);
     expect(responseHeaders.get("vary")).toBe("origin, accept-encoding");
+  });
+
+  it("rewrites browser websocket upgrade headers for tunneled upstream delivery", () => {
+    const requestHeaders = new Headers([
+      ["connection", "Upgrade"],
+      ["cookie", "mistle_port_access_session=session-token; theme=dark"],
+      ["host", "p-5173--sandbox.mistle.localhost"],
+      ["origin", "https://dashboard.mistle.localhost"],
+      ["sec-websocket-key", "websocket-key"],
+      ["sec-websocket-version", "13"],
+      ["upgrade", "websocket"],
+    ]);
+
+    expect(
+      buildPortAccessWebSocketRequestHeaders({
+        browserEdgePort: "443",
+        browserEdgeProto: "https",
+        browserVisibleHost: "p-5173--sandbox.mistle.localhost",
+        requestHeaders,
+        targetPort: 5173,
+        upstreamProtocol: "http",
+      }),
+    ).toEqual({
+      connection: ["Upgrade"],
+      cookie: ["theme=dark"],
+      host: ["127.0.0.1:5173"],
+      origin: ["http://127.0.0.1:5173"],
+      "sec-websocket-key": ["websocket-key"],
+      "sec-websocket-version": ["13"],
+      upgrade: ["websocket"],
+      "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
+      "x-forwarded-port": ["443"],
+      "x-forwarded-proto": ["https"],
+    });
+  });
+
+  it("drops websocket cookies entirely when only the port access session cookie is present", () => {
+    const requestHeaders = new Headers([
+      ["connection", "Upgrade"],
+      ["cookie", "mistle_port_access_session=session-token"],
+      ["upgrade", "websocket"],
+    ]);
+
+    expect(
+      buildPortAccessWebSocketRequestHeaders({
+        browserEdgePort: "80",
+        browserEdgeProto: "http",
+        browserVisibleHost: "p-5173--sandbox.mistle.localhost",
+        requestHeaders,
+        targetPort: 5173,
+        upstreamProtocol: "https",
+      }),
+    ).toEqual({
+      connection: ["Upgrade"],
+      host: ["127.0.0.1:5173"],
+      upgrade: ["websocket"],
+      "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
+      "x-forwarded-port": ["80"],
+      "x-forwarded-proto": ["http"],
+    });
   });
 });

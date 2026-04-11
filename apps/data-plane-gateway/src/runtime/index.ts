@@ -236,6 +236,7 @@ export function createDataPlaneGatewayRuntime(
   });
   registerPortAccessRoutes({
     app,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
     bootstrapTokenConfig: {
       tokenSecret: config.sandbox.publish.access.tokenSecret,
       tokenIssuer: config.sandbox.publish.access.tokenIssuer,

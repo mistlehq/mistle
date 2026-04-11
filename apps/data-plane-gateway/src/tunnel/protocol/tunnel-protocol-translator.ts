@@ -612,6 +612,9 @@ export class TunnelProtocolTranslator {
         portsTransportMessage.type === "ports.http.response.start" ||
         portsTransportMessage.type === "ports.http.body.chunk" ||
         portsTransportMessage.type === "ports.http.body.end" ||
+        portsTransportMessage.type === "ports.ws.accept" ||
+        portsTransportMessage.type === "ports.ws.frame" ||
+        portsTransportMessage.type === "ports.ws.close" ||
         portsTransportMessage.type === "ports.stream.error"
       ) {
         await this.portAccessTransportService.handleBootstrapTransportMessage({
