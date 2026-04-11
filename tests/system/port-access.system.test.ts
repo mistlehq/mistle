@@ -23,9 +23,9 @@ import { z } from "zod";
 
 import { it, type AuthenticatedSession, type SystemTestFixture } from "./system-test-context.js";
 
-const HttpFixtureHostPath = fileURLToPath(new URL("./fixtures/http-listener.py", import.meta.url));
+const HttpFixtureHostPath = fileURLToPath(new URL("./fixtures/http-listener.js", import.meta.url));
 const WebSocketFixtureHostPath = fileURLToPath(
-  new URL("./fixtures/ws-transport-listener.py", import.meta.url),
+  new URL("./fixtures/ws-transport-listener.js", import.meta.url),
 );
 
 const TestTimeoutMs = 5 * 60_000;
@@ -39,9 +39,9 @@ const WebSocketListenerPort = 5174;
 const OpenAiTargetKey = "openai-default";
 const OpenAiConnectionMethodId = "api-key";
 const OpenAiApiKey = "sk-system-port-access";
-const PythonRuntimeCommand = "mise exec python@3.12.13 -- python";
+const NodeRuntimeCommand = "mise exec node@25 -- node";
 const PtyCommandTimeoutMs = 60_000;
-const PythonProbeTimeoutMs = 10_000;
+const ListenerProbeTimeoutMs = 10_000;
 const TerminalControlSequencePattern = new RegExp(
   String.raw`\u001B(?:\][^\u0007\u001B]*(?:\u0007|\u001B\\)|\[[0-?]*[ -/]*[@-~]|[@-_])`,
   "g",
@@ -788,7 +788,7 @@ async function startFixtureListener(input: {
       "sh -lc",
       shellQuote(
         [
-          `${PythonRuntimeCommand} ${shellQuote(input.sandboxFixturePath)} ${String(input.port)} ${shellQuote(input.marker)} > ${shellQuote(input.logPath)} 2>&1 &`,
+          `${NodeRuntimeCommand} ${shellQuote(input.sandboxFixturePath)} ${String(input.port)} ${shellQuote(input.marker)} > ${shellQuote(input.logPath)} 2>&1 &`,
           "printf 'started\\n'",
         ].join(" "),
       ),
@@ -815,18 +815,21 @@ async function waitForListenerReady(input: {
           pump: input.pump,
           streamId: input.streamId,
           command: [
-            `${PythonRuntimeCommand} -c`,
+            `${NodeRuntimeCommand} -e`,
             shellQuote(
               [
-                "import socket",
-                "sock = socket.socket()",
-                "sock.settimeout(1.0)",
-                `sock.connect(('127.0.0.1', ${String(input.port)}))`,
-                "sock.close()",
+                'const net = require("node:net");',
+                "const socket = net.createConnection({ host: '127.0.0.1', port: " +
+                  String(input.port) +
+                  " });",
+                "socket.setTimeout(1000);",
+                "socket.once('connect', () => { socket.end(); process.exit(0); });",
+                "socket.once('timeout', () => { socket.destroy(); process.exit(1); });",
+                "socket.once('error', () => { process.exit(1); });",
               ].join("; "),
             ),
           ].join(" "),
-          timeoutMs: PythonProbeTimeoutMs,
+          timeoutMs: ListenerProbeTimeoutMs,
         });
 
         return result.exitCode === 0 ? true : null;
@@ -839,7 +842,7 @@ async function waitForListenerReady(input: {
       streamId: input.streamId,
       command: `sh -lc ${shellQuote(`test -f ${shellQuote(input.logPath)} && cat ${shellQuote(input.logPath)} || printf '<missing log>\\n'`)}`,
       description: `reading listener log '${input.logPath}'`,
-      timeoutMs: PythonProbeTimeoutMs,
+      timeoutMs: ListenerProbeTimeoutMs,
     }).catch((logError: unknown) => {
       return `<failed to read log: ${logError instanceof Error ? logError.message : String(logError)}>`;
     });
@@ -858,7 +861,7 @@ async function waitForListenerReady(input: {
           ].join("; "),
         ),
       description: "reading sandbox process diagnostics",
-      timeoutMs: PythonProbeTimeoutMs,
+      timeoutMs: ListenerProbeTimeoutMs,
     }).catch((processError: unknown) => {
       return `<failed to read process diagnostics: ${processError instanceof Error ? processError.message : String(processError)}>`;
     });
@@ -1136,7 +1139,7 @@ describe("system port access", () => {
         sandboxInstanceId,
       });
       const marker = `http-${randomUUID()}`;
-      const sandboxFixturePath = "/tmp/mistle-port-access-system/http-listener.py";
+      const sandboxFixturePath = "/tmp/mistle-port-access-system/http-listener.js";
       const websocket = new WebSocket(
         resolveGatewayTunnelWebSocketUrl({
           mintedUrl: connectionToken.url,
@@ -1274,7 +1277,7 @@ describe("system port access", () => {
         sandboxInstanceId,
       });
       const marker = `ws-${randomUUID()}`;
-      const sandboxFixturePath = "/tmp/mistle-port-access-system/ws-listener.py";
+      const sandboxFixturePath = "/tmp/mistle-port-access-system/ws-listener.js";
       const tunnelWebSocket = new WebSocket(
         resolveGatewayTunnelWebSocketUrl({
           mintedUrl: connectionToken.url,
