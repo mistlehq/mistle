@@ -13,10 +13,18 @@ import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 const PortsTargetAuthorizeTimeoutMs = 5_000;
 
 type PendingPortsTargetAuthorizeRequest = {
-  resolve: (result: PortsTargetAuthorizeResult) => void;
-  reject: (error: Error) => void;
   timeoutHandle: TimerHandle;
-};
+} & (
+  | {
+      kind: "internal";
+      resolve: (result: PortsTargetAuthorizeResult) => void;
+      reject: (error: Error) => void;
+    }
+  | {
+      kind: "connection";
+      clientSessionId: string;
+    }
+);
 
 export class PortsTargetAuthorizeTimedOutError extends Error {
   public constructor(sandboxInstanceId: string, port: number) {
@@ -80,6 +88,7 @@ export class PortsTargetAuthorizeService {
         sandboxInstanceId: input.sandboxInstanceId,
         requestId,
         pendingRequest: {
+          kind: "internal",
           resolve,
           reject,
           timeoutHandle,
@@ -105,16 +114,61 @@ export class PortsTargetAuthorizeService {
     return pendingPromise;
   }
 
+  public async forwardConnectionTargetAuthorize(input: {
+    sandboxInstanceId: string;
+    clientSessionId: string;
+    request: PortsTargetAuthorize;
+  }): Promise<void> {
+    const timeoutHandle = this.scheduler.schedule(() => {
+      this.deletePendingRequest({
+        sandboxInstanceId: input.sandboxInstanceId,
+        requestId: input.request.requestId,
+      });
+    }, PortsTargetAuthorizeTimeoutMs);
+
+    this.setPendingRequest({
+      sandboxInstanceId: input.sandboxInstanceId,
+      requestId: input.request.requestId,
+      pendingRequest: {
+        kind: "connection",
+        clientSessionId: input.clientSessionId,
+        timeoutHandle,
+      },
+    });
+
+    try {
+      await this.relayCoordinator.forwardPeerMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        fromSide: "connection",
+        payload: JSON.stringify(input.request),
+      });
+    } catch (error) {
+      this.deletePendingRequest({
+        sandboxInstanceId: input.sandboxInstanceId,
+        requestId: input.request.requestId,
+      });
+      throw error;
+    }
+  }
+
   public resolveTargetAuthorizeResult(input: {
     sandboxInstanceId: string;
     result: PortsTargetAuthorizeResult;
-  }): boolean {
+  }):
+    | {
+        kind: "drop";
+      }
+    | {
+        kind: "forward";
+        targetConnectionSessionId: string;
+      }
+    | undefined {
     const pendingRequest = this.getPendingRequest({
       sandboxInstanceId: input.sandboxInstanceId,
       requestId: input.result.requestId,
     });
     if (pendingRequest === undefined) {
-      return false;
+      return undefined;
     }
 
     this.scheduler.cancel(pendingRequest.timeoutHandle);
@@ -122,8 +176,18 @@ export class PortsTargetAuthorizeService {
       sandboxInstanceId: input.sandboxInstanceId,
       requestId: input.result.requestId,
     });
-    pendingRequest.resolve(input.result);
-    return true;
+
+    if (pendingRequest.kind === "internal") {
+      pendingRequest.resolve(input.result);
+      return {
+        kind: "drop",
+      };
+    }
+
+    return {
+      kind: "forward",
+      targetConnectionSessionId: pendingRequest.clientSessionId,
+    };
   }
 
   public rejectPendingRequestsForSandbox(input: { sandboxInstanceId: string }): void {
@@ -135,9 +199,11 @@ export class PortsTargetAuthorizeService {
     this.#pendingRequestsBySandboxInstanceId.delete(input.sandboxInstanceId);
     for (const pendingRequest of pendingRequests.values()) {
       this.scheduler.cancel(pendingRequest.timeoutHandle);
-      pendingRequest.reject(
-        new PortsTargetAuthorizeBootstrapDisconnectedError(input.sandboxInstanceId),
-      );
+      if (pendingRequest.kind === "internal") {
+        pendingRequest.reject(
+          new PortsTargetAuthorizeBootstrapDisconnectedError(input.sandboxInstanceId),
+        );
+      }
     }
   }
 
@@ -191,6 +257,8 @@ export class PortsTargetAuthorizeService {
       sandboxInstanceId: input.sandboxInstanceId,
       requestId: input.requestId,
     });
-    pendingRequest.reject(input.error);
+    if (pendingRequest.kind === "internal") {
+      pendingRequest.reject(input.error);
+    }
   }
 }

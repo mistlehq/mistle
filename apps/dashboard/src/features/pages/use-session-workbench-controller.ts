@@ -27,6 +27,7 @@ import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
+import { useSessionPortAccess } from "./use-session-port-access.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   reduceCodexRecoveryState,
@@ -90,6 +91,7 @@ type SessionWorkbenchState = {
     setPanelSize: (size: number) => void;
     togglePanel: () => void;
   };
+  portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
 type SessionConversationPaneState = {
@@ -184,6 +186,12 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const portAccessState = useSessionPortAccess({
+    canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+    stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
+  });
   const configControl = useSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
     clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
@@ -246,6 +254,7 @@ export function useSessionWorkbenchController(input: {
         setPanelSize: diffPanelState.setPanelSize,
         togglePanel: diffPanelState.togglePanel,
       },
+      portAccessState,
     },
     conversationPane: {
       chatState: chat.chatState,

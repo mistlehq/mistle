@@ -1041,4 +1041,73 @@ describe("TunnelProtocolTranslator", () => {
       },
     });
   });
+
+  it("forwards connection ports.target.authorize requests to the bootstrap peer", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_port_access_1",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+  });
+
+  it("forwards bootstrap ports.target.authorize.result messages back to the requesting connection", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await translator.translateInboundMessage({
+      clientSessionId: "conn_1",
+      payload: JSON.stringify({
+        type: "ports.target.authorize",
+        requestId: "req_port_access_1",
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      }),
+      sandboxInstanceId: SandboxInstanceId,
+      sourcePeerSide: "connection",
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_1",
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_1",
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        }),
+        targetConnectionSessionId: "conn_1",
+      },
+    });
+  });
 });

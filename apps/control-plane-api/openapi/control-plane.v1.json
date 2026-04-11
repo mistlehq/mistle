@@ -9719,6 +9719,10 @@
                       "type": "string",
                       "enum": ["/_mistle/access/bootstrap"]
                     },
+                    "bootstrapUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "token": {
                       "type": "string",
                       "minLength": 1
@@ -9728,7 +9732,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["host", "bootstrapPath", "token", "expiresAt"],
+                  "required": ["host", "bootstrapPath", "bootstrapUrl", "token", "expiresAt"],
                   "additionalProperties": false
                 }
               }

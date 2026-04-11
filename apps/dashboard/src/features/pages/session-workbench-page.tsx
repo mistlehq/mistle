@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanel,
@@ -12,6 +13,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
+import { SessionPortAccessPopover } from "./session-port-access-popover.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
@@ -50,7 +52,13 @@ function SessionWorkbenchPageContent(input: {
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
   const isErrorHeaderStatus = workbench.workbenchStatus.kind === "error";
-  const headerStatusLabel = isErrorHeaderStatus ? "Error" : "Not connected";
+  const headerStatusLabel = isErrorHeaderStatus
+    ? "Error"
+    : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
+  const headerStatusClassName =
+    workbench.workbenchStatus.kind === "connected"
+      ? "border-emerald-600 bg-emerald-600"
+      : "border-stone-300 bg-stone-300";
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-2">
@@ -61,7 +69,7 @@ function SessionWorkbenchPageContent(input: {
         ) : (
           <span
             aria-label={headerStatusLabel}
-            className="inline-block size-2.5 rounded-full border border-stone-300 bg-stone-300"
+            className={`inline-block size-2.5 rounded-full border ${headerStatusClassName}`}
             role="status"
             title={headerStatusLabel}
           />
@@ -113,6 +121,7 @@ function SessionWorkbenchPageContent(input: {
         >
           <GitDiffIcon className="size-4" />
         </Button>
+        <SessionPortAccessPopover state={workbench.portAccessState} />
         <Button
           aria-label={terminalButtonLabel}
           aria-pressed={workbench.terminalPanelState.isVisible}
@@ -146,12 +155,15 @@ function SessionWorkbenchPageContent(input: {
       cliButtonTitle,
       diffButtonLabel,
       diffButtonTitle,
+      headerStatusClassName,
       headerStatusLabel,
       isErrorHeaderStatus,
       terminalButtonLabel,
       terminalButtonTitle,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
+      workbench.portAccessState,
+      workbench.sandboxLifecycleStatus,
       workbench.primaryPanelState.canEnterCli,
       workbench.primaryPanelState.disabledReason,
       workbench.primaryPanelState.enterCliMode,

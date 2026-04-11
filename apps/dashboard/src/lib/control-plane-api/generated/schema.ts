@@ -4468,6 +4468,8 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               bootstrapPath: "/_mistle/access/bootstrap";
+              /** Format: uri */
+              bootstrapUrl: string;
               expiresAt: string;
               host: string;
               token: string;

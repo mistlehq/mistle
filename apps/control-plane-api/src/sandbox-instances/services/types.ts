@@ -25,6 +25,7 @@ export type MintSandboxInstancePortAccessInput = {
   instanceId: string;
   port: number;
   baseDomain: string;
+  gatewayWsUrl: string;
   bootstrapPath: "/_mistle/access/bootstrap";
   tokenTtlSeconds: number;
   tokenConfig: PortAccessBootstrapTokenConfig;
@@ -33,6 +34,7 @@ export type MintSandboxInstancePortAccessInput = {
 export type SandboxInstancePortAccess = {
   host: string;
   bootstrapPath: "/_mistle/access/bootstrap";
+  bootstrapUrl: string;
   token: string;
   expiresAt: string;
 };

@@ -41,7 +41,7 @@ use crate::tunnel::protocol::{
     PortsWsAccept, PortsWsClose, PortsWsFrame, PortsWsOpen,
 };
 
-const UPSTREAM_LOOPBACK_HOST: &str = "127.0.0.1";
+const UPSTREAM_LOCALHOST: &str = "localhost";
 const PORT_ACCESS_HTTP_BODY_CHANNEL_CAPACITY: usize = 16;
 
 type PortAccessHttpClient = Client<HttpsConnector<HttpConnector>, Channel<Bytes, Infallible>>;
@@ -760,7 +760,7 @@ fn build_request_uri(
     query: Option<&str>,
 ) -> Result<Uri, PortAccessTransportError> {
     let mut request_uri = format!(
-        "{upstream_protocol}://{UPSTREAM_LOOPBACK_HOST}:{}{}",
+        "{upstream_protocol}://{UPSTREAM_LOCALHOST}:{}{}",
         target.port, path
     );
     if let Some(query) = query {
@@ -843,7 +843,7 @@ fn build_websocket_request_uri(
     };
 
     let mut request_uri = format!(
-        "{websocket_protocol}://{UPSTREAM_LOOPBACK_HOST}:{}{}",
+        "{websocket_protocol}://{UPSTREAM_LOCALHOST}:{}{}",
         target.port, path
     );
     if let Some(query) = query {
@@ -982,5 +982,37 @@ impl ServerCertVerifier for AcceptAnyServerCertVerifier {
             SignatureScheme::RSA_PKCS1_SHA384,
             SignatureScheme::RSA_PKCS1_SHA512,
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_request_uri, build_websocket_request_uri};
+    use crate::tunnel::protocol::PortAccessTarget;
+
+    #[test]
+    fn builds_http_request_uri_against_localhost() {
+        let request_uri = build_request_uri(
+            &PortAccessTarget { kind: "port".to_string(), port: 3000 },
+            "http",
+            "/",
+            Some("import=1"),
+        )
+        .expect("request uri should build");
+
+        assert_eq!(request_uri.to_string(), "http://localhost:3000/?import=1");
+    }
+
+    #[test]
+    fn builds_websocket_request_uri_against_localhost() {
+        let request_uri = build_websocket_request_uri(
+            &PortAccessTarget { kind: "port".to_string(), port: 3000 },
+            "https",
+            "/@vite/client",
+            None,
+        )
+        .expect("websocket request uri should build");
+
+        assert_eq!(request_uri, "wss://localhost:3000/@vite/client");
     }
 }

@@ -1,8 +1,8 @@
-//! Process and loopback-listener inventory for the `processes` stream.
+//! Process and local-bind listener inventory for the `processes` stream.
 //!
 //! This module keeps the phase-1 inventory feed objective: enumerate the
-//! running processes visible to `sandboxd`, attach any loopback TCP listeners,
-//! and serialize one snapshot timestamp for the whole observation.
+//! running processes visible to `sandboxd`, retain only those with local-bind
+//! TCP listeners, and serialize one snapshot timestamp for the whole observation.
 
 use std::fmt::{self, Display};
 use std::path::Path;
@@ -78,12 +78,15 @@ fn collect_process_entries_for_proc_root(
 fn collect_linux_process_entries(
     proc_root: &Path,
 ) -> Result<Vec<ProcessEntry>, RuntimeProcessesError> {
-    let listeners_by_inode = read_loopback_listeners_by_inode(proc_root)?;
+    let listeners_by_inode = read_local_bind_listeners_by_inode(proc_root)?;
     let mut processes = Vec::new();
 
     for pid in read_numeric_proc_entries(proc_root)? {
         let command = read_process_command(proc_root, pid);
         let listeners = read_process_listeners(proc_root, pid, &listeners_by_inode);
+        if listeners.is_empty() {
+            continue;
+        }
         processes.push(ProcessEntry {
             pid,
             command,
@@ -196,7 +199,7 @@ fn parse_socket_inode(target: &Path) -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
-fn read_loopback_listeners_by_inode(
+fn read_local_bind_listeners_by_inode(
     proc_root: &Path,
 ) -> Result<BTreeMap<u64, ProcessListener>, RuntimeProcessesError> {
     let mut listeners = BTreeMap::new();
@@ -228,7 +231,7 @@ fn parse_proc_net_listeners(
         if fields[3] != "0A" {
             continue;
         }
-        let Some(listener) = parse_loopback_listener(fields[1]) else {
+        let Some(listener) = parse_local_bind_listener(fields[1]) else {
             continue;
         };
         let inode = fields[9].parse::<u64>().map_err(|error| {
@@ -241,7 +244,7 @@ fn parse_proc_net_listeners(
 }
 
 #[cfg(target_os = "linux")]
-fn parse_loopback_listener(socket_address: &str) -> Option<ProcessListener> {
+fn parse_local_bind_listener(socket_address: &str) -> Option<ProcessListener> {
     let (address_hex, port_hex) = socket_address.split_once(':')?;
     let port = u16::from_str_radix(port_hex, 16).ok()?;
 
@@ -252,12 +255,19 @@ fn parse_loopback_listener(socket_address: &str) -> Option<ProcessListener> {
             bytes[index] = u8::from_str_radix(hex, 16).ok()?;
         }
         let address = Ipv4Addr::new(bytes[3], bytes[2], bytes[1], bytes[0]);
-        if !address.is_loopback() {
+        if !address.is_loopback() && !address.is_unspecified() {
             return None;
         }
         return Some(ProcessListener {
             port,
             bind_address: address.to_string(),
+        });
+    }
+
+    if address_hex == "00000000000000000000000000000000" {
+        return Some(ProcessListener {
+            port,
+            bind_address: "::".to_string(),
         });
     }
 
@@ -301,12 +311,12 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn collects_processes_with_and_without_loopback_listeners() {
+    fn collects_only_processes_with_local_bind_listeners() {
         let server_marker = format!("mistle_process_inventory_server_{}", std::process::id());
         let idle_marker = format!("mistle_process_inventory_idle_{}", std::process::id());
         let port = reserve_available_port();
         let mut server = spawn_node_process(&format!(
-            "const tag='{server_marker}'; require('node:net').createServer(() => {{}}).listen({port}, '127.0.0.1'); setInterval(() => {{ void tag; }}, 1000);"
+            "const tag='{server_marker}'; require('node:net').createServer(() => {{}}).listen({port}, '0.0.0.0'); setInterval(() => {{ void tag; }}, 1000);"
         ));
         let mut idle = spawn_node_process(&format!(
             "const tag='{idle_marker}'; setInterval(() => {{ void tag; }}, 1000);"
@@ -331,12 +341,12 @@ mod tests {
                     .as_deref()
                     .is_some_and(|command| command.contains(&idle_marker))
             });
-            if has_server && has_idle {
+            if has_server && !has_idle {
                 break snapshot;
             }
             assert!(
                 Instant::now() < deadline,
-                "expected both spawned processes to appear in the inventory snapshot"
+                "expected only the local-bind listening server process to appear in the inventory snapshot"
             );
             thread::sleep(Duration::from_millis(25));
         };
@@ -355,21 +365,19 @@ mod tests {
             server_process
                 .listeners
                 .iter()
-                .any(|listener| listener.port == port && listener.bind_address == "127.0.0.1"),
-            "server process should include its loopback listener"
+                .any(|listener| listener.port == port && listener.bind_address == "0.0.0.0"),
+            "server process should include its local-bind listener"
         );
 
-        let idle_process = snapshot
-            .processes
-            .iter()
-            .find(|process| {
-                process
+        assert!(
+            snapshot.processes.iter().all(|process| {
+                !process
                     .command
                     .as_deref()
                     .is_some_and(|command| command.contains(&idle_marker))
-            })
-            .expect("idle process should be present");
-        assert_eq!(idle_process.listeners, Vec::new());
+            }),
+            "idle process without local-bind listeners should be omitted"
+        );
         assert_eq!(
             snapshot.observed_at,
             format_rfc3339_timestamp(clock.now_system_time())

@@ -27,6 +27,7 @@ const routeHandler = async (
       instanceId,
       port,
       baseDomain: portAccessConfig.baseDomain,
+      gatewayWsUrl: portAccessConfig.gatewayWsUrl,
       bootstrapPath: SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
       tokenTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
       tokenConfig: portAccessConfig.access,

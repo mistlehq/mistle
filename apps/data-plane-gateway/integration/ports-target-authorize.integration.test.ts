@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemClock } from "@mistle/time";
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
@@ -442,6 +443,99 @@ describe("ports target authorize integration", () => {
 
       await resultRejection;
     } finally {
+      if (bootstrapSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(bootstrapSocket);
+      }
+    }
+  });
+
+  it("round-trips connection-side target authorization through the bootstrap websocket", async ({
+    fixture,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      fixture,
+      sandboxInstanceId,
+    });
+    const bootstrapToken = await mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const connectionToken = await mintConnectionToken({
+      config: {
+        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const bootstrapSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "bootstrap",
+      token: bootstrapToken,
+    });
+    const connectionSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "connect",
+      token: connectionToken,
+    });
+
+    try {
+      connectionSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_connection_1",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+      );
+
+      const outboundMessage = await waitForWebSocketMessage(bootstrapSocket);
+      expect(outboundMessage.isBinary).toBe(false);
+      expect(JSON.parse(String(outboundMessage.data))).toEqual({
+        type: "ports.target.authorize",
+        requestId: "req_connection_1",
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      });
+
+      bootstrapSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_connection_1",
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        }),
+      );
+
+      const connectionMessage = await waitForWebSocketMessage(connectionSocket);
+      expect(connectionMessage.isBinary).toBe(false);
+      expect(JSON.parse(String(connectionMessage.data))).toEqual({
+        type: "ports.target.authorize.result",
+        requestId: "req_connection_1",
+        authorized: true,
+        upstreamProtocol: "http",
+        websocketCapable: true,
+      });
+    } finally {
+      if (connectionSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(connectionSocket);
+      }
       if (bootstrapSocket.readyState === WebSocket.OPEN) {
         await closeWebSocket(bootstrapSocket);
       }

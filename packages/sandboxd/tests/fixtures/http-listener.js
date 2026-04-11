@@ -2,6 +2,7 @@ import http from "node:http";
 
 const port = Number(process.argv[2]);
 const marker = process.argv[3] ?? "http-listener";
+const bindAddress = process.argv[4] ?? "127.0.0.1";
 
 if (!Number.isInteger(port) || port <= 0) {
   throw new Error(`Expected a positive integer port, got ${String(process.argv[2])}`);
@@ -14,7 +15,7 @@ const server = http.createServer((_request, response) => {
   response.end(`ok:${marker}`);
 });
 
-server.listen(port, "127.0.0.1");
+server.listen(port, bindAddress);
 
 function shutdown() {
   server.close(() => {

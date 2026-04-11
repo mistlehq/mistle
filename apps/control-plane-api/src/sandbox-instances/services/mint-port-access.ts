@@ -7,6 +7,31 @@ import type { MintSandboxInstancePortAccessInput, SandboxInstancePortAccess } fr
 
 type ExistingSandboxInstance = NonNullable<GetSandboxInstanceResponse>;
 
+function buildPortAccessBootstrapUrl(input: {
+  gatewayWsUrl: string;
+  host: string;
+  bootstrapPath: string;
+  token: string;
+}): string {
+  const gatewayUrl = new URL(input.gatewayWsUrl);
+  const protocol =
+    gatewayUrl.protocol === "wss:"
+      ? "https:"
+      : gatewayUrl.protocol === "ws:"
+        ? "http:"
+        : (() => {
+            throw new Error(
+              `Unsupported sandbox gateway websocket protocol '${gatewayUrl.protocol}'.`,
+            );
+          })();
+  const bootstrapUrl = new URL(`${protocol}//${input.host}${input.bootstrapPath}`);
+  if (gatewayUrl.port.length > 0) {
+    bootstrapUrl.port = gatewayUrl.port;
+  }
+  bootstrapUrl.searchParams.set("token", input.token);
+  return bootstrapUrl.toString();
+}
+
 function createExpirationIsoFromToken(token: string): string {
   const [, payloadSegment] = token.split(".");
   if (payloadSegment === undefined) {
@@ -80,6 +105,12 @@ export async function mintPortAccess(
   return {
     host,
     bootstrapPath: input.bootstrapPath,
+    bootstrapUrl: buildPortAccessBootstrapUrl({
+      gatewayWsUrl: input.gatewayWsUrl,
+      host,
+      bootstrapPath: input.bootstrapPath,
+      token,
+    }),
     token,
     expiresAt: createExpirationIsoFromToken(token),
   };

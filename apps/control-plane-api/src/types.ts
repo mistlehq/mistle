@@ -23,6 +23,7 @@ export type ControlPlaneApiConnectionTokenConfig = {
 };
 export type ControlPlaneApiPortAccessConfig = {
   baseDomain: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["baseDomain"];
+  gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
   access: {
     tokenSecret: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenSecret"];
     tokenIssuer: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenIssuer"];

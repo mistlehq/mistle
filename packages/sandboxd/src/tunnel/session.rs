@@ -6044,23 +6044,21 @@ mod tests {
                 .iter()
                 .any(|listener| {
                     listener["port"] == Value::Number(listener_port.into())
-                        && listener["bindAddress"] == Value::String("127.0.0.1".to_string())
+                        && listener["bindAddress"] == Value::String("0.0.0.0".to_string())
                 }),
-            "server process should expose the expected loopback listener"
+            "server process should expose the expected local-bind listener"
         );
 
-        let idle_process = processes
-            .iter()
-            .find(|process| {
-                process["command"]
-                    .as_str()
-                    .is_some_and(|command| command.contains(idle_marker))
-            })
-            .expect("snapshot should include the idle process");
         assert_eq!(
-            idle_process["listeners"],
-            Value::Array(Vec::new()),
-            "idle process should not report loopback listeners"
+            processes
+                .iter()
+                .any(|process| {
+                    process["command"]
+                        .as_str()
+                        .is_some_and(|command| command.contains(idle_marker))
+                }),
+            false,
+            "snapshot should omit processes without local-bind listeners"
         );
     }
 

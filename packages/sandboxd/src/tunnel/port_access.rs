@@ -70,37 +70,46 @@ pub async fn authorize_target_port(
     clock: &dyn Clock,
     target: &PortAccessTarget,
 ) -> Result<PortAccessAuthorizeDecision, PortAccessAuthorizeError> {
-    if !port_exists_in_processes_snapshot(clock, target.port)? {
+    let bind_addresses = bind_addresses_for_snapshot_port(clock, target.port)?;
+    if bind_addresses.is_empty() {
         return Ok(PortAccessAuthorizeDecision::Rejected {
             reason: PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
         });
     }
 
-    let http_outcome = probe_http(target.port).await;
-    if let ProbeOutcome::Supported {
-        upstream_protocol,
-        websocket_capable,
-    } = http_outcome
-    {
-        return Ok(PortAccessAuthorizeDecision::Authorized {
+    let mut probe_outcomes = Vec::with_capacity(bind_addresses.len() * 2);
+
+    for bind_address in &bind_addresses {
+        let http_outcome = probe_http(bind_address, target.port).await;
+        if let ProbeOutcome::Supported {
             upstream_protocol,
             websocket_capable,
-        });
+        } = http_outcome
+        {
+            return Ok(PortAccessAuthorizeDecision::Authorized {
+                upstream_protocol,
+                websocket_capable,
+            });
+        }
+        probe_outcomes.push(http_outcome);
     }
 
-    let https_outcome = probe_https(target.port).await;
-    if let ProbeOutcome::Supported {
-        upstream_protocol,
-        websocket_capable,
-    } = https_outcome
-    {
-        return Ok(PortAccessAuthorizeDecision::Authorized {
+    for bind_address in &bind_addresses {
+        let https_outcome = probe_https(bind_address, target.port).await;
+        if let ProbeOutcome::Supported {
             upstream_protocol,
             websocket_capable,
-        });
+        } = https_outcome
+        {
+            return Ok(PortAccessAuthorizeDecision::Authorized {
+                upstream_protocol,
+                websocket_capable,
+            });
+        }
+        probe_outcomes.push(https_outcome);
     }
 
-    if http_outcome.is_port_unreachable() && https_outcome.is_port_unreachable() {
+    if probe_outcomes.into_iter().all(ProbeOutcome::is_port_unreachable) {
         return Ok(PortAccessAuthorizeDecision::Rejected {
             reason: PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
         });
@@ -111,38 +120,45 @@ pub async fn authorize_target_port(
     })
 }
 
-fn port_exists_in_processes_snapshot(
+fn bind_addresses_for_snapshot_port(
     clock: &dyn Clock,
     port: u16,
-) -> Result<bool, PortAccessAuthorizeError> {
+) -> Result<Vec<String>, PortAccessAuthorizeError> {
     let snapshot = collect_processes_snapshot(clock)
         .map_err(|error| PortAccessAuthorizeError::new(error.to_string()))?;
 
-    Ok(snapshot.processes.iter().any(|process| {
-        process
-            .listeners
-            .iter()
-            .any(|listener| listener.port == port)
-    }))
+    let mut bind_addresses = Vec::new();
+    for process in snapshot.processes {
+        for listener in process.listeners {
+            if listener.port != port {
+                continue;
+            }
+            if !bind_addresses.iter().any(|existing| existing == &listener.bind_address) {
+                bind_addresses.push(listener.bind_address);
+            }
+        }
+    }
+
+    Ok(bind_addresses)
 }
 
-async fn probe_http(port: u16) -> ProbeOutcome {
-    let Ok(mut stream) = connect_loopback(port).await else {
+async fn probe_http(bind_address: &str, port: u16) -> ProbeOutcome {
+    let Ok(mut stream) = connect_loopback(bind_address, port).await else {
         return ProbeOutcome::PortUnreachable;
     };
 
-    if !probe_http_like_response(&mut stream, port).await {
+    if !probe_http_like_response(&mut stream, bind_address, port).await {
         return ProbeOutcome::UnsupportedProtocol;
     }
 
     ProbeOutcome::Supported {
         upstream_protocol: "http",
-        websocket_capable: probe_websocket_http(port).await,
+        websocket_capable: probe_websocket_http(bind_address, port).await,
     }
 }
 
-async fn probe_https(port: u16) -> ProbeOutcome {
-    let Ok(stream) = connect_loopback(port).await else {
+async fn probe_https(bind_address: &str, port: u16) -> ProbeOutcome {
+    let Ok(stream) = connect_loopback(bind_address, port).await else {
         return ProbeOutcome::PortUnreachable;
     };
 
@@ -162,20 +178,20 @@ async fn probe_https(port: u16) -> ProbeOutcome {
         return ProbeOutcome::UnsupportedProtocol;
     };
 
-    if !probe_http_like_response(&mut tls_stream, port).await {
+    if !probe_http_like_response(&mut tls_stream, bind_address, port).await {
         return ProbeOutcome::UnsupportedProtocol;
     }
 
     ProbeOutcome::Supported {
         upstream_protocol: "https",
-        websocket_capable: probe_websocket_https(port).await,
+        websocket_capable: probe_websocket_https(bind_address, port).await,
     }
 }
 
-async fn connect_loopback(port: u16) -> Result<TcpStream, PortAccessAuthorizeError> {
+async fn connect_loopback(bind_address: &str, port: u16) -> Result<TcpStream, PortAccessAuthorizeError> {
     let connect_result = timeout(
         DEFAULT_PORT_ACCESS_PROBE_TIMEOUT,
-        TcpStream::connect(("127.0.0.1", port)),
+        TcpStream::connect((bind_address, port)),
     )
     .await
     .map_err(|_| PortAccessAuthorizeError::new("port probe timed out"))?;
@@ -183,12 +199,13 @@ async fn connect_loopback(port: u16) -> Result<TcpStream, PortAccessAuthorizeErr
     connect_result.map_err(|error| PortAccessAuthorizeError::new(error.to_string()))
 }
 
-async fn probe_http_like_response<S>(stream: &mut S, port: u16) -> bool
+async fn probe_http_like_response<S>(stream: &mut S, bind_address: &str, port: u16) -> bool
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
     let request = format!(
-        "GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nConnection: close\r\n\r\n"
+        "GET / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+        loopback_host_header(bind_address, port)
     );
     if timeout(
         DEFAULT_PORT_ACCESS_PROBE_TIMEOUT,
@@ -216,16 +233,16 @@ where
     response[..bytes_read].starts_with(b"HTTP/1.")
 }
 
-async fn probe_websocket_http(port: u16) -> bool {
-    let Ok(mut stream) = connect_loopback(port).await else {
+async fn probe_websocket_http(bind_address: &str, port: u16) -> bool {
+    let Ok(mut stream) = connect_loopback(bind_address, port).await else {
         return false;
     };
 
-    probe_websocket_upgrade_response(&mut stream, port).await
+    probe_websocket_upgrade_response(&mut stream, bind_address, port).await
 }
 
-async fn probe_websocket_https(port: u16) -> bool {
-    let Ok(stream) = connect_loopback(port).await else {
+async fn probe_websocket_https(bind_address: &str, port: u16) -> bool {
+    let Ok(stream) = connect_loopback(bind_address, port).await else {
         return false;
     };
     let tls_connector = build_tls_connector();
@@ -244,7 +261,7 @@ async fn probe_websocket_https(port: u16) -> bool {
         return false;
     };
 
-    probe_websocket_upgrade_response(&mut tls_stream, port).await
+    probe_websocket_upgrade_response(&mut tls_stream, bind_address, port).await
 }
 
 fn build_tls_connector() -> TlsConnector {
@@ -262,17 +279,22 @@ fn server_name() -> Result<ServerName<'static>, PortAccessAuthorizeError> {
         .map_err(|error| PortAccessAuthorizeError::new(error.to_string()))
 }
 
-async fn probe_websocket_upgrade_response<S>(stream: &mut S, port: u16) -> bool
+async fn probe_websocket_upgrade_response<S>(
+    stream: &mut S,
+    bind_address: &str,
+    port: u16,
+) -> bool
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
     let request = format!(
         "GET / HTTP/1.1\r\n\
-         Host: 127.0.0.1:{port}\r\n\
+         Host: {}\r\n\
          Connection: Upgrade\r\n\
          Upgrade: websocket\r\n\
          Sec-WebSocket-Version: 13\r\n\
-         Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+         Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n",
+        loopback_host_header(bind_address, port)
     );
     if timeout(
         DEFAULT_PORT_ACCESS_PROBE_TIMEOUT,
@@ -304,6 +326,14 @@ where
 impl ProbeOutcome {
     fn is_port_unreachable(self) -> bool {
         matches!(self, Self::PortUnreachable)
+    }
+}
+
+fn loopback_host_header(bind_address: &str, port: u16) -> String {
+    if bind_address.contains(':') {
+        format!("[{bind_address}]:{port}")
+    } else {
+        format!("{bind_address}:{port}")
     }
 }
 
@@ -396,15 +426,26 @@ mod tests {
         port
     }
 
-    fn wait_until_listening(port: u16) {
+    fn reserve_available_ipv6_port() -> u16 {
+        let listener =
+            std::net::TcpListener::bind("[::1]:0").expect("ipv6 port reservation listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("reserved ipv6 listener should expose its address")
+            .port();
+        drop(listener);
+        port
+    }
+
+    fn wait_until_listening(bind_address: &str, port: u16) {
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         loop {
-            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            if std::net::TcpStream::connect((bind_address, port)).is_ok() {
                 return;
             }
             assert!(
                 std::time::Instant::now() < deadline,
-                "timed out waiting for fixture port {port} to accept connections"
+                "timed out waiting for fixture {bind_address}:{port} to accept connections"
             );
             thread::sleep(Duration::from_millis(25));
         }
@@ -419,7 +460,41 @@ mod tests {
     fn authorizes_reachable_http_ports() {
         let port = reserve_available_port();
         let mut server = spawn_node_fixture("http-listener.js", &[&port.to_string(), "authorize-http"]);
-        wait_until_listening(port);
+        wait_until_listening("127.0.0.1", port);
+
+        let runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime should build");
+        let decision = runtime
+            .block_on(authorize_target_port(
+                &SystemClock,
+                &PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+            ))
+            .expect("authorize_target_port should succeed");
+
+        assert_eq!(
+            decision,
+            PortAccessAuthorizeDecision::Authorized {
+                upstream_protocol: "http",
+                websocket_capable: false,
+            }
+        );
+
+        terminate_child(&mut server);
+    }
+
+    #[test]
+    fn authorizes_reachable_ipv6_loopback_http_ports() {
+        let port = reserve_available_ipv6_port();
+        let mut server = spawn_node_fixture(
+            "http-listener.js",
+            &[&port.to_string(), "authorize-http-ipv6", "::1"],
+        );
+        wait_until_listening("::1", port);
 
         let runtime = Builder::new_current_thread()
             .enable_all()
@@ -451,7 +526,7 @@ mod tests {
         let port = reserve_available_port();
         let mut server =
             spawn_node_fixture("http-ws-listener.js", &[&port.to_string(), "authorize-http-ws"]);
-        wait_until_listening(port);
+        wait_until_listening("127.0.0.1", port);
 
         let runtime = Builder::new_current_thread()
             .enable_all()
@@ -482,7 +557,7 @@ mod tests {
     fn rejects_reachable_unsupported_protocols() {
         let port = reserve_available_port();
         let mut server = spawn_node_fixture("raw-tcp-listener.js", &[&port.to_string()]);
-        wait_until_listening(port);
+        wait_until_listening("127.0.0.1", port);
 
         let runtime = Builder::new_current_thread()
             .enable_all()

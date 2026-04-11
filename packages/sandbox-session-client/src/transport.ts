@@ -3,10 +3,14 @@ import {
   DefaultStreamWindowBytes,
   encodeDataFrame,
   MaxStreamWindowBytes,
+  parseBootstrapControlMessage,
+  parsePortsControlMessage,
   parseStreamControlMessage,
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
+  type BootstrapControlMessage,
+  type PortsControlMessage,
   type StreamChannel,
   type StreamControlMessage,
   type StreamDataFrame,
@@ -39,7 +43,7 @@ export type SandboxSessionTransportEvent =
     }
   | {
       type: "unhandled_control";
-      message: StreamControlMessage;
+      message: BootstrapControlMessage | PortsControlMessage | StreamControlMessage;
     }
   | {
       type: "unhandled_data";
@@ -528,6 +532,15 @@ export class SandboxSessionTransport {
     return stream;
   }
 
+  async sendTextMessage(payload: string): Promise<void> {
+    const socket = this.#socket;
+    if (socket === null || socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      throw new Error("Sandbox session transport is not connected.");
+    }
+
+    await socket.send(payload);
+  }
+
   async sendControlForStream(input: {
     streamId: number;
     message: SandboxSessionOutboundControlMessage;
@@ -602,15 +615,35 @@ export class SandboxSessionTransport {
     const messagePayload = readMessageEventPayload(event);
     const textPayload = readTextPayload(messagePayload);
     if (textPayload !== null) {
-      const controlMessage = parseStreamControlMessage(textPayload);
-      if (controlMessage === undefined) {
-        this.#closeTransportWithError(
-          "Sandbox websocket text payload was not a valid stream control message.",
-        );
+      const streamControlMessage = parseStreamControlMessage(textPayload);
+      if (streamControlMessage !== undefined) {
+        this.#handleControlMessage(streamControlMessage);
         return;
       }
 
-      this.#handleControlMessage(controlMessage);
+      const portsControlMessage = parsePortsControlMessage(textPayload);
+      if (portsControlMessage !== undefined) {
+        this.#emit({
+          type: "unhandled_control",
+          message: portsControlMessage,
+        });
+        return;
+      }
+
+      const bootstrapControlMessage = parseBootstrapControlMessage(textPayload);
+      if (bootstrapControlMessage !== undefined) {
+        this.#emit({
+          type: "unhandled_control",
+          message: bootstrapControlMessage,
+        });
+        return;
+      }
+
+      if (streamControlMessage === undefined) {
+        this.#closeTransportWithError(
+          "Sandbox websocket text payload was not a valid control message.",
+        );
+      }
       return;
     }
 

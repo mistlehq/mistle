@@ -460,6 +460,21 @@ export class TunnelProtocolTranslator {
   private async translateConnectionTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "connection" },
   ): Promise<TunnelProtocolTranslation> {
+    const portsControlMessage = parsePortsControlMessage(input.payload);
+    if (portsControlMessage?.type === "ports.target.authorize") {
+      await this.portsTargetAuthorizeService.forwardConnectionTargetAuthorize({
+        sandboxInstanceId: input.sandboxInstanceId,
+        clientSessionId: input.clientSessionId,
+        request: portsControlMessage,
+      });
+
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+      });
+    }
+
     const ptyStreamOpen = parsePTYStreamOpen(input.payload);
     if (ptyStreamOpen !== undefined) {
       return this.translateConnectionStreamOpen({
@@ -594,10 +609,19 @@ export class TunnelProtocolTranslator {
   ): Promise<TunnelProtocolTranslation> {
     const portsControlMessage = parsePortsControlMessage(input.payload);
     if (portsControlMessage?.type === "ports.target.authorize.result") {
-      this.portsTargetAuthorizeService.resolveTargetAuthorizeResult({
+      const resolution = this.portsTargetAuthorizeService.resolveTargetAuthorizeResult({
         sandboxInstanceId: input.sandboxInstanceId,
         result: portsControlMessage,
       });
+
+      if (resolution?.kind === "forward") {
+        return createTranslation({
+          delivery: createForwardDelivery({
+            payload: input.payload,
+            targetConnectionSessionId: resolution.targetConnectionSessionId,
+          }),
+        });
+      }
 
       return createTranslation({
         delivery: {

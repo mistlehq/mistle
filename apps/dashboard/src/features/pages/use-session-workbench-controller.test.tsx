@@ -81,6 +81,8 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.panelSize).toBe(42);
     expect(result.current.workbench.diffPanelState.patch).toBe("");
+    expect(result.current.workbench.portAccessState.processes).toEqual([]);
+    expect(result.current.workbench.portAccessState.isPanelOpen).toBe(false);
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
     expect(result.current.conversationPane.chatState.entries).toEqual([]);
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({

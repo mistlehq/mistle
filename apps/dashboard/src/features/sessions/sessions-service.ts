@@ -43,6 +43,16 @@ const SandboxInstanceConnectionTokenSchema = z
   })
   .strict();
 
+const SandboxInstancePortAccessSchema = z
+  .object({
+    bootstrapPath: z.literal("/_mistle/access/bootstrap"),
+    bootstrapUrl: z.url(),
+    expiresAt: z.string().min(1),
+    host: z.string().min(1),
+    token: z.string().min(1),
+  })
+  .strict();
+
 const PatchSandboxInstanceTitleResponseSchema = z
   .object({
     id: z.string().min(1),
@@ -76,6 +86,10 @@ export type MintSandboxConnectionTokenResult = {
   connectionToken: string;
   connectionExpiresAt: string;
 };
+
+export type CreateSandboxInstancePortAccessResult = z.output<
+  typeof SandboxInstancePortAccessSchema
+>;
 
 export type ResumeSandboxInstanceResult = SandboxInstanceStatusResult;
 
@@ -244,6 +258,43 @@ export async function mintSandboxInstanceConnectionToken(input: {
         operation: "mintSandboxInstanceConnectionToken",
         error,
         fallbackMessage: "Could not establish sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function createSandboxInstancePortAccess(input: {
+  instanceId: string;
+  port: number;
+  signal?: AbortSignal;
+}): Promise<CreateSandboxInstancePortAccessResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createSandboxInstancePortAccess",
+      method: "POST",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/ports/${String(input.port)}/access`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not create sandbox port access.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstancePortAccessSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "createSandboxInstancePortAccess",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox instance port access response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "createSandboxInstancePortAccess",
+        error,
+        fallbackMessage: "Could not create sandbox port access.",
       }),
     );
   }

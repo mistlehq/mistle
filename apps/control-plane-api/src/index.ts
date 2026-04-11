@@ -15,6 +15,7 @@ async function startControlPlaneApi(): Promise<void> {
     },
     portAccess: {
       baseDomain: globalConfig.sandbox.publish.baseDomain,
+      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
       access: {
         tokenSecret: globalConfig.sandbox.publish.access.tokenSecret,
         tokenIssuer: globalConfig.sandbox.publish.access.tokenIssuer,

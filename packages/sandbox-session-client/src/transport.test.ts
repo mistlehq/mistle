@@ -5,6 +5,8 @@ import {
   parseStreamControlMessage,
   PayloadKindRawBytes,
   PayloadKindWebSocketText,
+  type BootstrapControlMessage,
+  type PortsControlMessage,
   type StreamChannel,
   type StreamControlMessage,
   type StreamDataFrame,
@@ -23,8 +25,10 @@ type TestServer = {
   connectionCount: () => number;
   receivedControlMessages: StreamControlMessage[];
   receivedDataFrames: StreamDataFrame[];
+  receivedTextMessages: string[];
   sendControlMessage: (message: StreamControlMessage) => void;
   sendDataFrame: (frame: { payload: Uint8Array; payloadKind: number; streamId: number }) => void;
+  sendTextMessage: (message: string) => void;
   url: string;
 };
 
@@ -81,6 +85,7 @@ async function startTestServer(input?: {
 
   const receivedControlMessages: StreamControlMessage[] = [];
   const receivedDataFrames: StreamDataFrame[] = [];
+  const receivedTextMessages: string[] = [];
   const rejectChannelKinds = new Set(input?.rejectChannelKinds ?? []);
   let currentConnectionCount = 0;
   let clientSocket: NodeWebSocket | null = null;
@@ -93,6 +98,7 @@ async function startTestServer(input?: {
       if (!isBinary) {
         const controlMessage = parseStreamControlMessage(toText(payload));
         if (controlMessage === undefined) {
+          receivedTextMessages.push(toText(payload));
           return;
         }
 
@@ -150,6 +156,7 @@ async function startTestServer(input?: {
     connectionCount: (): number => currentConnectionCount,
     receivedControlMessages,
     receivedDataFrames,
+    receivedTextMessages,
     sendControlMessage: (message): void => {
       if (clientSocket === null) {
         throw new Error("Expected websocket client to be connected before sending control.");
@@ -169,6 +176,13 @@ async function startTestServer(input?: {
           payload: frame.payload,
         }),
       );
+    },
+    sendTextMessage: (message): void => {
+      if (clientSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending text.");
+      }
+
+      clientSocket.send(message);
     },
     url: `ws://127.0.0.1:${String(address.port)}`,
   };
@@ -192,6 +206,70 @@ afterEach(async () => {
 });
 
 describe("SandboxSessionTransport", () => {
+  it("surfaces ports control messages as unhandled control events", async () => {
+    const server = await createManagedTestServer();
+    const transport = new SandboxSessionTransport({
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    const unhandledMessages: Array<
+      BootstrapControlMessage | PortsControlMessage | StreamControlMessage
+    > = [];
+
+    transport.onEvent((event) => {
+      if (event.type === "unhandled_control") {
+        unhandledMessages.push(event.message);
+      }
+    });
+
+    await transport.connect({
+      connectionUrl: server.url,
+    });
+
+    await transport.sendTextMessage(
+      JSON.stringify({
+        type: "ports.target.authorize",
+        requestId: "req_123",
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      }),
+    );
+    server.sendTextMessage(
+      JSON.stringify({
+        type: "ports.target.authorize.result",
+        requestId: "req_123",
+        authorized: true,
+        upstreamProtocol: "http",
+        websocketCapable: true,
+      }),
+    );
+
+    await waitForCondition({
+      description: "ports target authorize result",
+      evaluate: () => unhandledMessages.length === 1,
+      timeoutMs: 1000,
+    });
+
+    expect(server.receivedTextMessages).toEqual([
+      JSON.stringify({
+        type: "ports.target.authorize",
+        requestId: "req_123",
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      }),
+    ]);
+    expect(unhandledMessages[0]).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "req_123",
+      authorized: true,
+      upstreamProtocol: "http",
+      websocketCapable: true,
+    });
+  });
+
   it("opens multiple logical streams on one websocket transport", async () => {
     const server = await createManagedTestServer();
     const transport = new SandboxSessionTransport({

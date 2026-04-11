@@ -48,6 +48,7 @@ export const sandboxInstancePortAccessSchema = z
   .object({
     host: z.string().min(1),
     bootstrapPath: z.literal("/_mistle/access/bootstrap"),
+    bootstrapUrl: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
   })
