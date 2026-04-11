@@ -486,6 +486,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/port-access-auth':
+        specifier: workspace:*
+        version: link:../../packages/port-access-auth
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract
@@ -504,6 +507,9 @@ importers:
       hono:
         specifier: ^4.12.9
         version: 4.12.9
+      jose:
+        specifier: ^6.1.0
+        version: 6.2.2
       pg:
         specifier: ^8.20.0
         version: 8.20.0
