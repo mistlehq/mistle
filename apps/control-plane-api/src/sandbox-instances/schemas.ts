@@ -29,10 +29,25 @@ export const sandboxInstanceIdParamsSchema = z
   })
   .strict();
 
+export const sandboxInstancePortAccessParamsSchema = sandboxInstanceIdParamsSchema
+  .extend({
+    port: z.coerce.number().int().min(1).max(65_535),
+  })
+  .strict();
+
 export const sandboxInstanceConnectionTokenSchema = z
   .object({
     instanceId: z.string().min(1),
     url: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
+export const sandboxInstancePortAccessSchema = z
+  .object({
+    host: z.string().min(1),
+    bootstrapPath: z.literal("/_mistle/access/bootstrap"),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
   })

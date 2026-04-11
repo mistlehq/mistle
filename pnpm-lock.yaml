@@ -110,6 +110,9 @@ importers:
       '@mistle/object-store':
         specifier: workspace:*
         version: link:../../packages/object-store
+      '@mistle/port-access-auth':
+        specifier: workspace:*
+        version: link:../../packages/port-access-auth
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

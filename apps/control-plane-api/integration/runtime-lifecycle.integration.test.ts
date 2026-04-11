@@ -4,6 +4,7 @@ import { describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
@@ -51,6 +52,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      portAccess: IntegrationPortAccessConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
 
@@ -84,6 +86,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      portAccess: IntegrationPortAccessConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
@@ -108,6 +111,7 @@ describe("runtime lifecycle integration", () => {
       app: fixture.config,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      portAccess: IntegrationPortAccessConfig,
       sandbox: IntegrationSandboxRuntimeConfig,
     });
 

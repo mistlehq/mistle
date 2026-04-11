@@ -9,6 +9,7 @@ import {
   createDisposableDataPlaneRuntime,
   type DisposableDataPlaneRuntime,
 } from "./helpers/disposable-data-plane-runtime.js";
+import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
@@ -70,6 +71,7 @@ describe("sandbox instance title patch integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -158,6 +160,7 @@ describe("sandbox instance title patch integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -243,6 +246,7 @@ describe("sandbox instance title patch integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

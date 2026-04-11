@@ -3,12 +3,14 @@ export { SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "./constants.js";
 export { SandboxInstancesConflictCodes, SandboxInstancesNotFoundCodes } from "./constants.js";
 export {
   sandboxInstanceConnectionTokenSchema as SandboxInstanceConnectionTokenSchema,
+  sandboxInstancePortAccessSchema as SandboxInstancePortAccessSchema,
   listSandboxInstancesQuerySchema as ListSandboxInstancesQuerySchema,
   listSandboxInstancesResponseSchema as ListSandboxInstancesResponseSchema,
   sandboxInstancesNotFoundResponseSchema as SandboxInstancesNotFoundResponseSchema,
   sandboxInstanceStatusResponseSchema as SandboxInstanceStatusResponseSchema,
 } from "./schemas.js";
 export { route as createSandboxInstanceConnectionTokenRoute } from "./create-sandbox-instance-connection-token/route.js";
+export { route as createSandboxInstancePortAccessRoute } from "./create-sandbox-instance-port-access/route.js";
 export { route as listSandboxInstancesRoute } from "./list-sandbox-instances/route.js";
 export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.js";
 export { route as patchSandboxInstanceTitleRoute } from "./patch-sandbox-instance-title/route.js";

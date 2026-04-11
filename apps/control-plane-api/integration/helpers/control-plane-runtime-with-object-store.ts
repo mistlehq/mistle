@@ -2,13 +2,13 @@ import { startSeaweedfsS3 } from "@mistle/test-harness";
 
 import { createControlPlaneApiRuntime } from "../../src/main.js";
 import type { ControlPlaneApiConfig } from "../../src/types.js";
+import { IntegrationPortAccessConfig } from "./port-access-config.js";
 
 const IntegrationConnectionTokenConfig = {
   secret: "integration-connection-secret",
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
-
 const IntegrationSandboxRuntimeConfig = {
   defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
   gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -33,6 +33,7 @@ export async function createRuntimeWithObjectStore(input: {
     },
     internalAuthServiceToken: input.internalAuthServiceToken,
     connectionToken: IntegrationConnectionTokenConfig,
+    portAccess: IntegrationPortAccessConfig,
     sandbox: IntegrationSandboxRuntimeConfig,
   });
 }

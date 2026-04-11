@@ -21,6 +21,14 @@ export type ControlPlaneApiConnectionTokenConfig = {
   issuer: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenIssuer"];
   audience: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenAudience"];
 };
+export type ControlPlaneApiPortAccessConfig = {
+  baseDomain: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["baseDomain"];
+  access: {
+    tokenSecret: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenSecret"];
+    tokenIssuer: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenIssuer"];
+    tokenAudience: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenAudience"];
+  };
+};
 export type ControlPlaneApiSandboxRuntimeConfig = {
   defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
   gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
@@ -29,6 +37,7 @@ export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
   internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
   connectionToken: ControlPlaneApiConnectionTokenConfig;
+  portAccess: ControlPlaneApiPortAccessConfig;
   sandbox: ControlPlaneApiSandboxRuntimeConfig;
 };
 
@@ -62,6 +71,7 @@ export type AppContextVariables = {
   integrationRegistry: IntegrationRegistry;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
+  portAccessConfig: ControlPlaneApiPortAccessConfig;
   openWorkflow: OpenWorkflow;
   auth: ControlPlaneAuth;
   session: AppSession | null;

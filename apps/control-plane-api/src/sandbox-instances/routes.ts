@@ -4,6 +4,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "./constants.js";
 import * as createSandboxInstanceConnectionToken from "./create-sandbox-instance-connection-token/index.js";
+import * as createSandboxInstancePortAccess from "./create-sandbox-instance-port-access/index.js";
 import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as listSandboxInstances from "./list-sandbox-instances/index.js";
 import * as patchSandboxInstanceTitle from "./patch-sandbox-instance-title/index.js";
@@ -24,6 +25,7 @@ export function createSandboxInstancesRoutes(): AppRoutes<
     createSandboxInstanceConnectionToken.route,
     createSandboxInstanceConnectionToken.handler,
   );
+  routes.openapi(createSandboxInstancePortAccess.route, createSandboxInstancePortAccess.handler);
 
   return {
     basePath: SANDBOX_INSTANCES_ROUTE_BASE_PATH,

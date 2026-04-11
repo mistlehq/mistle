@@ -20,6 +20,7 @@ import {
   startDockerSandboxContainer,
   stopDockerSandboxContainer,
 } from "./helpers/docker-sandbox-runtime.js";
+import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 type WorkflowRunRow = {
@@ -214,6 +215,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -299,6 +301,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -374,6 +377,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -458,6 +462,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -536,6 +541,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -635,6 +641,7 @@ describe("sandbox instance resume integration", () => {
         issuer: "integration-issuer",
         audience: "integration-audience",
       },
+      portAccess: IntegrationPortAccessConfig,
       sandbox: {
         defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

@@ -1,5 +1,7 @@
 export const SANDBOX_INSTANCES_ROUTE_BASE_PATH = "/v1/sandbox/instances";
 export const SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS = 120;
+export const SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH = "/_mistle/access/bootstrap";
+export const SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS = 120;
 
 export const SandboxInstancesBadRequestCodes = {
   INVALID_LIST_INSTANCES_INPUT: "INVALID_LIST_INSTANCES_INPUT",

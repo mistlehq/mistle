@@ -31,6 +31,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../src/lib/crypto.js";
 import { createAppResources, stopAppResources } from "../src/resources.js";
+import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it } from "./test-context.js";
 
 describe("integration connections device authorization integration", () => {
@@ -216,6 +217,7 @@ describe("integration connections device authorization integration", () => {
           issuer: "integration-issuer",
           audience: "integration-audience",
         },
+        portAccessConfig: IntegrationPortAccessConfig,
         openWorkflow: resources.openWorkflow,
         auth,
       });
@@ -528,6 +530,7 @@ describe("integration connections device authorization integration", () => {
           issuer: "integration-issuer",
           audience: "integration-audience",
         },
+        portAccessConfig: IntegrationPortAccessConfig,
         openWorkflow: resources.openWorkflow,
         auth,
       });

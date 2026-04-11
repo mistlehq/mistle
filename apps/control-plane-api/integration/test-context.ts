@@ -239,6 +239,14 @@ export const it = vitestIt.extend<{
             issuer: "integration-issuer",
             audience: "integration-audience",
           },
+          portAccess: {
+            baseDomain: "mistle.localhost",
+            access: {
+              tokenSecret: "integration-port-access-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+          },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

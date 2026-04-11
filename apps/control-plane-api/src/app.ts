@@ -48,6 +48,7 @@ export type CreateAppInput = {
   integrationRegistry: IntegrationRegistry;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
+  portAccessConfig: AppContextBindings["Variables"]["portAccessConfig"];
   openWorkflow: OpenWorkflow;
   auth: AppContextVariables["auth"];
 };
@@ -65,6 +66,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     integrationRegistry: input.integrationRegistry,
     dataPlaneClient: input.dataPlaneClient,
     connectionTokenConfig: input.connectionTokenConfig,
+    portAccessConfig: input.portAccessConfig,
     openWorkflow: input.openWorkflow,
     auth: input.auth,
   });
@@ -87,6 +89,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       integrationRegistry: input.integrationRegistry,
       dataPlaneClient: input.dataPlaneClient,
       connectionTokenConfig: input.connectionTokenConfig,
+      portAccessConfig: input.portAccessConfig,
       openWorkflow: input.openWorkflow,
       auth,
     }),

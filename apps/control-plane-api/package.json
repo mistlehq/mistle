@@ -30,6 +30,7 @@
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/object-store": "workspace:*",
+    "@mistle/port-access-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/webhooks": "workspace:*",
