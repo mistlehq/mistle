@@ -13,8 +13,10 @@ const server = http.createServer((request, response) => {
       "content-type": "text/plain; charset=utf-8",
       "x-fixture": marker,
     });
-    response.write("partial:");
-    response.socket?.destroy();
+    response.flushHeaders();
+    response.write("partial:", () => {
+      response.socket?.destroy();
+    });
     return;
   }
 
