@@ -77,6 +77,7 @@ export function buildPortAccessRequestHeaders(input: {
   browserVisibleHost: string;
   requestHeaders: Headers;
   targetPort: number;
+  upstreamProtocol: "http" | "https";
 }): RepeatedHeaderValues {
   const tunneledHeaders: RepeatedHeaderValues = {};
 
@@ -93,6 +94,13 @@ export function buildPortAccessRequestHeaders(input: {
       }
 
       tunneledHeaders.cookie = [sanitizedCookieHeader];
+      continue;
+    }
+
+    if (normalizedHeaderName === "origin") {
+      tunneledHeaders.origin = [
+        `${input.upstreamProtocol}://127.0.0.1:${String(input.targetPort)}`,
+      ];
       continue;
     }
 

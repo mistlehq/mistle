@@ -12,6 +12,7 @@ describe("port access transport helpers", () => {
       ["cookie", "mistle_port_access_session=session-token; theme=dark"],
       ["connection", "keep-alive"],
       ["host", "p-5173--sandbox.mistle.localhost"],
+      ["origin", "https://p-5173--sandbox.mistle.localhost"],
       ["x-request-marker", "req-123"],
     ]);
 
@@ -22,11 +23,13 @@ describe("port access transport helpers", () => {
         browserVisibleHost: "p-5173--sandbox.mistle.localhost",
         requestHeaders,
         targetPort: 5173,
+        upstreamProtocol: "http",
       }),
     ).toEqual({
       accept: ["text/html"],
       cookie: ["theme=dark"],
       host: ["127.0.0.1:5173"],
+      origin: ["http://127.0.0.1:5173"],
       "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
       "x-forwarded-port": ["443"],
       "x-forwarded-proto": ["https"],
@@ -47,6 +50,7 @@ describe("port access transport helpers", () => {
         browserVisibleHost: "p-5173--sandbox.mistle.localhost",
         requestHeaders,
         targetPort: 5173,
+        upstreamProtocol: "https",
       }),
     ).toEqual({
       host: ["127.0.0.1:5173"],
