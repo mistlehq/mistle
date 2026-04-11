@@ -185,89 +185,76 @@ export function registerPortAccessRoutes(input: {
     return response;
   });
 
-  input.app.get(
-    "*",
-    async (ctx, next) => {
-      if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
-        return next();
-      }
-      if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
-        return next();
-      }
+  input.app.get("*", async (ctx, next) => {
+    if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
+      return next();
+    }
+    if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
+      return next();
+    }
 
-      const requestHost = ctx.req.header("host");
-      if (requestHost === undefined) {
-        return next();
-      }
+    const requestHost = ctx.req.header("host");
+    if (requestHost === undefined) {
+      return next();
+    }
 
-      const resolvedRequest = await resolvePortAccessRequest({
-        clock: input.clock,
-        hostConfig: input.hostConfig,
-        requestHost,
-        requestUrl: ctx.req.url,
-        forwardedProto: ctx.req.header("x-forwarded-proto"),
-        sessionConfig: input.sessionConfig,
-        cookieHeader: ctx.req.header("cookie"),
+    const resolvedRequest = await resolvePortAccessRequest({
+      clock: input.clock,
+      hostConfig: input.hostConfig,
+      requestHost,
+      requestUrl: ctx.req.url,
+      forwardedProto: ctx.req.header("x-forwarded-proto"),
+      sessionConfig: input.sessionConfig,
+      cookieHeader: ctx.req.header("cookie"),
+    });
+    if (resolvedRequest.kind === "not-port-access-host") {
+      return new Response("Not Found", { status: 404 });
+    }
+    if (resolvedRequest.kind === "failure") {
+      return resolvedRequest.response;
+    }
+
+    const requestUrl = new URL(ctx.req.url);
+    try {
+      const webSocketHandle = await input.portAccessTransportService.openWebSocketStream({
+        sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
+        target: {
+          kind: "port",
+          port: resolvedRequest.verifiedSession.port,
+        },
+        upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+        request: {
+          path: requestUrl.pathname,
+          query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
+          headers: buildPortAccessWebSocketRequestHeaders({
+            browserEdgePort: resolvedRequest.browserEdgePort,
+            browserEdgeProto: resolvedRequest.browserEdgeProto,
+            browserVisibleHost: resolvedRequest.parsedHost.host,
+            requestHeaders: ctx.req.raw.headers,
+            targetPort: resolvedRequest.verifiedSession.port,
+            upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+          }),
+        },
       });
-      if (resolvedRequest.kind === "not-port-access-host") {
-        return new Response("Not Found", { status: 404 });
-      }
-      if (resolvedRequest.kind === "failure") {
-        return resolvedRequest.response;
-      }
-
-      const requestUrl = new URL(ctx.req.url);
-      try {
-        const webSocketHandle = await input.portAccessTransportService.openWebSocketStream({
-          sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
-          target: {
-            kind: "port",
-            port: resolvedRequest.verifiedSession.port,
-          },
-          upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
-          request: {
-            path: requestUrl.pathname,
-            query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
-            headers: buildPortAccessWebSocketRequestHeaders({
-              browserEdgePort: resolvedRequest.browserEdgePort,
-              browserEdgeProto: resolvedRequest.browserEdgeProto,
-              browserVisibleHost: resolvedRequest.parsedHost.host,
-              requestHeaders: ctx.req.raw.headers,
-              targetPort: resolvedRequest.verifiedSession.port,
-              upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
-            }),
+      await webSocketHandle.accepted;
+      return await input.upgradeWebSocket(ctx, createPortAccessWebSocketEvents(webSocketHandle));
+    } catch (error) {
+      if (
+        error instanceof BootstrapTunnelNotConnectedError ||
+        error instanceof PortAccessTransportBootstrapDisconnectedError ||
+        error instanceof PortAccessTransportStreamError
+      ) {
+        return new Response("Port Access upstream request failed.", {
+          status: 502,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
           },
         });
-        await webSocketHandle.accepted;
-        ctx.set("portAccessWebSocketHandle", webSocketHandle);
-      } catch (error) {
-        if (
-          error instanceof BootstrapTunnelNotConnectedError ||
-          error instanceof PortAccessTransportBootstrapDisconnectedError ||
-          error instanceof PortAccessTransportStreamError
-        ) {
-          return new Response("Port Access upstream request failed.", {
-            status: 502,
-            headers: {
-              "content-type": "text/plain; charset=utf-8",
-            },
-          });
-        }
-
-        throw error;
       }
 
-      return next();
-    },
-    input.upgradeWebSocket((ctx) => {
-      const webSocketHandle = ctx.get("portAccessWebSocketHandle");
-      if (webSocketHandle === undefined) {
-        throw new Error("Expected validated Port Access websocket handle.");
-      }
-
-      return createPortAccessWebSocketEvents(webSocketHandle);
-    }),
-  );
+      throw error;
+    }
+  });
 
   input.app.all("*", async (ctx, next) => {
     if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
