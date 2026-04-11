@@ -19,7 +19,7 @@ import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
 import { createDataPlaneGatewayRuntime } from "../src/runtime/index.js";
-import type { DataPlaneGatewayRuntimeConfig } from "../src/types.js";
+import type { DataPlaneGatewayRuntime, DataPlaneGatewayRuntimeConfig } from "../src/types.js";
 
 const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secret";
 const IntegrationTokenIssuer = "integration-data-plane-worker";
@@ -57,6 +57,7 @@ export type DataPlaneGatewayIntegrationFixture = {
     body: string;
     path: string;
   }>;
+  runtime: DataPlaneGatewayRuntime;
 };
 
 type RuntimeStateBackend = DataPlaneGatewayRuntimeConfig["app"]["runtimeState"]["backend"];
@@ -374,6 +375,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             db,
             dbPool,
             otlpRequests: otlpReceiver.requests,
+            runtime,
           });
         } finally {
           await runCleanupTasks({

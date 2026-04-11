@@ -10,6 +10,7 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -136,6 +137,10 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     gatewayForwardingClient,
   );
+  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(
+    relayCoordinator,
+    systemScheduler,
+  );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
@@ -196,6 +201,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.connect.tokenIssuer,
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
+    portsTargetAuthorizeService,
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
@@ -249,6 +255,9 @@ export function createDataPlaneGatewayRuntime(
 
   return {
     app,
+    internals: {
+      portsTargetAuthorizeService,
+    },
     request: async (path, init) => app.request(path, init),
     start: async () => {
       if (stopped) {

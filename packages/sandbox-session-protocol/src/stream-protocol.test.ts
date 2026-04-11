@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parsePortsControlMessage,
   parseBootstrapControlMessage,
   parseProcessesStreamMessage,
   parseStreamControlMessage,
@@ -567,6 +568,83 @@ describe("processes stream message parser", () => {
               listeners: [],
             },
           ],
+        }),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("ports control message parser", () => {
+  it("parses target authorize requests", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_port_access_1",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize",
+      requestId: "req_port_access_1",
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+    });
+  });
+
+  it("parses successful target authorize results", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_1",
+          authorized: true,
+          upstreamProtocol: "https",
+          websocketCapable: true,
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "req_port_access_1",
+      authorized: true,
+      upstreamProtocol: "https",
+      websocketCapable: true,
+    });
+  });
+
+  it("parses failed target authorize results", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_2",
+          authorized: false,
+          reason: "unsupported_protocol",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "req_port_access_2",
+      authorized: false,
+      reason: "unsupported_protocol",
+    });
+  });
+
+  it("rejects malformed target authorize messages", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_port_access_3",
+          target: {
+            kind: "port",
+            port: "5173",
+          },
         }),
       ),
     ).toBeUndefined();

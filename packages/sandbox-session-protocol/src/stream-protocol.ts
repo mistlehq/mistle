@@ -127,6 +127,42 @@ const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
   ProcessesSnapshotSchema,
 ]);
 
+const PortAccessTargetSchema = z.object({
+  kind: z.literal("port"),
+  port: PositiveIntegerSchema,
+});
+
+const PortsTargetAuthorizeSchema = z.object({
+  type: z.literal("ports.target.authorize"),
+  requestId: NonEmptyStringSchema,
+  target: PortAccessTargetSchema,
+});
+
+const PortsTargetAuthorizeSuccessResultSchema = z.object({
+  type: z.literal("ports.target.authorize.result"),
+  requestId: NonEmptyStringSchema,
+  authorized: z.literal(true),
+  upstreamProtocol: z.enum(["http", "https"]),
+  websocketCapable: z.boolean(),
+});
+
+const PortsTargetAuthorizeFailureResultSchema = z.object({
+  type: z.literal("ports.target.authorize.result"),
+  requestId: NonEmptyStringSchema,
+  authorized: z.literal(false),
+  reason: z.enum(["port_unreachable", "unsupported_protocol"]),
+});
+
+const PortsTargetAuthorizeResultSchema = z.union([
+  PortsTargetAuthorizeSuccessResultSchema,
+  PortsTargetAuthorizeFailureResultSchema,
+]);
+
+const PortsControlMessageSchema = z.union([
+  PortsTargetAuthorizeSchema,
+  PortsTargetAuthorizeResultSchema,
+]);
+
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
   streamId: PositiveIntegerSchema,
@@ -285,6 +321,18 @@ export type ProcessEntry = z.infer<typeof ProcessEntrySchema>;
 export type ProcessesRefresh = z.infer<typeof ProcessesRefreshSchema>;
 export type ProcessesSnapshot = z.infer<typeof ProcessesSnapshotSchema>;
 export type ProcessesStreamMessage = z.infer<typeof ProcessesStreamMessageSchema>;
+export type PortAccessTarget = z.infer<typeof PortAccessTargetSchema>;
+export type PortsTargetAuthorize = z.infer<typeof PortsTargetAuthorizeSchema>;
+export type PortsTargetAuthorizeSuccessResult = z.infer<
+  typeof PortsTargetAuthorizeSuccessResultSchema
+>;
+export type PortsTargetAuthorizeFailureResult = z.infer<
+  typeof PortsTargetAuthorizeFailureResultSchema
+>;
+export type PortsTargetAuthorizeResult =
+  | PortsTargetAuthorizeSuccessResult
+  | PortsTargetAuthorizeFailureResult;
+export type PortsControlMessage = z.infer<typeof PortsControlMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -358,6 +406,16 @@ export function parseProcessesStreamMessage(payload: string): ProcessesStreamMes
   }
 
   const result = ProcessesStreamMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parsePortsControlMessage(payload: string): PortsControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = PortsControlMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 export type SandboxSessionControlMessage =

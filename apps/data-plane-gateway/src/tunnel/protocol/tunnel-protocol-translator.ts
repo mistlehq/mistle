@@ -3,6 +3,7 @@ import {
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
+  parsePortsControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
@@ -13,6 +14,7 @@ import {
   type TelemetryOpen,
 } from "@mistle/sandbox-session-protocol";
 
+import { PortsTargetAuthorizeService } from "../../publishing/ports-target-authorize-service.js";
 import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import {
@@ -411,6 +413,7 @@ export class TunnelProtocolViolationError extends Error {
 export class TunnelProtocolTranslator {
   public constructor(
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
+    private readonly portsTargetAuthorizeService: PortsTargetAuthorizeService,
     private readonly frameCodec: FrameCodec = new FrameCodec(),
   ) {}
 
@@ -586,6 +589,20 @@ export class TunnelProtocolTranslator {
   private async translateBootstrapTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "bootstrap" },
   ): Promise<TunnelProtocolTranslation> {
+    const portsControlMessage = parsePortsControlMessage(input.payload);
+    if (portsControlMessage?.type === "ports.target.authorize.result") {
+      this.portsTargetAuthorizeService.resolveTargetAuthorizeResult({
+        sandboxInstanceId: input.sandboxInstanceId,
+        result: portsControlMessage,
+      });
+
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+      });
+    }
+
     const controlMessage = parseBootstrapControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));

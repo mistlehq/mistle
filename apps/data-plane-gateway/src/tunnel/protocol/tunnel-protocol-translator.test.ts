@@ -5,8 +5,11 @@ import {
   encodeDataFrame,
 } from "@mistle/sandbox-session-protocol";
 import { systemClock } from "@mistle/time";
+import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { PortsTargetAuthorizeService } from "../../publishing/ports-target-authorize-service.js";
+import { createInMemoryTunnelRelayCoordinator } from "../create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -30,6 +33,8 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 async function createTranslatorHarness() {
+  const clock = createMutableClock(1_000);
+  const scheduler = createManualScheduler(clock);
   const ownerStore = new InMemorySandboxOwnerStore(systemClock);
   await ownerStore.claimOwner({
     sandboxInstanceId: SandboxInstanceId,
@@ -53,10 +58,14 @@ async function createTranslatorHarness() {
     new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
     forwardingClient,
   );
+  const portsTargetAuthorizeService = new PortsTargetAuthorizeService(
+    createInMemoryTunnelRelayCoordinator(LocalNodeId),
+    scheduler,
+  );
 
   return {
     router,
-    translator: new TunnelProtocolTranslator(router),
+    translator: new TunnelProtocolTranslator(router, portsTargetAuthorizeService),
   };
 }
 
@@ -1005,5 +1014,27 @@ describe("TunnelProtocolTranslator", () => {
         sourcePeerSide: "connection",
       }),
     ).rejects.toThrow(TunnelProtocolViolationError);
+  });
+
+  it("drops bootstrap ports.target.authorize.result messages", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_1",
+          authorized: false,
+          reason: "unsupported_protocol",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
   });
 });
