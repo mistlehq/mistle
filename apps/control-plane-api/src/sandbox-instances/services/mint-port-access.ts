@@ -27,13 +27,6 @@ function createExpirationIsoFromToken(token: string): string {
   return new Date(expiresAtSeconds * 1000).toISOString();
 }
 
-function createSandboxInstanceNotFoundError(instanceId: string): SandboxInstancesNotFoundError {
-  return new SandboxInstancesNotFoundError(
-    SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND,
-    `Sandbox instance '${instanceId}' was not found.`,
-  );
-}
-
 async function getExistingSandboxInstance(
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">,
   input: {
@@ -47,7 +40,10 @@ async function getExistingSandboxInstance(
   });
 
   if (sandboxInstance === null) {
-    throw createSandboxInstanceNotFoundError(input.instanceId);
+    throw new SandboxInstancesNotFoundError(
+      SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND,
+      `Sandbox instance '${input.instanceId}' was not found.`,
+    );
   }
 
   return sandboxInstance;

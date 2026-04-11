@@ -7,7 +7,7 @@ import {
   SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
   SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
 } from "../constants.js";
-import { mintPortAccessForInstance } from "../services/mint-port-access-for-instance.js";
+import { mintPortAccess } from "../services/mint-port-access.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -18,20 +18,18 @@ const routeHandler = async (
   const { instanceId, port } = ctx.req.valid("param");
   const portAccessConfig = ctx.get("portAccessConfig");
 
-  const portAccess = await mintPortAccessForInstance(
+  const portAccess = await mintPortAccess(
     {
       dataPlaneClient,
-      defaultPortAccess: {
-        baseDomain: portAccessConfig.baseDomain,
-        bootstrapPath: SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
-        tokenTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
-        tokenConfig: portAccessConfig.access,
-      },
     },
     {
       organizationId: session.activeOrganizationId,
       instanceId,
       port,
+      baseDomain: portAccessConfig.baseDomain,
+      bootstrapPath: SANDBOX_INSTANCE_PORT_ACCESS_BOOTSTRAP_PATH,
+      tokenTtlSeconds: SANDBOX_INSTANCE_PORT_ACCESS_TOKEN_TTL_SECONDS,
+      tokenConfig: portAccessConfig.access,
     },
   );
 
