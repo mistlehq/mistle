@@ -5,7 +5,7 @@
   "scripts": {
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:system:prepare": "pnpm --filter @mistle/control-plane-api... --filter @mistle/control-plane-worker... --filter @mistle/data-plane-api... --filter @mistle/data-plane-worker... --filter @mistle/data-plane-gateway... --filter @mistle/tokenizer-proxy... build && pnpm --dir .. run test-harness:prepare-runtime",
+    "test:system:prepare": "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm --dir .. config:init:integration && pnpm --filter @mistle/control-plane-api... --filter @mistle/control-plane-worker... --filter @mistle/data-plane-api... --filter @mistle/data-plane-worker... --filter @mistle/data-plane-gateway... --filter @mistle/tokenizer-proxy... build && pnpm --dir .. run test-harness:prepare-runtime",
     "test:system": "pnpm run test:system:prepare && vitest -c vitest.system.config.ts --run --passWithNoTests",
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
   },
@@ -16,9 +16,11 @@
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",
     "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
     "drizzle-orm": "^0.45.2",
     "openapi-fetch": "^0.17.0",
     "pg": "^8.20.0",
+    "ws": "^8.20.0",
     "zod": "^4.1.12"
   }
 }
