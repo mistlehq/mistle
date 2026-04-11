@@ -127,6 +127,8 @@ const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
   ProcessesSnapshotSchema,
 ]);
 
+const RepeatedHeaderValuesSchema = z.record(NonEmptyStringSchema, z.array(NonEmptyStringSchema));
+
 const PortAccessTargetSchema = z.object({
   kind: z.literal("port"),
   port: PositiveIntegerSchema,
@@ -161,6 +163,61 @@ const PortsTargetAuthorizeResultSchema = z.union([
 const PortsControlMessageSchema = z.union([
   PortsTargetAuthorizeSchema,
   PortsTargetAuthorizeResultSchema,
+]);
+
+const PortsHttpOpenSchema = z.object({
+  type: z.literal("ports.http.open"),
+  streamId: PositiveIntegerSchema,
+  target: PortAccessTargetSchema,
+  upstreamProtocol: z.enum(["http", "https"]),
+  request: z.object({
+    method: NonEmptyStringSchema,
+    path: NonEmptyStringSchema,
+    query: NonEmptyStringSchema.optional(),
+    headers: RepeatedHeaderValuesSchema,
+  }),
+});
+
+const PortsHttpResponseStartSchema = z.object({
+  type: z.literal("ports.http.response.start"),
+  streamId: PositiveIntegerSchema,
+  status: PositiveIntegerSchema,
+  headers: RepeatedHeaderValuesSchema,
+});
+
+const PortsHttpBodyChunkSchema = z.object({
+  type: z.literal("ports.http.body.chunk"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const PortsHttpBodyEndSchema = z.object({
+  type: z.literal("ports.http.body.end"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+});
+
+const PortsStreamCloseSchema = z.object({
+  type: z.literal("ports.stream.close"),
+  streamId: PositiveIntegerSchema,
+});
+
+const PortsStreamErrorSchema = z.object({
+  type: z.literal("ports.stream.error"),
+  streamId: PositiveIntegerSchema,
+  code: z.enum(["upstream_connect_failed", "upstream_handshake_failed", "upstream_io_error"]),
+  message: NonEmptyStringSchema,
+});
+
+const PortsTransportMessageSchema = z.union([
+  PortsHttpOpenSchema,
+  PortsHttpResponseStartSchema,
+  PortsHttpBodyChunkSchema,
+  PortsHttpBodyEndSchema,
+  PortsStreamCloseSchema,
+  PortsStreamErrorSchema,
 ]);
 
 const StreamOpenSchema = z.object({
@@ -333,6 +390,13 @@ export type PortsTargetAuthorizeResult =
   | PortsTargetAuthorizeSuccessResult
   | PortsTargetAuthorizeFailureResult;
 export type PortsControlMessage = z.infer<typeof PortsControlMessageSchema>;
+export type PortsHttpOpen = z.infer<typeof PortsHttpOpenSchema>;
+export type PortsHttpResponseStart = z.infer<typeof PortsHttpResponseStartSchema>;
+export type PortsHttpBodyChunk = z.infer<typeof PortsHttpBodyChunkSchema>;
+export type PortsHttpBodyEnd = z.infer<typeof PortsHttpBodyEndSchema>;
+export type PortsStreamClose = z.infer<typeof PortsStreamCloseSchema>;
+export type PortsStreamError = z.infer<typeof PortsStreamErrorSchema>;
+export type PortsTransportMessage = z.infer<typeof PortsTransportMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -416,6 +480,16 @@ export function parsePortsControlMessage(payload: string): PortsControlMessage |
   }
 
   const result = PortsControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parsePortsTransportMessage(payload: string): PortsTransportMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = PortsTransportMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 export type SandboxSessionControlMessage =

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  parsePortsControlMessage,
   parseBootstrapControlMessage,
+  parsePortsControlMessage,
+  parsePortsTransportMessage,
   parseProcessesStreamMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
@@ -644,6 +645,157 @@ describe("ports control message parser", () => {
           target: {
             kind: "port",
             port: "5173",
+          },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("ports http transport message parser", () => {
+  it("parses ports.http.open messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.open",
+          streamId: 41,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "https",
+          request: {
+            method: "GET",
+            path: "/src/main.ts",
+            query: "import=1",
+            headers: {
+              accept: ["text/plain"],
+              "x-forwarded-host": ["p-5173--sandbox.mistle.example.test"],
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.open",
+      streamId: 41,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "https",
+      request: {
+        method: "GET",
+        path: "/src/main.ts",
+        query: "import=1",
+        headers: {
+          accept: ["text/plain"],
+          "x-forwarded-host": ["p-5173--sandbox.mistle.example.test"],
+        },
+      },
+    });
+  });
+
+  it("parses ports.http response and body messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 41,
+          status: 200,
+          headers: {
+            "content-type": ["text/html; charset=utf-8"],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.response.start",
+      streamId: 41,
+      status: 200,
+      headers: {
+        "content-type": ["text/html; charset=utf-8"],
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.body.chunk",
+          streamId: 41,
+          direction: "response",
+          bytes: "SGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.body.chunk",
+      streamId: 41,
+      direction: "response",
+      bytes: "SGVsbG8=",
+      encoding: "base64",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.body.end",
+          streamId: 41,
+          direction: "response",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.body.end",
+      streamId: 41,
+      direction: "response",
+    });
+  });
+
+  it("parses ports stream close and error messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.stream.close",
+          streamId: 41,
+        }),
+      ),
+    ).toEqual({
+      type: "ports.stream.close",
+      streamId: 41,
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.stream.error",
+          streamId: 41,
+          code: "upstream_io_error",
+          message: "upstream closed early",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.stream.error",
+      streamId: 41,
+      code: "upstream_io_error",
+      message: "upstream closed early",
+    });
+  });
+
+  it("rejects malformed ports.http messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.open",
+          streamId: 41,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "http",
+          request: {
+            method: "GET",
+            path: "/",
+            headers: {
+              accept: "text/plain",
+            },
           },
         }),
       ),
