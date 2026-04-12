@@ -139,6 +139,7 @@ function renderCodexConfig(input: {
     features: {
       apps: false,
       plugins: false,
+      tool_search: true,
     },
     ...(input.chatgptBaseUrl === undefined ? {} : { chatgpt_base_url: input.chatgptBaseUrl }),
     projects: {

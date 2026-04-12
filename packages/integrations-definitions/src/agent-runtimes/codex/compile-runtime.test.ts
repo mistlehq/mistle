@@ -125,6 +125,8 @@ describe("compileCodexRuntime", () => {
     );
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("[features]");
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("apps = false");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("plugins = false");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("tool_search = true");
     expect(compiled.agentRuntimes).toEqual([
       {
         runtimeId: "codex",
@@ -252,5 +254,6 @@ describe("compileCodexRuntime", () => {
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
+    expect(configContent).toContain("tool_search = true");
   });
 });

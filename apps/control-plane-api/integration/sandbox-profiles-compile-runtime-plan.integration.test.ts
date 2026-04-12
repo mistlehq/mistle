@@ -203,6 +203,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
+    expect(configContent).toContain("tool_search = true");
   });
 
   it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({
@@ -298,6 +299,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
+    expect(configContent).toContain("tool_search = true");
   });
 
   it("omits optional github and jira cli artifacts when bindings do not select tools", async ({
