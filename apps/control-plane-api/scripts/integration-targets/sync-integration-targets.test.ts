@@ -59,6 +59,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "signoz-mcp",
+        familyId: "signoz",
+        variantId: "signoz-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "slack-default",
         familyId: "slack",
         variantId: "slack-default",

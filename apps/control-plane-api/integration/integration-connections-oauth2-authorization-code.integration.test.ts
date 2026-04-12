@@ -26,24 +26,35 @@ import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const EmptyConfigSchema = z.object({}).strict();
+const OAuth2AuthorizationCodeTestConnectionConfigSchema = z
+  .object({
+    region: z.string().min(1),
+  })
+  .strict();
 const OAuth2AuthorizationCodeTestFamilyId = "oauth2-auth-code-test";
 const OAuth2AuthorizationCodeTestVariantId = "oauth2-auth-code-default";
 
-type OAuth2AuthorizationCodeTestCapability = IntegrationOAuth2AuthorizationCodeCapability<
+type OAuth2AuthorizationCodeTestCapability<
+  TConnectionConfig extends Record<string, unknown> = Record<string, unknown>,
+> = IntegrationOAuth2AuthorizationCodeCapability<
   Record<string, unknown>,
   Record<string, string>,
-  Record<string, unknown>
+  TConnectionConfig
 >;
 
-function createOAuth2AuthorizationCodeTestRegistry(input: {
-  startAuthorization: OAuth2AuthorizationCodeTestCapability["startAuthorization"];
-  completeAuthorizationCodeGrant: OAuth2AuthorizationCodeTestCapability["completeAuthorizationCodeGrant"];
+function createOAuth2AuthorizationCodeTestRegistry<
+  TConnectionConfig extends Record<string, unknown> = Record<string, unknown>,
+>(input: {
+  startAuthorization: OAuth2AuthorizationCodeTestCapability<TConnectionConfig>["startAuthorization"];
+  completeAuthorizationCodeGrant: OAuth2AuthorizationCodeTestCapability<TConnectionConfig>["completeAuthorizationCodeGrant"];
+  startConfigSchema?: z.ZodType<TConnectionConfig>;
 }): IntegrationRegistry {
   const registry = new IntegrationRegistry();
   const definition: IntegrationDefinition<
     typeof EmptyConfigSchema,
     typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema
+    typeof EmptyConfigSchema,
+    TConnectionConfig
   > = {
     familyId: OAuth2AuthorizationCodeTestFamilyId,
     variantId: OAuth2AuthorizationCodeTestVariantId,
@@ -58,6 +69,9 @@ function createOAuth2AuthorizationCodeTestRegistry(input: {
         id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         label: "OAuth 2.0 Authorization Code",
         kind: "redirect",
+        ...(input.startConfigSchema === undefined
+          ? {}
+          : { startConfigSchema: input.startConfigSchema }),
         ui: {
           create: {
             submitLabel: "Connect",
@@ -340,6 +354,124 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
         client_id: "client_123",
         client_secret: "secret_456",
       });
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
+  it("passes validated redirect connection config into OAuth 2.0 start authorization", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-auth-code-start-config";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth2-authorization-code-start-config@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    let startedConnectionConfig: Record<string, unknown> | undefined;
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
+      startAuthorization: async (input) => {
+        startedConnectionConfig = input.connectionConfig;
+
+        return {
+          authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
+        };
+      },
+      completeAuthorizationCodeGrant: async () => {
+        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
+      },
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const response = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            config: {
+              region: "us",
+            },
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(startedConnectionConfig).toEqual({
+        region: "us",
+      });
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
+  it("returns 400 when OAuth 2.0 start config is invalid", async ({ fixture }) => {
+    const targetKey = "oauth2-auth-code-start-config-invalid";
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth2-authorization-code-start-config-invalid@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: OAuth2AuthorizationCodeTestFamilyId,
+      variantId: OAuth2AuthorizationCodeTestVariantId,
+      enabled: true,
+      config: {},
+    });
+
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
+      startAuthorization: async () => ({
+        authorizationUrl: "https://auth.example.com/authorize",
+      }),
+      completeAuthorizationCodeGrant: async () => {
+        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
+      },
+    });
+
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      const response = await app.request(
+        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            config: {},
+          }),
+        },
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual(
+        StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
+          code: "INVALID_OAUTH2_START_INPUT",
+          message: `Integration target '${targetKey}' received invalid OAuth 2.0 (Authorization Code) connection config.`,
+        }),
+      );
     } finally {
       await stopAppResources(resources);
     }

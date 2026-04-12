@@ -140,16 +140,25 @@ export function resolveConnectionMethodFormUiModel(input: {
     };
   }
 
-  if (methodDefinition.kind !== "form" || methodDefinition.configSchema === undefined) {
+  const configSchema =
+    methodDefinition.kind === "redirect"
+      ? methodDefinition.startConfigSchema
+      : methodDefinition.configSchema;
+  const configFormDefinition =
+    methodDefinition.kind === "redirect"
+      ? methodDefinition.startConfigForm
+      : methodDefinition.configForm;
+
+  if (configSchema === undefined) {
     return {
       mode: "none",
     };
   }
 
-  const parsedCurrentValueResult = methodDefinition.configSchema.safeParse(input.currentValue);
+  const parsedCurrentValueResult = configSchema.safeParse(input.currentValue);
   const resolvedForm = resolveIntegrationForm({
-    schema: methodDefinition.configSchema,
-    form: methodDefinition.configForm,
+    schema: configSchema,
+    form: configFormDefinition,
     context: {
       familyId: input.dialog.targetFamilyId,
       variantId: input.dialog.targetVariantId,

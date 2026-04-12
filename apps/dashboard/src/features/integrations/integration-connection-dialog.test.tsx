@@ -334,6 +334,80 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
   });
 
+  it("renders definition-driven config fields for redirect methods", () => {
+    const dialog: Extract<IntegrationConnectionDialogState, { mode: "create" }> = {
+      methods: [
+        {
+          id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          label: "SigNoz OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect SigNoz",
+              helperText: "Authorize SigNoz hosted MCP access.",
+            },
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "SigNoz",
+      targetFamilyId: "signoz",
+      targetKey: "signoz-mcp",
+      targetVariantId: "signoz-mcp",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      dialog,
+      methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      currentValue: {},
+    });
+
+    renderDialog({
+      configForm,
+      connectionDisplayNamePlaceholder: "SigNoz connection",
+      dialog,
+      methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+    });
+
+    expect(screen.getByLabelText("Region")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connect SigNoz" })).toBeTruthy();
+  });
+
+  it("does not render persisted redirect config fields when no start config schema is declared", () => {
+    const dialog: Extract<IntegrationConnectionDialogState, { mode: "create" }> = {
+      methods: [
+        {
+          id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          label: "PlanetScale OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect PlanetScale",
+              helperText: "Authorize PlanetScale hosted MCP access.",
+            },
+          },
+        },
+      ],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "PlanetScale",
+      targetFamilyId: "planetscale",
+      targetKey: "planetscale-mcp",
+      targetVariantId: "planetscale-mcp",
+    };
+
+    expect(
+      resolveConnectionMethodFormUiModel({
+        dialog,
+        methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        currentValue: {},
+      }),
+    ).toEqual({
+      mode: "none",
+    });
+  });
+
   it("renders device-authorization pending instructions and controls", () => {
     renderDialog({
       deviceAuthorizationPending: {

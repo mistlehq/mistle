@@ -178,13 +178,21 @@ export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
   methodId: "oauth2-authorization-code";
   displayName?: string;
+  config?: Record<string, unknown>;
 }): Promise<StartedRedirectConnection> {
   try {
     const response = await requestControlPlane({
       operation: "startRedirectIntegrationConnection",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2-authorization-code/start`,
-      ...(input.displayName === undefined ? {} : { body: { displayName: input.displayName } }),
+      ...(input.displayName === undefined && input.config === undefined
+        ? {}
+        : {
+            body: {
+              ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+              ...(input.config === undefined ? {} : { config: input.config }),
+            },
+          }),
       fallbackMessage: "Could not start integration connection.",
     });
 

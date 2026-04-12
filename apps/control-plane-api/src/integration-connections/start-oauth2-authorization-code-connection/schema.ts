@@ -18,6 +18,7 @@ export const StartOAuth2AuthorizationCodeConnectionParamsSchema = z
 export const StartOAuth2AuthorizationCodeConnectionBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 

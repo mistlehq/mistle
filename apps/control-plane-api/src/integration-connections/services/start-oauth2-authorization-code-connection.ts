@@ -4,6 +4,7 @@ import {
   integrationConnectionRedirectSessions,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import {
@@ -24,12 +25,64 @@ export type StartOAuth2AuthorizationCodeConnectionInput = {
   organizationId: string;
   targetKey: string;
   displayName?: string;
+  connectionConfig?: Record<string, unknown>;
   controlPlaneBaseUrl: string;
 };
 
 type StartedOAuth2AuthorizationCodeConnection = {
   authorizationUrl: string;
 };
+
+function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
+function resolveConnectionConfigOrThrow(input: {
+  targetKey: string;
+  rawConnectionConfig: Record<string, unknown> | undefined;
+  configSchema:
+    | {
+        safeParse(input: unknown): { success: true; data: unknown } | { success: false };
+      }
+    | undefined;
+}): Record<string, unknown> {
+  const rawConnectionConfig = input.rawConnectionConfig ?? {};
+
+  if (input.configSchema === undefined) {
+    if (Object.keys(rawConnectionConfig).length > 0) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+        `Integration target '${input.targetKey}' does not accept OAuth 2.0 (Authorization Code) connection config.`,
+      );
+    }
+
+    return {};
+  }
+
+  const parsedConnectionConfig = input.configSchema.safeParse(rawConnectionConfig);
+  if (!parsedConnectionConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+      `Integration target '${input.targetKey}' received invalid OAuth 2.0 (Authorization Code) connection config.`,
+    );
+  }
+
+  const connectionConfigRecord = toUnknownRecord(parsedConnectionConfig.data);
+  if (connectionConfigRecord === null) {
+    throw new Error("OAuth 2.0 (Authorization Code) connection config must parse to an object.");
+  }
+
+  return connectionConfigRecord;
+}
 
 function buildOAuth2AuthorizationCodeCompleteUrl(input: {
   controlPlaneBaseUrl: string;
@@ -102,6 +155,11 @@ export async function startOAuth2AuthorizationCodeConnection(
       invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
     },
   );
+  const connectionConfig = resolveConnectionConfigOrThrow({
+    targetKey: input.targetKey,
+    rawConnectionConfig: input.connectionConfig,
+    configSchema: resolved.connectionMethodStartConfigSchema,
+  });
 
   const state = encodeRedirectStateMetadata({
     state: createRedirectState(),
@@ -127,6 +185,7 @@ export async function startOAuth2AuthorizationCodeConnection(
       organizationId: input.organizationId,
       targetKey: input.targetKey,
       target: resolved.target,
+      connectionConfig,
       state,
       redirectUrl,
       pkce: {

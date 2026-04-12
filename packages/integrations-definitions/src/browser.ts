@@ -12,6 +12,7 @@ import { LinearDefinition } from "./linear/variants/linear-default/definition.js
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AwsBrowserDefinition = AwsBaseDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
@@ -19,6 +20,7 @@ export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBas
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const LinearBrowserDefinition = LinearDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
+export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
@@ -29,6 +31,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   LinearBrowserDefinition,
   OpenAiApiKeyDefinition,
   PlanetScaleBrowserDefinition,
+  SignozBrowserDefinition,
   SlackBrowserDefinition,
 ];
 

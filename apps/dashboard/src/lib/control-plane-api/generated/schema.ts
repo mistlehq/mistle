@@ -2618,6 +2618,9 @@ export interface paths {
       requestBody?: {
         content: {
           "application/json": {
+            config?: {
+              [key: string]: unknown;
+            };
             displayName?: string;
           };
         };

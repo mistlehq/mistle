@@ -95,6 +95,11 @@
       "config": {}
     },
     {
+      "targetKey": "signoz-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "slack-default",
       "enabled": true,
       "config": {

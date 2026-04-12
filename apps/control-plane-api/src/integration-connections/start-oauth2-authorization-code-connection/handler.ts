@@ -14,7 +14,7 @@ const routeHandler = async (
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
   const { targetKey } = ctx.req.valid("param");
-  const { displayName } = ctx.req.valid("json");
+  const { config: connectionConfig, displayName } = ctx.req.valid("json");
 
   const startedConnection = await startOAuth2AuthorizationCodeConnection(
     {
@@ -26,6 +26,7 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       targetKey,
       controlPlaneBaseUrl: config.auth.baseUrl,
+      ...(connectionConfig === undefined ? {} : { connectionConfig }),
       ...(displayName === undefined ? {} : { displayName }),
     },
   );

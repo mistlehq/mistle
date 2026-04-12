@@ -14,6 +14,7 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "planetscale" })).toBe(
       "/integration-logos/planetscale.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "signoz" })).toBe("/integration-logos/signoz.svg");
   });
 
   it("trims whitespace from the logo key", () => {

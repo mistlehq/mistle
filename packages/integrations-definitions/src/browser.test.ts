@@ -5,6 +5,7 @@ import {
   createBrowserDefinitionsBundle,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
+  SignozBrowserDefinition,
   SlackBrowserDefinition,
 } from "./browser.js";
 
@@ -50,5 +51,9 @@ describe("browser definitions", () => {
   it("keeps slack browser definitions free of server-only webhook hooks", () => {
     expect(SlackBrowserDefinition.webhookHandler).toBeUndefined();
     expect(SlackBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("keeps signoz browser definitions free of server-only OAuth handlers", () => {
+    expect(SignozBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 });

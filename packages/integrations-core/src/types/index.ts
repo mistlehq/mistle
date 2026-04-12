@@ -357,6 +357,13 @@ export type IntegrationRedirectConnectionMethodDefinition<
 > & {
   kind: "redirect";
   secretFields?: never;
+  startConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+  startConfigForm?: IntegrationFormDefinition<
+    TTargetConfig,
+    TTargetSecrets,
+    TBindingConfig,
+    Record<string, unknown>
+  >;
   ui: {
     create: IntegrationConnectionMethodCreateUi;
   };
@@ -668,6 +675,7 @@ export type IntegrationOAuth2AuthorizationCodeStartAuthorizationInput<
   organizationId: string;
   targetKey: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connectionConfig: Record<string, unknown>;
   state: string;
   redirectUrl: string;
   pkce?: {
@@ -1705,9 +1713,10 @@ export type IntegrationBrowserSafeRedirectConnectionMethodDefinition<
     TBindingConfig,
     TConnectionConfig
   >,
-  "configSchema"
+  "configSchema" | "startConfigSchema"
 > & {
   configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+  startConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
 
 export type IntegrationBrowserSafeDeviceAuthorizationConnectionMethodDefinition<

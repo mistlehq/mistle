@@ -80,6 +80,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       targetKey: string;
       methodId: "oauth2-authorization-code";
       displayName?: string;
+      config?: Record<string, unknown>;
     }) => startRedirectIntegrationConnection(mutationInput),
   });
 
@@ -354,6 +355,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     const started = await startRedirectMutation.mutateAsync({
       targetKey: dialog.targetKey,
       methodId: draft.methodId,
+      ...(Object.keys(draft.configValue).length === 0 ? {} : { config: draft.configValue }),
       ...(normalizedConnectionDisplayName.length === 0
         ? {}
         : { displayName: normalizedConnectionDisplayName }),

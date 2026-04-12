@@ -4124,6 +4124,10 @@
                   "displayName": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "additionalProperties": false

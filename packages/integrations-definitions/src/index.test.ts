@@ -37,6 +37,10 @@ describe("integrations-definitions index", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const signozDefinition = registry.getDefinition({
+      familyId: "signoz",
+      variantId: "signoz-mcp",
+    });
     const slackDefinition = registry.getDefinition({
       familyId: "slack",
       variantId: "slack-default",
@@ -152,6 +156,26 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(signozDefinition).toMatchObject({
+      familyId: "signoz",
+      variantId: "signoz-mcp",
+      kind: "connector",
+      displayName: "SigNoz",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "SigNoz OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect SigNoz",
+              helperText: "Authorize SigNoz hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(signozDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(githubCloudDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-cloud",
@@ -361,7 +385,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(8);
+    expect(definitions).toHaveLength(9);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -372,6 +396,7 @@ describe("integrations-definitions index", () => {
       "linear::linear-default",
       "openai::openai-default",
       "planetscale::planetscale-mcp",
+      "signoz::signoz-mcp",
       "slack::slack-default",
     ]);
   });

@@ -3,6 +3,7 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
+  type IntegrationConfigSchema,
   type IntegrationRegistry,
   type IntegrationOAuth2AuthorizationCodeCapability,
 } from "@mistle/integrations-core";
@@ -76,6 +77,7 @@ export type ResolvedOAuth2AuthorizationCodeCapabilityTarget = {
     Record<string, string>,
     Record<string, unknown>
   >;
+  connectionMethodStartConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
 
 export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
@@ -107,11 +109,12 @@ export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
     );
   }
 
-  if (
-    !definition.connectionMethods.some(
+  const oauth2ConnectionMethod =
+    definition.connectionMethods.find(
       (method) => method.id === IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-    )
-  ) {
+    ) ?? null;
+
+  if (oauth2ConnectionMethod === null) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support OAuth 2.0 (Authorization Code).`,
@@ -182,5 +185,9 @@ export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
       secrets: parsedSecrets,
     },
     oauth2AuthorizationCode,
+    ...(oauth2ConnectionMethod.kind !== "redirect" ||
+    oauth2ConnectionMethod.startConfigSchema === undefined
+      ? {}
+      : { connectionMethodStartConfigSchema: oauth2ConnectionMethod.startConfigSchema }),
   };
 }
