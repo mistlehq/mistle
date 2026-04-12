@@ -316,8 +316,8 @@ const StreamWindowSchema = z.object({
   bytes: PositiveIntegerSchema,
 });
 
-const TelemetrySignalSchema = z.enum(["logs"]);
-const TelemetryFormatSchema = z.literal("mistle.sandbox-runtime.log.v1");
+const TelemetrySignalSchema = z.enum(["logs", "traces"]);
+const TelemetryFormatSchema = z.enum(["mistle.sandbox-runtime.log.v1", "otlp.http.traces.v1+json"]);
 
 const TelemetryOpenSchema = z.object({
   type: z.literal("telemetry.open"),

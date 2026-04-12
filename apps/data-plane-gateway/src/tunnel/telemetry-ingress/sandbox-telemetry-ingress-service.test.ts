@@ -34,6 +34,36 @@ describe("SandboxTelemetryIngressService", () => {
     ]);
   });
 
+  it("accepts trace telemetry.open with the local no-op sink", async () => {
+    const service = new SandboxTelemetryIngressService(new NoopSandboxTelemetryIngressSink());
+    const sentMessages: unknown[] = [];
+
+    await service.handleDelivery({
+      delivery: {
+        kind: "telemetryOpen",
+        message: {
+          type: "telemetry.open",
+          streamId: 42,
+          signal: "traces",
+          format: "otlp.http.traces.v1+json",
+        },
+      },
+      relaySessionId: "sess_bootstrap",
+      sandboxInstanceId: "sbi_test",
+      sendControlMessage: (message) => {
+        sentMessages.push(message);
+      },
+    });
+
+    expect(sentMessages).toEqual([
+      {
+        type: "telemetry.open.ok",
+        streamId: 42,
+        initialWindowBytes: 65536,
+      },
+    ]);
+  });
+
   it("resets data frames for telemetry streams that are not attached", async () => {
     const service = new SandboxTelemetryIngressService(new NoopSandboxTelemetryIngressSink());
     const sentMessages: unknown[] = [];

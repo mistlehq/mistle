@@ -82,6 +82,76 @@ async function waitForCondition(
 
 describe("sandbox tunnel telemetry ingress integration", () => {
   it(
+    "forwards sandbox OTLP trace exports to the gateway traces endpoint",
+    async ({ fixture }) => {
+      fixture.otlpRequests.length = 0;
+      const sandboxInstanceId = typeid("sbi").toString();
+      const sandboxTraceId = "0123456789abcdef0123456789abcdef";
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        fixture,
+        sandboxInstanceId,
+      });
+
+      await sendWebSocketMessage(
+        bootstrapSocket,
+        JSON.stringify({
+          type: "telemetry.open",
+          streamId: 43,
+          signal: "traces",
+          format: "otlp.http.traces.v1+json",
+        }),
+      );
+
+      await expect(waitForWebSocketMessage(bootstrapSocket)).resolves.toEqual({
+        data: JSON.stringify({
+          type: "telemetry.open.ok",
+          streamId: 43,
+          initialWindowBytes: 65536,
+        }),
+        isBinary: false,
+      });
+
+      const traceExportBody = `{"resourceSpans":[{"resource":{"attributes":[{"key":"service.name","value":{"stringValue":"@mistle/sandbox-runtime"}}]},"scopeSpans":[{"spans":[{"traceId":"${sandboxTraceId}","spanId":"0123456789abcdef","name":"sandbox.runtime.request"}]}]}]}`;
+
+      await sendWebSocketMessage(
+        bootstrapSocket,
+        Buffer.from(
+          encodeDataFrame({
+            streamId: 43,
+            payloadKind: PayloadKindRawBytes,
+            payload: Buffer.from(traceExportBody, "utf8"),
+          }),
+        ),
+      );
+
+      await waitForCondition(
+        () =>
+          fixture.otlpRequests.some(
+            (request) => request.path === "/v1/traces" && request.body.includes(sandboxTraceId),
+          ),
+        10_000,
+        "Expected a forwarded OTLP trace export request.",
+      );
+
+      const otlpRequest = fixture.otlpRequests.find(
+        (request) => request.path === "/v1/traces" && request.body.includes(sandboxTraceId),
+      );
+
+      expect(otlpRequest).toEqual({
+        body: traceExportBody,
+        path: "/v1/traces",
+      });
+
+      await closeWebSocket(bootstrapSocket);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "forwards sandbox telemetry log lines to OTLP through the gateway sink",
     async ({ fixture }) => {
       fixture.otlpRequests.length = 0;

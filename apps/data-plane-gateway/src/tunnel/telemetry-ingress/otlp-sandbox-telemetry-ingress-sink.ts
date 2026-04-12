@@ -12,10 +12,28 @@ import {
   parseSandboxTelemetryLogLine,
   toSandboxTelemetryLogRecord,
 } from "./sandbox-telemetry-log-line.js";
+import { getTelemetryContentType } from "./telemetry-stream-format.js";
 
-type ActiveOtlpSandboxTelemetryStream = SandboxTelemetryIngressStream & {
+type ActiveOtlpSandboxTelemetryLogStream = SandboxTelemetryIngressStream & {
   lineDecoder: SandboxTelemetryLogLineDecoder;
 };
+
+type ActiveOtlpSandboxTelemetryTraceStream = SandboxTelemetryIngressStream & {
+  contentType: string;
+};
+
+type ActiveOtlpSandboxTelemetryStream =
+  | ActiveOtlpSandboxTelemetryLogStream
+  | ActiveOtlpSandboxTelemetryTraceStream;
+
+type OtlpTraceForwarder = {
+  forward: (input: { contentType: string; payload: Uint8Array }) => Promise<void>;
+};
+
+type EnabledTelemetryTracesConfig = Extract<
+  DataPlaneGatewayGlobalConfig["telemetry"],
+  { enabled: true }
+>["traces"];
 
 function buildStreamKey(input: {
   relaySessionId: string;
@@ -34,6 +52,35 @@ function joinResourceAttributes(
     : `${resourceAttributes},${extraAttribute}`;
 }
 
+function isLogStream(
+  input: ActiveOtlpSandboxTelemetryStream,
+): input is ActiveOtlpSandboxTelemetryLogStream {
+  return input.signal === "logs";
+}
+
+function createOtlpTraceForwarder(input: {
+  traces: EnabledTelemetryTracesConfig;
+}): OtlpTraceForwarder {
+  return {
+    forward: async ({ contentType, payload }) => {
+      const response = await fetch(input.traces.endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": contentType,
+        },
+        body: Buffer.from(payload),
+      });
+
+      if (!response.ok) {
+        const responseBody = await response.text().catch(() => "");
+        throw new Error(
+          `Trace OTLP export failed with status ${String(response.status)}${responseBody.length > 0 ? `: ${responseBody}` : "."}`,
+        );
+      }
+    },
+  };
+}
+
 export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressSink {
   readonly #streams = new Map<string, ActiveOtlpSandboxTelemetryStream>();
 
@@ -42,6 +89,7 @@ export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
       clock: Clock;
       gatewayNodeId: string;
       logForwarder: OtlpLogForwarder;
+      traceForwarder: OtlpTraceForwarder;
     },
   ) {}
 
@@ -51,9 +99,24 @@ export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
       throw new Error(`Sandbox telemetry stream ${String(input.streamId)} is already open.`);
     }
 
+    if (input.signal === "logs") {
+      this.#streams.set(streamKey, {
+        ...input,
+        lineDecoder: new SandboxTelemetryLogLineDecoder(),
+      });
+      return;
+    }
+
+    const contentType = getTelemetryContentType(input);
+    if (contentType === undefined) {
+      throw new Error(
+        `Unsupported sandbox telemetry stream format '${input.format}' for signal '${input.signal}'.`,
+      );
+    }
+
     this.#streams.set(streamKey, {
       ...input,
-      lineDecoder: new SandboxTelemetryLogLineDecoder(),
+      contentType,
     });
   }
 
@@ -65,19 +128,27 @@ export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
       throw new Error(`Sandbox telemetry stream ${String(input.streamId)} is not open.`);
     }
 
-    const completedLines = activeStream.lineDecoder.append(input.payload);
-    for (const line of completedLines) {
-      const parsedLine = parseSandboxTelemetryLogLine(line);
-      this.input.logForwarder.emit(
-        toSandboxTelemetryLogRecord({
-          clock: this.input.clock,
-          gatewayNodeId: this.input.gatewayNodeId,
-          relaySessionId: input.relaySessionId,
-          sandboxInstanceId: input.sandboxInstanceId,
-          logLine: parsedLine,
-        }),
-      );
+    if (isLogStream(activeStream)) {
+      const completedLines = activeStream.lineDecoder.append(input.payload);
+      for (const line of completedLines) {
+        const parsedLine = parseSandboxTelemetryLogLine(line);
+        this.input.logForwarder.emit(
+          toSandboxTelemetryLogRecord({
+            clock: this.input.clock,
+            gatewayNodeId: this.input.gatewayNodeId,
+            relaySessionId: input.relaySessionId,
+            sandboxInstanceId: input.sandboxInstanceId,
+            logLine: parsedLine,
+          }),
+        );
+      }
+      return;
     }
+
+    await this.input.traceForwarder.forward({
+      contentType: activeStream.contentType,
+      payload: input.payload,
+    });
   }
 
   public async closeStream(input: SandboxTelemetryIngressStream): Promise<void> {
@@ -88,7 +159,9 @@ export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
     }
 
     this.#streams.delete(streamKey);
-    activeStream.lineDecoder.finalize();
+    if (isLogStream(activeStream)) {
+      activeStream.lineDecoder.finalize();
+    }
   }
 
   public async shutdown(): Promise<void> {
@@ -116,6 +189,9 @@ export function createSandboxTelemetryIngressSink(input: {
         "mistle.telemetry.ingest=gateway-tunnel",
       ),
       logs: input.telemetry.logs,
+    }),
+    traceForwarder: createOtlpTraceForwarder({
+      traces: input.telemetry.traces,
     }),
   });
 }

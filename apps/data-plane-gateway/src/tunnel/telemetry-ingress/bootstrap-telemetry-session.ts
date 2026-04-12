@@ -10,6 +10,7 @@ import {
   createTelemetryReset,
   createTelemetryWindow,
 } from "./telemetry-control-messages.js";
+import { isSupportedTelemetryStream } from "./telemetry-stream-format.js";
 
 export type ActiveBootstrapTelemetryStream = {
   consumedSinceLastWindowGrantBytes: number;
@@ -57,6 +58,17 @@ export class BootstrapTelemetrySession {
     signal: TelemetrySignal;
     streamId: number;
   }): OpenBootstrapTelemetryStreamResult {
+    if (!isSupportedTelemetryStream(input)) {
+      return {
+        kind: "error",
+        response: createTelemetryOpenError({
+          code: "unsupported_telemetry_stream",
+          message: `Telemetry format '${input.format}' is not supported for signal '${input.signal}'.`,
+          streamId: input.streamId,
+        }),
+      };
+    }
+
     const existingStream = this.#streamsById.get(input.streamId);
     if (existingStream !== undefined) {
       return {
@@ -75,7 +87,7 @@ export class BootstrapTelemetrySession {
         kind: "error",
         response: createTelemetryOpenError({
           code: "telemetry_stream_already_open",
-          message: `A logs telemetry stream is already active for this bootstrap session.`,
+          message: `A ${input.signal} telemetry stream is already active for this bootstrap session.`,
           streamId: input.streamId,
         }),
       };

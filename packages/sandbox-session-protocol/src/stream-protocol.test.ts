@@ -319,6 +319,22 @@ describe("stream control message parser", () => {
     expect(
       parseTelemetryControlMessage(
         JSON.stringify({
+          type: "telemetry.open",
+          streamId: 32,
+          signal: "traces",
+          format: "otlp.http.traces.v1+json",
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.open",
+      streamId: 32,
+      signal: "traces",
+      format: "otlp.http.traces.v1+json",
+    });
+
+    expect(
+      parseTelemetryControlMessage(
+        JSON.stringify({
           type: "telemetry.reset",
           streamId: 31,
           code: "telemetry_stream_not_found",
@@ -348,6 +364,22 @@ describe("stream control message parser", () => {
       streamId: 41,
       signal: "logs",
       format: "mistle.sandbox-runtime.log.v1",
+    });
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "telemetry.open",
+          streamId: 42,
+          signal: "traces",
+          format: "otlp.http.traces.v1+json",
+        }),
+      ),
+    ).toEqual({
+      type: "telemetry.open",
+      streamId: 42,
+      signal: "traces",
+      format: "otlp.http.traces.v1+json",
     });
 
     expect(

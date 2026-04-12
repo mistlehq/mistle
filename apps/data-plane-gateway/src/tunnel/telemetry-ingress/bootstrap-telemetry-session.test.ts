@@ -29,6 +29,32 @@ describe("BootstrapTelemetrySession", () => {
     });
   });
 
+  it("opens a traces telemetry stream with a supported OTLP format", () => {
+    const session = new BootstrapTelemetrySession(128);
+
+    expect(
+      session.openStream({
+        format: "otlp.http.traces.v1+json",
+        signal: "traces",
+        streamId: 42,
+      }),
+    ).toEqual({
+      kind: "ok",
+      response: {
+        type: "telemetry.open.ok",
+        streamId: 42,
+        initialWindowBytes: 128,
+      },
+      stream: {
+        consumedSinceLastWindowGrantBytes: 0,
+        format: "otlp.http.traces.v1+json",
+        remainingWindowBytes: 128,
+        signal: "traces",
+        streamId: 42,
+      },
+    });
+  });
+
   it("rejects opening the same stream id twice", () => {
     const session = new BootstrapTelemetrySession(128);
     session.openStream({
@@ -75,6 +101,26 @@ describe("BootstrapTelemetrySession", () => {
         streamId: 42,
         code: "telemetry_stream_already_open",
         message: "A logs telemetry stream is already active for this bootstrap session.",
+      },
+    });
+  });
+
+  it("rejects mismatched signal and format pairs", () => {
+    const session = new BootstrapTelemetrySession(128);
+
+    expect(
+      session.openStream({
+        format: "otlp.http.traces.v1+json",
+        signal: "logs",
+        streamId: 42,
+      }),
+    ).toEqual({
+      kind: "error",
+      response: {
+        type: "telemetry.open.error",
+        streamId: 42,
+        code: "unsupported_telemetry_stream",
+        message: "Telemetry format 'otlp.http.traces.v1+json' is not supported for signal 'logs'.",
       },
     });
   });
