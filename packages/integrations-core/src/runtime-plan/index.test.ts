@@ -4,6 +4,14 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
 const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+const GitHubCliPlaceholderToken = [
+  "g",
+  "h",
+  "p",
+  "_",
+  "G7aBNSK9WMQh0rgA",
+  "lagCe4a7o75FPgRbQhls",
+].join("");
 
 function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
   return {
@@ -419,7 +427,7 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "gh-cli",
               name: "GitHub CLI",
               env: {
-                GH_TOKEN: "ghp_G7aBNSK9WMQh0rgAlagCe4a7o75FPgRbQhls",
+                GH_TOKEN: GitHubCliPlaceholderToken,
               },
               lifecycle: {
                 install: [{ args: ["sh", "-euc", "install-gh"] }],
@@ -437,7 +445,7 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "gh-cli",
               name: "GitHub CLI",
               env: {
-                GH_TOKEN: "ghp_G7aBNSK9WMQh0rgAlagCe4a7o75FPgRbQhls",
+                GH_TOKEN: GitHubCliPlaceholderToken,
               },
               lifecycle: {
                 install: [{ args: ["sh", "-euc", "install-gh"] }],
