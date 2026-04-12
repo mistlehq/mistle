@@ -40,13 +40,7 @@
               "maximum": 9007199254740991
             }
           },
-          "required": [
-            "sandboxInstanceId",
-            "ownerLeaseId",
-            "nodeId",
-            "sessionId",
-            "attachedAtMs"
-          ],
+          "required": ["sandboxInstanceId", "ownerLeaseId", "nodeId", "sessionId", "attachedAtMs"],
           "additionalProperties": false
         },
         {
@@ -63,9 +57,7 @@
           "maximum": 9007199254740991
         }
       },
-      "required": [
-        "activeCount"
-      ],
+      "required": ["activeCount"],
       "additionalProperties": false
     },
     "keepalive": {
@@ -75,9 +67,7 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "active"
-      ],
+      "required": ["active"],
       "additionalProperties": false
     },
     "runtime": {
@@ -87,18 +77,10 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "ready"
-      ],
+      "required": ["ready"],
       "additionalProperties": false
     }
   },
-  "required": [
-    "ownerLeaseId",
-    "attachment",
-    "presence",
-    "keepalive",
-    "runtime"
-  ],
+  "required": ["ownerLeaseId", "attachment", "presence", "keepalive", "runtime"],
   "additionalProperties": false
 }

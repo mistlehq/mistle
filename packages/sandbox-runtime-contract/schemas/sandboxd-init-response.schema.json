@@ -9,9 +9,7 @@
           "const": true
         }
       },
-      "required": [
-        "ok"
-      ],
+      "required": ["ok"],
       "additionalProperties": false
     },
     {
@@ -26,10 +24,7 @@
           "minLength": 1
         }
       },
-      "required": [
-        "ok",
-        "error"
-      ],
+      "required": ["ok", "error"],
       "additionalProperties": false
     }
   ]
