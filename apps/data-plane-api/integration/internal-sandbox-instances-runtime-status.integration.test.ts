@@ -90,6 +90,114 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
 
 describe("internal sandbox instance runtime status integration", () => {
   it(
+    "lists idly paused running sandboxes as stopped after provider inspection reconciles them",
+    async ({ fixture }) => {
+      const client = createDataPlaneSandboxInstancesClient({
+        baseUrl: fixture.baseUrl,
+        serviceToken: fixture.internalAuthServiceToken,
+      });
+      const gateway = await startGatewayForFixture({
+        fixture,
+      });
+      const adapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: fixture.config.sandbox.docker?.socketPath ?? "/var/run/docker.sock",
+        },
+      });
+      const organizationId = `org_${typeid("org").toString()}`;
+      const sandboxInstanceId = typeid("sbi").toString();
+      const sandbox = await adapter.start({
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: "2026-03-27T00:00:00.000Z",
+        },
+      });
+
+      try {
+        await fixture.db.insert(sandboxInstances).values({
+          id: sandboxInstanceId,
+          organizationId,
+          sandboxProfileId: "sbp_runtime_status",
+          sandboxProfileVersion: 1,
+          runtimeProvider: "docker",
+          providerSandboxId: sandbox.id,
+          status: SandboxInstanceStatuses.RUNNING,
+          startedByKind: "user",
+          startedById: "usr_runtime_status",
+          source: "dashboard",
+        });
+
+        const bootstrapToken = await mintValidBootstrapToken({
+          sandboxInstanceId,
+        });
+        const bootstrapSocket = await connectBootstrapSocket({
+          websocketBaseUrl: gateway.websocketBaseUrl,
+          sandboxInstanceId,
+          token: bootstrapToken,
+        });
+
+        try {
+          bootstrapSocket.send(
+            JSON.stringify({
+              type: "runtime.ready",
+              ready: true,
+            }),
+          );
+
+          await waitForListedSandboxStatus({
+            fixture,
+            organizationId,
+            sandboxInstanceId,
+            expectedStatus: "running",
+          });
+
+          await adapter.stop({
+            id: sandbox.id,
+          });
+          await closeWebSocket(bootstrapSocket);
+
+          await waitForListedSandboxStatus({
+            fixture,
+            organizationId,
+            sandboxInstanceId,
+            expectedStatus: "stopped",
+          });
+
+          const sandboxInstance = await client.getSandboxInstance({
+            organizationId,
+            instanceId: sandboxInstanceId,
+          });
+          expect(sandboxInstance).toMatchObject({
+            id: sandboxInstanceId,
+            status: "stopped",
+            connectable: false,
+          });
+
+          const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+            columns: {
+              status: true,
+            },
+            where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+          });
+          expect(persistedSandboxInstance?.status).toBe(SandboxInstanceStatuses.STOPPED);
+        } finally {
+          await closeWebSocket(bootstrapSocket);
+        }
+      } finally {
+        await gateway.stop();
+        await adapter
+          .destroy({
+            id: sandbox.id,
+          })
+          .catch(() => undefined);
+      }
+    },
+    RuntimeStatusTestTimeoutMs,
+  );
+
+  it(
     "returns starting before tunnel readiness, then running after attachment, and reconciles missing runtimes",
     async ({ fixture }) => {
       const client = createDataPlaneSandboxInstancesClient({
