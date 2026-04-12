@@ -29,6 +29,13 @@ type CreateEgressProxyHandlerInput = {
   egressGrantConfig: EgressGrantConfig;
 };
 
+type CredentialResolverInput = {
+  connectionId: string;
+  secretType: string;
+  slotKey?: string;
+  resolverKey?: string;
+};
+
 type ErrorResponse = {
   code: string;
   message: string;
@@ -237,6 +244,83 @@ function applyAdditionalHeaders(input: {
 }): void {
   for (const [headerName, headerValue] of Object.entries(input.additionalHeaders)) {
     input.outgoingHeaders.set(headerName, headerValue);
+  }
+}
+
+function createCredentialCacheKey(input: {
+  bindingId: string;
+  resolver: CredentialResolverInput;
+}): Parameters<CredentialCache["get"]>[0] {
+  return {
+    bindingId: input.bindingId,
+    connectionId: input.resolver.connectionId,
+    secretType: input.resolver.secretType,
+    ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+    ...(input.resolver.resolverKey === undefined
+      ? {}
+      : { resolverKey: input.resolver.resolverKey }),
+  };
+}
+
+async function resolveCredentialWithCache(input: {
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  credentialCache: CredentialCache;
+  bindingId: string;
+  resolver: CredentialResolverInput;
+}): Promise<CachedCredential> {
+  const cacheKey = createCredentialCacheKey({
+    bindingId: input.bindingId,
+    resolver: input.resolver,
+  });
+  const cacheLookup = input.credentialCache.getWithResult(cacheKey);
+  const resolvedCredential = cacheLookup.credential;
+
+  if (resolvedCredential !== undefined) {
+    return resolvedCredential;
+  }
+
+  const resolvedCredentialFromControlPlane =
+    await input.controlPlaneInternalClient.resolveIntegrationCredential({
+      connectionId: input.resolver.connectionId,
+      bindingId: input.bindingId,
+      secretType: input.resolver.secretType,
+      ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+      ...(input.resolver.resolverKey === undefined
+        ? {}
+        : { resolverKey: input.resolver.resolverKey }),
+    });
+
+  input.credentialCache.set(cacheKey, resolvedCredentialFromControlPlane);
+  return resolvedCredentialFromControlPlane;
+}
+
+async function applyAdditionalCredentialHeaders(input: {
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  credentialCache: CredentialCache;
+  bindingId: string;
+  outgoingHeaders: Headers;
+  additionalCredentialHeaders: NonNullable<AuthorizedEgressGrant["additionalCredentialHeaders"]>;
+}): Promise<void> {
+  for (const header of input.additionalCredentialHeaders) {
+    const credential = await resolveCredentialWithCache({
+      controlPlaneInternalClient: input.controlPlaneInternalClient,
+      credentialCache: input.credentialCache,
+      bindingId: input.bindingId,
+      resolver: {
+        connectionId: header.connectionId,
+        secretType: header.secretType,
+        ...(header.slotKey === undefined ? {} : { slotKey: header.slotKey }),
+        ...(header.resolverKey === undefined ? {} : { resolverKey: header.resolverKey }),
+      },
+    });
+
+    input.outgoingHeaders.set(
+      header.header,
+      resolveStaticCredentialValueOrThrow({
+        credential,
+        context: `Additional credential-backed header '${header.header}'`,
+      }),
+    );
   }
 }
 
@@ -506,8 +590,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           span.setAttribute("mistle.credential.resolver_key", egressGrant.resolverKey);
         }
 
-        const cacheKey = {
-          bindingId: egressGrant.bindingId,
+        const primaryResolver = {
           connectionId: egressGrant.connectionId,
           secretType: egressGrant.secretType,
           ...(egressGrant.slotKey === undefined ? {} : { slotKey: egressGrant.slotKey }),
@@ -515,6 +598,10 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             ? {}
             : { resolverKey: egressGrant.resolverKey }),
         };
+        const cacheKey = createCredentialCacheKey({
+          bindingId: egressGrant.bindingId,
+          resolver: primaryResolver,
+        });
 
         const cacheLookup = input.credentialCache.getWithResult(cacheKey);
         let resolvedCredential = cacheLookup.credential;
@@ -542,15 +629,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 try {
                   const resolvedCredential =
                     await input.controlPlaneInternalClient.resolveIntegrationCredential({
-                      connectionId: egressGrant.connectionId,
+                      connectionId: primaryResolver.connectionId,
                       bindingId: egressGrant.bindingId,
-                      secretType: egressGrant.secretType,
-                      ...(egressGrant.slotKey === undefined
+                      secretType: primaryResolver.secretType,
+                      ...(primaryResolver.slotKey === undefined
                         ? {}
-                        : { slotKey: egressGrant.slotKey }),
-                      ...(egressGrant.resolverKey === undefined
+                        : { slotKey: primaryResolver.slotKey }),
+                      ...(primaryResolver.resolverKey === undefined
                         ? {}
-                        : { resolverKey: egressGrant.resolverKey }),
+                        : { resolverKey: primaryResolver.resolverKey }),
                     });
 
                   input.credentialCache.set(cacheKey, resolvedCredential);
@@ -621,6 +708,38 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             outgoingHeaders,
             additionalHeaders: egressGrant.additionalHeaders,
           });
+        }
+        if (egressGrant.additionalCredentialHeaders !== undefined) {
+          try {
+            await applyAdditionalCredentialHeaders({
+              controlPlaneInternalClient: input.controlPlaneInternalClient,
+              credentialCache: input.credentialCache,
+              bindingId: egressGrant.bindingId,
+              outgoingHeaders,
+              additionalCredentialHeaders: egressGrant.additionalCredentialHeaders,
+            });
+          } catch (error) {
+            logger.error(
+              {
+                err: error,
+                egressRuleId: egressGrant.egressRuleId,
+                bindingId: egressGrant.bindingId,
+              },
+              "Failed to resolve additional credential-backed egress headers",
+            );
+            span.recordException(error instanceof Error ? error : new Error(String(error)));
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: "credential resolution failed",
+            });
+            return ctx.json(
+              createErrorResponse({
+                code: "CREDENTIAL_RESOLUTION_FAILED",
+                message: "Failed to resolve integration credential.",
+              }),
+              502,
+            );
+          }
         }
         const outgoingBody = await readOutgoingRequestBody(ctx);
 

@@ -22,6 +22,12 @@ type CreateEgressProxyUpgradeHandlerInput = {
 };
 
 type CredentialCacheKey = Parameters<CredentialCache["get"]>[0];
+type CredentialResolverInput = {
+  connectionId: string;
+  secretType: string;
+  slotKey?: string;
+  resolverKey?: string;
+};
 
 function readOptionalHeader(headers: IncomingHttpHeaders, headerName: string): string | undefined {
   const value = headers[headerName.toLowerCase()];
@@ -196,6 +202,21 @@ function applyAdditionalHeaders(input: {
   }
 }
 
+function createCredentialCacheKey(input: {
+  bindingId: string;
+  resolver: CredentialResolverInput;
+}): CredentialCacheKey {
+  return {
+    bindingId: input.bindingId,
+    connectionId: input.resolver.connectionId,
+    secretType: input.resolver.secretType,
+    ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+    ...(input.resolver.resolverKey === undefined
+      ? {}
+      : { resolverKey: input.resolver.resolverKey }),
+  };
+}
+
 function appendHeader(headers: Headers, headerName: string, headerValue: string | string[]): void {
   if (Array.isArray(headerValue)) {
     for (const value of headerValue) {
@@ -323,40 +344,37 @@ function connectTunnel(left: Socket, right: Socket, head: Buffer): void {
 async function resolveCredentialValue(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
-  egressGrant: AuthorizedEgressGrant;
+  bindingId: string;
+  resolver: CredentialResolverInput;
+  context: string;
 }): Promise<string> {
-  const cacheKey: CredentialCacheKey = {
-    bindingId: input.egressGrant.bindingId,
-    connectionId: input.egressGrant.connectionId,
-    secretType: input.egressGrant.secretType,
-    ...(input.egressGrant.slotKey === undefined ? {} : { slotKey: input.egressGrant.slotKey }),
-    ...(input.egressGrant.resolverKey === undefined
-      ? {}
-      : { resolverKey: input.egressGrant.resolverKey }),
-  };
+  const cacheKey = createCredentialCacheKey({
+    bindingId: input.bindingId,
+    resolver: input.resolver,
+  });
 
   const cachedCredential = input.credentialCache.get(cacheKey);
   if (cachedCredential !== undefined) {
     return resolveStaticCredentialValueOrThrow({
       credential: cachedCredential,
-      context: "Websocket egress auth injection",
+      context: input.context,
     });
   }
 
   const resolvedCredential = await input.controlPlaneInternalClient.resolveIntegrationCredential({
-    connectionId: input.egressGrant.connectionId,
-    bindingId: input.egressGrant.bindingId,
-    secretType: input.egressGrant.secretType,
-    ...(input.egressGrant.slotKey === undefined ? {} : { slotKey: input.egressGrant.slotKey }),
-    ...(input.egressGrant.resolverKey === undefined
+    connectionId: input.resolver.connectionId,
+    bindingId: input.bindingId,
+    secretType: input.resolver.secretType,
+    ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+    ...(input.resolver.resolverKey === undefined
       ? {}
-      : { resolverKey: input.egressGrant.resolverKey }),
+      : { resolverKey: input.resolver.resolverKey }),
   });
 
   input.credentialCache.set(cacheKey, resolvedCredential);
   return resolveStaticCredentialValueOrThrow({
     credential: resolvedCredential,
-    context: "Websocket egress auth injection",
+    context: input.context,
   });
 }
 
@@ -420,7 +438,16 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
         credentialValue = await resolveCredentialValue({
           controlPlaneInternalClient: input.controlPlaneInternalClient,
           credentialCache: input.credentialCache,
-          egressGrant,
+          bindingId: egressGrant.bindingId,
+          resolver: {
+            connectionId: egressGrant.connectionId,
+            secretType: egressGrant.secretType,
+            ...(egressGrant.slotKey === undefined ? {} : { slotKey: egressGrant.slotKey }),
+            ...(egressGrant.resolverKey === undefined
+              ? {}
+              : { resolverKey: egressGrant.resolverKey }),
+          },
+          context: "Websocket egress auth injection",
         });
       } catch (error) {
         logger.error(
@@ -448,6 +475,36 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
           outgoingHeaders,
           additionalHeaders: egressGrant.additionalHeaders,
         });
+      }
+      if (egressGrant.additionalCredentialHeaders !== undefined) {
+        try {
+          for (const header of egressGrant.additionalCredentialHeaders) {
+            const resolvedHeaderValue = await resolveCredentialValue({
+              controlPlaneInternalClient: input.controlPlaneInternalClient,
+              credentialCache: input.credentialCache,
+              bindingId: egressGrant.bindingId,
+              resolver: {
+                connectionId: header.connectionId,
+                secretType: header.secretType,
+                ...(header.slotKey === undefined ? {} : { slotKey: header.slotKey }),
+                ...(header.resolverKey === undefined ? {} : { resolverKey: header.resolverKey }),
+              },
+              context: `Additional credential-backed header '${header.header}'`,
+            });
+            outgoingHeaders.set(header.header, resolvedHeaderValue);
+          }
+        } catch (error) {
+          logger.error(
+            {
+              err: error,
+              egressRuleId: egressGrant.egressRuleId,
+              bindingId: egressGrant.bindingId,
+            },
+            "Failed to resolve additional credential-backed egress headers for websocket request",
+          );
+          writeFailure(socket, 502, "Bad Gateway", "Failed to resolve integration credential.");
+          return;
+        }
       }
       applyAuthInjection({
         upstreamUrl,

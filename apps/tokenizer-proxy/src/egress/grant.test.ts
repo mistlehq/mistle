@@ -12,6 +12,13 @@ const TestGrantConfig = {
 async function createGrant(input?: {
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
+  additionalCredentialHeaders?: ReadonlyArray<{
+    header: string;
+    connectionId: string;
+    secretType: string;
+    slotKey?: string;
+    resolverKey?: string;
+  }>;
 }): Promise<string> {
   return await mintEgressGrant({
     config: TestGrantConfig,
@@ -24,6 +31,9 @@ async function createGrant(input?: {
       upstreamBaseUrl: "https://api.openai.com/v1",
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
+      ...(input?.additionalCredentialHeaders === undefined
+        ? {}
+        : { additionalCredentialHeaders: input.additionalCredentialHeaders }),
       ...(input?.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
       ...(input?.allowedPathPrefixes === undefined
         ? {}
@@ -70,6 +80,37 @@ describe("authorizeEgressGrant", () => {
       bindingId: "ibd_openai",
       connectionId: "icn_openai",
       upstreamBaseUrl: "https://api.openai.com/v1",
+    });
+  });
+
+  it("returns additional credential-backed headers from the verified grant", async () => {
+    const grantToken = await createGrant({
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          connectionId: "icn_openai",
+          secretType: "api_key",
+          slotKey: "openai.openai-default.api-key.secondary",
+        },
+      ],
+    });
+
+    await expect(
+      authorizeEgressGrant({
+        grantToken,
+        config: TestGrantConfig,
+        method: "POST",
+        targetPath: "/v1/responses",
+      }),
+    ).resolves.toMatchObject({
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          connectionId: "icn_openai",
+          secretType: "api_key",
+          slotKey: "openai.openai-default.api-key.secondary",
+        },
+      ],
     });
   });
 

@@ -40,6 +40,13 @@ async function mintIntegrationEgressGrant(
     connectionId: string;
     secretType: string;
     additionalHeaders?: Readonly<Record<string, string>>;
+    additionalCredentialHeaders?: ReadonlyArray<{
+      header: string;
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    }>;
     slotKey?: string;
     resolverKey?: string;
     allowedMethods?: ReadonlyArray<string>;
@@ -70,6 +77,9 @@ async function mintIntegrationEgressGrant(
       ...(input.additionalHeaders === undefined
         ? {}
         : { additionalHeaders: input.additionalHeaders }),
+      ...(input.additionalCredentialHeaders === undefined
+        ? {}
+        : { additionalCredentialHeaders: input.additionalCredentialHeaders }),
       ...("authInjectionTarget" in input
         ? {
             authInjectionTarget: input.authInjectionTarget,
@@ -758,6 +768,85 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
+  it("supports additional credential-backed headers for HTTP egress", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "dd-secret",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_datadog",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_datadog",
+      authInjectionType: "header",
+      authInjectionTarget: "dd_api_key",
+      connectionId: "icn_datadog",
+      secretType: "api_key",
+      slotKey: "datadog.datadog-default.api-key.api-key",
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.application-key",
+        },
+      ],
+      allowedMethods: ["GET"],
+      allowedPathPrefixes: ["/mcp"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(`http://${host}:${String(port)}/tokenizer-proxy/egress/mcp`, {
+        method: "GET",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed response headers.");
+      }
+      expect(readHeaderValue(body.headers, "dd_api_key")).toBe("dd-secret");
+      expect(readHeaderValue(body.headers, "dd_application_key")).toBe("dd-secret");
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_datadog",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.api-key",
+        },
+        {
+          bindingId: "ibd_datadog",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.application-key",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
   it("strips proxy forwarding headers before forwarding HTTP egress upstream", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
@@ -1072,6 +1161,87 @@ describe("tokenizer proxy integration", () => {
           resolverKey: "default",
           secretType: "api_key",
           slotKey: "openai.openai-default.api-key.api-key",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
+    }
+  });
+
+  it("supports additional credential-backed headers for websocket egress", async () => {
+    const upstreamService = await startWebSocketUpstream({
+      host: "127.0.0.1",
+      path: "/mcp",
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "dd-secret",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_datadog_ws",
+      upstreamBaseUrl: upstreamService.baseUrl,
+      bindingId: "ibd_datadog",
+      authInjectionType: "header",
+      authInjectionTarget: "dd_api_key",
+      connectionId: "icn_datadog",
+      secretType: "api_key",
+      slotKey: "datadog.datadog-default.api-key.api-key",
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.application-key",
+        },
+      ],
+      allowedMethods: ["GET"],
+      allowedPathPrefixes: ["/mcp"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const message = await performUpgradeRequest({
+        baseUrl: `http://${host}:${String(port)}`,
+        path: "/tokenizer-proxy/egress/mcp",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+
+      expect(message).toBe("pong\n");
+      expect(readHeaderValue(upstreamService.capturedHeaders(), "dd_api_key")).toBe("dd-secret");
+      expect(readHeaderValue(upstreamService.capturedHeaders(), "dd_application_key")).toBe(
+        "dd-secret",
+      );
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_datadog",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.api-key",
+        },
+        {
+          bindingId: "ibd_datadog",
+          connectionId: "icn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.application-key",
         },
       ]);
     } finally {

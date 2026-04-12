@@ -12,6 +12,13 @@ type AuthorizedEgressGrantBase = {
   secretType: string;
   upstreamBaseUrl: string;
   additionalHeaders?: Readonly<Record<string, string>>;
+  additionalCredentialHeaders?: ReadonlyArray<{
+    header: string;
+    connectionId: string;
+    secretType: string;
+    slotKey?: string;
+    resolverKey?: string;
+  }>;
   slotKey?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
@@ -140,6 +147,12 @@ export async function authorizeEgressGrant(input: {
       authInjectionType: verifiedGrant.authInjectionType,
       authInjectionService: verifiedGrant.authInjectionService,
       authInjectionRegion: verifiedGrant.authInjectionRegion,
+      ...(verifiedGrant.additionalHeaders === undefined
+        ? {}
+        : { additionalHeaders: verifiedGrant.additionalHeaders }),
+      ...(verifiedGrant.additionalCredentialHeaders === undefined
+        ? {}
+        : { additionalCredentialHeaders: verifiedGrant.additionalCredentialHeaders }),
       ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
       ...(verifiedGrant.resolverKey === undefined
         ? {}
@@ -163,10 +176,16 @@ export async function authorizeEgressGrant(input: {
     upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
     authInjectionType: verifiedGrant.authInjectionType,
     authInjectionTarget: verifiedGrant.authInjectionTarget,
+    ...(verifiedGrant.additionalHeaders === undefined
+      ? {}
+      : { additionalHeaders: verifiedGrant.additionalHeaders }),
     ...(verifiedGrant.authInjectionType !== "basic" ||
     verifiedGrant.authInjectionUsername === undefined
       ? {}
       : { authInjectionUsername: verifiedGrant.authInjectionUsername }),
+    ...(verifiedGrant.additionalCredentialHeaders === undefined
+      ? {}
+      : { additionalCredentialHeaders: verifiedGrant.additionalCredentialHeaders }),
     ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
     ...(verifiedGrant.resolverKey === undefined ? {} : { resolverKey: verifiedGrant.resolverKey }),
     ...(verifiedGrant.allowedMethods === undefined
