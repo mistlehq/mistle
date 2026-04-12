@@ -308,9 +308,12 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
       );
 
       expect(response.status).toBe(200);
-      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
-        await response.json(),
-      );
+      const startedConnectionBody = await response.json();
+      expect(startedConnectionBody).toEqual({
+        authorizationUrl: expect.any(String),
+      });
+      const startedConnection =
+        StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(startedConnectionBody);
       const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
       if (state === null || state.length === 0) {
         throw new Error("Expected authorization URL to include redirect state.");

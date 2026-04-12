@@ -153,5 +153,7 @@ export async function startOAuth2AuthorizationCodeConnection(
     expiresAt: createRedirectSessionExpiryTimestamp(),
   });
 
-  return startedOAuth2AuthorizationCodeConnection;
+  return {
+    authorizationUrl: startedOAuth2AuthorizationCodeConnection.authorizationUrl,
+  };
 }
