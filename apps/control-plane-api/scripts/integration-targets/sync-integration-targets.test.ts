@@ -17,6 +17,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "datadog-default",
+        familyId: "datadog",
+        variantId: "datadog-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "github-cloud",
         familyId: "github",
         variantId: "github-cloud",

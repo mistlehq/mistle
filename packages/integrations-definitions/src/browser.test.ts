@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AwsBrowserDefinition,
   createBrowserDefinitionsBundle,
+  DatadogBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
   SignozBrowserDefinition,
@@ -46,6 +47,12 @@ describe("browser definitions", () => {
     expect(AwsBrowserDefinition.credentialResolvers).toBeUndefined();
     expect(AwsBrowserDefinition.webhookHandler).toBeUndefined();
     expect(AwsBrowserDefinition.webhookSource).toBeUndefined();
+  });
+
+  it("keeps Datadog browser definitions free of server-only hooks", () => {
+    expect(DatadogBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+    expect(DatadogBrowserDefinition.webhookHandler).toBeUndefined();
+    expect(DatadogBrowserDefinition.webhookSource).toBeUndefined();
   });
 
   it("keeps slack browser definitions free of server-only webhook hooks", () => {

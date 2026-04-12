@@ -13,6 +13,10 @@ describe("integrations-definitions index", () => {
       familyId: "aws",
       variantId: "aws-cli-default",
     });
+    const datadogDefinition = registry.getDefinition({
+      familyId: "datadog",
+      variantId: "datadog-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -70,6 +74,34 @@ describe("integrations-definitions index", () => {
     expect(awsDefinition?.credentialResolvers).toBeUndefined();
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
+    expect(datadogDefinition).toMatchObject({
+      familyId: "datadog",
+      variantId: "datadog-default",
+      kind: "connector",
+      displayName: "Datadog",
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key + application key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+            },
+            {
+              name: "applicationKey",
+              label: "Application key",
+              inputType: "password",
+              slotKey: "datadog.datadog-default.api-key.application-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(datadogDefinition?.mcp).toBeDefined();
     expect(jiraDefinition).toMatchObject({
       familyId: "jira",
       variantId: "jira-default",
@@ -385,11 +417,12 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(9);
+    expect(definitions).toHaveLength(10);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "aws::aws-cli-default",
+      "datadog::datadog-default",
       "jira::jira-default",
       "github::github-cloud",
       "github::github-enterprise-server",

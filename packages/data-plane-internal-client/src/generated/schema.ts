@@ -191,6 +191,15 @@ export interface paths {
                 name: string;
               }[];
               egressRoutes: {
+                additionalCredentialHeaders?: {
+                  credentialResolver: {
+                    connectionId: string;
+                    resolverKey?: string;
+                    secretType: string;
+                    slotKey?: string;
+                  };
+                  header: string;
+                }[];
                 additionalHeaders?: {
                   [key: string]: string;
                 };
@@ -505,6 +514,15 @@ export interface paths {
                   name: string;
                 }[];
                 egressRoutes: {
+                  additionalCredentialHeaders?: {
+                    credentialResolver: {
+                      connectionId: string;
+                      resolverKey?: string;
+                      secretType: string;
+                      slotKey?: string;
+                    };
+                    header: string;
+                  }[];
                   additionalHeaders?: {
                     [key: string]: string;
                   };

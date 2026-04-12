@@ -5,6 +5,7 @@ import {
 } from "@mistle/integrations-core";
 
 import { AwsBaseDefinition } from "./aws/variants/aws-cli-default/base-definition.js";
+import { DatadogDefinition } from "./datadog/index.js";
 import { GitHubCloudBaseDefinition } from "./github/variants/github-cloud/base-definition.js";
 import { GitHubEnterpriseServerBaseDefinition } from "./github/variants/github-enterprise-server/base-definition.js";
 import { JiraBaseDefinition } from "./jira/variants/jira-default/base-definition.js";
@@ -15,6 +16,7 @@ import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AwsBrowserDefinition = AwsBaseDefinition;
+export const DatadogBrowserDefinition = DatadogDefinition;
 export const GitHubCloudBrowserDefinition = GitHubCloudBaseDefinition;
 export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBaseDefinition;
 export const JiraBrowserDefinition = JiraBaseDefinition;
@@ -25,6 +27,7 @@ export const SlackBrowserDefinition = SlackBaseDefinition;
 
 const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AwsBrowserDefinition,
+  DatadogBrowserDefinition,
   JiraBrowserDefinition,
   GitHubCloudBrowserDefinition,
   GitHubEnterpriseServerBrowserDefinition,
@@ -51,3 +54,5 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
     agentRuntimeRegistry: createAgentRuntimeRegistry(),
   };
 }
+
+export * from "./datadog/index.js";

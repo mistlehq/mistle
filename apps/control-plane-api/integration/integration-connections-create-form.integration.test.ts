@@ -8,6 +8,7 @@ import {
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
+  DatadogCredentialSlotKeys,
   JiraConnectionMethodIds,
   SlackConnectionMethodIds,
 } from "@mistle/integrations-definitions";
@@ -588,6 +589,70 @@ describe("integration connections create form integration", () => {
     expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
   });
 
+  it("creates Datadog API key connections with application keys", async ({ fixture }) => {
+    await upsertDatadogTarget({ fixture, targetKey: "datadog-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-datadog-api-key@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/datadog-default/form", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Datadog MCP",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+        secrets: {
+          apiKey: "datadog-api-key",
+          applicationKey: "datadog-application-key",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
+    });
+    expect(responseBody.targetSnapshotConfig).toEqual({
+      mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+    });
+
+    const createdLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, responseBody.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(createdLinks.map((link) => link.slotKey)).toEqual([
+      DatadogCredentialSlotKeys.API_KEY,
+      DatadogCredentialSlotKeys.APPLICATION_KEY,
+    ]);
+
+    const createdCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            createdLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(createdCredentials).toHaveLength(2);
+    expect(createdCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+  });
+
   it("creates GitHub App form connections and the implicit webhook source", async ({ fixture }) => {
     await upsertGitHubTarget({ fixture, targetKey: "github-cloud" });
 
@@ -957,6 +1022,34 @@ async function upsertAwsTarget(input: {
         variantId: "aws-cli-default",
         enabled: true,
         config: {},
+      },
+    });
+}
+
+async function upsertDatadogTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "datadog",
+      variantId: "datadog-default",
+      enabled: true,
+      config: {
+        mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "datadog",
+        variantId: "datadog-default",
+        enabled: true,
+        config: {
+          mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+        },
       },
     });
 }

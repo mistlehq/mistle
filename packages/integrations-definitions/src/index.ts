@@ -5,6 +5,7 @@ import {
 } from "@mistle/integrations-core";
 
 import { AwsDefinition } from "./aws/browser.js";
+import { DatadogDefinition } from "./datadog/index.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -15,6 +16,7 @@ import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 
 export * from "./aws/browser.js";
+export * from "./datadog/index.js";
 export * from "./jira/browser.js";
 export * from "./github/browser.js";
 export * from "./linear/index.js";
@@ -27,6 +29,7 @@ export * from "./registry/agent-runtimes.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   AwsDefinition,
+  DatadogDefinition,
   JiraDefinition,
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,

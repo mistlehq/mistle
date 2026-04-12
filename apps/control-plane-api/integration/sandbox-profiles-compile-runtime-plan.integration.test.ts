@@ -9,6 +9,7 @@ import {
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
+  DatadogToolIds,
   createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiChatGptBaseUrl,
   OpenAiChatGptOriginBaseUrl,
@@ -853,6 +854,153 @@ describe("sandbox profile compile runtime plan integration", () => {
     );
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
       'url = "https://mcp.linear.app/mcp"',
+    );
+  });
+
+  it("includes Datadog MCP config and egress with credential-backed application headers", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-datadog-mcp@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_datadog_mcp",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Datadog MCP Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_datadog_mcp",
+      version: 1,
+    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "openai-default-compile-datadog-mcp",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com/v1",
+            binding_capabilities_by_connection_method:
+              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+          },
+        },
+        {
+          targetKey: "datadog-default-compile-datadog-mcp",
+          familyId: "datadog",
+          variantId: "datadog-default",
+          enabled: true,
+          config: {
+            mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+          },
+        },
+      ])
+      .onConflictDoNothing();
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_compile_datadog_mcp_openai",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-default-compile-datadog-mcp",
+        displayName: "Compile Datadog MCP OpenAI Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_compile_datadog_mcp_datadog",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "datadog-default-compile-datadog-mcp",
+        displayName: "Compile Datadog MCP Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_compile_datadog_mcp_openai",
+        sandboxProfileId: "sbp_compile_datadog_mcp",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_datadog_mcp_openai",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
+        },
+      },
+      {
+        id: "ibd_compile_datadog_mcp_datadog",
+        sandboxProfileId: "sbp_compile_datadog_mcp",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_compile_datadog_mcp_datadog",
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: [DatadogToolIds.DATADOG_MCP],
+        },
+      },
+    ]);
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_datadog_mcp",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    const datadogRoute = runtimePlan.egressRoutes.find(
+      (route) =>
+        route.upstream.baseUrl === "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp" &&
+        route.match.hosts.includes("mcp.datadoghq.com"),
+    );
+
+    expect(datadogRoute).toBeDefined();
+    expect(datadogRoute).toMatchObject({
+      match: {
+        hosts: ["mcp.datadoghq.com"],
+        pathPrefixes: ["/api/unstable/mcp-server/mcp"],
+      },
+      authInjection: {
+        type: "header",
+        target: "dd_api_key",
+      },
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          credentialResolver: {
+            connectionId: "icn_compile_datadog_mcp_datadog",
+            secretType: "api_key",
+            slotKey: "datadog.datadog-default.api-key.application-key",
+          },
+        },
+      ],
+    });
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "[mcp_servers.datadog]",
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'url = "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp?toolsets=all"',
     );
   });
 

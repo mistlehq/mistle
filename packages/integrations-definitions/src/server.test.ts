@@ -13,6 +13,10 @@ describe("integrations-definitions server", () => {
       familyId: "aws",
       variantId: "aws-cli-default",
     });
+    const datadogDefinition = registry.getDefinition({
+      familyId: "datadog",
+      variantId: "datadog-default",
+    });
     const jiraDefinition = registry.getDefinition({
       familyId: "jira",
       variantId: "jira-default",
@@ -75,6 +79,9 @@ describe("integrations-definitions server", () => {
         }),
       ]),
     );
+    expect(datadogDefinition?.webhookHandler).toBeUndefined();
+    expect(datadogDefinition?.webhookSource).toBeUndefined();
+    expect(datadogDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
@@ -90,7 +97,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(9);
+    expect(definitions).toHaveLength(10);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

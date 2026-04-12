@@ -5,6 +5,7 @@ import {
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
+  DatadogCredentialSlotKeys,
   JiraConnectionMethodIds,
   SlackConnectionMethodIds,
 } from "@mistle/integrations-definitions";
@@ -917,6 +918,104 @@ describe("integration connections update form integration", () => {
     ]);
   });
 
+  it("updates Datadog API key connections", async ({ fixture }) => {
+    await upsertDatadogTarget({ fixture, targetKey: "datadog-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-datadog-api-key@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/datadog-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Datadog MCP",
+          methodId: IntegrationConnectionMethodIds.API_KEY,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
+          secrets: {
+            apiKey: "original-datadog-api-key",
+            applicationKey: "original-datadog-application-key",
+          },
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+    expect(previousLinks).toHaveLength(2);
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Datadog MCP rotated",
+          config: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
+          secrets: {
+            apiKey: "rotated-datadog-api-key",
+            applicationKey: "rotated-datadog-application-key",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("Datadog MCP rotated");
+    expect(updatedConnection.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
+    });
+
+    const updatedLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
+      where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
+      orderBy: (table, { asc }) => [asc(table.slotKey)],
+    });
+
+    expect(updatedLinks).toHaveLength(2);
+    expect(updatedLinks.map((link) => link.slotKey)).toEqual([
+      DatadogCredentialSlotKeys.API_KEY,
+      DatadogCredentialSlotKeys.APPLICATION_KEY,
+    ]);
+    expect(updatedLinks[0]?.credentialId).not.toBe(previousLinks[0]?.credentialId);
+    expect(updatedLinks[1]?.credentialId).not.toBe(previousLinks[1]?.credentialId);
+
+    const updatedCredentials = await fixture.db.query.integrationCredentials.findMany({
+      where: (table, { and, eq, inArray }) =>
+        and(
+          inArray(
+            table.id,
+            updatedLinks.map((link) => link.credentialId),
+          ),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+      orderBy: (table, { asc }) => [asc(table.id)],
+    });
+
+    expect(updatedCredentials).toHaveLength(2);
+    expect(updatedCredentials.map((credential) => credential.secretKind)).toEqual([
+      IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.API_KEY,
+    ]);
+  });
+
   it("updates GitHub App form connections", async ({ fixture }) => {
     await upsertGitHubTarget({ fixture, targetKey: "github-cloud" });
 
@@ -1067,6 +1166,34 @@ async function upsertAwsTarget(input: {
         variantId: "aws-cli-default",
         enabled: true,
         config: {},
+      },
+    });
+}
+
+async function upsertDatadogTarget(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+}) {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "datadog",
+      variantId: "datadog-default",
+      enabled: true,
+      config: {
+        mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "datadog",
+        variantId: "datadog-default",
+        enabled: true,
+        config: {
+          mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
+        },
       },
     });
 }
