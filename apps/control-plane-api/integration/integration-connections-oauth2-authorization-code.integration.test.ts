@@ -21,6 +21,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../src/lib/crypto.js";
 import { createAppResources, stopAppResources } from "../src/resources.js";
+import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
@@ -130,6 +131,7 @@ async function createOAuth2AuthorizationCodeTestApp(input: {
       issuer: "integration-issuer",
       audience: "integration-audience",
     },
+    portAccessConfig: IntegrationPortAccessConfig,
     openWorkflow: resources.openWorkflow,
     auth,
   });
