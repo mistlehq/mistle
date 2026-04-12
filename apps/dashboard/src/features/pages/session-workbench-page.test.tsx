@@ -99,6 +99,6 @@ describe("SessionWorkbenchPage", () => {
 
     const status = await screen.findByRole("status", { name: "Running" });
     expect(status.className).toContain("bg-emerald-600");
-    expect(status.className).toContain("border-emerald-600");
+    expect(status.className).toContain("border-emerald-700");
   });
 });

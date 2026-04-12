@@ -66,7 +66,9 @@ function StoryHeaderActions(input: {
             : {
                 repositoryControl: {
                   ariaLabel: "Primary repository",
-                  disabled: input.repositoryDisabled,
+                  ...(input.repositoryDisabled === undefined
+                    ? {}
+                    : { disabled: input.repositoryDisabled }),
                   onValueChange: setSelectedRepositoryValue,
                   options: input.repositoryOptions,
                   selectedValue: selectedRepositoryValue,
@@ -104,10 +106,49 @@ function StoryHeaderActions(input: {
 }
 
 export const Default: Story = {
+  args: {
+    cliControl: {
+      ariaLabel: "CLI",
+      className: "",
+      disabled: false,
+      onClick: () => {
+        return;
+      },
+      pressed: false,
+      title: "Open Codex CLI",
+    },
+    diffControl: {
+      ariaLabel: "Open changes",
+      className: "",
+      disabled: false,
+      onClick: () => {
+        return;
+      },
+      pressed: false,
+      title: "Open changes",
+    },
+    status: {
+      kind: "not_connected",
+      label: "Not connected",
+    },
+    terminalControl: {
+      ariaLabel: "Open terminal",
+      className: "",
+      disabled: false,
+      onClick: () => {
+        return;
+      },
+      pressed: false,
+      title: "Open terminal",
+    },
+  },
   render: () => <StoryHeaderActions status="not_connected" />,
 };
 
 export const WithPrimaryRepositorySelector: Story = {
+  args: {
+    ...Default.args,
+  },
   render: () => (
     <StoryHeaderActions
       repositoryOptions={StoryRepositoryOptions}
@@ -118,6 +159,9 @@ export const WithPrimaryRepositorySelector: Story = {
 };
 
 export const WithNoRepositorySelected: Story = {
+  args: {
+    ...Default.args,
+  },
   render: () => (
     <StoryHeaderActions
       repositoryOptions={StoryRepositoryOptions}
@@ -128,6 +172,9 @@ export const WithNoRepositorySelected: Story = {
 };
 
 export const WithRepositorySelectorDisabled: Story = {
+  args: {
+    ...Default.args,
+  },
   render: () => (
     <StoryHeaderActions
       repositoryDisabled={true}
@@ -139,6 +186,9 @@ export const WithRepositorySelectorDisabled: Story = {
 };
 
 export const ErrorStatusWithRepositorySelector: Story = {
+  args: {
+    ...Default.args,
+  },
   render: () => (
     <StoryHeaderActions
       repositoryOptions={StoryRepositoryOptions}

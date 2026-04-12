@@ -112,7 +112,7 @@ function SessionWorkbenchPageContent(input: {
           title: terminalButtonTitle,
         }}
       />
-   ),
+    ),
     [
       isTerminalOpenDisabled,
       isDiffOpenDisabled,
