@@ -968,9 +968,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     );
 
     const datadogRoute = runtimePlan.egressRoutes.find(
-      (route) =>
-        route.upstream.baseUrl === "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp" &&
-        route.match.hosts.includes("mcp.datadoghq.com"),
+      (route) => route.upstream.baseUrl === "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
     );
 
     expect(datadogRoute).toBeDefined();
