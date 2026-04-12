@@ -4,7 +4,10 @@
   "properties": {
     "startupMode": {
       "type": "string",
-      "enum": ["new", "existing"]
+      "enum": [
+        "new",
+        "existing"
+      ]
     },
     "bootstrapToken": {
       "type": "string",
@@ -53,7 +56,12 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": ["source", "imageRef", "sandboxProfileId", "version"],
+              "required": [
+                "source",
+                "imageRef",
+                "sandboxProfileId",
+                "version"
+              ],
               "additionalProperties": false
             },
             {
@@ -68,7 +76,10 @@
                   "minLength": 1
                 }
               },
-              "required": ["source", "imageRef"],
+              "required": [
+                "source",
+                "imageRef"
+              ],
               "additionalProperties": false
             }
           ]
@@ -115,7 +126,9 @@
                     }
                   }
                 },
-                "required": ["hosts"],
+                "required": [
+                  "hosts"
+                ],
                 "additionalProperties": false
               },
               "upstream": {
@@ -126,7 +139,9 @@
                     "minLength": 1
                   }
                 },
-                "required": ["baseUrl"],
+                "required": [
+                  "baseUrl"
+                ],
                 "additionalProperties": false
               },
               "authInjection": {
@@ -143,7 +158,10 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["type", "target"],
+                    "required": [
+                      "type",
+                      "target"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -162,7 +180,10 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["type", "target"],
+                    "required": [
+                      "type",
+                      "target"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -177,7 +198,10 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["type", "target"],
+                    "required": [
+                      "type",
+                      "target"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -192,7 +216,10 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["type", "target"],
+                    "required": [
+                      "type",
+                      "target"
+                    ],
                     "additionalProperties": false
                   },
                   {
@@ -211,7 +238,11 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["type", "service", "region"],
+                    "required": [
+                      "type",
+                      "service",
+                      "region"
+                    ],
                     "additionalProperties": false
                   }
                 ]
@@ -223,6 +254,50 @@
                 },
                 "additionalProperties": {
                   "type": "string"
+                }
+              },
+              "additionalCredentialHeaders": {
+                "readOnly": true,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "header": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "credentialResolver": {
+                      "type": "object",
+                      "properties": {
+                        "connectionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "secretType": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "slotKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "resolverKey": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "connectionId",
+                        "secretType"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "header",
+                    "credentialResolver"
+                  ],
+                  "additionalProperties": false
                 }
               },
               "credentialResolver": {
@@ -245,7 +320,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["connectionId", "secretType"],
+                "required": [
+                  "connectionId",
+                  "secretType"
+                ],
                 "additionalProperties": false
               }
             },
@@ -322,16 +400,24 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["args"],
+                      "required": [
+                        "args"
+                      ],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": ["install"],
+                "required": [
+                  "install"
+                ],
                 "additionalProperties": false
               }
             },
-            "required": ["artifactKey", "name", "lifecycle"],
+            "required": [
+              "artifactKey",
+              "name",
+              "lifecycle"
+            ],
             "additionalProperties": false
           }
         },
@@ -360,7 +446,12 @@
                     "format": "uri"
                   }
                 },
-                "required": ["sourceKind", "resourceKind", "path", "originUrl"],
+                "required": [
+                  "sourceKind",
+                  "resourceKind",
+                  "path",
+                  "originUrl"
+                ],
                 "additionalProperties": false
               }
             ]
@@ -412,10 +503,18 @@
                         },
                         "writeMode": {
                           "type": "string",
-                          "enum": ["overwrite", "if-absent"]
+                          "enum": [
+                            "overwrite",
+                            "if-absent"
+                          ]
                         }
                       },
-                      "required": ["fileId", "path", "mode", "content"],
+                      "required": [
+                        "fileId",
+                        "path",
+                        "mode",
+                        "content"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -427,7 +526,10 @@
                     }
                   }
                 },
-                "required": ["env", "files"],
+                "required": [
+                  "env",
+                  "files"
+                ],
                 "additionalProperties": false
               },
               "processes": {
@@ -469,7 +571,9 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["args"],
+                      "required": [
+                        "args"
+                      ],
                       "additionalProperties": false
                     },
                     "readiness": {
@@ -482,7 +586,9 @@
                               "const": "none"
                             }
                           },
-                          "required": ["type"],
+                          "required": [
+                            "type"
+                          ],
                           "additionalProperties": false
                         },
                         {
@@ -507,7 +613,12 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": ["type", "host", "port", "timeoutMs"],
+                          "required": [
+                            "type",
+                            "host",
+                            "port",
+                            "timeoutMs"
+                          ],
                           "additionalProperties": false
                         },
                         {
@@ -532,7 +643,12 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": ["type", "url", "expectedStatus", "timeoutMs"],
+                          "required": [
+                            "type",
+                            "url",
+                            "expectedStatus",
+                            "timeoutMs"
+                          ],
                           "additionalProperties": false
                         },
                         {
@@ -552,7 +668,11 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": ["type", "url", "timeoutMs"],
+                          "required": [
+                            "type",
+                            "url",
+                            "timeoutMs"
+                          ],
                           "additionalProperties": false
                         }
                       ]
@@ -562,7 +682,10 @@
                       "properties": {
                         "signal": {
                           "type": "string",
-                          "enum": ["sigterm", "sigkill"]
+                          "enum": [
+                            "sigterm",
+                            "sigkill"
+                          ]
                         },
                         "timeoutMs": {
                           "type": "integer",
@@ -575,11 +698,19 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": ["signal", "timeoutMs"],
+                      "required": [
+                        "signal",
+                        "timeoutMs"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["processKey", "command", "readiness", "stop"],
+                  "required": [
+                    "processKey",
+                    "command",
+                    "readiness",
+                    "stop"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -611,22 +742,37 @@
                               "format": "uri"
                             }
                           },
-                          "required": ["type", "url"],
+                          "required": [
+                            "type",
+                            "url"
+                          ],
                           "additionalProperties": false
                         }
                       ]
                     },
                     "connectionMode": {
                       "type": "string",
-                      "enum": ["dedicated", "shared"]
+                      "enum": [
+                        "dedicated",
+                        "shared"
+                      ]
                     }
                   },
-                  "required": ["endpointKey", "transport", "connectionMode"],
+                  "required": [
+                    "endpointKey",
+                    "transport",
+                    "connectionMode"
+                  ],
                   "additionalProperties": false
                 }
               }
             },
-            "required": ["clientId", "setup", "processes", "endpoints"],
+            "required": [
+              "clientId",
+              "setup",
+              "processes",
+              "endpoints"
+            ],
             "additionalProperties": false
           }
         },
@@ -709,7 +855,10 @@
                                   "minLength": 1
                                 }
                               },
-                              "required": ["kind", "value"],
+                              "required": [
+                                "kind",
+                                "value"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -720,14 +869,22 @@
                                   "const": "threadId"
                                 }
                               },
-                              "required": ["kind"],
+                              "required": [
+                                "kind"
+                              ],
                               "additionalProperties": false
                             }
                           ]
                         }
                       }
                     },
-                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
+                    "required": [
+                      "ptySessionId",
+                      "cols",
+                      "rows",
+                      "command",
+                      "args"
+                    ],
                     "additionalProperties": false
                   },
                   "resumeLaunch": {
@@ -772,7 +929,10 @@
                                   "minLength": 1
                                 }
                               },
-                              "required": ["kind", "value"],
+                              "required": [
+                                "kind",
+                                "value"
+                              ],
                               "additionalProperties": false
                             },
                             {
@@ -783,18 +943,31 @@
                                   "const": "threadId"
                                 }
                               },
-                              "required": ["kind"],
+                              "required": [
+                                "kind"
+                              ],
                               "additionalProperties": false
                             }
                           ]
                         }
                       }
                     },
-                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
+                    "required": [
+                      "ptySessionId",
+                      "cols",
+                      "rows",
+                      "command",
+                      "args"
+                    ],
                     "additionalProperties": false
                   }
                 },
-                "required": ["runtimeId", "displayName", "newLaunch", "resumeLaunch"],
+                "required": [
+                  "runtimeId",
+                  "displayName",
+                  "newLaunch",
+                  "resumeLaunch"
+                ],
                 "additionalProperties": false
               }
             },
