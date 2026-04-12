@@ -153,6 +153,7 @@ export function renderSessionWorkbenchStory(input: {
 
 export function renderSessionWorkbenchStoryWithChrome(input: {
   children: React.ReactNode;
+  headerActions?: React.ReactNode;
   headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
   const headerStatusUi = input.headerStatusUi ?? {
@@ -164,28 +165,29 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
   return (
     <div className="from-background to-muted/20 flex h-screen min-h-0 flex-col overflow-hidden bg-linear-to-b">
       <div className="bg-background/80 flex h-12 flex-none items-center justify-end border-b px-4 backdrop-blur-sm">
-        {headerStatusUi.variant === "destructive" ? (
-          <Badge
-            aria-label={headerStatusUi.label}
-            className={headerStatusUi.className}
-            title={headerStatusUi.label}
-            variant={headerStatusUi.variant}
-          >
-            {headerStatusUi.label}
-          </Badge>
-        ) : (
-          <span
-            aria-label={headerStatusUi.label}
-            className={[
-              "inline-block size-2.5 rounded-full border",
-              headerStatusUi.variant === "secondary"
-                ? "border-emerald-700 bg-emerald-600"
-                : "border-stone-300 bg-stone-300",
-            ].join(" ")}
-            role="status"
-            title={headerStatusUi.label}
-          />
-        )}
+        {input.headerActions ??
+          (headerStatusUi.variant === "destructive" ? (
+            <Badge
+              aria-label={headerStatusUi.label}
+              className={headerStatusUi.className}
+              title={headerStatusUi.label}
+              variant={headerStatusUi.variant}
+            >
+              {headerStatusUi.label}
+            </Badge>
+          ) : (
+            <span
+              aria-label={headerStatusUi.label}
+              className={[
+                "inline-block size-2.5 rounded-full border",
+                headerStatusUi.variant === "secondary"
+                  ? "border-emerald-700 bg-emerald-600"
+                  : "border-stone-300 bg-stone-300",
+              ].join(" ")}
+              role="status"
+              title={headerStatusUi.label}
+            />
+          ))}
       </div>
       <div className="min-h-0 flex-1">{input.children}</div>
     </div>
@@ -194,6 +196,7 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
 
 export function SessionWorkbenchStoryChrome(input: {
   children: React.ReactNode;
+  headerActions?: React.ReactNode;
   headerStatusUi?: SandboxStatusBadgeUi;
 }): React.JSX.Element {
   return renderSessionWorkbenchStoryWithChrome(input);
