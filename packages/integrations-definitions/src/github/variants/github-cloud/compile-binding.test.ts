@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
+const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
 }
@@ -168,7 +170,7 @@ describe("compileGitHubCloudBinding", () => {
     expect(artifact?.artifactKey).toBe("gh-cli");
     expect(artifact?.name).toBe("GitHub CLI");
     expect(artifact?.env).toEqual({
-      GH_TOKEN: "dummy-value",
+      GH_TOKEN: expect.stringMatching(GitHubCliTokenPattern),
     });
     if (artifact === undefined) {
       throw new Error("Expected compiled gh artifact.");

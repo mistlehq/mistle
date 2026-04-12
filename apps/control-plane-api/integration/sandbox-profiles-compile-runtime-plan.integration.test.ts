@@ -30,6 +30,8 @@ import {
 } from "../src/sandbox-profiles/errors.js";
 import { it } from "./test-context.js";
 
+const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+
 describe("sandbox profile compile runtime plan integration", () => {
   it("compiles runtime plan from version bindings, connections, and targets", async ({
     fixture,
@@ -569,7 +571,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       "slack-cli",
     ]);
     expect(runtimePlan.artifacts[0]?.env).toEqual({
-      GH_TOKEN: "dummy-value",
+      GH_TOKEN: expect.stringMatching(GitHubCliTokenPattern),
     });
     const ghInstallCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
     expect(ghInstallCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);

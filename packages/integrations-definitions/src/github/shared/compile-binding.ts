@@ -23,8 +23,11 @@ type GitHubCompiledRoute = CompileBindingResult["egressRoutes"][number];
 
 const GitHubCliArtifactKey = "gh-cli";
 const GitHubCliArtifactName = "GitHub CLI";
+const GitHubCliPlaceholderToken = "ghp_G7aBNSK9WMQh0rgAlagCe4a7o75FPgRbQhls";
 const GitHubCliArtifactEnv = {
-  GH_TOKEN: "dummy-value",
+  // Keep the placeholder PAT-shaped so agents don't reject the environment
+  // before gh reaches the sandbox proxy that injects the real credential.
+  GH_TOKEN: GitHubCliPlaceholderToken,
 };
 const GitHubCliRepository = "cli/cli";
 const ArtifactCommandTimeoutMs = 120_000;
