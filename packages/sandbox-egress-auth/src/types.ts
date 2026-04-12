@@ -6,6 +6,14 @@ export type EgressGrantConfig = {
 
 export type EgressGrantAuthInjectionType = "bearer" | "basic" | "header" | "query" | "aws_sigv4";
 
+export type EgressGrantCredentialHeaderInjection = {
+  header: string;
+  connectionId: string;
+  secretType: string;
+  slotKey?: string;
+  resolverKey?: string;
+};
+
 type EgressGrantClaimsBase = {
   sub: string;
   jti: string;
@@ -14,6 +22,7 @@ type EgressGrantClaimsBase = {
   secretType: string;
   upstreamBaseUrl: string;
   additionalHeaders?: Readonly<Record<string, string>>;
+  additionalCredentialHeaders?: ReadonlyArray<EgressGrantCredentialHeaderInjection>;
   slotKey?: string;
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
@@ -44,6 +53,7 @@ type EgressGrantClaimsInputBase = {
   secretType: string | undefined;
   upstreamBaseUrl: string | undefined;
   additionalHeaders?: Readonly<Record<string, string>> | undefined;
+  additionalCredentialHeaders?: ReadonlyArray<EgressGrantCredentialHeaderInjection> | undefined;
   slotKey?: string | undefined;
   resolverKey?: string | undefined;
   allowedMethods?: ReadonlyArray<string> | undefined;

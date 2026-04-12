@@ -105,6 +105,16 @@ describe("createEgressGrantByRuleId", () => {
             additionalHeaders: {
               "chatgpt-account-id": "acct_123",
             },
+            additionalCredentialHeaders: [
+              {
+                header: "dd_application_key",
+                credentialResolver: {
+                  connectionId: "icn_github_secondary",
+                  secretType: "api_key",
+                  slotKey: "github.github-cloud.api-key.application-key",
+                },
+              },
+            ],
             credentialResolver: {
               connectionId: "icn_github",
               secretType: "github_app_installation_token",
@@ -143,6 +153,14 @@ describe("createEgressGrantByRuleId", () => {
       additionalHeaders: {
         "chatgpt-account-id": "acct_123",
       },
+      additionalCredentialHeaders: [
+        {
+          header: "dd_application_key",
+          connectionId: "icn_github_secondary",
+          secretType: "api_key",
+          slotKey: "github.github-cloud.api-key.application-key",
+        },
+      ],
       slotKey: "github.github-cloud.github-app-installation.installation-token",
       resolverKey: "github_app_installation_token",
       allowedMethods: ["GET"],
@@ -155,6 +173,14 @@ describe("createEgressGrantByRuleId", () => {
     expect(decodedGrant.additionalHeaders).toEqual({
       "chatgpt-account-id": "acct_123",
     });
+    expect(decodedGrant.additionalCredentialHeaders).toEqual([
+      {
+        header: "dd_application_key",
+        connectionId: "icn_github_secondary",
+        secretType: "api_key",
+        slotKey: "github.github-cloud.api-key.application-key",
+      },
+    ]);
     expect(Number(decodedGrant.exp) - Number(decodedGrant.iat)).toBe(60 * 60 * 24);
   });
 

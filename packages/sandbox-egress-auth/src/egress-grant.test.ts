@@ -28,6 +28,14 @@ const defaultClaims: EgressGrantClaims = {
   additionalHeaders: {
     "chatgpt-account-id": "acct_123",
   },
+  additionalCredentialHeaders: [
+    {
+      header: "dd-application-key",
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      slotKey: "openai.openai-default.api-key.secondary",
+    },
+  ],
   slotKey: "openai.openai-default.api-key.api-key",
   resolverKey: "default",
   allowedMethods: ["GET", "POST"],
@@ -273,6 +281,87 @@ describe("egress-grant", () => {
       }),
     ).rejects.toMatchObject({
       code: EgressGrantErrorCode.ADDITIONAL_HEADERS_INVALID,
+    });
+  });
+
+  it("normalizes additional credential-backed headers during minting", async () => {
+    const token = await mintEgressGrant({
+      config: defaultConfig,
+      claims: {
+        ...defaultClaims,
+        additionalCredentialHeaders: [
+          {
+            header: " DD-APPLICATION-KEY ",
+            connectionId: " icn_openai ",
+            secretType: " api_key ",
+            slotKey: " openai.openai-default.api-key.secondary ",
+          },
+        ],
+      },
+      ttlSeconds: 60,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).resolves.toMatchObject({
+      additionalCredentialHeaders: [
+        {
+          header: "dd-application-key",
+          connectionId: "icn_openai",
+          secretType: "api_key",
+          slotKey: "openai.openai-default.api-key.secondary",
+        },
+      ],
+    });
+  });
+
+  it("rejects invalid additional credential-backed headers during minting", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...defaultClaims,
+          additionalCredentialHeaders: [
+            {
+              header: " DD-APPLICATION-KEY ",
+              connectionId: "icn_openai",
+              secretType: "api_key",
+            },
+            {
+              header: "dd-application-key",
+              connectionId: "icn_openai",
+              secretType: "api_key",
+            },
+          ],
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.ADDITIONAL_CREDENTIAL_HEADERS_INVALID,
+    });
+  });
+
+  it("rejects additional credential-backed headers for aws sigv4 grants", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...awsClaims,
+          additionalCredentialHeaders: [
+            {
+              header: "x-api-key",
+              connectionId: "icn_aws",
+              secretType: "api_key",
+            },
+          ],
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.ADDITIONAL_CREDENTIAL_HEADERS_INVALID,
     });
   });
 

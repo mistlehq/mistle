@@ -7,6 +7,7 @@ import {
 import type {
   EgressGrantAuthInjectionType,
   EgressGrantClaims,
+  EgressGrantCredentialHeaderInjection,
   EgressGrantClaimsInput,
 } from "./types.js";
 
@@ -75,6 +76,78 @@ function normalizeAdditionalHeaders(
   );
 }
 
+function normalizeAdditionalCredentialHeaders(
+  value: ReadonlyArray<EgressGrantCredentialHeaderInjection> | undefined,
+): ReadonlyArray<EgressGrantCredentialHeaderInjection> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value.length === 0) {
+    return undefined;
+  }
+
+  const occupiedHeaderNames = new Set<string>();
+  const normalizedHeaders = value.map((entry) => {
+    const normalizedHeaderName = toNonEmptyString(entry.header)?.toLowerCase();
+    const connectionId = toNonEmptyString(entry.connectionId);
+    const secretType = toNonEmptyString(entry.secretType);
+    const slotKey = toNonEmptyString(entry.slotKey);
+    const resolverKey = toNonEmptyString(entry.resolverKey);
+
+    if (
+      normalizedHeaderName === undefined ||
+      !HeaderNamePattern.test(normalizedHeaderName) ||
+      connectionId === undefined ||
+      secretType === undefined
+    ) {
+      return undefined;
+    }
+
+    if (occupiedHeaderNames.has(normalizedHeaderName)) {
+      return undefined;
+    }
+
+    occupiedHeaderNames.add(normalizedHeaderName);
+
+    return {
+      header: normalizedHeaderName,
+      connectionId,
+      secretType,
+      ...(slotKey === undefined ? {} : { slotKey }),
+      ...(resolverKey === undefined ? {} : { resolverKey }),
+    };
+  });
+
+  if (
+    !normalizedHeaders.every(
+      (entry): entry is EgressGrantCredentialHeaderInjection => entry !== undefined,
+    )
+  ) {
+    return undefined;
+  }
+
+  return [...normalizedHeaders].sort((left, right) => {
+    if (left.header !== right.header) {
+      return left.header.localeCompare(right.header);
+    }
+
+    if (left.connectionId !== right.connectionId) {
+      return left.connectionId.localeCompare(right.connectionId);
+    }
+
+    if (left.secretType !== right.secretType) {
+      return left.secretType.localeCompare(right.secretType);
+    }
+
+    if (left.slotKey !== right.slotKey) {
+      return (left.slotKey ?? "").localeCompare(right.slotKey ?? "");
+    }
+
+    return (left.resolverKey ?? "").localeCompare(right.resolverKey ?? "");
+  });
+}
+
 export function parseAuthInjectionType(value: unknown): EgressGrantAuthInjectionType | undefined {
   if (
     value === "bearer" ||
@@ -129,6 +202,20 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     });
   }
 
+  const additionalCredentialHeaders = normalizeAdditionalCredentialHeaders(
+    input.additionalCredentialHeaders,
+  );
+  if (
+    input.additionalCredentialHeaders !== undefined &&
+    additionalCredentialHeaders === undefined
+  ) {
+    throw new EgressGrantError({
+      code: EgressGrantErrorCode.ADDITIONAL_CREDENTIAL_HEADERS_INVALID,
+      message:
+        "Egress grant additionalCredentialHeaders must contain unique valid header names and valid credential resolvers.",
+    });
+  }
+
   const allowedMethods = toOptionalNonEmptyStringArray(input.allowedMethods);
   if (input.allowedMethods !== undefined && allowedMethods === undefined) {
     throw new EgressGrantError({
@@ -173,6 +260,14 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
   };
 
   if (authInjectionType === "aws_sigv4") {
+    if (additionalCredentialHeaders !== undefined) {
+      throw new EgressGrantError({
+        code: EgressGrantErrorCode.ADDITIONAL_CREDENTIAL_HEADERS_INVALID,
+        message:
+          "Egress grant additionalCredentialHeaders cannot be combined with aws_sigv4 auth injection.",
+      });
+    }
+
     return {
       ...baseClaims,
       authInjectionType,
@@ -198,6 +293,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       "authInjectionTarget",
     ),
     ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
+    ...(additionalCredentialHeaders === undefined ? {} : { additionalCredentialHeaders }),
     ...(authInjectionType !== "basic" || authInjectionUsername === undefined
       ? {}
       : { authInjectionUsername }),

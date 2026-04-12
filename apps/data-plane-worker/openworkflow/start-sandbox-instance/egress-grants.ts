@@ -30,6 +30,21 @@ export async function createEgressGrantByRuleId(input: {
           ...(route.additionalHeaders === undefined
             ? {}
             : { additionalHeaders: route.additionalHeaders }),
+          ...(route.additionalCredentialHeaders === undefined
+            ? {}
+            : {
+                additionalCredentialHeaders: route.additionalCredentialHeaders.map((header) => ({
+                  header: header.header,
+                  connectionId: header.credentialResolver.connectionId,
+                  secretType: header.credentialResolver.secretType,
+                  ...(header.credentialResolver.slotKey === undefined
+                    ? {}
+                    : { slotKey: header.credentialResolver.slotKey }),
+                  ...(header.credentialResolver.resolverKey === undefined
+                    ? {}
+                    : { resolverKey: header.credentialResolver.resolverKey }),
+                })),
+              }),
           ...(route.authInjection.type === "aws_sigv4"
             ? {
                 authInjectionService: route.authInjection.service,

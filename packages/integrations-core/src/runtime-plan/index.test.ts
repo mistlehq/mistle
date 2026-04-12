@@ -801,4 +801,161 @@ describe("assembleCompiledRuntimePlan", () => {
       }),
     ).toThrow(/Duplicate additional header/);
   });
+
+  it("normalizes additional credential-backed egress headers to lowercase sorted keys", () => {
+    const plan = CompiledRuntimePlanSchema.parse({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      egressRoutes: [
+        {
+          egressRuleId: "egress_rule_datadog",
+          bindingId: "bind_datadog",
+          match: {
+            hosts: ["mcp.datadoghq.com"],
+          },
+          upstream: {
+            baseUrl: "https://mcp.datadoghq.com",
+          },
+          authInjection: {
+            type: "header",
+            target: "DD_API_KEY",
+          },
+          additionalCredentialHeaders: [
+            {
+              header: " DD_APPLICATION_KEY ",
+              credentialResolver: {
+                connectionId: "conn_datadog",
+                secretType: "api_key",
+                slotKey: "datadog.datadog-default.api-key.application-key",
+              },
+            },
+          ],
+          credentialResolver: {
+            connectionId: "conn_datadog",
+            secretType: "api_key",
+            slotKey: "datadog.datadog-default.api-key.api-key",
+          },
+        },
+      ],
+      artifacts: [],
+      workspaceSources: [],
+      runtimeClients: [],
+      agentRuntimes: [],
+    });
+
+    expect(plan.egressRoutes[0]?.additionalCredentialHeaders).toEqual([
+      {
+        header: "dd_application_key",
+        credentialResolver: {
+          connectionId: "conn_datadog",
+          secretType: "api_key",
+          slotKey: "datadog.datadog-default.api-key.application-key",
+        },
+      },
+    ]);
+  });
+
+  it("rejects additional credential-backed egress headers that collide after normalization", () => {
+    expect(() =>
+      CompiledRuntimePlanSchema.parse({
+        sandboxProfileId: "sbp_123",
+        version: 7,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_datadog",
+            bindingId: "bind_datadog",
+            match: {
+              hosts: ["mcp.datadoghq.com"],
+            },
+            upstream: {
+              baseUrl: "https://mcp.datadoghq.com",
+            },
+            authInjection: {
+              type: "header",
+              target: "DD_API_KEY",
+            },
+            additionalCredentialHeaders: [
+              {
+                header: " DD_APPLICATION_KEY ",
+                credentialResolver: {
+                  connectionId: "conn_datadog",
+                  secretType: "api_key",
+                },
+              },
+              {
+                header: "dd_application_key",
+                credentialResolver: {
+                  connectionId: "conn_datadog",
+                  secretType: "api_key",
+                },
+              },
+            ],
+            credentialResolver: {
+              connectionId: "conn_datadog",
+              secretType: "api_key",
+            },
+          },
+        ],
+        artifacts: [],
+        workspaceSources: [],
+        runtimeClients: [],
+        agentRuntimes: [],
+      }),
+    ).toThrow(/Duplicate additional credential-backed header/);
+  });
+
+  it("rejects additional credential-backed egress headers for aws sigv4 routes", () => {
+    expect(() =>
+      CompiledRuntimePlanSchema.parse({
+        sandboxProfileId: "sbp_123",
+        version: 7,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_aws",
+            bindingId: "bind_aws",
+            match: {
+              hosts: ["sts.amazonaws.com"],
+            },
+            upstream: {
+              baseUrl: "https://sts.amazonaws.com",
+            },
+            authInjection: {
+              type: "aws_sigv4",
+              service: "sts",
+              region: "us-east-1",
+            },
+            additionalCredentialHeaders: [
+              {
+                header: "x-api-key",
+                credentialResolver: {
+                  connectionId: "conn_aws",
+                  secretType: "api_key",
+                },
+              },
+            ],
+            credentialResolver: {
+              connectionId: "conn_aws",
+              secretType: "aws_secret_access_key",
+            },
+          },
+        ],
+        artifacts: [],
+        workspaceSources: [],
+        runtimeClients: [],
+        agentRuntimes: [],
+      }),
+    ).toThrow(/aws_sigv4/);
+  });
 });

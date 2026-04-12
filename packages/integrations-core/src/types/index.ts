@@ -990,6 +990,11 @@ export type EgressCredentialResolverRef = {
   resolverKey?: string;
 };
 
+export type EgressCredentialHeaderInjection = {
+  header: string;
+  credentialResolver: EgressCredentialResolverRef;
+};
+
 export type EgressCredentialRoute = {
   egressRuleId: string;
   bindingId: string;
@@ -1029,6 +1034,7 @@ export type EgressCredentialRoute = {
         region: string;
       };
   additionalHeaders?: Readonly<Record<string, string>>;
+  additionalCredentialHeaders?: ReadonlyArray<EgressCredentialHeaderInjection>;
   credentialResolver: EgressCredentialResolverRef;
 };
 

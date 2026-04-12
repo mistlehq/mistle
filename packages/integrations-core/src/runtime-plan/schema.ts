@@ -74,6 +74,24 @@ const EgressCredentialRouteSchema = z
         .strict(),
     ]),
     additionalHeaders: z.record(z.string(), z.string()).optional(),
+    additionalCredentialHeaders: z
+      .array(
+        z
+          .object({
+            header: z.string().min(1),
+            credentialResolver: z
+              .object({
+                connectionId: z.string().min(1),
+                secretType: z.string().min(1),
+                slotKey: z.string().min(1).optional(),
+                resolverKey: z.string().min(1).optional(),
+              })
+              .strict(),
+          })
+          .strict(),
+      )
+      .readonly()
+      .optional(),
     credentialResolver: z
       .object({
         connectionId: z.string().min(1),
@@ -326,6 +344,90 @@ function normalizeAdditionalHeaders(
   return sortRecord(normalizedHeaders);
 }
 
+function normalizeAdditionalCredentialHeaders(input: {
+  additionalCredentialHeaders:
+    | z.output<typeof EgressCredentialRouteSchema>["additionalCredentialHeaders"]
+    | undefined;
+  additionalHeaders: Record<string, string> | undefined;
+  authInjection: z.output<typeof EgressCredentialRouteSchema>["authInjection"];
+}): RuntimePlanRoute["additionalCredentialHeaders"] {
+  if (
+    input.additionalCredentialHeaders === undefined ||
+    input.additionalCredentialHeaders.length === 0
+  ) {
+    return undefined;
+  }
+
+  if (input.authInjection.type === "aws_sigv4") {
+    throw new Error(
+      "Compiled runtime plan cannot combine aws_sigv4 auth injection with additional credential-backed headers.",
+    );
+  }
+
+  const occupiedHeaderNames = new Set<string>(Object.keys(input.additionalHeaders ?? {}));
+  if (input.authInjection.type !== "query") {
+    occupiedHeaderNames.add(input.authInjection.target.trim().toLowerCase());
+  }
+
+  const normalizedHeaders = input.additionalCredentialHeaders.map((headerInjection) => {
+    const normalizedHeaderName = headerInjection.header.trim().toLowerCase();
+
+    if (normalizedHeaderName.length === 0 || !HeaderNamePattern.test(normalizedHeaderName)) {
+      throw new Error(
+        `Invalid additional credential-backed header name '${headerInjection.header}' in compiled runtime plan.`,
+      );
+    }
+
+    if (occupiedHeaderNames.has(normalizedHeaderName)) {
+      throw new Error(
+        `Duplicate additional credential-backed header '${normalizedHeaderName}' in compiled runtime plan.`,
+      );
+    }
+
+    occupiedHeaderNames.add(normalizedHeaderName);
+
+    return {
+      header: normalizedHeaderName,
+      credentialResolver: {
+        connectionId: headerInjection.credentialResolver.connectionId,
+        secretType: headerInjection.credentialResolver.secretType,
+        ...(headerInjection.credentialResolver.slotKey === undefined
+          ? {}
+          : { slotKey: headerInjection.credentialResolver.slotKey }),
+        ...(headerInjection.credentialResolver.resolverKey === undefined
+          ? {}
+          : { resolverKey: headerInjection.credentialResolver.resolverKey }),
+      },
+    };
+  });
+
+  return normalizedHeaders.sort((left, right) => {
+    if (left.header !== right.header) {
+      return left.header.localeCompare(right.header);
+    }
+
+    if (left.credentialResolver.connectionId !== right.credentialResolver.connectionId) {
+      return left.credentialResolver.connectionId.localeCompare(
+        right.credentialResolver.connectionId,
+      );
+    }
+
+    if (left.credentialResolver.secretType !== right.credentialResolver.secretType) {
+      return left.credentialResolver.secretType.localeCompare(right.credentialResolver.secretType);
+    }
+
+    if (left.credentialResolver.slotKey !== right.credentialResolver.slotKey) {
+      return (left.credentialResolver.slotKey ?? "").localeCompare(
+        right.credentialResolver.slotKey ?? "",
+      );
+    }
+
+    return (left.credentialResolver.resolverKey ?? "").localeCompare(
+      right.credentialResolver.resolverKey ?? "",
+    );
+  });
+}
+
 function normalizeRuntimeArtifactCommand(
   command: z.output<typeof RuntimeArtifactCommandSchema>,
 ): RuntimePlanArtifactCommand {
@@ -353,6 +455,11 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
             ? {}
             : { username: route.authInjection.username }),
         };
+  const additionalCredentialHeaders = normalizeAdditionalCredentialHeaders({
+    additionalCredentialHeaders: route.additionalCredentialHeaders,
+    additionalHeaders,
+    authInjection: route.authInjection,
+  });
 
   return {
     egressRuleId: route.egressRuleId,
@@ -367,6 +474,7 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
     },
     authInjection,
     ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
+    ...(additionalCredentialHeaders === undefined ? {} : { additionalCredentialHeaders }),
     credentialResolver: {
       connectionId: route.credentialResolver.connectionId,
       secretType: route.credentialResolver.secretType,
