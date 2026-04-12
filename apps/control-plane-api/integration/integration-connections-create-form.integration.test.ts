@@ -620,9 +620,7 @@ describe("integration connections create form integration", () => {
     expect(responseBody.config).toEqual({
       connection_method: IntegrationConnectionMethodIds.API_KEY,
     });
-    expect(responseBody.targetSnapshotConfig).toEqual({
-      mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-    });
+    expect(responseBody.targetSnapshotConfig).toEqual({});
 
     const createdLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
       where: (table, { eq }) => eq(table.connectionId, responseBody.id),
@@ -1037,9 +1035,7 @@ async function upsertDatadogTarget(input: {
       familyId: "datadog",
       variantId: "datadog-default",
       enabled: true,
-      config: {
-        mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-      },
+      config: {},
     })
     .onConflictDoUpdate({
       target: integrationTargets.targetKey,
@@ -1047,9 +1043,7 @@ async function upsertDatadogTarget(input: {
         familyId: "datadog",
         variantId: "datadog-default",
         enabled: true,
-        config: {
-          mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-        },
+        config: {},
       },
     });
 }

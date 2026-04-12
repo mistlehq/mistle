@@ -26,9 +26,7 @@ describe("compileDatadogBinding", () => {
         familyId: "datadog",
         variantId: "datadog-default",
         enabled: true,
-        config: {
-          mcpBaseUrl: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-        },
+        config: {},
         secrets: {},
       },
       connection: {
@@ -95,9 +93,7 @@ describe("compileDatadogBinding", () => {
         familyId: "datadog",
         variantId: "datadog-default",
         enabled: true,
-        config: {
-          mcpBaseUrl: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-        },
+        config: {},
         secrets: {},
       },
       connection: {

@@ -73,7 +73,7 @@ export const DatadogDefinition: DatadogIntegrationDefinition = {
             serverId: DatadogToolIds.DATADOG_MCP,
             serverName: "datadog",
             transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-            url: resolveDatadogMcpUrl(input.target.config.mcpBaseUrl),
+            url: resolveDatadogMcpUrl(),
             description: "Datadog MCP",
           },
         ]

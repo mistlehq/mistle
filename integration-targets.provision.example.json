@@ -82,9 +82,7 @@
     {
       "targetKey": "datadog-default",
       "enabled": true,
-      "config": {
-        "mcp_base_url": "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp"
-      }
+      "config": {}
     },
     {
       "targetKey": "jira-default",

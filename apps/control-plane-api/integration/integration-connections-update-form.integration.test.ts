@@ -1181,9 +1181,7 @@ async function upsertDatadogTarget(input: {
       familyId: "datadog",
       variantId: "datadog-default",
       enabled: true,
-      config: {
-        mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-      },
+      config: {},
     })
     .onConflictDoUpdate({
       target: integrationTargets.targetKey,
@@ -1191,9 +1189,7 @@ async function upsertDatadogTarget(input: {
         familyId: "datadog",
         variantId: "datadog-default",
         enabled: true,
-        config: {
-          mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-        },
+        config: {},
       },
     });
 }

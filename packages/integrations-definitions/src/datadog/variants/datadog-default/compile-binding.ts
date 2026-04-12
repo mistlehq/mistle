@@ -2,7 +2,7 @@ import { type CompileBindingInput, type CompileBindingResult } from "@mistle/int
 
 import { DatadogCredentialSecretTypes, DatadogCredentialSlotKeys } from "./auth.js";
 import type { DatadogBindingConfig } from "./binding-config-schema.js";
-import type { DatadogTargetConfig } from "./target-config-schema.js";
+import { DatadogMcpBaseUrl, type DatadogTargetConfig } from "./target-config-schema.js";
 import { DatadogToolIds } from "./tool-ids.js";
 
 export type DatadogCompileBindingInput = CompileBindingInput<
@@ -17,9 +17,8 @@ const DatadogHeaderNames = {
 
 function createDatadogMcpRoute(input: {
   connectionId: string;
-  mcpBaseUrl: string;
 }): CompileBindingResult["egressRoutes"][number] {
-  const parsedBaseUrl = new URL(input.mcpBaseUrl);
+  const parsedBaseUrl = new URL(DatadogMcpBaseUrl);
 
   return {
     match: {
@@ -27,7 +26,7 @@ function createDatadogMcpRoute(input: {
       pathPrefixes: [parsedBaseUrl.pathname],
     },
     upstream: {
-      baseUrl: input.mcpBaseUrl,
+      baseUrl: DatadogMcpBaseUrl,
     },
     authInjection: {
       type: "header",
@@ -59,7 +58,6 @@ export function compileDatadogBinding(input: DatadogCompileBindingInput): Compil
       ? [
           createDatadogMcpRoute({
             connectionId: input.connection.id,
-            mcpBaseUrl: input.target.config.mcpBaseUrl,
           }),
         ]
       : [],

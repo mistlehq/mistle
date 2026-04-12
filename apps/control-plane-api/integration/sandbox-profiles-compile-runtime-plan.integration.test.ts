@@ -893,9 +893,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           familyId: "datadog",
           variantId: "datadog-default",
           enabled: true,
-          config: {
-            mcp_base_url: "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
-          },
+          config: {},
         },
       ])
       .onConflictDoNothing();
