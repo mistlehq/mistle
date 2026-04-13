@@ -54,6 +54,14 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
       },
     },
     githubReleases: {
+      install(): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: {
+            args: ["github-releases.install"],
+          },
+        };
+      },
       installLatestBinary(): RuntimeArtifactInstallStep {
         return {
           op: "exec",

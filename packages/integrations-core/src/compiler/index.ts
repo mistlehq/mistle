@@ -1,5 +1,3 @@
-import { quote } from "shell-quote";
-
 import { runDefinitionBindingWriteValidation } from "../binding-validation/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { applyMcpConfigToRuntimeClients } from "../mcp-config/index.js";
@@ -20,9 +18,8 @@ import {
   type IntegrationMcpValue,
   type ResolvedIntegrationMcpServer,
   type CompiledRuntimePlan,
-  type RuntimeArtifactGithubReleaseInstallInput,
-  type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
-  type RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
+  type RuntimeArtifactGitHubReleaseInstallHelperInput,
+  type RuntimeArtifactGitHubReleaseInstallAssetShape,
   type RuntimeArtifactInstallStep,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
@@ -41,7 +38,6 @@ const SandboxPaths: SandboxPathRefs = {
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
   runtimeArtifactBinDir: "/usr/local/bin",
 };
-const GitHubReleaseRetryAttempts = 3;
 
 function artifactBinPath(name: string): string {
   return `${SandboxPaths.runtimeArtifactBinDir}/${name}`;
@@ -55,204 +51,56 @@ function resolveEgressRuleId(input: { bindingId: string; routeIndex: number }): 
   return `egress_rule_${input.bindingId}_${input.routeIndex + 1}`;
 }
 
-function renderRetryShellFunction(input: { contextLabel: string }): string[] {
-  return [
-    "run_with_retry() {",
-    '  max_attempts="$1"',
-    "  shift",
-    "  attempt=1",
-    "  while :; do",
-    '    if "$@"; then',
-    "      return 0",
-    "    else",
-    '      status="$?"',
-    "    fi",
-    "",
-    '    if [ "$attempt" -ge "$max_attempts" ]; then',
-    '      return "$status"',
-    "    fi",
-    "",
-    `    echo "Failed to ${input.contextLabel} on attempt $attempt/$max_attempts (exit=$status); retrying." >&2`,
-    '    sleep "$attempt"',
-    "    attempt=$((attempt + 1))",
-    "  done",
-    "}",
-    "",
-  ];
+function toGitHubReleaseInstallAssetShape(input: {
+  fileName: string;
+  binaryPath: string;
+  format?: "tar.gz" | "binary";
+}): RuntimeArtifactGitHubReleaseInstallAssetShape {
+  if (input.format === "binary") {
+    return {
+      fileName: input.fileName,
+      format: "binary",
+    };
+  }
+
+  return {
+    fileName: input.fileName,
+    format: "tar.gz",
+    extractedPath: input.binaryPath,
+  };
 }
 
-function renderInstallLatestGithubReleaseBinaryScript(
-  input: RuntimeArtifactGithubReleaseInstallInput,
-): string {
-  const x86AssetFormat = input.assets.x86_64.format ?? "tar.gz";
-  const aarch64AssetFormat = input.assets.aarch64.format ?? "tar.gz";
-
-  return [
-    'arch="$(uname -m)"',
-    "repo=" + quote([input.repository]),
-    "install_path=" + quote([input.installPath]),
-    ...renderRetryShellFunction({
-      contextLabel: `download GitHub release asset for $repo`,
-    }),
-    'case "$arch" in',
-    "  x86_64)",
-    `    asset_name=${quote([input.assets.x86_64.fileName])}`,
-    `    binary_path=${quote([input.assets.x86_64.binaryPath])}`,
-    `    asset_format=${quote([x86AssetFormat])}`,
-    "    ;;",
-    "  aarch64|arm64)",
-    `    asset_name=${quote([input.assets.aarch64.fileName])}`,
-    `    binary_path=${quote([input.assets.aarch64.binaryPath])}`,
-    `    asset_format=${quote([aarch64AssetFormat])}`,
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported architecture: $arch" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-    "",
-    'temp_dir="$(mktemp -d)"',
-    "trap 'rm -rf \"$temp_dir\"' EXIT",
-    "",
-    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"`,
-    'case "$asset_format" in',
-    "  tar.gz)",
-    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
-    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
-    "    ;;",
-    "  binary)",
-    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported asset format: $asset_format" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-  ].join("\n");
-}
-
-function renderInstallTaggedGithubReleaseBinaryScript(
-  input: RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
-): string {
-  const x86AssetFormat = input.assets.x86_64.format ?? "tar.gz";
-  const aarch64AssetFormat = input.assets.aarch64.format ?? "tar.gz";
-
-  return [
-    'arch="$(uname -m)"',
-    "repo=" + quote([input.repository]),
-    "release_tag=" + quote([input.releaseTag]),
-    "install_path=" + quote([input.installPath]),
-    ...renderRetryShellFunction({
-      contextLabel: `download tagged GitHub release asset for $repo`,
-    }),
-    'case "$arch" in',
-    "  x86_64)",
-    `    asset_name=${quote([input.assets.x86_64.fileName])}`,
-    `    binary_path=${quote([input.assets.x86_64.binaryPath])}`,
-    `    asset_format=${quote([x86AssetFormat])}`,
-    "    ;;",
-    "  aarch64|arm64)",
-    `    asset_name=${quote([input.assets.aarch64.fileName])}`,
-    `    binary_path=${quote([input.assets.aarch64.binaryPath])}`,
-    `    asset_format=${quote([aarch64AssetFormat])}`,
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported architecture: $arch" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-    "",
-    'temp_dir="$(mktemp -d)"',
-    "trap 'rm -rf \"$temp_dir\"' EXIT",
-    "",
-    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://github.com/$repo/releases/download/$release_tag/$asset_name" -o "$temp_dir/artifact"`,
-    'case "$asset_format" in',
-    "  tar.gz)",
-    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
-    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
-    "    ;;",
-    "  binary)",
-    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported asset format: $asset_format" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-  ].join("\n");
-}
-
-function renderInstallLatestTaggedGithubReleaseAssetScript(
-  input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
-): string {
-  const assetFormat = input.format ?? "binary";
-  const binaryPathAssignments =
-    "binaryPath" in input ? ["binary_path=" + quote([input.binaryPath])] : [];
-
-  return [
-    "repo=" + quote([input.repository]),
-    "release_tag_prefix=" + quote([input.releaseTagPrefix]),
-    "asset_name=" + quote([input.assetName]),
-    "install_path=" + quote([input.installPath]),
-    "asset_format=" + quote([assetFormat]),
-    ...binaryPathAssignments,
-    "",
-    ...renderRetryShellFunction({
-      contextLabel: `perform GitHub release request for $repo`,
-    }),
-    'temp_dir="$(mktemp -d)"',
-    "trap 'rm -rf \"$temp_dir\"' EXIT",
-    "",
-    "page=1",
-    'release_json=""',
-    'releases_path="$temp_dir/releases.json"',
-    "while :; do",
-    `  run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -o "$releases_path"`,
-    '  releases_json="$(cat "$releases_path")"',
-    '  if ! printf "%s" "$releases_json" | jq -e \'type == "array"\' >/dev/null; then',
-    '    echo "GitHub releases API returned invalid JSON for $repo." >&2',
-    "    exit 1",
-    "  fi",
-    "",
-    '  if [ "$(printf "%s" "$releases_json" | jq "length")" -eq 0 ]; then',
-    "    break",
-    "  fi",
-    "",
-    '  release_json="$(printf "%s" "$releases_json" | jq -cer --arg prefix "$release_tag_prefix" \'[.[] | select((.draft | not) and (.prerelease | not) and (.tag_name | startswith($prefix)))] | .[0] // empty\')"',
-    '  if [ -n "$release_json" ]; then',
-    "    break",
-    "  fi",
-    "",
-    "  page=$((page + 1))",
-    "done",
-    "",
-    'if [ -z "$release_json" ]; then',
-    '  echo "Failed to find a matching GitHub release for $repo with tag prefix $release_tag_prefix." >&2',
-    "  exit 1",
-    "fi",
-    "",
-    'download_url="$(printf "%s" "$release_json" | jq -r --arg asset_name "$asset_name" \'.assets[] | select(.name == $asset_name) | .browser_download_url\' | head -n1)"',
-    'if [ -z "$download_url" ]; then',
-    '  release_tag="$(printf "%s" "$release_json" | jq -r ".tag_name")"',
-    '  echo "Release $release_tag for $repo does not contain asset $asset_name." >&2',
-    "  exit 1",
-    "fi",
-    "",
-    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/artifact"`,
-    'case "$asset_format" in',
-    "  tar.gz)",
-    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
-    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
-    "    ;;",
-    "  binary)",
-    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported asset format: $asset_format" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-  ].join("\n");
+function createGitHubReleaseInstallStep(
+  input: RuntimeArtifactGitHubReleaseInstallHelperInput,
+): RuntimeArtifactInstallStep {
+  return {
+    op: "github_release_install",
+    repository: input.repository,
+    release:
+      input.release.kind === "latest"
+        ? { kind: "latest" }
+        : input.release.match === "exact"
+          ? {
+              kind: "tag",
+              match: "exact",
+              tag: input.release.tag,
+            }
+          : {
+              kind: "tag",
+              match: "latest_matching_prefix",
+              prefix: input.release.prefix,
+            },
+    asset:
+      input.asset.kind === "exact"
+        ? { ...input.asset }
+        : {
+            kind: "by_arch",
+            x86_64: { ...input.asset.x86_64 },
+            aarch64: { ...input.asset.aarch64 },
+          },
+    installPath: input.installPath,
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+  };
 }
 
 function createRuntimeArtifactRefs(input: {
@@ -290,31 +138,67 @@ function createRuntimeArtifactRefs(input: {
     sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
-      install: (installInput) =>
-        exec({
-          args: [
-            "mise",
-            "install",
-            ...(installInput.force === true ? ["--force"] : []),
-            ...installInput.tools,
-          ],
-          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-        }),
+      install: (installInput) => ({
+        op: "mise_install",
+        tools: [...installInput.tools],
+        ...(installInput.force === undefined ? {} : { force: installInput.force }),
+        ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+      }),
     },
     githubReleases: {
+      install: (installInput) => createGitHubReleaseInstallStep(installInput),
       installLatestBinary: (installInput) =>
-        exec({
-          args: ["sh", "-euc", renderInstallLatestGithubReleaseBinaryScript(installInput)],
+        createGitHubReleaseInstallStep({
+          repository: installInput.repository,
+          release: {
+            kind: "latest",
+          },
+          asset: {
+            kind: "by_arch",
+            x86_64: toGitHubReleaseInstallAssetShape(installInput.assets.x86_64),
+            aarch64: toGitHubReleaseInstallAssetShape(installInput.assets.aarch64),
+          },
+          installPath: installInput.installPath,
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
       installTaggedBinary: (installInput) =>
-        exec({
-          args: ["sh", "-euc", renderInstallTaggedGithubReleaseBinaryScript(installInput)],
+        createGitHubReleaseInstallStep({
+          repository: installInput.repository,
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: installInput.releaseTag,
+          },
+          asset: {
+            kind: "by_arch",
+            x86_64: toGitHubReleaseInstallAssetShape(installInput.assets.x86_64),
+            aarch64: toGitHubReleaseInstallAssetShape(installInput.assets.aarch64),
+          },
+          installPath: installInput.installPath,
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
       installLatestTaggedAsset: (installInput) =>
-        exec({
-          args: ["sh", "-euc", renderInstallLatestTaggedGithubReleaseAssetScript(installInput)],
+        createGitHubReleaseInstallStep({
+          repository: installInput.repository,
+          release: {
+            kind: "tag",
+            match: "latest_matching_prefix",
+            prefix: installInput.releaseTagPrefix,
+          },
+          asset: {
+            kind: "exact",
+            ...(installInput.format === "tar.gz"
+              ? {
+                  fileName: installInput.assetName,
+                  format: "tar.gz" as const,
+                  extractedPath: installInput.binaryPath,
+                }
+              : {
+                  fileName: installInput.assetName,
+                  format: "binary" as const,
+                }),
+          },
+          installPath: installInput.installPath,
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
     },
@@ -357,18 +241,10 @@ function resolveLifecycleHook(input: {
   }
 }
 
-function compileRuntimeArtifactInstallEntry(input: {
-  artifactKey: string;
-  installEntry: RuntimeArtifactInstallStep;
-}): CompiledRuntimeArtifactSpec["lifecycle"]["install"][number] {
-  if (input.installEntry.op === "exec") {
-    return input.installEntry.command;
-  }
-
-  throw new IntegrationCompilerError(
-    CompilerErrorCodes.ARTIFACT_CONFLICT,
-    `Artifact '${input.artifactKey}' uses install step op '${input.installEntry.op}' before compiled runtime-plan emission supports typed artifact operations.`,
-  );
+function compileRuntimeArtifactInstallEntry(
+  input: RuntimeArtifactInstallStep,
+): CompiledRuntimeArtifactSpec["lifecycle"]["install"][number] {
+  return input;
 }
 
 function resolveRuntimeArtifacts(input: {
@@ -408,12 +284,7 @@ function resolveRuntimeArtifacts(input: {
       ...(artifact.description === undefined ? {} : { description: artifact.description }),
       ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
-        install: install.map((installEntry) =>
-          compileRuntimeArtifactInstallEntry({
-            artifactKey: artifact.artifactKey,
-            installEntry,
-          }),
-        ),
+        install: install.map((installEntry) => compileRuntimeArtifactInstallEntry(installEntry)),
       },
     };
   });

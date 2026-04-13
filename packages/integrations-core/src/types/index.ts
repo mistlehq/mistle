@@ -1097,6 +1097,35 @@ export type RuntimeArtifactGitHubReleaseInstallStepInput = {
   timeoutMs?: number;
 };
 
+export type RuntimeArtifactGitHubReleaseInstallHelperAssetShape =
+  | {
+      fileName: string;
+      format: "binary";
+    }
+  | {
+      fileName: string;
+      format: "tar.gz";
+      extractedPath: string;
+    };
+
+export type RuntimeArtifactGitHubReleaseInstallHelperAsset =
+  | ({
+      kind: "exact";
+    } & RuntimeArtifactGitHubReleaseInstallHelperAssetShape)
+  | {
+      kind: "by_arch";
+      x86_64: RuntimeArtifactGitHubReleaseInstallHelperAssetShape;
+      aarch64: RuntimeArtifactGitHubReleaseInstallHelperAssetShape;
+    };
+
+export type RuntimeArtifactGitHubReleaseInstallHelperInput = {
+  repository: string;
+  release: RuntimeArtifactGitHubReleaseSelector;
+  asset: RuntimeArtifactGitHubReleaseInstallHelperAsset;
+  installPath: string;
+  timeoutMs?: number;
+};
+
 export type RuntimeArtifactInstallStep =
   | ({
       op: "github_release_install";
@@ -1174,6 +1203,7 @@ export type RuntimeArtifactRefs = {
     }): RuntimeArtifactInstallStep;
   };
   githubReleases: {
+    install(input: RuntimeArtifactGitHubReleaseInstallHelperInput): RuntimeArtifactInstallStep;
     installLatestBinary(
       input: RuntimeArtifactGithubReleaseInstallInput,
     ): RuntimeArtifactInstallStep;
