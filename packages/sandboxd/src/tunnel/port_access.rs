@@ -440,7 +440,9 @@ mod tests {
     fn wait_until_listening(bind_address: &str, port: u16) {
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         loop {
-            if std::net::TcpStream::connect((bind_address, port)).is_ok() {
+            let bind_addresses = bind_addresses_for_snapshot_port(&SystemClock, port)
+                .expect("process snapshot should load while waiting for fixture listener");
+            if bind_addresses.iter().any(|existing| existing == bind_address) {
                 return;
             }
             assert!(
