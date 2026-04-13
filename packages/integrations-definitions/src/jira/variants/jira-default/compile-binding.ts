@@ -31,12 +31,19 @@ function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["a
     },
     lifecycle: {
       install: ({ refs }) => [
-        refs.githubReleases.installLatestTaggedAsset({
+        refs.githubReleases.install({
           repository: "mistlehq/tools",
-          releaseTagPrefix: "jira/",
-          assetName: "jira-linux-amd64",
+          release: {
+            kind: "tag",
+            match: "latest_matching_prefix",
+            prefix: "jira/",
+          },
+          asset: {
+            kind: "exact",
+            fileName: "jira-linux-amd64",
+            format: "binary",
+          },
           installPath: refs.artifactBinPath("jira"),
-          format: "binary",
           timeoutMs: ArtifactCommandTimeoutMs,
         }),
       ],

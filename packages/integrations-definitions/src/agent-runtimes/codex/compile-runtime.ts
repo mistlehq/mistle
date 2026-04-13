@@ -196,10 +196,26 @@ export function compileCodexRuntime(
         name: "Codex CLI",
         lifecycle: {
           install: ({ refs }) => [
-            refs.githubReleases.installTaggedBinary({
+            refs.githubReleases.install({
               repository: CodexGitHubRepository,
-              releaseTag: CodexCliReleaseTag,
-              assets: CodexGitHubAssets,
+              release: {
+                kind: "tag",
+                match: "exact",
+                tag: CodexCliReleaseTag,
+              },
+              asset: {
+                kind: "by_arch",
+                x86_64: {
+                  fileName: CodexGitHubAssets.x86_64.fileName,
+                  format: "tar.gz",
+                  extractedPath: CodexGitHubAssets.x86_64.binaryPath,
+                },
+                aarch64: {
+                  fileName: CodexGitHubAssets.aarch64.fileName,
+                  format: "tar.gz",
+                  extractedPath: CodexGitHubAssets.aarch64.binaryPath,
+                },
+              },
               installPath: refs.artifactBinPath("codex"),
               timeoutMs: ArtifactCommandTimeoutMs,
             }),

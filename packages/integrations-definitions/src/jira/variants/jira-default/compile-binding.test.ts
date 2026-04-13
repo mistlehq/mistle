@@ -1,4 +1,5 @@
 import type {
+  RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
   RuntimeExecCommand,
@@ -49,12 +50,10 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
       },
     },
     githubReleases: {
-      install(): RuntimeArtifactInstallStep {
+      install(input: RuntimeArtifactGitHubReleaseInstallHelperInput): RuntimeArtifactInstallStep {
         return {
-          op: "exec",
-          command: {
-            args: ["github-releases.install"],
-          },
+          op: "github_release_install",
+          ...input,
         };
       },
       installLatestBinary(): RuntimeArtifactInstallStep {
@@ -169,10 +168,20 @@ describe("compileJiraBinding", () => {
     expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
       install: [
         {
-          op: "exec",
-          command: {
-            args: ["github-releases.installLatestTaggedAsset"],
+          op: "github_release_install",
+          repository: "mistlehq/tools",
+          release: {
+            kind: "tag",
+            match: "latest_matching_prefix",
+            prefix: "jira/",
           },
+          asset: {
+            kind: "exact",
+            fileName: "jira-linux-amd64",
+            format: "binary",
+          },
+          installPath: "/usr/local/bin/jira",
+          timeoutMs: 120_000,
         },
       ],
     });

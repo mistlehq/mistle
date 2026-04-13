@@ -1,6 +1,97 @@
+import type {
+  RuntimeArtifactGitHubReleaseInstallHelperInput,
+  RuntimeArtifactInstallStep,
+  RuntimeArtifactSpec,
+  RuntimeExecCommand,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { compileCodexRuntime } from "./compile-runtime.js";
+
+function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
+  install: ReadonlyArray<RuntimeArtifactInstallStep>;
+} {
+  const refs = {
+    command: {
+      exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: input,
+        };
+      },
+    },
+    sandboxPaths: {
+      userHomeDir: "/root",
+      workspaceDir: "/root",
+      runtimeDataDir: "/var/lib/mistle",
+      runtimeArtifactDir: "/var/lib/mistle/artifacts",
+      runtimeArtifactBinDir: "/usr/local/bin",
+    },
+    artifactBinPath: (artifactName: string) => `/usr/local/bin/${artifactName}`,
+    mise: {
+      install(input: {
+        tools: ReadonlyArray<string>;
+        force?: boolean;
+        timeoutMs?: number;
+      }): RuntimeArtifactInstallStep {
+        return {
+          op: "mise_install",
+          tools: [...input.tools],
+          ...(input.force === undefined ? {} : { force: input.force }),
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+        };
+      },
+    },
+    githubReleases: {
+      install(input: RuntimeArtifactGitHubReleaseInstallHelperInput): RuntimeArtifactInstallStep {
+        return {
+          op: "github_release_install",
+          ...input,
+        };
+      },
+      installLatestBinary(): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestBinary"],
+          },
+        };
+      },
+      installTaggedBinary(): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: {
+            args: ["github-releases.installTaggedBinary"],
+          },
+        };
+      },
+      installLatestTaggedAsset(): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestTaggedAsset"],
+          },
+        };
+      },
+    },
+    compileContext: {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "openai-default",
+      bindingId: "bind_openai_agent",
+    },
+  };
+
+  const install =
+    typeof artifact.lifecycle.install === "function"
+      ? artifact.lifecycle.install({ refs })
+      : artifact.lifecycle.install;
+
+  return {
+    install,
+  };
+}
 
 describe("compileCodexRuntime", () => {
   it("compiles Codex runtime artifacts and app-server wiring from provider access", () => {
@@ -72,6 +163,37 @@ describe("compileCodexRuntime", () => {
     ]);
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts?.[0]?.artifactKey).toBe("codex-cli");
+    if (compiled.artifacts?.[0] === undefined) {
+      throw new Error("Expected compiled Codex artifact.");
+    }
+    expect(resolveArtifactLifecycleCommands(compiled.artifacts[0])).toEqual({
+      install: [
+        {
+          op: "github_release_install",
+          repository: "openai/codex",
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: "rust-v0.119.0",
+          },
+          asset: {
+            kind: "by_arch",
+            x86_64: {
+              fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+              format: "tar.gz",
+              extractedPath: "codex-x86_64-unknown-linux-musl",
+            },
+            aarch64: {
+              fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+              format: "tar.gz",
+              extractedPath: "codex-aarch64-unknown-linux-musl",
+            },
+          },
+          installPath: "/usr/local/bin/codex",
+          timeoutMs: 120_000,
+        },
+      ],
+    });
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",

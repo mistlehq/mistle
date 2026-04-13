@@ -26,12 +26,19 @@ function createSlackCliArtifact(
     },
     lifecycle: {
       install: ({ refs }) => [
-        refs.githubReleases.installLatestTaggedAsset({
+        refs.githubReleases.install({
           repository: "mistlehq/tools",
-          releaseTagPrefix: "slack/",
-          assetName: "slack-linux-amd64",
+          release: {
+            kind: "tag",
+            match: "latest_matching_prefix",
+            prefix: "slack/",
+          },
+          asset: {
+            kind: "exact",
+            fileName: "slack-linux-amd64",
+            format: "binary",
+          },
           installPath: refs.artifactBinPath("slack"),
-          format: "binary",
           timeoutMs: ArtifactCommandTimeoutMs,
         }),
       ],
