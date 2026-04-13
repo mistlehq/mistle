@@ -1038,27 +1038,88 @@ export type EgressCredentialRoute = {
   credentialResolver: EgressCredentialResolverRef;
 };
 
-export type RuntimeArtifactCommand = {
+export type RuntimeExecCommand = {
   args: ReadonlyArray<string>;
   env?: Record<string, string>;
   cwd?: string;
   timeoutMs?: number;
 };
 
+/**
+ * @deprecated Use RuntimeExecCommand for subprocess commands. This alias
+ * remains during the artifact install compatibility transition.
+ */
+export type RuntimeArtifactCommand = RuntimeExecCommand;
+
+export type LegacyRuntimeArtifactCommand = RuntimeExecCommand;
+
+export type RuntimeArtifactGitHubReleaseSelector =
+  | {
+      kind: "latest";
+    }
+  | {
+      kind: "tag";
+      match: "exact";
+      tag: string;
+    }
+  | {
+      kind: "tag";
+      match: "latest_matching_prefix";
+      prefix: string;
+    };
+
+export type RuntimeArtifactGitHubReleaseInstallAssetShape =
+  | {
+      fileName: string;
+      format?: "binary";
+    }
+  | {
+      fileName: string;
+      format: "tar.gz";
+      extractedPath: string;
+    };
+
+export type RuntimeArtifactGitHubReleaseInstallAsset =
+  | ({
+      kind: "exact";
+    } & RuntimeArtifactGitHubReleaseInstallAssetShape)
+  | {
+      kind: "by_arch";
+      x86_64: RuntimeArtifactGitHubReleaseInstallAssetShape;
+      aarch64: RuntimeArtifactGitHubReleaseInstallAssetShape;
+    };
+
+export type RuntimeArtifactGitHubReleaseInstallStepInput = {
+  repository: string;
+  release: RuntimeArtifactGitHubReleaseSelector;
+  asset: RuntimeArtifactGitHubReleaseInstallAsset;
+  installPath: string;
+  timeoutMs?: number;
+};
+
+export type RuntimeArtifactInstallStep =
+  | ({
+      op: "github_release_install";
+    } & RuntimeArtifactGitHubReleaseInstallStepInput)
+  | {
+      op: "mise_install";
+      tools: ReadonlyArray<string>;
+      force?: boolean;
+      timeoutMs?: number;
+    }
+  | {
+      op: "exec";
+      command: RuntimeExecCommand;
+    };
+
+export type RuntimeArtifactInstallEntryCompat =
+  | LegacyRuntimeArtifactCommand
+  | RuntimeArtifactInstallStep;
+
 export type RuntimeArtifactGithubReleaseAsset = {
   fileName: string;
   binaryPath: string;
   format?: "tar.gz" | "binary";
-};
-
-export type RuntimeArtifactGithubReleaseInstallInput = {
-  repository: string;
-  assets: {
-    x86_64: RuntimeArtifactGithubReleaseAsset;
-    aarch64: RuntimeArtifactGithubReleaseAsset;
-  };
-  installPath: string;
-  timeoutMs?: number;
 };
 
 export type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput = {
@@ -1089,9 +1150,19 @@ export type RuntimeArtifactGithubReleaseTaggedAssetInstallInput =
       binaryPath: string;
     });
 
+export type RuntimeArtifactGithubReleaseInstallInput = {
+  repository: string;
+  assets: {
+    x86_64: RuntimeArtifactGithubReleaseAsset;
+    aarch64: RuntimeArtifactGithubReleaseAsset;
+  };
+  installPath: string;
+  timeoutMs?: number;
+};
+
 export type RuntimeArtifactRefs = {
   command: {
-    exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
+    exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep;
   };
   sandboxPaths: SandboxPathRefs;
   artifactBinPath(name: string): string;
@@ -1100,16 +1171,18 @@ export type RuntimeArtifactRefs = {
       tools: ReadonlyArray<string>;
       force?: boolean;
       timeoutMs?: number;
-    }): RuntimeArtifactCommand;
+    }): RuntimeArtifactInstallStep;
   };
   githubReleases: {
-    installLatestBinary(input: RuntimeArtifactGithubReleaseInstallInput): RuntimeArtifactCommand;
+    installLatestBinary(
+      input: RuntimeArtifactGithubReleaseInstallInput,
+    ): RuntimeArtifactInstallStep;
     installTaggedBinary(
       input: RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
-    ): RuntimeArtifactCommand;
+    ): RuntimeArtifactInstallStep;
     installLatestTaggedAsset(
       input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
-    ): RuntimeArtifactCommand;
+    ): RuntimeArtifactInstallStep;
   };
   compileContext: {
     organizationId: string;
@@ -1122,7 +1195,7 @@ export type RuntimeArtifactRefs = {
 
 export type RuntimeArtifactLifecycleBuilder = (input: {
   refs: RuntimeArtifactRefs;
-}) => ReadonlyArray<RuntimeArtifactCommand>;
+}) => ReadonlyArray<RuntimeArtifactInstallStep>;
 
 type RuntimeArtifactLifecycle<THook> = {
   install: THook;
@@ -1134,7 +1207,7 @@ export type RuntimeArtifactSpec = {
   description?: string;
   env?: Readonly<Record<string, string>>;
   lifecycle: RuntimeArtifactLifecycle<
-    ReadonlyArray<RuntimeArtifactCommand> | RuntimeArtifactLifecycleBuilder
+    ReadonlyArray<RuntimeArtifactInstallStep> | RuntimeArtifactLifecycleBuilder
   >;
 };
 
@@ -1143,7 +1216,7 @@ export type CompiledRuntimeArtifactSpec = {
   name: string;
   description?: string;
   env?: Readonly<Record<string, string>>;
-  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
+  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactInstallEntryCompat>>;
 };
 
 export const RuntimeFileWriteMode = {
@@ -1201,7 +1274,7 @@ export type RuntimeClientProcessStopPolicy = {
 
 export type RuntimeClientProcessSpec = {
   processKey: string;
-  command: RuntimeArtifactCommand;
+  command: RuntimeExecCommand;
   readiness: RuntimeClientProcessReadiness;
   stop: RuntimeClientProcessStopPolicy;
 };

@@ -103,7 +103,7 @@ const EgressCredentialRouteSchema = z
   })
   .strict();
 
-const RuntimeArtifactCommandSchema = z
+const RuntimeExecCommandSchema = z
   .object({
     args: z.array(z.string()).readonly(),
     env: z.record(z.string(), z.string()).optional(),
@@ -111,6 +111,105 @@ const RuntimeArtifactCommandSchema = z
     timeoutMs: z.number().int().positive().optional(),
   })
   .strict();
+
+const RuntimeArtifactGitHubReleaseSelectorSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("latest"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("tag"),
+      match: z.literal("exact"),
+      tag: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("tag"),
+      match: z.literal("latest_matching_prefix"),
+      prefix: z.string().min(1),
+    })
+    .strict(),
+]);
+
+const RuntimeArtifactGitHubReleaseAssetBinarySchema = z
+  .object({
+    fileName: z.string().min(1),
+    format: z.literal("binary").optional(),
+  })
+  .strict();
+
+const RuntimeArtifactGitHubReleaseAssetTarGzSchema = z
+  .object({
+    fileName: z.string().min(1),
+    format: z.literal("tar.gz"),
+    extractedPath: z.string().min(1),
+  })
+  .strict();
+
+const RuntimeArtifactGitHubReleaseAssetShapeSchema = z.union([
+  RuntimeArtifactGitHubReleaseAssetBinarySchema,
+  RuntimeArtifactGitHubReleaseAssetTarGzSchema,
+]);
+
+const RuntimeArtifactGitHubReleaseInstallAssetSchema = z.union([
+  z
+    .object({
+      kind: z.literal("exact"),
+      fileName: z.string().min(1),
+      format: z.literal("binary").optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("exact"),
+      fileName: z.string().min(1),
+      format: z.literal("tar.gz"),
+      extractedPath: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("by_arch"),
+      x86_64: RuntimeArtifactGitHubReleaseAssetShapeSchema,
+      aarch64: RuntimeArtifactGitHubReleaseAssetShapeSchema,
+    })
+    .strict(),
+]);
+
+const RuntimeArtifactInstallStepSchema = z.discriminatedUnion("op", [
+  z
+    .object({
+      op: z.literal("github_release_install"),
+      repository: z.string().min(1),
+      release: RuntimeArtifactGitHubReleaseSelectorSchema,
+      asset: RuntimeArtifactGitHubReleaseInstallAssetSchema,
+      installPath: z.string().min(1),
+      timeoutMs: z.number().int().positive().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("mise_install"),
+      tools: z.array(z.string().min(1)).min(1).readonly(),
+      force: z.boolean().optional(),
+      timeoutMs: z.number().int().positive().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("exec"),
+      command: RuntimeExecCommandSchema,
+    })
+    .strict(),
+]);
+
+const RuntimeArtifactInstallEntryCompatSchema = z.union([
+  RuntimeExecCommandSchema,
+  RuntimeArtifactInstallStepSchema,
+]);
 
 const CompiledRuntimeArtifactSpecSchema = z
   .object({
@@ -120,7 +219,7 @@ const CompiledRuntimeArtifactSpecSchema = z
     env: z.record(z.string(), z.string()).optional(),
     lifecycle: z
       .object({
-        install: z.array(RuntimeArtifactCommandSchema).readonly(),
+        install: z.array(RuntimeArtifactInstallEntryCompatSchema).readonly(),
       })
       .strict(),
   })
@@ -193,7 +292,7 @@ const RuntimeClientProcessStopPolicySchema = z
 const RuntimeClientProcessSchema = z
   .object({
     processKey: z.string().min(1),
-    command: RuntimeArtifactCommandSchema,
+    command: RuntimeExecCommandSchema,
     readiness: RuntimeClientProcessReadinessSchema,
     stop: RuntimeClientProcessStopPolicySchema,
   })
@@ -287,7 +386,8 @@ const CompiledWorkspaceSourceSchema = z.discriminatedUnion("sourceKind", [
 
 type RuntimePlanRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanArtifact = CompiledRuntimePlan["artifacts"][number];
-type RuntimePlanArtifactCommand = RuntimePlanArtifact["lifecycle"]["install"][number];
+type RuntimePlanExecCommand =
+  CompiledRuntimePlan["runtimeClients"][number]["processes"][number]["command"];
 type RuntimePlanRuntimeClient = CompiledRuntimePlan["runtimeClients"][number];
 type RuntimePlanRuntimeClientProcess = RuntimePlanRuntimeClient["processes"][number];
 type RuntimePlanRuntimeClientEndpoint = RuntimePlanRuntimeClient["endpoints"][number];
@@ -428,14 +528,102 @@ function normalizeAdditionalCredentialHeaders(input: {
   });
 }
 
-function normalizeRuntimeArtifactCommand(
-  command: z.output<typeof RuntimeArtifactCommandSchema>,
-): RuntimePlanArtifactCommand {
+function normalizeRuntimeExecCommand(
+  command: z.output<typeof RuntimeExecCommandSchema>,
+): RuntimePlanExecCommand {
   return {
     args: command.args,
     ...(command.env === undefined ? {} : { env: command.env }),
     ...(command.cwd === undefined ? {} : { cwd: command.cwd }),
     ...(command.timeoutMs === undefined ? {} : { timeoutMs: command.timeoutMs }),
+  };
+}
+
+function normalizeGitHubReleaseAssetShape(
+  asset: z.output<typeof RuntimeArtifactGitHubReleaseAssetShapeSchema>,
+) {
+  if (asset.format === "tar.gz") {
+    return {
+      fileName: asset.fileName,
+      format: "tar.gz" as const,
+      extractedPath: asset.extractedPath,
+    };
+  }
+
+  return {
+    fileName: asset.fileName,
+    ...(asset.format === undefined ? {} : { format: asset.format }),
+  };
+}
+
+function normalizeGitHubReleaseInstallAsset(
+  asset: z.output<typeof RuntimeArtifactGitHubReleaseInstallAssetSchema>,
+) {
+  if (asset.kind === "exact") {
+    return {
+      kind: "exact" as const,
+      ...normalizeGitHubReleaseAssetShape(asset),
+    };
+  }
+
+  return {
+    kind: "by_arch" as const,
+    x86_64: normalizeGitHubReleaseAssetShape(asset.x86_64),
+    aarch64: normalizeGitHubReleaseAssetShape(asset.aarch64),
+  };
+}
+
+function isLegacyRuntimeArtifactInstallEntry(
+  entry: z.output<typeof RuntimeArtifactInstallEntryCompatSchema>,
+): entry is z.output<typeof RuntimeExecCommandSchema> {
+  return "args" in entry;
+}
+
+function normalizeRuntimeArtifactInstallEntry(
+  entry: z.output<typeof RuntimeArtifactInstallEntryCompatSchema>,
+): RuntimePlanArtifact["lifecycle"]["install"][number] {
+  if (isLegacyRuntimeArtifactInstallEntry(entry)) {
+    return normalizeRuntimeExecCommand(entry);
+  }
+
+  if (entry.op === "exec") {
+    return {
+      op: "exec",
+      command: normalizeRuntimeExecCommand(entry.command),
+    };
+  }
+
+  if (entry.op === "mise_install") {
+    return {
+      op: "mise_install",
+      tools: entry.tools,
+      ...(entry.force === undefined ? {} : { force: entry.force }),
+      ...(entry.timeoutMs === undefined ? {} : { timeoutMs: entry.timeoutMs }),
+    };
+  }
+
+  return {
+    op: "github_release_install",
+    repository: entry.repository,
+    release:
+      entry.release.kind === "latest"
+        ? {
+            kind: "latest",
+          }
+        : entry.release.match === "exact"
+          ? {
+              kind: "tag",
+              match: "exact",
+              tag: entry.release.tag,
+            }
+          : {
+              kind: "tag",
+              match: "latest_matching_prefix",
+              prefix: entry.release.prefix,
+            },
+    asset: normalizeGitHubReleaseInstallAsset(entry.asset),
+    installPath: entry.installPath,
+    ...(entry.timeoutMs === undefined ? {} : { timeoutMs: entry.timeoutMs }),
   };
 }
 
@@ -497,7 +685,7 @@ function normalizeArtifact(
     ...(artifact.description === undefined ? {} : { description: artifact.description }),
     ...(artifact.env === undefined ? {} : { env: sortRecord(artifact.env) }),
     lifecycle: {
-      install: artifact.lifecycle.install.map(normalizeRuntimeArtifactCommand),
+      install: artifact.lifecycle.install.map(normalizeRuntimeArtifactInstallEntry),
     },
   };
 }
@@ -519,7 +707,7 @@ function normalizeRuntimeClientProcess(
 ): RuntimePlanRuntimeClientProcess {
   return {
     processKey: process.processKey,
-    command: normalizeRuntimeArtifactCommand(process.command),
+    command: normalizeRuntimeExecCommand(process.command),
     readiness:
       process.readiness.type === "none"
         ? {

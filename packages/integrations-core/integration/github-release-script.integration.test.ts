@@ -5,7 +5,12 @@ import { z } from "zod";
 import { AgentRuntimeRegistry } from "../src/agent-runtimes/index.js";
 import { compileRuntimePlan } from "../src/compiler/index.js";
 import { IntegrationRegistry } from "../src/registry/index.js";
-import { IntegrationConnectionMethodIds, type IntegrationDefinition } from "../src/types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationDefinition,
+  type RuntimeArtifactInstallEntryCompat,
+  type RuntimeExecCommand,
+} from "../src/types/index.js";
 
 const EmptyTargetConfigSchema = z.object({});
 const EmptyTargetSecretsSchema = z.object({});
@@ -29,6 +34,16 @@ const ApiKeyConnectionMethods = [
     ],
   },
 ] as const;
+
+function expectLegacyInstallCommand(
+  entry: RuntimeArtifactInstallEntryCompat | undefined,
+): RuntimeExecCommand {
+  if (entry === undefined || !("args" in entry)) {
+    throw new Error("Expected legacy exec install command during compatibility branch.");
+  }
+
+  return entry;
+}
 
 function createDefinitionsBundle(registry: IntegrationRegistry) {
   return {
@@ -179,12 +194,14 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
       ],
     });
 
-    const installCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
-    expect(installCommand?.args[0]).toBe("sh");
-    expect(installCommand?.args[1]).toBe("-euc");
-    expect(typeof installCommand?.args[2]).toBe("string");
+    const installCommand = expectLegacyInstallCommand(
+      runtimePlan.artifacts[0]?.lifecycle.install[0],
+    );
+    expect(installCommand.args[0]).toBe("sh");
+    expect(installCommand.args[1]).toBe("-euc");
+    expect(typeof installCommand.args[2]).toBe("string");
 
-    const script = installCommand?.args[2];
+    const script = installCommand.args[2];
     if (typeof script !== "string") {
       throw new Error("Expected generated github release install script.");
     }
@@ -250,12 +267,14 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
       ],
     });
 
-    const installCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
-    expect(installCommand?.args[0]).toBe("sh");
-    expect(installCommand?.args[1]).toBe("-euc");
-    expect(typeof installCommand?.args[2]).toBe("string");
+    const installCommand = expectLegacyInstallCommand(
+      runtimePlan.artifacts[0]?.lifecycle.install[0],
+    );
+    expect(installCommand.args[0]).toBe("sh");
+    expect(installCommand.args[1]).toBe("-euc");
+    expect(typeof installCommand.args[2]).toBe("string");
 
-    const script = installCommand?.args[2];
+    const script = installCommand.args[2];
     if (typeof script !== "string") {
       throw new Error("Expected generated tagged github release install script.");
     }

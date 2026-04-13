@@ -6,7 +6,9 @@ import type {
   CompiledRuntimeClient,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
-  RuntimeArtifactCommand,
+  RuntimeArtifactInstallEntryCompat,
+  RuntimeArtifactInstallStep,
+  RuntimeExecCommand,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
   RuntimeFileWriteMode,
@@ -149,21 +151,11 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
     > = [artifact.lifecycle.install];
 
     for (const hookCommands of lifecycleHooks) {
-      for (const command of hookCommands) {
-        if (command.args.length === 0) {
-          throw new IntegrationCompilerError(
-            CompilerErrorCodes.ARTIFACT_CONFLICT,
-            `Artifact '${artifact.artifactKey}' contains a lifecycle command with no args.`,
-          );
-        }
-
-        const commandName = command.args[0];
-        if (commandName === undefined || commandName.trim().length === 0) {
-          throw new IntegrationCompilerError(
-            CompilerErrorCodes.ARTIFACT_CONFLICT,
-            `Artifact '${artifact.artifactKey}' contains an empty lifecycle command.`,
-          );
-        }
+      for (const installEntry of hookCommands) {
+        validateArtifactInstallEntry({
+          artifactKey: artifact.artifactKey,
+          installEntry,
+        });
       }
     }
 
@@ -182,6 +174,142 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
         `Artifact key conflict detected for '${artifact.artifactKey}'.`,
+      );
+    }
+  }
+}
+
+function isLegacyRuntimeArtifactInstallEntry(
+  entry: RuntimeArtifactInstallEntryCompat,
+): entry is RuntimeExecCommand {
+  return "args" in entry;
+}
+
+function validateArtifactInstallEntry(input: {
+  artifactKey: string;
+  installEntry: RuntimeArtifactInstallEntryCompat;
+}): void {
+  const { installEntry } = input;
+
+  if (isLegacyRuntimeArtifactInstallEntry(installEntry)) {
+    if (installEntry.args.length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a lifecycle command with no args.`,
+      );
+    }
+
+    const commandName = installEntry.args[0];
+    if (commandName === undefined || commandName.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains an empty lifecycle command.`,
+      );
+    }
+
+    return;
+  }
+
+  if (installEntry.op === "exec") {
+    validateArtifactInstallEntry({
+      artifactKey: input.artifactKey,
+      installEntry: installEntry.command,
+    });
+    return;
+  }
+
+  if (installEntry.op === "mise_install") {
+    if (installEntry.tools.length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a mise install step with no tools.`,
+      );
+    }
+
+    for (const tool of installEntry.tools) {
+      if (tool.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.ARTIFACT_CONFLICT,
+          `Artifact '${input.artifactKey}' contains a mise install step with an empty tool entry.`,
+        );
+      }
+    }
+
+    return;
+  }
+
+  if (installEntry.repository.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.ARTIFACT_CONFLICT,
+      `Artifact '${input.artifactKey}' contains a github release install step with an empty repository.`,
+    );
+  }
+
+  if (installEntry.installPath.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.ARTIFACT_CONFLICT,
+      `Artifact '${input.artifactKey}' contains a github release install step with an empty installPath.`,
+    );
+  }
+
+  if (installEntry.release.kind === "tag") {
+    if (installEntry.release.match === "exact" && installEntry.release.tag.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with an empty exact tag selector.`,
+      );
+    }
+
+    if (
+      installEntry.release.match === "latest_matching_prefix" &&
+      installEntry.release.prefix.trim().length === 0
+    ) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with an empty tag prefix selector.`,
+      );
+    }
+  }
+
+  if (installEntry.asset.kind === "exact") {
+    if (installEntry.asset.fileName.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with an empty asset fileName.`,
+      );
+    }
+
+    if (
+      installEntry.asset.format === "tar.gz" &&
+      (!("extractedPath" in installEntry.asset) || installEntry.asset.extractedPath === undefined)
+    ) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with tar.gz asset '${installEntry.asset.fileName}' missing extractedPath.`,
+      );
+    }
+
+    return;
+  }
+
+  for (const [archKey, archAsset] of [
+    ["x86_64", installEntry.asset.x86_64],
+    ["aarch64", installEntry.asset.aarch64],
+  ] as const) {
+    if (archAsset.fileName.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with empty ${archKey} asset fileName.`,
+      );
+    }
+
+    if (
+      archAsset.format === "tar.gz" &&
+      (!("extractedPath" in archAsset) || archAsset.extractedPath === undefined)
+    ) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${input.artifactKey}' contains a github release install step with tar.gz ${archKey} asset '${archAsset.fileName}' missing extractedPath.`,
       );
     }
   }
@@ -233,12 +361,7 @@ function artifactCommandsEqual(
       return false;
     }
 
-    if (
-      !stringArrayEquals(leftCommand.args, rightCommand.args) ||
-      !stringRecordEquals(leftCommand.env, rightCommand.env) ||
-      leftCommand.cwd !== rightCommand.cwd ||
-      leftCommand.timeoutMs !== rightCommand.timeoutMs
-    ) {
+    if (!runtimeArtifactInstallEntryEquals(leftCommand, rightCommand)) {
       return false;
     }
   }
@@ -434,15 +557,133 @@ function artifactLifecycleEquals(
   return artifactCommandsEqual(left.install, right.install);
 }
 
-function runtimeArtifactCommandEquals(
-  left: RuntimeArtifactCommand,
-  right: RuntimeArtifactCommand,
-): boolean {
+function runtimeExecCommandEquals(left: RuntimeExecCommand, right: RuntimeExecCommand): boolean {
   return (
     stringArrayEquals(left.args, right.args) &&
     stringRecordEquals(left.env, right.env) &&
     left.cwd === right.cwd &&
     left.timeoutMs === right.timeoutMs
+  );
+}
+
+function isExactTagReleaseSelector(
+  selector: Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+): selector is Extract<
+  Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+  { kind: "tag"; match: "exact" }
+> {
+  return selector.kind === "tag" && selector.match === "exact";
+}
+
+function isLatestMatchingPrefixReleaseSelector(
+  selector: Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+): selector is Extract<
+  Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+  { kind: "tag"; match: "latest_matching_prefix" }
+> {
+  return selector.kind === "tag" && selector.match === "latest_matching_prefix";
+}
+
+function runtimeArtifactGitHubReleaseSelectorEquals(
+  left: Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+  right: Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["release"],
+): boolean {
+  if (left.kind === "latest" || right.kind === "latest") {
+    return left.kind === "latest" && right.kind === "latest";
+  }
+
+  if (left.match !== right.match) {
+    return false;
+  }
+
+  if (isExactTagReleaseSelector(left) && isExactTagReleaseSelector(right)) {
+    return left.tag === right.tag;
+  }
+
+  if (isLatestMatchingPrefixReleaseSelector(left) && isLatestMatchingPrefixReleaseSelector(right)) {
+    return left.prefix === right.prefix;
+  }
+
+  return false;
+}
+
+function runtimeArtifactGitHubReleaseAssetShapeEquals(
+  left:
+    | Extract<
+        Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["asset"],
+        { kind: "exact" }
+      >
+    | Extract<
+        Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["asset"],
+        { kind: "by_arch" }
+      >["x86_64"],
+  right:
+    | Extract<
+        Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["asset"],
+        { kind: "exact" }
+      >
+    | Extract<
+        Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }>["asset"],
+        { kind: "by_arch" }
+      >["x86_64"],
+): boolean {
+  return (
+    left.fileName === right.fileName &&
+    left.format === right.format &&
+    ("extractedPath" in left ? left.extractedPath : undefined) ===
+      ("extractedPath" in right ? right.extractedPath : undefined)
+  );
+}
+
+function runtimeArtifactInstallEntryEquals(
+  left: RuntimeArtifactInstallEntryCompat,
+  right: RuntimeArtifactInstallEntryCompat,
+): boolean {
+  if (isLegacyRuntimeArtifactInstallEntry(left) || isLegacyRuntimeArtifactInstallEntry(right)) {
+    return (
+      isLegacyRuntimeArtifactInstallEntry(left) &&
+      isLegacyRuntimeArtifactInstallEntry(right) &&
+      runtimeExecCommandEquals(left, right)
+    );
+  }
+
+  if (left.op !== right.op) {
+    return false;
+  }
+
+  if (left.op === "exec" && right.op === "exec") {
+    return runtimeExecCommandEquals(left.command, right.command);
+  }
+
+  if (left.op === "mise_install" && right.op === "mise_install") {
+    return (
+      stringArrayEquals(left.tools, right.tools) &&
+      left.force === right.force &&
+      left.timeoutMs === right.timeoutMs
+    );
+  }
+
+  if (left.op !== "github_release_install" || right.op !== "github_release_install") {
+    return false;
+  }
+
+  if (!runtimeArtifactGitHubReleaseSelectorEquals(left.release, right.release)) {
+    return false;
+  }
+
+  const assetEquals =
+    left.asset.kind === "exact" && right.asset.kind === "exact"
+      ? runtimeArtifactGitHubReleaseAssetShapeEquals(left.asset, right.asset)
+      : left.asset.kind === "by_arch" && right.asset.kind === "by_arch"
+        ? runtimeArtifactGitHubReleaseAssetShapeEquals(left.asset.x86_64, right.asset.x86_64) &&
+          runtimeArtifactGitHubReleaseAssetShapeEquals(left.asset.aarch64, right.asset.aarch64)
+        : false;
+
+  return (
+    left.repository === right.repository &&
+    left.installPath === right.installPath &&
+    left.timeoutMs === right.timeoutMs &&
+    assetEquals
   );
 }
 
@@ -495,7 +736,7 @@ function runtimeClientProcessSpecEquals(
   right: RuntimeClientProcessSpec,
 ): boolean {
   return (
-    runtimeArtifactCommandEquals(left.command, right.command) &&
+    runtimeExecCommandEquals(left.command, right.command) &&
     runtimeClientProcessReadinessEquals(left.readiness, right.readiness) &&
     runtimeClientProcessStopPolicyEquals(left.stop, right.stop)
   );

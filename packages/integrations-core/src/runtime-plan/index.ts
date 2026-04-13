@@ -7,7 +7,7 @@ import type {
   CompiledRuntimeClient,
   CompiledRuntimePlan,
   CompiledWorkspaceSource,
-  RuntimeArtifactCommand,
+  RuntimeExecCommand,
   RuntimeClient,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
@@ -149,10 +149,7 @@ function stringRecordEquals(
   return true;
 }
 
-function runtimeArtifactCommandEquals(
-  left: RuntimeArtifactCommand,
-  right: RuntimeArtifactCommand,
-): boolean {
+function runtimeExecCommandEquals(left: RuntimeExecCommand, right: RuntimeExecCommand): boolean {
   return (
     stringArrayEquals(left.args, right.args) &&
     stringRecordEquals(left.env, right.env) &&
@@ -210,7 +207,7 @@ function runtimeClientProcessSpecEquals(
   right: RuntimeClientProcessSpec,
 ): boolean {
   return (
-    runtimeArtifactCommandEquals(left.command, right.command) &&
+    runtimeExecCommandEquals(left.command, right.command) &&
     runtimeClientProcessReadinessEquals(left.readiness, right.readiness) &&
     runtimeClientProcessStopPolicyEquals(left.stop, right.stop)
   );

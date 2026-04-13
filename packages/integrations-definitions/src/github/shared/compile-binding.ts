@@ -2,7 +2,7 @@ import {
   IntegrationConnectionMethodIds,
   joinRoutePathPrefixes,
   resolveRoutePathPrefixFromBaseUrl,
-  type RuntimeArtifactCommand,
+  type RuntimeArtifactInstallStep,
   type CompileBindingInput,
   type CompileBindingResult,
 } from "@mistle/integrations-core";
@@ -108,10 +108,15 @@ function renderInstallGitHubCliScript(installPath: string): string {
   ].join("\n");
 }
 
-function buildGitHubCliLifecycleCommand(input: { installPath: string }): RuntimeArtifactCommand {
+function buildGitHubCliLifecycleCommand(input: {
+  installPath: string;
+}): RuntimeArtifactInstallStep {
   return {
-    args: ["sh", "-euc", renderInstallGitHubCliScript(input.installPath)],
-    timeoutMs: ArtifactCommandTimeoutMs,
+    op: "exec",
+    command: {
+      args: ["sh", "-euc", renderInstallGitHubCliScript(input.installPath)],
+      timeoutMs: ArtifactCommandTimeoutMs,
+    },
   };
 }
 

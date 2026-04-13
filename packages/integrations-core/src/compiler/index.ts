@@ -20,12 +20,13 @@ import {
   type IntegrationMcpValue,
   type ResolvedIntegrationMcpServer,
   type CompiledRuntimePlan,
-  type RuntimeArtifactCommand,
   type RuntimeArtifactGithubReleaseInstallInput,
   type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
   type RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
+  type RuntimeArtifactInstallStep,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
+  type RuntimeExecCommand,
   type RuntimeArtifactSpec,
   type SandboxPathRefs,
 } from "../types/index.js";
@@ -261,17 +262,24 @@ function createRuntimeArtifactRefs(input: {
   targetKey: string;
   bindingId: string;
 }): RuntimeArtifactRefs {
-  const exec = (execInput: {
+  const createExecCommand = (execInput: {
     args: ReadonlyArray<string>;
     env?: Record<string, string>;
     cwd?: string;
     timeoutMs?: number;
-  }): RuntimeArtifactCommand => {
+  }): RuntimeExecCommand => {
     return {
       args: [...execInput.args],
       ...(execInput.env === undefined ? {} : { env: execInput.env }),
       ...(execInput.cwd === undefined ? {} : { cwd: execInput.cwd }),
       ...(execInput.timeoutMs === undefined ? {} : { timeoutMs: execInput.timeoutMs }),
+    };
+  };
+
+  const exec = (execInput: RuntimeExecCommand): RuntimeArtifactInstallStep => {
+    return {
+      op: "exec",
+      command: createExecCommand(execInput),
     };
   };
 
@@ -321,7 +329,7 @@ function createRuntimeArtifactRefs(input: {
 }
 
 type RuntimeArtifactLifecycleHook =
-  | ReadonlyArray<RuntimeArtifactCommand>
+  | ReadonlyArray<RuntimeArtifactInstallStep>
   | RuntimeArtifactLifecycleBuilder;
 
 function resolveLifecycleHook(input: {
@@ -329,7 +337,7 @@ function resolveLifecycleHook(input: {
   hookName: "install" | "remove";
   hook: RuntimeArtifactLifecycleHook | undefined;
   refs: RuntimeArtifactRefs;
-}): ReadonlyArray<RuntimeArtifactCommand> | undefined {
+}): ReadonlyArray<RuntimeArtifactInstallStep> | undefined {
   if (input.hook === undefined) {
     return undefined;
   }
@@ -347,6 +355,20 @@ function resolveLifecycleHook(input: {
       { cause: error },
     );
   }
+}
+
+function compileRuntimeArtifactInstallEntry(input: {
+  artifactKey: string;
+  installEntry: RuntimeArtifactInstallStep;
+}): CompiledRuntimeArtifactSpec["lifecycle"]["install"][number] {
+  if (input.installEntry.op === "exec") {
+    return input.installEntry.command;
+  }
+
+  throw new IntegrationCompilerError(
+    CompilerErrorCodes.ARTIFACT_CONFLICT,
+    `Artifact '${input.artifactKey}' uses install step op '${input.installEntry.op}' before compiled runtime-plan emission supports typed artifact operations.`,
+  );
 }
 
 function resolveRuntimeArtifacts(input: {
@@ -386,7 +408,12 @@ function resolveRuntimeArtifacts(input: {
       ...(artifact.description === undefined ? {} : { description: artifact.description }),
       ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
-        install,
+        install: install.map((installEntry) =>
+          compileRuntimeArtifactInstallEntry({
+            artifactKey: artifact.artifactKey,
+            installEntry,
+          }),
+        ),
       },
     };
   });

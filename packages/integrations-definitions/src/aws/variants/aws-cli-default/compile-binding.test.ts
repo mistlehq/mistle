@@ -1,4 +1,8 @@
-import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
+import type {
+  RuntimeArtifactInstallStep,
+  RuntimeArtifactSpec,
+  RuntimeExecCommand,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,37 +27,56 @@ const SandboxPaths = {
 } as const;
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
-  install: ReadonlyArray<RuntimeArtifactCommand>;
+  install: ReadonlyArray<RuntimeArtifactInstallStep>;
 } {
   const refs = {
     command: {
-      exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand {
-        return input;
+      exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: input,
+        };
       },
     },
     sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
-      install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
+      install(input: {
+        tools: ReadonlyArray<string>;
+        force?: boolean;
+        timeoutMs?: number;
+      }): RuntimeArtifactInstallStep {
         return {
-          args: ["mise", "install", ...input.tools],
+          op: "exec",
+          command: {
+            args: ["mise", "install", ...input.tools],
+          },
         };
       },
     },
     githubReleases: {
-      installLatestBinary() {
+      installLatestBinary(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installLatestBinary"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestBinary"],
+          },
         };
       },
-      installTaggedBinary() {
+      installTaggedBinary(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installTaggedBinary"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installTaggedBinary"],
+          },
         };
       },
-      installLatestTaggedAsset() {
+      installLatestTaggedAsset(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installLatestTaggedAsset"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestTaggedAsset"],
+          },
         };
       },
     },
@@ -299,13 +322,19 @@ describe("compileAwsBinding", () => {
     }
     const installCommand = resolveArtifactLifecycleCommands(artifact).install[0];
     expect(installCommand).toEqual({
-      args: expect.arrayContaining(["sh", "-euc", expect.any(String)]),
-      timeoutMs: 120000,
+      op: "exec",
+      command: {
+        args: expect.arrayContaining(["sh", "-euc", expect.any(String)]),
+        timeoutMs: 120000,
+      },
     });
-    expect(installCommand?.args[2]).toContain(
+    if (installCommand?.op !== "exec") {
+      throw new Error("Expected aws artifact install step to remain an exec step in branch 1.");
+    }
+    expect(installCommand.command.args[2]).toContain(
       "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.31.22.zip",
     );
-    expect(installCommand?.args[2]).toContain(
+    expect(installCommand.command.args[2]).toContain(
       '"$temp_dir/aws/install" --install-dir "$install_root" --bin-dir "$temp_dir/bin"',
     );
 

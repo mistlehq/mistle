@@ -1,4 +1,8 @@
-import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
+import type {
+  RuntimeArtifactInstallStep,
+  RuntimeArtifactSpec,
+  RuntimeExecCommand,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,37 +26,56 @@ const SandboxPaths = {
 };
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
-  install: ReadonlyArray<RuntimeArtifactCommand>;
+  install: ReadonlyArray<RuntimeArtifactInstallStep>;
 } {
   const refs = {
     command: {
-      exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand {
-        return input;
+      exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep {
+        return {
+          op: "exec",
+          command: input,
+        };
       },
     },
     sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
-      install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
+      install(input: {
+        tools: ReadonlyArray<string>;
+        force?: boolean;
+        timeoutMs?: number;
+      }): RuntimeArtifactInstallStep {
         return {
-          args: ["mise", "install", ...input.tools],
+          op: "exec",
+          command: {
+            args: ["mise", "install", ...input.tools],
+          },
         };
       },
     },
     githubReleases: {
-      installLatestBinary() {
+      installLatestBinary(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installLatestBinary"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestBinary"],
+          },
         };
       },
-      installTaggedBinary() {
+      installTaggedBinary(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installTaggedBinary"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installTaggedBinary"],
+          },
         };
       },
-      installLatestTaggedAsset() {
+      installLatestTaggedAsset(): RuntimeArtifactInstallStep {
         return {
-          args: ["github-releases.installLatestTaggedAsset"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestTaggedAsset"],
+          },
         };
       },
     },
@@ -145,7 +168,10 @@ describe("compileSlackBinding", () => {
     expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
       install: [
         {
-          args: ["github-releases.installLatestTaggedAsset"],
+          op: "exec",
+          command: {
+            args: ["github-releases.installLatestTaggedAsset"],
+          },
         },
       ],
     });

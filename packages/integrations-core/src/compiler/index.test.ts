@@ -9,6 +9,8 @@ import {
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
   type IntegrationDefinition,
+  type RuntimeArtifactInstallEntryCompat,
+  type RuntimeExecCommand,
 } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
@@ -76,6 +78,16 @@ const NoopConversationProvider = {
   }),
   interruptExecution: async () => {},
 };
+
+function expectLegacyInstallCommand(
+  entry: RuntimeArtifactInstallEntryCompat | undefined,
+): RuntimeExecCommand {
+  if (entry === undefined || !("args" in entry)) {
+    throw new Error("Expected legacy exec install command during compatibility branch.");
+  }
+
+  return entry;
+}
 
 function createDefinitionsBundle(registry: IntegrationRegistry) {
   const agentRuntimeRegistry = new AgentRuntimeRegistry();
@@ -658,6 +670,42 @@ function createTaggedGithubReleaseArtifactDefinition(): IntegrationDefinition<
   };
 }
 
+function createTypedMiseInstallArtifactDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof ConnectorBindingConfigSchema
+> {
+  return {
+    familyId: "openai",
+    variantId: "openai-default",
+    kind: "connector",
+    displayName: "OpenAI",
+    logoKey: "openai",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
+    connectionMethods: ApiKeyConnectionMethods,
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [
+        {
+          artifactKey: "typed-mise-cli",
+          name: "Typed Mise CLI",
+          lifecycle: {
+            install: [
+              {
+                op: "mise_install",
+                tools: ["node@22.0.0"],
+              },
+            ],
+          },
+        },
+      ],
+      runtimeClients: [],
+    }),
+  };
+}
+
 describe("compileRuntimePlan", () => {
   it("compiles bindings into a deterministic runtime plan", () => {
     const registry = new IntegrationRegistry();
@@ -719,11 +767,14 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
     expect(runtimePlan.artifacts[0]?.name).toBe("Codex CLI");
     expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(2);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2]).toContain("openai/codex");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[1]).toEqual({
+    const codexInstallCommand = expectLegacyInstallCommand(
+      runtimePlan.artifacts[0]?.lifecycle.install[0],
+    );
+    expect(codexInstallCommand.args[0]).toBe("sh");
+    expect(codexInstallCommand.args[1]).toBe("-euc");
+    expect(codexInstallCommand.args[2]).toContain("openai/codex");
+    expect(codexInstallCommand.timeoutMs).toBe(120_000);
+    expect(expectLegacyInstallCommand(runtimePlan.artifacts[0]?.lifecycle.install[1])).toEqual({
       args: ["echo", "binding:bind_openai_agent"],
     });
     expect(runtimePlan.artifacts[0]?.env).toEqual({
@@ -831,11 +882,14 @@ describe("compileRuntimePlan", () => {
 
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
+    const latestBinaryInstallCommand = expectLegacyInstallCommand(
+      runtimePlan.artifacts[0]?.lifecycle.install[0],
+    );
+    expect(latestBinaryInstallCommand.args[0]).toBe("sh");
+    expect(latestBinaryInstallCommand.args[1]).toBe("-euc");
+    expect(latestBinaryInstallCommand.timeoutMs).toBe(120_000);
 
-    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    const installScript = latestBinaryInstallCommand.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain(
       'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name"',
@@ -888,7 +942,8 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    const installScript = expectLegacyInstallCommand(runtimePlan.artifacts[0]?.lifecycle.install[0])
+      .args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain("release_tag=rust-v0.119.0");
     expect(installScript).toContain(
@@ -943,11 +998,14 @@ describe("compileRuntimePlan", () => {
 
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
-    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
+    const taggedAssetInstallCommand = expectLegacyInstallCommand(
+      runtimePlan.artifacts[0]?.lifecycle.install[0],
+    );
+    expect(taggedAssetInstallCommand.args[0]).toBe("sh");
+    expect(taggedAssetInstallCommand.args[1]).toBe("-euc");
+    expect(taggedAssetInstallCommand.timeoutMs).toBe(120_000);
 
-    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    const installScript = taggedAssetInstallCommand.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain(
       "https://api.github.com/repos/$repo/releases?per_page=100&page=$page",
@@ -964,6 +1022,58 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain("jira/");
     expect(installScript).toContain("jira-linux-amd64");
     expect(installScript).toContain("/usr/local/bin/jira");
+  });
+
+  it("rejects non-exec typed install steps until typed runtime-plan emission is enabled", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createTypedMiseInstallArtifactDefinition());
+
+    expect(() =>
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 12,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        definitions: createDefinitionsBundle(registry),
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "connector",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: CompilerErrorCodes.ARTIFACT_CONFLICT,
+        message: expect.stringContaining(
+          "before compiled runtime-plan emission supports typed artifact operations",
+        ),
+      }),
+    );
   });
 
   it("collects MCP servers from connectors and maps them into agent runtime files", () => {
