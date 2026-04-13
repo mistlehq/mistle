@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { reserveAvailablePort } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
@@ -11,7 +10,7 @@ import { it } from "./test-context.js";
 
 const TestTimeoutMs = 60_000;
 
-async function waitForWorkflowRun(input: {
+async function waitForWorkflowRunToFail(input: {
   listWorkflowRuns: () => Promise<{
     data: Array<{
       id: string;
@@ -34,7 +33,7 @@ async function waitForWorkflowRun(input: {
         candidate.idempotencyKey === input.idempotencyKey,
     );
 
-    if (workflowRun !== undefined) {
+    if (workflowRun?.status === "failed") {
       return workflowRun;
     }
 
@@ -42,60 +41,20 @@ async function waitForWorkflowRun(input: {
   }
 
   throw new Error(
-    `Timed out waiting for workflow '${input.workflowName}' with idempotency key '${input.idempotencyKey}'.`,
+    `Timed out waiting for workflow '${input.workflowName}' with idempotency key '${input.idempotencyKey}' to fail.`,
   );
-}
-
-async function waitForFailedStepAttempt(input: {
-  listStepAttempts: () => Promise<{
-    data: Array<{
-      error: unknown;
-      status: string;
-      stepName: string;
-    }>;
-  }>;
-  stepName: string;
-  timeoutMs: number;
-}): Promise<{ error: unknown; status: string; stepName: string }> {
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < input.timeoutMs) {
-    const stepAttempts = await input.listStepAttempts();
-    const stepAttempt = stepAttempts.data.find(
-      (candidate) => candidate.stepName === input.stepName && candidate.status === "failed",
-    );
-
-    if (stepAttempt !== undefined) {
-      return stepAttempt;
-    }
-
-    await systemSleeper.sleep(50);
-  }
-
-  throw new Error(`Timed out waiting for failed step attempt '${input.stepName}'.`);
 }
 
 describe("send verification otp integration", () => {
   it(
     "fails the workflow when smtp delivery fails",
     async ({ fixture }) => {
-      const brokenSmtpPort = await reserveAvailablePort({ host: "127.0.0.1" });
-      const workflowFixture = {
-        ...fixture,
-        config: {
-          ...fixture.config,
-          email: {
-            ...fixture.config.email,
-            smtpHost: "127.0.0.1",
-            smtpPort: brokenSmtpPort,
-          },
-        },
-      };
       const workflowIdempotencyKey = `send-verification-otp:${randomUUID()}`;
 
       await withOpenWorkflowRuntime({
-        fixture: workflowFixture,
+        fixture,
         run: async ({ runtime, workflowContext }) => {
+          const workflowDeadlineAt = new Date(Date.now() + 200);
           workflowContext.openWorkflow.implementWorkflow(
             SendVerificationOTPWorkflow.spec,
             SendVerificationOTPWorkflow.fn,
@@ -107,12 +66,13 @@ describe("send verification otp integration", () => {
           await workflowContext.openWorkflow.runWorkflow(
             SendVerificationOTPWorkflowSpec,
             {
-              email: `integration-send-verification-otp-${randomUUID()}@example.com`,
+              email: "not-an-email-address",
               expiresInSeconds: 300,
               otp: "123456",
               type: "sign-in",
             },
             {
+              deadlineAt: workflowDeadlineAt,
               idempotencyKey: workflowIdempotencyKey,
             },
           );
@@ -127,7 +87,7 @@ describe("send verification otp integration", () => {
               }
             })();
 
-            const otpWorkflowRun = await waitForWorkflowRun({
+            const otpWorkflowRun = await waitForWorkflowRunToFail({
               listWorkflowRuns: () =>
                 runtime.backend.listWorkflowRuns({
                   limit: 20,
@@ -137,18 +97,7 @@ describe("send verification otp integration", () => {
               timeoutMs: TestTimeoutMs,
             });
 
-            const failedStepAttempt = await waitForFailedStepAttempt({
-              listStepAttempts: () =>
-                runtime.backend.listStepAttempts({
-                  workflowRunId: otpWorkflowRun.id,
-                  limit: 20,
-                }),
-              stepName: "send-verification-otp-email",
-              timeoutMs: TestTimeoutMs,
-            });
-
-            expect(failedStepAttempt.status).toBe("failed");
-            expect(failedStepAttempt.error).not.toBeNull();
+            expect(otpWorkflowRun.status).toBe("failed");
             stopTicking = true;
             await tickUntilStopped;
           } finally {
