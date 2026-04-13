@@ -183,7 +183,13 @@ export function useSessionWorkbenchController(input: {
     ptyState,
     queryClient,
   });
+  const primaryRepositoryState = useSessionPrimaryRepositoryState({
+    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const branchDiffState = useSessionBranchDiff({
+    cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -193,11 +199,6 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
     stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
-  });
-  const primaryRepositoryState = useSessionPrimaryRepositoryState({
-    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-    sandboxInstanceId: input.sandboxInstanceId,
   });
   const configControl = useSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
