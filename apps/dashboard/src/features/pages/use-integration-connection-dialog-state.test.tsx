@@ -180,6 +180,7 @@ describe("useIntegrationConnectionDialogState", () => {
       const { result } = renderHook(
         () =>
           useIntegrationConnectionDialogState({
+            initialOpenInput: openAiCreateDialogInput(),
             queryKey: ["integrations"],
           }),
         {
@@ -187,9 +188,6 @@ describe("useIntegrationConnectionDialogState", () => {
         },
       );
 
-      act(() => {
-        result.current.openDialog(openAiCreateDialogInput());
-      });
       act(() => {
         result.current.onConnectionDisplayNameChange("OpenAI Personal");
       });
@@ -279,6 +277,7 @@ describe("useIntegrationConnectionDialogState", () => {
       const { result } = renderHook(
         () =>
           useIntegrationConnectionDialogState({
+            initialOpenInput: openAiCreateDialogInput(),
             queryKey: ["integrations"],
           }),
         {
@@ -286,9 +285,6 @@ describe("useIntegrationConnectionDialogState", () => {
         },
       );
 
-      act(() => {
-        result.current.openDialog(openAiCreateDialogInput());
-      });
       act(() => {
         result.current.onConnectionDisplayNameChange("OpenAI Personal");
       });
@@ -357,6 +353,7 @@ describe("useIntegrationConnectionDialogState", () => {
       const { result } = renderHook(
         () =>
           useIntegrationConnectionDialogState({
+            initialOpenInput: openAiCreateDialogInput(),
             queryKey: ["integrations"],
           }),
         {
@@ -364,9 +361,6 @@ describe("useIntegrationConnectionDialogState", () => {
         },
       );
 
-      act(() => {
-        result.current.openDialog(openAiCreateDialogInput());
-      });
       act(() => {
         result.current.onConnectionDisplayNameChange("OpenAI Personal");
       });

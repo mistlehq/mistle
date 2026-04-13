@@ -47,54 +47,54 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+      () =>
+        useIntegrationConnectionDialogState({
+          initialOpenInput: {
+            mode: "create",
+            methods: [
+              {
+                id: IntegrationConnectionMethodIds.API_KEY,
+                label: "API key",
+                kind: "form",
+                secretFields: [
+                  {
+                    name: "apiKey",
+                    label: "API key",
+                    inputType: "password",
+                  },
+                ],
+              },
+              {
+                id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+                label: "GitHub App installation",
+                kind: "form",
+                secretFields: [
+                  {
+                    name: "appPrivateKeyPem",
+                    label: "App private key PEM",
+                    inputType: "textarea",
+                  },
+                  {
+                    name: "webhookSecret",
+                    label: "Webhook secret",
+                    inputType: "password",
+                  },
+                ],
+              },
+            ],
+            targetConfig: {
+              api_base_url: "https://api.github.com",
+              web_base_url: "https://github.com",
+            },
+            targetDisplayName: "GitHub",
+            targetFamilyId: "github",
+            targetKey: "github-cloud",
+            targetVariantId: "github-cloud",
+          },
+          queryKey: ["integration-directory"],
+        }),
       { wrapper },
     );
-
-    act(() => {
-      result.current.openDialog({
-        mode: "create",
-        methods: [
-          {
-            id: IntegrationConnectionMethodIds.API_KEY,
-            label: "API key",
-            kind: "form",
-            secretFields: [
-              {
-                name: "apiKey",
-                label: "API key",
-                inputType: "password",
-              },
-            ],
-          },
-          {
-            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-            label: "GitHub App installation",
-            kind: "form",
-            secretFields: [
-              {
-                name: "appPrivateKeyPem",
-                label: "App private key PEM",
-                inputType: "textarea",
-              },
-              {
-                name: "webhookSecret",
-                label: "Webhook secret",
-                inputType: "password",
-              },
-            ],
-          },
-        ],
-        targetConfig: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-        targetDisplayName: "GitHub",
-        targetFamilyId: "github",
-        targetKey: "github-cloud",
-        targetVariantId: "github-cloud",
-      });
-    });
 
     expect(result.current.methodId).toBe("");
     expect(result.current.configForm).toEqual({
@@ -108,54 +108,54 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
     const { result } = renderHook(
-      () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+      () =>
+        useIntegrationConnectionDialogState({
+          initialOpenInput: {
+            mode: "create",
+            methods: [
+              {
+                id: IntegrationConnectionMethodIds.API_KEY,
+                label: "API key",
+                kind: "form",
+                secretFields: [
+                  {
+                    name: "apiKey",
+                    label: "API key",
+                    inputType: "password",
+                  },
+                ],
+              },
+              {
+                id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+                label: "GitHub App installation",
+                kind: "form",
+                secretFields: [
+                  {
+                    name: "appPrivateKeyPem",
+                    label: "App private key PEM",
+                    inputType: "textarea",
+                  },
+                  {
+                    name: "webhookSecret",
+                    label: "Webhook secret",
+                    inputType: "password",
+                  },
+                ],
+              },
+            ],
+            targetConfig: {
+              api_base_url: "https://api.github.com",
+              web_base_url: "https://github.com",
+            },
+            targetDisplayName: "GitHub",
+            targetFamilyId: "github",
+            targetKey: "github-cloud",
+            targetVariantId: "github-cloud",
+          },
+          queryKey: ["integration-directory"],
+        }),
       { wrapper },
     );
-
-    act(() => {
-      result.current.openDialog({
-        mode: "create",
-        methods: [
-          {
-            id: IntegrationConnectionMethodIds.API_KEY,
-            label: "API key",
-            kind: "form",
-            secretFields: [
-              {
-                name: "apiKey",
-                label: "API key",
-                inputType: "password",
-              },
-            ],
-          },
-          {
-            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-            label: "GitHub App installation",
-            kind: "form",
-            secretFields: [
-              {
-                name: "appPrivateKeyPem",
-                label: "App private key PEM",
-                inputType: "textarea",
-              },
-              {
-                name: "webhookSecret",
-                label: "Webhook secret",
-                inputType: "password",
-              },
-            ],
-          },
-        ],
-        targetConfig: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-        targetDisplayName: "GitHub",
-        targetFamilyId: "github",
-        targetKey: "github-cloud",
-        targetVariantId: "github-cloud",
-      });
-    });
 
     act(() => {
       result.current.onConnectionDisplayNameChange("GitHub connection");
@@ -214,38 +214,41 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       );
       const { result } = renderHook(
-        () => useIntegrationConnectionDialogState({ queryKey: ["integration-directory"] }),
+        () =>
+          useIntegrationConnectionDialogState({
+            initialOpenInput: {
+              mode: "update",
+              connectionConfig: {
+                connection_method: IntegrationConnectionMethodIds.API_KEY,
+              },
+              connectionId: "icn_123",
+              connectionDisplayName: "Existing connection",
+              currentMethod: {
+                id: IntegrationConnectionMethodIds.API_KEY,
+                label: "API key",
+                kind: "form",
+                secretFields: [
+                  {
+                    name: "apiKey",
+                    label: "API key",
+                    inputType: "password",
+                  },
+                ],
+              },
+              targetConfig: {
+                api_base_url: "https://api.openai.com",
+              },
+              targetDisplayName: "OpenAI",
+              targetFamilyId: "openai",
+              targetKey: "openai-default",
+              targetVariantId: "openai-default",
+            },
+            queryKey: ["integration-directory"],
+          }),
         { wrapper },
       );
 
       act(() => {
-        result.current.openDialog({
-          mode: "update",
-          connectionConfig: {
-            connection_method: IntegrationConnectionMethodIds.API_KEY,
-          },
-          connectionId: "icn_123",
-          connectionDisplayName: "Existing connection",
-          currentMethod: {
-            id: IntegrationConnectionMethodIds.API_KEY,
-            label: "API key",
-            kind: "form",
-            secretFields: [
-              {
-                name: "apiKey",
-                label: "API key",
-                inputType: "password",
-              },
-            ],
-          },
-          targetConfig: {
-            api_base_url: "https://api.openai.com",
-          },
-          targetDisplayName: "OpenAI",
-          targetFamilyId: "openai",
-          targetKey: "openai-default",
-          targetVariantId: "openai-default",
-        });
         result.current.onConnectionDisplayNameChange("Renamed connection");
         result.current.onSecretChange("apiKey", "   ");
       });

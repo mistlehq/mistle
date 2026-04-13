@@ -36,7 +36,7 @@ type IntegrationConnectionSubmitSuccessInput = {
 };
 
 type UseIntegrationConnectionDialogStateInput = {
-  initialOpenInput?: OpenIntegrationConnectionDialogInput;
+  initialOpenInput: OpenIntegrationConnectionDialogInput;
   onClose?: () => void | Promise<void>;
   onSubmitSuccess?: (input: IntegrationConnectionSubmitSuccessInput) => void | Promise<void>;
   queryKey: readonly unknown[];
@@ -67,43 +67,17 @@ function resolveSelectedMethod(input: {
 
 const DeviceAuthorizationPollFloorMs = 2_000;
 
-function createInitialDialogState(input: {
-  initialOpenInput?: OpenIntegrationConnectionDialogInput;
-}): {
-  dialog: IntegrationConnectionDialogState | null;
-  draft: ReturnType<typeof createClosedIntegrationConnectionDialogDraft>;
-} {
-  if (input.initialOpenInput === undefined) {
-    return {
-      dialog: null,
-      draft: createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
-    };
-  }
-
-  const nextState = createOpenIntegrationConnectionDialogState({
+export function useIntegrationConnectionDialogState(
+  input: UseIntegrationConnectionDialogStateInput,
+) {
+  const queryClient = useQueryClient();
+  const initialState = createOpenIntegrationConnectionDialogState({
     defaultMethodId:
       input.initialOpenInput.mode === "create"
         ? resolveDefaultMethodId(input.initialOpenInput.methods)
         : input.initialOpenInput.currentMethod.id,
     openInput: input.initialOpenInput,
   });
-
-  return {
-    dialog: nextState.dialog,
-    draft: nextState.draft,
-  };
-}
-
-export function useIntegrationConnectionDialogState(
-  input: UseIntegrationConnectionDialogStateInput,
-) {
-  const queryClient = useQueryClient();
-  const initialState =
-    input.initialOpenInput === undefined
-      ? createInitialDialogState({})
-      : createInitialDialogState({
-          initialOpenInput: input.initialOpenInput,
-        });
   const [dialog, setDialog] = useState<IntegrationConnectionDialogState | null>(
     initialState.dialog,
   );
@@ -173,19 +147,6 @@ export function useIntegrationConnectionDialogState(
     setDeviceAuthorizationPending(null);
     setDraft(createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY));
     void input.onClose?.();
-  }
-
-  function openDialog(openInput: OpenIntegrationConnectionDialogInput): void {
-    const nextState = createOpenIntegrationConnectionDialogState({
-      defaultMethodId:
-        openInput.mode === "create"
-          ? resolveDefaultMethodId(openInput.methods)
-          : openInput.currentMethod.id,
-      openInput,
-    });
-    setDialog(nextState.dialog);
-    setDeviceAuthorizationPending(null);
-    setDraft(nextState.draft);
   }
 
   function closeDialogWithoutCancellingPendingAttempt(): void {
@@ -477,7 +438,6 @@ export function useIntegrationConnectionDialogState(
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
     }),
-    openDialog,
     closeDialog: (): void => {
       if (deviceAuthorizationPending !== null) {
         void cancelPendingDeviceAuthorizationAndClose().catch((cancelError: unknown) => {
