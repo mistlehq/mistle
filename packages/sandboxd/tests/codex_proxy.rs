@@ -18,6 +18,7 @@ use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(100);
+const LIVE_RETAIN_FAILURE_ATTEMPTS: usize = 50;
 
 #[test]
 fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
@@ -1087,24 +1088,26 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
             ))
             .expect("turn/start success should send");
 
-        let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
-        manager_socket
-            .send(Message::Text(
-                json!({
-                    "id": retain_request["id"],
-                    "error": {
-                        "code": -32600,
-                        "message": "no rollout found for thread id thr_failure"
-                    }
-                })
-                .to_string()
-                .into(),
-            ))
-            .expect("manager retain failure should send");
+        for _ in 0..LIVE_RETAIN_FAILURE_ATTEMPTS {
+            let retain_request = read_json_text_message(&mut manager_socket);
+            assert_eq!(
+                retain_request["method"],
+                Value::String("thread/resume".to_string())
+            );
+            manager_socket
+                .send(Message::Text(
+                    json!({
+                        "id": retain_request["id"],
+                        "error": {
+                            "code": -32600,
+                            "message": "no rollout found for thread id thr_failure"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("manager retain failure should send");
+        }
         server_shutdown_receiver
             .recv()
             .expect("test should signal raw server shutdown");

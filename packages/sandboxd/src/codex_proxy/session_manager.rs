@@ -33,6 +33,9 @@ const MISSING_THREAD_MESSAGES: [&str; 4] = [
     "references missing provider conversation",
     "invalid thread id",
 ];
+// Codex can acknowledge turn/start before a second subscriber can resume the new thread.
+const LIVE_RETAIN_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
+const LIVE_RETAIN_MAX_ATTEMPTS: usize = 50;
 
 #[derive(Clone)]
 pub struct CodexSessionManagerHandle {
@@ -363,7 +366,14 @@ async fn handle_retain_thread(
     retained_thread.retain_reasons.insert(reason);
     retained_thread.subscription_state = ThreadSubscriptionState::Requested;
 
-    match resume_thread_subscription(socket, manager_state, shutdown_receiver, thread_id).await {
+    match issue_thread_resume_with_live_retain_retry(
+        socket,
+        manager_state,
+        shutdown_receiver,
+        thread_id,
+    )
+    .await
+    {
         Ok((status, mut pending_updates)) => {
             if let Some(retained_thread) = manager_state.retained_threads.get_mut(thread_id) {
                 retained_thread.last_status = Some(status.clone());
@@ -715,6 +725,36 @@ async fn read_loaded_threads(
     Ok(threads)
 }
 
+async fn issue_thread_resume_with_live_retain_retry(
+    socket: &mut RawCodexSocket,
+    manager_state: &mut CodexSessionManagerState,
+    shutdown_receiver: &mut watch::Receiver<bool>,
+    thread_id: &str,
+) -> Result<(CodexThreadStatus, Vec<(String, CodexThreadStatus)>), CommandRequestError> {
+    for attempt in 0..LIVE_RETAIN_MAX_ATTEMPTS {
+        match resume_thread_subscription(socket, manager_state, shutdown_receiver, thread_id).await {
+            Ok(result) => return Ok(result),
+            Err(error)
+                if should_retry_live_retain_thread_resume(&error)
+                    && attempt + 1 < LIVE_RETAIN_MAX_ATTEMPTS
+                    && !*shutdown_receiver.borrow() =>
+            {
+                tokio::select! {
+                    _ = shutdown_receiver.changed() => {
+                        return Err(CommandRequestError::Rejected {
+                            message: "shutdown requested during live retain retry".to_string(),
+                        });
+                    }
+                    _ = tokio::time::sleep(LIVE_RETAIN_RETRY_INTERVAL) => {}
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    unreachable!("live retain retry loop should return before exhausting attempts");
+}
+
 async fn resume_thread_subscription(
     socket: &mut RawCodexSocket,
     manager_state: &mut CodexSessionManagerState,
@@ -808,6 +848,16 @@ fn is_release_success_message(message: &str) -> bool {
     RELEASE_SUCCESS_MESSAGES
         .iter()
         .any(|pattern| normalized.contains(pattern))
+}
+
+fn should_retry_live_retain_thread_resume(error: &CommandRequestError) -> bool {
+    match error {
+        CommandRequestError::Rejected { message } => {
+            is_missing_thread_message(message)
+                || (message.contains("rollout at ") && message.ends_with(" is empty"))
+        }
+        CommandRequestError::Transport(_) => false,
+    }
 }
 
 enum CommandRequestError {
