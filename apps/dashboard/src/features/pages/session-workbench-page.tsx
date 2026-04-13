@@ -94,9 +94,12 @@ function SessionWorkbenchPageContent(input: {
         repositoryControl={{
           ariaLabel: "Primary repository",
           disabled:
-            !workbench.connectionReadiness.canConnect || workbench.primaryRepositoryState.isLoading,
+            !workbench.connectionReadiness.canConnect ||
+            workbench.primaryRepositoryState.isLoading ||
+            workbench.primaryRepositoryControlState.isSwitching ||
+            workbench.primaryRepositoryControlState.disabledReason !== null,
           onValueChange: (nextValue) => {
-            workbench.primaryRepositoryState.setSelectedRepositoryPath(
+            void workbench.primaryRepositoryControlState.switchPrimaryRepository(
               nextValue === SessionRepositoryNoneValue ? null : nextValue,
             );
           },
@@ -105,12 +108,15 @@ function SessionWorkbenchPageContent(input: {
             workbench.primaryRepositoryState.selectedRepositoryPath ?? SessionRepositoryNoneValue,
           title:
             workbench.primaryRepositoryState.errorMessage ??
+            workbench.primaryRepositoryControlState.disabledReason ??
             (!workbench.connectionReadiness.canConnect
               ? (workbench.stoppedSessionMessage ??
                 "Primary repository is available only when the sandbox is running.")
-              : workbench.primaryRepositoryState.isLoading
-                ? "Loading repositories from the active sandbox."
-                : "Primary repository"),
+              : workbench.primaryRepositoryControlState.isSwitching
+                ? "Switching the active chat thread for the selected repository."
+                : workbench.primaryRepositoryState.isLoading
+                  ? "Loading repositories from the active sandbox."
+                  : "Primary repository"),
         }}
         status={{
           kind: headerStatusKind,
@@ -154,7 +160,9 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryRepositoryState.isLoading,
       workbench.primaryRepositoryState.options,
       workbench.primaryRepositoryState.selectedRepositoryPath,
-      workbench.primaryRepositoryState.setSelectedRepositoryPath,
+      workbench.primaryRepositoryControlState.disabledReason,
+      workbench.primaryRepositoryControlState.isSwitching,
+      workbench.primaryRepositoryControlState.switchPrimaryRepository,
       workbench.sandboxLifecycleStatus,
       workbench.primaryPanelState.canEnterCli,
       workbench.primaryPanelState.disabledReason,
