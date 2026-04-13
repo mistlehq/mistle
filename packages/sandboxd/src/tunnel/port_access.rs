@@ -395,7 +395,9 @@ mod tests {
     use tokio::runtime::Builder;
 
     use crate::time::SystemClock;
-    use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
+    use crate::tunnel::port_access::{
+        PortAccessAuthorizeDecision, authorize_target_port, bind_addresses_for_snapshot_port,
+    };
     use crate::tunnel::protocol::PortAccessTarget;
 
     fn fixture_path(script_name: &str) -> PathBuf {
