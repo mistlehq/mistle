@@ -62,6 +62,38 @@ export type ReconcileSandboxInstanceInput = {
 };
 export type ReconcileSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/reconcile"]["post"]["responses"]["200"]["content"]["application/json"];
+export type PutSandboxInstanceDeadlineInput = {
+  sandboxInstanceId: string;
+  kind: "idle" | "disconnect";
+  ownerLeaseId: string;
+  dueAt: string;
+};
+const PutSandboxInstanceDeadlineAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    kind: z.enum(["idle", "disconnect"]),
+    generation: z.number().int().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+export type PutSandboxInstanceDeadlineAcceptedResponse = z.infer<
+  typeof PutSandboxInstanceDeadlineAcceptedResponseSchema
+>;
+export type DeleteSandboxInstanceDeadlineInput = {
+  sandboxInstanceId: string;
+  kind: "idle" | "disconnect";
+};
+const DeleteSandboxInstanceDeadlineOkResponseSchema = z
+  .object({
+    status: z.literal("ok"),
+    sandboxInstanceId: z.string().min(1),
+    kind: z.enum(["idle", "disconnect"]),
+  })
+  .strict();
+export type DeleteSandboxInstanceDeadlineOkResponse = z.infer<
+  typeof DeleteSandboxInstanceDeadlineOkResponseSchema
+>;
 export type PatchSandboxInstanceTitleInput = {
   organizationId: string;
   instanceId: string;
@@ -125,6 +157,12 @@ export type DataPlaneSandboxInstancesClient = {
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
+  putSandboxInstanceDeadline: (
+    input: PutSandboxInstanceDeadlineInput,
+  ) => Promise<PutSandboxInstanceDeadlineAcceptedResponse>;
+  deleteSandboxInstanceDeadline: (
+    input: DeleteSandboxInstanceDeadlineInput,
+  ) => Promise<DeleteSandboxInstanceDeadlineOkResponse>;
   patchSandboxInstanceTitle: (
     input: PatchSandboxInstanceTitleInput,
   ) => Promise<PatchSandboxInstanceTitleResponse>;
@@ -158,13 +196,24 @@ function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
 function createClientError(input: {
   status: number;
   error: unknown;
-  operation: "start" | "resume" | "stop" | "reconcile" | "patch" | "read" | "list";
+  operation:
+    | "start"
+    | "resume"
+    | "stop"
+    | "reconcile"
+    | "putDeadline"
+    | "deleteDeadline"
+    | "patch"
+    | "read"
+    | "list";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
     resume: "resume",
     stop: "stop",
     reconcile: "reconcile",
+    putDeadline: "put deadline",
+    deleteDeadline: "delete deadline",
     patch: "patch",
     read: "read",
     list: "list",
@@ -365,6 +414,74 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "reconcile",
+      });
+    },
+
+    async putSandboxInstanceDeadline(putDeadlineInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: putDeadlineInput.sandboxInstanceId,
+          suffix: `/deadlines/${encodeURIComponent(putDeadlineInput.kind)}`,
+        }),
+        {
+          method: "PUT",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            ownerLeaseId: putDeadlineInput.ownerLeaseId,
+            dueAt: putDeadlineInput.dueAt,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = PutSandboxInstanceDeadlineAcceptedResponseSchema.parse(
+          await response.json(),
+        );
+
+        return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "putDeadline",
+      });
+    },
+
+    async deleteSandboxInstanceDeadline(deleteDeadlineInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: deleteDeadlineInput.sandboxInstanceId,
+          suffix: `/deadlines/${encodeURIComponent(deleteDeadlineInput.kind)}`,
+        }),
+        {
+          method: "DELETE",
+          headers: {
+            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
+          },
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = DeleteSandboxInstanceDeadlineOkResponseSchema.parse(
+          await response.json(),
+        );
+
+        return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "deleteDeadline",
       });
     },
 
