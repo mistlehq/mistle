@@ -288,7 +288,26 @@ export function resolveTerminalRecoveryMessage(input: {
   }
 }
 
+export function buildTerminalPtyOpenInput(input: {
+  cwd: string | null;
+  sandboxInstanceId: string;
+}): {
+  sandboxInstanceId: string;
+  ptySessionId: "terminal";
+  cols: number;
+  rows: number;
+  cwd?: string;
+} {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    ptySessionId: "terminal",
+    ...INITIAL_PTY_DIMENSIONS,
+    ...(input.cwd === null ? {} : { cwd: input.cwd }),
+  };
+}
+
 type SessionTerminalPanelProps = {
+  cwd: string | null;
   onHide: () => void;
   isVisible: boolean;
   isConnectionReady: boolean;
@@ -299,6 +318,7 @@ type SessionTerminalPanelProps = {
 };
 
 export function SessionTerminalPanel({
+  cwd,
   onHide,
   isVisible,
   isConnectionReady,
@@ -353,11 +373,12 @@ export function SessionTerminalPanel({
       type: "reopen_requested",
     });
 
-    void openPty({
-      sandboxInstanceId,
-      ptySessionId: "terminal",
-      ...INITIAL_PTY_DIMENSIONS,
-    })
+    void openPty(
+      buildTerminalPtyOpenInput({
+        cwd,
+        sandboxInstanceId,
+      }),
+    )
       .catch((error) => {
         dispatchRecoveryEvent({
           type: "reopen_failed",
@@ -373,7 +394,7 @@ export function SessionTerminalPanel({
           sandboxStatus,
         });
       });
-  }, [lifecycle.state, openPty, recovery, sandboxInstanceId, sandboxStatus]);
+  }, [cwd, lifecycle.state, openPty, recovery, sandboxInstanceId, sandboxStatus]);
 
   const terminalRecoveryMessage = resolveTerminalRecoveryMessage({
     recovery,
@@ -412,14 +433,15 @@ export function SessionTerminalPanel({
     }
 
     hasAttemptedAutoOpenRef.current = true;
-    void openPty({
-      sandboxInstanceId,
-      ptySessionId: "terminal",
-      ...INITIAL_PTY_DIMENSIONS,
-    }).catch(() => {
+    void openPty(
+      buildTerminalPtyOpenInput({
+        cwd,
+        sandboxInstanceId,
+      }),
+    ).catch(() => {
       // Error state is surfaced through lifecycle state and page alerts.
     });
-  }, [isConnectionReady, isVisible, lifecycle.state, openPty, sandboxInstanceId]);
+  }, [cwd, isConnectionReady, isVisible, lifecycle.state, openPty, sandboxInstanceId]);
 
   async function handleHideTerminal(): Promise<void> {
     onHide();

@@ -104,6 +104,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
     alert: null,
     bottomPanel: (
       <SessionTerminalPanel
+        cwd={null}
         isConnectionReady={true}
         isVisible={isTerminalVisible}
         onHide={() => {

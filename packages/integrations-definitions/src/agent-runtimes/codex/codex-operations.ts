@@ -51,6 +51,7 @@ const ThreadListResponseSchema = z.looseObject({
       id: z.string().min(1),
       name: z.string().nullable().optional(),
       preview: z.string().optional(),
+      cwd: z.string().min(1),
       updatedAt: z.number().optional(),
       createdAt: z.number().optional(),
     }),
@@ -131,6 +132,7 @@ export type CodexThreadSummary = {
   id: string;
   name: string | null;
   preview: string | null;
+  cwd: string;
   updatedAt: number | null;
   createdAt: number | null;
 };
@@ -200,14 +202,13 @@ export function buildCodexTurnInputItems(input: {
 
 export async function startCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
+  cwd?: string;
   model?: string;
 }): Promise<{ threadId: string; response: unknown }> {
-  const requestParameters =
-    input.model === undefined
-      ? {}
-      : {
-          model: input.model,
-        };
+  const requestParameters = {
+    ...(input.model === undefined ? {} : { model: input.model }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+  };
   const response = await input.rpcClient.call("thread/start", requestParameters);
 
   const parsedResponse = ThreadStartResponseSchema.safeParse(response);
@@ -320,9 +321,11 @@ export async function readCodexThread(input: {
 
 export async function listCodexThreads(input: {
   rpcClient: CodexJsonRpcClient;
+  cwd?: string | null;
   cursor?: string | null;
   limit?: number;
   archived?: boolean;
+  sortKey?: "created_at" | "updated_at";
 }): Promise<{
   threads: readonly CodexThreadSummary[];
   nextCursor: string | null;
@@ -332,6 +335,8 @@ export async function listCodexThreads(input: {
     cursor: input.cursor ?? null,
     ...(input.limit === undefined ? {} : { limit: input.limit }),
     ...(input.archived === undefined ? {} : { archived: input.archived }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.sortKey === undefined ? {} : { sortKey: input.sortKey }),
     sourceKinds: AllCodexThreadSourceKinds,
   });
 
@@ -347,6 +352,7 @@ export async function listCodexThreads(input: {
       id: thread.id,
       name: thread.name ?? null,
       preview: thread.preview ?? null,
+      cwd: thread.cwd,
       updatedAt: thread.updatedAt ?? null,
       createdAt: thread.createdAt ?? null,
     })),

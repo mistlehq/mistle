@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TerminalRecoveryState } from "./session-terminal-panel.js";
 import {
+  buildTerminalPtyOpenInput,
   reduceTerminalRecoveryState,
   resolveTerminalRecoveryMessage,
   shouldAttemptTerminalReconnect,
@@ -13,6 +14,37 @@ const ResetInfo = {
   code: "bootstrap_disconnected",
   message: "Sandbox bootstrap tunnel disconnected.",
 } as const;
+
+describe("buildTerminalPtyOpenInput", () => {
+  it("includes the selected repository path as cwd", () => {
+    expect(
+      buildTerminalPtyOpenInput({
+        cwd: "/root/acme/repo-2",
+        sandboxInstanceId: "sandbox_123",
+      }),
+    ).toEqual({
+      cols: 120,
+      cwd: "/root/acme/repo-2",
+      ptySessionId: "terminal",
+      rows: 20,
+      sandboxInstanceId: "sandbox_123",
+    });
+  });
+
+  it("omits cwd when no repository is selected", () => {
+    expect(
+      buildTerminalPtyOpenInput({
+        cwd: null,
+        sandboxInstanceId: "sandbox_123",
+      }),
+    ).toEqual({
+      cols: 120,
+      ptySessionId: "terminal",
+      rows: 20,
+      sandboxInstanceId: "sandbox_123",
+    });
+  });
+});
 
 describe("shouldAutoOpenTerminal", () => {
   it("allows auto-open for running sandboxes", () => {
