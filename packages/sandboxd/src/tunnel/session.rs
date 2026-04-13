@@ -19,10 +19,19 @@ use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
 use base64::Engine;
-use futures_util::{SinkExt, StreamExt};
+use bytes::Bytes;
+use futures_util::{FutureExt, SinkExt, StreamExt};
+use http_body_util::{BodyExt, Empty};
+use hyper::header::AUTHORIZATION;
+use hyper::{Request, StatusCode};
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use hyper_util::client::legacy::Client;
+use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::rt::TokioExecutor;
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::net::{TcpStream, lookup_host};
 use tokio::runtime::Builder;
@@ -97,6 +106,7 @@ const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
+const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
 #[derive(Debug)]
@@ -201,6 +211,24 @@ enum ConnectedTunnelSessionOutcome {
     RestartRequired,
 }
 
+struct ConnectedTunnelSessionResult {
+    outcome: ConnectedTunnelSessionOutcome,
+    startup_completed: bool,
+}
+
+type TunnelExchangeHttpClient = Client<HttpsConnector<HttpConnector>, Empty<Bytes>>;
+
+struct TunnelExchangeSuccess {
+    bootstrap_token: String,
+    tunnel_exchange_token: String,
+}
+
+enum TunnelExchangeOutcome {
+    Success(TunnelExchangeSuccess),
+    Retryable(String),
+    Terminal(String),
+}
+
 enum TunnelWriterMessage {
     Text(String),
     Binary(Vec<u8>),
@@ -251,6 +279,13 @@ struct PendingExecOpenState {
     child_pid: Arc<Mutex<Option<u32>>>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TunnelExchangeResponse {
+    bootstrap_token: String,
+    tunnel_exchange_token: String,
+}
+
 struct ExecCommandResult {
     exit_code: i32,
     stdout: String,
@@ -274,7 +309,7 @@ impl TunnelSession {
         fs::create_dir_all(&attachment_root)
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 
-        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let shutdown_requested = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (startup_result_sender, startup_result_receiver) = std::sync::mpsc::channel();
         let thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
@@ -293,6 +328,7 @@ impl TunnelSession {
             };
             let connected_url = startup_input.tunnel_gateway_ws_url.clone();
             let bootstrap_token = startup_input.bootstrap_token.clone();
+            let tunnel_exchange_token = startup_input.tunnel_exchange_token.clone();
             move || match panic::catch_unwind(AssertUnwindSafe(move || {
                 let runtime_builder = Builder::new_multi_thread()
                     .worker_threads(2)
@@ -308,6 +344,7 @@ impl TunnelSession {
                         runtime,
                         &connected_url,
                         &bootstrap_token,
+                        &tunnel_exchange_token,
                         startup_result_sender,
                     )
                     .await;
@@ -440,35 +477,12 @@ async fn run_tunnel_supervisor(
     runtime: TunnelSessionRuntime,
     gateway_ws_url: &str,
     bootstrap_token: &str,
+    tunnel_exchange_token: &str,
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
-    match run_connected_tunnel_session(
-        runtime,
-        gateway_ws_url,
-        bootstrap_token,
-        startup_result_sender,
-    )
-    .await?
+    let initial_connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
+    let (bootstrap_socket, _) = match connect_bootstrap_websocket(initial_connected_url.as_str()).await
     {
-        ConnectedTunnelSessionOutcome::ShutdownRequested => {
-            eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
-            Ok(())
-        }
-        ConnectedTunnelSessionOutcome::RestartRequired => {
-            eprintln!("sandboxd bootstrap connected session requested restart");
-            Ok(())
-        }
-    }
-}
-
-async fn run_connected_tunnel_session(
-    runtime: TunnelSessionRuntime,
-    gateway_ws_url: &str,
-    bootstrap_token: &str,
-    startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
-) -> Result<ConnectedTunnelSessionOutcome, TunnelSessionError> {
-    let connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
-    let (bootstrap_socket, _) = match connect_bootstrap_websocket(connected_url.as_str()).await {
         Ok(value) => value,
         Err(startup_error) => {
             eprintln!("sandboxd initial tunnel connect failed: {startup_error}");
@@ -478,6 +492,90 @@ async fn run_connected_tunnel_session(
             return Err(startup_error);
         }
     };
+    let mut current_tunnel_exchange_token = tunnel_exchange_token.to_string();
+
+    let mut session_result = run_connected_tunnel_session_catching_panics(
+        &runtime,
+        bootstrap_socket,
+        Some(&startup_result_sender),
+    )
+    .await;
+    if !session_result.startup_completed {
+        return Ok(());
+    }
+    let token_exchange_url = resolve_tunnel_exchange_url(gateway_ws_url)?;
+    let tunnel_exchange_client = build_tunnel_exchange_http_client()?;
+
+    loop {
+        match session_result.outcome {
+            ConnectedTunnelSessionOutcome::ShutdownRequested => {
+                eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
+                return Ok(());
+            }
+            ConnectedTunnelSessionOutcome::RestartRequired => {
+                eprintln!("sandboxd bootstrap connected session requested restart");
+            }
+        }
+
+        let Some(reconnected_socket) = reconnect_bootstrap_tunnel(
+            &runtime,
+            &tunnel_exchange_client,
+            token_exchange_url.as_str(),
+            gateway_ws_url,
+            &mut current_tunnel_exchange_token,
+        )
+        .await?
+        else {
+            return Ok(());
+        };
+
+        session_result =
+            run_connected_tunnel_session_catching_panics(&runtime, reconnected_socket, None).await;
+    }
+}
+
+async fn run_connected_tunnel_session_catching_panics(
+    runtime: &TunnelSessionRuntime,
+    bootstrap_socket: TunnelWebSocket,
+    startup_result_sender: Option<&std::sync::mpsc::Sender<Result<(), TunnelSessionError>>>,
+) -> ConnectedTunnelSessionResult {
+    let startup_completed = Arc::new(AtomicBool::new(startup_result_sender.is_none()));
+    match AssertUnwindSafe(run_connected_tunnel_session(
+        runtime,
+        bootstrap_socket,
+        startup_result_sender,
+        startup_completed.as_ref(),
+    ))
+    .catch_unwind()
+    .await
+    {
+        Ok(result) => result,
+        Err(payload) => {
+            eprintln!(
+                "sandboxd bootstrap connected session panicked and will restart: {}",
+                format_panic_payload(payload.as_ref())
+            );
+            let startup_completed = startup_completed.load(Ordering::Relaxed);
+            if let Some(startup_result_sender) = startup_result_sender
+                && !startup_completed
+            {
+                let _ = startup_result_sender.send(Err(TunnelSessionError::SessionPanicked));
+            }
+            mark_tunnel_disconnected(runtime);
+            ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                startup_completed,
+            }
+        }
+    }
+}
+
+async fn run_connected_tunnel_session(
+    runtime: &TunnelSessionRuntime,
+    bootstrap_socket: TunnelWebSocket,
+    startup_result_sender: Option<&std::sync::mpsc::Sender<Result<(), TunnelSessionError>>>,
+    startup_completed: &AtomicBool,
+) -> ConnectedTunnelSessionResult {
     let (tunnel_writer_sender, tunnel_writer_receiver) = mpsc::unbounded_channel();
     let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
     let _bootstrap_socket_task = spawn_bootstrap_socket_task(
@@ -503,24 +601,42 @@ async fn run_connected_tunnel_session(
         pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
     };
-    send_telemetry_frames(
-        &tunnel_writer_sender,
-        session_state
-            .telemetry_relay
-            .attach_tunnel_connection()
-            .map_err(|error| TunnelSessionError::AttachTelemetry(error.to_string()))?,
-    )?;
-    runtime
-        .keepalive_manager
-        .lock()
-        .expect("keepalive manager lock should not be poisoned")
-        .on_tunnel_connected(runtime.clock.as_ref());
-    runtime
-        .runtime_readiness_manager
-        .lock()
-        .expect("runtime readiness manager lock should not be poisoned")
-        .on_tunnel_connected();
-    let _ = startup_result_sender.send(Ok(()));
+    let telemetry_frames = match session_state.telemetry_relay.attach_tunnel_connection() {
+        Ok(frames) => frames,
+        Err(error) => {
+            let error = TunnelSessionError::AttachTelemetry(error.to_string());
+            eprintln!("sandboxd bootstrap connected session failed before entering the event loop: {error}");
+            mark_tunnel_disconnected(runtime);
+            if let Some(startup_result_sender) = startup_result_sender {
+                let _ = startup_result_sender.send(Err(error));
+            }
+            return ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                startup_completed: false,
+            };
+        }
+    };
+    match send_telemetry_frames(&tunnel_writer_sender, telemetry_frames) {
+        Ok(()) => {
+            mark_tunnel_connected(runtime);
+            if let Some(startup_result_sender) = startup_result_sender {
+                let _ = startup_result_sender.send(Ok(()));
+            }
+            startup_completed.store(true, Ordering::Relaxed);
+        }
+        Err(error) => {
+            eprintln!("sandboxd bootstrap connected session failed before entering the event loop: {error}");
+            mark_tunnel_disconnected(runtime);
+            if let Some(startup_result_sender) = startup_result_sender {
+                let _ = startup_result_sender.send(Err(error));
+            }
+            return ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                startup_completed: false,
+            };
+        }
+    }
+    let startup_completed = startup_completed.load(Ordering::Relaxed);
 
     let loop_context = TunnelSessionLoopContext {
         agent_endpoint_url: runtime.agent_endpoint_url.as_deref(),
@@ -540,9 +656,30 @@ async fn run_connected_tunnel_session(
                 .expect("keepalive manager lock should not be poisoned")
                 .take_publishable_state(loop_context.clock);
             if let Some(state) = publishable_state {
-                let payload =
-                    serde_json::to_string(&state).map_err(TunnelSessionError::PublishKeepalive)?;
-                write_tunnel_text(&tunnel_writer_sender, payload)?;
+                let payload = match serde_json::to_string(&state) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        eprintln!(
+                            "sandboxd bootstrap connected session will restart after error: {}",
+                            TunnelSessionError::PublishKeepalive(error)
+                        );
+                        mark_tunnel_disconnected(runtime);
+                        return ConnectedTunnelSessionResult {
+                            outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                            startup_completed,
+                        };
+                    }
+                };
+                if let Err(error) = write_tunnel_text(&tunnel_writer_sender, payload) {
+                    eprintln!(
+                        "sandboxd bootstrap connected session will restart after error: {error}"
+                    );
+                    mark_tunnel_disconnected(runtime);
+                    return ConnectedTunnelSessionResult {
+                        outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                        startup_completed,
+                    };
+                }
             }
         }
         {
@@ -552,9 +689,30 @@ async fn run_connected_tunnel_session(
                 .expect("runtime readiness manager lock should not be poisoned")
                 .take_publishable_state();
             if let Some(state) = publishable_state {
-                let payload = serde_json::to_string(&state)
-                    .map_err(TunnelSessionError::PublishRuntimeReady)?;
-                write_tunnel_text(&tunnel_writer_sender, payload)?;
+                let payload = match serde_json::to_string(&state) {
+                    Ok(payload) => payload,
+                    Err(error) => {
+                        eprintln!(
+                            "sandboxd bootstrap connected session will restart after error: {}",
+                            TunnelSessionError::PublishRuntimeReady(error)
+                        );
+                        mark_tunnel_disconnected(runtime);
+                        return ConnectedTunnelSessionResult {
+                            outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                            startup_completed,
+                        };
+                    }
+                };
+                if let Err(error) = write_tunnel_text(&tunnel_writer_sender, payload) {
+                    eprintln!(
+                        "sandboxd bootstrap connected session will restart after error: {error}"
+                    );
+                    mark_tunnel_disconnected(runtime);
+                    return ConnectedTunnelSessionResult {
+                        outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                        startup_completed,
+                    };
+                }
             }
         }
         let Some(event) = event_receiver.recv().await else {
@@ -589,18 +747,12 @@ async fn run_connected_tunnel_session(
             if let Ok(frames) = session_state.telemetry_relay.detach_tunnel_connection() {
                 let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
             }
-            runtime
-                .keepalive_manager
-                .lock()
-                .expect("keepalive manager lock should not be poisoned")
-                .on_tunnel_disconnected();
-            runtime
-                .runtime_readiness_manager
-                .lock()
-                .expect("runtime readiness manager lock should not be poisoned")
-                .on_tunnel_disconnected();
+            mark_tunnel_disconnected(runtime);
             let _ = write_tunnel_close(&tunnel_writer_sender);
-            return Ok(ConnectedTunnelSessionOutcome::ShutdownRequested);
+            return ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::ShutdownRequested,
+                startup_completed,
+            };
         }
 
         match handle_tunnel_session_event(
@@ -610,26 +762,252 @@ async fn run_connected_tunnel_session(
             &loop_context,
             &mut session_state,
         )
-        .await?
+        .await
         {
-            TunnelSessionControlFlow::Continue => {}
-            TunnelSessionControlFlow::RestartRequired => {
-                runtime
-                    .keepalive_manager
-                    .lock()
-                    .expect("keepalive manager lock should not be poisoned")
-                    .on_tunnel_disconnected();
-                runtime
-                    .runtime_readiness_manager
-                    .lock()
-                    .expect("runtime readiness manager lock should not be poisoned")
-                    .on_tunnel_disconnected();
-                return Ok(ConnectedTunnelSessionOutcome::RestartRequired);
+            Ok(TunnelSessionControlFlow::Continue) => {}
+            Ok(TunnelSessionControlFlow::RestartRequired) => {
+                mark_tunnel_disconnected(runtime);
+                return ConnectedTunnelSessionResult {
+                    outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                    startup_completed,
+                };
+            }
+            Err(error) => {
+                eprintln!(
+                    "sandboxd bootstrap connected session will restart after error: {error}"
+                );
+                mark_tunnel_disconnected(runtime);
+                return ConnectedTunnelSessionResult {
+                    outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                    startup_completed,
+                };
             }
         }
     }
 
-    Ok(ConnectedTunnelSessionOutcome::RestartRequired)
+    mark_tunnel_disconnected(runtime);
+    ConnectedTunnelSessionResult {
+        outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+        startup_completed,
+    }
+}
+
+fn mark_tunnel_connected(runtime: &TunnelSessionRuntime) {
+    match runtime.keepalive_manager.lock() {
+        Ok(mut keepalive_manager) => keepalive_manager.on_tunnel_connected(runtime.clock.as_ref()),
+        Err(poisoned_manager) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned keepalive manager during connect; continuing with the poisoned state"
+            );
+            poisoned_manager
+                .into_inner()
+                .on_tunnel_connected(runtime.clock.as_ref());
+        }
+    }
+    match runtime.runtime_readiness_manager.lock() {
+        Ok(mut runtime_readiness_manager) => runtime_readiness_manager.on_tunnel_connected(),
+        Err(poisoned_manager) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned runtime readiness manager during connect; continuing with the poisoned state"
+            );
+            poisoned_manager.into_inner().on_tunnel_connected();
+        }
+    }
+}
+
+fn mark_tunnel_disconnected(runtime: &TunnelSessionRuntime) {
+    match runtime.keepalive_manager.lock() {
+        Ok(mut keepalive_manager) => keepalive_manager.on_tunnel_disconnected(),
+        Err(poisoned_manager) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned keepalive manager during disconnect; continuing with the poisoned state"
+            );
+            poisoned_manager.into_inner().on_tunnel_disconnected();
+        }
+    }
+    match runtime.runtime_readiness_manager.lock() {
+        Ok(mut runtime_readiness_manager) => runtime_readiness_manager.on_tunnel_disconnected(),
+        Err(poisoned_manager) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned runtime readiness manager during disconnect; continuing with the poisoned state"
+            );
+            poisoned_manager.into_inner().on_tunnel_disconnected();
+        }
+    }
+}
+
+fn build_tunnel_exchange_http_client() -> Result<TunnelExchangeHttpClient, TunnelSessionError> {
+    let mut http_connector = HttpConnector::new();
+    http_connector.enforce_http(false);
+    let https_connector = HttpsConnectorBuilder::new()
+        .with_native_roots()
+        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
+        .https_or_http()
+        .enable_http1()
+        .wrap_connector(http_connector);
+    Ok(Client::builder(TokioExecutor::new()).build(https_connector))
+}
+
+async fn reconnect_bootstrap_tunnel(
+    runtime: &TunnelSessionRuntime,
+    tunnel_exchange_client: &TunnelExchangeHttpClient,
+    token_exchange_url: &str,
+    gateway_ws_url: &str,
+    current_tunnel_exchange_token: &mut String,
+) -> Result<Option<TunnelWebSocket>, TunnelSessionError> {
+    let mut attempt_index = 0_usize;
+
+    loop {
+        if runtime.shutdown_requested.load(Ordering::Relaxed) {
+            eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
+            return Ok(None);
+        }
+
+        let attempt_number = attempt_index + 1;
+        eprintln!("sandboxd bootstrap reconnect attempt started: attempt={attempt_number}");
+        match exchange_tunnel_token(
+            tunnel_exchange_client,
+            token_exchange_url,
+            current_tunnel_exchange_token.as_str(),
+        )
+        .await?
+        {
+            TunnelExchangeOutcome::Success(exchange) => {
+                *current_tunnel_exchange_token = exchange.tunnel_exchange_token;
+                let connected_url =
+                    resolve_bootstrap_tunnel_url(gateway_ws_url, exchange.bootstrap_token.as_str())?;
+                match connect_bootstrap_websocket(connected_url.as_str()).await {
+                    Ok((bootstrap_socket, _)) => {
+                        eprintln!("sandboxd bootstrap reconnect succeeded");
+                        return Ok(Some(bootstrap_socket));
+                    }
+                    Err(error) => {
+                        eprintln!(
+                            "sandboxd bootstrap reconnect websocket connect failed and will retry: {error}"
+                        );
+                    }
+                }
+            }
+            TunnelExchangeOutcome::Retryable(error) => {
+                eprintln!("sandboxd bootstrap token exchange failed and will retry: {error}");
+            }
+            TunnelExchangeOutcome::Terminal(error) => {
+                eprintln!("sandboxd bootstrap token exchange failed terminally: {error}");
+                mark_tunnel_disconnected(runtime);
+                return Ok(None);
+            }
+        }
+
+        mark_tunnel_disconnected(runtime);
+        runtime
+            .sleeper
+            .sleep(Duration::from_millis(reconnect_backoff_ms(attempt_index)));
+        attempt_index = attempt_index.saturating_add(1);
+    }
+}
+
+fn reconnect_backoff_ms(attempt_index: usize) -> u64 {
+    *TUNNEL_RECONNECT_BACKOFF_MS
+        .get(attempt_index)
+        .unwrap_or_else(|| TUNNEL_RECONNECT_BACKOFF_MS.last().expect("backoff list should not be empty"))
+}
+
+async fn exchange_tunnel_token(
+    tunnel_exchange_client: &TunnelExchangeHttpClient,
+    token_exchange_url: &str,
+    tunnel_exchange_token: &str,
+) -> Result<TunnelExchangeOutcome, TunnelSessionError> {
+    let normalized_token = tunnel_exchange_token.trim();
+    if normalized_token.is_empty() {
+        return Ok(TunnelExchangeOutcome::Retryable(
+            "sandbox tunnel exchange token is required".to_string(),
+        ));
+    }
+
+    let request = Request::post(token_exchange_url)
+        .header(AUTHORIZATION, format!("Bearer {normalized_token}"))
+        .body(Empty::new())
+        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?;
+
+    let response = match tunnel_exchange_client.request(request).await {
+        Ok(response) => response,
+        Err(error) => {
+            return Ok(TunnelExchangeOutcome::Retryable(error.to_string()));
+        }
+    };
+    let status = response.status();
+    let response_body = response
+        .into_body()
+        .collect()
+        .await
+        .map_err(|error| error.to_string());
+
+    let response_body = match response_body {
+        Ok(response_body) => response_body.to_bytes(),
+        Err(error) => {
+            return Ok(TunnelExchangeOutcome::Retryable(error));
+        }
+    };
+
+    match status {
+        StatusCode::OK => {
+            let parsed_response: TunnelExchangeResponse = match serde_json::from_slice(&response_body)
+            {
+                Ok(response) => response,
+                Err(error) => {
+                    return Ok(TunnelExchangeOutcome::Retryable(error.to_string()));
+                }
+            };
+            if parsed_response.bootstrap_token.trim().is_empty()
+                || parsed_response.tunnel_exchange_token.trim().is_empty()
+            {
+                return Ok(TunnelExchangeOutcome::Retryable(
+                    "tunnel exchange response must include non-empty bootstrapToken and tunnelExchangeToken"
+                        .to_string(),
+                ));
+            }
+            Ok(TunnelExchangeOutcome::Success(TunnelExchangeSuccess {
+                bootstrap_token: parsed_response.bootstrap_token,
+                tunnel_exchange_token: parsed_response.tunnel_exchange_token,
+            }))
+        }
+        StatusCode::UNAUTHORIZED | StatusCode::NOT_FOUND | StatusCode::CONFLICT => {
+            Ok(TunnelExchangeOutcome::Terminal(read_tunnel_exchange_error_message(
+                status,
+                &response_body,
+            )))
+        }
+        StatusCode::TOO_MANY_REQUESTS => Ok(TunnelExchangeOutcome::Retryable(
+            read_tunnel_exchange_error_message(status, &response_body),
+        )),
+        status if status.is_server_error() => Ok(TunnelExchangeOutcome::Retryable(
+            read_tunnel_exchange_error_message(status, &response_body),
+        )),
+        _ => Ok(TunnelExchangeOutcome::Retryable(
+            read_tunnel_exchange_error_message(status, &response_body),
+        )),
+    }
+}
+
+fn read_tunnel_exchange_error_message(status: StatusCode, response_body: &[u8]) -> String {
+    match serde_json::from_slice::<Value>(response_body) {
+        Ok(Value::Object(fields)) => fields
+            .get("error")
+            .and_then(Value::as_str)
+            .map(std::string::ToString::to_string)
+            .unwrap_or_else(|| format!("token exchange returned unexpected status {}", status.as_u16())),
+        Ok(other) => format!(
+            "token exchange returned status {} with unexpected JSON body: {other}",
+            status.as_u16()
+        ),
+        Err(_) if response_body.is_empty() => {
+            format!("token exchange returned status {} with an empty body", status.as_u16())
+        }
+        Err(_) => format!(
+            "token exchange returned status {} with a non-JSON body",
+            status.as_u16()
+        ),
+    }
 }
 
 type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -2733,6 +3111,29 @@ fn resolve_bootstrap_tunnel_url(
     Ok(parsed_url.to_string())
 }
 
+fn resolve_tunnel_exchange_url(gateway_ws_url: &str) -> Result<String, TunnelSessionError> {
+    let mut parsed_url = Url::parse(gateway_ws_url)
+        .map_err(|error| TunnelSessionError::InvalidGatewayUrl(error.to_string()))?;
+    match parsed_url.scheme() {
+        "ws" => parsed_url
+            .set_scheme("http")
+            .expect("ws -> http scheme rewrite should succeed"),
+        "wss" => parsed_url
+            .set_scheme("https")
+            .expect("wss -> https scheme rewrite should succeed"),
+        _ => {
+            return Err(TunnelSessionError::InvalidGatewayUrl(
+                "sandbox tunnel gateway ws url must use ws or wss scheme".to_string(),
+            ));
+        }
+    }
+    parsed_url.set_query(None);
+    let mut path = parsed_url.path().trim_end_matches('/').to_string();
+    path.push_str("/token-exchange");
+    parsed_url.set_path(&path);
+    Ok(parsed_url.to_string())
+}
+
 fn send_telemetry_frames(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     frames: Vec<TelemetryRelayFrame>,
@@ -2928,13 +3329,17 @@ fn matches_signature(bytes: &[u8], offset: usize, signature: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        AgentStreamState, TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
-        TunnelWriterMessage, handle_tunnel_session_event,
+        AgentStreamState, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
+        TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
+        TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
+        connect_bootstrap_websocket, handle_tunnel_session_event, resolve_bootstrap_tunnel_url,
+        run_connected_tunnel_session_catching_panics,
     };
 
     use std::collections::BTreeMap;
     use std::fs;
-    use std::net::TcpListener;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
     use std::path::PathBuf;
     #[cfg(target_os = "linux")]
     use std::process::{Child, Command, Stdio};
@@ -2947,13 +3352,16 @@ mod tests {
     #[cfg(target_os = "linux")]
     use base64::Engine;
     use serde_json::{Value, json};
-    use tungstenite::{Error as WebSocketError, Message, WebSocket, accept};
+    use tungstenite::{
+        Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
+        handshake::server::{Request, Response},
+    };
 
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
-    use crate::time::{SystemClock, ThreadSleeper};
+    use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
         PAYLOAD_KIND_WEBSOCKET_TEXT, StreamSendWindow, decode_stream_data_frame,
@@ -2963,6 +3371,27 @@ mod tests {
     use crate::tunnel::telemetry::{TelemetryRelay, decode_telemetry_data_frame};
 
     static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(900);
+
+    #[derive(Default)]
+    struct PanicClock {
+        panic_requested: std::sync::atomic::AtomicBool,
+    }
+
+    impl PanicClock {
+        fn request_panic(&self) {
+            self.panic_requested.store(true, Ordering::Relaxed);
+        }
+    }
+
+    impl Clock for PanicClock {
+        fn now_ms(&self) -> u64 {
+            assert!(
+                !self.panic_requested.swap(false, Ordering::Relaxed),
+                "panic clock requested connected-session panic"
+            );
+            0
+        }
+    }
 
     #[tokio::test]
     async fn restores_agent_stream_window_credit_after_runtime_writes_complete() {
@@ -4095,6 +4524,567 @@ mod tests {
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn start_returns_error_when_initial_bootstrap_session_never_establishes() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the initial bootstrap socket");
+            drop(stream);
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let error = match TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        ) {
+            Ok(_) => panic!("initial bootstrap websocket failure should fail start()"),
+            Err(error) => error,
+        };
+
+        assert!(
+            error.to_string().contains("failed to configure bootstrap tunnel socket"),
+            "start() should surface the initial websocket establishment failure"
+        );
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_port = bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port();
+        let bootstrap_url = format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+        let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (initial_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the initial bootstrap websocket");
+            let (mut initial_websocket, initial_request_uri) =
+                accept_bootstrap_websocket(initial_stream);
+            assert!(
+                initial_request_uri.contains("bootstrap_token=bootstrap-token-initial"),
+                "initial bootstrap websocket should include the startup bootstrap token"
+            );
+            expect_tunnel_connected_publications(&mut initial_websocket);
+            initial_websocket
+                .close(None)
+                .expect("gateway should close the initial websocket");
+
+            let (mut first_exchange_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the first token exchange request");
+            let first_exchange_request = read_http_request(&mut first_exchange_stream);
+            assert!(first_exchange_request.starts_with(
+                "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
+            ));
+            assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
+            write_http_json_response(
+                &mut first_exchange_stream,
+                200,
+                &json!({
+                    "bootstrapToken": "bootstrap-token-reconnect-1",
+                    "tunnelExchangeToken": "exchange-token-reconnect-1"
+                }),
+            );
+
+            let (reconnect_stream_one, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the first reconnect websocket");
+            let (mut reconnect_websocket_one, reconnect_request_uri_one) =
+                accept_bootstrap_websocket(reconnect_stream_one);
+            assert!(
+                reconnect_request_uri_one.contains("bootstrap_token=bootstrap-token-reconnect-1"),
+                "first reconnect websocket should use the exchanged bootstrap token"
+            );
+            expect_tunnel_connected_publications(&mut reconnect_websocket_one);
+            reconnect_websocket_one
+                .close(None)
+                .expect("gateway should close the first reconnect websocket");
+
+            let (mut second_exchange_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the second token exchange request");
+            let second_exchange_request = read_http_request(&mut second_exchange_stream);
+            assert!(second_exchange_request.starts_with(
+                "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
+            ));
+            assert_http_bearer_token(&second_exchange_request, "exchange-token-reconnect-1");
+            write_http_json_response(
+                &mut second_exchange_stream,
+                200,
+                &json!({
+                    "bootstrapToken": "bootstrap-token-reconnect-2",
+                    "tunnelExchangeToken": "exchange-token-reconnect-2"
+                }),
+            );
+
+            let (reconnect_stream_two, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the second reconnect websocket");
+            let (mut reconnect_websocket_two, reconnect_request_uri_two) =
+                accept_bootstrap_websocket(reconnect_stream_two);
+            assert!(
+                reconnect_request_uri_two.contains("bootstrap_token=bootstrap-token-reconnect-2"),
+                "second reconnect websocket should use the rolled bootstrap token"
+            );
+            expect_tunnel_connected_publications(&mut reconnect_websocket_two);
+            gateway_ready_sender
+                .send(())
+                .expect("gateway should report the second reconnect is established");
+
+            loop {
+                match reconnect_websocket_two.read() {
+                    Ok(Message::Text(payload)) => {
+                        let message: Value = serde_json::from_str(payload.as_str())
+                            .expect("shutdown control payload should be valid json");
+                        assert_eq!(message["type"], "telemetry.close");
+                    }
+                    Ok(Message::Close(_))
+                    | Err(WebSocketError::ConnectionClosed)
+                    | Err(WebSocketError::Protocol(_)) => break,
+                    Ok(other) => panic!(
+                        "expected tunnel_session.close() to end the second reconnect websocket, got {other:?}"
+                    ),
+                    Err(error) => panic!(
+                        "expected tunnel_session.close() to end the second reconnect websocket: {error}"
+                    ),
+                }
+            }
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-initial".to_string(),
+            tunnel_exchange_token: "exchange-token-initial".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_ready_receiver
+            .recv()
+            .expect("gateway should observe the second reconnect");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn post_startup_panic_marks_restart_required_and_startup_completed() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_port = bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port();
+        let bootstrap_url =
+            format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+        let (initial_connected_sender, initial_connected_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (initial_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the initial bootstrap websocket");
+            let (mut initial_websocket, _) = accept_bootstrap_websocket(initial_stream);
+            expect_tunnel_connected_publications(&mut initial_websocket);
+            initial_connected_sender
+                .send(())
+                .expect("gateway should report the initial connected session is established");
+            initial_websocket
+                .get_mut()
+                .set_read_timeout(Some(std::time::Duration::from_millis(250)))
+                .expect("bootstrap websocket should accept a read timeout");
+            match initial_websocket.read() {
+                Ok(Message::Close(_))
+                | Err(WebSocketError::ConnectionClosed)
+                | Err(WebSocketError::Protocol(_)) => {}
+                Err(WebSocketError::Io(error))
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) => {}
+                Ok(other) => panic!(
+                    "expected the post-startup panic session to end the bootstrap websocket, got {other:?}"
+                ),
+                Err(error) => panic!(
+                    "expected the post-startup panic session to end the bootstrap websocket: {error}"
+                ),
+            }
+        });
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let panic_clock = Arc::new(PanicClock::default());
+        let shutdown_requested = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let runtime = TunnelSessionRuntime {
+            keepalive_manager,
+            runtime_readiness_manager,
+            agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
+            cgroup_root: PathBuf::from(crate::cgroups::DEFAULT_CGROUP_ROOT),
+            attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
+            sandbox_instance_id: "sbi_tunnel_session".to_string(),
+            shutdown_requested,
+            clock: panic_clock.clone(),
+            sleeper: Arc::new(ThreadSleeper),
+        };
+        let connected_url = resolve_bootstrap_tunnel_url(&bootstrap_url, "bootstrap-token-initial")
+            .expect("bootstrap websocket URL should be derivable");
+        let runtime_builder = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("test tokio runtime should build");
+        let (startup_result_sender, startup_result_receiver) =
+            std::sync::mpsc::channel::<Result<(), TunnelSessionError>>();
+        let session_result = runtime_builder.block_on(async {
+            let (bootstrap_socket, _) = connect_bootstrap_websocket(connected_url.as_str())
+                .await
+                .expect("bootstrap websocket should connect");
+            let panic_clock = panic_clock.clone();
+            let ready_thread = thread::spawn(move || {
+                initial_connected_receiver
+                    .recv()
+                    .expect("gateway should observe the initial connected session");
+                panic_clock.request_panic();
+            });
+            let session_result = run_connected_tunnel_session_catching_panics(
+                &runtime,
+                bootstrap_socket,
+                Some(&startup_result_sender),
+            )
+            .await;
+            ready_thread
+                .join()
+                .expect("ready-thread should exit cleanly");
+            session_result
+        });
+
+        assert!(
+            startup_result_receiver
+                .recv()
+                .expect("connected session should report the initial startup result")
+                .is_ok(),
+            "post-startup panic should not retroactively fail initial startup"
+        );
+        assert!(
+            matches!(
+                session_result.outcome,
+                ConnectedTunnelSessionOutcome::RestartRequired
+            ),
+            "post-startup panic should request a reconnect"
+        );
+        assert!(
+            session_result.startup_completed,
+            "post-startup panic should preserve the successful startup completion signal"
+        );
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn retries_when_token_exchange_response_body_read_fails() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_port = bootstrap_listener
+            .local_addr()
+            .expect("bootstrap listener should expose an address")
+            .port();
+        let bootstrap_url =
+            format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+        let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (initial_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the initial bootstrap websocket");
+            let (mut initial_websocket, _) = accept_bootstrap_websocket(initial_stream);
+            expect_tunnel_connected_publications(&mut initial_websocket);
+            initial_websocket
+                .close(None)
+                .expect("gateway should close the initial websocket");
+
+            let (mut first_exchange_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the first token exchange request");
+            let first_exchange_request = read_http_request(&mut first_exchange_stream);
+            assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
+            first_exchange_stream
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 64\r\nconnection: close\r\n\r\n{\"bootstrapToken\":\"bootstrap-token-reconnect\"",
+                )
+                .expect("gateway should write the truncated token exchange response");
+            first_exchange_stream
+                .flush()
+                .expect("gateway should flush the truncated token exchange response");
+            drop(first_exchange_stream);
+
+            let (mut second_exchange_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the retried token exchange request");
+            let second_exchange_request = read_http_request(&mut second_exchange_stream);
+            assert_http_bearer_token(&second_exchange_request, "exchange-token-initial");
+            write_http_json_response(
+                &mut second_exchange_stream,
+                200,
+                &json!({
+                    "bootstrapToken": "bootstrap-token-reconnect",
+                    "tunnelExchangeToken": "exchange-token-reconnect"
+                }),
+            );
+
+            let (reconnect_stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the reconnect websocket");
+            let (mut reconnect_websocket, reconnect_request_uri) =
+                accept_bootstrap_websocket(reconnect_stream);
+            assert!(
+                reconnect_request_uri.contains("bootstrap_token=bootstrap-token-reconnect"),
+                "reconnect websocket should use the exchanged bootstrap token after the retried token exchange"
+            );
+            expect_tunnel_connected_publications(&mut reconnect_websocket);
+            gateway_ready_sender
+                .send(())
+                .expect("gateway should report the reconnect session is established");
+
+            loop {
+                match reconnect_websocket.read() {
+                    Ok(Message::Text(payload)) => {
+                        let message: Value = serde_json::from_str(payload.as_str())
+                            .expect("shutdown control payload should be valid json");
+                        assert_eq!(message["type"], "telemetry.close");
+                    }
+                    Ok(Message::Close(_))
+                    | Err(WebSocketError::ConnectionClosed)
+                    | Err(WebSocketError::Protocol(_)) => break,
+                    Ok(other) => panic!(
+                        "expected tunnel_session.close() to end the reconnect websocket after retrying the token exchange body read failure, got {other:?}"
+                    ),
+                    Err(error) => panic!(
+                        "expected tunnel_session.close() to end the reconnect websocket after retrying the token exchange body read failure: {error}"
+                    ),
+                }
+            }
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-initial".to_string(),
+            tunnel_exchange_token: "exchange-token-initial".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_ready_receiver
+            .recv()
+            .expect("gateway should observe reconnect after retrying the token exchange body read failure");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn stops_retrying_when_token_exchange_returns_terminal_status() {
+        for status_code in [401_u16, 404_u16, 409_u16] {
+            let bootstrap_listener =
+                TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+            let bootstrap_port = bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port();
+            let bootstrap_url =
+                format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+            let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+            let gateway_thread = thread::spawn(move || {
+                let (initial_stream, _) = bootstrap_listener
+                    .accept()
+                    .expect("gateway should accept the initial bootstrap websocket");
+                let (mut initial_websocket, initial_request_uri) =
+                    accept_bootstrap_websocket(initial_stream);
+                assert!(
+                    initial_request_uri.contains("bootstrap_token=bootstrap-token-initial"),
+                    "initial bootstrap websocket should include the startup bootstrap token"
+                );
+                expect_tunnel_connected_publications(&mut initial_websocket);
+                initial_websocket
+                    .close(None)
+                    .expect("gateway should close the initial websocket");
+
+                let (mut exchange_stream, _) = bootstrap_listener
+                    .accept()
+                    .expect("gateway should accept the terminal token exchange request");
+                let exchange_request = read_http_request(&mut exchange_stream);
+                assert!(exchange_request.starts_with(
+                    "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
+                ));
+                assert_http_bearer_token(&exchange_request, "exchange-token-initial");
+                write_http_json_response(
+                    &mut exchange_stream,
+                    status_code,
+                    &json!({
+                        "error": format!("terminal-status-{status_code}")
+                    }),
+                );
+
+                bootstrap_listener
+                    .set_nonblocking(true)
+                    .expect("listener should allow nonblocking terminal assertions");
+                thread::sleep(std::time::Duration::from_millis(150));
+                match bootstrap_listener.accept() {
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+                    Ok(_) => panic!(
+                        "terminal token exchange status {status_code} should prevent further reconnect attempts"
+                    ),
+                    Err(error) => panic!(
+                        "listener should only stop further reconnects by becoming empty: {error}"
+                    ),
+                }
+                gateway_done_sender
+                    .send(())
+                    .expect("gateway should report the terminal exchange case finished");
+            });
+
+            let startup_input = StartupInput {
+                startup_mode: StartupMode::New,
+                bootstrap_token: "bootstrap-token-initial".to_string(),
+                tunnel_exchange_token: "exchange-token-initial".to_string(),
+                tunnel_gateway_ws_url: bootstrap_url,
+                runtime_plan: serde_json::json!({
+                    "sandboxProfileId": "sbp_123",
+                    "version": 1,
+                    "image": {
+                        "source": "base",
+                        "imageRef": "mistle/sandbox-base:dev"
+                    },
+                    "egressRoutes": [],
+                    "artifacts": [],
+                    "workspaceSources": [],
+                    "runtimeClients": [],
+                    "agentRuntimes": []
+                }),
+                egress_grant_by_rule_id: BTreeMap::new(),
+            };
+
+            let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+            let runtime_readiness_manager =
+                Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+            let tunnel_session = TunnelSession::start(
+                &startup_input,
+                keepalive_manager,
+                runtime_readiness_manager,
+                None,
+                BTreeMap::new(),
+                Arc::new(SystemClock),
+                Arc::new(ThreadSleeper),
+            )
+            .expect("tunnel session should start");
+
+            gateway_done_receiver
+                .recv()
+                .expect("gateway should observe the terminal exchange response");
+
+            tunnel_session.close();
+            gateway_thread
+                .join()
+                .expect("gateway thread should exit cleanly");
+        }
     }
 
     #[test]
@@ -6286,6 +7276,105 @@ mod tests {
                 }
                 _ => panic!("expected websocket binary telemetry frame"),
             }
+        }
+    }
+
+    fn accept_bootstrap_websocket(stream: TcpStream) -> (WebSocket<TcpStream>, String) {
+        let request_uri = Arc::new(Mutex::new(None::<String>));
+        let request_uri_capture = request_uri.clone();
+        let websocket = accept_hdr(stream, move |request: &Request, response: Response| {
+            *request_uri_capture
+                .lock()
+                .expect("request uri capture lock should not be poisoned") =
+                Some(request.uri().to_string());
+            Ok(response)
+        })
+        .expect("gateway websocket handshake should succeed");
+        let request_uri = request_uri
+            .lock()
+            .expect("request uri capture lock should not be poisoned")
+            .clone()
+            .expect("captured bootstrap request uri should exist");
+        (websocket, request_uri)
+    }
+
+    fn expect_tunnel_connected_publications(socket: &mut WebSocket<TcpStream>) {
+        let telemetry_open = read_json_text_message(socket);
+        assert_eq!(telemetry_open["type"], "telemetry.open");
+        socket
+            .send(Message::Text(
+                json!({
+                    "type": "telemetry.open.ok",
+                    "streamId": telemetry_open["streamId"],
+                    "initialWindowBytes": 1024
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should acknowledge telemetry.open");
+
+        let mut saw_keepalive = false;
+        let mut saw_runtime_ready = false;
+        while !saw_keepalive || !saw_runtime_ready {
+            let control_message = read_json_text_message(socket);
+            match control_message["type"].as_str() {
+                Some("keepalive.state") => saw_keepalive = true,
+                Some("runtime.ready") => saw_runtime_ready = true,
+                other => panic!("unexpected bootstrap control message while waiting for reconnect readiness: {other:?}"),
+            }
+        }
+    }
+
+    fn read_http_request(stream: &mut TcpStream) -> String {
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+            .expect("http request stream should accept a read timeout");
+        let mut request_bytes = Vec::new();
+        let mut buffer = [0_u8; 1024];
+        loop {
+            let bytes_read = stream
+                .read(&mut buffer)
+                .expect("http request stream should be readable");
+            assert!(bytes_read > 0, "http request stream should not close before headers");
+            request_bytes.extend_from_slice(&buffer[..bytes_read]);
+            if request_bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+                break;
+            }
+        }
+        String::from_utf8(request_bytes).expect("http request should be valid utf-8")
+    }
+
+    fn assert_http_bearer_token(request: &str, expected_token: &str) {
+        let normalized_request = request.to_ascii_lowercase();
+        assert!(
+            normalized_request.contains(&format!(
+                "\r\nauthorization: bearer {expected_token}\r\n"
+            )),
+            "http request should contain the expected bearer token"
+        );
+    }
+
+    fn write_http_json_response(stream: &mut TcpStream, status_code: u16, body: &Value) {
+        let body_bytes = body.to_string();
+        let response = format!(
+            "HTTP/1.1 {status_code} {}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+            status_text(status_code),
+            body_bytes.len(),
+            body_bytes
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("http response should be writable");
+        stream.flush().expect("http response should flush");
+    }
+
+    fn status_text(status_code: u16) -> &'static str {
+        match status_code {
+            200 => "OK",
+            401 => "Unauthorized",
+            404 => "Not Found",
+            409 => "Conflict",
+            _ => panic!("unexpected test status code {status_code}"),
         }
     }
 
