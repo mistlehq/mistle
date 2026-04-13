@@ -8,8 +8,8 @@ E2B implementation for `@mistle/sandbox`.
 
 - `apiKey`: E2B API key
 - `domain` (optional): override E2B domain when not using the default `e2b.app`
-- `cpuCount` (optional): template CPU default for newly built E2B templates, defaults to `4`
-- `memoryMb` (optional): template memory default in MB for newly built E2B templates, defaults to `8192`
+- `cpuCount` (optional): template CPU default for newly built E2B templates, defaults to `2`
+- `memoryMb` (optional): template memory default in MB for newly built E2B templates, defaults to `4096`
 
 All config fields are validated with Zod and fail fast when invalid.
 

@@ -6,8 +6,8 @@ describe("createE2BTemplateAlias", () => {
   it("returns the same alias for the same base image ref", () => {
     const input = {
       baseRef: "ghcr.io/mistlehq/sandbox-base:latest",
-      cpuCount: 4,
-      memoryMb: 8192,
+      cpuCount: 2,
+      memoryMb: 4096,
     };
 
     expect(createE2BTemplateAlias(input)).toBe(createE2BTemplateAlias(input));
@@ -17,14 +17,14 @@ describe("createE2BTemplateAlias", () => {
     expect(
       createE2BTemplateAlias({
         baseRef: "ghcr.io/mistlehq/sandbox-base:latest",
-        cpuCount: 4,
-        memoryMb: 8192,
+        cpuCount: 2,
+        memoryMb: 4096,
       }),
     ).not.toBe(
       createE2BTemplateAlias({
         baseRef: "ghcr.io/mistlehq/sandbox-base:v2",
-        cpuCount: 4,
-        memoryMb: 8192,
+        cpuCount: 2,
+        memoryMb: 4096,
       }),
     );
   });
@@ -33,14 +33,14 @@ describe("createE2BTemplateAlias", () => {
     expect(
       createE2BTemplateAlias({
         baseRef: "ghcr.io/mistlehq/sandbox-base:latest",
-        cpuCount: 4,
-        memoryMb: 8192,
+        cpuCount: 2,
+        memoryMb: 4096,
       }),
     ).not.toBe(
       createE2BTemplateAlias({
         baseRef: "ghcr.io/mistlehq/sandbox-base:latest",
         cpuCount: 6,
-        memoryMb: 8192,
+        memoryMb: 4096,
       }),
     );
   });

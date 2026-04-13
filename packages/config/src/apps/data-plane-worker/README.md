@@ -21,12 +21,12 @@ Namespace in final config:
 | `sandbox.docker.networkName`          | `string` (optional) | Optional Docker network name that sandbox containers join.     | None      | `[apps.data_plane_worker.sandbox.docker].network_name`             | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME`                   |
 | `sandbox.e2b.apiKey`                  | `string`            | E2B API key used when provider is e2b.                         | None      | `[apps.data_plane_worker.sandbox.e2b].api_key`                     | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY`                           |
 | `sandbox.e2b.domain`                  | `string` (optional) | Optional E2B domain override.                                  | `e2b.app` | `[apps.data_plane_worker.sandbox.e2b].domain`                      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN`                            |
-| `sandbox.e2b.cpuCount`                | `number` (`>=1`)    | Optional E2B template CPU default used for new sandboxes.      | `4`       | `[apps.data_plane_worker.sandbox.e2b].cpu_count`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT`                         |
-| `sandbox.e2b.memoryMb`                | `number` (`>=1`)    | Optional E2B template memory default in MB for new sandboxes.  | `8192`    | `[apps.data_plane_worker.sandbox.e2b].memory_mb`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB`                         |
+| `sandbox.e2b.cpuCount`                | `number` (`>=1`)    | Optional E2B template CPU default used for new sandboxes.      | `2`       | `[apps.data_plane_worker.sandbox.e2b].cpu_count`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT`                         |
+| `sandbox.e2b.memoryMb`                | `number` (`>=1`)    | Optional E2B template memory default in MB for new sandboxes.  | `4096`    | `[apps.data_plane_worker.sandbox.e2b].memory_mb`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB`                         |
 
 Notes:
 
 - Sandbox provider selection now comes from `global.sandbox.provider`.
 - `apps.data_plane_worker.sandbox` only carries provider-specific runtime settings plus `tokenizer_proxy_egress_base_url`.
 - Docker and E2B both consume the same `global.sandbox.defaultBaseImage` OCI reference.
-- Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `4` vCPU and `8192` MB.
+- Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `2` vCPU and `4096` MB.

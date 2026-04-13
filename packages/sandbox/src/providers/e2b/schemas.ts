@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const E2BDefaultTemplateCpuCount = 4;
-export const E2BDefaultTemplateMemoryMb = 8 * 1024;
+export const E2BDefaultTemplateCpuCount = 2;
+export const E2BDefaultTemplateMemoryMb = 4 * 1024;
 
 export const E2BSandboxConfigSchema = z
   .object({
