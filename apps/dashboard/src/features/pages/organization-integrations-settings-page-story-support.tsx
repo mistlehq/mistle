@@ -7,20 +7,20 @@ import type React from "react";
 import {
   IntegrationConnectionEditorPage,
   type IntegrationConnectionMethodId,
-} from "../integrations/integration-connection-dialog.js";
+} from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import { FormPageFrame } from "../shared/page-frame.js";
-import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
+import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 import {
-  createOpenIntegrationConnectionDialogState,
-  hasIntegrationConnectionDialogChanges,
+  createInitialIntegrationConnectionEditorState,
+  hasIntegrationConnectionEditorChanges,
   isIntegrationConnectionDisplayNameChanged,
   resolveConnectionMethodFormUiModel,
   resolveDefaultMethodId,
-  resolveIntegrationConnectionDialogValidationError,
+  resolveIntegrationConnectionEditorValidationError,
   resolveNextDraftForMethodChange,
-} from "./use-integration-connection-dialog-state-helpers.js";
+} from "./use-integration-connection-editor-state-helpers.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
 type BuiltInIntegrationVariantId =
@@ -168,9 +168,9 @@ function createTargetConfig(variantId: BuiltInIntegrationVariantId): Record<stri
   return {};
 }
 
-function createDialogInput(
+function createEditorInput(
   spec: StoryIntegrationSpec,
-): Extract<OpenIntegrationConnectionDialogInput, { mode: "create" }> {
+): Extract<OpenIntegrationConnectionEditorInput, { mode: "create" }> {
   const definition = getStoryDefinitionOrThrow(spec.variantId);
   const methods = resolveConnectionMethodsOrThrow(definition);
 
@@ -210,18 +210,18 @@ export function createAvailableCardsOverview(): readonly OrganizationIntegration
 }
 
 export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): React.JSX.Element {
-  const openInput = createDialogInput(spec);
+  const initialEditorInput = createEditorInput(spec);
   const defaultMethodId =
     spec.initialMethodId ??
     resolveDefaultMethodId(
       resolveConnectionMethodsOrThrow(getStoryDefinitionOrThrow(spec.variantId)),
     );
-  const initialState = createOpenIntegrationConnectionDialogState({
+  const initialState = createInitialIntegrationConnectionEditorState({
     defaultMethodId,
-    openInput,
+    initialEditorInput,
   });
   const startsWithoutSelectedMethod =
-    openInput.methods.length > 1 && spec.initialMethodId === undefined;
+    initialEditorInput.methods.length > 1 && spec.initialMethodId === undefined;
   const [draft, setDraft] = useState(() => ({
     ...initialState.draft,
     connectionDisplayNameValue: "",
@@ -230,22 +230,22 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
     secrets: spec.initialSecrets ?? initialState.draft.secrets,
   }));
 
-  const dialog = initialState.dialog;
+  const editor = initialState.editor;
   const configForm =
     draft.methodId.length === 0
       ? {
           mode: "none" as const,
         }
       : resolveConnectionMethodFormUiModel({
-          dialog,
+          editor,
           methodId: draft.methodId,
           currentValue: draft.configValue,
         });
 
   return (
     <FormPageFrame
-      description={openInput.targetKey}
-      title={`Add ${openInput.targetDisplayName} Connection`}
+      description={initialEditorInput.targetKey}
+      title={`Add ${initialEditorInput.targetDisplayName} Connection`}
     >
       <IntegrationConnectionEditorPage
         configForm={configForm}
@@ -253,9 +253,9 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
         connectionDisplayNamePlaceholder={draft.connectionDisplayNamePlaceholder}
         connectionDisplayNameValue={draft.connectionDisplayNameValue}
         connectError={draft.error}
-        dialog={dialog}
-        hasChanges={hasIntegrationConnectionDialogChanges({
-          dialog,
+        editor={editor}
+        hasChanges={hasIntegrationConnectionEditorChanges({
+          editor,
           configValue: draft.configValue,
           connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
           connectionDisplayNameValue: draft.connectionDisplayNameValue,
@@ -263,7 +263,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
           secrets: draft.secrets,
         })}
         isConnectionDisplayNameChanged={isIntegrationConnectionDisplayNameChanged({
-          dialog,
+          editor,
           connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
           connectionDisplayNameValue: draft.connectionDisplayNameValue,
         })}
@@ -287,7 +287,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
         onMethodChange={(methodId) => {
           setDraft((currentDraft) =>
             resolveNextDraftForMethodChange({
-              dialog,
+              editor,
               nextMethodId: methodId,
               currentDraft,
             }),
@@ -309,8 +309,8 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
             error:
               currentDraft.methodId.length === 0
                 ? "Authentication method is required."
-                : (resolveIntegrationConnectionDialogValidationError({
-                    dialog,
+                : (resolveIntegrationConnectionEditorValidationError({
+                    editor,
                     methodId: currentDraft.methodId,
                     connectionDisplayNameValue: currentDraft.connectionDisplayNameValue,
                     secrets: currentDraft.secrets,

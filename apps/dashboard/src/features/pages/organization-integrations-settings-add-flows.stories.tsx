@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-dialog.js";
+import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
 import {
   AddFlowStorySpecs,
   createAvailableCardsOverview,

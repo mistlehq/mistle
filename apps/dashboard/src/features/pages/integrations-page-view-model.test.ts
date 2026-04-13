@@ -4,7 +4,7 @@ import type { IntegrationCardViewModel } from "../integrations/directory-model.j
 import {
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
-} from "../integrations/integration-connection-dialog.js";
+} from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   buildAvailableIntegrationViewCards,
@@ -22,7 +22,7 @@ import {
 } from "./integrations-page-view-model.js";
 
 describe("integrations page view model", () => {
-  it("passes through connection methods for the dialog", () => {
+  it("passes through connection methods for the editor", () => {
     expect(
       toConnectionMethods([
         {

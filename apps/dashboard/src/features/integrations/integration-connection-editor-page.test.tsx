@@ -5,12 +5,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-dialog-state-helpers.js";
+import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import {
   IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
-  type IntegrationConnectionDialogState,
-} from "./integration-connection-dialog.js";
+  type IntegrationConnectionEditorState,
+} from "./integration-connection-editor.js";
 
 const GitHubAppInstallationSecretFields = [
   {
@@ -27,7 +27,7 @@ const GitHubAppInstallationSecretFields = [
   },
 ] as const;
 
-const createDialog: IntegrationConnectionDialogState = {
+const createEditor: IntegrationConnectionEditorState = {
   methods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -71,7 +71,7 @@ function renderEditorPage(
     connectionDisplayNamePlaceholder: "OpenAI connection",
     connectionDisplayNameValue: "",
     connectError: null,
-    dialog: createDialog,
+    editor: createEditor,
     hasChanges: true,
     isConnectionDisplayNameChanged: false,
     isSecretChanged: false,
@@ -90,9 +90,9 @@ function renderEditorPage(
   render(<IntegrationConnectionEditorPage {...props} />);
 }
 
-function createUpdateFormDialog(
-  input: Partial<Extract<IntegrationConnectionDialogState, { mode: "update" }>> = {},
-): Extract<IntegrationConnectionDialogState, { mode: "update" }> {
+function createUpdateFormEditor(
+  input: Partial<Extract<IntegrationConnectionEditorState, { mode: "update" }>> = {},
+): Extract<IntegrationConnectionEditorState, { mode: "update" }> {
   return {
     connectionConfig: {
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -125,9 +125,9 @@ function createUpdateFormDialog(
   };
 }
 
-function createJiraCreateDialog(
-  method: Extract<IntegrationConnectionDialogState, { mode: "create" }>["methods"][number],
-): Extract<IntegrationConnectionDialogState, { mode: "create" }> {
+function createJiraCreateEditor(
+  method: Extract<IntegrationConnectionEditorState, { mode: "create" }>["methods"][number],
+): Extract<IntegrationConnectionEditorState, { mode: "create" }> {
   return {
     methods: [method],
     mode: "create",
@@ -175,7 +175,7 @@ describe("IntegrationConnectionEditorPage", () => {
         endpoint: "https://api.example.com",
       },
       connectionDisplayNamePlaceholder: "Example connection",
-      dialog: {
+      editor: {
         methods: [
           {
             id: "custom-form",
@@ -211,7 +211,7 @@ describe("IntegrationConnectionEditorPage", () => {
         connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
       connectionDisplayNameValue: "Existing connection",
-      dialog: {
+      editor: {
         connectionConfig: {
           connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
@@ -289,7 +289,7 @@ describe("IntegrationConnectionEditorPage", () => {
     }) => {
       renderEditorPage({
         connectionDisplayNameValue,
-        dialog: createUpdateFormDialog(),
+        editor: createUpdateFormEditor(),
         hasChanges,
         isConnectionDisplayNameChanged,
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -304,7 +304,7 @@ describe("IntegrationConnectionEditorPage", () => {
   );
 
   it("renders Jira personal token configuration fields", () => {
-    const dialog = createJiraCreateDialog({
+    const editor = createJiraCreateEditor({
       id: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       label: "Personal API token",
       kind: "form",
@@ -319,7 +319,7 @@ describe("IntegrationConnectionEditorPage", () => {
     });
 
     const configForm = resolveConnectionMethodFormUiModel({
-      dialog,
+      editor,
       methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       currentValue: {},
     });
@@ -327,7 +327,7 @@ describe("IntegrationConnectionEditorPage", () => {
     renderEditorPage({
       configForm,
       connectionDisplayNamePlaceholder: "Jira connection",
-      dialog,
+      editor,
       methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
     });
 
@@ -337,7 +337,7 @@ describe("IntegrationConnectionEditorPage", () => {
   });
 
   it("renders definition-driven config fields for redirect methods", () => {
-    const dialog: Extract<IntegrationConnectionDialogState, { mode: "create" }> = {
+    const editor: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
       methods: [
         {
           id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
@@ -360,7 +360,7 @@ describe("IntegrationConnectionEditorPage", () => {
     };
 
     const configForm = resolveConnectionMethodFormUiModel({
-      dialog,
+      editor,
       methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       currentValue: {},
     });
@@ -368,7 +368,7 @@ describe("IntegrationConnectionEditorPage", () => {
     renderEditorPage({
       configForm,
       connectionDisplayNamePlaceholder: "SigNoz connection",
-      dialog,
+      editor,
       methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
     });
 
@@ -377,7 +377,7 @@ describe("IntegrationConnectionEditorPage", () => {
   });
 
   it("does not render persisted redirect config fields when no start config schema is declared", () => {
-    const dialog: Extract<IntegrationConnectionDialogState, { mode: "create" }> = {
+    const editor: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
       methods: [
         {
           id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
@@ -401,7 +401,7 @@ describe("IntegrationConnectionEditorPage", () => {
 
     expect(
       resolveConnectionMethodFormUiModel({
-        dialog,
+        editor,
         methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
         currentValue: {},
       }),
@@ -445,7 +445,7 @@ describe("IntegrationConnectionEditorPage", () => {
   });
 
   it("hides GitHub API key discriminator config and the nested rjsf submit button", () => {
-    const dialog: IntegrationConnectionDialogState = {
+    const editor: IntegrationConnectionEditorState = {
       methods: [
         {
           id: IntegrationConnectionMethodIds.API_KEY,
@@ -473,7 +473,7 @@ describe("IntegrationConnectionEditorPage", () => {
     };
 
     const configForm = resolveConnectionMethodFormUiModel({
-      dialog,
+      editor,
       methodId: IntegrationConnectionMethodIds.API_KEY,
       currentValue: {},
     });
@@ -486,7 +486,7 @@ describe("IntegrationConnectionEditorPage", () => {
     renderEditorPage({
       configForm,
       connectionDisplayNamePlaceholder: "GitHub connection",
-      dialog,
+      editor,
       methodId: IntegrationConnectionMethodIds.API_KEY,
     });
 
@@ -544,7 +544,7 @@ describe("IntegrationConnectionEditorPage", () => {
 
   it("hides callback-managed GitHub App config fields from the form", () => {
     const configForm = resolveConnectionMethodFormUiModel({
-      dialog: createDialog,
+      editor: createEditor,
       methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       currentValue: {},
     });

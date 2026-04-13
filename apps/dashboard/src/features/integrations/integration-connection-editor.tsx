@@ -20,7 +20,7 @@ import type { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
 import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
-import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-dialog-state-helpers.js";
+import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
@@ -28,7 +28,7 @@ export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
 export type IntegrationConnectionMethodId = IntegrationConnectionMethod["id"];
 export { IntegrationConnectionMethodIds };
 
-type CreateIntegrationConnectionDialogState = {
+type CreateIntegrationConnectionEditorState = {
   methods: readonly IntegrationConnectionMethod[];
   mode: "create";
   targetConfig: Record<string, unknown>;
@@ -38,7 +38,7 @@ type CreateIntegrationConnectionDialogState = {
   targetVariantId: string;
 };
 
-type UpdateIntegrationConnectionDialogState = {
+type UpdateIntegrationConnectionEditorState = {
   connectionConfig?: Record<string, unknown>;
   connectionId: string;
   currentConnectionConfig: Record<string, unknown>;
@@ -53,9 +53,9 @@ type UpdateIntegrationConnectionDialogState = {
   targetVariantId: string;
 };
 
-export type IntegrationConnectionDialogState =
-  | CreateIntegrationConnectionDialogState
-  | UpdateIntegrationConnectionDialogState;
+export type IntegrationConnectionEditorState =
+  | CreateIntegrationConnectionEditorState
+  | UpdateIntegrationConnectionEditorState;
 
 export type IntegrationConnectionDeviceAuthorizationPendingState = {
   targetKey: string;
@@ -67,14 +67,14 @@ export type IntegrationConnectionDeviceAuthorizationPendingState = {
   method: Extract<IntegrationConnectionMethod, { kind: "device-authorization" }>;
 };
 
-type IntegrationConnectionDialogProps = {
+type IntegrationConnectionEditorProps = {
   configForm: ConnectionMethodFormUiModel;
   configValue: Record<string, unknown>;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
   connectError: string | null;
   deviceAuthorizationPending?: IntegrationConnectionDeviceAuthorizationPendingState | null;
-  dialog: IntegrationConnectionDialogState | null;
+  editor: IntegrationConnectionEditorState;
   hasChanges: boolean;
   isConnectionDisplayNameChanged: boolean;
   isSecretChanged: boolean;
@@ -89,23 +89,19 @@ type IntegrationConnectionDialogProps = {
   secrets: Record<string, string>;
 };
 
-type IntegrationConnectionEditorContentProps = IntegrationConnectionDialogProps & {
-  dialog: IntegrationConnectionDialogState;
-};
-
 function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
   return method.label;
 }
 
 function resolveSelectedMethod(input: {
-  dialog: IntegrationConnectionDialogState;
+  editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
 }): IntegrationConnectionMethod | null {
-  if (input.dialog.mode === "update") {
-    return input.dialog.currentMethod.id === input.methodId ? input.dialog.currentMethod : null;
+  if (input.editor.mode === "update") {
+    return input.editor.currentMethod.id === input.methodId ? input.editor.currentMethod : null;
   }
 
-  return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
+  return input.editor.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): string {
@@ -175,14 +171,14 @@ function renderDeviceAuthorizationPending(input: {
   );
 }
 
-function renderConnectionEditorFields(props: IntegrationConnectionEditorContentProps) {
-  const dialog = props.dialog;
-  const isUpdateMode = dialog.mode === "update";
+function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
+  const editor = props.editor;
+  const isUpdateMode = editor.mode === "update";
   const selectedMethod = resolveSelectedMethod({
-    dialog,
+    editor,
     methodId: props.methodId,
   });
-  const showMethodPicker = dialog.mode === "create" && dialog.methods.length > 1;
+  const showMethodPicker = editor.mode === "create" && editor.methods.length > 1;
   const showsSecretInput = selectedMethod?.kind === "form";
   const selectedMethodLabel = selectedMethod
     ? formatIntegrationConnectionMethodLabel(selectedMethod)
@@ -192,12 +188,12 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
     <>
       <Field contentWidth="fill" orientation="vertical">
         <FieldHeader>
-          <FieldLabel htmlFor={`connection-display-name-${dialog.targetKey}`}>Name</FieldLabel>
+          <FieldLabel htmlFor={`connection-display-name-${editor.targetKey}`}>Name</FieldLabel>
         </FieldHeader>
         <FieldContent>
           <Input
             autoComplete="off"
-            id={`connection-display-name-${dialog.targetKey}`}
+            id={`connection-display-name-${editor.targetKey}`}
             onChange={(event) => {
               props.onConnectionDisplayNameChange(event.currentTarget.value);
             }}
@@ -211,7 +207,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
       {showMethodPicker ? (
         <Field contentWidth="fill" orientation="vertical">
           <FieldHeader>
-            <FieldLabel htmlFor={`connect-auth-method-${dialog.targetKey}`}>
+            <FieldLabel htmlFor={`connect-auth-method-${editor.targetKey}`}>
               Authentication method
             </FieldLabel>
           </FieldHeader>
@@ -222,13 +218,13 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
               }}
               value={props.methodId.length === 0 ? "" : props.methodId}
             >
-              <SelectTrigger className="w-full" id={`connect-auth-method-${dialog.targetKey}`}>
+              <SelectTrigger className="w-full" id={`connect-auth-method-${editor.targetKey}`}>
                 <SelectValue placeholder="Select authentication method">
                   {selectedMethodLabel}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
-                {dialog.methods.map((method) => (
+                {editor.methods.map((method) => (
                   <SelectItem key={method.id} value={method.id}>
                     {formatIntegrationConnectionMethodLabel(method)}
                   </SelectItem>
@@ -264,7 +260,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
             <Field contentWidth="fill" key={secretField.name} orientation="vertical">
               <FieldHeader>
                 <div className="flex items-center justify-between gap-3">
-                  <FieldLabel htmlFor={`connection-secret-${dialog.targetKey}-${secretField.name}`}>
+                  <FieldLabel htmlFor={`connection-secret-${editor.targetKey}-${secretField.name}`}>
                     {secretField.label}
                   </FieldLabel>
                   {isUpdateMode && props.isSecretChanged ? (
@@ -280,7 +276,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
                   <Textarea
                     autoComplete="off"
                     data-1p-ignore="true"
-                    id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                    id={`connection-secret-${editor.targetKey}-${secretField.name}`}
                     onChange={(event) => {
                       props.onSecretChange(secretField.name, event.currentTarget.value);
                     }}
@@ -296,7 +292,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
                   <Input
                     autoComplete="off"
                     data-1p-ignore="true"
-                    id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                    id={`connection-secret-${editor.targetKey}-${secretField.name}`}
                     onChange={(event) => {
                       props.onSecretChange(secretField.name, event.currentTarget.value);
                     }}
@@ -325,15 +321,10 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorContentP
 }
 
 export function IntegrationConnectionEditorPage(
-  props: IntegrationConnectionDialogProps,
-): React.JSX.Element | null {
-  const dialog = props.dialog;
-  const isUpdateMode = dialog?.mode === "update";
-
-  if (dialog === null) {
-    return null;
-  }
-
+  props: IntegrationConnectionEditorProps,
+): React.JSX.Element {
+  const editor = props.editor;
+  const isUpdateMode = editor.mode === "update";
   return (
     <FormPageStack>
       <FormPageSection>
@@ -344,7 +335,7 @@ export function IntegrationConnectionEditorPage(
               })
             : renderConnectionEditorFields({
                 ...props,
-                dialog,
+                editor,
               })}
 
           {props.connectError ? (
@@ -365,7 +356,7 @@ export function IntegrationConnectionEditorPage(
                   ? "Save"
                   : resolveCreateSubmitLabel(
                       resolveSelectedMethod({
-                        dialog,
+                        editor,
                         methodId: props.methodId,
                       }),
                     )}

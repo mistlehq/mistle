@@ -6,10 +6,10 @@ import { FormPageFrame } from "../shared/page-frame.js";
 import {
   IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
-  type IntegrationConnectionDialogState,
-} from "./integration-connection-dialog.js";
+  type IntegrationConnectionEditorState,
+} from "./integration-connection-editor.js";
 
-const githubAppCreateDialog: IntegrationConnectionDialogState = {
+const githubAppCreateEditor: IntegrationConnectionEditorState = {
   methods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,
@@ -77,7 +77,7 @@ const meta = {
     connectionDisplayNamePlaceholder: "GitHub connection",
     connectionDisplayNameValue: "",
     connectError: null,
-    dialog: githubAppCreateDialog,
+    editor: githubAppCreateEditor,
     hasChanges: true,
     isConnectionDisplayNameChanged: false,
     isSecretChanged: false,

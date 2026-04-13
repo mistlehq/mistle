@@ -8,7 +8,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useIntegrationConnectionDialogState } from "../src/features/pages/use-integration-connection-dialog-state.js";
+import { useIntegrationConnectionEditorState } from "../src/features/pages/use-integration-connection-editor-state.js";
 import { createTestQueryClient } from "../src/test-support/query-client.js";
 
 type CapturedRequest = {
@@ -36,7 +36,7 @@ function readJsonBody(bodyText: string): unknown {
   return JSON.parse(bodyText);
 }
 
-describe("useIntegrationConnectionDialogState update form behavior", () => {
+describe("useIntegrationConnectionEditorState update form behavior", () => {
   afterEach(() => {
     cleanup();
   });
@@ -48,8 +48,8 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
     );
     const { result } = renderHook(
       () =>
-        useIntegrationConnectionDialogState({
-          initialOpenInput: {
+        useIntegrationConnectionEditorState({
+          initialEditorInput: {
             mode: "create",
             methods: [
               {
@@ -109,8 +109,8 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
     );
     const { result } = renderHook(
       () =>
-        useIntegrationConnectionDialogState({
-          initialOpenInput: {
+        useIntegrationConnectionEditorState({
+          initialEditorInput: {
             mode: "create",
             methods: [
               {
@@ -159,7 +159,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
 
     act(() => {
       result.current.onConnectionDisplayNameChange("GitHub connection");
-      result.current.submitDialog();
+      result.current.submitEditor();
     });
 
     await waitFor(() => {
@@ -215,8 +215,8 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       );
       const { result } = renderHook(
         () =>
-          useIntegrationConnectionDialogState({
-            initialOpenInput: {
+          useIntegrationConnectionEditorState({
+            initialEditorInput: {
               mode: "update",
               connectionConfig: {
                 connection_method: IntegrationConnectionMethodIds.API_KEY,
@@ -256,7 +256,7 @@ describe("useIntegrationConnectionDialogState update form behavior", () => {
       expect(result.current.isSecretChanged).toBe(false);
 
       act(() => {
-        result.current.submitDialog();
+        result.current.submitEditor();
       });
 
       await waitFor(() => {

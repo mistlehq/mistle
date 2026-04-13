@@ -5,12 +5,12 @@ import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 
 import type {
-  IntegrationConnectionDialogState,
+  IntegrationConnectionEditorState,
   IntegrationConnectionMethodId,
-} from "../integrations/integration-connection-dialog.js";
+} from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import { isRecord } from "../shared/is-record.js";
-import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
+import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = createIntegrationFormRegistry(Definitions);
@@ -33,7 +33,7 @@ export type ConnectionMethodFormUiModel =
       message: string;
     };
 
-export type IntegrationConnectionDialogDraft = {
+export type IntegrationConnectionEditorDraft = {
   configValue: Record<string, unknown>;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
@@ -90,18 +90,18 @@ function resolveVisiblePropertyKeys(input: {
 }
 
 function resolveSelectedMethod(input: {
-  dialog: IntegrationConnectionDialogState;
+  editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
 }): IntegrationConnectionMethod | null {
-  if (input.dialog.mode === "update") {
-    return input.dialog.currentMethod.id === input.methodId ? input.dialog.currentMethod : null;
+  if (input.editor.mode === "update") {
+    return input.editor.currentMethod.id === input.methodId ? input.editor.currentMethod : null;
   }
 
-  return input.dialog.methods.find((method) => method.id === input.methodId) ?? null;
+  return input.editor.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 export function resolveConnectionMethodFormUiModel(input: {
-  dialog: IntegrationConnectionDialogState;
+  editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
   currentValue: Record<string, unknown>;
 }): ConnectionMethodFormUiModel {
@@ -113,21 +113,21 @@ export function resolveConnectionMethodFormUiModel(input: {
 
   const definition =
     IntegrationRegistry.getDefinition({
-      familyId: input.dialog.targetFamilyId,
-      variantId: input.dialog.targetVariantId,
+      familyId: input.editor.targetFamilyId,
+      variantId: input.editor.targetVariantId,
     }) ?? null;
   if (definition === null) {
     return {
       mode: "unsupported",
-      message: `Missing integration definition for target '${input.dialog.targetFamilyId}/${input.dialog.targetVariantId}'.`,
+      message: `Missing integration definition for target '${input.editor.targetFamilyId}/${input.editor.targetVariantId}'.`,
     };
   }
 
-  const targetConfigResult = definition.targetConfigSchema.safeParse(input.dialog.targetConfig);
+  const targetConfigResult = definition.targetConfigSchema.safeParse(input.editor.targetConfig);
   if (!targetConfigResult.success) {
     return {
       mode: "unsupported",
-      message: `Target '${input.dialog.targetFamilyId}/${input.dialog.targetVariantId}' has invalid config.`,
+      message: `Target '${input.editor.targetFamilyId}/${input.editor.targetVariantId}' has invalid config.`,
     };
   }
 
@@ -136,7 +136,7 @@ export function resolveConnectionMethodFormUiModel(input: {
   if (methodDefinition === null) {
     return {
       mode: "unsupported",
-      message: `Missing connection method '${input.methodId}' for target '${input.dialog.targetKey}'.`,
+      message: `Missing connection method '${input.methodId}' for target '${input.editor.targetKey}'.`,
     };
   }
 
@@ -160,11 +160,11 @@ export function resolveConnectionMethodFormUiModel(input: {
     schema: configSchema,
     form: configFormDefinition,
     context: {
-      familyId: input.dialog.targetFamilyId,
-      variantId: input.dialog.targetVariantId,
+      familyId: input.editor.targetFamilyId,
+      variantId: input.editor.targetVariantId,
       kind: definition.kind,
       target: {
-        rawConfig: input.dialog.targetConfig,
+        rawConfig: input.editor.targetConfig,
         config: targetConfigResult.data,
       },
       currentValue: input.currentValue,
@@ -174,14 +174,14 @@ export function resolveConnectionMethodFormUiModel(input: {
             parsedCurrentValue: parsedCurrentValueResult.data,
           }
         : {}),
-      ...(input.dialog.mode === "update"
+      ...(input.editor.mode === "update"
         ? {
             connection: {
-              id: input.dialog.connectionId,
-              rawConfig: input.dialog.currentConnectionConfig,
+              id: input.editor.connectionId,
+              rawConfig: input.editor.currentConnectionConfig,
               config:
-                input.dialog.currentMethod.id === input.methodId
-                  ? resolveRecord(input.dialog.currentConnectionConfig)
+                input.editor.currentMethod.id === input.methodId
+                  ? resolveRecord(input.editor.currentConnectionConfig)
                   : {},
             },
           }
@@ -209,16 +209,16 @@ export function resolveConnectionMethodFormUiModel(input: {
 }
 
 function resolveInitialConfigValue(input: {
-  dialog: IntegrationConnectionDialogState;
+  editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
 }): Record<string, unknown> {
   const baseValue =
-    input.dialog.mode === "update" && input.dialog.currentMethod.id === input.methodId
-      ? input.dialog.currentConnectionConfig
+    input.editor.mode === "update" && input.editor.currentMethod.id === input.methodId
+      ? input.editor.currentConnectionConfig
       : {};
 
   const formUiModel = resolveConnectionMethodFormUiModel({
-    dialog: input.dialog,
+    editor: input.editor,
     methodId: input.methodId,
     currentValue: baseValue,
   });
@@ -230,82 +230,72 @@ function resolveInitialConfigValue(input: {
   return formUiModel.value;
 }
 
-export function createClosedIntegrationConnectionDialogDraft(
-  defaultMethodId: IntegrationConnectionMethodId,
-): IntegrationConnectionDialogDraft {
-  return {
-    configValue: {},
-    connectionDisplayNamePlaceholder: "",
-    connectionDisplayNameValue: "",
-    error: null,
-    initialConfigValue: {},
-    methodId: defaultMethodId,
-    secrets: {},
-  };
-}
-
-export function createOpenIntegrationConnectionDialogState(input: {
+export function createInitialIntegrationConnectionEditorState(input: {
   defaultMethodId: IntegrationConnectionMethodId;
-  openInput: OpenIntegrationConnectionDialogInput;
+  initialEditorInput: OpenIntegrationConnectionEditorInput;
 }): {
-  dialog: IntegrationConnectionDialogState;
-  draft: IntegrationConnectionDialogDraft;
+  editor: IntegrationConnectionEditorState;
+  draft: IntegrationConnectionEditorDraft;
 } {
   const supportedMethods =
-    input.openInput.mode === "create"
-      ? input.openInput.methods.map((method) => method.id)
-      : [input.openInput.currentMethod.id];
+    input.initialEditorInput.mode === "create"
+      ? input.initialEditorInput.methods.map((method) => method.id)
+      : [input.initialEditorInput.currentMethod.id];
   if (supportedMethods[0] === undefined) {
     throw new Error(
-      `Integration target '${input.openInput.targetKey}' does not declare any supported connection methods.`,
+      `Integration target '${input.initialEditorInput.targetKey}' does not declare any supported connection methods.`,
     );
   }
   const selectedMethodId =
-    input.openInput.mode === "create" ? input.defaultMethodId : input.openInput.currentMethod.id;
+    input.initialEditorInput.mode === "create"
+      ? input.defaultMethodId
+      : input.initialEditorInput.currentMethod.id;
 
   const existingConnectionDisplayName =
-    input.openInput.mode === "update" ? input.openInput.connectionDisplayName : undefined;
+    input.initialEditorInput.mode === "update"
+      ? input.initialEditorInput.connectionDisplayName
+      : undefined;
   const defaultConnectionDisplayName =
-    input.openInput.mode === "update"
-      ? (existingConnectionDisplayName ?? input.openInput.connectionId ?? "")
-      : `${input.openInput.targetDisplayName} connection`;
+    input.initialEditorInput.mode === "update"
+      ? (existingConnectionDisplayName ?? input.initialEditorInput.connectionId ?? "")
+      : `${input.initialEditorInput.targetDisplayName} connection`;
 
-  const dialog: IntegrationConnectionDialogState =
-    input.openInput.mode === "create"
+  const editor: IntegrationConnectionEditorState =
+    input.initialEditorInput.mode === "create"
       ? {
-          targetConfig: input.openInput.targetConfig,
-          targetDisplayName: input.openInput.targetDisplayName,
-          targetFamilyId: input.openInput.targetFamilyId,
-          targetKey: input.openInput.targetKey,
-          targetVariantId: input.openInput.targetVariantId,
-          mode: input.openInput.mode,
-          methods: input.openInput.methods,
+          targetConfig: input.initialEditorInput.targetConfig,
+          targetDisplayName: input.initialEditorInput.targetDisplayName,
+          targetFamilyId: input.initialEditorInput.targetFamilyId,
+          targetKey: input.initialEditorInput.targetKey,
+          targetVariantId: input.initialEditorInput.targetVariantId,
+          mode: input.initialEditorInput.mode,
+          methods: input.initialEditorInput.methods,
         }
       : {
-          connectionId: input.openInput.connectionId,
-          currentConnectionConfig: input.openInput.connectionConfig ?? {},
-          currentMethod: input.openInput.currentMethod,
-          targetConfig: input.openInput.targetConfig,
-          targetDisplayName: input.openInput.targetDisplayName,
-          targetFamilyId: input.openInput.targetFamilyId,
-          targetKey: input.openInput.targetKey,
-          targetVariantId: input.openInput.targetVariantId,
-          mode: input.openInput.mode,
-          ...(input.openInput.connectionConfig === undefined
+          connectionId: input.initialEditorInput.connectionId,
+          currentConnectionConfig: input.initialEditorInput.connectionConfig ?? {},
+          currentMethod: input.initialEditorInput.currentMethod,
+          targetConfig: input.initialEditorInput.targetConfig,
+          targetDisplayName: input.initialEditorInput.targetDisplayName,
+          targetFamilyId: input.initialEditorInput.targetFamilyId,
+          targetKey: input.initialEditorInput.targetKey,
+          targetVariantId: input.initialEditorInput.targetVariantId,
+          mode: input.initialEditorInput.mode,
+          ...(input.initialEditorInput.connectionConfig === undefined
             ? {}
-            : { connectionConfig: input.openInput.connectionConfig }),
+            : { connectionConfig: input.initialEditorInput.connectionConfig }),
           ...(existingConnectionDisplayName === undefined
             ? {}
             : { initialConnectionDisplayName: existingConnectionDisplayName }),
         };
 
   const initialConfigValue = resolveInitialConfigValue({
-    dialog,
+    editor,
     methodId: selectedMethodId,
   });
 
   return {
-    dialog,
+    editor,
     draft: {
       configValue: initialConfigValue,
       connectionDisplayNamePlaceholder: defaultConnectionDisplayName,
@@ -322,59 +312,58 @@ function areConfigsEqual(left: Record<string, unknown>, right: Record<string, un
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-export function hasIntegrationConnectionDialogChanges(input: {
-  dialog: IntegrationConnectionDialogState | null;
+export function hasIntegrationConnectionEditorChanges(input: {
+  editor: IntegrationConnectionEditorState;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
   configValue: Record<string, unknown>;
   initialConfigValue: Record<string, unknown>;
   secrets: Record<string, string>;
 }): boolean {
-  if (input.dialog?.mode === "create") {
+  if (input.editor.mode === "create") {
     return true;
   }
 
   return (
-    (
-      input.dialog?.initialConnectionDisplayName ?? input.connectionDisplayNamePlaceholder
-    ).trim() !== input.connectionDisplayNameValue.trim() ||
+    (input.editor.initialConnectionDisplayName ?? input.connectionDisplayNamePlaceholder).trim() !==
+      input.connectionDisplayNameValue.trim() ||
     !areConfigsEqual(input.initialConfigValue, input.configValue) ||
     Object.values(input.secrets).some((value) => value.trim().length > 0)
   );
 }
 
 export function isIntegrationConnectionDisplayNameChanged(input: {
-  dialog: IntegrationConnectionDialogState | null;
+  editor: IntegrationConnectionEditorState;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
 }): boolean {
-  if (input.dialog?.mode !== "update") {
+  if (input.editor.mode !== "update") {
     return input.connectionDisplayNameValue.trim().length > 0;
   }
 
   return (
-    (input.dialog.initialConnectionDisplayName ?? input.connectionDisplayNamePlaceholder).trim() !==
+    (input.editor.initialConnectionDisplayName ?? input.connectionDisplayNamePlaceholder).trim() !==
     input.connectionDisplayNameValue.trim()
   );
 }
 
-export function resolveIntegrationConnectionDialogValidationError(input: {
-  dialog: IntegrationConnectionDialogState;
+export function resolveIntegrationConnectionEditorValidationError(input: {
+  editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
   connectionDisplayNameValue: string;
   secrets: Record<string, string>;
 }): string | null {
-  if (input.dialog.mode === "create" && input.methodId.length === 0) {
+  if (input.editor.mode === "create" && input.methodId.length === 0) {
     return "Authentication method is required.";
   }
 
   const selectedMethod = resolveSelectedMethod({
-    dialog: input.dialog,
+    editor: input.editor,
     methodId: input.methodId,
   });
   if (selectedMethod === null) {
     throw new Error(
-      `Connect method '${input.methodId}' is not supported for target '${input.dialog.targetKey}'.`,
+      `Connect method '${input.methodId}' is not supported for target '${input.editor.targetKey}'.`,
     );
   }
 
@@ -387,7 +376,7 @@ export function resolveIntegrationConnectionDialogValidationError(input: {
     return null;
   }
 
-  if (input.dialog.mode === "create") {
+  if (input.editor.mode === "create") {
     const missingSecretField = selectedMethod.secretFields.find(
       (secretField) => (input.secrets[secretField.name] ?? "").trim().length === 0,
     );
@@ -411,12 +400,12 @@ export function resolveDefaultMethodId(
 }
 
 export function resolveNextDraftForMethodChange(input: {
-  dialog: IntegrationConnectionDialogState;
+  editor: IntegrationConnectionEditorState;
   nextMethodId: IntegrationConnectionMethodId;
-  currentDraft: IntegrationConnectionDialogDraft;
-}): IntegrationConnectionDialogDraft {
+  currentDraft: IntegrationConnectionEditorDraft;
+}): IntegrationConnectionEditorDraft {
   const nextInitialConfigValue = resolveInitialConfigValue({
-    dialog: input.dialog,
+    editor: input.editor,
     methodId: input.nextMethodId,
   });
 

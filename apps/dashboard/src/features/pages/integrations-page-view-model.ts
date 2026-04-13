@@ -9,12 +9,12 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
   type IntegrationConnectionMethodId,
-} from "../integrations/integration-connection-dialog.js";
+} from "../integrations/integration-connection-editor.js";
 import type {
   IntegrationConnection,
   IntegrationConnectionResource,
 } from "../integrations/integrations-service.js";
-import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
+import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 
 const GitHubAppInstallationCompletePath = "/p/integration/callbacks/github-app-installation";
@@ -78,7 +78,7 @@ export function buildAvailableIntegrationViewCards(input: {
 
 export function buildOpenCreateIntegrationConnectionInput(
   card: IntegrationCardViewModel,
-): OpenIntegrationConnectionDialogInput {
+): OpenIntegrationConnectionEditorInput {
   return {
     targetConfig: resolveTargetConfig(card.target.config),
     targetKey: card.target.targetKey,

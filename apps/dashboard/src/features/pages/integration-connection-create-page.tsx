@@ -4,14 +4,14 @@ import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
-import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-dialog.js";
+import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
+import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import { buildOpenCreateIntegrationConnectionInput } from "./integrations-page-view-model.js";
-import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
+import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 export function IntegrationConnectionCreatePage(): React.JSX.Element {
@@ -92,21 +92,21 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
     >
       <LoadedIntegrationConnectionCreatePage
         key={targetKey}
-        openInput={buildOpenCreateIntegrationConnectionInput(card)}
+        initialEditorInput={buildOpenCreateIntegrationConnectionInput(card)}
       />
     </FormPageFrame>
   );
 }
 
 function LoadedIntegrationConnectionCreatePage(input: {
-  openInput: OpenIntegrationConnectionDialogInput;
+  initialEditorInput: OpenIntegrationConnectionEditorInput;
 }): React.JSX.Element {
   const navigate = useNavigate();
-  const connectionState = useIntegrationConnectionDialogState({
-    initialOpenInput: input.openInput,
+  const connectionState = useIntegrationConnectionEditorState({
+    initialEditorInput: input.initialEditorInput,
     onClose: () => navigate("/integrations"),
-    onSubmitSuccess: async ({ dialog }) => {
-      await navigate(`/integrations/${dialog.targetKey}`);
+    onSubmitSuccess: async ({ editor }) => {
+      await navigate(`/integrations/${editor.targetKey}`);
     },
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
@@ -119,17 +119,17 @@ function LoadedIntegrationConnectionCreatePage(input: {
       connectionDisplayNamePlaceholder={connectionState.connectionDisplayNamePlaceholder}
       connectionDisplayNameValue={connectionState.connectionDisplayNameValue}
       deviceAuthorizationPending={connectionState.deviceAuthorizationPending}
-      dialog={connectionState.dialog}
+      editor={connectionState.editor}
       hasChanges={connectionState.hasChanges}
       isConnectionDisplayNameChanged={connectionState.isConnectionDisplayNameChanged}
       isSecretChanged={connectionState.isSecretChanged}
       methodId={connectionState.methodId}
-      onClose={connectionState.closeDialog}
+      onClose={connectionState.closeEditor}
       onConfigChange={connectionState.onConfigChange}
       onConnectionDisplayNameChange={connectionState.onConnectionDisplayNameChange}
       onMethodChange={connectionState.onMethodChange}
       onSecretChange={connectionState.onSecretChange}
-      onSubmit={connectionState.submitDialog}
+      onSubmit={connectionState.submitEditor}
       pending={connectionState.pending}
       secrets={connectionState.secrets}
     />

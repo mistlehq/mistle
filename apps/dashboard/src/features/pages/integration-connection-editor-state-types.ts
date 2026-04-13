@@ -1,6 +1,6 @@
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 
-type BaseOpenIntegrationConnectionDialogInput = {
+type BaseOpenIntegrationConnectionEditorInput = {
   targetConfig: Record<string, unknown>;
   targetDisplayName: string;
   targetFamilyId: string;
@@ -8,12 +8,12 @@ type BaseOpenIntegrationConnectionDialogInput = {
   targetVariantId: string;
 };
 
-export type OpenIntegrationConnectionDialogInput =
-  | (BaseOpenIntegrationConnectionDialogInput & {
+export type OpenIntegrationConnectionEditorInput =
+  | (BaseOpenIntegrationConnectionEditorInput & {
       methods: readonly IntegrationConnectionMethod[];
       mode: "create";
     })
-  | (BaseOpenIntegrationConnectionDialogInput & {
+  | (BaseOpenIntegrationConnectionEditorInput & {
       connectionConfig?: Record<string, unknown>;
       connectionDisplayName?: string;
       connectionId: string;
