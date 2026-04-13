@@ -51,8 +51,9 @@ function SessionWorkbenchPageContent(input: {
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
+  const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusLabel =
-    workbench.workbenchStatus.kind === "error"
+    headerStatusKind === "error"
       ? "Error"
       : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
   const headerActions = useMemo(
@@ -112,7 +113,7 @@ function SessionWorkbenchPageContent(input: {
                 : "Primary repository"),
         }}
         status={{
-          kind: workbench.workbenchStatus.kind,
+          kind: headerStatusKind,
           label: headerStatusLabel,
         }}
         terminalControl={{
@@ -141,6 +142,7 @@ function SessionWorkbenchPageContent(input: {
       cliButtonTitle,
       diffButtonLabel,
       diffButtonTitle,
+      headerStatusKind,
       headerStatusLabel,
       terminalButtonLabel,
       terminalButtonTitle,
