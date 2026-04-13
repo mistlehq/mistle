@@ -112,7 +112,7 @@ const RuntimeExecCommandSchema = z
   })
   .strict();
 
-const RuntimeArtifactGitHubReleaseSelectorSchema = z.discriminatedUnion("kind", [
+const RuntimeArtifactGitHubReleaseSelectorSchema = z.union([
   z
     .object({
       kind: z.literal("latest"),
@@ -137,7 +137,7 @@ const RuntimeArtifactGitHubReleaseSelectorSchema = z.discriminatedUnion("kind", 
 const RuntimeArtifactGitHubReleaseAssetBinarySchema = z
   .object({
     fileName: z.string().min(1),
-    format: z.literal("binary").optional(),
+    format: z.literal("binary"),
   })
   .strict();
 
@@ -159,7 +159,7 @@ const RuntimeArtifactGitHubReleaseInstallAssetSchema = z.union([
     .object({
       kind: z.literal("exact"),
       fileName: z.string().min(1),
-      format: z.literal("binary").optional(),
+      format: z.literal("binary"),
     })
     .strict(),
   z
@@ -206,11 +206,6 @@ const RuntimeArtifactInstallStepSchema = z.discriminatedUnion("op", [
     .strict(),
 ]);
 
-const RuntimeArtifactInstallEntryCompatSchema = z.union([
-  RuntimeExecCommandSchema,
-  RuntimeArtifactInstallStepSchema,
-]);
-
 const CompiledRuntimeArtifactSpecSchema = z
   .object({
     artifactKey: z.string().min(1),
@@ -219,7 +214,7 @@ const CompiledRuntimeArtifactSpecSchema = z
     env: z.record(z.string(), z.string()).optional(),
     lifecycle: z
       .object({
-        install: z.array(RuntimeArtifactInstallEntryCompatSchema).readonly(),
+        install: z.array(RuntimeArtifactInstallStepSchema).readonly(),
       })
       .strict(),
   })
@@ -573,19 +568,9 @@ function normalizeGitHubReleaseInstallAsset(
   };
 }
 
-function isLegacyRuntimeArtifactInstallEntry(
-  entry: z.output<typeof RuntimeArtifactInstallEntryCompatSchema>,
-): entry is z.output<typeof RuntimeExecCommandSchema> {
-  return "args" in entry;
-}
-
 function normalizeRuntimeArtifactInstallEntry(
-  entry: z.output<typeof RuntimeArtifactInstallEntryCompatSchema>,
+  entry: z.output<typeof RuntimeArtifactInstallStepSchema>,
 ): RuntimePlanArtifact["lifecycle"]["install"][number] {
-  if (isLegacyRuntimeArtifactInstallEntry(entry)) {
-    return normalizeRuntimeExecCommand(entry);
-  }
-
   if (entry.op === "exec") {
     return {
       op: "exec",

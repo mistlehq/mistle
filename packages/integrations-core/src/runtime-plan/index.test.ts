@@ -195,7 +195,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 A_VAR: "one",
               },
               lifecycle: {
-                install: [{ args: ["mise", "install", "gh@latest"] }],
+                install: [{ op: "mise_install", tools: ["gh@latest"] }],
               },
             },
           ],
@@ -284,7 +284,14 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "codex-cli",
               name: "Codex CLI",
               lifecycle: {
-                install: [{ args: ["sh", "-euc", "install-codex-latest"] }],
+                install: [
+                  {
+                    op: "exec",
+                    command: {
+                      args: ["sh", "-euc", "install-codex-latest"],
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -430,7 +437,14 @@ describe("assembleCompiledRuntimePlan", () => {
                 GH_TOKEN: GitHubCliPlaceholderToken,
               },
               lifecycle: {
-                install: [{ args: ["sh", "-euc", "install-gh"] }],
+                install: [
+                  {
+                    op: "exec",
+                    command: {
+                      args: ["sh", "-euc", "install-gh"],
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -448,14 +462,28 @@ describe("assembleCompiledRuntimePlan", () => {
                 GH_TOKEN: GitHubCliPlaceholderToken,
               },
               lifecycle: {
-                install: [{ args: ["sh", "-euc", "install-gh"] }],
+                install: [
+                  {
+                    op: "exec",
+                    command: {
+                      args: ["sh", "-euc", "install-gh"],
+                    },
+                  },
+                ],
               },
             },
             {
               artifactKey: "jira-cli",
               name: "Jira CLI",
               lifecycle: {
-                install: [{ args: ["sh", "-euc", "install-jira"] }],
+                install: [
+                  {
+                    op: "exec",
+                    command: {
+                      args: ["sh", "-euc", "install-jira"],
+                    },
+                  },
+                ],
               },
             },
           ],
@@ -957,5 +985,44 @@ describe("assembleCompiledRuntimePlan", () => {
         agentRuntimes: [],
       }),
     ).toThrow(/aws_sigv4/);
+  });
+
+  it("rejects github release binary assets that omit format in typed artifact steps", () => {
+    expect(() =>
+      CompiledRuntimePlanSchema.parse({
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        egressRoutes: [],
+        artifacts: [
+          {
+            artifactKey: "slack-cli",
+            name: "Slack CLI",
+            lifecycle: {
+              install: [
+                {
+                  op: "github_release_install",
+                  repository: "mistlehq/tools",
+                  release: {
+                    kind: "latest",
+                  },
+                  asset: {
+                    kind: "exact",
+                    fileName: "slack-linux-amd64",
+                  },
+                  installPath: "/usr/local/bin/slack",
+                },
+              ],
+            },
+          },
+        ],
+        workspaceSources: [],
+        runtimeClients: [],
+        agentRuntimes: [],
+      }),
+    ).toThrow(/format/);
   });
 });

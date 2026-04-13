@@ -9,7 +9,6 @@ import {
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
   type IntegrationDefinition,
-  type RuntimeArtifactInstallEntryCompat,
   type RuntimeArtifactInstallStep,
 } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
@@ -80,10 +79,10 @@ const NoopConversationProvider = {
 };
 
 function expectTypedInstallStep(
-  entry: RuntimeArtifactInstallEntryCompat | undefined,
+  entry: RuntimeArtifactInstallStep | undefined,
 ): RuntimeArtifactInstallStep {
-  if (entry === undefined || "args" in entry) {
-    throw new Error("Expected typed artifact install step after helper migration.");
+  if (entry === undefined) {
+    throw new Error("Expected artifact install step.");
   }
 
   return entry;

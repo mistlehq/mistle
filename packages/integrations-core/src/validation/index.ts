@@ -6,7 +6,6 @@ import type {
   CompiledRuntimeClient,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
-  RuntimeArtifactInstallEntryCompat,
   RuntimeArtifactInstallStep,
   RuntimeExecCommand,
   RuntimeClientEndpointSpec,
@@ -179,42 +178,28 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
   }
 }
 
-function isLegacyRuntimeArtifactInstallEntry(
-  entry: RuntimeArtifactInstallEntryCompat,
-): entry is RuntimeExecCommand {
-  return "args" in entry;
-}
-
 function validateArtifactInstallEntry(input: {
   artifactKey: string;
-  installEntry: RuntimeArtifactInstallEntryCompat;
+  installEntry: RuntimeArtifactInstallStep;
 }): void {
   const { installEntry } = input;
 
-  if (isLegacyRuntimeArtifactInstallEntry(installEntry)) {
-    if (installEntry.args.length === 0) {
+  if (installEntry.op === "exec") {
+    if (installEntry.command.args.length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${input.artifactKey}' contains a lifecycle command with no args.`,
+        `Artifact '${input.artifactKey}' contains an exec install step with no args.`,
       );
     }
 
-    const commandName = installEntry.args[0];
+    const commandName = installEntry.command.args[0];
     if (commandName === undefined || commandName.trim().length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${input.artifactKey}' contains an empty lifecycle command.`,
+        `Artifact '${input.artifactKey}' contains an exec install step with an empty command.`,
       );
     }
 
-    return;
-  }
-
-  if (installEntry.op === "exec") {
-    validateArtifactInstallEntry({
-      artifactKey: input.artifactKey,
-      installEntry: installEntry.command,
-    });
     return;
   }
 
@@ -636,17 +621,9 @@ function runtimeArtifactGitHubReleaseAssetShapeEquals(
 }
 
 function runtimeArtifactInstallEntryEquals(
-  left: RuntimeArtifactInstallEntryCompat,
-  right: RuntimeArtifactInstallEntryCompat,
+  left: RuntimeArtifactInstallStep,
+  right: RuntimeArtifactInstallStep,
 ): boolean {
-  if (isLegacyRuntimeArtifactInstallEntry(left) || isLegacyRuntimeArtifactInstallEntry(right)) {
-    return (
-      isLegacyRuntimeArtifactInstallEntry(left) &&
-      isLegacyRuntimeArtifactInstallEntry(right) &&
-      runtimeExecCommandEquals(left, right)
-    );
-  }
-
   if (left.op !== right.op) {
     return false;
   }

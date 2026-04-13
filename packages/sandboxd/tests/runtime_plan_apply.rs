@@ -49,8 +49,11 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
               "lifecycle": {
                 "install": [
                   {
-                    "args": ["sh", "-c", format!("printf artifact > {}", artifact_output_path.display())],
-                    "cwd": test_dir.display().to_string()
+                    "op": "exec",
+                    "command": {
+                      "args": ["sh", "-c", format!("printf artifact > {}", artifact_output_path.display())],
+                      "cwd": test_dir.display().to_string()
+                    }
                   }
                 ]
               }
@@ -120,7 +123,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 }
 
 #[test]
-fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
+fn decodes_typed_artifact_install_steps() {
     let runtime_plan: runtime::CompiledRuntimePlan = serde_json::from_value(serde_json::json!({
       "sandboxProfileId": "sbp_123",
       "version": 1,
@@ -135,9 +138,6 @@ fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
           "name": "artifact one",
           "lifecycle": {
             "install": [
-              {
-                "args": ["sh", "-c", "echo legacy"]
-              },
               {
                 "op": "exec",
                 "command": {
@@ -179,29 +179,19 @@ fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
       "workspaceSources": [],
       "agentRuntimes": []
     }))
-    .expect("runtime plan should decode artifact install compatibility shapes");
+    .expect("runtime plan should decode typed artifact install steps");
 
     assert!(matches!(
         runtime_plan.artifacts[0].lifecycle.install[0],
-        runtime::RuntimeArtifactInstallEntry::LegacyCommand(_)
+        runtime::RuntimeArtifactInstallStep::Exec { .. }
     ));
     assert!(matches!(
         runtime_plan.artifacts[0].lifecycle.install[1],
-        runtime::RuntimeArtifactInstallEntry::Step(
-            runtime::RuntimeArtifactInstallStep::Exec { .. }
-        )
+        runtime::RuntimeArtifactInstallStep::MiseInstall { .. }
     ));
     assert!(matches!(
         runtime_plan.artifacts[0].lifecycle.install[2],
-        runtime::RuntimeArtifactInstallEntry::Step(
-            runtime::RuntimeArtifactInstallStep::MiseInstall { .. }
-        )
-    ));
-    assert!(matches!(
-        runtime_plan.artifacts[0].lifecycle.install[3],
-        runtime::RuntimeArtifactInstallEntry::Step(
-            runtime::RuntimeArtifactInstallStep::GitHubReleaseInstall { .. }
-        )
+        runtime::RuntimeArtifactInstallStep::GitHubReleaseInstall { .. }
     ));
 }
 
@@ -231,7 +221,8 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
                     },
                     "asset": {
                       "kind": "exact",
-                      "fileName": "slack-linux-amd64"
+                      "fileName": "slack-linux-amd64",
+                      "format": "binary"
                     },
                     "installPath": "/usr/local/bin/slack"
                   }
@@ -319,6 +310,50 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
     assert!(
         invalid_empty_mise_tools.is_err(),
         "typed mise installs with no tools should fail decode"
+    );
+
+    let invalid_missing_binary_format =
+        serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "github_release_install",
+                    "repository": "mistlehq/tools",
+                    "release": {
+                      "kind": "tag",
+                      "match": "latest_matching_prefix",
+                      "prefix": "slack/"
+                    },
+                    "asset": {
+                      "kind": "exact",
+                      "fileName": "slack-linux-amd64"
+                    },
+                    "installPath": "/usr/local/bin/slack"
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }));
+    assert!(
+        invalid_missing_binary_format
+            .expect_err("binary github release assets without format should be rejected")
+            .to_string()
+            .contains("missing field `format`")
     );
 }
 

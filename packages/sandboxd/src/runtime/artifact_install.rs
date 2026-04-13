@@ -18,7 +18,7 @@ use super::plan::{
     RuntimeArtifactGitHubReleaseAssetShape, RuntimeArtifactGitHubReleaseInstallAsset,
     RuntimeArtifactGitHubReleaseSelector, RuntimeArtifactGitHubReleaseTagSelector,
 };
-use super::{RuntimeArtifactInstallEntry, RuntimeArtifactInstallStep, RuntimeExecCommand};
+use super::{RuntimeArtifactInstallStep, RuntimeExecCommand};
 
 const GITHUB_API_BASE_URL: &str = "https://api.github.com";
 const GITHUB_API_ACCEPT_HEADER: &str = "application/vnd.github+json";
@@ -27,39 +27,7 @@ const GITHUB_RELEASE_ATTEMPTS: usize = 3;
 const GITHUB_RELEASE_RETRY_BACKOFFS_MS: [u64; 2] = [1_000, 2_000];
 const INSTALLED_BINARY_MODE: u32 = 0o755;
 
-pub(crate) fn artifact_install_entry_op(entry: &RuntimeArtifactInstallEntry) -> &'static str {
-    match entry {
-        RuntimeArtifactInstallEntry::LegacyCommand(_) => "legacy_command",
-        RuntimeArtifactInstallEntry::Step(step) => artifact_install_step_op(step),
-    }
-}
-
-pub(crate) fn apply_artifact_install_entry(
-    entry: &RuntimeArtifactInstallEntry,
-) -> Result<(), String> {
-    apply_artifact_install_entry_with_dependencies(entry, &SystemClock, &ThreadSleeper)
-}
-
-fn apply_artifact_install_entry_with_dependencies<C, S>(
-    entry: &RuntimeArtifactInstallEntry,
-    clock: &C,
-    sleeper: &S,
-) -> Result<(), String>
-where
-    C: Clock,
-    S: Sleeper,
-{
-    match entry {
-        RuntimeArtifactInstallEntry::LegacyCommand(command) => {
-            apply_exec_command(command, clock, sleeper)
-        }
-        RuntimeArtifactInstallEntry::Step(step) => {
-            apply_artifact_install_step(step, clock, sleeper)
-        }
-    }
-}
-
-fn artifact_install_step_op(step: &RuntimeArtifactInstallStep) -> &'static str {
+pub(crate) fn artifact_install_step_op(step: &RuntimeArtifactInstallStep) -> &'static str {
     match step {
         RuntimeArtifactInstallStep::GitHubReleaseInstall { .. } => "github_release_install",
         RuntimeArtifactInstallStep::MiseInstall { .. } => "mise_install",
@@ -67,7 +35,11 @@ fn artifact_install_step_op(step: &RuntimeArtifactInstallStep) -> &'static str {
     }
 }
 
-fn apply_artifact_install_step<C, S>(
+pub(crate) fn apply_artifact_install_step(step: &RuntimeArtifactInstallStep) -> Result<(), String> {
+    apply_artifact_install_step_with_dependencies(step, &SystemClock, &ThreadSleeper)
+}
+
+fn apply_artifact_install_step_with_dependencies<C, S>(
     step: &RuntimeArtifactInstallStep,
     clock: &C,
     sleeper: &S,
@@ -816,13 +788,13 @@ mod tests {
         let x86_asset = RuntimeArtifactGitHubReleaseAssetShape::Binary(
             RuntimeArtifactGitHubReleaseBinaryAssetShape {
                 file_name: "tool-linux-amd64".to_string(),
-                format: None,
+                format: crate::runtime::plan::RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
             },
         );
         let arm_asset = RuntimeArtifactGitHubReleaseAssetShape::Binary(
             RuntimeArtifactGitHubReleaseBinaryAssetShape {
                 file_name: "tool-linux-arm64".to_string(),
-                format: None,
+                format: crate::runtime::plan::RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
             },
         );
         let by_arch_asset = RuntimeArtifactGitHubReleaseInstallAsset::ByArch {
@@ -942,7 +914,7 @@ mod tests {
         let binary_asset = RuntimeArtifactGitHubReleaseAssetShape::Binary(
             RuntimeArtifactGitHubReleaseBinaryAssetShape {
                 file_name: "tool-linux-amd64".to_string(),
-                format: None,
+                format: crate::runtime::plan::RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
             },
         );
 
@@ -1010,7 +982,7 @@ mod tests {
         let binary_asset = RuntimeArtifactGitHubReleaseAssetShape::Binary(
             RuntimeArtifactGitHubReleaseBinaryAssetShape {
                 file_name: "tool-linux-amd64".to_string(),
-                format: None,
+                format: crate::runtime::plan::RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
             },
         );
 

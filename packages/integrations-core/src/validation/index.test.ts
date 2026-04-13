@@ -6,6 +6,7 @@ import type {
   CompiledBindingResult,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
+  RuntimeArtifactInstallStep,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
 } from "../types/index.js";
@@ -111,12 +112,7 @@ function createCompiledBindingResult(input: {
   artifactKey: string;
   artifactName?: string;
   artifactEnv?: Readonly<Record<string, string>>;
-  artifactInstallCommands?: ReadonlyArray<{
-    args: ReadonlyArray<string>;
-    env?: Record<string, string>;
-    cwd?: string;
-    timeoutMs?: number;
-  }>;
+  artifactInstallCommands?: ReadonlyArray<RuntimeArtifactInstallStep>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string>;
@@ -141,7 +137,12 @@ function createCompiledBindingResult(input: {
         ...(input.artifactEnv === undefined ? {} : { env: input.artifactEnv }),
         lifecycle: {
           install: input.artifactInstallCommands ?? [
-            { args: ["echo", "install", input.route.egressRuleId] },
+            {
+              op: "exec",
+              command: {
+                args: ["echo", "install", input.route.egressRuleId],
+              },
+            },
           ],
         },
       },
@@ -523,8 +524,11 @@ describe("validateCompiledBindingResults", () => {
       },
       artifactInstallCommands: [
         {
-          args: ["sh", "-euc", "install jira"],
-          timeoutMs: 120_000,
+          op: "exec",
+          command: {
+            args: ["sh", "-euc", "install jira"],
+            timeoutMs: 120_000,
+          },
         },
       ],
     });
@@ -541,8 +545,11 @@ describe("validateCompiledBindingResults", () => {
       },
       artifactInstallCommands: [
         {
-          args: ["sh", "-euc", "install jira"],
-          timeoutMs: 120_000,
+          op: "exec",
+          command: {
+            args: ["sh", "-euc", "install jira"],
+            timeoutMs: 120_000,
+          },
         },
       ],
     });
@@ -778,7 +785,14 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-latest"] }],
+      artifactInstallCommands: [
+        {
+          op: "exec",
+          command: {
+            args: ["sh", "-euc", "install-codex-latest"],
+          },
+        },
+      ],
     });
 
     const resultB = createCompiledBindingResult({
@@ -789,7 +803,14 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-v0.100.0"] }],
+      artifactInstallCommands: [
+        {
+          op: "exec",
+          command: {
+            args: ["sh", "-euc", "install-codex-v0.100.0"],
+          },
+        },
+      ],
     });
 
     expect(() =>
@@ -851,7 +872,7 @@ describe("validateCompiledBindingResults", () => {
     ).toThrow(IntegrationCompilerError);
   });
 
-  it("fails when an artifact command has empty args", () => {
+  it("fails when an artifact exec install step has empty args", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
         egressRuleId: "egress_rule_a",
@@ -859,7 +880,14 @@ describe("validateCompiledBindingResults", () => {
         hosts: ["api.openai.com"],
       }),
       artifactKey: "codex-cli",
-      artifactInstallCommands: [{ args: [] }],
+      artifactInstallCommands: [
+        {
+          op: "exec",
+          command: {
+            args: [],
+          },
+        },
+      ],
     });
 
     expect(() =>

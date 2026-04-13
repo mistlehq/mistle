@@ -80,7 +80,7 @@ pub struct CompiledEgressRouteCredentialResolver {
     pub resolver_key: Option<String>,
 }
 
-/// One subprocess command used by runtime client processes and legacy artifact installs.
+/// One subprocess command used by runtime client processes and exec artifact installs.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeExecCommand {
@@ -89,8 +89,6 @@ pub struct RuntimeExecCommand {
     pub cwd: Option<String>,
     pub timeout_ms: Option<u64>,
 }
-
-pub type LegacyRuntimeArtifactCommand = RuntimeExecCommand;
 
 fn deserialize_non_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -212,7 +210,7 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseAssetShape {
         struct Shape {
             #[serde(deserialize_with = "deserialize_non_empty_string")]
             file_name: String,
-            format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+            format: RuntimeArtifactGitHubReleaseAssetFormatWire,
             extracted_path: Option<String>,
         }
 
@@ -227,7 +225,7 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseAssetShape {
 pub struct RuntimeArtifactGitHubReleaseBinaryAssetShape {
     #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub file_name: String,
-    pub format: Option<RuntimeArtifactGitHubReleaseBinaryAssetFormat>,
+    pub format: RuntimeArtifactGitHubReleaseBinaryAssetFormat,
 }
 
 /// One tarball GitHub release asset shape.
@@ -286,7 +284,7 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseInstallAsset {
                 #[serde(rename = "fileName")]
                 #[serde(deserialize_with = "deserialize_non_empty_string")]
                 file_name: String,
-                format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+                format: RuntimeArtifactGitHubReleaseAssetFormatWire,
                 #[serde(rename = "extractedPath")]
                 extracted_path: Option<String>,
             },
@@ -316,22 +314,22 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseInstallAsset {
 
 fn parse_github_release_asset_shape<E>(
     file_name: String,
-    format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+    format: RuntimeArtifactGitHubReleaseAssetFormatWire,
     extracted_path: Option<String>,
 ) -> Result<RuntimeArtifactGitHubReleaseAssetShape, E>
 where
     E: serde::de::Error,
 {
     match (format, extracted_path) {
-        (None, None) | (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::Binary), None) => {
+        (RuntimeArtifactGitHubReleaseAssetFormatWire::Binary, None) => {
             Ok(RuntimeArtifactGitHubReleaseAssetShape::Binary(
                 RuntimeArtifactGitHubReleaseBinaryAssetShape {
                     file_name,
-                    format: format.map(|_| RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary),
+                    format: RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
                 },
             ))
         }
-        (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz), Some(extracted_path)) => {
+        (RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz, Some(extracted_path)) => {
             Ok(RuntimeArtifactGitHubReleaseAssetShape::TarGz(
                 RuntimeArtifactGitHubReleaseTarGzAssetShape {
                     file_name,
@@ -340,10 +338,10 @@ where
                 },
             ))
         }
-        (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz), None) => Err(
+        (RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz, None) => Err(
             serde::de::Error::custom("tar.gz assets must include extractedPath"),
         ),
-        (None, Some(_)) | (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::Binary), Some(_)) => {
+        (RuntimeArtifactGitHubReleaseAssetFormatWire::Binary, Some(_)) => {
             Err(serde::de::Error::custom(
                 "binary assets must not include extractedPath",
             ))
@@ -396,19 +394,11 @@ pub enum RuntimeArtifactInstallStep {
     Exec { command: RuntimeExecCommand },
 }
 
-/// One artifact lifecycle install entry during the compatibility window.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(untagged)]
-pub enum RuntimeArtifactInstallEntry {
-    LegacyCommand(LegacyRuntimeArtifactCommand),
-    Step(RuntimeArtifactInstallStep),
-}
-
 /// The install lifecycle for one compiled runtime artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeArtifactLifecycle {
-    pub install: Vec<RuntimeArtifactInstallEntry>,
+    pub install: Vec<RuntimeArtifactInstallStep>,
 }
 
 /// One artifact that must be materialized before runtime clients start.

@@ -19,12 +19,11 @@ pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
     CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
     CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimeArtifact,
-    CompiledRuntimePlan, CompiledWorkspaceSource, RuntimeArtifactInstallEntry,
-    RuntimeArtifactInstallStep, RuntimeArtifactLifecycle, RuntimeClient,
-    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
-    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
-    RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile, RuntimeExecCommand,
-    WorkspaceSourceResourceKind,
+    CompiledRuntimePlan, CompiledWorkspaceSource, RuntimeArtifactInstallStep,
+    RuntimeArtifactLifecycle, RuntimeClient, RuntimeClientConnectionMode, RuntimeClientEndpoint,
+    RuntimeClientEndpointTransport, RuntimeClientProcess, RuntimeClientProcessReadiness,
+    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal, RuntimeClientSetup,
+    RuntimeClientSetupFile, RuntimeExecCommand, WorkspaceSourceResourceKind,
 };
 
 /// Describes why one runtime-plan setup step failed while applying startup input.
@@ -112,13 +111,13 @@ pub fn apply_compiled_runtime_plan(
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
-        for (install_index, install_entry) in artifact.lifecycle.install.iter().enumerate() {
-            artifact_install::apply_artifact_install_entry(install_entry).map_err(|error| {
+        for (install_index, install_step) in artifact.lifecycle.install.iter().enumerate() {
+            artifact_install::apply_artifact_install_step(install_step).map_err(|error| {
                 RuntimePlanApplyError::ArtifactInstall {
                     artifact_index,
                     install_index,
                     artifact_key: artifact.artifact_key.clone(),
-                    op: artifact_install::artifact_install_entry_op(install_entry),
+                    op: artifact_install::artifact_install_step_op(install_step),
                     error,
                 }
             })?;

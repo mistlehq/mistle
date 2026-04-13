@@ -1045,8 +1045,6 @@ export type RuntimeExecCommand = {
   timeoutMs?: number;
 };
 
-export type LegacyRuntimeArtifactCommand = RuntimeExecCommand;
-
 export type RuntimeArtifactGitHubReleaseSelector =
   | {
       kind: "latest";
@@ -1065,7 +1063,7 @@ export type RuntimeArtifactGitHubReleaseSelector =
 export type RuntimeArtifactGitHubReleaseInstallAssetShape =
   | {
       fileName: string;
-      format?: "binary";
+      format: "binary";
     }
   | {
       fileName: string;
@@ -1135,10 +1133,6 @@ export type RuntimeArtifactInstallStep =
       command: RuntimeExecCommand;
     };
 
-export type RuntimeArtifactInstallEntryCompat =
-  | LegacyRuntimeArtifactCommand
-  | RuntimeArtifactInstallStep;
-
 export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep;
@@ -1187,7 +1181,7 @@ export type CompiledRuntimeArtifactSpec = {
   name: string;
   description?: string;
   env?: Readonly<Record<string, string>>;
-  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactInstallEntryCompat>>;
+  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactInstallStep>>;
 };
 
 export const RuntimeFileWriteMode = {
