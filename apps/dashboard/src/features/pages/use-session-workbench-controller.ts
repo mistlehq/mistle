@@ -195,7 +195,6 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
-  const isPrimaryRepositorySwitchBlockedByActiveTurn = chat.canInterruptTurn || chat.canSteerTurn;
   const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;
   const isSwitchingPrimaryRepository = sessionState.threads.isSwitchingPrimaryRepository;
   const branchDiffState = useSessionBranchDiff({
@@ -290,11 +289,9 @@ export function useSessionWorkbenchController(input: {
       primaryRepositoryState,
       portAccessState,
       primaryRepositoryControlState: {
-        disabledReason: isPrimaryRepositorySwitchBlockedByActiveTurn
-          ? "Finish the active turn before switching the primary repository."
-          : isPrimaryRepositorySwitchBlockedByCli
-            ? "Exit Codex CLI before switching the primary repository."
-            : null,
+        disabledReason: isPrimaryRepositorySwitchBlockedByCli
+          ? "Exit Codex CLI before switching the primary repository."
+          : null,
         isSwitching: isSwitchingPrimaryRepository,
         switchPrimaryRepository,
       },
