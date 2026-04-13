@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildRepositoryDiscoveryFindArgs,
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
   resolveCurrentRepositoryPath,
@@ -20,6 +21,29 @@ describe("useSessionPrimaryRepositoryState helpers", () => {
         ].join("\n"),
       }),
     ).toEqual(["/root/acme/repo-1", "/root/acme/repo-2", "/root/platform"]);
+  });
+
+  it("builds a find command that supports repositories and worktree checkouts", () => {
+    expect(
+      buildRepositoryDiscoveryFindArgs({
+        workspaceRoot: DefaultSandboxWorkspaceDir,
+      }),
+    ).toEqual([
+      "/root",
+      "-mindepth",
+      "1",
+      "-maxdepth",
+      "3",
+      "(",
+      "-type",
+      "d",
+      "-o",
+      "-type",
+      "f",
+      ")",
+      "-name",
+      ".git",
+    ]);
   });
 
   it("builds repository labels relative to the workspace root", () => {

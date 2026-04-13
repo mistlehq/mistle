@@ -52,6 +52,25 @@ function normalizeRepositoryPath(path: string): string {
   return path.replace(/\/+$/, "");
 }
 
+export function buildRepositoryDiscoveryFindArgs(input: { workspaceRoot: string }): string[] {
+  return [
+    input.workspaceRoot,
+    "-mindepth",
+    "1",
+    "-maxdepth",
+    "3",
+    "(",
+    "-type",
+    "d",
+    "-o",
+    "-type",
+    "f",
+    ")",
+    "-name",
+    ".git",
+  ];
+}
+
 export function parseRepositoryPaths(input: { findOutput: string }): string[] {
   const parsedPaths = input.findOutput
     .split("\n")
@@ -106,17 +125,9 @@ async function loadSessionRepositoryDiscovery(input: {
 }): Promise<SessionRepositoryDiscoveryResult> {
   const [findOutput, workingDirectoryOutput] = await Promise.all([
     runExecCommand({
-      args: [
-        DefaultSandboxWorkspaceDir,
-        "-mindepth",
-        "1",
-        "-maxdepth",
-        "3",
-        "-type",
-        "d",
-        "-name",
-        ".git",
-      ],
+      args: buildRepositoryDiscoveryFindArgs({
+        workspaceRoot: DefaultSandboxWorkspaceDir,
+      }),
       command: "find",
       ensureTransportConnected: input.ensureTransportConnected,
       sandboxInstanceId: input.sandboxInstanceId,
