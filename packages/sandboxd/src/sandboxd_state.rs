@@ -135,7 +135,6 @@ impl SandboxdState {
                 startup_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
-                sleeper.clone(),
             )
             .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
         let agent_endpoint_url = match runtime_adapters.adapters() {

@@ -27,7 +27,6 @@ fn automation_turn_survives_worker_disconnect_after_proxy_retention() {
         &raw_url,
         keepalive_manager,
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 

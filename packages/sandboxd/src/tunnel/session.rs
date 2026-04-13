@@ -3864,12 +3864,7 @@ mod tests {
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(
-                &startup_input,
-                keepalive_manager.clone(),
-                runtime_readiness_manager.clone(),
-                Arc::new(ThreadSleeper),
-            )
+            .start(&startup_input, keepalive_manager.clone(), runtime_readiness_manager.clone())
             .expect("runtime adapters should start");
         let tunnel_session = TunnelSession::start(
             &startup_input,
@@ -4214,12 +4209,7 @@ mod tests {
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(
-                &startup_input,
-                keepalive_manager.clone(),
-                runtime_readiness_manager.clone(),
-                Arc::new(ThreadSleeper),
-            )
+            .start(&startup_input, keepalive_manager.clone(), runtime_readiness_manager.clone())
             .expect("runtime adapters should start");
         let tunnel_session = TunnelSession::start(
             &startup_input,

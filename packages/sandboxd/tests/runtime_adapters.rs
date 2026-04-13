@@ -235,7 +235,6 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
             &startup_input,
             keepalive_manager.clone(),
             runtime_readiness_manager.clone(),
-            Arc::new(ThreadSleeper),
         )
         .expect("runtime adapter registry should start the codex adapter");
 

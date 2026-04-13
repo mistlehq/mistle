@@ -44,8 +44,6 @@ pub use crate::codex_proxy::types::{
 };
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::RuntimeReadinessManager;
-use crate::time::Sleeper;
-
 pub type RawCodexSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// Default public listener URL for the Codex proxy endpoint.
@@ -257,7 +255,6 @@ pub fn start_codex_proxy(
     raw_app_server_url: &str,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
-    _sleeper: Arc<dyn Sleeper>,
 ) -> Result<CodexProxy, CodexProxyError> {
     let listen_url = Url::parse(proxy_listen_url)
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;

@@ -18,8 +18,6 @@ use crate::runtime::plan::{
     RuntimeClientEndpointTransport, RuntimeClientProcessReadiness,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
-use crate::time::Sleeper;
-
 /// Starts the runtime-specific platform-activity adapters declared by one startup input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
@@ -183,7 +181,6 @@ impl RuntimeAdapterRegistry {
         startup_input: &StartupInput,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
-        sleeper: Arc<dyn Sleeper>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone())
@@ -204,7 +201,6 @@ impl RuntimeAdapterRegistry {
                     &runtime_plan,
                     keepalive_manager.clone(),
                     runtime_readiness_manager.clone(),
-                    sleeper.clone(),
                 )?),
                 _ => {
                     return Err(RuntimeAdapterRegistryError::UnsupportedRuntimeId {
@@ -225,7 +221,6 @@ fn start_codex_runtime_adapter(
     runtime_plan: &CompiledRuntimePlan,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
-    sleeper: Arc<dyn Sleeper>,
 ) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
     let runtime_client = runtime_plan
         .runtime_clients
@@ -281,7 +276,6 @@ fn start_codex_runtime_adapter(
         raw_app_server_url,
         keepalive_manager,
         runtime_readiness_manager,
-        sleeper,
     )
     .map_err(RuntimeAdapterRegistryError::StartCodexProxy)?;
 
@@ -300,7 +294,6 @@ mod tests {
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapterRegistryError};
     use crate::runtime::readiness::RuntimeReadinessManager;
-    use crate::time::ThreadSleeper;
 
     #[test]
     fn rejects_unknown_runtime_ids() {
@@ -338,7 +331,6 @@ mod tests {
             &startup_input,
             Arc::new(Mutex::new(KeepaliveManager::default())),
             Arc::new(Mutex::new(RuntimeReadinessManager::default())),
-            Arc::new(ThreadSleeper),
         ) {
             Ok(_) => panic!("unknown runtime ids should be rejected"),
             Err(error) => assert!(matches!(

@@ -113,7 +113,6 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
         &raw_url,
         keepalive_manager.clone(),
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 
@@ -970,7 +969,6 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
         &raw_url,
         keepalive_manager,
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 
@@ -1124,7 +1122,6 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
         &raw_url,
         keepalive_manager,
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 
@@ -1303,7 +1300,6 @@ fn automation_turn_steer_buffers_success_until_retention_succeeds() {
         &raw_url,
         keepalive_manager,
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 
@@ -1448,7 +1444,6 @@ fn non_automation_turn_start_remains_passthrough() {
         &raw_url,
         keepalive_manager,
         runtime_readiness_manager.clone(),
-        Arc::new(ThreadSleeper),
     )
     .expect("Codex proxy should start");
 
