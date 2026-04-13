@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
 use sandboxd::runtime;
+
+static TEMP_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
@@ -143,6 +147,29 @@ fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
               {
                 "op": "mise_install",
                 "tools": ["node@22.0.0"]
+              },
+              {
+                "op": "github_release_install",
+                "repository": "openai/codex",
+                "release": {
+                  "kind": "tag",
+                  "match": "exact",
+                  "tag": "rust-v0.120.0"
+                },
+                "asset": {
+                  "kind": "by_arch",
+                  "x86_64": {
+                    "fileName": "codex-x86_64-unknown-linux-musl.tar.gz",
+                    "format": "tar.gz",
+                    "extractedPath": "codex-x86_64-unknown-linux-musl"
+                  },
+                  "aarch64": {
+                    "fileName": "codex-aarch64-unknown-linux-musl.tar.gz",
+                    "format": "tar.gz",
+                    "extractedPath": "codex-aarch64-unknown-linux-musl"
+                  }
+                },
+                "installPath": "/usr/local/bin/codex"
               }
             ]
           }
@@ -170,45 +197,52 @@ fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
             runtime::RuntimeArtifactInstallStep::MiseInstall { .. }
         )
     ));
+    assert!(matches!(
+        runtime_plan.artifacts[0].lifecycle.install[3],
+        runtime::RuntimeArtifactInstallEntry::Step(
+            runtime::RuntimeArtifactInstallStep::GitHubReleaseInstall { .. }
+        )
+    ));
 }
 
 #[test]
 fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
-    let invalid_missing_tag = serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
-      "sandboxProfileId": "sbp_123",
-      "version": 1,
-      "image": {
-        "source": "base",
-        "imageRef": "mistle/sandbox-base:dev"
-      },
-      "egressRoutes": [],
-      "artifacts": [
-        {
-          "artifactKey": "artifact_1",
-          "name": "artifact one",
-          "lifecycle": {
-            "install": [
-              {
-                "op": "github_release_install",
-                "repository": "mistlehq/tools",
-                "release": {
-                  "kind": "tag",
-                  "match": "exact"
-                },
-                "asset": {
-                  "kind": "exact",
-                  "fileName": "slack-linux-amd64"
-                },
-                "installPath": "/usr/local/bin/slack"
+    let invalid_missing_tag =
+        serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "github_release_install",
+                    "repository": "mistlehq/tools",
+                    "release": {
+                      "kind": "tag",
+                      "match": "exact"
+                    },
+                    "asset": {
+                      "kind": "exact",
+                      "fileName": "slack-linux-amd64"
+                    },
+                    "installPath": "/usr/local/bin/slack"
+                  }
+                ]
               }
-            ]
-          }
-        }
-      ],
-      "runtimeClients": [],
-      "workspaceSources": [],
-      "agentRuntimes": []
-    }));
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }));
     assert!(
         invalid_missing_tag.is_err(),
         "typed github release selectors missing the exact tag should fail decode"
@@ -381,7 +415,20 @@ fn applies_typed_mise_install_steps() {
 }
 
 #[test]
-fn rejects_unsupported_github_release_artifact_install_steps_before_branch_4() {
+fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
+    let test_dir = create_temp_test_dir("runtime_plan_apply_github_release");
+    let install_path = test_dir.join("gh");
+    let (asset_name, extracted_path) = match std::env::consts::ARCH {
+        "x86_64" => (
+            "gh_2.76.2_linux_amd64.tar.gz",
+            "gh_2.76.2_linux_amd64/bin/gh",
+        ),
+        "aarch64" | "arm64" => (
+            "gh_2.76.2_linux_arm64.tar.gz",
+            "gh_2.76.2_linux_arm64/bin/gh",
+        ),
+        other => panic!("unsupported test architecture: {other}"),
+    };
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
         bootstrap_token: "bootstrap-token-value".to_string(),
@@ -403,15 +450,19 @@ fn rejects_unsupported_github_release_artifact_install_steps_before_branch_4() {
                 "install": [
                   {
                     "op": "github_release_install",
-                    "repository": "mistlehq/tools",
+                    "repository": "cli/cli",
                     "release": {
-                      "kind": "latest"
+                      "kind": "tag",
+                      "match": "exact",
+                      "tag": "v2.76.2"
                     },
                     "asset": {
                       "kind": "exact",
-                      "fileName": "slack-linux-amd64"
+                      "fileName": asset_name,
+                      "format": "tar.gz",
+                      "extractedPath": extracted_path
                     },
-                    "installPath": "/usr/local/bin/slack"
+                    "installPath": install_path.display().to_string()
                   }
                 ]
               }
@@ -424,21 +475,31 @@ fn rejects_unsupported_github_release_artifact_install_steps_before_branch_4() {
         egress_grant_by_rule_id: BTreeMap::new(),
     };
 
-    let error = runtime::apply_runtime_plan(&startup_input)
-        .expect_err("branch 3 should still reject github release artifact install execution");
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("github release install should download and materialize the requested asset");
 
     assert!(
-        error
-            .to_string()
-            .contains("artifactKey=artifact_1 op=github_release_install"),
-        "operation-centric artifact apply errors should include the typed op name"
+        install_path.exists(),
+        "github release install should materialize the final binary path"
     );
     assert!(
-        error
-            .to_string()
-            .contains("artifact install op 'github_release_install' is not supported yet by sandboxd"),
-        "unsupported github release install should surface the branch-4 executor boundary"
+        fs::metadata(&install_path)
+            .expect("installed gh binary metadata should exist")
+            .len()
+            > 0,
+        "installed gh binary should be non-empty"
     );
+    assert!(
+        fs::metadata(&install_path)
+            .expect("installed gh binary metadata should exist")
+            .permissions()
+            .mode()
+            & 0o777
+            == 0o755,
+        "github release install should preserve executable permissions"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }
 
 #[test]
@@ -521,11 +582,14 @@ fn create_temp_test_dir(prefix: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time should be after unix epoch")
         .as_nanos();
-    let short_prefix = &prefix[..prefix.len().min(8)];
+    let unique_counter = TEMP_TEST_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let sanitized_prefix =
+        prefix.replace(|character: char| !character.is_ascii_alphanumeric(), "_");
     let path = PathBuf::from("/tmp").join(format!(
-        "sbd_{short_prefix}_{}_{}",
+        "sbd_{sanitized_prefix}_{}_{}_{}",
         std::process::id(),
-        unique_suffix
+        unique_suffix,
+        unique_counter
     ));
 
     fs::create_dir_all(&path).expect("temp test dir should be creatable");
