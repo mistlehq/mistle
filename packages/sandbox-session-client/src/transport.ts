@@ -147,16 +147,24 @@ function readTextPayload(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-function readBinaryPayload(value: unknown): ArrayBuffer | Uint8Array | null {
-  if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
+function readBinaryPayload(value: unknown): ArrayBuffer | ArrayBufferView | null {
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
     return value;
   }
 
   return null;
 }
 
-function toUint8Array(value: ArrayBuffer | Uint8Array): Uint8Array {
-  return value instanceof Uint8Array ? value : new Uint8Array(value);
+function toUint8Array(value: ArrayBuffer | ArrayBufferView): Uint8Array {
+  if (value instanceof Uint8Array) {
+    return value;
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+
+  return new Uint8Array(value);
 }
 
 function normalizeSocketCloseEvent(event: unknown): {

@@ -247,4 +247,33 @@ describe("ExecStreamClient", () => {
       transport.disconnect(1000, "test complete");
     }
   });
+
+  it("handles an exec result that arrives before the stream listener finishes subscribing", async () => {
+    const server = await startTestServer();
+    openServers.add(server);
+    const { client, transport } = await createConnectedClient(server);
+
+    try {
+      const resultPromise = client.run({
+        command: "pwd",
+      });
+
+      await server.openRequest;
+      server.sendResult({
+        exitCode: 0,
+        stdout: "/root/mistlehq/mistle\n",
+        stderr: "",
+        truncated: false,
+      });
+
+      await expect(resultPromise).resolves.toEqual({
+        exitCode: 0,
+        stdout: "/root/mistlehq/mistle\n",
+        stderr: "",
+        truncated: false,
+      });
+    } finally {
+      transport.disconnect(1000, "test complete");
+    }
+  });
 });

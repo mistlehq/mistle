@@ -74,6 +74,7 @@ async function waitForExecCompletion(input: {
 }): Promise<ExecCommandResult> {
   return await new Promise((resolve, reject) => {
     let latestResult: ExecCommandResult | null = null;
+    let unsubscribe = (): void => {};
     const timeoutTask = input.runtime.scheduleTimeout(() => {
       unsubscribe();
       reject(new Error("Timed out waiting for exec stream result."));
@@ -85,7 +86,7 @@ async function waitForExecCompletion(input: {
       callback();
     };
 
-    const unsubscribe = input.stream.onEvent((event) => {
+    unsubscribe = input.stream.onEvent((event) => {
       if (event.type === "control" && isExecResultEvent(event.message)) {
         latestResult = normalizeExecResult(event.message.event);
         return;
