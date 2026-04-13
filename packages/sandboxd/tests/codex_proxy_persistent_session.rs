@@ -1,4 +1,6 @@
+use std::env;
 use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -282,16 +284,28 @@ fn call_json_rpc_allow_error(
 }
 
 fn start_codex_app_server(port: u16) -> CodexAppServerProcess {
-    let child = Command::new("codex")
+    let codex_binary = resolve_codex_binary();
+    let child = Command::new(&codex_binary)
         .args(["app-server", "--listen", &format!("ws://127.0.0.1:{port}")])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect("codex app-server should start");
+        .unwrap_or_else(|error| {
+            panic!(
+                "codex app-server should start via {}: {error}",
+                codex_binary.display()
+            )
+        });
 
     wait_for_port(port);
 
     CodexAppServerProcess { child }
+}
+
+fn resolve_codex_binary() -> PathBuf {
+    env::var_os("MISTLE_TEST_CODEX_BIN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("codex"))
 }
 
 fn wait_for_port(port: u16) {
