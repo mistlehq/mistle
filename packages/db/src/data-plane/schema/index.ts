@@ -26,3 +26,8 @@ export type {
   InsertSandboxTunnelTokenRedemption,
   SandboxTunnelTokenRedemption,
 } from "./sandbox-tunnel-token-redemptions.js";
+export {
+  sandboxInstanceDeadlines,
+  SandboxInstanceDeadlineKinds,
+} from "./sandbox-instance-deadlines.js";
+export type { SandboxInstanceDeadlineKind } from "./sandbox-instance-deadlines.js";
