@@ -383,13 +383,6 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
-      - name: Install pinned Codex CLI for sandboxd regression tests
-        run: |
-          codex_dir="$RUNNER_TEMP/codex-cli"
-          codex_bin="$(./scripts/ci/install-codex-cli.sh "$codex_dir")"
-          echo "$codex_dir" >> "$GITHUB_PATH"
-          echo "MISTLE_TEST_CODEX_BIN=$codex_bin" >> "$GITHUB_ENV"
-
       - name: Run Rust tests in Nix shell
         run: nix develop --command pnpm test:rust
 

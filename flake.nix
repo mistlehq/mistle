@@ -12,6 +12,54 @@
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
+        codexVersion = "0.120.0";
+        codexReleaseAsset =
+          {
+            x86_64-linux = {
+              fileName = "codex-x86_64-unknown-linux-musl.tar.gz";
+              binaryName = "codex-x86_64-unknown-linux-musl";
+              hash = "sha256-IbCMyneEvlPTPG9Gz4l80rRAzaWNx5ElY9vGdrTRcBc=";
+            };
+            aarch64-linux = {
+              fileName = "codex-aarch64-unknown-linux-musl.tar.gz";
+              binaryName = "codex-aarch64-unknown-linux-musl";
+              hash = "sha256-ItvAuFli07YZc2SunihpR/fJmf6AsucJUQwveY4ibpQ=";
+            };
+            x86_64-darwin = {
+              fileName = "codex-x86_64-apple-darwin.tar.gz";
+              binaryName = "codex-x86_64-apple-darwin";
+              hash = "sha256-NJzURTerHdHyictB5vT5uEayCgvjB6fZ8XfEglGORgo=";
+            };
+            aarch64-darwin = {
+              fileName = "codex-aarch64-apple-darwin.tar.gz";
+              binaryName = "codex-aarch64-apple-darwin";
+              hash = "sha256-sQg8Q4t1L6KSBX+4xzX1jRMjFEo9655XQsToRRUslfA=";
+            };
+          }
+          .${system}
+          or (throw "Unsupported system for pinned Codex CLI: ${system}");
+        codexPinned = pkgs.stdenvNoCC.mkDerivation {
+          pname = "codex";
+          version = codexVersion;
+
+          src = pkgs.fetchurl {
+            url =
+              "https://github.com/openai/codex/releases/download/rust-v${codexVersion}/${codexReleaseAsset.fileName}";
+            hash = codexReleaseAsset.hash;
+          };
+
+          dontConfigure = true;
+          dontBuild = true;
+
+          unpackPhase = ''
+            tar -xzf "$src"
+          '';
+
+          installPhase = ''
+            mkdir -p "$out/bin"
+            install -m755 "${codexReleaseAsset.binaryName}" "$out/bin/codex"
+          '';
+        };
         commonPackages = [
           pkgs.typos
           pkgs.llvm
@@ -35,9 +83,14 @@
         '';
       in
       {
+        packages.codex = codexPinned;
+
         devShells.default = pkgs.mkShell {
-          packages = [nodejs] ++ commonPackages;
-          shellHook = commonShellHook;
+          packages = [nodejs codexPinned] ++ commonPackages;
+          shellHook = ''
+            ${commonShellHook}
+            export PATH=${codexPinned}/bin:$PATH
+          '';
         };
 
         devShells.docs = pkgs.mkShell {
