@@ -89,7 +89,7 @@ export async function stopSandboxInstance(
     stopReason: SandboxStopReason;
     expectedOwnerLeaseId: string;
   },
-): Promise<void> {
+): Promise<boolean> {
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: input.sandboxInstanceId,
     nowMs: ctx.clock.nowMs(),
@@ -101,7 +101,7 @@ export async function stopSandboxInstance(
       snapshot,
     })
   ) {
-    return;
+    return false;
   }
 
   const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
@@ -109,7 +109,7 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstanceState === null) {
-    return;
+    return false;
   }
 
   try {
@@ -134,4 +134,6 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
   });
+
+  return true;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  HandleSandboxInstanceDeadlineWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
@@ -23,6 +24,10 @@ describe("data-plane workflow registry", () => {
     });
     expect(ReconcileSandboxInstanceWorkflowSpec).toEqual({
       name: "data-plane.sandbox-instances.reconcile",
+      version: "1",
+    });
+    expect(HandleSandboxInstanceDeadlineWorkflowSpec).toEqual({
+      name: "data-plane.sandbox-instance-deadlines.handle",
       version: "1",
     });
   });

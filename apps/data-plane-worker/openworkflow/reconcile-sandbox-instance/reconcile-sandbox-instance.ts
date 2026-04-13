@@ -201,7 +201,7 @@ export async function reconcileSandboxInstance(
     reason: SandboxReconcileReason;
     expectedOwnerLeaseId: string;
   },
-): Promise<void> {
+): Promise<boolean> {
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: input.sandboxInstanceId,
     nowMs: ctx.clock.nowMs(),
@@ -212,7 +212,7 @@ export async function reconcileSandboxInstance(
       snapshot,
     })
   ) {
-    return;
+    return false;
   }
 
   const sandboxInstance = await resolveActiveSandboxInstance({
@@ -220,7 +220,7 @@ export async function reconcileSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstance === null) {
-    return;
+    return false;
   }
 
   const providerState = await inspectProviderStateOrMissing({
@@ -241,14 +241,14 @@ export async function reconcileSandboxInstance(
         failureCode: action.failureCode,
         failureMessage: action.failureMessage,
       });
-      return;
+      return true;
     case "mark_stopped":
       await markSandboxInstanceStopped({
         db: ctx.db,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
       });
-      return;
+      return true;
     case "stop_then_mark_stopped":
       await stopProviderSandboxOrMarkMissing({
         config: ctx.config,
@@ -256,6 +256,6 @@ export async function reconcileSandboxInstance(
         db: ctx.db,
         sandboxInstance,
       });
-      return;
+      return true;
   }
 }

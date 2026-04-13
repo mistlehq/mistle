@@ -6,6 +6,8 @@ import {
 } from "@mistle/db/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
+import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
+
 export async function markSandboxInstanceFailed(ctx: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
@@ -13,26 +15,37 @@ export async function markSandboxInstanceFailed(ctx: {
   failureCode: string;
   failureMessage: string;
 }): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.FAILED,
-      stopReason: SandboxStopReasons.FAILED,
-      stoppedAt: null,
-      failedAt: sql`now()`,
-      failureCode: ctx.failureCode,
-      failureMessage: ctx.failureMessage,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, ctx.sandboxInstanceId),
-        eq(sandboxInstances.status, ctx.currentStatus),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
+  const updatedRows = await ctx.db.transaction(async (tx) => {
+    const failedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.FAILED,
+        stopReason: SandboxStopReasons.FAILED,
+        stoppedAt: null,
+        failedAt: sql`now()`,
+        failureCode: ctx.failureCode,
+        failureMessage: ctx.failureMessage,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, ctx.sandboxInstanceId),
+          eq(sandboxInstances.status, ctx.currentStatus),
+        ),
+      )
+      .returning({
+        status: sandboxInstances.status,
+      });
+
+    if (failedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
+      await clearSandboxInstanceDeadlines({
+        db: tx,
+        sandboxInstanceId: ctx.sandboxInstanceId,
+      });
+    }
+
+    return failedRows;
+  });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
     return;
@@ -47,6 +60,10 @@ export async function markSandboxInstanceFailed(ctx: {
     where: (table, { eq: whereEq }) => whereEq(table.id, ctx.sandboxInstanceId),
   });
   if (sandboxInstance?.status === SandboxInstanceStatuses.FAILED) {
+    await clearSandboxInstanceDeadlines({
+      db: ctx.db,
+      sandboxInstanceId: ctx.sandboxInstanceId,
+    });
     return;
   }
 

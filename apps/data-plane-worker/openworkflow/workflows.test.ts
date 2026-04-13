@@ -1,4 +1,5 @@
 import {
+  HandleSandboxInstanceDeadlineWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
@@ -8,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { ReconcileSandboxInstanceWorkflow } from "./reconcile-sandbox-instance/workflow.js";
 import { ResumeSandboxInstanceWorkflow } from "./resume-sandbox-instance/workflow.js";
+import { HandleSandboxInstanceDeadlineWorkflow } from "./sandbox-instance-deadlines/workflow.js";
 import { StartSandboxInstanceWorkflow } from "./start-sandbox-instance/workflow.js";
 import { StopSandboxInstanceWorkflow } from "./stop-sandbox-instance/workflow.js";
 
@@ -27,6 +29,12 @@ describe("data-plane worker openworkflow entrypoints", () => {
   it("preserves the reconcile sandbox instance workflow identity", () => {
     expect(ReconcileSandboxInstanceWorkflow.spec).toMatchObject(
       ReconcileSandboxInstanceWorkflowSpec,
+    );
+  });
+
+  it("preserves the handle sandbox instance deadline workflow identity", () => {
+    expect(HandleSandboxInstanceDeadlineWorkflow.spec).toMatchObject(
+      HandleSandboxInstanceDeadlineWorkflowSpec,
     );
   });
 });

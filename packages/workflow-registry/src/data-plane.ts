@@ -11,9 +11,13 @@ export const StopSandboxInstanceWorkflowName = "data-plane.sandbox-instances.sto
 export const StopSandboxInstanceWorkflowVersion = "1";
 export const ReconcileSandboxInstanceWorkflowName = "data-plane.sandbox-instances.reconcile";
 export const ReconcileSandboxInstanceWorkflowVersion = "1";
+export const HandleSandboxInstanceDeadlineWorkflowName =
+  "data-plane.sandbox-instance-deadlines.handle";
+export const HandleSandboxInstanceDeadlineWorkflowVersion = "1";
 
 export type SandboxStopReason = "idle";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
+export type SandboxInstanceDeadlineKind = "idle" | "disconnect";
 
 export type StartSandboxInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,
@@ -97,4 +101,26 @@ export const ReconcileSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 >({
   name: ReconcileSandboxInstanceWorkflowName,
   version: ReconcileSandboxInstanceWorkflowVersion,
+});
+
+export type HandleSandboxInstanceDeadlineWorkflowInput = {
+  sandboxInstanceId: string;
+  kind: SandboxInstanceDeadlineKind;
+  ownerLeaseId: string;
+  dueAt: string;
+  generation: number;
+};
+
+export type HandleSandboxInstanceDeadlineWorkflowOutput = {
+  sandboxInstanceId: string;
+  kind: SandboxInstanceDeadlineKind;
+  executed: boolean;
+};
+
+export const HandleSandboxInstanceDeadlineWorkflowSpec = defineWorkflowSpec<
+  HandleSandboxInstanceDeadlineWorkflowInput,
+  HandleSandboxInstanceDeadlineWorkflowOutput
+>({
+  name: HandleSandboxInstanceDeadlineWorkflowName,
+  version: HandleSandboxInstanceDeadlineWorkflowVersion,
 });

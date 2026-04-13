@@ -6,6 +6,8 @@ import {
 } from "@mistle/db/data-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
+import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
+
 export async function markSandboxInstanceFailed(
   ctx: {
     db: DataPlaneDatabase;
@@ -16,28 +18,39 @@ export async function markSandboxInstanceFailed(
     failureMessage: string;
   },
 ): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.FAILED,
-      stopReason: SandboxStopReasons.FAILED,
-      failedAt: sql`now()`,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        or(
-          eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
-          eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+  const updatedRows = await ctx.db.transaction(async (tx) => {
+    const failedRows = await tx
+      .update(sandboxInstances)
+      .set({
+        status: SandboxInstanceStatuses.FAILED,
+        stopReason: SandboxStopReasons.FAILED,
+        failedAt: sql`now()`,
+        failureCode: input.failureCode,
+        failureMessage: input.failureMessage,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(sandboxInstances.id, input.sandboxInstanceId),
+          or(
+            eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
+            eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+          ),
         ),
-      ),
-    )
-    .returning({
-      id: sandboxInstances.id,
-    });
+      )
+      .returning({
+        id: sandboxInstances.id,
+      });
+
+    if (failedRows[0] !== undefined) {
+      await clearSandboxInstanceDeadlines({
+        db: tx,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    return failedRows;
+  });
 
   if (updatedRows[0] === undefined) {
     throw new Error(
