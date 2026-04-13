@@ -3,7 +3,7 @@ import type {
   AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -93,6 +93,11 @@ type SessionWorkbenchState = {
     togglePanel: () => void;
   };
   primaryRepositoryState: ReturnType<typeof useSessionPrimaryRepositoryState>;
+  primaryRepositoryControlState: {
+    disabledReason: string | null;
+    isSwitching: boolean;
+    switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
+  };
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
@@ -190,6 +195,8 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
+  const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;
+  const isSwitchingPrimaryRepository = sessionState.threads.isSwitchingPrimaryRepository;
   const branchDiffState = useSessionBranchDiff({
     cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
@@ -231,6 +238,21 @@ export function useSessionWorkbenchController(input: {
         : null,
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
+  const switchPrimaryRepository = useCallback(
+    async (nextSelectedRepositoryPath: string | null): Promise<void> => {
+      if (nextSelectedRepositoryPath === primaryRepositoryState.selectedRepositoryPath) {
+        return;
+      }
+
+      await sessionState.threads.switchPrimaryRepository(nextSelectedRepositoryPath);
+      primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
+    },
+    [
+      primaryRepositoryState.selectedRepositoryPath,
+      primaryRepositoryState.setSelectedRepositoryPath,
+      sessionState.threads.switchPrimaryRepository,
+    ],
+  );
 
   return {
     workbench: {
@@ -266,6 +288,13 @@ export function useSessionWorkbenchController(input: {
       },
       primaryRepositoryState,
       portAccessState,
+      primaryRepositoryControlState: {
+        disabledReason: isPrimaryRepositorySwitchBlockedByCli
+          ? "Exit Codex CLI before switching the primary repository."
+          : null,
+        isSwitching: isSwitchingPrimaryRepository,
+        switchPrimaryRepository,
+      },
     },
     conversationPane: {
       chatState: chat.chatState,
