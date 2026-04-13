@@ -87,7 +87,9 @@ function readNestedValue(value: unknown, path: readonly string[]): unknown {
   return currentValue;
 }
 
-function normalizeThreadStatus(statusValue: unknown): AgentConversationInspectResult["status"] {
+export function normalizeCodexThreadStatus(
+  statusValue: unknown,
+): AgentConversationInspectResult["status"] {
   if (!isRecord(statusValue) || typeof statusValue.type !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
@@ -99,7 +101,10 @@ function normalizeThreadStatus(statusValue: unknown): AgentConversationInspectRe
     case "active":
       return "active";
     case "systemError":
-      return "error";
+      // Codex reports non-active terminal threads as `systemError`. Automation
+      // delivery should still attempt a fresh turn on that thread instead of
+      // failing the conversation before trying `turn/start`.
+      return "idle";
     case "idle":
     case "notLoaded":
       return "idle";
@@ -523,7 +528,9 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
 
           return {
             exists: true,
-            status: normalizeThreadStatus(readNestedValue(inspectResult, ["thread", "status"])),
+            status: normalizeCodexThreadStatus(
+              readNestedValue(inspectResult, ["thread", "status"]),
+            ),
             activeExecutionId: null,
           };
         }
@@ -539,7 +546,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
 
       return {
         exists: true,
-        status: normalizeThreadStatus(readNestedValue(inspectResult, ["thread", "status"])),
+        status: normalizeCodexThreadStatus(readNestedValue(inspectResult, ["thread", "status"])),
         activeExecutionId: null,
       };
     },
