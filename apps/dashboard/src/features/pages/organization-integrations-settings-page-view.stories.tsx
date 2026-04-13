@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
 import {
   OrganizationIntegrationsSettingsPageView,
   type OrganizationIntegrationsSettingsPageCard,
@@ -27,35 +28,7 @@ const ConnectedCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
   },
 ] as const;
 
-const AvailableCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
-  {
-    targetKey: "openai-default",
-    displayName: "OpenAI",
-    description: "Bring organization API access into Mistle.",
-    configStatus: "valid",
-    logoKey: "openai",
-    actionLabel: "Add",
-    onAction: () => {},
-  },
-  {
-    targetKey: "slack",
-    displayName: "Slack",
-    description: "Link channels and workspace context.",
-    configStatus: "valid",
-    logoKey: "slack",
-    actionLabel: "Add",
-    onAction: () => {},
-  },
-  {
-    targetKey: "custom-api",
-    displayName: "Custom API",
-    description: "No supported auth methods are configured.",
-    configStatus: "invalid",
-    actionDisabled: true,
-    actionLabel: "Add",
-    onAction: () => {},
-  },
-] as const;
+const AvailableCards = createAvailableCardsOverview();
 
 const meta = {
   title: "Dashboard/Integrations/PageView",
