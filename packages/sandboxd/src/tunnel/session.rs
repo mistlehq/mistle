@@ -191,6 +191,16 @@ pub struct TunnelSession {
     thread: Option<JoinHandle<Result<(), TunnelSessionError>>>,
 }
 
+enum TunnelSessionControlFlow {
+    Continue,
+    RestartRequired,
+}
+
+enum ConnectedTunnelSessionOutcome {
+    ShutdownRequested,
+    RestartRequired,
+}
+
 enum TunnelWriterMessage {
     Text(String),
     Binary(Vec<u8>),
@@ -294,7 +304,7 @@ impl TunnelSession {
 
                 let startup_result_sender = startup_result_sender;
                 runtime_builder.block_on(async move {
-                    let result = run_tunnel_session(
+                    let result = run_tunnel_supervisor(
                         runtime,
                         &connected_url,
                         &bootstrap_token,
@@ -337,7 +347,7 @@ impl TunnelSession {
     }
 
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
-    pub fn close(mut self) -> Result<(), TunnelSessionError> {
+    pub fn close(mut self) {
         self.shutdown_requested.store(true, Ordering::Relaxed);
         let thread = self
             .thread
@@ -345,14 +355,15 @@ impl TunnelSession {
             .expect("tunnel session thread should exist");
 
         match thread.join() {
-            Ok(Ok(())) => Ok(()),
-            Ok(Err(TunnelSessionError::ReadTunnel(reason)))
-                if reason == "bootstrap tunnel closed" =>
-            {
-                Ok(())
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                eprintln!("sandboxd bootstrap tunnel close observed session error: {error}");
             }
-            Ok(Err(error)) => Err(error),
-            Err(_) => Err(TunnelSessionError::SessionPanicked),
+            Err(_) => {
+                eprintln!(
+                    "sandboxd bootstrap tunnel close observed a panicked session thread"
+                );
+            }
         }
     }
 }
@@ -419,16 +430,48 @@ struct PtyOpenContext<'a> {
     sleeper: &'a dyn Sleeper,
 }
 
-async fn run_tunnel_session(
+fn continue_with(
+    result: Result<(), TunnelSessionError>,
+) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
+    result.map(|()| TunnelSessionControlFlow::Continue)
+}
+
+async fn run_tunnel_supervisor(
     runtime: TunnelSessionRuntime,
     gateway_ws_url: &str,
     bootstrap_token: &str,
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
+    match run_connected_tunnel_session(
+        runtime,
+        gateway_ws_url,
+        bootstrap_token,
+        startup_result_sender,
+    )
+    .await?
+    {
+        ConnectedTunnelSessionOutcome::ShutdownRequested => {
+            eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
+            Ok(())
+        }
+        ConnectedTunnelSessionOutcome::RestartRequired => {
+            eprintln!("sandboxd bootstrap connected session requested restart");
+            Ok(())
+        }
+    }
+}
+
+async fn run_connected_tunnel_session(
+    runtime: TunnelSessionRuntime,
+    gateway_ws_url: &str,
+    bootstrap_token: &str,
+    startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
+) -> Result<ConnectedTunnelSessionOutcome, TunnelSessionError> {
     let connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
     let (bootstrap_socket, _) = match connect_bootstrap_websocket(connected_url.as_str()).await {
         Ok(value) => value,
         Err(startup_error) => {
+            eprintln!("sandboxd initial tunnel connect failed: {startup_error}");
             let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
                 startup_error.to_string(),
             )));
@@ -557,20 +600,36 @@ async fn run_tunnel_session(
                 .expect("runtime readiness manager lock should not be poisoned")
                 .on_tunnel_disconnected();
             let _ = write_tunnel_close(&tunnel_writer_sender);
-            return Ok(());
+            return Ok(ConnectedTunnelSessionOutcome::ShutdownRequested);
         }
 
-        handle_tunnel_session_event(
+        match handle_tunnel_session_event(
             event,
             &tunnel_writer_sender,
             &event_sender,
             &loop_context,
             &mut session_state,
         )
-        .await?;
+        .await?
+        {
+            TunnelSessionControlFlow::Continue => {}
+            TunnelSessionControlFlow::RestartRequired => {
+                runtime
+                    .keepalive_manager
+                    .lock()
+                    .expect("keepalive manager lock should not be poisoned")
+                    .on_tunnel_disconnected();
+                runtime
+                    .runtime_readiness_manager
+                    .lock()
+                    .expect("runtime readiness manager lock should not be poisoned")
+                    .on_tunnel_disconnected();
+                return Ok(ConnectedTunnelSessionOutcome::RestartRequired);
+            }
+        }
     }
 
-    Ok(())
+    Ok(ConnectedTunnelSessionOutcome::RestartRequired)
 }
 
 type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -1302,15 +1361,15 @@ async fn handle_tunnel_session_event(
     event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
     context: &TunnelSessionLoopContext<'_>,
     session_state: &mut TunnelSessionMutableState,
-) -> Result<(), TunnelSessionError> {
+) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
             eprintln!("sandboxd bootstrap tunnel closed: {reason_text}");
-            Err(TunnelSessionError::ReadTunnel(reason_text))
+            Ok(TunnelSessionControlFlow::RestartRequired)
         }
         TunnelSessionEvent::Wake => {
-            let _ = poll_pty_sessions(
+            poll_pty_sessions(
                 tunnel_writer_sender,
                 &mut session_state.pty_sessions,
                 context.clock,
@@ -1328,7 +1387,7 @@ async fn handle_tunnel_session_event(
                     error.to_string(),
                 )?;
             }
-            Ok(())
+            Ok(TunnelSessionControlFlow::Continue)
         }
         TunnelSessionEvent::AgentDialed { stream_id, result } => {
             let result = *result;
@@ -1340,7 +1399,7 @@ async fn handle_tunnel_session_event(
                 if let Ok(runtime_socket) = result {
                     drop(runtime_socket);
                 }
-                return Ok(());
+                return Ok(TunnelSessionControlFlow::Continue);
             }
 
             match result {
@@ -1354,27 +1413,27 @@ async fn handle_tunnel_session_event(
                             send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
                         },
                     );
-                    write_tunnel_text(tunnel_writer_sender, stream_open_ok(stream_id))
+                    continue_with(write_tunnel_text(
+                        tunnel_writer_sender,
+                        stream_open_ok(stream_id),
+                    ))
                 }
-                Err(error) => write_tunnel_text(
+                Err(error) => continue_with(write_tunnel_text(
                     tunnel_writer_sender,
                     stream_open_error(
                         stream_id,
                         CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
                         format!("failed to connect agent endpoint: {error}"),
                     ),
-                ),
+                )),
             }
         }
         TunnelSessionEvent::BootstrapMessage(message) => match message {
             Message::Text(payload) => {
-                match session_state
-                    .telemetry_relay
-                    .handle_control_message(&payload)
-                {
+                match session_state.telemetry_relay.handle_control_message(&payload) {
                     Ok(Some(frames)) => {
                         send_telemetry_frames(tunnel_writer_sender, frames)?;
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                     Ok(None) => {}
                     Err(error) => {
@@ -1384,7 +1443,7 @@ async fn handle_tunnel_session_event(
                             context.clock,
                             format!("telemetry control rejected: {error}"),
                         );
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                 }
 
@@ -1392,13 +1451,9 @@ async fn handle_tunnel_session_event(
                     Ok(Some(crate::tunnel::protocol::PortsControlMessage::TargetAuthorize(
                         message,
                     ))) => {
-                        handle_ports_control_message(
-                            tunnel_writer_sender,
-                            message,
-                            context.clock,
-                        )
-                        .await?;
-                        return Ok(());
+                        handle_ports_control_message(tunnel_writer_sender, message, context.clock)
+                            .await?;
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                     Ok(None) => {}
                     Err(error) => {
@@ -1408,7 +1463,7 @@ async fn handle_tunnel_session_event(
                             context.clock,
                             error.to_string(),
                         );
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                 }
 
@@ -1424,7 +1479,7 @@ async fn handle_tunnel_session_event(
                                 error.to_string(),
                             );
                         }
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                     Ok(None) => {}
                     Err(error) => {
@@ -1434,7 +1489,7 @@ async fn handle_tunnel_session_event(
                             context.clock,
                             error.to_string(),
                         );
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                 }
 
@@ -1447,17 +1502,19 @@ async fn handle_tunnel_session_event(
                             context.clock,
                             error.to_string(),
                         );
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                 };
-                handle_tunnel_control_message(
-                    tunnel_writer_sender,
-                    event_sender,
-                    control_message,
-                    context,
-                    session_state,
+                continue_with(
+                    handle_tunnel_control_message(
+                        tunnel_writer_sender,
+                        event_sender,
+                        control_message,
+                        context,
+                        session_state,
+                    )
+                    .await,
                 )
-                .await
             }
             Message::Binary(payload) => {
                 let frame = match decode_stream_data_frame(payload.as_ref()) {
@@ -1469,38 +1526,38 @@ async fn handle_tunnel_session_event(
                             context.clock,
                             error.to_string(),
                         );
-                        return Ok(());
+                        return Ok(TunnelSessionControlFlow::Continue);
                     }
                 };
-                handle_tunnel_binary_frame(
+                continue_with(handle_tunnel_binary_frame(
                     tunnel_writer_sender,
                     frame,
                     session_state,
                     context.clock,
-                )
+                ))
             }
-            Message::Ping(payload) => write_tunnel_pong(tunnel_writer_sender, payload.to_vec()),
-            Message::Pong(_) => Ok(()),
-            Message::Close(_) => Err(TunnelSessionError::ReadTunnel(
-                "bootstrap tunnel closed".to_string(),
-            )),
-            _ => Ok(()),
+            Message::Ping(payload) => {
+                continue_with(write_tunnel_pong(tunnel_writer_sender, payload.to_vec()))
+            }
+            Message::Pong(_) => Ok(TunnelSessionControlFlow::Continue),
+            Message::Close(_) => Ok(TunnelSessionControlFlow::RestartRequired),
+            _ => Ok(TunnelSessionControlFlow::Continue),
         },
         TunnelSessionEvent::AgentMessage { stream_id, message } => match message {
             Message::Text(payload) => {
                 let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                    return Ok(());
+                    return Ok(TunnelSessionControlFlow::Continue);
                 };
                 if !agent_stream.send_window.try_consume(payload.len()) {
                     session_state.agent_streams.remove(&stream_id);
-                    return write_tunnel_text(
+                    return continue_with(write_tunnel_text(
                         tunnel_writer_sender,
                         stream_reset(
                             stream_id,
                             STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
                             "agent stream send window is exhausted",
                         ),
-                    );
+                    ));
                 }
                 let encoded = encode_stream_data_frame(
                     stream_id,
@@ -1508,22 +1565,22 @@ async fn handle_tunnel_session_event(
                     payload.as_bytes(),
                 )
                 .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
-                write_tunnel_binary(tunnel_writer_sender, encoded)
+                continue_with(write_tunnel_binary(tunnel_writer_sender, encoded))
             }
             Message::Binary(payload) => {
                 let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                    return Ok(());
+                    return Ok(TunnelSessionControlFlow::Continue);
                 };
                 if !agent_stream.send_window.try_consume(payload.len()) {
                     session_state.agent_streams.remove(&stream_id);
-                    return write_tunnel_text(
+                    return continue_with(write_tunnel_text(
                         tunnel_writer_sender,
                         stream_reset(
                             stream_id,
                             STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
                             "agent stream send window is exhausted",
                         ),
-                    );
+                    ));
                 }
                 let encoded = encode_stream_data_frame(
                     stream_id,
@@ -1531,7 +1588,7 @@ async fn handle_tunnel_session_event(
                     payload.as_ref(),
                 )
                 .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
-                write_tunnel_binary(tunnel_writer_sender, encoded)
+                continue_with(write_tunnel_binary(tunnel_writer_sender, encoded))
             }
             Message::Ping(payload) => {
                 if let Some(agent_stream) = session_state.agent_streams.get(&stream_id) {
@@ -1540,28 +1597,31 @@ async fn handle_tunnel_session_event(
                         .send(Message::Pong(payload))
                         .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
                 }
-                Ok(())
+                Ok(TunnelSessionControlFlow::Continue)
             }
-            Message::Pong(_) => Ok(()),
+            Message::Pong(_) => Ok(TunnelSessionControlFlow::Continue),
             Message::Close(_) => {
                 session_state.agent_streams.remove(&stream_id);
-                write_tunnel_text(
+                continue_with(write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
                         stream_id,
                         STREAM_RESET_CODE_TARGET_CLOSED,
                         "agent runtime websocket closed",
                     ),
-                )
+                ))
             }
-            _ => Ok(()),
+            _ => Ok(TunnelSessionControlFlow::Continue),
         },
         TunnelSessionEvent::AgentWriteCompleted { stream_id, bytes } => {
             if !session_state.agent_streams.contains_key(&stream_id) {
-                return Ok(());
+                return Ok(TunnelSessionControlFlow::Continue);
             }
 
-            write_tunnel_text(tunnel_writer_sender, stream_window(stream_id, bytes))
+            continue_with(write_tunnel_text(
+                tunnel_writer_sender,
+                stream_window(stream_id, bytes),
+            ))
         }
         TunnelSessionEvent::PortAccessTransport(event) => {
             match &event {
@@ -1591,7 +1651,7 @@ async fn handle_tunnel_session_event(
                 PortAccessTransportEvent::StreamError(message) => serde_json::to_string(&message),
             }
             .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            write_tunnel_text(tunnel_writer_sender, payload)
+            continue_with(write_tunnel_text(tunnel_writer_sender, payload))
         }
         TunnelSessionEvent::AgentClosed { stream_id, reason } => {
             if session_state.agent_streams.remove(&stream_id).is_some() {
@@ -1604,7 +1664,7 @@ async fn handle_tunnel_session_event(
                     ),
                 )?;
             }
-            Ok(())
+            Ok(TunnelSessionControlFlow::Continue)
         }
         TunnelSessionEvent::ExecCompleted { stream_id, result } => {
             if session_state
@@ -1612,7 +1672,7 @@ async fn handle_tunnel_session_event(
                 .remove(&stream_id)
                 .is_none()
             {
-                return Ok(());
+                return Ok(TunnelSessionControlFlow::Continue);
             }
 
             match *result {
@@ -1627,12 +1687,15 @@ async fn handle_tunnel_session_event(
                             exec_result.truncated,
                         ),
                     )?;
-                    write_tunnel_text(tunnel_writer_sender, stream_complete(stream_id))
+                    continue_with(write_tunnel_text(
+                        tunnel_writer_sender,
+                        stream_complete(stream_id),
+                    ))
                 }
-                Err(error) => write_tunnel_text(
+                Err(error) => continue_with(write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(stream_id, STREAM_RESET_CODE_EXEC_COMMAND_FAILED, error),
-                ),
+                )),
             }
         }
     }
@@ -3394,9 +3457,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the live tunnel interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         runtime_adapters
             .close()
             .expect("runtime adapters should stop cleanly");
@@ -3746,9 +3807,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the large-response interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         runtime_adapters
             .close()
             .expect("runtime adapters should stop cleanly");
@@ -3912,9 +3971,127 @@ mod tests {
             .recv()
             .expect("gateway should complete the bootstrap interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn bootstrap_disconnect_leaves_publish_managers_disconnected_until_explicit_close() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let mut saw_keepalive_state = false;
+            let mut saw_runtime_ready = false;
+            for _ in 0..4 {
+                let message = read_json_text_message(&mut websocket);
+                let message_type = message["type"]
+                    .as_str()
+                    .expect("tunnel text message should expose a type");
+                if message_type == "keepalive.state" {
+                    saw_keepalive_state = true;
+                }
+                if message_type == "runtime.ready" {
+                    saw_runtime_ready = true;
+                }
+                if saw_keepalive_state && saw_runtime_ready {
+                    break;
+                }
+            }
+            assert!(
+                saw_keepalive_state,
+                "connected session should publish keepalive state after startup"
+            );
+            assert!(
+                saw_runtime_ready,
+                "connected session should publish runtime readiness after startup"
+            );
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the bootstrap disconnect");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager.clone(),
+            runtime_readiness_manager.clone(),
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the bootstrap disconnect");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+
+        {
+            let mut keepalive_manager = keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned");
+            keepalive_manager.set_platform_active(true);
+            assert!(
+                keepalive_manager
+                    .take_publishable_state(&SystemClock)
+                    .is_none(),
+                "disconnected tunnel should suppress keepalive publication"
+            );
+        }
+        {
+            let mut runtime_readiness_manager = runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned");
+            runtime_readiness_manager.set_ready(true);
+            assert!(
+                runtime_readiness_manager.take_publishable_state().is_none(),
+                "disconnected tunnel should suppress runtime readiness publication"
+            );
+        }
+
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4117,9 +4294,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the bootstrap interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4260,9 +4435,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the bootstrap interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4413,9 +4586,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the bootstrap interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4616,9 +4787,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the processes stream interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4740,9 +4909,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the authorize interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -4937,9 +5104,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the http transport interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5076,9 +5241,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the failed http transport interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5223,9 +5386,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the mid-response failure interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5425,9 +5586,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the websocket transport interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5591,9 +5750,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the websocket ping interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5730,9 +5887,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the websocket close interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
@@ -5865,9 +6020,7 @@ mod tests {
             .recv()
             .expect("gateway should complete the fragmented websocket interaction");
 
-        tunnel_session
-            .close()
-            .expect("tunnel session should stop cleanly");
+        tunnel_session.close();
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");

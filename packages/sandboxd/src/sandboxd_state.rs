@@ -32,7 +32,6 @@ pub enum SandboxdStateError {
     StopEgressProxy(String),
     StopRuntimeProcesses(String),
     StopRuntimeAdapters(String),
-    CloseTunnelSession(String),
 }
 
 impl fmt::Display for SandboxdStateError {
@@ -56,9 +55,6 @@ impl fmt::Display for SandboxdStateError {
             }
             Self::StopRuntimeAdapters(error) => {
                 write!(f, "failed to stop runtime adapters: {error}")
-            }
-            Self::CloseTunnelSession(error) => {
-                write!(f, "failed to close bootstrap tunnel session: {error}")
             }
             Self::StopEgressProxy(error) => {
                 write!(f, "failed to stop local egress proxy: {error}")
@@ -188,9 +184,7 @@ impl SandboxdState {
     /// Reconnects the bootstrap tunnel for an already-initialized daemon.
     pub fn resume(&mut self, startup_input: &StartupInput) -> Result<(), SandboxdStateError> {
         if let Some(tunnel_session) = self.tunnel_session.take() {
-            tunnel_session
-                .close()
-                .map_err(|error| SandboxdStateError::CloseTunnelSession(error.to_string()))?;
+            tunnel_session.close();
         }
 
         self.tunnel_session = Some(
@@ -211,11 +205,9 @@ impl SandboxdState {
 
     /// Stops the initialized runtime resources owned by the daemon.
     pub fn close(mut self) -> Result<(), SandboxdStateError> {
-        self.tunnel_session
-            .take()
-            .map(TunnelSession::close)
-            .transpose()
-            .map_err(|error| SandboxdStateError::CloseTunnelSession(error.to_string()))?;
+        if let Some(tunnel_session) = self.tunnel_session.take() {
+            tunnel_session.close();
+        }
         self.runtime_adapters
             .close()
             .map_err(|error| SandboxdStateError::StopRuntimeAdapters(error.to_string()))?;
