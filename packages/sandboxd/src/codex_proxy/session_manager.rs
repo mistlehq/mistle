@@ -872,6 +872,7 @@ enum CommandExecutionError {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
     use tokio::sync::oneshot;
 
     use crate::codex_proxy::session_manager::{
