@@ -11,7 +11,6 @@ import type { ControlPlaneApiConfig } from "../src/types.js";
 import { withControlPlaneWorkerRuntime } from "./helpers/control-plane-worker-runtime.js";
 import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
