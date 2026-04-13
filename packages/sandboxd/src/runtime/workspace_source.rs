@@ -3,7 +3,7 @@ use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::Path;
 
-use super::plan::{CompiledWorkspaceSource, RuntimeArtifactCommand, WorkspaceSourceResourceKind};
+use super::plan::{CompiledWorkspaceSource, RuntimeExecCommand, WorkspaceSourceResourceKind};
 use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
 use crate::time::{SystemClock, ThreadSleeper};
 
@@ -66,7 +66,7 @@ fn apply_git_clone_workspace_source(
         path.to_string(),
     ]);
 
-    let command = RuntimeArtifactCommand {
+    let command = RuntimeExecCommand {
         args,
         env: Some(env),
         cwd: None,
@@ -87,7 +87,7 @@ fn apply_git_clone_workspace_source(
     .map_err(|error| format!("failed to clone repository: {error}"))?;
 
     if clone_url.is_some_and(|clone_url| clone_url != origin_url) {
-        let update_origin_command = RuntimeArtifactCommand {
+        let update_origin_command = RuntimeExecCommand {
             args: vec![
                 "git".to_string(),
                 "-C".to_string(),

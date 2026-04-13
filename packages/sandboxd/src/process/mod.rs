@@ -16,8 +16,8 @@ use nix::sys::signal::{Signal, kill as send_signal};
 use nix::unistd::Pid;
 
 use crate::runtime::{
-    RuntimeArtifactCommand, RuntimeClient, RuntimeClientProcessReadiness,
-    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
+    RuntimeClient, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
+    RuntimeClientProcessStopSignal, RuntimeExecCommand,
 };
 use crate::time::{Clock, Sleeper};
 
@@ -30,7 +30,7 @@ pub const DEFAULT_PROCESS_EXIT_POLL_INTERVAL: Duration = Duration::from_millis(2
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeClientProcessSpec {
     pub process_key: String,
-    pub command: RuntimeArtifactCommand,
+    pub command: RuntimeExecCommand,
     pub readiness: RuntimeClientProcessReadiness,
     pub stop: RuntimeClientProcessStopPolicy,
 }
@@ -108,7 +108,7 @@ pub fn flatten_runtime_client_processes(
             );
             processes.push(RuntimeClientProcessSpec {
                 process_key: process.process_key.clone(),
-                command: RuntimeArtifactCommand {
+                command: RuntimeExecCommand {
                     args: process.command.args.clone(),
                     env: merged_env,
                     cwd: process.command.cwd.clone(),

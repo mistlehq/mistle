@@ -518,7 +518,7 @@ supports_websockets = false
                 },
                 processes: vec![RuntimeClientProcess {
                     process_key: "codex-app-server".to_string(),
-                    command: crate::runtime::RuntimeArtifactCommand {
+                    command: crate::runtime::RuntimeExecCommand {
                         args: vec![
                             "/usr/local/bin/codex".to_string(),
                             "app-server".to_string(),

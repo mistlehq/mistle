@@ -116,6 +116,228 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 }
 
 #[test]
+fn decodes_legacy_and_typed_artifact_install_entries_during_transition() {
+    let runtime_plan: runtime::CompiledRuntimePlan = serde_json::from_value(serde_json::json!({
+      "sandboxProfileId": "sbp_123",
+      "version": 1,
+      "image": {
+        "source": "base",
+        "imageRef": "mistle/sandbox-base:dev"
+      },
+      "egressRoutes": [],
+      "artifacts": [
+        {
+          "artifactKey": "artifact_1",
+          "name": "artifact one",
+          "lifecycle": {
+            "install": [
+              {
+                "args": ["sh", "-c", "echo legacy"]
+              },
+              {
+                "op": "exec",
+                "command": {
+                  "args": ["sh", "-c", "echo typed-exec"]
+                }
+              },
+              {
+                "op": "mise_install",
+                "tools": ["node@22.0.0"]
+              }
+            ]
+          }
+        }
+      ],
+      "runtimeClients": [],
+      "workspaceSources": [],
+      "agentRuntimes": []
+    }))
+    .expect("runtime plan should decode artifact install compatibility shapes");
+
+    assert!(matches!(
+        runtime_plan.artifacts[0].lifecycle.install[0],
+        runtime::RuntimeArtifactInstallEntry::LegacyCommand(_)
+    ));
+    assert!(matches!(
+        runtime_plan.artifacts[0].lifecycle.install[1],
+        runtime::RuntimeArtifactInstallEntry::Step(
+            runtime::RuntimeArtifactInstallStep::Exec { .. }
+        )
+    ));
+    assert!(matches!(
+        runtime_plan.artifacts[0].lifecycle.install[2],
+        runtime::RuntimeArtifactInstallEntry::Step(
+            runtime::RuntimeArtifactInstallStep::MiseInstall { .. }
+        )
+    ));
+}
+
+#[test]
+fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
+    let invalid_missing_tag = serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
+      "sandboxProfileId": "sbp_123",
+      "version": 1,
+      "image": {
+        "source": "base",
+        "imageRef": "mistle/sandbox-base:dev"
+      },
+      "egressRoutes": [],
+      "artifacts": [
+        {
+          "artifactKey": "artifact_1",
+          "name": "artifact one",
+          "lifecycle": {
+            "install": [
+              {
+                "op": "github_release_install",
+                "repository": "mistlehq/tools",
+                "release": {
+                  "kind": "tag",
+                  "match": "exact"
+                },
+                "asset": {
+                  "kind": "exact",
+                  "fileName": "slack-linux-amd64"
+                },
+                "installPath": "/usr/local/bin/slack"
+              }
+            ]
+          }
+        }
+      ],
+      "runtimeClients": [],
+      "workspaceSources": [],
+      "agentRuntimes": []
+    }));
+    assert!(
+        invalid_missing_tag.is_err(),
+        "typed github release selectors missing the exact tag should fail decode"
+    );
+
+    let invalid_missing_extracted_path =
+        serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "github_release_install",
+                    "repository": "openai/codex",
+                    "release": {
+                      "kind": "latest"
+                    },
+                    "asset": {
+                      "kind": "exact",
+                      "fileName": "codex.tar.gz",
+                      "format": "tar.gz"
+                    },
+                    "installPath": "/usr/local/bin/codex"
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }));
+    assert!(
+        invalid_missing_extracted_path.is_err(),
+        "typed tar.gz assets missing extractedPath should fail decode"
+    );
+
+    let invalid_empty_mise_tools =
+        serde_json::from_value::<runtime::CompiledRuntimePlan>(serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "mise_install",
+                    "tools": []
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }));
+    assert!(
+        invalid_empty_mise_tools.is_err(),
+        "typed mise installs with no tools should fail decode"
+    );
+}
+
+#[test]
+fn rejects_typed_artifact_install_steps_before_executor_support_lands() {
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "exec",
+                    "command": {
+                      "args": ["sh", "-c", "printf should-not-run"]
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    };
+
+    let error = runtime::apply_runtime_plan(&startup_input)
+        .expect_err("branch 2 should reject typed artifact install execution");
+
+    assert!(
+        error
+            .to_string()
+            .contains("artifact install op 'exec' is not supported yet by sandboxd"),
+        "typed artifact step rejection should surface the unsupported op"
+    );
+}
+
+#[test]
 fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_credential_resolvers() {
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,

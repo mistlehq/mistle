@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use sandboxd::process::{self, RuntimeClientProcessSpec};
 use sandboxd::runtime::{
-    RuntimeArtifactCommand, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
-    RuntimeClientProcessStopSignal,
+    RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
+    RuntimeExecCommand,
 };
 use sandboxd::time::{SystemClock, ThreadSleeper};
 
@@ -141,7 +141,7 @@ fn starts_runtime_client_processes_without_readiness_probe_when_none_is_configur
 fn surfaces_readiness_failures_when_process_exits_early() {
     let process_spec = RuntimeClientProcessSpec {
         process_key: "exits_early".to_string(),
-        command: RuntimeArtifactCommand {
+        command: RuntimeExecCommand {
             args: vec!["sh".to_string(), "-c".to_string(), "exit 7".to_string()],
             env: None,
             cwd: None,
@@ -172,8 +172,8 @@ fn surfaces_readiness_failures_when_process_exits_early() {
     );
 }
 
-fn node_process(source: &str) -> RuntimeArtifactCommand {
-    RuntimeArtifactCommand {
+fn node_process(source: &str) -> RuntimeExecCommand {
+    RuntimeExecCommand {
         args: vec!["node".to_string(), "-e".to_string(), source.to_string()],
         env: None,
         cwd: None,

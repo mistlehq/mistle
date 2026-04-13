@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// The subset of the compiled runtime plan that `sandboxd` currently understands.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -80,21 +80,188 @@ pub struct CompiledEgressRouteCredentialResolver {
     pub resolver_key: Option<String>,
 }
 
-/// One artifact lifecycle command or runtime client process command.
+/// One subprocess command used by runtime client processes and legacy artifact installs.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct RuntimeArtifactCommand {
+pub struct RuntimeExecCommand {
     pub args: Vec<String>,
     pub env: Option<BTreeMap<String, String>>,
     pub cwd: Option<String>,
     pub timeout_ms: Option<u64>,
 }
 
+pub type LegacyRuntimeArtifactCommand = RuntimeExecCommand;
+
+fn deserialize_non_empty_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = String::deserialize(deserializer)?;
+    if value.is_empty() {
+        return Err(serde::de::Error::custom("string value must not be empty"));
+    }
+    Ok(value)
+}
+
+fn deserialize_non_empty_string_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<String>::deserialize(deserializer)?;
+    if values.is_empty() {
+        return Err(serde::de::Error::custom("string list must not be empty"));
+    }
+    if values.iter().any(String::is_empty) {
+        return Err(serde::de::Error::custom(
+            "string list entries must not be empty",
+        ));
+    }
+    Ok(values)
+}
+
+/// One GitHub release selector for a typed artifact install step.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RuntimeArtifactGitHubReleaseSelector {
+    #[serde(rename = "latest")]
+    Latest,
+    #[serde(rename = "tag")]
+    Tag {
+        #[serde(flatten)]
+        selector: RuntimeArtifactGitHubReleaseTagSelector,
+    },
+}
+
+/// The tag-selection payload for typed GitHub release install steps.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "match", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RuntimeArtifactGitHubReleaseTagSelector {
+    #[serde(rename = "exact")]
+    Exact {
+        #[serde(deserialize_with = "deserialize_non_empty_string")]
+        tag: String,
+    },
+    #[serde(rename = "latest_matching_prefix")]
+    LatestMatchingPrefix {
+        #[serde(deserialize_with = "deserialize_non_empty_string")]
+        prefix: String,
+    },
+}
+
+/// One concrete GitHub release asset shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RuntimeArtifactGitHubReleaseAssetShape {
+    Binary(RuntimeArtifactGitHubReleaseBinaryAssetShape),
+    TarGz(RuntimeArtifactGitHubReleaseTarGzAssetShape),
+}
+
+impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseAssetShape {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Shape {
+            Binary(RuntimeArtifactGitHubReleaseBinaryAssetShape),
+            TarGz(RuntimeArtifactGitHubReleaseTarGzAssetShape),
+        }
+
+        match Shape::deserialize(deserializer)? {
+            Shape::Binary(binary) => Ok(Self::Binary(binary)),
+            Shape::TarGz(tar_gz) => Ok(Self::TarGz(tar_gz)),
+        }
+    }
+}
+
+/// One binary GitHub release asset shape.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeArtifactGitHubReleaseBinaryAssetShape {
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
+    pub file_name: String,
+    pub format: Option<RuntimeArtifactGitHubReleaseBinaryAssetFormat>,
+}
+
+/// One tarball GitHub release asset shape.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeArtifactGitHubReleaseTarGzAssetShape {
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
+    pub file_name: String,
+    pub format: RuntimeArtifactGitHubReleaseTarGzAssetFormat,
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
+    pub extracted_path: String,
+}
+
+/// The supported binary GitHub release asset format marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum RuntimeArtifactGitHubReleaseBinaryAssetFormat {
+    #[serde(rename = "binary")]
+    Binary,
+}
+
+/// The supported tarball GitHub release asset format marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum RuntimeArtifactGitHubReleaseTarGzAssetFormat {
+    #[serde(rename = "tar.gz")]
+    TarGz,
+}
+
+/// The GitHub release asset selection for a typed install step.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RuntimeArtifactGitHubReleaseInstallAsset {
+    #[serde(rename = "exact")]
+    Exact {
+        #[serde(flatten)]
+        asset: RuntimeArtifactGitHubReleaseAssetShape,
+    },
+    #[serde(rename = "by_arch")]
+    ByArch {
+        x86_64: RuntimeArtifactGitHubReleaseAssetShape,
+        aarch64: RuntimeArtifactGitHubReleaseAssetShape,
+    },
+}
+
+/// One typed artifact install step.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+pub enum RuntimeArtifactInstallStep {
+    #[serde(rename = "github_release_install")]
+    GitHubReleaseInstall {
+        #[serde(deserialize_with = "deserialize_non_empty_string")]
+        repository: String,
+        release: RuntimeArtifactGitHubReleaseSelector,
+        asset: RuntimeArtifactGitHubReleaseInstallAsset,
+        #[serde(deserialize_with = "deserialize_non_empty_string")]
+        install_path: String,
+        timeout_ms: Option<u64>,
+    },
+    #[serde(rename = "mise_install")]
+    MiseInstall {
+        #[serde(deserialize_with = "deserialize_non_empty_string_vec")]
+        tools: Vec<String>,
+        force: Option<bool>,
+        timeout_ms: Option<u64>,
+    },
+    #[serde(rename = "exec")]
+    Exec { command: RuntimeExecCommand },
+}
+
+/// One artifact lifecycle install entry during the compatibility window.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum RuntimeArtifactInstallEntry {
+    LegacyCommand(LegacyRuntimeArtifactCommand),
+    Step(RuntimeArtifactInstallStep),
+}
+
 /// The install lifecycle for one compiled runtime artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeArtifactLifecycle {
-    pub install: Vec<RuntimeArtifactCommand>,
+    pub install: Vec<RuntimeArtifactInstallEntry>,
 }
 
 /// One artifact that must be materialized before runtime clients start.
@@ -152,7 +319,7 @@ pub struct RuntimeClient {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeClientProcess {
     pub process_key: String,
-    pub command: RuntimeArtifactCommand,
+    pub command: RuntimeExecCommand,
     pub readiness: RuntimeClientProcessReadiness,
     pub stop: RuntimeClientProcessStopPolicy,
 }

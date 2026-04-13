@@ -20,22 +20,21 @@ pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
     CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
     CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimeArtifact,
-    CompiledRuntimePlan,
-    CompiledWorkspaceSource,
-    RuntimeArtifactCommand, RuntimeArtifactLifecycle, RuntimeClient, RuntimeClientConnectionMode,
-    RuntimeClientEndpoint,
-    RuntimeClientEndpointTransport, RuntimeClientProcess, RuntimeClientProcessReadiness,
-    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal, RuntimeClientSetup,
-    RuntimeClientSetupFile, WorkspaceSourceResourceKind,
+    CompiledRuntimePlan, CompiledWorkspaceSource, RuntimeArtifactInstallEntry,
+    RuntimeArtifactInstallStep, RuntimeArtifactLifecycle, RuntimeClient,
+    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
+    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
+    RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile, RuntimeExecCommand,
+    WorkspaceSourceResourceKind,
 };
 
 /// Describes why one runtime-plan setup step failed while applying startup input.
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),
-    ArtifactCommand {
+    ArtifactInstallEntry {
         artifact_index: usize,
-        command_index: usize,
+        install_index: usize,
         artifact_key: String,
         error: String,
     },
@@ -61,14 +60,14 @@ impl fmt::Display for RuntimePlanApplyError {
             Self::InvalidRuntimePlan(error) => {
                 write!(f, "runtime plan is invalid: {error}")
             }
-            Self::ArtifactCommand {
+            Self::ArtifactInstallEntry {
                 artifact_index,
-                command_index,
+                install_index,
                 artifact_key,
                 error,
             } => write!(
                 f,
-                "runtime plan artifacts[{artifact_index}] lifecycle.install[{command_index}] failed (artifactKey={artifact_key}): {error}"
+                "runtime plan artifacts[{artifact_index}] lifecycle.install[{install_index}] failed (artifactKey={artifact_key}): {error}"
             ),
             Self::WorkspaceSource {
                 source_index,
@@ -96,6 +95,41 @@ impl fmt::Display for RuntimePlanApplyError {
 
 impl std::error::Error for RuntimePlanApplyError {}
 
+fn apply_legacy_artifact_command(command: &RuntimeExecCommand) -> Result<(), String> {
+    run_command(
+        CommandSpec {
+            args: &command.args,
+            env: command.env.as_ref(),
+            cwd: command.cwd.as_deref(),
+            timeout_ms: command.timeout_ms,
+        },
+        &SystemClock,
+        &ThreadSleeper,
+        DEFAULT_COMMAND_POLL_INTERVAL,
+    )
+}
+
+fn dispatch_artifact_install_step(step: &RuntimeArtifactInstallStep) -> Result<(), String> {
+    let op = match step {
+        RuntimeArtifactInstallStep::GitHubReleaseInstall { .. } => "github_release_install",
+        RuntimeArtifactInstallStep::MiseInstall { .. } => "mise_install",
+        RuntimeArtifactInstallStep::Exec { .. } => "exec",
+    };
+
+    Err(format!(
+        "artifact install op '{op}' is not supported yet by sandboxd"
+    ))
+}
+
+fn apply_artifact_install_entry(entry: &RuntimeArtifactInstallEntry) -> Result<(), String> {
+    match entry {
+        RuntimeArtifactInstallEntry::LegacyCommand(command) => {
+            apply_legacy_artifact_command(command)
+        }
+        RuntimeArtifactInstallEntry::Step(step) => dispatch_artifact_install_step(step),
+    }
+}
+
 /// Applies the artifact, workspace-source, and setup-file portions of one startup input's runtime
 /// plan.
 pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
@@ -112,23 +146,14 @@ pub fn apply_compiled_runtime_plan(
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
-        for (command_index, command) in artifact.lifecycle.install.iter().enumerate() {
-            run_command(
-                CommandSpec {
-                    args: &command.args,
-                    env: command.env.as_ref(),
-                    cwd: command.cwd.as_deref(),
-                    timeout_ms: command.timeout_ms,
-                },
-                &SystemClock,
-                &ThreadSleeper,
-                DEFAULT_COMMAND_POLL_INTERVAL,
-            )
-            .map_err(|error| RuntimePlanApplyError::ArtifactCommand {
-                artifact_index,
-                command_index,
-                artifact_key: artifact.artifact_key.clone(),
-                error,
+        for (install_index, install_entry) in artifact.lifecycle.install.iter().enumerate() {
+            apply_artifact_install_entry(install_entry).map_err(|error| {
+                RuntimePlanApplyError::ArtifactInstallEntry {
+                    artifact_index,
+                    install_index,
+                    artifact_key: artifact.artifact_key.clone(),
+                    error,
+                }
             })?;
         }
     }
