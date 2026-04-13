@@ -21,6 +21,10 @@ export const dataPlaneGatewayDevelopmentPreset = {
         data_plane_api: {
           base_url: "http://127.0.0.1:5200",
         },
+        lifecycle: {
+          idle_timeout_ms: 300_000,
+          bootstrap_disconnect_grace_ms: 60_000,
+        },
       },
     },
   },

@@ -18,6 +18,8 @@ const CONFIG_PATH_IN_CONTAINER = DockerIntegrationConfigPathInContainer;
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const INTERNAL_AUTH_SERVICE_TOKEN = "system-internal-service-token";
+const DATA_PLANE_GATEWAY_IDLE_TIMEOUT_MS = 20_000;
+const DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS = 8_000;
 const TestContextId = "system";
 
 function createTelemetryEnvironmentOverrides(input: {
@@ -66,9 +68,21 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       controlPlaneWorkerEnvironment: telemetryEnvironmentOverrides,
       dataPlaneApiEnvironment: telemetryEnvironmentOverrides,
       dataPlaneWorkerEnvironment: telemetryEnvironmentOverrides,
-      dataPlaneGatewayEnvironment: telemetryEnvironmentOverrides,
+      dataPlaneGatewayEnvironment: {
+        ...telemetryEnvironmentOverrides,
+        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: String(
+          DATA_PLANE_GATEWAY_IDLE_TIMEOUT_MS,
+        ),
+        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: String(
+          DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS,
+        ),
+      },
       tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
     });
+    const gatewayLifecycle = environment.dataPlaneGatewayLifecycle;
+    if (gatewayLifecycle === undefined) {
+      throw new Error("Expected full system environment to expose gateway lifecycle settings.");
+    }
 
     try {
       await writeTestContext({
@@ -84,6 +98,8 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
           dataPlaneWorkerContainerId: environment.dataPlaneWorker.containerId,
           dataPlaneGatewayBaseUrl: environment.dataPlaneGateway.hostBaseUrl,
           dataPlaneGatewayContainerId: environment.dataPlaneGateway.containerId,
+          dataPlaneGatewayIdleTimeoutMs: gatewayLifecycle.idleTimeoutMs,
+          dataPlaneGatewayBootstrapDisconnectGraceMs: gatewayLifecycle.bootstrapDisconnectGraceMs,
           tokenizerProxyBaseUrl: environment.tokenizerProxy.hostBaseUrl,
           tokenizerProxyContainerId: environment.tokenizerProxy.containerId,
           mailpitHttpBaseUrl: environment.mailpit.httpBaseUrl,
