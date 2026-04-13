@@ -799,6 +799,11 @@ describe("LocalSandboxIdleController", () => {
         1_000,
         "Timed out waiting for initial idle stop request.",
       );
+      await waitForCondition(
+        () => scheduler.pendingCount() === 1,
+        1_000,
+        "Timed out waiting for idle stop retry scheduling.",
+      );
 
       expect(disposeCount).toBe(0);
       expect(scheduler.pendingCount()).toBe(1);
