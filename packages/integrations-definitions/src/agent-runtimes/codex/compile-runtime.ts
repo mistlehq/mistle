@@ -14,6 +14,8 @@ import {
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
+const CodexCliVersion = "0.119.0";
+const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "Proxy";
 const CodexGitHubRepository = "openai/codex";
@@ -194,8 +196,9 @@ export function compileCodexRuntime(
         name: "Codex CLI",
         lifecycle: {
           install: ({ refs }) => [
-            refs.githubReleases.installLatestBinary({
+            refs.githubReleases.installTaggedBinary({
               repository: CodexGitHubRepository,
+              releaseTag: CodexCliReleaseTag,
               assets: CodexGitHubAssets,
               installPath: refs.artifactBinPath("codex"),
               timeoutMs: ArtifactCommandTimeoutMs,

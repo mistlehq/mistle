@@ -127,7 +127,8 @@ describe("sandbox profile compile runtime plan integration", () => {
     const installScript = installCommand?.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain("repo=openai/codex");
-    expect(installScript).toContain("releases/latest/download/$asset_name");
+    expect(installScript).toContain("release_tag=rust-v0.119.0");
+    expect(installScript).toContain("releases/download/$release_tag/$asset_name");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/usr/local/bin/codex");

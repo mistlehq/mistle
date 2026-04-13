@@ -1061,6 +1061,17 @@ export type RuntimeArtifactGithubReleaseInstallInput = {
   timeoutMs?: number;
 };
 
+export type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput = {
+  repository: string;
+  releaseTag: string;
+  assets: {
+    x86_64: RuntimeArtifactGithubReleaseAsset;
+    aarch64: RuntimeArtifactGithubReleaseAsset;
+  };
+  installPath: string;
+  timeoutMs?: number;
+};
+
 type RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput = {
   repository: string;
   releaseTagPrefix: string;
@@ -1093,6 +1104,9 @@ export type RuntimeArtifactRefs = {
   };
   githubReleases: {
     installLatestBinary(input: RuntimeArtifactGithubReleaseInstallInput): RuntimeArtifactCommand;
+    installTaggedBinary(
+      input: RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
+    ): RuntimeArtifactCommand;
     installLatestTaggedAsset(
       input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
     ): RuntimeArtifactCommand;

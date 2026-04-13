@@ -22,6 +22,7 @@ import {
   type CompiledRuntimePlan,
   type RuntimeArtifactCommand,
   type RuntimeArtifactGithubReleaseInstallInput,
+  type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
   type RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
@@ -83,6 +84,54 @@ function renderInstallLatestGithubReleaseBinaryScript(
     "trap 'rm -rf \"$temp_dir\"' EXIT",
     "",
     'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"',
+    'case "$asset_format" in',
+    "  tar.gz)",
+    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
+    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
+    "    ;;",
+    "  binary)",
+    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported asset format: $asset_format" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+  ].join("\n");
+}
+
+function renderInstallTaggedGithubReleaseBinaryScript(
+  input: RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
+): string {
+  const x86AssetFormat = input.assets.x86_64.format ?? "tar.gz";
+  const aarch64AssetFormat = input.assets.aarch64.format ?? "tar.gz";
+
+  return [
+    'arch="$(uname -m)"',
+    "repo=" + quote([input.repository]),
+    "release_tag=" + quote([input.releaseTag]),
+    "install_path=" + quote([input.installPath]),
+    'case "$arch" in',
+    "  x86_64)",
+    `    asset_name=${quote([input.assets.x86_64.fileName])}`,
+    `    binary_path=${quote([input.assets.x86_64.binaryPath])}`,
+    `    asset_format=${quote([x86AssetFormat])}`,
+    "    ;;",
+    "  aarch64|arm64)",
+    `    asset_name=${quote([input.assets.aarch64.fileName])}`,
+    `    binary_path=${quote([input.assets.aarch64.binaryPath])}`,
+    `    asset_format=${quote([aarch64AssetFormat])}`,
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported architecture: $arch" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+    "",
+    'temp_dir="$(mktemp -d)"',
+    "trap 'rm -rf \"$temp_dir\"' EXIT",
+    "",
+    'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/download/$release_tag/$asset_name" -o "$temp_dir/artifact"',
     'case "$asset_format" in',
     "  tar.gz)",
     '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
@@ -210,6 +259,11 @@ function createRuntimeArtifactRefs(input: {
       installLatestBinary: (installInput) =>
         exec({
           args: ["sh", "-euc", renderInstallLatestGithubReleaseBinaryScript(installInput)],
+          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+        }),
+      installTaggedBinary: (installInput) =>
+        exec({
+          args: ["sh", "-euc", renderInstallTaggedGithubReleaseBinaryScript(installInput)],
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
       installLatestTaggedAsset: (installInput) =>

@@ -570,6 +570,54 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
   };
 }
 
+function createPinnedGithubReleaseArtifactDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof ConnectorBindingConfigSchema
+> {
+  return {
+    familyId: "openai",
+    variantId: "openai-default",
+    kind: "connector",
+    displayName: "OpenAI",
+    logoKey: "openai",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: ConnectorBindingConfigSchema,
+    connectionMethods: ApiKeyConnectionMethods,
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [
+        {
+          artifactKey: "codex-cli",
+          name: "Codex CLI",
+          lifecycle: {
+            install: ({ refs }) => [
+              refs.githubReleases.installTaggedBinary({
+                repository: "openai/codex",
+                releaseTag: "rust-v0.119.0",
+                assets: {
+                  x86_64: {
+                    fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                  },
+                  aarch64: {
+                    fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                  },
+                },
+                installPath: "/usr/local/bin/codex",
+                timeoutMs: 120_000,
+              }),
+            ],
+          },
+        },
+      ],
+      runtimeClients: [],
+    }),
+  };
+}
+
 function createTaggedGithubReleaseArtifactDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
   typeof EmptyTargetSecretsSchema,
@@ -793,6 +841,59 @@ describe("compileRuntimePlan", () => {
       'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name"',
     );
     expect(installScript).toContain("openai/codex");
+    expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("/usr/local/bin/codex");
+  });
+
+  it("supports pinned github release binary install refs in artifact lifecycle hooks", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createPinnedGithubReleaseArtifactDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "connector",
+            connectionId: "conn_openai_org_123",
+            config: {
+              defaultModel: "gpt-5.3-codex",
+            },
+          },
+        },
+      ],
+    });
+
+    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    expect(typeof installScript).toBe("string");
+    expect(installScript).toContain("release_tag=rust-v0.119.0");
+    expect(installScript).toContain(
+      'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/download/$release_tag/$asset_name"',
+    );
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/usr/local/bin/codex");
