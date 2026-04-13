@@ -272,6 +272,7 @@ function SessionWorkbenchPageContent(input: {
       bottomPanel={
         <SessionTerminalPanel
           key={terminalPanelKey}
+          cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={workbench.terminalPanelState.closePanel}
