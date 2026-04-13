@@ -17,7 +17,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { InfoIcon } from "@phosphor-icons/react";
+import { ArrowSquareOutIcon, InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -30,7 +30,7 @@ import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
-import { formatRelativeOrDate } from "../shared/date-formatters.js";
+import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
@@ -126,11 +126,7 @@ export function SandboxSessionStatusBadge(input: {
   );
 }
 
-export function shouldUseResumeActionLabel(status: SandboxLifecycleStatus): boolean {
-  return status === "stopped";
-}
-
-function SessionTitleCell(input: { title: string }): React.JSX.Element {
+function SessionTitleCell(input: { title: string; isNavigable: boolean }): React.JSX.Element {
   const [titleElement, setTitleElement] = useState<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -166,8 +162,23 @@ function SessionTitleCell(input: { title: string }): React.JSX.Element {
     <Tooltip delay={0} disabled={!isTruncated}>
       <TooltipTrigger
         render={
-          <span className="block max-w-full truncate font-medium" ref={handleTitleRef}>
-            {input.title}
+          <span className="flex max-w-full items-center gap-1">
+            <span
+              className={`block min-w-0 flex-1 cursor-default truncate font-medium ${
+                input.isNavigable
+                  ? "group-hover/session-row:underline group-focus-within/session-row:underline"
+                  : "text-muted-foreground"
+              }`}
+              ref={handleTitleRef}
+            >
+              {input.title}
+            </span>
+            {input.isNavigable ? (
+              <ArrowSquareOutIcon
+                aria-hidden
+                className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
+              />
+            ) : null}
           </span>
         }
       />
@@ -188,6 +199,29 @@ function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): stri
   }
 
   return "User";
+}
+
+function resolveUpdatedLabel(input: {
+  status: SandboxLifecycleStatus;
+  updatedAt: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+}): React.JSX.Element {
+  if (input.status === "failed") {
+    return (
+      <SandboxSessionStatusBadge
+        failureCode={input.failureCode}
+        failureMessage={input.failureMessage}
+        status={input.status}
+      />
+    );
+  }
+
+  return (
+    <span className="text-muted-foreground text-sm whitespace-nowrap">
+      {formatCompactRelativeOrDate(input.updatedAt)}
+    </span>
+  );
 }
 
 export function buildOptimisticSessions(input: {
@@ -499,74 +533,97 @@ export function SessionsPage(): React.JSX.Element {
         )}
 
         <div className="flex flex-col gap-3">
-          <Table className="min-w-[48rem] table-fixed">
+          <Table className="min-w-[40rem] table-fixed">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground w-[44%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                   Sessions
                 </TableHead>
-                <TableHead className="text-foreground w-48 py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground w-[24%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  Sandbox profile
+                </TableHead>
+                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                   Started by
                 </TableHead>
-                <TableHead className="text-foreground w-28 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-                  Created
-                </TableHead>
-                <TableHead className="text-foreground w-24 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-                  Status
-                </TableHead>
-                <TableHead className="text-right text-foreground w-20 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
-                  <span className="sr-only">Actions</span>
+                <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  Updated
                 </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!isLoadingSessions && !hasSessions ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={5}>
+                  <TableCell className="text-muted-foreground" colSpan={4}>
                     No sessions yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedSessions.map((session) => {
+                  const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+
                   return (
-                    <TableRow key={session.id}>
-                      <TableCell className="max-w-0 whitespace-normal">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <SessionTitleCell title={session.title ?? "Untitled"} />
-                          <span className="text-muted-foreground text-xs break-words">
-                            {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm whitespace-normal">
-                        <span className="break-words">
-                          {formatStartedByLabel(session.startedBy)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        {formatRelativeOrDate(session.createdAt)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <SandboxSessionStatusBadge
-                            failureCode={session.failureCode}
-                            failureMessage={session.failureMessage}
-                            status={session.status}
+                    <TableRow
+                      className={
+                        isNavigable
+                          ? "group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
+                          : "group/session-row hover:bg-transparent"
+                      }
+                      key={session.id}
+                      onClick={() => {
+                        if (!isNavigable) {
+                          return;
+                        }
+
+                        void navigate(`/sessions/${encodeURIComponent(session.id)}`);
+                      }}
+                      onKeyDown={(event) => {
+                        if (!isNavigable) {
+                          return;
+                        }
+
+                        if (event.key !== "Enter" && event.key !== " ") {
+                          return;
+                        }
+
+                        event.preventDefault();
+                        void navigate(`/sessions/${encodeURIComponent(session.id)}`);
+                      }}
+                      {...(isNavigable
+                        ? {
+                            role: "link",
+                            tabIndex: 0,
+                          }
+                        : {
+                            "aria-disabled": true,
+                          })}
+                    >
+                      <TableCell className="max-w-0 align-top whitespace-normal">
+                        <div className="flex min-w-0">
+                          <SessionTitleCell
+                            isNavigable={isNavigable}
+                            title={session.title ?? "Untitled"}
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="text-right whitespace-nowrap">
-                        {/** Stopped sessions resume through the workbench so the
-                         existing reconnect and error flow stays centralized. */}
-                        <Button
-                          disabled={!isSessionPageNavigableSandboxStatus(session.status)}
-                          onClick={() => {
-                            void navigate(`/sessions/${encodeURIComponent(session.id)}`);
-                          }}
-                          type="button"
-                        >
-                          {shouldUseResumeActionLabel(session.status) ? "Resume" : "Open"}
-                        </Button>
+                      <TableCell className="align-top text-sm whitespace-normal">
+                        <span className="break-words text-sm text-muted-foreground">
+                          {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top text-sm whitespace-normal">
+                        <span className="break-words text-sm text-foreground/80">
+                          {formatStartedByLabel(session.startedBy)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top text-right whitespace-nowrap">
+                        <div className="flex justify-end">
+                          {resolveUpdatedLabel({
+                            status: session.status,
+                            updatedAt: session.updatedAt,
+                            failureCode: session.failureCode,
+                            failureMessage: session.failureMessage,
+                          })}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
