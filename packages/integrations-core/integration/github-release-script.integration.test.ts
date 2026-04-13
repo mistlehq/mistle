@@ -73,17 +73,19 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
           name: "jq",
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installLatestBinary({
+              refs.githubReleases.install({
                 repository: "jqlang/jq",
-                assets: {
+                release: {
+                  kind: "latest",
+                },
+                asset: {
+                  kind: "by_arch",
                   x86_64: {
                     fileName: "jq-linux-amd64",
-                    binaryPath: "jq-linux-amd64",
                     format: "binary",
                   },
                   aarch64: {
                     fileName: "jq-linux-arm64",
-                    binaryPath: "jq-linux-arm64",
                     format: "binary",
                   },
                 },
@@ -122,12 +124,19 @@ function createTaggedGithubBinaryInstallDefinition(): IntegrationDefinition<
           name: "jq",
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installLatestTaggedAsset({
+              refs.githubReleases.install({
                 repository: "jqlang/jq",
-                releaseTagPrefix: "jq-",
-                assetName: "jq-linux-amd64",
+                release: {
+                  kind: "tag",
+                  match: "latest_matching_prefix",
+                  prefix: "jq-",
+                },
+                asset: {
+                  kind: "exact",
+                  fileName: "jq-linux-amd64",
+                  format: "binary",
+                },
                 installPath: InstallPath,
-                format: "binary",
                 timeoutMs: 120_000,
               }),
             ],
@@ -140,7 +149,7 @@ function createTaggedGithubBinaryInstallDefinition(): IntegrationDefinition<
 }
 
 describe("github release helper integration", () => {
-  it("compiles latest-binary GitHub helper refs into typed artifact ops", () => {
+  it("compiles canonical GitHub release install refs for latest releases into typed artifact ops", () => {
     const registry = new IntegrationRegistry();
     registry.register(createGithubBinaryInstallDefinition());
 
@@ -200,7 +209,7 @@ describe("github release helper integration", () => {
     });
   });
 
-  it("compiles latest-tagged-asset GitHub helper refs into typed artifact ops", () => {
+  it("compiles canonical GitHub release install refs for matching tag prefixes into typed artifact ops", () => {
     const registry = new IntegrationRegistry();
     registry.register(createTaggedGithubBinaryInstallDefinition());
 

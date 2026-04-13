@@ -134,16 +134,22 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           },
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installLatestBinary({
+              refs.githubReleases.install({
                 repository: "openai/codex",
-                assets: {
+                release: {
+                  kind: "latest",
+                },
+                asset: {
+                  kind: "by_arch",
                   x86_64: {
                     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-x86_64-unknown-linux-musl",
                   },
                   aarch64: {
                     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
                 installPath: refs.artifactBinPath("codex"),
@@ -558,16 +564,22 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installLatestBinary({
+              refs.githubReleases.install({
                 repository: "openai/codex",
-                assets: {
+                release: {
+                  kind: "latest",
+                },
+                asset: {
+                  kind: "by_arch",
                   x86_64: {
                     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-x86_64-unknown-linux-musl",
                   },
                   aarch64: {
                     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
                 installPath: "/usr/local/bin/codex",
@@ -605,17 +617,24 @@ function createPinnedGithubReleaseArtifactDefinition(): IntegrationDefinition<
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installTaggedBinary({
+              refs.githubReleases.install({
                 repository: "openai/codex",
-                releaseTag: "rust-v0.119.0",
-                assets: {
+                release: {
+                  kind: "tag",
+                  match: "exact",
+                  tag: "rust-v0.119.0",
+                },
+                asset: {
+                  kind: "by_arch",
                   x86_64: {
                     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-x86_64-unknown-linux-musl",
                   },
                   aarch64: {
                     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
-                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                    format: "tar.gz",
+                    extractedPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
                 installPath: "/usr/local/bin/codex",
@@ -708,12 +727,19 @@ function createTaggedGithubReleaseArtifactDefinition(): IntegrationDefinition<
           name: "Jira CLI",
           lifecycle: {
             install: ({ refs }) => [
-              refs.githubReleases.installLatestTaggedAsset({
+              refs.githubReleases.install({
                 repository: "mistlehq/tools",
-                releaseTagPrefix: "jira/",
-                assetName: "jira-linux-amd64",
+                release: {
+                  kind: "tag",
+                  match: "latest_matching_prefix",
+                  prefix: "jira/",
+                },
+                asset: {
+                  kind: "exact",
+                  fileName: "jira-linux-amd64",
+                  format: "binary",
+                },
                 installPath: "/usr/local/bin/jira",
-                format: "binary",
                 timeoutMs: 120_000,
               }),
             ],

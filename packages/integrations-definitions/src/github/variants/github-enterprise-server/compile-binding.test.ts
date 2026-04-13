@@ -59,30 +59,6 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
           },
         };
       },
-      installLatestBinary(): RuntimeArtifactInstallStep {
-        return {
-          op: "exec",
-          command: {
-            args: ["github-releases.installLatestBinary"],
-          },
-        };
-      },
-      installTaggedBinary(): RuntimeArtifactInstallStep {
-        return {
-          op: "exec",
-          command: {
-            args: ["github-releases.installTaggedBinary"],
-          },
-        };
-      },
-      installLatestTaggedAsset(): RuntimeArtifactInstallStep {
-        return {
-          op: "exec",
-          command: {
-            args: ["github-releases.installLatestTaggedAsset"],
-          },
-        };
-      },
     },
     compileContext: {
       organizationId: "org_123",

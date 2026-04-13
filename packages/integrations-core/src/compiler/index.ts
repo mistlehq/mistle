@@ -19,7 +19,6 @@ import {
   type ResolvedIntegrationMcpServer,
   type CompiledRuntimePlan,
   type RuntimeArtifactGitHubReleaseInstallHelperInput,
-  type RuntimeArtifactGitHubReleaseInstallAssetShape,
   type RuntimeArtifactInstallStep,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
@@ -49,25 +48,6 @@ function resolveEgressRuleId(input: { bindingId: string; routeIndex: number }): 
   }
 
   return `egress_rule_${input.bindingId}_${input.routeIndex + 1}`;
-}
-
-function toGitHubReleaseInstallAssetShape(input: {
-  fileName: string;
-  binaryPath: string;
-  format?: "tar.gz" | "binary";
-}): RuntimeArtifactGitHubReleaseInstallAssetShape {
-  if (input.format === "binary") {
-    return {
-      fileName: input.fileName,
-      format: "binary",
-    };
-  }
-
-  return {
-    fileName: input.fileName,
-    format: "tar.gz",
-    extractedPath: input.binaryPath,
-  };
 }
 
 function createGitHubReleaseInstallStep(
@@ -147,60 +127,6 @@ function createRuntimeArtifactRefs(input: {
     },
     githubReleases: {
       install: (installInput) => createGitHubReleaseInstallStep(installInput),
-      installLatestBinary: (installInput) =>
-        createGitHubReleaseInstallStep({
-          repository: installInput.repository,
-          release: {
-            kind: "latest",
-          },
-          asset: {
-            kind: "by_arch",
-            x86_64: toGitHubReleaseInstallAssetShape(installInput.assets.x86_64),
-            aarch64: toGitHubReleaseInstallAssetShape(installInput.assets.aarch64),
-          },
-          installPath: installInput.installPath,
-          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-        }),
-      installTaggedBinary: (installInput) =>
-        createGitHubReleaseInstallStep({
-          repository: installInput.repository,
-          release: {
-            kind: "tag",
-            match: "exact",
-            tag: installInput.releaseTag,
-          },
-          asset: {
-            kind: "by_arch",
-            x86_64: toGitHubReleaseInstallAssetShape(installInput.assets.x86_64),
-            aarch64: toGitHubReleaseInstallAssetShape(installInput.assets.aarch64),
-          },
-          installPath: installInput.installPath,
-          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-        }),
-      installLatestTaggedAsset: (installInput) =>
-        createGitHubReleaseInstallStep({
-          repository: installInput.repository,
-          release: {
-            kind: "tag",
-            match: "latest_matching_prefix",
-            prefix: installInput.releaseTagPrefix,
-          },
-          asset: {
-            kind: "exact",
-            ...(installInput.format === "tar.gz"
-              ? {
-                  fileName: installInput.assetName,
-                  format: "tar.gz" as const,
-                  extractedPath: installInput.binaryPath,
-                }
-              : {
-                  fileName: installInput.assetName,
-                  format: "binary" as const,
-                }),
-          },
-          installPath: installInput.installPath,
-          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
-        }),
     },
     compileContext: {
       organizationId: input.organizationId,

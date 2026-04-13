@@ -1045,12 +1045,6 @@ export type RuntimeExecCommand = {
   timeoutMs?: number;
 };
 
-/**
- * @deprecated Use RuntimeExecCommand for subprocess commands. This alias
- * remains during the artifact install compatibility transition.
- */
-export type RuntimeArtifactCommand = RuntimeExecCommand;
-
 export type LegacyRuntimeArtifactCommand = RuntimeExecCommand;
 
 export type RuntimeArtifactGitHubReleaseSelector =
@@ -1145,50 +1139,6 @@ export type RuntimeArtifactInstallEntryCompat =
   | LegacyRuntimeArtifactCommand
   | RuntimeArtifactInstallStep;
 
-export type RuntimeArtifactGithubReleaseAsset = {
-  fileName: string;
-  binaryPath: string;
-  format?: "tar.gz" | "binary";
-};
-
-export type RuntimeArtifactGithubReleaseTaggedBinaryInstallInput = {
-  repository: string;
-  releaseTag: string;
-  assets: {
-    x86_64: RuntimeArtifactGithubReleaseAsset;
-    aarch64: RuntimeArtifactGithubReleaseAsset;
-  };
-  installPath: string;
-  timeoutMs?: number;
-};
-
-type RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput = {
-  repository: string;
-  releaseTagPrefix: string;
-  assetName: string;
-  installPath: string;
-  timeoutMs?: number;
-};
-
-export type RuntimeArtifactGithubReleaseTaggedAssetInstallInput =
-  | (RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput & {
-      format?: "binary";
-    })
-  | (RuntimeArtifactGithubReleaseTaggedAssetInstallBaseInput & {
-      format: "tar.gz";
-      binaryPath: string;
-    });
-
-export type RuntimeArtifactGithubReleaseInstallInput = {
-  repository: string;
-  assets: {
-    x86_64: RuntimeArtifactGithubReleaseAsset;
-    aarch64: RuntimeArtifactGithubReleaseAsset;
-  };
-  installPath: string;
-  timeoutMs?: number;
-};
-
 export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeExecCommand): RuntimeArtifactInstallStep;
@@ -1204,15 +1154,6 @@ export type RuntimeArtifactRefs = {
   };
   githubReleases: {
     install(input: RuntimeArtifactGitHubReleaseInstallHelperInput): RuntimeArtifactInstallStep;
-    installLatestBinary(
-      input: RuntimeArtifactGithubReleaseInstallInput,
-    ): RuntimeArtifactInstallStep;
-    installTaggedBinary(
-      input: RuntimeArtifactGithubReleaseTaggedBinaryInstallInput,
-    ): RuntimeArtifactInstallStep;
-    installLatestTaggedAsset(
-      input: RuntimeArtifactGithubReleaseTaggedAssetInstallInput,
-    ): RuntimeArtifactInstallStep;
   };
   compileContext: {
     organizationId: string;
