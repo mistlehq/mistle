@@ -4,8 +4,8 @@ use std::sync::{Arc, mpsc};
 use std::thread;
 
 use serde_json::{Value, json};
-use tungstenite::{Message, WebSocket, accept, connect};
 use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{Message, WebSocket, accept, connect};
 
 use sandboxd::codex_proxy::{CODEX_INITIALIZE_CLIENT_NAME, start_codex_proxy};
 use sandboxd::keepalive::KeepaliveManager;

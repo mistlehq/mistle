@@ -5,10 +5,12 @@
 //! still in flight. This module adds the first runtime-specific adapter:
 //! - a websocket proxy listener that forwards JSON-RPC traffic to the raw
 //!   app-server endpoint
-//! - one internal monitor connection that rebuilds active thread state from
+//! - one internal session-manager connection that rebuilds active thread state from
 //!   `thread/loaded/list` and `thread/read`
 //! - incremental keepalive updates driven only by `thread/status/changed`
-//! - runtime-readiness updates driven by the monitor's real protocol bootstrap
+//! - runtime-readiness updates driven by the session manager's real protocol bootstrap
+
+mod session_manager;
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -25,6 +27,9 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Error as WebSocketError, Message, WebSocket, accept, connect};
 use url::Url;
 
+pub use crate::codex_proxy::session_manager::{
+    CodexSessionManager, CodexSessionManagerCommand, CodexSessionManagerError, RetainReason,
+};
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Duration, Sleeper};
@@ -77,7 +82,6 @@ pub enum CodexProxyError {
     ReadSocket(WebSocketError),
     WriteSocket(WebSocketError),
     ListenerPanicked,
-    MonitorPanicked,
     SessionPanicked,
 }
 
@@ -146,7 +150,6 @@ impl fmt::Display for CodexProxyError {
                 write!(f, "failed to write Codex websocket message: {error}")
             }
             Self::ListenerPanicked => write!(f, "Codex proxy listener thread panicked"),
-            Self::MonitorPanicked => write!(f, "Codex proxy monitor thread panicked"),
             Self::SessionPanicked => write!(f, "Codex proxy session thread panicked"),
         }
     }
@@ -213,12 +216,12 @@ impl CodexMonitor {
 type SessionThread = JoinHandle<Result<(), CodexProxyError>>;
 type SessionThreads = Arc<Mutex<Vec<SessionThread>>>;
 
-/// Owns one running Codex proxy listener together with its monitor thread.
+/// Owns one running Codex proxy listener together with its internal session manager.
 pub struct CodexProxy {
     listen_url: String,
     shutdown_requested: Arc<AtomicBool>,
     listener_thread: Option<JoinHandle<Result<(), CodexProxyError>>>,
-    monitor_thread: Option<JoinHandle<()>>,
+    session_manager: Option<CodexSessionManager>,
     session_threads: SessionThreads,
 }
 
@@ -241,13 +244,13 @@ impl CodexProxy {
             Err(_) => return Err(CodexProxyError::ListenerPanicked),
         }
 
-        let monitor_thread = self
-            .monitor_thread
+        let session_manager = self
+            .session_manager
             .take()
-            .expect("Codex proxy monitor thread should exist");
-        if monitor_thread.join().is_err() {
-            return Err(CodexProxyError::MonitorPanicked);
-        }
+            .expect("Codex proxy session manager should exist");
+        session_manager
+            .close()
+            .map_err(|_| CodexProxyError::SessionPanicked)?;
 
         let mut session_threads = self
             .session_threads
@@ -264,7 +267,7 @@ impl CodexProxy {
     }
 }
 
-/// Starts the Codex websocket proxy listener and its internal activity monitor.
+/// Starts the Codex websocket proxy listener and its internal activity session manager.
 pub fn start_codex_proxy(
     proxy_listen_url: &str,
     raw_app_server_url: &str,
@@ -337,26 +340,19 @@ pub fn start_codex_proxy(
         )
     });
 
-    let monitor_shutdown = shutdown_requested.clone();
-    let monitor_keepalive = keepalive_manager.clone();
-    let monitor_runtime_readiness = runtime_readiness_manager.clone();
-    let monitor_raw_url = raw_app_server_url.to_string();
-    let monitor_sleeper = sleeper;
-    let monitor_thread = thread::spawn(move || {
-        run_codex_monitor_loop(
-            &monitor_raw_url,
-            &monitor_keepalive,
-            &monitor_runtime_readiness,
-            &monitor_shutdown,
-            monitor_sleeper.as_ref(),
-        );
-    });
+    let session_manager = CodexSessionManager::start(
+        raw_app_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        shutdown_requested.clone(),
+        sleeper,
+    );
 
     Ok(CodexProxy {
         listen_url: final_listen_url.to_string(),
         shutdown_requested,
         listener_thread: Some(listener_thread),
-        monitor_thread: Some(monitor_thread),
+        session_manager: Some(session_manager),
         session_threads,
     })
 }
@@ -394,148 +390,6 @@ fn run_codex_proxy_listener(
     }
 
     Ok(())
-}
-
-fn run_codex_monitor_loop(
-    raw_app_server_url: &str,
-    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
-    shutdown_requested: &Arc<AtomicBool>,
-    sleeper: &dyn Sleeper,
-) {
-    let mut monitor = CodexMonitor::default();
-
-    while !shutdown_requested.load(Ordering::Relaxed) {
-        let result = run_codex_monitor_session(
-            raw_app_server_url,
-            &mut monitor,
-            keepalive_manager,
-            runtime_readiness_manager,
-            DEFAULT_CODEX_PROXY_SOCKET_POLL_INTERVAL,
-        );
-
-        if let Ok(mut keepalive_manager) = keepalive_manager.lock() {
-            monitor.clear(&mut keepalive_manager);
-        }
-        if let Ok(mut runtime_readiness_manager) = runtime_readiness_manager.lock() {
-            runtime_readiness_manager.set_ready(false);
-        }
-
-        if shutdown_requested.load(Ordering::Relaxed) {
-            return;
-        }
-
-        if result.is_err() {
-            sleeper.sleep(DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL);
-        }
-    }
-}
-
-/// Connects to the raw Codex app-server, rebuilds active threads, then consumes
-/// `thread/status/changed` notifications until the connection closes.
-pub fn run_codex_monitor_session(
-    raw_app_server_url: &str,
-    monitor: &mut CodexMonitor,
-    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
-    socket_poll_interval: Duration,
-) -> Result<(), CodexProxyError> {
-    let (mut socket, _) = connect(raw_app_server_url).map_err(CodexProxyError::ConnectRaw)?;
-    configure_raw_socket_timeout(&mut socket, socket_poll_interval)?;
-
-    send_json_message(
-        &mut socket,
-        json!({
-            "method": "initialize",
-            "id": 1,
-            "params": {
-                "clientInfo": {
-                    "name": CODEX_INITIALIZE_CLIENT_NAME,
-                    "title": "Mistle sandboxd Codex monitor",
-                    "version": "0.0.0"
-                }
-            }
-        }),
-    )?;
-    let mut pending_updates = Vec::new();
-    let _ = wait_for_response(&mut socket, 1, &mut pending_updates)?;
-    send_json_message(
-        &mut socket,
-        json!({
-            "method": "initialized",
-            "params": {}
-        }),
-    )?;
-
-    send_json_message(
-        &mut socket,
-        json!({
-            "method": "thread/loaded/list",
-            "id": 2,
-            "params": {}
-        }),
-    )?;
-    let loaded_response = wait_for_response(&mut socket, 2, &mut pending_updates)?;
-    let loaded_thread_ids = parse_thread_loaded_list_response(&loaded_response)?;
-
-    let mut threads = Vec::new();
-    let mut next_request_id = 3;
-    for thread_id in loaded_thread_ids {
-        send_json_message(
-            &mut socket,
-            json!({
-                "method": "thread/read",
-                "id": next_request_id,
-                "params": {
-                    "threadId": thread_id
-                }
-            }),
-        )?;
-        let thread_response =
-            wait_for_response(&mut socket, next_request_id, &mut pending_updates)?;
-        let status = parse_thread_read_response(&thread_response)?;
-        let thread_id = thread_response["result"]["thread"]["id"]
-            .as_str()
-            .ok_or_else(|| {
-                CodexProxyError::InvalidThreadRead(
-                    "thread/read response is missing thread.id".to_string(),
-                )
-            })?
-            .to_string();
-        threads.push((thread_id, status));
-        next_request_id += 1;
-    }
-
-    {
-        let mut keepalive_manager = keepalive_manager
-            .lock()
-            .expect("Codex keepalive manager lock should not be poisoned");
-        monitor.rebuild_from_threads(threads, &mut keepalive_manager);
-        for (thread_id, status) in pending_updates.drain(..) {
-            monitor.apply_thread_status(&thread_id, &status, &mut keepalive_manager);
-        }
-    }
-    runtime_readiness_manager
-        .lock()
-        .expect("Codex runtime readiness manager lock should not be poisoned")
-        .set_ready(true);
-
-    loop {
-        match socket.read() {
-            Ok(message) => {
-                if let Some((thread_id, status)) = parse_thread_status_changed_message(&message)? {
-                    let mut keepalive_manager = keepalive_manager
-                        .lock()
-                        .expect("Codex keepalive manager lock should not be poisoned");
-                    monitor.apply_thread_status(&thread_id, &status, &mut keepalive_manager);
-                }
-            }
-            Err(WebSocketError::Io(error))
-                if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {}
-            Err(error) if is_connection_termination_error(&error) => return Ok(()),
-            Err(error) => return Err(CodexProxyError::ReadSocket(error)),
-        }
-    }
 }
 
 /// Relays websocket frames between one Codex client connection and the raw app-server.
@@ -598,7 +452,10 @@ pub fn relay_codex_proxy_connection(
     }
 }
 
-fn send_json_message<S>(socket: &mut WebSocket<S>, payload: Value) -> Result<(), CodexProxyError>
+pub(crate) fn send_json_message<S>(
+    socket: &mut WebSocket<S>,
+    payload: Value,
+) -> Result<(), CodexProxyError>
 where
     S: std::io::Read + std::io::Write,
 {
@@ -607,7 +464,7 @@ where
         .map_err(CodexProxyError::WriteSocket)
 }
 
-fn wait_for_response(
+pub(crate) fn wait_for_response(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     expected_id: u64,
     pending_updates: &mut Vec<(String, CodexThreadStatus)>,
@@ -639,7 +496,9 @@ fn wait_for_response(
     }
 }
 
-fn parse_thread_loaded_list_response(response: &Value) -> Result<Vec<String>, CodexProxyError> {
+pub(crate) fn parse_thread_loaded_list_response(
+    response: &Value,
+) -> Result<Vec<String>, CodexProxyError> {
     let loaded_list = response["result"]["data"].as_array().ok_or_else(|| {
         CodexProxyError::InvalidThreadLoadedList(
             "thread/loaded/list response is missing result.data array".to_string(),
@@ -659,7 +518,9 @@ fn parse_thread_loaded_list_response(response: &Value) -> Result<Vec<String>, Co
     Ok(thread_ids)
 }
 
-fn parse_thread_read_response(response: &Value) -> Result<CodexThreadStatus, CodexProxyError> {
+pub(crate) fn parse_thread_read_response(
+    response: &Value,
+) -> Result<CodexThreadStatus, CodexProxyError> {
     let status = response["result"]["thread"]["status"].clone();
     serde_json::from_value(status).map_err(|error| {
         CodexProxyError::InvalidThreadRead(format!(
@@ -668,7 +529,7 @@ fn parse_thread_read_response(response: &Value) -> Result<CodexThreadStatus, Cod
     })
 }
 
-fn parse_thread_status_changed_message(
+pub(crate) fn parse_thread_status_changed_message(
     message: &Message,
 ) -> Result<Option<(String, CodexThreadStatus)>, CodexProxyError> {
     let Message::Text(payload) = message else {
@@ -695,7 +556,7 @@ fn parse_thread_status_changed_message(
     Ok(Some((params.thread_id, params.status)))
 }
 
-fn configure_plain_socket_timeout(
+pub(crate) fn configure_plain_socket_timeout(
     socket: &mut WebSocket<TcpStream>,
     timeout: Duration,
 ) -> Result<(), CodexProxyError> {
@@ -710,7 +571,7 @@ fn configure_plain_socket_timeout(
     Ok(())
 }
 
-fn configure_raw_socket_timeout(
+pub(crate) fn configure_raw_socket_timeout(
     socket: &mut WebSocket<MaybeTlsStream<TcpStream>>,
     timeout: Duration,
 ) -> Result<(), CodexProxyError> {
@@ -730,7 +591,7 @@ fn configure_raw_socket_timeout(
     }
 }
 
-fn is_connection_termination_error(error: &WebSocketError) -> bool {
+pub(crate) fn is_connection_termination_error(error: &WebSocketError) -> bool {
     matches!(
         error,
         WebSocketError::ConnectionClosed
