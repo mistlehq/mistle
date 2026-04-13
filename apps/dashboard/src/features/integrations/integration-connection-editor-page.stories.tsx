@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { FormPageFrame } from "../shared/page-frame.js";
 import {
-  IntegrationConnectionDialog,
+  IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
   type IntegrationConnectionDialogState,
 } from "./integration-connection-dialog.js";
@@ -50,9 +52,19 @@ const githubAppCreateDialog: IntegrationConnectionDialogState = {
   targetVariantId: "github-cloud",
 };
 
+function IntegrationConnectionEditorPageStory(
+  props: ComponentProps<typeof IntegrationConnectionEditorPage>,
+): React.JSX.Element {
+  return (
+    <FormPageFrame description="github-cloud" title="Add GitHub Connection">
+      <IntegrationConnectionEditorPage {...props} />
+    </FormPageFrame>
+  );
+}
+
 const meta = {
-  title: "Dashboard/Integrations/Connection/Dialog",
-  component: IntegrationConnectionDialog,
+  title: "Dashboard/Integrations/Connection/EditorPage",
+  component: IntegrationConnectionEditorPageStory,
   decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
@@ -79,7 +91,7 @@ const meta = {
     pending: false,
     secrets: {},
   },
-} satisfies Meta<typeof IntegrationConnectionDialog>;
+} satisfies Meta<typeof IntegrationConnectionEditorPageStory>;
 
 export default meta;
 

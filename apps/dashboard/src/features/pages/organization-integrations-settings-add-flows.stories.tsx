@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-dialog.js";
 import {
   AddFlowStorySpecs,
   createAvailableCardsOverview,
@@ -10,15 +11,9 @@ import { OrganizationIntegrationsSettingsPageView } from "./organization-integra
 
 const meta = {
   title: "Dashboard/Integrations/AddFlows",
-  component: OrganizationIntegrationsSettingsPageView,
+  component: IntegrationConnectionEditorPage,
   decorators: [withDashboardPageStory],
-  args: {
-    availableCards: [],
-    connectedCards: [],
-    isLoading: false,
-    loadErrorMessage: null,
-  },
-} satisfies Meta<typeof OrganizationIntegrationsSettingsPageView>;
+} satisfies Meta<typeof IntegrationConnectionEditorPage>;
 
 export default meta;
 

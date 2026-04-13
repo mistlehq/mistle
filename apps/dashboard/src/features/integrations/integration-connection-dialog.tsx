@@ -1,11 +1,6 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Field,
   FieldContent,
   FieldDescription,
@@ -380,75 +375,5 @@ export function IntegrationConnectionEditorPage(
         </div>
       </FormPageSection>
     </FormPageStack>
-  );
-}
-
-export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
-  const dialog = props.dialog;
-  const isUpdateMode = dialog?.mode === "update";
-
-  return (
-    <Dialog
-      isBusy={props.pending}
-      isDismissible={!props.pending}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          props.onClose();
-        }
-      }}
-      open={dialog !== null}
-    >
-      {dialog ? (
-        <DialogContent
-          className="max-h-[calc(100svh-2rem)] overflow-y-auto sm:max-w-2xl"
-          showCloseButton={false}
-        >
-          <DialogHeader variant="sectioned">
-            <DialogTitle>
-              {props.deviceAuthorizationPending
-                ? `Finish ${dialog.targetDisplayName} Connection`
-                : isUpdateMode
-                  ? "Edit Connection"
-                  : `Add ${dialog.targetDisplayName} Connection`}
-            </DialogTitle>
-          </DialogHeader>
-
-          {props.deviceAuthorizationPending
-            ? renderDeviceAuthorizationPending({
-                pending: props.deviceAuthorizationPending,
-              })
-            : renderConnectionEditorFields({
-                ...props,
-                dialog,
-              })}
-
-          {props.connectError ? (
-            <p className="text-destructive text-sm">{props.connectError}</p>
-          ) : null}
-
-          <DialogFooter>
-            <Button onClick={props.onClose} type="button" variant="outline">
-              {props.deviceAuthorizationPending ? "Cancel authorization" : "Cancel"}
-            </Button>
-            {props.deviceAuthorizationPending ? null : (
-              <Button
-                disabled={props.pending || (isUpdateMode && !props.hasChanges)}
-                onClick={props.onSubmit}
-                type="button"
-              >
-                {isUpdateMode
-                  ? "Save"
-                  : resolveCreateSubmitLabel(
-                      resolveSelectedMethod({
-                        dialog,
-                        methodId: props.methodId,
-                      }),
-                    )}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
-    </Dialog>
   );
 }
