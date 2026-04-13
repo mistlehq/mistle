@@ -90,7 +90,9 @@ export async function withControlPlaneWorkerRuntime<T>(input: {
     ...createControlPlaneWorkerEnvironment({
       fixture: input.fixture,
       namespaceId: input.namespaceId,
-      overrides: input.environmentOverrides,
+      ...(input.environmentOverrides === undefined
+        ? {}
+        : { overrides: input.environmentOverrides }),
     }),
   });
 
