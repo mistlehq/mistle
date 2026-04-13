@@ -21,7 +21,11 @@ hyper-util = { version = "0.1.17", features = [
 nix = { version = "0.31.2", features = ["fs", "process", "signal", "socket", "user"] }
 portable-pty = "0.9.0"
 rcgen = "0.13.2"
-reqwest = { version = "0.13.2", default-features = false, features = ["blocking", "json", "rustls"] }
+reqwest = { version = "0.13.2", default-features = false, features = [
+  "blocking",
+  "json",
+  "rustls",
+] }
 rustls-pki-types = { version = "1.14.0", features = ["std"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"

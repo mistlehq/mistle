@@ -335,31 +335,300 @@
                                 "install": {
                                   "type": "array",
                                   "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "args": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string"
-                                        }
-                                      },
-                                      "env": {
+                                    "oneOf": [
+                                      {
                                         "type": "object",
-                                        "additionalProperties": {
-                                          "type": "string"
-                                        }
+                                        "properties": {
+                                          "op": {
+                                            "type": "string",
+                                            "enum": ["github_release_install"]
+                                          },
+                                          "repository": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "release": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["latest"]
+                                                  }
+                                                },
+                                                "required": ["kind"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["tag"]
+                                                  },
+                                                  "match": {
+                                                    "type": "string",
+                                                    "enum": ["exact"]
+                                                  },
+                                                  "tag": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  }
+                                                },
+                                                "required": ["kind", "match", "tag"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["tag"]
+                                                  },
+                                                  "match": {
+                                                    "type": "string",
+                                                    "enum": ["latest_matching_prefix"]
+                                                  },
+                                                  "prefix": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  }
+                                                },
+                                                "required": ["kind", "match", "prefix"],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          },
+                                          "asset": {
+                                            "anyOf": [
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["exact"]
+                                                  },
+                                                  "fileName": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "format": {
+                                                    "type": "string",
+                                                    "enum": ["binary"]
+                                                  }
+                                                },
+                                                "required": ["kind", "fileName", "format"],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["exact"]
+                                                  },
+                                                  "fileName": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "format": {
+                                                    "type": "string",
+                                                    "enum": ["tar.gz"]
+                                                  },
+                                                  "extractedPath": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "fileName",
+                                                  "format",
+                                                  "extractedPath"
+                                                ],
+                                                "additionalProperties": false
+                                              },
+                                              {
+                                                "type": "object",
+                                                "properties": {
+                                                  "kind": {
+                                                    "type": "string",
+                                                    "enum": ["by_arch"]
+                                                  },
+                                                  "x86_64": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "fileName": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "format": {
+                                                            "type": "string",
+                                                            "enum": ["binary"]
+                                                          }
+                                                        },
+                                                        "required": ["fileName", "format"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "fileName": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "format": {
+                                                            "type": "string",
+                                                            "enum": ["tar.gz"]
+                                                          },
+                                                          "extractedPath": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "fileName",
+                                                          "format",
+                                                          "extractedPath"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  },
+                                                  "aarch64": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "fileName": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "format": {
+                                                            "type": "string",
+                                                            "enum": ["binary"]
+                                                          }
+                                                        },
+                                                        "required": ["fileName", "format"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "fileName": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          },
+                                                          "format": {
+                                                            "type": "string",
+                                                            "enum": ["tar.gz"]
+                                                          },
+                                                          "extractedPath": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": [
+                                                          "fileName",
+                                                          "format",
+                                                          "extractedPath"
+                                                        ],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": ["kind", "x86_64", "aarch64"],
+                                                "additionalProperties": false
+                                              }
+                                            ]
+                                          },
+                                          "installPath": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "timeoutMs": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "op",
+                                          "repository",
+                                          "release",
+                                          "asset",
+                                          "installPath"
+                                        ],
+                                        "additionalProperties": false
                                       },
-                                      "cwd": {
-                                        "type": "string",
-                                        "minLength": 1
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "op": {
+                                            "type": "string",
+                                            "enum": ["mise_install"]
+                                          },
+                                          "tools": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "force": {
+                                            "type": "boolean"
+                                          },
+                                          "timeoutMs": {
+                                            "type": "integer",
+                                            "exclusiveMinimum": 0
+                                          }
+                                        },
+                                        "required": ["op", "tools"],
+                                        "additionalProperties": false
                                       },
-                                      "timeoutMs": {
-                                        "type": "integer",
-                                        "exclusiveMinimum": 0
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "op": {
+                                            "type": "string",
+                                            "enum": ["exec"]
+                                          },
+                                          "command": {
+                                            "type": "object",
+                                            "properties": {
+                                              "args": {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "env": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "cwd": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "timeoutMs": {
+                                                "type": "integer",
+                                                "exclusiveMinimum": 0
+                                              }
+                                            },
+                                            "required": ["args"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "required": ["op", "command"],
+                                        "additionalProperties": false
                                       }
-                                    },
-                                    "required": ["args"],
-                                    "additionalProperties": false
+                                    ]
                                   }
                                 }
                               },
@@ -1568,31 +1837,300 @@
                                   "install": {
                                     "type": "array",
                                     "items": {
-                                      "type": "object",
-                                      "properties": {
-                                        "args": {
-                                          "type": "array",
-                                          "items": {
-                                            "type": "string"
-                                          }
-                                        },
-                                        "env": {
+                                      "oneOf": [
+                                        {
                                           "type": "object",
-                                          "additionalProperties": {
-                                            "type": "string"
-                                          }
+                                          "properties": {
+                                            "op": {
+                                              "type": "string",
+                                              "enum": ["github_release_install"]
+                                            },
+                                            "repository": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "release": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["latest"]
+                                                    }
+                                                  },
+                                                  "required": ["kind"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["tag"]
+                                                    },
+                                                    "match": {
+                                                      "type": "string",
+                                                      "enum": ["exact"]
+                                                    },
+                                                    "tag": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": ["kind", "match", "tag"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["tag"]
+                                                    },
+                                                    "match": {
+                                                      "type": "string",
+                                                      "enum": ["latest_matching_prefix"]
+                                                    },
+                                                    "prefix": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": ["kind", "match", "prefix"],
+                                                  "additionalProperties": false
+                                                }
+                                              ]
+                                            },
+                                            "asset": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["exact"]
+                                                    },
+                                                    "fileName": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "format": {
+                                                      "type": "string",
+                                                      "enum": ["binary"]
+                                                    }
+                                                  },
+                                                  "required": ["kind", "fileName", "format"],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["exact"]
+                                                    },
+                                                    "fileName": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "format": {
+                                                      "type": "string",
+                                                      "enum": ["tar.gz"]
+                                                    },
+                                                    "extractedPath": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "kind",
+                                                    "fileName",
+                                                    "format",
+                                                    "extractedPath"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "kind": {
+                                                      "type": "string",
+                                                      "enum": ["by_arch"]
+                                                    },
+                                                    "x86_64": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "fileName": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "format": {
+                                                              "type": "string",
+                                                              "enum": ["binary"]
+                                                            }
+                                                          },
+                                                          "required": ["fileName", "format"],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "fileName": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "format": {
+                                                              "type": "string",
+                                                              "enum": ["tar.gz"]
+                                                            },
+                                                            "extractedPath": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "fileName",
+                                                            "format",
+                                                            "extractedPath"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      ]
+                                                    },
+                                                    "aarch64": {
+                                                      "anyOf": [
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "fileName": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "format": {
+                                                              "type": "string",
+                                                              "enum": ["binary"]
+                                                            }
+                                                          },
+                                                          "required": ["fileName", "format"],
+                                                          "additionalProperties": false
+                                                        },
+                                                        {
+                                                          "type": "object",
+                                                          "properties": {
+                                                            "fileName": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            },
+                                                            "format": {
+                                                              "type": "string",
+                                                              "enum": ["tar.gz"]
+                                                            },
+                                                            "extractedPath": {
+                                                              "type": "string",
+                                                              "minLength": 1
+                                                            }
+                                                          },
+                                                          "required": [
+                                                            "fileName",
+                                                            "format",
+                                                            "extractedPath"
+                                                          ],
+                                                          "additionalProperties": false
+                                                        }
+                                                      ]
+                                                    }
+                                                  },
+                                                  "required": ["kind", "x86_64", "aarch64"],
+                                                  "additionalProperties": false
+                                                }
+                                              ]
+                                            },
+                                            "installPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "timeoutMs": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": [
+                                            "op",
+                                            "repository",
+                                            "release",
+                                            "asset",
+                                            "installPath"
+                                          ],
+                                          "additionalProperties": false
                                         },
-                                        "cwd": {
-                                          "type": "string",
-                                          "minLength": 1
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "op": {
+                                              "type": "string",
+                                              "enum": ["mise_install"]
+                                            },
+                                            "tools": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "minItems": 1
+                                            },
+                                            "force": {
+                                              "type": "boolean"
+                                            },
+                                            "timeoutMs": {
+                                              "type": "integer",
+                                              "exclusiveMinimum": 0
+                                            }
+                                          },
+                                          "required": ["op", "tools"],
+                                          "additionalProperties": false
                                         },
-                                        "timeoutMs": {
-                                          "type": "integer",
-                                          "exclusiveMinimum": 0
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "op": {
+                                              "type": "string",
+                                              "enum": ["exec"]
+                                            },
+                                            "command": {
+                                              "type": "object",
+                                              "properties": {
+                                                "args": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "env": {
+                                                  "type": "object",
+                                                  "additionalProperties": {
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "cwd": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "timeoutMs": {
+                                                  "type": "integer",
+                                                  "exclusiveMinimum": 0
+                                                }
+                                              },
+                                              "required": ["args"],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": ["op", "command"],
+                                          "additionalProperties": false
                                         }
-                                      },
-                                      "required": ["args"],
-                                      "additionalProperties": false
+                                      ]
                                     }
                                   }
                                 },

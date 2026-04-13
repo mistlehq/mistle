@@ -156,13 +156,14 @@ where
             )
         })?;
 
+    let download_failure_context = format!(
+        "github release asset download failed for {repository} release {selector_description} asset {asset_name}"
+    );
     download_github_asset_to_path(
         &client,
         &download_url,
         workspace.download_path(),
-        repository,
-        &selector_description,
-        asset_name,
+        &download_failure_context,
         &budget,
         sleeper,
     )?;
@@ -304,9 +305,7 @@ fn download_github_asset_to_path<C, S>(
     client: &Client,
     download_url: &str,
     download_path: &Path,
-    repository: &str,
-    selector_description: &str,
-    asset_name: &str,
+    failure_context: &str,
     budget: &StepBudget<'_, C>,
     sleeper: &S,
 ) -> Result<(), String>
@@ -316,9 +315,6 @@ where
 {
     let parsed_download_url = Url::parse(download_url)
         .map_err(|error| format!("github release asset download url is invalid: {error}"))?;
-    let failure_context = format!(
-        "github release asset download failed for {repository} release {selector_description} asset {asset_name}"
-    );
 
     stream_download_to_path_with_retry(download_path, budget, sleeper, |remaining_timeout, file| {
         let mut request = client.get(parsed_download_url.clone());
@@ -441,7 +437,7 @@ fn install_tar_gz_entry(
             ));
         }
 
-        let mut staged_file = File::create(&staged_path)
+        let mut staged_file = File::create(staged_path)
             .map_err(|error| format!("failed to create staged install file: {error}"))?;
         std::io::copy(&mut entry, &mut staged_file)
             .map_err(|error| format!("failed to extract github release tar.gz entry: {error}"))?;

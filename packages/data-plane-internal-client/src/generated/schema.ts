@@ -179,14 +179,97 @@ export interface paths {
                   [key: string]: string;
                 };
                 lifecycle: {
-                  install: {
-                    args: string[];
-                    cwd?: string;
-                    env?: {
-                      [key: string]: string;
-                    };
-                    timeoutMs?: number;
-                  }[];
+                  install: (
+                    | {
+                        asset:
+                          | {
+                              fileName: string;
+                              /** @enum {string} */
+                              format: "binary";
+                              /** @enum {string} */
+                              kind: "exact";
+                            }
+                          | {
+                              extractedPath: string;
+                              fileName: string;
+                              /** @enum {string} */
+                              format: "tar.gz";
+                              /** @enum {string} */
+                              kind: "exact";
+                            }
+                          | {
+                              aarch64:
+                                | {
+                                    fileName: string;
+                                    /** @enum {string} */
+                                    format: "binary";
+                                  }
+                                | {
+                                    extractedPath: string;
+                                    fileName: string;
+                                    /** @enum {string} */
+                                    format: "tar.gz";
+                                  };
+                              /** @enum {string} */
+                              kind: "by_arch";
+                              x86_64:
+                                | {
+                                    fileName: string;
+                                    /** @enum {string} */
+                                    format: "binary";
+                                  }
+                                | {
+                                    extractedPath: string;
+                                    fileName: string;
+                                    /** @enum {string} */
+                                    format: "tar.gz";
+                                  };
+                            };
+                        installPath: string;
+                        /** @enum {string} */
+                        op: "github_release_install";
+                        release:
+                          | {
+                              /** @enum {string} */
+                              kind: "latest";
+                            }
+                          | {
+                              /** @enum {string} */
+                              kind: "tag";
+                              /** @enum {string} */
+                              match: "exact";
+                              tag: string;
+                            }
+                          | {
+                              /** @enum {string} */
+                              kind: "tag";
+                              /** @enum {string} */
+                              match: "latest_matching_prefix";
+                              prefix: string;
+                            };
+                        repository: string;
+                        timeoutMs?: number;
+                      }
+                    | {
+                        force?: boolean;
+                        /** @enum {string} */
+                        op: "mise_install";
+                        timeoutMs?: number;
+                        tools: string[];
+                      }
+                    | {
+                        command: {
+                          args: string[];
+                          cwd?: string;
+                          env?: {
+                            [key: string]: string;
+                          };
+                          timeoutMs?: number;
+                        };
+                        /** @enum {string} */
+                        op: "exec";
+                      }
+                  )[];
                 };
                 name: string;
               }[];
@@ -502,14 +585,97 @@ export interface paths {
                     [key: string]: string;
                   };
                   lifecycle: {
-                    install: {
-                      args: string[];
-                      cwd?: string;
-                      env?: {
-                        [key: string]: string;
-                      };
-                      timeoutMs?: number;
-                    }[];
+                    install: (
+                      | {
+                          asset:
+                            | {
+                                fileName: string;
+                                /** @enum {string} */
+                                format: "binary";
+                                /** @enum {string} */
+                                kind: "exact";
+                              }
+                            | {
+                                extractedPath: string;
+                                fileName: string;
+                                /** @enum {string} */
+                                format: "tar.gz";
+                                /** @enum {string} */
+                                kind: "exact";
+                              }
+                            | {
+                                aarch64:
+                                  | {
+                                      fileName: string;
+                                      /** @enum {string} */
+                                      format: "binary";
+                                    }
+                                  | {
+                                      extractedPath: string;
+                                      fileName: string;
+                                      /** @enum {string} */
+                                      format: "tar.gz";
+                                    };
+                                /** @enum {string} */
+                                kind: "by_arch";
+                                x86_64:
+                                  | {
+                                      fileName: string;
+                                      /** @enum {string} */
+                                      format: "binary";
+                                    }
+                                  | {
+                                      extractedPath: string;
+                                      fileName: string;
+                                      /** @enum {string} */
+                                      format: "tar.gz";
+                                    };
+                              };
+                          installPath: string;
+                          /** @enum {string} */
+                          op: "github_release_install";
+                          release:
+                            | {
+                                /** @enum {string} */
+                                kind: "latest";
+                              }
+                            | {
+                                /** @enum {string} */
+                                kind: "tag";
+                                /** @enum {string} */
+                                match: "exact";
+                                tag: string;
+                              }
+                            | {
+                                /** @enum {string} */
+                                kind: "tag";
+                                /** @enum {string} */
+                                match: "latest_matching_prefix";
+                                prefix: string;
+                              };
+                          repository: string;
+                          timeoutMs?: number;
+                        }
+                      | {
+                          force?: boolean;
+                          /** @enum {string} */
+                          op: "mise_install";
+                          timeoutMs?: number;
+                          tools: string[];
+                        }
+                      | {
+                          command: {
+                            args: string[];
+                            cwd?: string;
+                            env?: {
+                              [key: string]: string;
+                            };
+                            timeoutMs?: number;
+                          };
+                          /** @enum {string} */
+                          op: "exec";
+                        }
+                    )[];
                   };
                   name: string;
                 }[];

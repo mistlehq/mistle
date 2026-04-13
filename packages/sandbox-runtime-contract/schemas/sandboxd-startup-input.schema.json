@@ -4,10 +4,7 @@
   "properties": {
     "startupMode": {
       "type": "string",
-      "enum": [
-        "new",
-        "existing"
-      ]
+      "enum": ["new", "existing"]
     },
     "bootstrapToken": {
       "type": "string",
@@ -56,12 +53,7 @@
                   "maximum": 9007199254740991
                 }
               },
-              "required": [
-                "source",
-                "imageRef",
-                "sandboxProfileId",
-                "version"
-              ],
+              "required": ["source", "imageRef", "sandboxProfileId", "version"],
               "additionalProperties": false
             },
             {
@@ -76,10 +68,7 @@
                   "minLength": 1
                 }
               },
-              "required": [
-                "source",
-                "imageRef"
-              ],
+              "required": ["source", "imageRef"],
               "additionalProperties": false
             }
           ]
@@ -126,9 +115,7 @@
                     }
                   }
                 },
-                "required": [
-                  "hosts"
-                ],
+                "required": ["hosts"],
                 "additionalProperties": false
               },
               "upstream": {
@@ -139,9 +126,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "baseUrl"
-                ],
+                "required": ["baseUrl"],
                 "additionalProperties": false
               },
               "authInjection": {
@@ -158,10 +143,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "type",
-                      "target"
-                    ],
+                    "required": ["type", "target"],
                     "additionalProperties": false
                   },
                   {
@@ -180,10 +162,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "type",
-                      "target"
-                    ],
+                    "required": ["type", "target"],
                     "additionalProperties": false
                   },
                   {
@@ -198,10 +177,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "type",
-                      "target"
-                    ],
+                    "required": ["type", "target"],
                     "additionalProperties": false
                   },
                   {
@@ -216,10 +192,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "type",
-                      "target"
-                    ],
+                    "required": ["type", "target"],
                     "additionalProperties": false
                   },
                   {
@@ -238,11 +211,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "type",
-                      "service",
-                      "region"
-                    ],
+                    "required": ["type", "service", "region"],
                     "additionalProperties": false
                   }
                 ]
@@ -286,17 +255,11 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "connectionId",
-                        "secretType"
-                      ],
+                      "required": ["connectionId", "secretType"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "header",
-                    "credentialResolver"
-                  ],
+                  "required": ["header", "credentialResolver"],
                   "additionalProperties": false
                 }
               },
@@ -320,10 +283,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "connectionId",
-                  "secretType"
-                ],
+                "required": ["connectionId", "secretType"],
                 "additionalProperties": false
               }
             },
@@ -372,27 +332,205 @@
                     "readOnly": true,
                     "type": "array",
                     "items": {
-                      "anyOf": [
+                      "oneOf": [
                         {
                           "type": "object",
                           "properties": {
-                            "args": {
-                              "readOnly": true,
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
+                            "op": {
+                              "type": "string",
+                              "const": "github_release_install"
                             },
-                            "env": {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {
-                                "type": "string"
-                              }
+                            "repository": {
+                              "type": "string",
+                              "minLength": 1
                             },
-                            "cwd": {
+                            "release": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "latest"
+                                    }
+                                  },
+                                  "required": ["kind"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "tag"
+                                    },
+                                    "match": {
+                                      "type": "string",
+                                      "const": "exact"
+                                    },
+                                    "tag": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "match", "tag"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "tag"
+                                    },
+                                    "match": {
+                                      "type": "string",
+                                      "const": "latest_matching_prefix"
+                                    },
+                                    "prefix": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "match", "prefix"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "asset": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "exact"
+                                    },
+                                    "fileName": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "const": "binary"
+                                    }
+                                  },
+                                  "required": ["kind", "fileName", "format"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "exact"
+                                    },
+                                    "fileName": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "const": "tar.gz"
+                                    },
+                                    "extractedPath": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "fileName", "format", "extractedPath"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "by_arch"
+                                    },
+                                    "x86_64": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "fileName": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "const": "binary"
+                                            }
+                                          },
+                                          "required": ["fileName", "format"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "fileName": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "const": "tar.gz"
+                                            },
+                                            "extractedPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["fileName", "format", "extractedPath"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    },
+                                    "aarch64": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "fileName": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "const": "binary"
+                                            }
+                                          },
+                                          "required": ["fileName", "format"],
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "fileName": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "format": {
+                                              "type": "string",
+                                              "const": "tar.gz"
+                                            },
+                                            "extractedPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["fileName", "format", "extractedPath"],
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": ["kind", "x86_64", "aarch64"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "installPath": {
                               "type": "string",
                               "minLength": 1
                             },
@@ -402,281 +540,66 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": [
-                            "args"
-                          ],
+                          "required": ["op", "repository", "release", "asset", "installPath"],
                           "additionalProperties": false
                         },
                         {
-                          "oneOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "op": {
-                                  "type": "string",
-                                  "const": "github_release_install"
-                                },
-                                "repository": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "release": {
-                                  "oneOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "latest"
-                                        }
-                                      },
-                                      "required": [
-                                        "kind"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "tag"
-                                        },
-                                        "match": {
-                                          "type": "string",
-                                          "const": "exact"
-                                        },
-                                        "tag": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "match",
-                                        "tag"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "tag"
-                                        },
-                                        "match": {
-                                          "type": "string",
-                                          "const": "latest_matching_prefix"
-                                        },
-                                        "prefix": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "match",
-                                        "prefix"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                },
-                                "asset": {
-                                  "anyOf": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "exact"
-                                        },
-                                        "fileName": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "format": {
-                                          "type": "string",
-                                          "const": "binary"
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "fileName"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "exact"
-                                        },
-                                        "fileName": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "format": {
-                                          "type": "string",
-                                          "const": "tar.gz"
-                                        },
-                                        "extractedPath": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "fileName",
-                                        "format",
-                                        "extractedPath"
-                                      ],
-                                      "additionalProperties": false
-                                    },
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "kind": {
-                                          "type": "string",
-                                          "const": "by_arch"
-                                        },
-                                        "x86_64": {
-                                          "anyOf": [
-                                            {
-                                              "type": "object",
-                                              "properties": {
-                                                "fileName": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                },
-                                                "format": {
-                                                  "type": "string",
-                                                  "const": "binary"
-                                                }
-                                              },
-                                              "required": [
-                                                "fileName"
-                                              ],
-                                              "additionalProperties": false
-                                            },
-                                            {
-                                              "type": "object",
-                                              "properties": {
-                                                "fileName": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                },
-                                                "format": {
-                                                  "type": "string",
-                                                  "const": "tar.gz"
-                                                },
-                                                "extractedPath": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                }
-                                              },
-                                              "required": [
-                                                "fileName",
-                                                "format",
-                                                "extractedPath"
-                                              ],
-                                              "additionalProperties": false
-                                            }
-                                          ]
-                                        },
-                                        "aarch64": {
-                                          "anyOf": [
-                                            {
-                                              "type": "object",
-                                              "properties": {
-                                                "fileName": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                },
-                                                "format": {
-                                                  "type": "string",
-                                                  "const": "binary"
-                                                }
-                                              },
-                                              "required": [
-                                                "fileName"
-                                              ],
-                                              "additionalProperties": false
-                                            },
-                                            {
-                                              "type": "object",
-                                              "properties": {
-                                                "fileName": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                },
-                                                "format": {
-                                                  "type": "string",
-                                                  "const": "tar.gz"
-                                                },
-                                                "extractedPath": {
-                                                  "type": "string",
-                                                  "minLength": 1
-                                                }
-                                              },
-                                              "required": [
-                                                "fileName",
-                                                "format",
-                                                "extractedPath"
-                                              ],
-                                              "additionalProperties": false
-                                            }
-                                          ]
-                                        }
-                                      },
-                                      "required": [
-                                        "kind",
-                                        "x86_64",
-                                        "aarch64"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                },
-                                "installPath": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "timeoutMs": {
-                                  "type": "integer",
-                                  "exclusiveMinimum": 0,
-                                  "maximum": 9007199254740991
-                                }
-                              },
-                              "required": [
-                                "op",
-                                "repository",
-                                "release",
-                                "asset",
-                                "installPath"
-                              ],
-                              "additionalProperties": false
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "type": "string",
+                              "const": "mise_install"
                             },
-                            {
+                            "tools": {
+                              "readOnly": true,
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "force": {
+                              "type": "boolean"
+                            },
+                            "timeoutMs": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "required": ["op", "tools"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "type": "string",
+                              "const": "exec"
+                            },
+                            "command": {
                               "type": "object",
                               "properties": {
-                                "op": {
-                                  "type": "string",
-                                  "const": "mise_install"
-                                },
-                                "tools": {
+                                "args": {
                                   "readOnly": true,
-                                  "minItems": 1,
                                   "type": "array",
                                   "items": {
-                                    "type": "string",
-                                    "minLength": 1
+                                    "type": "string"
                                   }
                                 },
-                                "force": {
-                                  "type": "boolean"
+                                "env": {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  }
+                                },
+                                "cwd": {
+                                  "type": "string",
+                                  "minLength": 1
                                 },
                                 "timeoutMs": {
                                   "type": "integer",
@@ -684,77 +607,22 @@
                                   "maximum": 9007199254740991
                                 }
                               },
-                              "required": [
-                                "op",
-                                "tools"
-                              ],
-                              "additionalProperties": false
-                            },
-                            {
-                              "type": "object",
-                              "properties": {
-                                "op": {
-                                  "type": "string",
-                                  "const": "exec"
-                                },
-                                "command": {
-                                  "type": "object",
-                                  "properties": {
-                                    "args": {
-                                      "readOnly": true,
-                                      "type": "array",
-                                      "items": {
-                                        "type": "string"
-                                      }
-                                    },
-                                    "env": {
-                                      "type": "object",
-                                      "propertyNames": {
-                                        "type": "string"
-                                      },
-                                      "additionalProperties": {
-                                        "type": "string"
-                                      }
-                                    },
-                                    "cwd": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "timeoutMs": {
-                                      "type": "integer",
-                                      "exclusiveMinimum": 0,
-                                      "maximum": 9007199254740991
-                                    }
-                                  },
-                                  "required": [
-                                    "args"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              },
-                              "required": [
-                                "op",
-                                "command"
-                              ],
+                              "required": ["args"],
                               "additionalProperties": false
                             }
-                          ]
+                          },
+                          "required": ["op", "command"],
+                          "additionalProperties": false
                         }
                       ]
                     }
                   }
                 },
-                "required": [
-                  "install"
-                ],
+                "required": ["install"],
                 "additionalProperties": false
               }
             },
-            "required": [
-              "artifactKey",
-              "name",
-              "lifecycle"
-            ],
+            "required": ["artifactKey", "name", "lifecycle"],
             "additionalProperties": false
           }
         },
@@ -783,12 +651,7 @@
                     "format": "uri"
                   }
                 },
-                "required": [
-                  "sourceKind",
-                  "resourceKind",
-                  "path",
-                  "originUrl"
-                ],
+                "required": ["sourceKind", "resourceKind", "path", "originUrl"],
                 "additionalProperties": false
               }
             ]
@@ -840,18 +703,10 @@
                         },
                         "writeMode": {
                           "type": "string",
-                          "enum": [
-                            "overwrite",
-                            "if-absent"
-                          ]
+                          "enum": ["overwrite", "if-absent"]
                         }
                       },
-                      "required": [
-                        "fileId",
-                        "path",
-                        "mode",
-                        "content"
-                      ],
+                      "required": ["fileId", "path", "mode", "content"],
                       "additionalProperties": false
                     }
                   },
@@ -863,10 +718,7 @@
                     }
                   }
                 },
-                "required": [
-                  "env",
-                  "files"
-                ],
+                "required": ["env", "files"],
                 "additionalProperties": false
               },
               "processes": {
@@ -908,9 +760,7 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": [
-                        "args"
-                      ],
+                      "required": ["args"],
                       "additionalProperties": false
                     },
                     "readiness": {
@@ -923,9 +773,7 @@
                               "const": "none"
                             }
                           },
-                          "required": [
-                            "type"
-                          ],
+                          "required": ["type"],
                           "additionalProperties": false
                         },
                         {
@@ -950,12 +798,7 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": [
-                            "type",
-                            "host",
-                            "port",
-                            "timeoutMs"
-                          ],
+                          "required": ["type", "host", "port", "timeoutMs"],
                           "additionalProperties": false
                         },
                         {
@@ -980,12 +823,7 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": [
-                            "type",
-                            "url",
-                            "expectedStatus",
-                            "timeoutMs"
-                          ],
+                          "required": ["type", "url", "expectedStatus", "timeoutMs"],
                           "additionalProperties": false
                         },
                         {
@@ -1005,11 +843,7 @@
                               "maximum": 9007199254740991
                             }
                           },
-                          "required": [
-                            "type",
-                            "url",
-                            "timeoutMs"
-                          ],
+                          "required": ["type", "url", "timeoutMs"],
                           "additionalProperties": false
                         }
                       ]
@@ -1019,10 +853,7 @@
                       "properties": {
                         "signal": {
                           "type": "string",
-                          "enum": [
-                            "sigterm",
-                            "sigkill"
-                          ]
+                          "enum": ["sigterm", "sigkill"]
                         },
                         "timeoutMs": {
                           "type": "integer",
@@ -1035,19 +866,11 @@
                           "maximum": 9007199254740991
                         }
                       },
-                      "required": [
-                        "signal",
-                        "timeoutMs"
-                      ],
+                      "required": ["signal", "timeoutMs"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "processKey",
-                    "command",
-                    "readiness",
-                    "stop"
-                  ],
+                  "required": ["processKey", "command", "readiness", "stop"],
                   "additionalProperties": false
                 }
               },
@@ -1079,37 +902,22 @@
                               "format": "uri"
                             }
                           },
-                          "required": [
-                            "type",
-                            "url"
-                          ],
+                          "required": ["type", "url"],
                           "additionalProperties": false
                         }
                       ]
                     },
                     "connectionMode": {
                       "type": "string",
-                      "enum": [
-                        "dedicated",
-                        "shared"
-                      ]
+                      "enum": ["dedicated", "shared"]
                     }
                   },
-                  "required": [
-                    "endpointKey",
-                    "transport",
-                    "connectionMode"
-                  ],
+                  "required": ["endpointKey", "transport", "connectionMode"],
                   "additionalProperties": false
                 }
               }
             },
-            "required": [
-              "clientId",
-              "setup",
-              "processes",
-              "endpoints"
-            ],
+            "required": ["clientId", "setup", "processes", "endpoints"],
             "additionalProperties": false
           }
         },
@@ -1192,10 +1000,7 @@
                                   "minLength": 1
                                 }
                               },
-                              "required": [
-                                "kind",
-                                "value"
-                              ],
+                              "required": ["kind", "value"],
                               "additionalProperties": false
                             },
                             {
@@ -1206,22 +1011,14 @@
                                   "const": "threadId"
                                 }
                               },
-                              "required": [
-                                "kind"
-                              ],
+                              "required": ["kind"],
                               "additionalProperties": false
                             }
                           ]
                         }
                       }
                     },
-                    "required": [
-                      "ptySessionId",
-                      "cols",
-                      "rows",
-                      "command",
-                      "args"
-                    ],
+                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
                     "additionalProperties": false
                   },
                   "resumeLaunch": {
@@ -1266,10 +1063,7 @@
                                   "minLength": 1
                                 }
                               },
-                              "required": [
-                                "kind",
-                                "value"
-                              ],
+                              "required": ["kind", "value"],
                               "additionalProperties": false
                             },
                             {
@@ -1280,31 +1074,18 @@
                                   "const": "threadId"
                                 }
                               },
-                              "required": [
-                                "kind"
-                              ],
+                              "required": ["kind"],
                               "additionalProperties": false
                             }
                           ]
                         }
                       }
                     },
-                    "required": [
-                      "ptySessionId",
-                      "cols",
-                      "rows",
-                      "command",
-                      "args"
-                    ],
+                    "required": ["ptySessionId", "cols", "rows", "command", "args"],
                     "additionalProperties": false
                   }
                 },
-                "required": [
-                  "runtimeId",
-                  "displayName",
-                  "newLaunch",
-                  "resumeLaunch"
-                ],
+                "required": ["runtimeId", "displayName", "newLaunch", "resumeLaunch"],
                 "additionalProperties": false
               }
             },
