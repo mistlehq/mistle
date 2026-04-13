@@ -1,7 +1,9 @@
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import {
   archiveCodexThread,
   compactCodexThread,
   forkCodexThread,
+  listCodexThreads,
   rollbackCodexThread,
   resumeCodexThread,
   startCodexThread,
@@ -28,6 +30,7 @@ import {
 import { parseThreadNameUpdate } from "./codex-session-events.js";
 import { type ConnectedCodexSession, type StartSessionStep } from "./codex-session-types.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
+import { resolvePrimaryRepositoryThreadSwitchAction } from "./primary-repository-thread-switch.js";
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
@@ -61,6 +64,7 @@ type CodexSessionThreadState = {
   isRefreshingArchivedThreads: boolean;
   isStartingNewThread: boolean;
   isResumingThread: boolean;
+  isSwitchingPrimaryRepository: boolean;
   isForkingThread: boolean;
   isArchivingThread: boolean;
   isUnarchivingThread: boolean;
@@ -78,6 +82,7 @@ type CodexSessionThreadState = {
   unsubscribeThread: (threadId: string) => void;
   compactThread: (threadId: string) => void;
   rollbackThread: (threadId: string, numTurns: number) => void;
+  switchPrimaryRepository: (selectedRepositoryPath: string | null) => Promise<string>;
 };
 
 type CodexSessionChatState = {
@@ -373,13 +378,14 @@ export function useCodexSessionState(input: {
   });
 
   const startNewThreadMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (input?: { cwd?: string }) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
         throw new Error("Connect to a sandbox session before starting a new thread.");
       }
 
       const threadStart = await startCodexThread({
+        ...(input?.cwd === undefined ? {} : { cwd: input.cwd }),
         rpcClient,
         model: "gpt-5.3-codex",
       });
@@ -417,6 +423,39 @@ export function useCodexSessionState(input: {
     },
     onError: (error) => {
       handleThreadMutationFailure("Could not resume thread.", error);
+    },
+  });
+
+  const switchPrimaryRepositoryMutation = useMutation({
+    mutationFn: async (selectedRepositoryPath: string | null) => {
+      const rpcClient = rpcClientRef.current;
+      if (rpcClient === null) {
+        throw new Error("Connect to a sandbox session before switching the primary repository.");
+      }
+
+      const matchingThreads = await listCodexThreads({
+        cwd: selectedRepositoryPath ?? DefaultSandboxWorkspaceDir,
+        limit: 20,
+        rpcClient,
+        sortKey: "updated_at",
+      });
+      const switchAction = resolvePrimaryRepositoryThreadSwitchAction({
+        matchingThreads: matchingThreads.threads,
+        selectedRepositoryPath,
+      });
+
+      if (switchAction.type === "resume_existing_thread") {
+        const result = await resumeThreadMutateAsync(switchAction.threadId);
+        return result.threadId;
+      }
+
+      const result = await startNewThreadMutateAsync({
+        cwd: switchAction.cwd,
+      });
+      return result.threadId;
+    },
+    onError: (error) => {
+      handleThreadMutationFailure("Could not switch the primary repository.", error);
     },
   });
 
@@ -592,6 +631,10 @@ export function useCodexSessionState(input: {
     startNewThreadMutation;
   const { mutateAsync: resumeThreadMutateAsync, isPending: isResumingThread } =
     resumeThreadMutation;
+  const {
+    mutateAsync: switchPrimaryRepositoryMutateAsync,
+    isPending: isSwitchingPrimaryRepository,
+  } = switchPrimaryRepositoryMutation;
   const { mutate: forkThreadMutate, isPending: isForkingThread } = forkThreadMutation;
   const { mutate: archiveThreadMutate, isPending: isArchivingThread } = archiveThreadMutation;
   const { mutate: unarchiveThreadMutate, isPending: isUnarchivingThread } = unarchiveThreadMutation;
@@ -615,7 +658,7 @@ export function useCodexSessionState(input: {
   }, [refreshArchivedThreadListMutate]);
 
   const startNewThread = useCallback(async (): Promise<string> => {
-    const result = await startNewThreadMutateAsync();
+    const result = await startNewThreadMutateAsync(undefined);
     return result.threadId;
   }, [startNewThreadMutateAsync]);
 
@@ -625,6 +668,13 @@ export function useCodexSessionState(input: {
       return result.threadId;
     },
     [resumeThreadMutateAsync],
+  );
+
+  const switchPrimaryRepository = useCallback(
+    async (selectedRepositoryPath: string | null): Promise<string> => {
+      return await switchPrimaryRepositoryMutateAsync(selectedRepositoryPath);
+    },
+    [switchPrimaryRepositoryMutateAsync],
   );
 
   const forkThread = useCallback(
@@ -750,6 +800,7 @@ export function useCodexSessionState(input: {
       isRefreshingArchivedThreads,
       isStartingNewThread,
       isResumingThread,
+      isSwitchingPrimaryRepository,
       isForkingThread,
       isArchivingThread,
       isUnarchivingThread,
@@ -767,6 +818,7 @@ export function useCodexSessionState(input: {
       unsubscribeThread,
       compactThread,
       rollbackThread,
+      switchPrimaryRepository,
     };
   }, [
     archiveThread,
@@ -781,6 +833,7 @@ export function useCodexSessionState(input: {
     isRefreshingLoadedThreads,
     isRefreshingThreads,
     isResumingThread,
+    isSwitchingPrimaryRepository,
     isRollingBackThread,
     isStartingNewThread,
     isUnarchivingThread,
@@ -792,6 +845,7 @@ export function useCodexSessionState(input: {
     resumeThread,
     rollbackThread,
     startNewThread,
+    switchPrimaryRepository,
     unarchiveThread,
     unsubscribeThread,
   ]);

@@ -1,4 +1,8 @@
-import { ExecStreamClient, type ExecCommandResult } from "@mistle/sandbox-session-client";
+import {
+  ExecStreamClient,
+  type ExecCommandRequest,
+  type ExecCommandResult,
+} from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
 
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
@@ -15,8 +19,28 @@ type BranchDiffLoadResult = {
   patch: string;
 };
 
+export function buildBranchDiffGitExecRequest(input: {
+  args: string[];
+  cwd: string | null;
+}): ExecCommandRequest {
+  return {
+    args: input.args,
+    command: "git",
+    ...(input.cwd === null ? {} : { cwd: input.cwd }),
+    timeoutMs: BranchDiffCommandTimeoutMs,
+  };
+}
+
+export function getSessionBranchDiffQueryKey(input: {
+  sandboxInstanceId: string | null;
+  cwd: string | null;
+}): readonly ["session-branch-diff", string | null, string | null] {
+  return ["session-branch-diff", input.sandboxInstanceId, input.cwd];
+}
+
 async function runGitCommand(input: {
   args: string[];
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<ExecCommandResult> {
@@ -27,11 +51,12 @@ async function runGitCommand(input: {
     transport,
   });
 
-  return await exec.run({
-    command: "git",
-    args: input.args,
-    timeoutMs: BranchDiffCommandTimeoutMs,
-  });
+  return await exec.run(
+    buildBranchDiffGitExecRequest({
+      args: input.args,
+      cwd: input.cwd,
+    }),
+  );
 }
 
 function formatGitFailureDetails(result: ExecCommandResult): string {
@@ -44,11 +69,13 @@ function formatGitFailureDetails(result: ExecCommandResult): string {
 }
 
 async function readMergeBase(input: {
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<string> {
   const mergeBaseResult = await runGitCommand({
     args: ["merge-base", "main", "HEAD"],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -65,12 +92,14 @@ async function readMergeBase(input: {
 }
 
 async function readTrackedWorktreeDiff(input: {
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   mergeBase: string;
   sandboxInstanceId: string;
 }): Promise<ExecCommandResult> {
   const diffResult = await runGitCommand({
     args: ["diff", "--binary", input.mergeBase],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -82,11 +111,13 @@ async function readTrackedWorktreeDiff(input: {
 }
 
 async function listUntrackedFiles(input: {
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<string[]> {
   const result = await runGitCommand({
     args: ["ls-files", "--others", "--exclude-standard", "-z"],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -102,12 +133,14 @@ async function listUntrackedFiles(input: {
 }
 
 async function readUntrackedFilePatch(input: {
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   path: string;
   sandboxInstanceId: string;
 }): Promise<ExecCommandResult> {
   const result = await runGitCommand({
     args: ["diff", "--binary", "--no-index", "--", "/dev/null", input.path],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -119,11 +152,13 @@ async function readUntrackedFilePatch(input: {
 }
 
 async function loadBranchDiff(input: {
+  cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<BranchDiffLoadResult> {
   const repoCheck = await runGitCommand({
     args: ["rev-parse", "--is-inside-work-tree"],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -133,6 +168,7 @@ async function loadBranchDiff(input: {
 
   const baseCheck = await runGitCommand({
     args: ["rev-parse", "--verify", "main"],
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -141,16 +177,19 @@ async function loadBranchDiff(input: {
   }
 
   const mergeBase = await readMergeBase({
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
   const trackedDiffResult = await readTrackedWorktreeDiff({
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     mergeBase,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const untrackedFiles = await listUntrackedFiles({
+    cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -158,6 +197,7 @@ async function loadBranchDiff(input: {
   for (const path of untrackedFiles) {
     untrackedDiffResults.push(
       await readUntrackedFilePatch({
+        cwd: input.cwd,
         ensureTransportConnected: input.ensureTransportConnected,
         path,
         sandboxInstanceId: input.sandboxInstanceId,
@@ -184,6 +224,7 @@ function normalizeBranchDiffError(error: unknown): string {
 }
 
 export function useSessionBranchDiff(input: {
+  cwd: string | null;
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string | null;
@@ -197,11 +238,15 @@ export function useSessionBranchDiff(input: {
       }
 
       return await loadBranchDiff({
+        cwd: input.cwd,
         ensureTransportConnected: input.ensureTransportConnected,
         sandboxInstanceId,
       });
     },
-    queryKey: ["session-branch-diff", input.sandboxInstanceId],
+    queryKey: getSessionBranchDiffQueryKey({
+      sandboxInstanceId: input.sandboxInstanceId,
+      cwd: input.cwd,
+    }),
     retry: false,
   });
 

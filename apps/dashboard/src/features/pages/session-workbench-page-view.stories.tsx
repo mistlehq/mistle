@@ -171,6 +171,7 @@ export const CliSplitWithTerminal: Story = {
     primaryBottomPanel: null,
     bottomPanel: (
       <SessionTerminalPanel
+        cwd={null}
         isConnectionReady={true}
         isVisible={true}
         onDisconnectTerminal={noop}

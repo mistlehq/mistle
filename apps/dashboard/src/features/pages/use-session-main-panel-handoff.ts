@@ -1,6 +1,6 @@
 import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
 import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/index.js";
@@ -23,6 +23,7 @@ type UseSessionMainPanelHandoffInput = {
     | "sessionSnapshot"
     | "sessionConnectionState"
   >;
+  selectedRepositoryPathRef: RefObject<string | null>;
   sandboxInstanceId: string | null;
   serverRequests: Pick<
     ReturnType<typeof useCodexSessionState>["serverRequests"],
@@ -53,6 +54,41 @@ async function closeAndDisconnectCliPty(
   const disconnectPromise = cliPtyState.actions.disconnectPty().catch(() => {});
 
   await Promise.all([closePromise, disconnectPromise]);
+}
+
+export function buildCliPtyOpenInput(input: {
+  launchTarget:
+    | {
+        type: "resume";
+        threadId: string;
+      }
+    | {
+        type: "start_new";
+        shouldClearActiveThreadId: boolean;
+      };
+  sandboxInstanceId: string;
+  selectedRepositoryPath: string | null;
+}): {
+  sandboxInstanceId: string;
+  ptySessionId: "cli";
+  cols: number;
+  rows: number;
+  command: "codex";
+  args: string[];
+  cwd?: string;
+} {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    ptySessionId: "cli",
+    cols: 120,
+    rows: 32,
+    command: "codex",
+    args:
+      input.launchTarget.type === "resume"
+        ? ["resume", "--remote", CodexAppServerListenUrl, input.launchTarget.threadId]
+        : ["--remote", CodexAppServerListenUrl],
+    ...(input.selectedRepositoryPath === null ? {} : { cwd: input.selectedRepositoryPath }),
+  };
 }
 
 export function resolveChatRestoreConnectionInput(input: {
@@ -206,15 +242,11 @@ export function useSessionMainPanelHandoff(
       let cliOpened = false;
       try {
         await input.cliPtyState.actions.openPty({
-          sandboxInstanceId: input.sandboxInstanceId,
-          ptySessionId: "cli",
-          cols: 120,
-          rows: 32,
-          command: "codex",
-          args:
-            launchTarget.type === "resume"
-              ? ["resume", "--remote", CodexAppServerListenUrl, launchTarget.threadId]
-              : ["--remote", CodexAppServerListenUrl],
+          ...buildCliPtyOpenInput({
+            launchTarget,
+            sandboxInstanceId: input.sandboxInstanceId,
+            selectedRepositoryPath: input.selectedRepositoryPathRef.current,
+          }),
         });
         cliOpened = true;
       } catch (error) {
@@ -246,6 +278,7 @@ export function useSessionMainPanelHandoff(
   }, [
     input.cliPtyState,
     input.lifecycle,
+    input.selectedRepositoryPathRef,
     input.sandboxInstanceId,
     input.serverRequests,
     input.threadAuthority,
