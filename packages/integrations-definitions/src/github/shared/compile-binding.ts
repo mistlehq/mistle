@@ -38,10 +38,40 @@ const GitHubCliArtifactEnv = {
 };
 const GitHubCliRepository = "cli/cli";
 const ArtifactCommandTimeoutMs = 120_000;
+const GitHubReleaseRetryAttempts = 3;
+
+function renderRetryShellFunction(input: { contextLabel: string }): string {
+  return [
+    "run_with_retry() {",
+    '  max_attempts="$1"',
+    "  shift",
+    "  attempt=1",
+    "  while :; do",
+    '    if "$@"; then',
+    "      return 0",
+    "    else",
+    '      status="$?"',
+    "    fi",
+    "",
+    '    if [ "$attempt" -ge "$max_attempts" ]; then',
+    '      return "$status"',
+    "    fi",
+    "",
+    `    echo "Failed to ${input.contextLabel} on attempt $attempt/$max_attempts (exit=$status); retrying." >&2`,
+    '    sleep "$attempt"',
+    "    attempt=$((attempt + 1))",
+    "  done",
+    "}",
+  ].join("\n");
+}
 
 function renderInstallGitHubCliScript(installPath: string): string {
   return [
     'arch="$(uname -m)"',
+    renderRetryShellFunction({
+      contextLabel: `download GitHub CLI release data for ${GitHubCliRepository}`,
+    }),
+    "",
     'case "$arch" in',
     "  x86_64)",
     '    asset_suffix="linux_amd64"',
@@ -55,7 +85,10 @@ function renderInstallGitHubCliScript(installPath: string): string {
     "    ;;",
     "esac",
     "",
-    `tag_name="$(curl --noproxy '*' -fsSI https://github.com/${GitHubCliRepository}/releases/latest | tr -d '\\r' | sed -n 's/^[Ll]ocation: .*\\/tag\\/\\([^[:space:]]*\\)$/\\1/p' | tail -n1)"`,
+    `tag_headers_path="$(mktemp)"`,
+    `trap 'rm -f "$tag_headers_path"' EXIT`,
+    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy '*' -fsSI https://github.com/${GitHubCliRepository}/releases/latest -o "$tag_headers_path"`,
+    `tag_name="$(tr -d '\\r' < "$tag_headers_path" | sed -n 's/^[Ll]ocation: .*\\/tag\\/\\([^[:space:]]*\\)$/\\1/p' | tail -n1)"`,
     'if [ -z "$tag_name" ]; then',
     '  echo "Failed to resolve latest gh release tag." >&2',
     "  exit 1",
@@ -67,9 +100,9 @@ function renderInstallGitHubCliScript(installPath: string): string {
     `install_path=${JSON.stringify(installPath)}`,
     "",
     'temp_dir="$(mktemp -d)"',
-    "trap 'rm -rf \"$temp_dir\"' EXIT",
+    'trap \'rm -rf "$temp_dir" "$tag_headers_path"\' EXIT',
     "",
-    'curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/gh.tar.gz"',
+    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/gh.tar.gz"`,
     'tar -xzf "$temp_dir/gh.tar.gz" -C "$temp_dir"',
     'install -m 0755 "$temp_dir/$archive_root/bin/gh" "$install_path"',
   ].join("\n");

@@ -164,11 +164,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
       install: [
         {
-          args: [
-            "sh",
-            "-euc",
-            expect.stringContaining("https://github.com/cli/cli/releases/latest"),
-          ],
+          args: ["sh", "-euc", expect.stringContaining("run_with_retry")],
           timeoutMs: 120_000,
         },
       ],

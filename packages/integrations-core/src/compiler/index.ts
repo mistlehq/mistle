@@ -40,6 +40,7 @@ const SandboxPaths: SandboxPathRefs = {
   runtimeArtifactDir: "/var/lib/mistle/artifacts",
   runtimeArtifactBinDir: "/usr/local/bin",
 };
+const GitHubReleaseRetryAttempts = 3;
 
 function artifactBinPath(name: string): string {
   return `${SandboxPaths.runtimeArtifactBinDir}/${name}`;
@@ -53,6 +54,32 @@ function resolveEgressRuleId(input: { bindingId: string; routeIndex: number }): 
   return `egress_rule_${input.bindingId}_${input.routeIndex + 1}`;
 }
 
+function renderRetryShellFunction(input: { contextLabel: string }): string[] {
+  return [
+    "run_with_retry() {",
+    '  max_attempts="$1"',
+    "  shift",
+    "  attempt=1",
+    "  while :; do",
+    '    if "$@"; then',
+    "      return 0",
+    "    else",
+    '      status="$?"',
+    "    fi",
+    "",
+    '    if [ "$attempt" -ge "$max_attempts" ]; then',
+    '      return "$status"',
+    "    fi",
+    "",
+    `    echo "Failed to ${input.contextLabel} on attempt $attempt/$max_attempts (exit=$status); retrying." >&2`,
+    '    sleep "$attempt"',
+    "    attempt=$((attempt + 1))",
+    "  done",
+    "}",
+    "",
+  ];
+}
+
 function renderInstallLatestGithubReleaseBinaryScript(
   input: RuntimeArtifactGithubReleaseInstallInput,
 ): string {
@@ -63,6 +90,9 @@ function renderInstallLatestGithubReleaseBinaryScript(
     'arch="$(uname -m)"',
     "repo=" + quote([input.repository]),
     "install_path=" + quote([input.installPath]),
+    ...renderRetryShellFunction({
+      contextLabel: `download GitHub release asset for $repo`,
+    }),
     'case "$arch" in',
     "  x86_64)",
     `    asset_name=${quote([input.assets.x86_64.fileName])}`,
@@ -83,7 +113,7 @@ function renderInstallLatestGithubReleaseBinaryScript(
     'temp_dir="$(mktemp -d)"',
     "trap 'rm -rf \"$temp_dir\"' EXIT",
     "",
-    'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"',
+    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"`,
     'case "$asset_format" in',
     "  tar.gz)",
     '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
@@ -111,6 +141,9 @@ function renderInstallTaggedGithubReleaseBinaryScript(
     "repo=" + quote([input.repository]),
     "release_tag=" + quote([input.releaseTag]),
     "install_path=" + quote([input.installPath]),
+    ...renderRetryShellFunction({
+      contextLabel: `download tagged GitHub release asset for $repo`,
+    }),
     'case "$arch" in',
     "  x86_64)",
     `    asset_name=${quote([input.assets.x86_64.fileName])}`,
@@ -131,7 +164,7 @@ function renderInstallTaggedGithubReleaseBinaryScript(
     'temp_dir="$(mktemp -d)"',
     "trap 'rm -rf \"$temp_dir\"' EXIT",
     "",
-    'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/download/$release_tag/$asset_name" -o "$temp_dir/artifact"',
+    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://github.com/$repo/releases/download/$release_tag/$asset_name" -o "$temp_dir/artifact"`,
     'case "$asset_format" in',
     "  tar.gz)",
     '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
@@ -163,13 +196,18 @@ function renderInstallLatestTaggedGithubReleaseAssetScript(
     "asset_format=" + quote([assetFormat]),
     ...binaryPathAssignments,
     "",
+    ...renderRetryShellFunction({
+      contextLabel: `perform GitHub release request for $repo`,
+    }),
     'temp_dir="$(mktemp -d)"',
     "trap 'rm -rf \"$temp_dir\"' EXIT",
     "",
     "page=1",
     'release_json=""',
+    'releases_path="$temp_dir/releases.json"',
     "while :; do",
-    '  releases_json="$(curl --noproxy "*" -fsSL "https://api.github.com/repos/$repo/releases?per_page=100&page=$page")"',
+    `  run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -o "$releases_path"`,
+    '  releases_json="$(cat "$releases_path")"',
     '  if ! printf "%s" "$releases_json" | jq -e \'type == "array"\' >/dev/null; then',
     '    echo "GitHub releases API returned invalid JSON for $repo." >&2',
     "    exit 1",
@@ -199,7 +237,7 @@ function renderInstallLatestTaggedGithubReleaseAssetScript(
     "  exit 1",
     "fi",
     "",
-    'curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/artifact"',
+    `run_with_retry ${String(GitHubReleaseRetryAttempts)} curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/artifact"`,
     'case "$asset_format" in',
     "  tar.gz)",
     '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',

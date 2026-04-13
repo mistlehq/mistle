@@ -952,6 +952,13 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain(
       "https://api.github.com/repos/$repo/releases?per_page=100&page=$page",
     );
+    expect(installScript).toContain("run_with_retry()");
+    expect(installScript).toContain(
+      'run_with_retry 3 curl --noproxy "*" -fsSL "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -o "$releases_path"',
+    );
+    expect(installScript).toContain(
+      'run_with_retry 3 curl --noproxy "*" -fsSL "$download_url" -o "$temp_dir/artifact"',
+    );
     expect(installScript).toContain('jq -cer --arg prefix "$release_tag_prefix"');
     expect(installScript).toContain("mistlehq/tools");
     expect(installScript).toContain("jira/");

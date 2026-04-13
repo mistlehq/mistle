@@ -7,6 +7,7 @@ import {
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
+import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -213,7 +214,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       await markSandboxInstanceFailedStep({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
         failureCode: StartSandboxFailureCodes.SANDBOX_START_FAILED,
-        failureMessage: "Sandbox provider start failed before runtime provisioning completed.",
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Sandbox provider start failed before runtime provisioning completed.",
+          error,
+        }),
       });
       throw error;
     }
@@ -263,7 +267,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.PERSIST_PROVISIONING_METADATA_FAILED,
-          failureMessage: "Failed to persist sandbox runtime plan and provider sandbox metadata.",
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Failed to persist sandbox runtime plan and provider sandbox metadata.",
+            error,
+          }),
         });
       } catch (cleanupError) {
         throw new Error(
@@ -326,7 +333,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.SANDBOX_INIT_FAILED,
-          failureMessage: "Failed to initialize sandbox runtime.",
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Failed to initialize sandbox runtime.",
+            error,
+          }),
         });
       } catch (cleanupError) {
         throw new Error(
@@ -395,7 +405,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-          failureMessage: "Failed to wait for sandbox runtime readiness.",
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Failed to wait for sandbox runtime readiness.",
+            error,
+          }),
         });
       } catch (cleanupError) {
         throw new Error(
@@ -484,7 +497,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           runtimeProvider: startedSandbox.runtimeProvider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-          failureMessage: "Failed to transition sandbox instance status from starting to running.",
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Failed to transition sandbox instance status from starting to running.",
+            error,
+          }),
         });
       } catch (cleanupError) {
         throw new Error(

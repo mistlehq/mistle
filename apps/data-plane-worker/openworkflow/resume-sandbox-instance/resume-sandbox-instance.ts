@@ -5,6 +5,7 @@ import type { Clock, Sleeper } from "@mistle/time";
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
@@ -141,7 +142,10 @@ export async function resumeSandboxInstance(
     await handleFailedResume({
       sandboxInstanceId: input.sandboxInstanceId,
       failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-      failureMessage: "Failed to resume sandbox runtime.",
+      failureMessage: formatPersistedFailureMessage({
+        summary: "Failed to resume sandbox runtime.",
+        error,
+      }),
     });
     throw error;
   }
@@ -164,7 +168,10 @@ export async function resumeSandboxInstance(
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
-      failureMessage: "Failed to initialize resumed sandbox runtime.",
+      failureMessage: formatPersistedFailureMessage({
+        summary: "Failed to initialize resumed sandbox runtime.",
+        error,
+      }),
     });
     throw error;
   }
@@ -190,7 +197,10 @@ export async function resumeSandboxInstance(
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-      failureMessage: "Failed while waiting for resumed sandbox runtime readiness.",
+      failureMessage: formatPersistedFailureMessage({
+        summary: "Failed while waiting for resumed sandbox runtime readiness.",
+        error,
+      }),
     });
     throw error;
   }
@@ -221,7 +231,10 @@ export async function resumeSandboxInstance(
       runtimeProvider: resumedRuntime.runtimeProvider,
       providerSandboxId: resumedRuntime.providerSandboxId,
       failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
-      failureMessage: "Failed to mark resumed sandbox instance as running.",
+      failureMessage: formatPersistedFailureMessage({
+        summary: "Failed to mark resumed sandbox instance as running.",
+        error,
+      }),
     });
     throw error;
   }
