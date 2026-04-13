@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
 import {
   AddFlowStorySpecs,
   createAvailableCardsOverview,
@@ -9,11 +8,15 @@ import {
 } from "./organization-integrations-settings-page-story-support.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 
+function OrganizationIntegrationsAddFlowStory(): React.JSX.Element {
+  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GitHubCloud} />;
+}
+
 const meta = {
   title: "Dashboard/Integrations/AddFlows",
-  component: IntegrationConnectionEditorPage,
+  component: OrganizationIntegrationsAddFlowStory,
   decorators: [withDashboardPageStory],
-} satisfies Meta<typeof IntegrationConnectionEditorPage>;
+} satisfies Meta<typeof OrganizationIntegrationsAddFlowStory>;
 
 export default meta;
 
