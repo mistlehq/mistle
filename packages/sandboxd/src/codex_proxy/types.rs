@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::Value;
 use tokio::sync::oneshot;
+use tungstenite::Message;
 
 use crate::codex_proxy::CodexThreadStatus;
 
@@ -38,6 +40,27 @@ pub struct CodexSessionManagerState {
     pub next_request_id: u64,
     pub initialized: bool,
     pub retention_replay_in_progress: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProxyClientKind {
+    Unknown,
+    AutomationWorker,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingClientRequest {
+    pub method: String,
+    pub thread_id: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct BufferedSuccessResponse {
+    pub request_id: Value,
+    pub response_sequence: u64,
+    pub payload: Message,
+    pub subscription_retention_result: Option<Result<(), CodexSessionManagerError>>,
 }
 
 impl Default for CodexSessionManagerState {

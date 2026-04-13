@@ -39,7 +39,8 @@ pub use crate::codex_proxy::session_manager::{
 };
 pub use crate::codex_proxy::types::{
     CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerState, RetainReason,
-    RetainedThreadState, ThreadSubscriptionState,
+    BufferedSuccessResponse, PendingClientRequest, ProxyClientKind, RetainedThreadState,
+    ThreadSubscriptionState,
 };
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::RuntimeReadinessManager;

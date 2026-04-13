@@ -556,7 +556,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
     let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
 
     let (server_ready_sender, server_ready_receiver) = mpsc::channel();
-    let (second_connection_ready_sender, second_connection_ready_receiver) = mpsc::channel::<()>();
+    let (second_connection_ready_sender, second_connection_ready_receiver) = mpsc::channel();
     let raw_server_thread = thread::spawn(move || {
         server_ready_sender
             .send(())
@@ -834,6 +834,666 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
         .expect("raw server thread should exit cleanly");
 }
 
+#[test]
+fn automation_turn_start_buffers_success_until_retention_succeeds() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (release_retention_sender, release_retention_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+
+        let initialize_request = read_json_text_message(&mut client_socket);
+        assert_eq!(
+            initialize_request["method"],
+            Value::String("initialize".to_string())
+        );
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": initialize_request["id"],
+                    "result": {
+                        "userAgent": "codex-app-server",
+                        "codexHome": "/tmp/codex-home",
+                        "platformFamily": "linux",
+                        "platformOs": "linux"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("initialize response should send");
+
+        let turn_start_request = read_json_text_message(&mut client_socket);
+        assert_eq!(
+            turn_start_request["method"],
+            Value::String("turn/start".to_string())
+        );
+        assert_eq!(
+            turn_start_request["params"]["threadId"],
+            Value::String("thr_automation".to_string())
+        );
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": turn_start_request["id"],
+                    "result": {
+                        "turn": {
+                            "id": "turn_automation",
+                            "status": "inProgress"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("turn/start success should send");
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "method": "turn/started",
+                    "params": {
+                        "turnId": "turn_automation"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("notification should send");
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        assert_eq!(
+            retain_request["params"]["threadId"],
+            Value::String("thr_automation".to_string())
+        );
+
+        release_retention_receiver
+            .recv()
+            .expect("test should release retained success forwarding");
+
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_automation",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("manager retain response should send");
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("Codex proxy should start");
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    send_initialize_request(
+        &mut proxy_client,
+        REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
+        Some("Mistle Control Plane Worker"),
+    );
+    let _ = read_json_text_message(&mut proxy_client);
+
+    let turn_start_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": turn_start_id,
+                "method": "turn/start",
+                "params": {
+                    "threadId": "thr_automation",
+                    "input": []
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("turn/start request should send");
+
+    let first_message = read_json_text_message(&mut proxy_client);
+    assert_eq!(first_message["method"], json!("turn/started"));
+
+    release_retention_sender
+        .send(())
+        .expect("retention release signal should send");
+
+    let success_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(success_response["id"], json!(turn_start_id));
+    assert_eq!(
+        success_response["result"]["turn"]["id"],
+        json!("turn_automation")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn automation_turn_start_returns_proxy_error_when_retention_fails() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+
+        let initialize_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": initialize_request["id"],
+                    "result": {
+                        "userAgent": "codex-app-server",
+                        "codexHome": "/tmp/codex-home",
+                        "platformFamily": "linux",
+                        "platformOs": "linux"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("initialize response should send");
+
+        let turn_start_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": turn_start_request["id"],
+                    "result": {
+                        "turn": {
+                            "id": "turn_failure",
+                            "status": "inProgress"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("turn/start success should send");
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "error": {
+                        "code": -32600,
+                        "message": "no rollout found for thread id thr_failure"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("manager retain failure should send");
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("Codex proxy should start");
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    send_initialize_request(
+        &mut proxy_client,
+        REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
+        Some("Mistle Control Plane Worker"),
+    );
+    let _ = read_json_text_message(&mut proxy_client);
+
+    let turn_start_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": turn_start_id,
+                "method": "turn/start",
+                "params": {
+                    "threadId": "thr_failure",
+                    "input": []
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("turn/start request should send");
+
+    let error_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(error_response["id"], json!(turn_start_id));
+    assert_eq!(error_response["error"]["code"], json!(-32000));
+    assert_eq!(
+        error_response["error"]["message"],
+        json!("sandboxd failed to retain Codex thread subscription for background execution")
+    );
+    assert_eq!(error_response.get("result"), None);
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn automation_turn_steer_buffers_success_until_retention_succeeds() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (release_retention_sender, release_retention_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+
+        let initialize_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": initialize_request["id"],
+                    "result": {
+                        "userAgent": "codex-app-server",
+                        "codexHome": "/tmp/codex-home",
+                        "platformFamily": "linux",
+                        "platformOs": "linux"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("initialize response should send");
+
+        let turn_steer_request = read_json_text_message(&mut client_socket);
+        assert_eq!(
+            turn_steer_request["method"],
+            Value::String("turn/steer".to_string())
+        );
+        assert_eq!(
+            turn_steer_request["params"]["threadId"],
+            Value::String("thr_steer".to_string())
+        );
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": turn_steer_request["id"],
+                    "result": {
+                        "turnId": "turn_steered"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("turn/steer success should send");
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "method": "turn/updated",
+                    "params": {
+                        "turnId": "turn_steered"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("notification should send");
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        assert_eq!(
+            retain_request["params"]["threadId"],
+            Value::String("thr_steer".to_string())
+        );
+
+        release_retention_receiver
+            .recv()
+            .expect("test should release retained success forwarding");
+
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_steer",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("manager retain response should send");
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("Codex proxy should start");
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    send_initialize_request(
+        &mut proxy_client,
+        REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
+        Some("Mistle Control Plane Worker"),
+    );
+    let _ = read_json_text_message(&mut proxy_client);
+
+    let turn_steer_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": turn_steer_id,
+                "method": "turn/steer",
+                "params": {
+                    "threadId": "thr_steer",
+                    "input": []
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("turn/steer request should send");
+
+    let first_message = read_json_text_message(&mut proxy_client);
+    assert_eq!(first_message["method"], json!("turn/updated"));
+
+    release_retention_sender
+        .send(())
+        .expect("retention release signal should send");
+
+    let success_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(success_response["id"], json!(turn_steer_id));
+    assert_eq!(success_response["result"]["turnId"], json!("turn_steered"));
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn non_automation_turn_start_remains_passthrough() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (server_shutdown_sender, server_shutdown_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+        set_plain_websocket_read_timeout(&mut manager_socket, Duration::from_millis(50));
+
+        let (client_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied client connection");
+        let mut client_socket =
+            accept(client_stream).expect("proxied client handshake should succeed");
+
+        let initialize_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": initialize_request["id"],
+                    "result": {
+                        "userAgent": "codex-app-server",
+                        "codexHome": "/tmp/codex-home",
+                        "platformFamily": "linux",
+                        "platformOs": "linux"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("initialize response should send");
+
+        let turn_start_request = read_json_text_message(&mut client_socket);
+        client_socket
+            .send(Message::Text(
+                json!({
+                    "id": turn_start_request["id"],
+                    "result": {
+                        "turn": {
+                            "id": "turn_passthrough",
+                            "status": "inProgress"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("turn/start success should send");
+
+        match manager_socket.read() {
+            Err(tungstenite::Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) => {}
+            Err(tungstenite::Error::Protocol(
+                tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+            ))
+            | Err(tungstenite::Error::ConnectionClosed)
+            | Err(tungstenite::Error::AlreadyClosed) => {}
+            other => panic!("manager should not receive a retain request: {other:?}"),
+        }
+        server_shutdown_receiver
+            .recv()
+            .expect("test should signal raw server shutdown");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_codex_proxy(
+        "ws://127.0.0.1:0/codex",
+        &raw_url,
+        keepalive_manager,
+        runtime_readiness_manager.clone(),
+        Arc::new(ThreadSleeper),
+    )
+    .expect("Codex proxy should start");
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+
+    let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
+    send_initialize_request(
+        &mut proxy_client,
+        REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
+        Some("Mistle Dashboard"),
+    );
+    let _ = read_json_text_message(&mut proxy_client);
+
+    let turn_start_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": turn_start_id,
+                "method": "turn/start",
+                "params": {
+                    "threadId": "thr_passthrough",
+                    "input": []
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("turn/start request should send");
+
+    let success_response = read_json_text_message(&mut proxy_client);
+    assert_eq!(success_response["id"], json!(turn_start_id));
+    assert_eq!(
+        success_response["result"]["turn"]["id"],
+        json!("turn_passthrough")
+    );
+
+    server_shutdown_sender
+        .send(())
+        .expect("raw server shutdown signal should send");
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    proxy.close().expect("Codex proxy should close cleanly");
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
 fn build_runtime() -> Runtime {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -973,4 +1633,39 @@ fn connect_to_proxy_with_retry(
             .map(|error| error.to_string())
             .unwrap_or_else(|| "unknown connection error".to_string())
     );
+}
+
+fn send_initialize_request(
+    proxy_client: &mut WebSocket<MaybeTlsStream<TcpStream>>,
+    request_id: u64,
+    client_title: Option<&str>,
+) {
+    let mut client_info = json!({
+        "name": CODEX_INITIALIZE_CLIENT_NAME,
+        "version": "0.1.0"
+    });
+    if let Some(client_title) = client_title {
+        client_info["title"] = json!(client_title);
+    }
+
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": request_id,
+                "method": "initialize",
+                "params": {
+                    "clientInfo": client_info
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("initialize request should send");
+}
+
+fn set_plain_websocket_read_timeout(socket: &mut WebSocket<TcpStream>, timeout: Duration) {
+    socket
+        .get_mut()
+        .set_read_timeout(Some(timeout))
+        .expect("websocket read timeout should configure");
 }
