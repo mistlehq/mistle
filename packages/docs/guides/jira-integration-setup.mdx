@@ -6,18 +6,18 @@ icon: /integration-logos/jira.svg
 
 ## Overview
 
-Mistle supports three Jira connection methods:
+Jira can be connected in three ways:
 
 - Personal API token
 - Service account API token
 - Service account OAuth client credentials
 
-Use Personal API token when Mistle should access Jira as a user account.
-Use a service account token or OAuth client credentials when Mistle should access Jira as a service account.
+Use Personal API token when the connection should access Jira as a user account.
+Use a service account token or OAuth client credentials when the connection should access Jira as a service account.
 
 ## Option 1: Personal API Token
 
-Personal API token gives Mistle access to Jira as that Atlassian user and is the only Jira option that currently supports managed webhook registration in Mistle.
+Personal API token gives access to Jira as that Atlassian user and is the only Jira option that currently supports managed webhook registration.
 
 Create an Atlassian API token for that user, then connect in Mistle with:
 
@@ -29,7 +29,7 @@ Create an Atlassian API token for that user, then connect in Mistle with:
 
 ## Option 2: Service Account API Token
 
-Service account API token gives Mistle access to Jira as a service account by using a scoped Atlassian API token.
+Service account API token gives access to Jira as a service account by using a scoped Atlassian API token.
 
 Create a service account and a scoped API token, then connect in Mistle with:
 
@@ -38,11 +38,11 @@ Create a service account and a scoped API token, then connect in Mistle with:
 | `cloud_id` | Jira Cloud ID             |
 | `apiKey`   | Service account API token |
 
-Mistle's Jira service-account path stores `cloud_id`, not a site URL. Atlassian's scoped service-account tokens use the `api.atlassian.com/ex/jira/<cloudId>/...` API shape, so make sure you collect the cloud ID before connecting.
+This option uses `cloud_id`, not a site URL. Atlassian's scoped service-account tokens use the `api.atlassian.com/ex/jira/<cloudId>/...` API shape, so make sure you collect the cloud ID before connecting.
 
 ## Option 3: Service Account OAuth Client Credentials
 
-Service account OAuth client credentials gives Mistle access to Jira as a service account by exchanging a client ID and client secret for access tokens.
+Service account OAuth client credentials gives access to Jira as a service account by exchanging a client ID and client secret for access tokens.
 
 Create Atlassian OAuth 2.0 credentials for the service account, then connect in Mistle with:
 
@@ -54,9 +54,9 @@ Create Atlassian OAuth 2.0 credentials for the service account, then connect in 
 
 ## Webhooks
 
-The Jira integration supports managed webhook registration, but the current implementation only supports that path for **personal API token** connections.
+Managed webhook registration is currently supported only for **personal API token** connections.
 
-After the connection exists, use the **Webhooks** section on that connection in Mistle. The product already shows the callback URL to copy into Jira, and Mistle can create the managed webhook registration from there.
+After the connection exists, use the **Webhooks** section on that connection. The product already shows the callback URL to copy into Jira, and the managed webhook registration can be created from there.
 
 ## Jira Cloud
 

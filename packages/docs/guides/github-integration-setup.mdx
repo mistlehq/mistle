@@ -6,17 +6,17 @@ icon: /integration-logos/github.svg
 
 ## Overview
 
-Mistle supports two GitHub connection methods:
+GitHub can be connected in two ways:
 
 - API key
 - GitHub App installation
 
-Use API key when Mistle only needs access to GitHub resources.
-Use GitHub App installation when Mistle also needs to receive webhook events from GitHub.
+Use API key when the connection only needs access to GitHub resources.
+Use GitHub App installation when the connection also needs to receive webhook events from GitHub.
 
 ## Option 1: Connect With An API Key
 
-API key gives Mistle access to the GitHub resources available to that token, but it does not support webhook events from GitHub.
+API key gives access to the GitHub resources available to that token, but it does not support webhook events from GitHub.
 
 Create a GitHub personal access token or other API token with the scopes your workflows need, then create the Mistle connection with:
 
@@ -26,7 +26,7 @@ Create a GitHub personal access token or other API token with the scopes your wo
 
 ## Option 2: Connect With A GitHub App Installation
 
-GitHub App installation gives Mistle access through the installed GitHub App and supports webhook events from GitHub.
+GitHub App installation gives access through the installed GitHub App and supports webhook events from GitHub.
 
 ### Create The GitHub App
 
@@ -52,7 +52,7 @@ Enter:
 | `appPrivateKeyPem` | GitHub App private key PEM                         |
 | `webhookSecret`    | Shared webhook secret configured on the GitHub App |
 
-Mistle stores `installation_id` and `setup_action` internally after the installation flow completes. You do not enter those manually.
+`installation_id` and `setup_action` are stored automatically after the installation flow completes. You do not enter those manually.
 
 ### Copy The URLs From Mistle Into GitHub
 

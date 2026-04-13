@@ -6,17 +6,16 @@ icon: /integration-logos/aws.svg
 
 ## Overview
 
-AWS gives Mistle access by using an IAM user's access key to assume the IAM role you specify.
+Connect to AWS by using an IAM user's access key to assume the IAM role you specify.
 
-## Create AWS Credentials
+## Configuring AWS Access
 
-Create the AWS pieces Mistle needs:
+Before creating the connection, make sure:
 
-1. Create or choose an IAM user that will call `sts:AssumeRole`.
-2. Create an access key for that IAM user.
-3. Create an IAM role with the permissions you want Mistle to have.
-4. Add a trust policy so the IAM user can assume that role.
-5. If you use third-party-style cross-account protection, add an `ExternalId` condition and keep the same value for the Mistle connection.
+1. You have an IAM user or IAM principal that can call `sts:AssumeRole`.
+2. You have an IAM role with the permissions you want to use.
+3. That role's trust policy allows that principal to assume it.
+4. If you use third-party-style cross-account protection, you have the `ExternalId` value ready for the connection.
 
 ## Connect In Mistle
 
