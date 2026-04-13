@@ -146,6 +146,10 @@ key_prefix = "mistle:runtime-state:fixture"
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://127.0.0.1:5300"
 
+[apps.data_plane_gateway.lifecycle]
+idle_timeout_ms = 300000
+bootstrap_disconnect_grace_ms = 60000
+
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 

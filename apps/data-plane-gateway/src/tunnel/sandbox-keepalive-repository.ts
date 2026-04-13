@@ -1,13 +1,15 @@
 import type { KeepaliveControlMessage } from "@mistle/sandbox-session-protocol";
 import type { Clock } from "@mistle/time";
 
-import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
+import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
+import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 
 export class SandboxKeepaliveRepository {
   public constructor(
     private readonly keepaliveStore: SandboxKeepaliveStore,
-    private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
+    private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
+    private readonly sandboxOwnerStore: SandboxOwnerStore,
     private readonly clock: Clock,
     private readonly gatewayNodeId: string,
   ) {}
@@ -32,19 +34,18 @@ export class SandboxKeepaliveRepository {
       return;
     }
 
-    this.requireController(input.sandboxInstanceId).handleActivityTouch({
-      nowMs,
+    const owner = await this.sandboxOwnerStore.getOwner({
+      sandboxInstanceId: input.sandboxInstanceId,
     });
-  }
-
-  private requireController(sandboxInstanceId: string) {
-    const sandboxIdleController = this.sandboxIdleControllerRegistry.getController({
-      sandboxInstanceId,
-    });
-    if (sandboxIdleController !== null) {
-      return sandboxIdleController;
+    if (owner === undefined) {
+      throw new Error(
+        `Expected active owner lease for sandbox '${input.sandboxInstanceId}' before applying keepalive activity.`,
+      );
     }
 
-    throw new Error(`Expected idle controller for sandbox '${sandboxInstanceId}'.`);
+    await this.sandboxInstanceDeadlineService.touchIdleDeadline({
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: owner.leaseId,
+    });
   }
 }

@@ -1,7 +1,7 @@
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 import { WebSocket } from "ws";
 
-import type { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
+import type { SandboxInstanceDeadlineService } from "../../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../../logger.js";
 import {
   ATTACHMENT_TTL_MS,
@@ -82,7 +82,7 @@ export class TunnelSessionService {
     private readonly sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat,
     private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
-    private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
+    private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
   ) {}
@@ -110,14 +110,6 @@ export class TunnelSessionService {
     const attachResult = this.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
 
     const runtimeAttachmentAttachedAtMs = this.clock.nowMs();
-    const sandboxIdleController = this.sandboxIdleControllerRegistry.ensureController({
-      sandboxInstanceId: input.sandboxInstanceId,
-      ownerLeaseId: input.leaseId,
-      nowMs: runtimeAttachmentAttachedAtMs,
-    });
-    sandboxIdleController.start({
-      nowMs: runtimeAttachmentAttachedAtMs,
-    });
     let websocketHealthHandle:
       | {
           stop: () => void;
@@ -179,6 +171,27 @@ export class TunnelSessionService {
         statusMessage: "Failed to persist sandbox runtime attachment.",
       });
     });
+
+    void this.sandboxInstanceDeadlineService
+      .handleBootstrapAttach({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.leaseId,
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: input.sandboxInstanceId,
+            ownerLeaseId: input.leaseId,
+          },
+          "Failed to persist sandbox deadlines for attached bootstrap tunnel",
+        );
+        input.onFatalError({
+          closeReason: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
+          error,
+          statusMessage: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
+        });
+      });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
       relayCoordinator: this.relayCoordinator,
@@ -260,15 +273,6 @@ export class TunnelSessionService {
       socket: input.socket,
     });
 
-    const sandboxIdleController = this.sandboxIdleControllerRegistry.getController({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (sandboxIdleController === null) {
-      throw new Error(
-        `Expected idle controller for sandbox '${input.sandboxInstanceId}' before attaching connection peer.`,
-      );
-    }
-
     let websocketHealthHandle:
       | {
           stop: () => void;
@@ -319,10 +323,19 @@ export class TunnelSessionService {
 
     presenceLeaseRenewalHandle = this.startPresenceLeaseRenewal({
       leaseId: input.relaySessionId,
-      onLeaseTouched: (nowMs) => {
-        sandboxIdleController.handlePresenceLeaseTouch({
-          leaseId: input.relaySessionId,
-          nowMs,
+      onLeaseTouched: async () => {
+        const owner = await this.sandboxOwnerStore.getOwner({
+          sandboxInstanceId: input.sandboxInstanceId,
+        });
+        if (owner === undefined) {
+          throw new Error(
+            `Expected active owner lease for sandbox '${input.sandboxInstanceId}' before touching presence deadline.`,
+          );
+        }
+
+        await this.sandboxInstanceDeadlineService.touchIdleDeadline({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: owner.leaseId,
         });
       },
       onTouchFailed: (error) => {
@@ -334,10 +347,18 @@ export class TunnelSessionService {
           },
           "Failed to persist sandbox presence lease for connection peer",
         );
-        input.onFatalError({
+        void this.closeCurrentBootstrapPeer({
+          sandboxInstanceId: input.sandboxInstanceId,
           closeReason: "Failed to persist sandbox presence lease.",
-          error,
           statusMessage: "Failed to persist sandbox presence lease.",
+        }).catch((closeError: unknown) => {
+          logger.error(
+            {
+              err: closeError,
+              sandboxInstanceId: input.sandboxInstanceId,
+            },
+            "Failed to close bootstrap websocket after presence deadline failure",
+          );
         });
       },
       relaySessionId: input.relaySessionId,
@@ -372,13 +393,10 @@ export class TunnelSessionService {
       return;
     }
 
-    this.sandboxIdleControllerRegistry
-      .getController({
-        sandboxInstanceId: input.sandboxInstanceId,
-      })
-      ?.handleBootstrapDisconnect({
-        nowMs: this.clock.nowMs(),
-      });
+    await this.sandboxInstanceDeadlineService.handleBootstrapDisconnect({
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.leaseId,
+    });
 
     void this.sandboxRuntimeAttachmentStore
       .clearAttachment({
@@ -507,7 +525,7 @@ export class TunnelSessionService {
 
   private startPresenceLeaseRenewal(input: {
     leaseId: string;
-    onLeaseTouched: (nowMs: number) => void;
+    onLeaseTouched: () => Promise<void>;
     onTouchFailed: (error: unknown) => void;
     relaySessionId: string;
     sandboxInstanceId: string;
@@ -549,6 +567,7 @@ export class TunnelSessionService {
           ttlMs: PRESENCE_LEASE_TTL_MS,
           nowMs,
         });
+        await input.onLeaseTouched();
       } catch (error) {
         if (stopped) {
           return;
@@ -560,7 +579,6 @@ export class TunnelSessionService {
         return;
       }
 
-      input.onLeaseTouched(nowMs);
       scheduleNextRenewal();
     };
 
@@ -579,5 +597,33 @@ export class TunnelSessionService {
         }
       },
     };
+  }
+
+  private async closeCurrentBootstrapPeer(input: {
+    sandboxInstanceId: string;
+    closeReason: string;
+    statusMessage: string;
+  }): Promise<void> {
+    const bootstrapPeer = this.relayCoordinator.getBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapPeer === undefined) {
+      throw new Error(
+        `Expected current bootstrap peer for sandbox '${input.sandboxInstanceId}' while closing the session.`,
+      );
+    }
+
+    await this.relayCoordinator.closePeer({
+      target: bootstrapPeer,
+      closeCode: 1011,
+      closeReason: input.closeReason,
+    });
+    logger.error(
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        closeReason: input.closeReason,
+      },
+      input.statusMessage,
+    );
   }
 }

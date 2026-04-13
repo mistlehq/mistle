@@ -4,7 +4,7 @@ import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { Clock, Scheduler } from "@mistle/time";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
-import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
+import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../logger.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -55,7 +55,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
-  sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
+  sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
   telemetryIngressService: SandboxTelemetryIngressService;
   clock: Clock;
   scheduler: Scheduler;
@@ -91,7 +91,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   );
   const sandboxKeepaliveRepository = new SandboxKeepaliveRepository(
     input.sandboxKeepaliveStore,
-    input.sandboxIdleControllerRegistry,
+    input.sandboxInstanceDeadlineService,
+    input.sandboxOwnerStore,
     input.clock,
     input.gatewayNodeId,
   );
@@ -108,7 +109,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxOwnerLeaseHeartbeat,
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
-    input.sandboxIdleControllerRegistry,
+    input.sandboxInstanceDeadlineService,
     input.clock,
     input.scheduler,
   );
@@ -361,16 +362,40 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       "Failed detaching sandbox telemetry ingress session",
                     );
                   });
-                void tunnelSessionService.detachBootstrapPeer({
-                  attachedPeer,
-                  leaseId: admittedRequest.ownerLeaseId,
-                  sandboxInstanceId,
-                });
+                void tunnelSessionService
+                  .detachBootstrapPeer({
+                    attachedPeer,
+                    leaseId: admittedRequest.ownerLeaseId,
+                    sandboxInstanceId,
+                  })
+                  .catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        relaySessionId,
+                        sandboxInstanceId,
+                        tokenKind: sourceTokenKind,
+                      },
+                      "Failed detaching sandbox bootstrap tunnel session",
+                    );
+                  });
               } else {
-                void tunnelSessionService.detachConnectionPeer({
-                  attachedPeer,
-                  sandboxInstanceId,
-                });
+                void tunnelSessionService
+                  .detachConnectionPeer({
+                    attachedPeer,
+                    sandboxInstanceId,
+                  })
+                  .catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        relaySessionId,
+                        sandboxInstanceId,
+                        tokenKind: sourceTokenKind,
+                      },
+                      "Failed detaching sandbox connection tunnel session",
+                    );
+                  });
               }
             }
             finalizeTunnelSession({

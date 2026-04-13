@@ -142,6 +142,20 @@ export class TunnelRelayCoordinator {
     );
   }
 
+  public async closePeer(input: {
+    target: RelayTarget;
+    closeCode: number;
+    closeReason: string;
+  }): Promise<void> {
+    await this.relayTransport.deliverEnvelope(
+      toCloseEnvelope({
+        target: input.target,
+        closeCode: input.closeCode,
+        closeReason: input.closeReason,
+      }),
+    );
+  }
+
   public detachPeer(input: RelayTarget): void {
     this.detachPeerWithOptions({
       target: input,

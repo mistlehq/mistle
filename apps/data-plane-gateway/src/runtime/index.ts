@@ -7,8 +7,7 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
-import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
-import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
+import { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -21,12 +20,7 @@ import { ValkeySandboxKeepaliveStore } from "../runtime-state/adapters/valkey-sa
 import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
-import {
-  BOOTSTRAP_DISCONNECT_GRACE_MS,
-  IDLE_TIMEOUT_MS,
-  IDLE_REQUEST_RETRY_MS,
-  OWNER_LEASE_RENEW_INTERVAL_MS,
-} from "../runtime-state/durations.js";
+import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/durations.js";
 import {
   connectValkeyClient,
   createValkeyClient,
@@ -159,25 +153,11 @@ export function createDataPlaneGatewayRuntime(
     baseUrl: config.app.dataPlaneApi.baseUrl,
     serviceToken: config.internalAuth.serviceToken,
   });
-  const sandboxIdleControllerRegistry = new SandboxIdleControllerRegistry((input) => {
-    return new LocalSandboxIdleController(
-      {
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.ownerLeaseId,
-        timeoutMs: IDLE_TIMEOUT_MS,
-        disconnectGraceMs: BOOTSTRAP_DISCONNECT_GRACE_MS,
-        requestRetryMs: IDLE_REQUEST_RETRY_MS,
-        clock: systemClock,
-        scheduler: systemScheduler,
-        ownerStore: sandboxOwnerStore,
-        keepaliveStore: sandboxKeepaliveStore,
-        presenceStore: sandboxPresenceStore,
-        runtimeAttachmentStore: sandboxRuntimeAttachmentStore,
-        dataPlaneClient,
-      },
-      input.onDisposed,
-    );
-  });
+  const sandboxInstanceDeadlineService = new SandboxInstanceDeadlineService(
+    dataPlaneClient,
+    systemClock,
+    config.app.lifecycle,
+  );
 
   registerSandboxRuntimeStateRoute({
     app,
@@ -216,7 +196,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxRuntimeReadinessStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
-    sandboxIdleControllerRegistry,
+    sandboxInstanceDeadlineService,
     telemetryIngressService,
     clock: systemClock,
     scheduler: systemScheduler,

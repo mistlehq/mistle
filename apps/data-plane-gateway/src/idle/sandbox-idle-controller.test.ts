@@ -5,6 +5,7 @@ import { systemSleeper } from "@mistle/time";
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { InMemorySandboxKeepaliveStore } from "../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -608,7 +609,11 @@ describe("LocalSandboxIdleController", () => {
       });
       const keepaliveRepository = new SandboxKeepaliveRepository(
         keepaliveStore,
-        registry,
+        new SandboxInstanceDeadlineService(dataPlaneClient, clock, {
+          idleTimeoutMs: 5_000,
+          bootstrapDisconnectGraceMs: 1_000,
+        }),
+        ownerStore,
         clock,
         "dpg_inactive_keepalive",
       );

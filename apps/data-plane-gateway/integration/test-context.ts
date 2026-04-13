@@ -4,15 +4,18 @@
 
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
+  DockerIntegrationConfigPathInContainer,
   createIntegrationRuntimeScopeId,
   createIntegrationRuntimeDatabaseName,
   getCurrentVitestFilePath,
   readTestContext,
   reserveAvailablePort,
   runCleanupTasks,
+  startDataPlaneApi,
 } from "@mistle/test-harness";
 import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
@@ -22,10 +25,18 @@ import { createDataPlaneGatewayRuntime } from "../src/runtime/index.js";
 import type { DataPlaneGatewayRuntime, DataPlaneGatewayRuntimeConfig } from "../src/types.js";
 
 const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secret";
+const IntegrationConnectTokenSecret = "integration-connect-token-secret";
 const IntegrationTokenIssuer = "integration-data-plane-worker";
 const IntegrationTokenAudience = "integration-data-plane-gateway";
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_runtime";
 const TestContextId = "data-plane-gateway.integration";
+const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../..", import.meta.url));
+const CONFIG_FIXTURE_HOST_PATH = fileURLToPath(
+  new URL("../../../packages/config/integration/fixtures/config.toml", import.meta.url),
+);
+const DATA_PLANE_API_STARTUP_TIMEOUT_MS = 120_000;
+const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
+const DockerSocketPath = "/var/run/docker.sock";
 
 const SharedInfraConfigSchema = z
   .object({
@@ -53,11 +64,13 @@ export type DataPlaneGatewayIntegrationFixture = {
   databaseStack: DataPlaneGatewayIntegrationDatabaseStack;
   db: DataPlaneDatabase;
   dbPool: Pool;
+  internalAuthServiceToken: string;
   otlpRequests: Array<{
     body: string;
     path: string;
   }>;
   runtime: DataPlaneGatewayRuntime;
+  workflowNamespaceId: string;
 };
 
 type RuntimeStateBackend = DataPlaneGatewayRuntimeConfig["app"]["runtimeState"]["backend"];
@@ -271,6 +284,15 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             port: sharedInfraConfig.databaseDirectPort,
             databaseName: runtimeDatabaseName,
           });
+          const containerRuntimeDatabaseUrl = createDatabaseUrl({
+            username: sharedInfraConfig.databaseUsername,
+            password: sharedInfraConfig.databasePassword,
+            host: "host.testcontainers.internal",
+            port: sharedInfraConfig.databaseDirectPort,
+            databaseName: runtimeDatabaseName,
+          });
+          const gatewayPort = await reserveAvailablePort({ host: "127.0.0.1" });
+          const workflowNamespaceId = `gateway_it_${runtimeDatabaseName}`;
 
           const dbPool = new Pool({
             connectionString: runtimeDatabaseUrl,
@@ -280,11 +302,62 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
           });
           const db = createDataPlaneDatabase(dbPool);
 
+          const dataPlaneApi = await startDataPlaneApi({
+            buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+            configPathInContainer: DockerIntegrationConfigPathInContainer,
+            startupTimeoutMs: DATA_PLANE_API_STARTUP_TIMEOUT_MS,
+            bindMounts: [
+              {
+                source: CONFIG_FIXTURE_HOST_PATH,
+                target: DockerIntegrationConfigPathInContainer,
+                mode: "ro",
+              },
+              {
+                source: DockerSocketPath,
+                target: DockerSocketPath,
+                mode: "rw",
+              },
+            ],
+            environment: {
+              MISTLE_GLOBAL_TELEMETRY_ENABLED: "false",
+              MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
+              MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: INTERNAL_AUTH_SERVICE_TOKEN,
+              MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+              MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
+              MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: `ws://host.testcontainers.internal:${String(gatewayPort)}/tunnel/sandbox`,
+              MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: `ws://host.testcontainers.internal:${String(gatewayPort)}/tunnel/sandbox`,
+              MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: IntegrationConnectTokenSecret,
+              MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "integration-control-plane-api",
+              MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: IntegrationTokenAudience,
+              MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: IntegrationBootstrapTokenSecret,
+              MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: IntegrationTokenIssuer,
+              MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: IntegrationTokenAudience,
+              MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "integration-egress-token-secret",
+              MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "integration-data-plane-worker",
+              MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "integration-tokenizer-proxy",
+              MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
+              MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "integration-publish-token-secret",
+              MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "integration-control-plane-api",
+              MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: IntegrationTokenAudience,
+              MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET:
+                "integration-publish-cookie-secret",
+              MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerRuntimeDatabaseUrl,
+              MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerRuntimeDatabaseUrl,
+              MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerRuntimeDatabaseUrl,
+              MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+              MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL: `http://host.testcontainers.internal:${String(gatewayPort)}`,
+              MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+            },
+          });
+          cleanupTasks.unshift(async () => {
+            await dataPlaneApi.stop();
+          });
+
           const runtimeConfig: DataPlaneGatewayRuntimeConfig = {
             app: {
               server: {
                 host: "127.0.0.1",
-                port: await reserveAvailablePort({ host: "127.0.0.1" }),
+                port: gatewayPort,
               },
               database: {
                 url: runtimeDatabaseUrl,
@@ -295,19 +368,23 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
                 valkeyUrl: sharedInfraConfig.valkeyUrl,
               }),
               dataPlaneApi: {
-                baseUrl: "http://127.0.0.1:5300",
+                baseUrl: dataPlaneApi.hostBaseUrl,
+              },
+              lifecycle: {
+                idleTimeoutMs: 300_000,
+                bootstrapDisconnectGraceMs: 60_000,
               },
             },
             internalAuth: {
-              serviceToken: "integration-service-token",
+              serviceToken: INTERNAL_AUTH_SERVICE_TOKEN,
             },
             sandbox: {
               provider: "docker",
               defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-              gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-              internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+              gatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
+              internalGatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
               connect: {
-                tokenSecret: "integration-connect-token-secret",
+                tokenSecret: IntegrationConnectTokenSecret,
                 tokenIssuer: "integration-control-plane-api",
                 tokenAudience: IntegrationTokenAudience,
               },
@@ -374,8 +451,10 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             },
             db,
             dbPool,
+            internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
             otlpRequests: otlpReceiver.requests,
             runtime,
+            workflowNamespaceId,
           });
         } finally {
           await runCleanupTasks({

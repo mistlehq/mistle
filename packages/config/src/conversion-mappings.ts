@@ -411,6 +411,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_gateway", "lifecycle", "idleTimeoutMs"],
+    tomlPath: ["apps", "data_plane_gateway", "lifecycle", "idle_timeout_ms"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS",
+  },
+  {
+    configPath: ["apps", "data_plane_gateway", "lifecycle", "bootstrapDisconnectGraceMs"],
+    tomlPath: ["apps", "data_plane_gateway", "lifecycle", "bootstrap_disconnect_grace_ms"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS",
+  },
+  {
     configPath: ["apps", "data_plane_worker", "database", "url"],
     tomlPath: ["apps", "data_plane_worker", "database", "url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL",

@@ -308,6 +308,10 @@ const dataPlaneGatewayEnvConfig = {
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
+  lifecycle: {
+    idleTimeoutMs: 300_000,
+    bootstrapDisconnectGraceMs: 60_000,
+  },
 } as const;
 
 const dataPlaneGatewayFixtureConfig = {

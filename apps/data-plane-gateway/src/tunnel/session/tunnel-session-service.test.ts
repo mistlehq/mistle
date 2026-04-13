@@ -5,7 +5,7 @@ import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
+import { SandboxInstanceDeadlineService } from "../../deadlines/sandbox-instance-deadline-service.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -90,6 +90,29 @@ function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebSocketMe
     };
 
     socket.once("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
+function waitForWebSocketClose(socket: WebSocket): Promise<{ code: number; reason: string }> {
+  return new Promise((resolve, reject) => {
+    const onClose = (code: number, reason: Buffer): void => {
+      cleanup();
+      resolve({
+        code,
+        reason: reason.toString("utf8"),
+      });
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("close", onClose);
+      socket.off("error", onError);
+    };
+
+    socket.once("close", onClose);
     socket.once("error", onError);
   });
 }
@@ -238,9 +261,31 @@ async function createDisconnectTestHarness() {
     new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
     new InMemorySandboxPresenceStore(clock),
     new InMemorySandboxRuntimeAttachmentStore(clock),
-    new SandboxIdleControllerRegistry(() => {
-      throw new Error("Sandbox idle controller should not be created in this test.");
-    }),
+    new SandboxInstanceDeadlineService(
+      {
+        async putSandboxInstanceDeadline() {
+          return {
+            status: "accepted",
+            sandboxInstanceId: SandboxInstanceId,
+            kind: "disconnect",
+            generation: 1,
+            workflowRunId: "owfr_test",
+          };
+        },
+        async deleteSandboxInstanceDeadline() {
+          return {
+            status: "ok",
+            sandboxInstanceId: SandboxInstanceId,
+            kind: "idle",
+          };
+        },
+      },
+      clock,
+      {
+        idleTimeoutMs: 300_000,
+        bootstrapDisconnectGraceMs: 60_000,
+      },
+    ),
     clock,
     scheduler,
   );
@@ -275,6 +320,130 @@ async function createDisconnectTestHarness() {
 }
 
 describe("TunnelSessionService", () => {
+  it("closes only the bootstrap peer when presence deadline persistence fails", async () => {
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    const ownerStore = new InMemorySandboxOwnerStore(clock);
+    const relayCoordinator = new TunnelRelayCoordinator(
+      GatewayNodeId,
+      new InMemoryLocalPeerRegistryAdapter(),
+      new InMemoryRelayTransportAdapter(GatewayNodeId),
+    );
+    const tunnelSessionRegistry = new TunnelSessionRegistry(
+      new InMemoryTunnelSessionRegistryAdapter(),
+    );
+    const interactiveStreamRouter = new InteractiveStreamRouter(
+      GatewayNodeId,
+      new StoreBackedSandboxOwnerResolver(GatewayNodeId, ownerStore),
+      new LocalGatewayForwardingClientAdapter(
+        GatewayNodeId,
+        new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+      ),
+    );
+    await ownerStore.claimOwner({
+      sandboxInstanceId: SandboxInstanceId,
+      nodeId: GatewayNodeId,
+      sessionId: BootstrapSessionId,
+      ttlMs: 60_000,
+    });
+    let idlePutCount = 0;
+
+    const service = new TunnelSessionService(
+      GatewayNodeId,
+      interactiveStreamRouter,
+      relayCoordinator,
+      tunnelSessionRegistry,
+      ownerStore,
+      new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
+      new InMemorySandboxPresenceStore(clock),
+      new InMemorySandboxRuntimeAttachmentStore(clock),
+      new SandboxInstanceDeadlineService(
+        {
+          async putSandboxInstanceDeadline(input) {
+            if (input.kind === "idle" && idlePutCount >= 1) {
+              throw new Error("Synthetic idle deadline failure.");
+            }
+            if (input.kind === "idle") {
+              idlePutCount += 1;
+            }
+
+            return {
+              status: "accepted",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+              generation: 1,
+              workflowRunId: "owfr_test",
+            } satisfies SandboxInstanceDeadlinePutAcceptedResponse;
+          },
+          async deleteSandboxInstanceDeadline(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+            };
+          },
+        },
+        clock,
+        {
+          idleTimeoutMs: 300_000,
+          bootstrapDisconnectGraceMs: 60_000,
+        },
+      ),
+      clock,
+      scheduler,
+    );
+
+    const bootstrapPair = await createWebSocketPair();
+    const connectionPair = await createWebSocketPair();
+    openPairs.add(bootstrapPair);
+    openPairs.add(connectionPair);
+
+    const bootstrapAttachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: bootstrapPair.peerSocket,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    let connectionFatalErrorMessage: string | undefined;
+    service.attachConnectionPeer({
+      onFatalError: (failure) => {
+        connectionFatalErrorMessage = failure.statusMessage;
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Connection transport should remain healthy in this test.");
+      },
+      relaySessionId: ConnectionSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: connectionPair.peerSocket,
+    });
+
+    await expect(waitForWebSocketClose(bootstrapPair.clientSocket)).resolves.toEqual({
+      code: 1011,
+      reason: "Failed to persist sandbox presence lease.",
+    });
+    expect(connectionFatalErrorMessage).toBeUndefined();
+    expect(connectionPair.clientSocket.readyState).toBe(WebSocket.OPEN);
+
+    await service.detachBootstrapPeer({
+      attachedPeer: bootstrapAttachedPeer,
+      leaseId: OwnerLeaseId,
+      sandboxInstanceId: SandboxInstanceId,
+    });
+  });
+
   it("releases active file upload bindings and notifies the connection peer on bootstrap disconnect", async () => {
     const { attachedBootstrapPeer, connectionPair, interactiveStreamRouter, service } =
       await createDisconnectTestHarness();

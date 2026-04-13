@@ -70,12 +70,23 @@ export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayLifecycleConfigSchema = z
+  .object({
+    idleTimeoutMs: z.number().int().min(1),
+    bootstrapDisconnectGraceMs: z.number().int().min(1),
+  })
+  .strict();
+
+export const PartialDataPlaneGatewayLifecycleConfigSchema =
+  DataPlaneGatewayLifecycleConfigSchema.partial();
+
 export const DataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema,
     database: DataPlaneGatewayDatabaseConfigSchema,
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
+    lifecycle: DataPlaneGatewayLifecycleConfigSchema,
   })
   .strict();
 
@@ -85,6 +96,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     database: DataPlaneGatewayDatabaseConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
+    lifecycle: PartialDataPlaneGatewayLifecycleConfigSchema.optional(),
   })
   .strict();
 

@@ -2,6 +2,7 @@ import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   DataPlaneGatewayDatabaseConfigSchema,
   DataPlaneGatewayDataPlaneApiConfigSchema,
+  DataPlaneGatewayLifecycleConfigSchema,
   PartialDataPlaneGatewayRuntimeStateConfigSchema,
   PartialDataPlaneGatewayRuntimeStateValkeyConfigSchema,
   type PartialDataPlaneGatewayConfigInput,
@@ -57,6 +58,19 @@ const loadDataPlaneApiEnv = createEnvLoader<typeof DataPlaneGatewayDataPlaneApiC
   },
 ]);
 
+const loadLifecycleEnv = createEnvLoader<typeof DataPlaneGatewayLifecycleConfigSchema>([
+  {
+    key: "idleTimeoutMs",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS",
+    parse: Number,
+  },
+  {
+    key: "bootstrapDisconnectGraceMs",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS",
+    parse: Number,
+  },
+]);
+
 export function loadDataPlaneGatewayFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneGatewayConfigInput {
@@ -88,6 +102,11 @@ export function loadDataPlaneGatewayFromEnv(
   const dataPlaneApi = loadDataPlaneApiEnv(env);
   if (hasEntries(dataPlaneApi)) {
     partialConfig.dataPlaneApi = dataPlaneApi;
+  }
+
+  const lifecycle = loadLifecycleEnv(env);
+  if (hasEntries(lifecycle)) {
+    partialConfig.lifecycle = lifecycle;
   }
 
   return PartialDataPlaneGatewayConfigSchema.parse(partialConfig);
