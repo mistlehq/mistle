@@ -22,6 +22,7 @@ type SessionWorkbenchHeaderRepositoryControl = {
   onValueChange: (nextValue: string) => void;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedValue: string | null;
+  title?: string;
 };
 
 type SessionWorkbenchHeaderButtonControl = {
@@ -91,6 +92,7 @@ export function SessionWorkbenchHeaderActions(input: {
             <SelectTrigger
               aria-label={repositoryControl.ariaLabel}
               className="h-8 w-48 min-w-0 border-stone-200 bg-transparent text-xs shadow-none hover:bg-stone-100"
+              title={repositoryControl.title ?? repositoryControl.ariaLabel}
             >
               <SelectValue placeholder="Primary repository">
                 {selectedRepositoryLabel ?? "Primary repository"}

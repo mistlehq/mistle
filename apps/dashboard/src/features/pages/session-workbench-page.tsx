@@ -18,6 +18,7 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
+import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -50,10 +51,10 @@ function SessionWorkbenchPageContent(input: {
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
     : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
-  const isErrorHeaderStatus = workbench.workbenchStatus.kind === "error";
-  const headerStatusLabel = isErrorHeaderStatus
-    ? "Error"
-    : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
+  const headerStatusLabel =
+    workbench.workbenchStatus.kind === "error"
+      ? "Error"
+      : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
   const headerActions = useMemo(
     () => (
       <SessionWorkbenchHeaderActions
@@ -89,6 +90,27 @@ function SessionWorkbenchPageContent(input: {
           title: diffButtonTitle,
         }}
         extraActions={<SessionPortAccessPopover state={workbench.portAccessState} />}
+        repositoryControl={{
+          ariaLabel: "Primary repository",
+          disabled:
+            !workbench.connectionReadiness.canConnect || workbench.primaryRepositoryState.isLoading,
+          onValueChange: (nextValue) => {
+            workbench.primaryRepositoryState.setSelectedRepositoryPath(
+              nextValue === SessionRepositoryNoneValue ? null : nextValue,
+            );
+          },
+          options: workbench.primaryRepositoryState.options,
+          selectedValue:
+            workbench.primaryRepositoryState.selectedRepositoryPath ?? SessionRepositoryNoneValue,
+          title:
+            workbench.primaryRepositoryState.errorMessage ??
+            (!workbench.connectionReadiness.canConnect
+              ? (workbench.stoppedSessionMessage ??
+                "Primary repository is available only when the sandbox is running.")
+              : workbench.primaryRepositoryState.isLoading
+                ? "Loading repositories from the active sandbox."
+                : "Primary repository"),
+        }}
         status={{
           kind: workbench.workbenchStatus.kind,
           label: headerStatusLabel,
@@ -120,12 +142,17 @@ function SessionWorkbenchPageContent(input: {
       diffButtonLabel,
       diffButtonTitle,
       headerStatusLabel,
-      isErrorHeaderStatus,
       terminalButtonLabel,
       terminalButtonTitle,
+      workbench.connectionReadiness.canConnect,
       workbench.diffPanelState.isVisible,
       workbench.diffPanelState.togglePanel,
       workbench.portAccessState,
+      workbench.primaryRepositoryState.errorMessage,
+      workbench.primaryRepositoryState.isLoading,
+      workbench.primaryRepositoryState.options,
+      workbench.primaryRepositoryState.selectedRepositoryPath,
+      workbench.primaryRepositoryState.setSelectedRepositoryPath,
       workbench.sandboxLifecycleStatus,
       workbench.primaryPanelState.canEnterCli,
       workbench.primaryPanelState.disabledReason,
@@ -133,6 +160,7 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryPanelState.exitCliMode,
       workbench.primaryPanelState.isCliToggleActive,
       workbench.ptyState.actions.disconnectPty,
+      workbench.stoppedSessionMessage,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
       workbench.terminalPanelState.openPanel,
