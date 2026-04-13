@@ -56,7 +56,7 @@ function IntegrationConnectionEditorPageStory(
   props: ComponentProps<typeof IntegrationConnectionEditorPage>,
 ): React.JSX.Element {
   return (
-    <FormPageFrame description="github-cloud" title="Add GitHub Connection">
+    <FormPageFrame title="Add GitHub Connection">
       <IntegrationConnectionEditorPage {...props} />
     </FormPageFrame>
   );

@@ -441,7 +441,7 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.getByDisplayValue("ABCD-1234")).toBeTruthy();
     expect(screen.getByRole("link", { name: "https://auth.openai.com/codex/device" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel authorization" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Create connection" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add connection" })).toBeNull();
   });
 
   it("hides GitHub API key discriminator config and the nested rjsf submit button", () => {
@@ -494,7 +494,7 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.queryByLabelText("connection_method")).toBeNull();
     expect(screen.queryByRole("button", { name: "Submit" })).toBeNull();
     expect(screen.getByPlaceholderText("Enter API key")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();
   });
 
   it("renders GitHub App form fields in create mode", () => {
@@ -539,7 +539,7 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
     expect(screen.queryByLabelText("installation_id")).toBeNull();
     expect(screen.queryByLabelText("setup_action")).toBeNull();
-    expect(screen.getByRole("button", { name: "Create connection" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();
   });
 
   it("hides callback-managed GitHub App config fields from the form", () => {

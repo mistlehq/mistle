@@ -109,7 +109,7 @@ function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): s
     return method.ui.create.submitLabel;
   }
 
-  return "Create connection";
+  return "Add connection";
 }
 
 function renderAuthCreateHelper(method: IntegrationConnectionMethod | null) {

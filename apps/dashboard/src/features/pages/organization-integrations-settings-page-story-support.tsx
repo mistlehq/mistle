@@ -243,10 +243,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
         });
 
   return (
-    <FormPageFrame
-      description={initialEditorInput.targetKey}
-      title={`Add ${initialEditorInput.targetDisplayName} Connection`}
-    >
+    <FormPageFrame title={`Add ${initialEditorInput.targetDisplayName} Connection`}>
       <IntegrationConnectionEditorPage
         configForm={configForm}
         configValue={draft.configValue}
