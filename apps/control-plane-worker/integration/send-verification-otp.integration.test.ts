@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { reserveAvailablePort } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
@@ -47,12 +48,24 @@ async function waitForWorkflowRunToFail(input: {
 
 describe("send verification otp integration", () => {
   it(
-    "fails the workflow when smtp delivery fails",
+    "fails the workflow when the email provider is unavailable",
     async ({ fixture }) => {
+      const unavailableSmtpPort = await reserveAvailablePort({ host: "127.0.0.1" });
+      const workflowFixture = {
+        ...fixture,
+        config: {
+          ...fixture.config,
+          email: {
+            ...fixture.config.email,
+            smtpHost: "127.0.0.1",
+            smtpPort: unavailableSmtpPort,
+          },
+        },
+      };
       const workflowIdempotencyKey = `send-verification-otp:${randomUUID()}`;
 
       await withOpenWorkflowRuntime({
-        fixture,
+        fixture: workflowFixture,
         run: async ({ runtime, workflowContext }) => {
           const workflowDeadlineAt = new Date(Date.now() + 200);
           workflowContext.openWorkflow.implementWorkflow(
@@ -66,7 +79,7 @@ describe("send verification otp integration", () => {
           await workflowContext.openWorkflow.runWorkflow(
             SendVerificationOTPWorkflowSpec,
             {
-              email: "not-an-email-address",
+              email: `integration-send-verification-otp-${randomUUID()}@example.com`,
               expiresInSeconds: 300,
               otp: "123456",
               type: "sign-in",
