@@ -130,6 +130,54 @@ export function shouldUseResumeActionLabel(status: SandboxLifecycleStatus): bool
   return status === "stopped";
 }
 
+function SessionTitleCell(input: { title: string }): React.JSX.Element {
+  const [titleElement, setTitleElement] = useState<HTMLSpanElement | null>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    if (titleElement === null) {
+      setIsTruncated(false);
+      return;
+    }
+
+    const updateTruncation = () => {
+      setIsTruncated(titleElement.scrollWidth > titleElement.clientWidth);
+    };
+
+    updateTruncation();
+
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(updateTruncation);
+    resizeObserver.observe(titleElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [input.title, titleElement]);
+
+  function handleTitleRef(element: HTMLSpanElement | null): void {
+    setTitleElement(element);
+  }
+
+  return (
+    <Tooltip delay={0} disabled={!isTruncated}>
+      <TooltipTrigger
+        render={
+          <span className="block max-w-full truncate font-medium" ref={handleTitleRef}>
+            {input.title}
+          </span>
+        }
+      />
+      <TooltipContent showArrow={false} side="top" variant="light">
+        {input.title}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
   if (input.name !== null) {
     return input.name;
@@ -451,22 +499,22 @@ export function SessionsPage(): React.JSX.Element {
         )}
 
         <div className="flex flex-col gap-3">
-          <Table className="min-w-[48rem]">
+          <Table className="min-w-[48rem] table-fixed">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Sessions
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="text-foreground w-48 py-2 text-xs font-semibold tracking-wide uppercase">
                   Started by
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                <TableHead className="text-foreground w-28 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Created
                 </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                <TableHead className="text-foreground w-24 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Status
                 </TableHead>
-                <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                <TableHead className="text-right text-foreground w-20 py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   <span className="sr-only">Actions</span>
                 </TableHead>
               </TableRow>
@@ -482,11 +530,9 @@ export function SessionsPage(): React.JSX.Element {
                 sortedSessions.map((session) => {
                   return (
                     <TableRow key={session.id}>
-                      <TableCell className="whitespace-normal">
+                      <TableCell className="max-w-0 whitespace-normal">
                         <div className="flex min-w-0 flex-col gap-1">
-                          <span className="font-medium break-words">
-                            {session.title ?? "Untitled"}
-                          </span>
+                          <SessionTitleCell title={session.title ?? "Untitled"} />
                           <span className="text-muted-foreground text-xs break-words">
                             {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
                           </span>

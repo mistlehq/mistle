@@ -166,7 +166,7 @@ describe("SessionsPage", () => {
     );
 
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem]"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem] table-fixed"',
     );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
@@ -202,7 +202,7 @@ describe("SessionsPage", () => {
 
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem]"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem] table-fixed"',
     );
     expect(markup).toContain("Finance Investigator");
     expect(markup).not.toContain('class="grid gap-3 md:hidden"');
@@ -234,6 +234,37 @@ describe("SessionsPage", () => {
     expect(screen.getByText("Profile metadata")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+  });
+
+  it("truncates long session titles in the list so the full value can be shown in a tooltip", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_long_title",
+          title:
+            "This session title is intentionally extremely long so the sessions list keeps the row compact instead of wrapping across multiple lines",
+        }),
+      ],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("This session title is intentionally extremely long");
+    expect(markup).toContain('class="block max-w-full truncate font-medium"');
+    expect(markup).toContain(
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[48rem] table-fixed"',
+    );
   });
 
   it("renders Untitled when the persisted conversation title is missing", () => {
