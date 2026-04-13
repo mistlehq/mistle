@@ -5,10 +5,8 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
-import { IntegrationConnectionDialog } from "../integrations/integration-connection-dialog.js";
 import { buildIntegrationConnectionDetailItems } from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
-import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
 import { useIntegrationConnectionEditors } from "./use-integration-connection-editors.js";
 import { useIntegrationWebhookSourceState } from "./use-integration-webhook-source-state.js";
 import {
@@ -21,15 +19,8 @@ export function IntegrationsPage() {
   const detailTargetKey = params["targetKey"] ?? null;
   const dashboardConfig = getDashboardConfig();
 
-  const connectionDialogState = useIntegrationConnectionDialogState({
-    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-  });
-
   const directoryState = useIntegrationsDirectoryState({
     detailTargetKey,
-    onOpenCreateDialog: (dialogInput) => {
-      connectionDialogState.openDialog(dialogInput);
-    },
   });
 
   const connectionEditors = useIntegrationConnectionEditors({
@@ -101,29 +92,6 @@ export function IntegrationsPage() {
       connectedCards={directoryState.connectedViewCards}
       connectionDialog={
         <>
-          <IntegrationConnectionDialog
-            configForm={connectionDialogState.configForm}
-            configValue={connectionDialogState.configValue}
-            connectionDisplayNamePlaceholder={
-              connectionDialogState.connectionDisplayNamePlaceholder
-            }
-            connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
-            connectError={connectionDialogState.error}
-            deviceAuthorizationPending={connectionDialogState.deviceAuthorizationPending}
-            dialog={connectionDialogState.dialog}
-            hasChanges={connectionDialogState.hasChanges}
-            isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
-            isSecretChanged={connectionDialogState.isSecretChanged}
-            methodId={connectionDialogState.methodId}
-            onClose={connectionDialogState.closeDialog}
-            onConfigChange={connectionDialogState.onConfigChange}
-            onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
-            onMethodChange={connectionDialogState.onMethodChange}
-            onSecretChange={connectionDialogState.onSecretChange}
-            onSubmit={connectionDialogState.submitDialog}
-            pending={connectionDialogState.pending}
-            secrets={connectionDialogState.secrets}
-          />
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
           <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />
         </>

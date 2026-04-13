@@ -50,6 +50,11 @@ describe("app routing breadcrumb integration", () => {
         <Route element={<PageHarness />} index />
         <Route
           element={<PageHarness />}
+          handle={ROUTE_HANDLES.integrationCreate}
+          path=":targetKey/add"
+        />
+        <Route
+          element={<PageHarness />}
           handle={ROUTE_HANDLES.integrationDetail}
           path=":targetKey"
         />
@@ -133,6 +138,14 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Github");
     expect(markup).toContain('data-slot="meta-title">GitHub');
     expect(markup).toContain('data-slot="meta-description">github');
+
+    await router.navigate("/integrations/github/add");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/integrations"');
+    expect(markup).toContain("Add");
+    expect(markup).toContain('data-slot="meta-title">Add GitHub Connection');
+    expect(markup).toContain('data-slot="meta-description">github');
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
@@ -153,7 +166,11 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("enforces breadcrumb and page metadata coverage for integrations destinations", () => {
-    const integrationDestinations = ["/integrations", "/integrations/github"];
+    const integrationDestinations = [
+      "/integrations",
+      "/integrations/github",
+      "/integrations/github/add",
+    ];
 
     for (const destination of integrationDestinations) {
       const router = createMemoryRouter(integrationRoutes, {

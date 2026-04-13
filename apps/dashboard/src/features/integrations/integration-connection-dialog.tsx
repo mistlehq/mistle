@@ -26,6 +26,7 @@ import validator from "@rjsf/validator-ajv8";
 
 import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-dialog-state-helpers.js";
+import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
 export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
@@ -91,6 +92,10 @@ type IntegrationConnectionDialogProps = {
   onSubmit: () => void;
   pending: boolean;
   secrets: Record<string, string>;
+};
+
+type IntegrationConnectionEditorContentProps = IntegrationConnectionDialogProps & {
+  dialog: IntegrationConnectionDialogState;
 };
 
 function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
@@ -175,22 +180,212 @@ function renderDeviceAuthorizationPending(input: {
   );
 }
 
-export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
+function renderConnectionEditorFields(props: IntegrationConnectionEditorContentProps) {
   const dialog = props.dialog;
-  const isUpdateMode = dialog?.mode === "update";
-  const isDeviceAuthorizationPending = props.deviceAuthorizationPending != null;
-  const showMethodPicker = dialog?.mode === "create" && dialog.methods.length > 1;
-  const selectedMethod =
-    dialog === null
-      ? null
-      : resolveSelectedMethod({
-          dialog,
-          methodId: props.methodId,
-        });
+  const isUpdateMode = dialog.mode === "update";
+  const selectedMethod = resolveSelectedMethod({
+    dialog,
+    methodId: props.methodId,
+  });
+  const showMethodPicker = dialog.mode === "create" && dialog.methods.length > 1;
   const showsSecretInput = selectedMethod?.kind === "form";
   const selectedMethodLabel = selectedMethod
     ? formatIntegrationConnectionMethodLabel(selectedMethod)
     : undefined;
+
+  return (
+    <>
+      <Field contentWidth="fill" orientation="vertical">
+        <FieldHeader>
+          <FieldLabel htmlFor={`connection-display-name-${dialog.targetKey}`}>Name</FieldLabel>
+        </FieldHeader>
+        <FieldContent>
+          <Input
+            autoComplete="off"
+            id={`connection-display-name-${dialog.targetKey}`}
+            onChange={(event) => {
+              props.onConnectionDisplayNameChange(event.currentTarget.value);
+            }}
+            placeholder={props.connectionDisplayNamePlaceholder}
+            type="text"
+            value={props.connectionDisplayNameValue}
+          />
+        </FieldContent>
+      </Field>
+
+      {showMethodPicker ? (
+        <Field contentWidth="fill" orientation="vertical">
+          <FieldHeader>
+            <FieldLabel htmlFor={`connect-auth-method-${dialog.targetKey}`}>
+              Authentication method
+            </FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Select
+              onValueChange={(nextValue) => {
+                props.onMethodChange(nextValue ?? "");
+              }}
+              value={props.methodId.length === 0 ? "" : props.methodId}
+            >
+              <SelectTrigger className="w-full" id={`connect-auth-method-${dialog.targetKey}`}>
+                <SelectValue placeholder="Select authentication method">
+                  {selectedMethodLabel}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                {dialog.methods.map((method) => (
+                  <SelectItem key={method.id} value={method.id}>
+                    {formatIntegrationConnectionMethodLabel(method)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldContent>
+        </Field>
+      ) : null}
+
+      {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
+        <IntegrationFormWithoutSubmit
+          formData={props.configValue}
+          noHtml5Validate
+          onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
+            const nextValue = event.formData;
+            props.onConfigChange(
+              typeof nextValue === "object" && nextValue !== null && !Array.isArray(nextValue)
+                ? nextValue
+                : {},
+            );
+          }}
+          schema={props.configForm.schema}
+          showErrorList={false}
+          uiSchema={props.configForm.uiSchema}
+          validator={validator}
+        />
+      ) : null}
+
+      {showsSecretInput && selectedMethod !== null ? (
+        <>
+          {selectedMethod.secretFields.map((secretField) => (
+            <Field contentWidth="fill" key={secretField.name} orientation="vertical">
+              <FieldHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <FieldLabel htmlFor={`connection-secret-${dialog.targetKey}-${secretField.name}`}>
+                    {secretField.label}
+                  </FieldLabel>
+                  {isUpdateMode && props.isSecretChanged ? (
+                    <span className="text-muted-foreground text-xs">Will update</span>
+                  ) : null}
+                </div>
+                {secretField.description ? (
+                  <FieldDescription>{secretField.description}</FieldDescription>
+                ) : null}
+              </FieldHeader>
+              <FieldContent>
+                {secretField.inputType === "textarea" ? (
+                  <Textarea
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                    onChange={(event) => {
+                      props.onSecretChange(secretField.name, event.currentTarget.value);
+                    }}
+                    placeholder={
+                      isUpdateMode
+                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
+                    }
+                    rows={8}
+                    value={props.secrets[secretField.name] ?? ""}
+                  />
+                ) : (
+                  <Input
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
+                    onChange={(event) => {
+                      props.onSecretChange(secretField.name, event.currentTarget.value);
+                    }}
+                    placeholder={
+                      isUpdateMode
+                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
+                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
+                    }
+                    type={secretField.inputType}
+                    value={props.secrets[secretField.name] ?? ""}
+                  />
+                )}
+              </FieldContent>
+            </Field>
+          ))}
+        </>
+      ) : props.configForm.mode === "unsupported" ? (
+        <p className="text-destructive text-sm">{props.configForm.message}</p>
+      ) : !isUpdateMode ? (
+        renderAuthCreateHelper(selectedMethod)
+      ) : (
+        <p className="text-muted-foreground text-sm">Save to update this connection.</p>
+      )}
+    </>
+  );
+}
+
+export function IntegrationConnectionEditorPage(
+  props: IntegrationConnectionDialogProps,
+): React.JSX.Element | null {
+  const dialog = props.dialog;
+  const isUpdateMode = dialog?.mode === "update";
+
+  if (dialog === null) {
+    return null;
+  }
+
+  return (
+    <FormPageStack>
+      <FormPageSection>
+        <div className="flex flex-col gap-6 p-4">
+          {props.deviceAuthorizationPending
+            ? renderDeviceAuthorizationPending({
+                pending: props.deviceAuthorizationPending,
+              })
+            : renderConnectionEditorFields({
+                ...props,
+                dialog,
+              })}
+
+          {props.connectError ? (
+            <p className="text-destructive text-sm">{props.connectError}</p>
+          ) : null}
+
+          <FormPageActionBar>
+            <Button onClick={props.onClose} type="button" variant="outline">
+              {props.deviceAuthorizationPending ? "Cancel authorization" : "Cancel"}
+            </Button>
+            {props.deviceAuthorizationPending ? null : (
+              <Button
+                disabled={props.pending || (isUpdateMode && !props.hasChanges)}
+                onClick={props.onSubmit}
+                type="button"
+              >
+                {isUpdateMode
+                  ? "Save"
+                  : resolveCreateSubmitLabel(
+                      resolveSelectedMethod({
+                        dialog,
+                        methodId: props.methodId,
+                      }),
+                    )}
+              </Button>
+            )}
+          </FormPageActionBar>
+        </div>
+      </FormPageSection>
+    </FormPageStack>
+  );
+}
+
+export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
+  const dialog = props.dialog;
+  const isUpdateMode = dialog?.mode === "update";
 
   return (
     <Dialog
@@ -210,7 +405,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
         >
           <DialogHeader variant="sectioned">
             <DialogTitle>
-              {isDeviceAuthorizationPending
+              {props.deviceAuthorizationPending
                 ? `Finish ${dialog.targetDisplayName} Connection`
                 : isUpdateMode
                   ? "Edit Connection"
@@ -218,156 +413,14 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </DialogTitle>
           </DialogHeader>
 
-          {props.deviceAuthorizationPending ? (
-            renderDeviceAuthorizationPending({
-              pending: props.deviceAuthorizationPending,
-            })
-          ) : (
-            <>
-              <Field contentWidth="fill" orientation="vertical">
-                <FieldHeader>
-                  <FieldLabel htmlFor={`connection-display-name-${dialog.targetKey}`}>
-                    Name
-                  </FieldLabel>
-                </FieldHeader>
-                <FieldContent>
-                  <Input
-                    autoComplete="off"
-                    id={`connection-display-name-${dialog.targetKey}`}
-                    onChange={(event) => {
-                      props.onConnectionDisplayNameChange(event.currentTarget.value);
-                    }}
-                    placeholder={props.connectionDisplayNamePlaceholder}
-                    type="text"
-                    value={props.connectionDisplayNameValue}
-                  />
-                </FieldContent>
-              </Field>
-
-              {showMethodPicker ? (
-                <Field contentWidth="fill" orientation="vertical">
-                  <FieldHeader>
-                    <FieldLabel htmlFor={`connect-auth-method-${dialog.targetKey}`}>
-                      Authentication method
-                    </FieldLabel>
-                  </FieldHeader>
-                  <FieldContent>
-                    <Select
-                      onValueChange={(nextValue) => {
-                        props.onMethodChange(nextValue ?? "");
-                      }}
-                      value={props.methodId.length === 0 ? "" : props.methodId}
-                    >
-                      <SelectTrigger
-                        className="w-full"
-                        id={`connect-auth-method-${dialog.targetKey}`}
-                      >
-                        <SelectValue placeholder="Select authentication method">
-                          {selectedMethodLabel}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {dialog.methods.map((method) => (
-                          <SelectItem key={method.id} value={method.id}>
-                            {formatIntegrationConnectionMethodLabel(method)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FieldContent>
-                </Field>
-              ) : null}
-
-              {props.configForm.mode === "form" &&
-              props.configForm.visiblePropertyKeys.length > 0 ? (
-                <IntegrationFormWithoutSubmit
-                  formData={props.configValue}
-                  noHtml5Validate
-                  onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
-                    const nextValue = event.formData;
-                    props.onConfigChange(
-                      typeof nextValue === "object" &&
-                        nextValue !== null &&
-                        !Array.isArray(nextValue)
-                        ? nextValue
-                        : {},
-                    );
-                  }}
-                  schema={props.configForm.schema}
-                  showErrorList={false}
-                  uiSchema={props.configForm.uiSchema}
-                  validator={validator}
-                />
-              ) : null}
-
-              {showsSecretInput && selectedMethod !== null ? (
-                <>
-                  {selectedMethod.secretFields.map((secretField) => (
-                    <Field contentWidth="fill" key={secretField.name} orientation="vertical">
-                      <FieldHeader>
-                        <div className="flex items-center justify-between gap-3">
-                          <FieldLabel
-                            htmlFor={`connection-secret-${dialog.targetKey}-${secretField.name}`}
-                          >
-                            {secretField.label}
-                          </FieldLabel>
-                          {isUpdateMode && props.isSecretChanged ? (
-                            <span className="text-muted-foreground text-xs">Will update</span>
-                          ) : null}
-                        </div>
-                        {secretField.description ? (
-                          <FieldDescription>{secretField.description}</FieldDescription>
-                        ) : null}
-                      </FieldHeader>
-                      <FieldContent>
-                        {secretField.inputType === "textarea" ? (
-                          <Textarea
-                            autoComplete="off"
-                            data-1p-ignore="true"
-                            id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
-                            onChange={(event) => {
-                              props.onSecretChange(secretField.name, event.currentTarget.value);
-                            }}
-                            placeholder={
-                              isUpdateMode
-                                ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                                : (secretField.placeholder ??
-                                  `Enter ${secretField.label.toLowerCase()}`)
-                            }
-                            rows={8}
-                            value={props.secrets[secretField.name] ?? ""}
-                          />
-                        ) : (
-                          <Input
-                            autoComplete="off"
-                            data-1p-ignore="true"
-                            id={`connection-secret-${dialog.targetKey}-${secretField.name}`}
-                            onChange={(event) => {
-                              props.onSecretChange(secretField.name, event.currentTarget.value);
-                            }}
-                            placeholder={
-                              isUpdateMode
-                                ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                                : (secretField.placeholder ??
-                                  `Enter ${secretField.label.toLowerCase()}`)
-                            }
-                            type={secretField.inputType}
-                            value={props.secrets[secretField.name] ?? ""}
-                          />
-                        )}
-                      </FieldContent>
-                    </Field>
-                  ))}
-                </>
-              ) : props.configForm.mode === "unsupported" ? (
-                <p className="text-destructive text-sm">{props.configForm.message}</p>
-              ) : !isUpdateMode ? (
-                renderAuthCreateHelper(selectedMethod)
-              ) : (
-                <p className="text-muted-foreground text-sm">Save to update this connection.</p>
-              )}
-            </>
-          )}
+          {props.deviceAuthorizationPending
+            ? renderDeviceAuthorizationPending({
+                pending: props.deviceAuthorizationPending,
+              })
+            : renderConnectionEditorFields({
+                ...props,
+                dialog,
+              })}
 
           {props.connectError ? (
             <p className="text-destructive text-sm">{props.connectError}</p>
@@ -383,7 +436,14 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 onClick={props.onSubmit}
                 type="button"
               >
-                {isUpdateMode ? "Save" : resolveCreateSubmitLabel(selectedMethod)}
+                {isUpdateMode
+                  ? "Save"
+                  : resolveCreateSubmitLabel(
+                      resolveSelectedMethod({
+                        dialog,
+                        methodId: props.methodId,
+                      }),
+                    )}
               </Button>
             )}
           </DialogFooter>

@@ -4,7 +4,6 @@ import { useNavigate } from "react-router";
 
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
-import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
 import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
@@ -21,10 +20,7 @@ export const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integration
   "directory",
 ];
 
-export function useIntegrationsDirectoryState(input: {
-  detailTargetKey: string | null;
-  onOpenCreateDialog: (input: OpenIntegrationConnectionDialogInput) => void;
-}) {
+export function useIntegrationsDirectoryState(input: { detailTargetKey: string | null }) {
   const navigate = useNavigate();
   const activeDetailConnectionIdRef = useRef<string | null>(null);
 
@@ -69,7 +65,9 @@ export function useIntegrationsDirectoryState(input: {
 
   const availableViewCards = buildAvailableIntegrationViewCards({
     cards,
-    onOpenCreateDialog: input.onOpenCreateDialog,
+    onOpenCreatePage: (targetKey) => {
+      void navigate(`/integrations/${targetKey}/add`);
+    },
   });
 
   return {

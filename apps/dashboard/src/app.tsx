@@ -16,6 +16,7 @@ import {
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
+import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
@@ -89,6 +90,11 @@ export const APP_ROUTES = createRoutesFromElements(
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
           <Route element={<OrganizationIntegrationsSettingsPage />} index />
+          <Route
+            element={<IntegrationConnectionCreatePage />}
+            handle={ROUTE_HANDLES.integrationCreate}
+            path=":targetKey/add"
+          />
           <Route
             element={<OrganizationIntegrationsSettingsPage />}
             handle={ROUTE_HANDLES.integrationDetail}

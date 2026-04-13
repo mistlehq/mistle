@@ -31,6 +31,17 @@ import {
   resolveNextDraftForMethodChange,
 } from "./use-integration-connection-dialog-state-helpers.js";
 
+type IntegrationConnectionSubmitSuccessInput = {
+  dialog: IntegrationConnectionDialogState;
+};
+
+type UseIntegrationConnectionDialogStateInput = {
+  initialOpenInput?: OpenIntegrationConnectionDialogInput;
+  onClose?: () => void | Promise<void>;
+  onSubmitSuccess?: (input: IntegrationConnectionSubmitSuccessInput) => void | Promise<void>;
+  queryKey: readonly unknown[];
+};
+
 function isRedirectConnectionMethodId(
   methodId: IntegrationConnectionMethodId,
 ): methodId is "oauth2-authorization-code" {
@@ -56,14 +67,49 @@ function resolveSelectedMethod(input: {
 
 const DeviceAuthorizationPollFloorMs = 2_000;
 
-export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
+function createInitialDialogState(input: {
+  initialOpenInput?: OpenIntegrationConnectionDialogInput;
+}): {
+  dialog: IntegrationConnectionDialogState | null;
+  draft: ReturnType<typeof createClosedIntegrationConnectionDialogDraft>;
+} {
+  if (input.initialOpenInput === undefined) {
+    return {
+      dialog: null,
+      draft: createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
+    };
+  }
+
+  const nextState = createOpenIntegrationConnectionDialogState({
+    defaultMethodId:
+      input.initialOpenInput.mode === "create"
+        ? resolveDefaultMethodId(input.initialOpenInput.methods)
+        : input.initialOpenInput.currentMethod.id,
+    openInput: input.initialOpenInput,
+  });
+
+  return {
+    dialog: nextState.dialog,
+    draft: nextState.draft,
+  };
+}
+
+export function useIntegrationConnectionDialogState(
+  input: UseIntegrationConnectionDialogStateInput,
+) {
   const queryClient = useQueryClient();
-  const [dialog, setDialog] = useState<IntegrationConnectionDialogState | null>(null);
+  const initialState =
+    input.initialOpenInput === undefined
+      ? createInitialDialogState({})
+      : createInitialDialogState({
+          initialOpenInput: input.initialOpenInput,
+        });
+  const [dialog, setDialog] = useState<IntegrationConnectionDialogState | null>(
+    initialState.dialog,
+  );
   const [deviceAuthorizationPending, setDeviceAuthorizationPending] =
     useState<IntegrationConnectionDeviceAuthorizationPendingState | null>(null);
-  const [draft, setDraft] = useState(() =>
-    createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
-  );
+  const [draft, setDraft] = useState(() => initialState.draft);
 
   const createFormMutation = useMutation({
     mutationFn: async (mutationInput: {
@@ -126,6 +172,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     setDialog(null);
     setDeviceAuthorizationPending(null);
     setDraft(createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY));
+    void input.onClose?.();
   }
 
   function openDialog(openInput: OpenIntegrationConnectionDialogInput): void {
@@ -163,6 +210,17 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     });
 
     closeDialogWithoutCancellingPendingAttempt();
+    void input.onClose?.();
+  }
+
+  async function handleSubmitSuccess(
+    successInput: IntegrationConnectionSubmitSuccessInput,
+  ): Promise<void> {
+    closeDialogWithoutCancellingPendingAttempt();
+
+    if (input.onSubmitSuccess !== undefined) {
+      await input.onSubmitSuccess(successInput);
+    }
   }
 
   useEffect(() => {
@@ -207,7 +265,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
                 queryKey: input.queryKey,
               });
               if (!disposed) {
-                closeDialogWithoutCancellingPendingAttempt();
+                await handleSubmitSuccess({
+                  dialog,
+                });
               }
               return;
             }
@@ -309,7 +369,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
         queryKey: input.queryKey,
       });
 
-      closeDialog();
+      await handleSubmitSuccess({
+        dialog,
+      });
       return;
     }
 
@@ -323,7 +385,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
         queryKey: input.queryKey,
       });
 
-      closeDialog();
+      await handleSubmitSuccess({
+        dialog,
+      });
       return;
     }
 

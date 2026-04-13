@@ -12,6 +12,10 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
     expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.integrations.description).toBe("");
+    expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
+    expect(typeof ROUTE_HANDLES.integrationCreate.description).toBe("function");
+    expect(ROUTE_HANDLES.integrationCreate.headerIcon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.headerIcon).toBeDefined();
@@ -103,6 +107,20 @@ describe("route handles", () => {
     expect(detailTitle({ params: { targetKey: "github-cloud" } })).toBe("GitHub");
     expect(detailTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Custom Integration V2",
+    );
+  });
+
+  it("resolves integration create title from the target key", () => {
+    const createTitle = ROUTE_HANDLES.integrationCreate.title;
+    expect(typeof createTitle).toBe("function");
+
+    if (typeof createTitle !== "function") {
+      throw new Error("integrationCreate title must be a function");
+    }
+
+    expect(createTitle({ params: { targetKey: "github-cloud" } })).toBe("Add GitHub Connection");
+    expect(createTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
+      "Add Custom Integration V2 Connection",
     );
   });
 

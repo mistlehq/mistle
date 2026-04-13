@@ -56,7 +56,7 @@ export function buildConnectedIntegrationViewCards(input: {
 
 export function buildAvailableIntegrationViewCards(input: {
   cards: readonly IntegrationCardViewModel[];
-  onOpenCreateDialog: (input: OpenIntegrationConnectionDialogInput) => void;
+  onOpenCreatePage: (targetKey: string) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
   return input.cards.map((card) => {
     const methods = toConnectionMethods(card.target.connectionMethods);
@@ -70,18 +70,24 @@ export function buildAvailableIntegrationViewCards(input: {
       actionDisabled: methods.length === 0,
       actionLabel: "Add",
       onAction: () => {
-        input.onOpenCreateDialog({
-          targetConfig: resolveTargetConfig(card.target.config),
-          targetKey: card.target.targetKey,
-          targetDisplayName: card.displayName,
-          targetFamilyId: card.target.familyId,
-          targetVariantId: card.target.variantId,
-          methods,
-          mode: "create",
-        });
+        input.onOpenCreatePage(card.target.targetKey);
       },
     };
   });
+}
+
+export function buildOpenCreateIntegrationConnectionInput(
+  card: IntegrationCardViewModel,
+): OpenIntegrationConnectionDialogInput {
+  return {
+    targetConfig: resolveTargetConfig(card.target.config),
+    targetKey: card.target.targetKey,
+    targetDisplayName: card.displayName,
+    targetFamilyId: card.target.familyId,
+    targetVariantId: card.target.variantId,
+    methods: toConnectionMethods(card.target.connectionMethods),
+    mode: "create",
+  };
 }
 
 export function resolveEditableConnectionMethodId(
