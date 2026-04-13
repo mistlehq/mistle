@@ -161,16 +161,16 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseAssetShape {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Shape {
-            Binary(RuntimeArtifactGitHubReleaseBinaryAssetShape),
-            TarGz(RuntimeArtifactGitHubReleaseTarGzAssetShape),
+        #[serde(rename_all = "camelCase", deny_unknown_fields)]
+        struct Shape {
+            #[serde(deserialize_with = "deserialize_non_empty_string")]
+            file_name: String,
+            format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+            extracted_path: Option<String>,
         }
 
-        match Shape::deserialize(deserializer)? {
-            Shape::Binary(binary) => Ok(Self::Binary(binary)),
-            Shape::TarGz(tar_gz) => Ok(Self::TarGz(tar_gz)),
-        }
+        let shape = Shape::deserialize(deserializer)?;
+        parse_github_release_asset_shape(shape.file_name, shape.format, shape.extracted_path)
     }
 }
 
@@ -208,20 +208,98 @@ pub enum RuntimeArtifactGitHubReleaseTarGzAssetFormat {
     TarGz,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+enum RuntimeArtifactGitHubReleaseAssetFormatWire {
+    #[serde(rename = "binary")]
+    Binary,
+    #[serde(rename = "tar.gz")]
+    TarGz,
+}
+
 /// The GitHub release asset selection for a typed install step.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuntimeArtifactGitHubReleaseInstallAsset {
-    #[serde(rename = "exact")]
-    Exact {
-        #[serde(flatten)]
-        asset: RuntimeArtifactGitHubReleaseAssetShape,
-    },
-    #[serde(rename = "by_arch")]
+    Exact(RuntimeArtifactGitHubReleaseAssetShape),
     ByArch {
         x86_64: RuntimeArtifactGitHubReleaseAssetShape,
         aarch64: RuntimeArtifactGitHubReleaseAssetShape,
     },
+}
+
+impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseInstallAsset {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+        enum Wire {
+            #[serde(rename = "exact")]
+            Exact {
+                #[serde(rename = "fileName")]
+                #[serde(deserialize_with = "deserialize_non_empty_string")]
+                file_name: String,
+                format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+                #[serde(rename = "extractedPath")]
+                extracted_path: Option<String>,
+            },
+            #[serde(rename = "by_arch")]
+            ByArch {
+                x86_64: RuntimeArtifactGitHubReleaseAssetShape,
+                aarch64: RuntimeArtifactGitHubReleaseAssetShape,
+            },
+        }
+
+        match Wire::deserialize(deserializer)? {
+            Wire::Exact {
+                file_name,
+                format,
+                extracted_path,
+            } => Ok(Self::Exact(parse_github_release_asset_shape(
+                file_name,
+                format,
+                extracted_path,
+            )?)),
+            Wire::ByArch { x86_64, aarch64 } => Ok(Self::ByArch { x86_64, aarch64 }),
+        }
+    }
+}
+
+fn parse_github_release_asset_shape<E>(
+    file_name: String,
+    format: Option<RuntimeArtifactGitHubReleaseAssetFormatWire>,
+    extracted_path: Option<String>,
+) -> Result<RuntimeArtifactGitHubReleaseAssetShape, E>
+where
+    E: serde::de::Error,
+{
+    match (format, extracted_path) {
+        (None, None) | (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::Binary), None) => Ok(
+            RuntimeArtifactGitHubReleaseAssetShape::Binary(
+                RuntimeArtifactGitHubReleaseBinaryAssetShape {
+                    file_name,
+                    format: format.map(|_| RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary),
+                },
+            ),
+        ),
+        (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz), Some(extracted_path)) => Ok(
+            RuntimeArtifactGitHubReleaseAssetShape::TarGz(
+                RuntimeArtifactGitHubReleaseTarGzAssetShape {
+                    file_name,
+                    format: RuntimeArtifactGitHubReleaseTarGzAssetFormat::TarGz,
+                    extracted_path,
+                },
+            ),
+        ),
+        (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz), None) => Err(
+            serde::de::Error::custom("tar.gz assets must include extractedPath"),
+        ),
+        (None, Some(_)) | (Some(RuntimeArtifactGitHubReleaseAssetFormatWire::Binary), Some(_)) => {
+            Err(serde::de::Error::custom(
+                "binary assets must not include extractedPath",
+            ))
+        }
+    }
 }
 
 /// One typed artifact install step.
@@ -234,8 +312,10 @@ pub enum RuntimeArtifactInstallStep {
         repository: String,
         release: RuntimeArtifactGitHubReleaseSelector,
         asset: RuntimeArtifactGitHubReleaseInstallAsset,
+        #[serde(rename = "installPath")]
         #[serde(deserialize_with = "deserialize_non_empty_string")]
         install_path: String,
+        #[serde(rename = "timeoutMs")]
         timeout_ms: Option<u64>,
     },
     #[serde(rename = "mise_install")]
@@ -243,6 +323,7 @@ pub enum RuntimeArtifactInstallStep {
         #[serde(deserialize_with = "deserialize_non_empty_string_vec")]
         tools: Vec<String>,
         force: Option<bool>,
+        #[serde(rename = "timeoutMs")]
         timeout_ms: Option<u64>,
     },
     #[serde(rename = "exec")]

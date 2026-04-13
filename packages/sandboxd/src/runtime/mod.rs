@@ -5,6 +5,7 @@
 //! supervision module starts and stops for the active sandbox session.
 
 pub mod adapters;
+mod artifact_install;
 mod plan;
 pub mod readiness;
 mod runtime_file;
@@ -12,9 +13,7 @@ mod workspace_source;
 
 use std::fmt;
 
-use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
 use crate::protocol::startup::StartupInput;
-use crate::time::{SystemClock, ThreadSleeper};
 
 pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
@@ -32,10 +31,11 @@ pub use plan::{
 #[derive(Debug)]
 pub enum RuntimePlanApplyError {
     InvalidRuntimePlan(serde_json::Error),
-    ArtifactInstallEntry {
+    ArtifactInstall {
         artifact_index: usize,
         install_index: usize,
         artifact_key: String,
+        op: &'static str,
         error: String,
     },
     WorkspaceSource {
@@ -60,14 +60,15 @@ impl fmt::Display for RuntimePlanApplyError {
             Self::InvalidRuntimePlan(error) => {
                 write!(f, "runtime plan is invalid: {error}")
             }
-            Self::ArtifactInstallEntry {
+            Self::ArtifactInstall {
                 artifact_index,
                 install_index,
                 artifact_key,
+                op,
                 error,
             } => write!(
                 f,
-                "runtime plan artifacts[{artifact_index}] lifecycle.install[{install_index}] failed (artifactKey={artifact_key}): {error}"
+                "runtime plan artifacts[{artifact_index}] lifecycle.install[{install_index}] failed (artifactKey={artifact_key} op={op}): {error}"
             ),
             Self::WorkspaceSource {
                 source_index,
@@ -95,41 +96,6 @@ impl fmt::Display for RuntimePlanApplyError {
 
 impl std::error::Error for RuntimePlanApplyError {}
 
-fn apply_legacy_artifact_command(command: &RuntimeExecCommand) -> Result<(), String> {
-    run_command(
-        CommandSpec {
-            args: &command.args,
-            env: command.env.as_ref(),
-            cwd: command.cwd.as_deref(),
-            timeout_ms: command.timeout_ms,
-        },
-        &SystemClock,
-        &ThreadSleeper,
-        DEFAULT_COMMAND_POLL_INTERVAL,
-    )
-}
-
-fn dispatch_artifact_install_step(step: &RuntimeArtifactInstallStep) -> Result<(), String> {
-    let op = match step {
-        RuntimeArtifactInstallStep::GitHubReleaseInstall { .. } => "github_release_install",
-        RuntimeArtifactInstallStep::MiseInstall { .. } => "mise_install",
-        RuntimeArtifactInstallStep::Exec { .. } => "exec",
-    };
-
-    Err(format!(
-        "artifact install op '{op}' is not supported yet by sandboxd"
-    ))
-}
-
-fn apply_artifact_install_entry(entry: &RuntimeArtifactInstallEntry) -> Result<(), String> {
-    match entry {
-        RuntimeArtifactInstallEntry::LegacyCommand(command) => {
-            apply_legacy_artifact_command(command)
-        }
-        RuntimeArtifactInstallEntry::Step(step) => dispatch_artifact_install_step(step),
-    }
-}
-
 /// Applies the artifact, workspace-source, and setup-file portions of one startup input's runtime
 /// plan.
 pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePlanApplyError> {
@@ -147,11 +113,12 @@ pub fn apply_compiled_runtime_plan(
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (install_index, install_entry) in artifact.lifecycle.install.iter().enumerate() {
-            apply_artifact_install_entry(install_entry).map_err(|error| {
-                RuntimePlanApplyError::ArtifactInstallEntry {
+            artifact_install::apply_artifact_install_entry(install_entry).map_err(|error| {
+                RuntimePlanApplyError::ArtifactInstall {
                     artifact_index,
                     install_index,
                     artifact_key: artifact.artifact_key.clone(),
+                    op: artifact_install::artifact_install_entry_op(install_entry),
                     error,
                 }
             })?;

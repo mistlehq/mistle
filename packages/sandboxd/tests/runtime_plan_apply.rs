@@ -289,7 +289,10 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
 }
 
 #[test]
-fn rejects_typed_artifact_install_steps_before_executor_support_lands() {
+fn applies_typed_exec_artifact_install_steps() {
+    let test_dir = create_temp_test_dir("runtime_plan_typed_exec");
+    let artifact_output_path = test_dir.join("typed-exec-output.txt");
+
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
         bootstrap_token: "bootstrap-token-value".to_string(),
@@ -312,7 +315,7 @@ fn rejects_typed_artifact_install_steps_before_executor_support_lands() {
                   {
                     "op": "exec",
                     "command": {
-                      "args": ["sh", "-c", "printf should-not-run"]
+                      "args": ["sh", "-c", format!("printf typed-exec > {}", artifact_output_path.display())]
                     }
                   }
                 ]
@@ -326,14 +329,115 @@ fn rejects_typed_artifact_install_steps_before_executor_support_lands() {
         egress_grant_by_rule_id: BTreeMap::new(),
     };
 
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("typed exec artifact install steps should execute through run_command");
+
+    assert_eq!(
+        fs::read_to_string(&artifact_output_path).expect("typed exec artifact output should exist"),
+        "typed-exec"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+#[test]
+fn applies_typed_mise_install_steps() {
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "mise_install",
+                    "tools": ["--help"]
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    };
+
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("typed mise install steps should execute through the real mise subprocess path");
+}
+
+#[test]
+fn rejects_unsupported_github_release_artifact_install_steps_before_branch_4() {
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [
+            {
+              "artifactKey": "artifact_1",
+              "name": "artifact one",
+              "lifecycle": {
+                "install": [
+                  {
+                    "op": "github_release_install",
+                    "repository": "mistlehq/tools",
+                    "release": {
+                      "kind": "latest"
+                    },
+                    "asset": {
+                      "kind": "exact",
+                      "fileName": "slack-linux-amd64"
+                    },
+                    "installPath": "/usr/local/bin/slack"
+                  }
+                ]
+              }
+            }
+          ],
+          "runtimeClients": [],
+          "workspaceSources": [],
+          "agentRuntimes": []
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    };
+
     let error = runtime::apply_runtime_plan(&startup_input)
-        .expect_err("branch 2 should reject typed artifact install execution");
+        .expect_err("branch 3 should still reject github release artifact install execution");
 
     assert!(
         error
             .to_string()
-            .contains("artifact install op 'exec' is not supported yet by sandboxd"),
-        "typed artifact step rejection should surface the unsupported op"
+            .contains("artifactKey=artifact_1 op=github_release_install"),
+        "operation-centric artifact apply errors should include the typed op name"
+    );
+    assert!(
+        error
+            .to_string()
+            .contains("artifact install op 'github_release_install' is not supported yet by sandboxd"),
+        "unsupported github release install should surface the branch-4 executor boundary"
     );
 }
 
