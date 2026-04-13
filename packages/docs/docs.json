@@ -15,20 +15,38 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Overview",
+        "tab": "Integrations",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Getting Started",
             "pages": ["index"]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "guides/aws-integration-setup",
+              "guides/datadog-integration-setup",
+              "guides/github-integration-setup",
+              "guides/jira-integration-setup",
+              "guides/linear-integration-setup",
+              "guides/openai-integration-setup",
+              "guides/planetscale-integration-setup",
+              "guides/signoz-integration-setup",
+              "guides/slack-integration-setup"
+            ]
           }
         ]
       },
       {
-        "tab": "Guides",
+        "tab": "Self-Hosted",
         "groups": [
           {
-            "group": "Integrations",
-            "pages": ["guides/github-integration-setup"]
+            "group": "Operators",
+            "pages": [
+              "guides/self-hosted-integrations-overview",
+              "guides/self-hosted-integration-targets",
+              "guides/self-hosted-webhook-callbacks"
+            ]
           }
         ]
       }

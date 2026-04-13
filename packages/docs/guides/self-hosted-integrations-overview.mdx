@@ -1,0 +1,46 @@
+---
+title: Self-Hosted Integrations Overview
+description: Operator guide to enabling integration targets in a self-hosted Mistle deployment
+---
+
+## Overview
+
+Self-hosted integration setup has two separate concerns:
+
+1. Operators enable Mistle integration targets in the deployment.
+2. Users or workspace admins create provider-specific connections in the dashboard.
+
+This section is only for the first concern: operator-owned self-hosted setup.
+
+Use the connection guides when you need provider-specific setup such as GitHub App registration, Slack app configuration, Jira service-account credentials, or OAuth approval flows.
+
+## What Operators Own
+
+Operators are responsible for:
+
+- choosing which built-in targets are enabled
+- maintaining `integration-targets.provision.json`
+- running `integration-targets:sync`
+- making sure the control-plane base URL is publicly reachable when integrations need callbacks or webhooks
+
+## Built-In Targets
+
+Mistle currently ships these built-in targets:
+
+| Integration | Target key(s)                              |
+| ----------- | ------------------------------------------ |
+| AWS         | `aws-cli-default`                          |
+| Datadog     | `datadog-default`                          |
+| GitHub      | `github-cloud`, `github-enterprise-server` |
+| Jira        | `jira-default`                             |
+| Linear      | `linear-default`                           |
+| OpenAI      | `openai-default`                           |
+| PlanetScale | `planetscale-mcp`                          |
+| SigNoz      | `signoz-mcp`                               |
+| Slack       | `slack-default`                            |
+
+## Next Steps
+
+- Read [Provision Integration Targets](/guides/self-hosted-integration-targets)
+- Read [Webhook And Callback URLs](/guides/self-hosted-webhook-callbacks)
+- Then use the provider-specific connection guides in the `Connect Integrations` section

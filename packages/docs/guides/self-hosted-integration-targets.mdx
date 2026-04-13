@@ -1,0 +1,121 @@
+---
+title: Provision Integration Targets
+description: Configure integration-targets.provision.json and sync built-in targets into a self-hosted Mistle deployment
+---
+
+## Overview
+
+Self-hosted Mistle uses integration targets to expose built-in providers to the dashboard and runtime.
+
+Operators provision those targets in `integration-targets.provision.json`, then sync them into the control-plane database:
+
+```bash
+pnpm --filter @mistle/control-plane-api integration-targets:sync
+```
+
+## Start From The Example File
+
+Use the repository example file as the starting point:
+
+- `integration-targets.provision.example.json`
+
+Copy the targets you want, remove the ones you do not want, and commit the operator-managed manifest your deployment uses.
+
+## Required Workflow
+
+For every manifest change:
+
+1. Edit `integration-targets.provision.json`
+2. Deploy any referenced environment variables or secrets
+3. Run `pnpm --filter @mistle/control-plane-api integration-targets:sync`
+
+## Target Config Reference
+
+These are the target-level fields operators own.
+
+### Empty-config targets
+
+These targets only need to be enabled:
+
+- `aws-cli-default`
+- `datadog-default`
+- `jira-default`
+- `linear-default`
+- `planetscale-mcp`
+- `signoz-mcp`
+
+Example:
+
+```json
+{
+  "targetKey": "linear-default",
+  "enabled": true,
+  "config": {}
+}
+```
+
+### Slack
+
+`slack-default` requires an API base URL:
+
+```json
+{
+  "targetKey": "slack-default",
+  "enabled": true,
+  "config": {
+    "api_base_url": "https://slack.com/api"
+  }
+}
+```
+
+### GitHub
+
+`github-cloud` and `github-enterprise-server` require API and web base URLs:
+
+```json
+{
+  "targetKey": "github-cloud",
+  "enabled": true,
+  "config": {
+    "api_base_url": "https://api.github.com",
+    "web_base_url": "https://github.com"
+  }
+}
+```
+
+```json
+{
+  "targetKey": "github-enterprise-server",
+  "enabled": false,
+  "config": {
+    "api_base_url": "https://ghe.example.com/api/v3",
+    "web_base_url": "https://ghe.example.com"
+  }
+}
+```
+
+`github-cloud` is the default enabled GitHub target in the example manifest. `github-enterprise-server` is supported, but disabled by default until you explicitly turn it on for a GHES deployment.
+At this point, `github-enterprise-server` is only supported for self-hosted deployments.
+
+### OpenAI
+
+`openai-default` requires both the API base URL and model capability policy.
+
+Use the `openai-default` block from `integration-targets.provision.example.json` as your starting point. That block defines:
+
+- `api_base_url`
+- `binding_capabilities_by_connection_method`
+- allowed and default reasoning settings per model
+
+## Scope Boundary
+
+This page covers target provisioning only.
+
+It does not cover:
+
+- creating GitHub Apps
+- choosing Slack bot scopes
+- creating Jira credentials
+- approving provider OAuth flows
+
+Those tasks belong in the provider-specific connection guides.

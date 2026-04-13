@@ -6,6 +6,7 @@
     "dev": "tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/docs --env-mode=loose",
+    "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",
     "storybook": "pnpm --filter @mistle/storybook storybook",
     "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
     "emails:preview": "pnpm --filter @mistle/emails preview",

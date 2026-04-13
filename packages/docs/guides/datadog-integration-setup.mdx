@@ -1,0 +1,37 @@
+---
+title: Datadog
+description: Connect Datadog to Mistle
+icon: /integration-logos/datadog.svg
+---
+
+## Overview
+
+Mistle supports one Datadog connection method:
+
+- API key + application key
+
+Datadog gives Mistle access through the Datadog API key and application key you provide for that connection.
+
+## Create Datadog Credentials
+
+Create:
+
+1. A Datadog API key.
+2. A Datadog application key with the scopes your agents need.
+
+Mistle uses those credentials against Datadog's hosted MCP endpoint. The current integration definition points at Datadog's hosted MCP server and does not require extra target-level URLs in Mistle.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Datadog**, then select **API key + application key**.
+
+Enter:
+
+| Field            | Value                   |
+| ---------------- | ----------------------- |
+| `apiKey`         | Datadog API key         |
+| `applicationKey` | Datadog application key |
+
+## Official References
+
+- [Datadog API and application keys](https://docs.datadoghq.com/account_management/api-app-keys/)

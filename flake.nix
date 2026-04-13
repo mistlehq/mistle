@@ -11,32 +11,38 @@
       let
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
+        docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
+        commonPackages = [
+          pkgs.typos
+          pkgs.llvm
+          pkgs.pnpm
+          pkgs.rustc
+          pkgs.cargo
+          pkgs.rustfmt
+          pkgs.clippy
+          pkgs.rust-analyzer
+          pkgs.ripgrep
+          pkgs.cloudflared
+          pkgs.docker
+          pkgs.git
+          pkgs.git-cliff
+          pkgs.jq
+          pkgs.ripgrep
+        ];
+        commonShellHook = ''
+          export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+          export RUST_SRC_PATH=${pkgs.rustPlatform.rustLibSrc}
+        '';
       in
       {
         devShells.default = pkgs.mkShell {
-          packages = [
-            nodejs
-            pkgs.typos
-            pkgs.llvm
-            pkgs.pnpm
-            pkgs.rustc
-            pkgs.cargo
-            pkgs.rustfmt
-            pkgs.clippy
-            pkgs.rust-analyzer
-            pkgs.ripgrep
-            pkgs.cloudflared
-            pkgs.docker
-            pkgs.git
-            pkgs.git-cliff
-            pkgs.jq
-            pkgs.ripgrep
-          ];
+          packages = [nodejs] ++ commonPackages;
+          shellHook = commonShellHook;
+        };
 
-          shellHook = ''
-            export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-            export RUST_SRC_PATH=${pkgs.rustPlatform.rustLibSrc}
-          '';
+        devShells.docs = pkgs.mkShell {
+          packages = [docsNodejs] ++ commonPackages;
+          shellHook = commonShellHook;
         };
       });
 }

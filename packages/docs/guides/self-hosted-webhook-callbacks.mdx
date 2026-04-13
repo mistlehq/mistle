@@ -1,0 +1,32 @@
+---
+title: Webhook And Callback URLs
+description: Self-hosted control-plane URL requirements for provider callbacks and webhook delivery
+---
+
+## Overview
+
+Some integrations require the control plane to receive browser callbacks or provider webhooks.
+
+Operators own the platform requirement behind those flows:
+
+- the control plane must have a stable externally reachable base URL
+- that base URL must be the one used when configuring provider apps or webhook registrations
+
+## Current Callback And Webhook Shapes
+
+Mistle currently uses these callback and webhook URL patterns:
+
+| Purpose                                   | URL shape                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| GitHub App installation callback          | `https://<control-plane-base-url>/p/integration/callbacks/github-app-installation`    |
+| Source-keyed integration webhook endpoint | `https://<control-plane-base-url>/p/integration/webhooks/<target-key>/<endpoint-key>` |
+
+## Integrations That Depend On This
+
+These integrations currently depend on callback or webhook reachability:
+
+- GitHub App installation
+- Slack webhook sources
+- Jira managed webhook sources
+
+Provider-specific setup details still belong in each connection guide. This page only defines the operator-owned platform requirement: the base URL must be reachable from the provider.

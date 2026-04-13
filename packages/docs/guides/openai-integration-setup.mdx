@@ -1,0 +1,48 @@
+---
+title: OpenAI
+description: Connect OpenAI to Mistle
+icon: /integration-logos/openai.svg
+---
+
+## Overview
+
+Mistle supports two OpenAI connection methods:
+
+- API key
+- ChatGPT subscription
+
+Use API key when Mistle should access OpenAI through an API credential.
+Use ChatGPT subscription when the user should sign in interactively through ChatGPT instead.
+
+Model and reasoning capability policy for this target is managed at the target level rather than per connection.
+
+## Option 1: API Key
+
+API key gives Mistle access to OpenAI through the API key you provide.
+
+Create an OpenAI API key, then connect in Mistle with:
+
+| Field    | Value          |
+| -------- | -------------- |
+| `apiKey` | OpenAI API key |
+
+## Option 2: ChatGPT Subscription
+
+ChatGPT subscription gives Mistle access through an interactive ChatGPT sign-in flow instead of a user-entered API key.
+
+Open **Integrations** in the dashboard, choose **OpenAI**, then select **ChatGPT subscription**.
+
+Mistle starts a device-authorization flow and asks the user to:
+
+1. Open the verification link.
+2. Enter the device code.
+3. Approve access in ChatGPT.
+
+No operator-managed OAuth client registration is exposed in Mistle for this flow. The device-code flow is built into Mistle's current OpenAI integration implementation.
+
+## Official References
+
+- [How to create and use an API key](https://help.openai.com/en/articles/4936850-how-to-create-and-use-an-api-key)
+- [Assign API key permissions](https://help.openai.com/en/articles/8867743-assign-api-key-permissions)
+
+The ChatGPT subscription notes above are based on Mistle's current `device-authorization` implementation. OpenAI's public docs currently document API-key setup much more directly than this product-specific device-code flow.

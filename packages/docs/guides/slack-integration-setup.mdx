@@ -1,0 +1,46 @@
+---
+title: Slack
+description: Connect Slack to Mistle
+icon: /integration-logos/slack.svg
+---
+
+## Overview
+
+Mistle supports one Slack connection method:
+
+- Bot token
+
+Slack gives Mistle access to a workspace through a bot token and signing secret, and it can also receive Slack Events API callbacks through the connection's Webhooks section.
+
+## Create The Slack App
+
+Create a Slack app for the workspace you want Mistle to access.
+
+Collect:
+
+1. The bot user OAuth token (`xoxb-...`)
+2. The signing secret from the app's Basic Information page
+
+Grant the bot scopes your Mistle workflows need before installing the app to the workspace.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Slack**, then select **Bot token**.
+
+Enter:
+
+| Field           | Value                |
+| --------------- | -------------------- |
+| `botToken`      | Slack bot token      |
+| `signingSecret` | Slack signing secret |
+
+## Webhooks
+
+If you use Slack-triggered automations, open the connection's **Webhooks** section in Mistle and copy the displayed callback URL into your Slack app's Events API configuration.
+
+## Official References
+
+- [Creating an app from app settings](https://docs.slack.dev/app-management/quickstart-app-settings)
+- [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth/)
+- [Slack tokens](https://docs.slack.dev/authentication/tokens/)
+- [Using HTTP Request URLs](https://docs.slack.dev/apis/events-api/using-http-request-urls/)
