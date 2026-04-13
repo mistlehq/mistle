@@ -12,6 +12,7 @@
 
 mod proxy_session;
 mod session_manager;
+mod types;
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -34,7 +35,11 @@ use url::Url;
 
 use crate::codex_proxy::proxy_session::relay_codex_proxy_connection;
 pub use crate::codex_proxy::session_manager::{
-    CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerHandle, RetainReason,
+    CodexSessionManagerHandle, spawn_codex_session_manager,
+};
+pub use crate::codex_proxy::types::{
+    CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerState, RetainReason,
+    RetainedThreadState, ThreadSubscriptionState,
 };
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::RuntimeReadinessManager;

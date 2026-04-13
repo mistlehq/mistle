@@ -1,13 +1,18 @@
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
 use serde_json::{Value, json};
+use tokio::runtime::Runtime;
+use tokio::sync::watch;
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, accept, connect};
 
-use sandboxd::codex_proxy::{CODEX_INITIALIZE_CLIENT_NAME, start_codex_proxy};
+use sandboxd::codex_proxy::{
+    CODEX_INITIALIZE_CLIENT_NAME, CodexSessionManagerError, RetainReason,
+    spawn_codex_session_manager, start_codex_proxy,
+};
 use sandboxd::keepalive::KeepaliveManager;
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
@@ -34,54 +39,7 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
             .expect("raw server should accept the monitor connection");
         let mut monitor_socket = accept(monitor_stream).expect("monitor handshake should succeed");
 
-        let initialize_request = read_json_text_message(&mut monitor_socket);
-        assert_eq!(
-            initialize_request["method"],
-            Value::String("initialize".to_string())
-        );
-        assert_eq!(
-            initialize_request["params"]["clientInfo"]["name"],
-            Value::String(CODEX_INITIALIZE_CLIENT_NAME.to_string())
-        );
-        monitor_socket
-            .send(Message::Text(
-                json!({
-                    "id": 1,
-                    "result": {
-                        "userAgent": "codex-app-server",
-                        "codexHome": "/tmp/codex-home",
-                        "platformFamily": "linux",
-                        "platformOs": "linux"
-                    }
-                })
-                .to_string()
-                .into(),
-            ))
-            .expect("initialize response should send");
-
-        assert_eq!(
-            read_json_text_message(&mut monitor_socket)["method"],
-            Value::String("initialized".to_string())
-        );
-
-        let thread_loaded_list_request = read_json_text_message(&mut monitor_socket);
-        assert_eq!(
-            thread_loaded_list_request["method"],
-            Value::String("thread/loaded/list".to_string())
-        );
-        monitor_socket
-            .send(Message::Text(
-                json!({
-                    "id": thread_loaded_list_request["id"],
-                    "result": {
-                        "data": ["thr_123"],
-                        "nextCursor": null
-                    }
-                })
-                .to_string()
-                .into(),
-            ))
-            .expect("thread/loaded/list response should send");
+        respond_to_manager_bootstrap(&mut monitor_socket, vec![json!("thr_123")]);
 
         let thread_read_request = read_json_text_message(&mut monitor_socket);
         assert_eq!(
@@ -147,9 +105,8 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
         .recv()
         .expect("raw server should report readiness");
 
-    let keepalive_manager = Arc::new(std::sync::Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager =
-        Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let proxy = start_codex_proxy(
         "ws://127.0.0.1:0/codex",
         &raw_url,
@@ -192,8 +149,700 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
         .expect("raw server thread should exit cleanly");
 }
 
+#[test]
+fn session_manager_retain_and_release_manage_subscriptions() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the session manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        assert_eq!(
+            retain_request["params"]["threadId"],
+            Value::String("thr_123".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_123",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/resume success should send");
+
+        let release_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            release_request["method"],
+            Value::String("thread/unsubscribe".to_string())
+        );
+        assert_eq!(
+            release_request["params"]["threadId"],
+            Value::String("thr_123".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": release_request["id"],
+                    "result": {
+                        "status": "unsubscribed"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/unsubscribe success should send");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let runtime = build_runtime();
+    let (shutdown_sender, handle, task) = runtime.block_on(async {
+        let (shutdown_sender, shutdown_receiver) = watch::channel(false);
+        let (handle, task) = spawn_codex_session_manager(
+            raw_url,
+            keepalive_manager,
+            runtime_readiness_manager.clone(),
+            shutdown_receiver,
+        );
+        (shutdown_sender, handle, task)
+    });
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_123".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("retain command should succeed");
+        handle
+            .release_thread(
+                "thr_123".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("release command should succeed");
+        shutdown_sender
+            .send(true)
+            .expect("shutdown should notify the session manager");
+        task.await
+            .expect("session manager task should join")
+            .expect("session manager should exit cleanly");
+    });
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn session_manager_auto_releases_when_resume_returns_non_active_status() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (auto_release_sender, auto_release_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the session manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_idle",
+                            "status": {
+                                "type": "idle"
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/resume idle response should send");
+
+        let release_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            release_request["method"],
+            Value::String("thread/unsubscribe".to_string())
+        );
+        assert_eq!(
+            release_request["params"]["threadId"],
+            Value::String("thr_idle".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": release_request["id"],
+                    "result": {
+                        "status": "unsubscribed"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/unsubscribe success should send");
+        auto_release_sender
+            .send(())
+            .expect("auto-release signal should send");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let runtime = build_runtime();
+    let (shutdown_sender, handle, task) = runtime.block_on(async {
+        let (shutdown_sender, shutdown_receiver) = watch::channel(false);
+        let (handle, task) = spawn_codex_session_manager(
+            raw_url,
+            keepalive_manager,
+            runtime_readiness_manager.clone(),
+            shutdown_receiver,
+        );
+        (shutdown_sender, handle, task)
+    });
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_idle".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("retain command should succeed");
+    });
+    auto_release_receiver
+        .recv()
+        .expect("auto-release should be observed");
+    runtime.block_on(async {
+        shutdown_sender
+            .send(true)
+            .expect("shutdown should notify the session manager");
+        task.await
+            .expect("session manager task should join")
+            .expect("session manager should exit cleanly");
+    });
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (replay_ready_sender, replay_ready_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (first_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the first manager connection");
+        let mut first_socket = accept(first_stream).expect("first handshake should succeed");
+        respond_to_manager_bootstrap(&mut first_socket, Vec::new());
+
+        let retain_request = read_json_text_message(&mut first_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        first_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_release_error",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("retain success should send");
+
+        let release_request = read_json_text_message(&mut first_socket);
+        assert_eq!(
+            release_request["method"],
+            Value::String("thread/unsubscribe".to_string())
+        );
+        first_socket
+            .send(Message::Text(
+                json!({
+                    "id": release_request["id"],
+                    "error": {
+                        "code": -32600,
+                        "message": "permission denied"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("unsubscribe failure should send");
+        drop(first_socket);
+
+        let (second_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the replay manager connection");
+        let mut second_socket = accept(second_stream).expect("second handshake should succeed");
+        respond_to_manager_bootstrap(&mut second_socket, Vec::new());
+
+        let replay_request = read_json_text_message(&mut second_socket);
+        assert_eq!(
+            replay_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        assert_eq!(
+            replay_request["params"]["threadId"],
+            Value::String("thr_release_error".to_string())
+        );
+        second_socket
+            .send(Message::Text(
+                json!({
+                    "id": replay_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_release_error",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("replay success should send");
+        replay_ready_sender
+            .send(())
+            .expect("replay ready signal should send");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let runtime = build_runtime();
+    let (shutdown_sender, handle, task) = runtime.block_on(async {
+        let (shutdown_sender, shutdown_receiver) = watch::channel(false);
+        let (handle, task) = spawn_codex_session_manager(
+            raw_url,
+            keepalive_manager,
+            runtime_readiness_manager.clone(),
+            shutdown_receiver,
+        );
+        (shutdown_sender, handle, task)
+    });
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_release_error".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("retain command should succeed");
+        let error = handle
+            .release_thread(
+                "thr_release_error".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect_err("release should fail when unsubscribe is rejected");
+        match error {
+            CodexSessionManagerError::RequestRejected { method, message } => {
+                assert_eq!(method, "thread/unsubscribe");
+                assert_eq!(message, "permission denied");
+            }
+            other => panic!("unexpected release error: {other}"),
+        }
+    });
+    replay_ready_receiver
+        .recv()
+        .expect("replay should occur after release failure");
+    runtime.block_on(async {
+        shutdown_sender
+            .send(true)
+            .expect("shutdown should notify the session manager");
+        task.await
+            .expect("session manager task should join")
+            .expect("session manager should exit cleanly");
+    });
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_again() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (second_connection_ready_sender, second_connection_ready_receiver) = mpsc::channel::<()>();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (first_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the first manager connection");
+        let mut first_socket = accept(first_stream).expect("first handshake should succeed");
+        respond_to_manager_bootstrap(&mut first_socket, Vec::new());
+
+        let first_retain = read_json_text_message(&mut first_socket);
+        assert_eq!(
+            first_retain["method"],
+            Value::String("thread/resume".to_string())
+        );
+        first_socket
+            .send(Message::Text(
+                json!({
+                    "id": first_retain["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_missing",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("first thread/resume success should send");
+        drop(first_socket);
+
+        let (second_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the replay manager connection");
+        let mut second_socket = accept(second_stream).expect("second handshake should succeed");
+        respond_to_manager_bootstrap(&mut second_socket, Vec::new());
+
+        let replay_request = read_json_text_message(&mut second_socket);
+        assert_eq!(
+            replay_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        second_socket
+            .send(Message::Text(
+                json!({
+                    "id": replay_request["id"],
+                    "error": {
+                        "code": -32600,
+                        "message": "no rollout found for thread id thr_missing"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("replay failure should send");
+        second_connection_ready_sender
+            .send(())
+            .expect("second connection ready signal should send");
+
+        let second_retain = read_json_text_message(&mut second_socket);
+        assert_eq!(
+            second_retain["method"],
+            Value::String("thread/resume".to_string())
+        );
+        assert_eq!(
+            second_retain["params"]["threadId"],
+            Value::String("thr_missing".to_string())
+        );
+        second_socket
+            .send(Message::Text(
+                json!({
+                    "id": second_retain["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_missing",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("second thread/resume success should send");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let runtime = build_runtime();
+    let (shutdown_sender, handle, task) = runtime.block_on(async {
+        let (shutdown_sender, shutdown_receiver) = watch::channel(false);
+        let (handle, task) = spawn_codex_session_manager(
+            raw_url,
+            keepalive_manager,
+            runtime_readiness_manager.clone(),
+            shutdown_receiver,
+        );
+        (shutdown_sender, handle, task)
+    });
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_missing".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("initial retain should succeed");
+    });
+    second_connection_ready_receiver
+        .recv()
+        .expect("second connection should become ready");
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_missing".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("retain should succeed again after replay removed the stale entry");
+        shutdown_sender
+            .send(true)
+            .expect("shutdown should notify the session manager");
+        task.await
+            .expect("session manager task should join")
+            .expect("session manager should exit cleanly");
+    });
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+#[test]
+fn session_manager_auto_releases_retained_threads_on_non_active_status() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_url = format!("ws://127.0.0.1:{raw_port}/raw");
+
+    let (server_ready_sender, server_ready_receiver) = mpsc::channel();
+    let (auto_release_sender, auto_release_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        server_ready_sender
+            .send(())
+            .expect("raw server ready signal should send");
+
+        let (manager_stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the session manager connection");
+        let mut manager_socket = accept(manager_stream).expect("manager handshake should succeed");
+
+        respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
+
+        let retain_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            retain_request["method"],
+            Value::String("thread/resume".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": retain_request["id"],
+                    "result": {
+                        "thread": {
+                            "id": "thr_456",
+                            "status": {
+                                "type": "active",
+                                "activeFlags": []
+                            }
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/resume success should send");
+
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "method": "thread/status/changed",
+                    "params": {
+                        "threadId": "thr_456",
+                        "status": {
+                            "type": "idle"
+                        }
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("idle status change should send");
+
+        let release_request = read_json_text_message(&mut manager_socket);
+        assert_eq!(
+            release_request["method"],
+            Value::String("thread/unsubscribe".to_string())
+        );
+        assert_eq!(
+            release_request["params"]["threadId"],
+            Value::String("thr_456".to_string())
+        );
+        manager_socket
+            .send(Message::Text(
+                json!({
+                    "id": release_request["id"],
+                    "result": {
+                        "status": "unsubscribed"
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("thread/unsubscribe success should send");
+        auto_release_sender
+            .send(())
+            .expect("auto-release signal should send");
+    });
+
+    server_ready_receiver
+        .recv()
+        .expect("raw server should report readiness");
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let runtime = build_runtime();
+    let (shutdown_sender, handle, task) = runtime.block_on(async {
+        let (shutdown_sender, shutdown_receiver) = watch::channel(false);
+        let (handle, task) = spawn_codex_session_manager(
+            raw_url,
+            keepalive_manager,
+            runtime_readiness_manager.clone(),
+            shutdown_receiver,
+        );
+        (shutdown_sender, handle, task)
+    });
+
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    runtime.block_on(async {
+        handle
+            .retain_thread(
+                "thr_456".to_string(),
+                RetainReason::AutomationBackgroundExecution,
+            )
+            .await
+            .expect("retain command should succeed");
+    });
+    auto_release_receiver
+        .recv()
+        .expect("auto-release should be observed");
+    runtime.block_on(async {
+        shutdown_sender
+            .send(true)
+            .expect("shutdown should notify the session manager");
+        task.await
+            .expect("session manager task should join")
+            .expect("session manager should exit cleanly");
+    });
+    raw_server_thread
+        .join()
+        .expect("raw server thread should exit cleanly");
+}
+
+fn build_runtime() -> Runtime {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime should build")
+}
+
 fn wait_for_runtime_readiness(
-    runtime_readiness_manager: &Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     expected_ready: bool,
 ) {
     for _ in 0..100 {
@@ -213,7 +862,7 @@ fn wait_for_runtime_readiness(
 }
 
 fn wait_for_keepalive_state(
-    keepalive_manager: &Arc<std::sync::Mutex<KeepaliveManager>>,
+    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
     expected_active: bool,
 ) {
     for _ in 0..100 {
@@ -244,6 +893,60 @@ where
     };
 
     serde_json::from_str(payload.as_str()).expect("text payload should be valid JSON")
+}
+
+fn respond_to_manager_bootstrap<S>(manager_socket: &mut WebSocket<S>, loaded_threads: Vec<Value>)
+where
+    S: std::io::Read + std::io::Write,
+{
+    let initialize_request = read_json_text_message(manager_socket);
+    assert_eq!(
+        initialize_request["method"],
+        Value::String("initialize".to_string())
+    );
+    assert_eq!(
+        initialize_request["params"]["clientInfo"]["name"],
+        Value::String(CODEX_INITIALIZE_CLIENT_NAME.to_string())
+    );
+    manager_socket
+        .send(Message::Text(
+            json!({
+                "id": initialize_request["id"],
+                "result": {
+                    "userAgent": "codex-app-server",
+                    "codexHome": "/tmp/codex-home",
+                    "platformFamily": "linux",
+                    "platformOs": "linux"
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("initialize response should send");
+
+    assert_eq!(
+        read_json_text_message(manager_socket)["method"],
+        Value::String("initialized".to_string())
+    );
+
+    let thread_loaded_list_request = read_json_text_message(manager_socket);
+    assert_eq!(
+        thread_loaded_list_request["method"],
+        Value::String("thread/loaded/list".to_string())
+    );
+    manager_socket
+        .send(Message::Text(
+            json!({
+                "id": thread_loaded_list_request["id"],
+                "result": {
+                    "data": loaded_threads,
+                    "nextCursor": null
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("thread/loaded/list response should send");
 }
 
 fn connect_to_proxy_with_retry(
