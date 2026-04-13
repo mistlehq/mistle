@@ -143,6 +143,7 @@ export function useSessionWorkbenchController(input: {
   const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
+  const selectedRepositoryPathRef = useRef<string | null>(null);
   const sessionState = useCodexSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sessionClientRef,
@@ -171,11 +172,11 @@ export function useSessionWorkbenchController(input: {
     cliPtyState,
     chat,
     lifecycle,
+    selectedRepositoryPathRef,
     sandboxInstanceId: input.sandboxInstanceId,
     serverRequests,
     threadAuthority: sessionState.threadAuthority,
   });
-
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
@@ -188,6 +189,7 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
   const branchDiffState = useSessionBranchDiff({
     cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
