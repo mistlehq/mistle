@@ -36,10 +36,15 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 }
 
 async function startControlPlaneTestServer(input: {
-  handler: (request: ServerRequestRecord) => {
-    status: number;
-    body: unknown;
-  };
+  handler: (request: ServerRequestRecord) =>
+    | {
+        status: number;
+        body: unknown;
+      }
+    | Promise<{
+        status: number;
+        body: unknown;
+      }>;
 }): Promise<{
   origin: string;
   requests: ServerRequestRecord[];
@@ -54,7 +59,7 @@ async function startControlPlaneTestServer(input: {
     };
     requests.push(requestRecord);
 
-    const handled = input.handler(requestRecord);
+    const handled = await input.handler(requestRecord);
     response.statusCode = handled.status;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify(handled.body));

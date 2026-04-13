@@ -134,8 +134,19 @@ export function useIntegrationConnectionEditorState(
       methodId: draft.methodId,
       currentValue: draft.configValue,
     });
+  const submitPending =
+    createFormMutation.isPending ||
+    startDeviceAuthorizationMutation.isPending ||
+    startRedirectMutation.isPending ||
+    updateConnectionMetadataMutation.isPending ||
+    updateFormMutation.isPending;
+  const closePending = submitPending || cancelDeviceAuthorizationMutation.isPending;
 
   function closeEditor(): void {
+    if (closePending) {
+      return;
+    }
+
     setDeviceAuthorizationPending(null);
     void input.onClose?.();
   }
@@ -402,13 +413,8 @@ export function useIntegrationConnectionEditorState(
     secrets: draft.secrets,
     error: draft.error,
     deviceAuthorizationPending,
-    pending:
-      createFormMutation.isPending ||
-      startDeviceAuthorizationMutation.isPending ||
-      startRedirectMutation.isPending ||
-      cancelDeviceAuthorizationMutation.isPending ||
-      updateConnectionMetadataMutation.isPending ||
-      updateFormMutation.isPending,
+    pending: submitPending,
+    closeDisabled: closePending,
     hasChanges: hasIntegrationConnectionEditorChanges({
       editor,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,

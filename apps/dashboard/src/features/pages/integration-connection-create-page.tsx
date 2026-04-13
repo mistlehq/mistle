@@ -115,6 +115,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
     <IntegrationConnectionEditorPage
       configForm={connectionState.configForm}
       configValue={connectionState.configValue}
+      closeDisabled={connectionState.closeDisabled}
       connectError={connectionState.error}
       connectionDisplayNamePlaceholder={connectionState.connectionDisplayNamePlaceholder}
       connectionDisplayNameValue={connectionState.connectionDisplayNameValue}

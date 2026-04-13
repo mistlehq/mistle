@@ -64,6 +64,7 @@ function renderEditorPage(
   input: Partial<ComponentProps<typeof IntegrationConnectionEditorPage>> = {},
 ) {
   const props: ComponentProps<typeof IntegrationConnectionEditorPage> = {
+    closeDisabled: false,
     configForm: {
       mode: "none",
     },
@@ -303,6 +304,15 @@ describe("IntegrationConnectionEditorPage", () => {
     },
   );
 
+  it("disables Cancel while a non-device submit is pending", () => {
+    renderEditorPage({
+      closeDisabled: true,
+      pending: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Cancel" }).hasAttribute("disabled")).toBe(true);
+  });
+
   it("renders Jira personal token configuration fields", () => {
     const editor = createJiraCreateEditor({
       id: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
@@ -441,6 +451,9 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.getByDisplayValue("ABCD-1234")).toBeTruthy();
     expect(screen.getByRole("link", { name: "https://auth.openai.com/codex/device" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel authorization" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Cancel authorization" }).hasAttribute("disabled"),
+    ).toBe(false);
     expect(screen.queryByRole("button", { name: "Add connection" })).toBeNull();
   });
 

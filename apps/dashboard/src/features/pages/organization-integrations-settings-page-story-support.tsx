@@ -247,6 +247,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
       <IntegrationConnectionEditorPage
         configForm={configForm}
         configValue={draft.configValue}
+        closeDisabled={spec.pending ?? false}
         connectionDisplayNamePlaceholder={draft.connectionDisplayNamePlaceholder}
         connectionDisplayNameValue={draft.connectionDisplayNameValue}
         connectError={draft.error}

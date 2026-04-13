@@ -68,6 +68,7 @@ export type IntegrationConnectionDeviceAuthorizationPendingState = {
 };
 
 type IntegrationConnectionEditorProps = {
+  closeDisabled?: boolean;
   configForm: ConnectionMethodFormUiModel;
   configValue: Record<string, unknown>;
   connectionDisplayNamePlaceholder: string;
@@ -325,6 +326,7 @@ export function IntegrationConnectionEditorPage(
 ): React.JSX.Element {
   const editor = props.editor;
   const isUpdateMode = editor.mode === "update";
+  const closeDisabled = props.closeDisabled ?? false;
   return (
     <FormPageStack>
       <FormPageSection>
@@ -343,7 +345,12 @@ export function IntegrationConnectionEditorPage(
           ) : null}
 
           <FormPageActionBar>
-            <Button onClick={props.onClose} type="button" variant="outline">
+            <Button
+              disabled={closeDisabled}
+              onClick={props.onClose}
+              type="button"
+              variant="outline"
+            >
               {props.deviceAuthorizationPending ? "Cancel authorization" : "Cancel"}
             </Button>
             {props.deviceAuthorizationPending ? null : (
