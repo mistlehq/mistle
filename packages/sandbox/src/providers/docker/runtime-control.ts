@@ -19,7 +19,8 @@ import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/usr/local/bin/sandboxd", "init"];
 const DockerExecExitPollIntervalMs = 50;
-const DockerExecExitPollAttempts = 200;
+const DockerInitExecExitTimeoutMs = 120_000;
+const DockerExecExitPollAttempts = DockerInitExecExitTimeoutMs / DockerExecExitPollIntervalMs;
 
 async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
