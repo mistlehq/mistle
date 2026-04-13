@@ -172,7 +172,9 @@ const StartSandboxInstanceResponseSchema = z
 const SandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),
+    title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: z.unknown().nullable(),
@@ -2031,7 +2033,231 @@ async function waitForSandboxInstanceRunning(input: {
   }
 }
 
+async function runExecOverTunnel(input: {
+  command: string;
+  args?: readonly string[];
+  socket: WebSocket;
+  timeoutMs: number;
+}): Promise<{
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+  truncated: boolean;
+}> {
+  const streamId = 1;
+  let execResult: {
+    exitCode: number;
+    stderr: string;
+    stdout: string;
+    truncated: boolean;
+  } | null = null;
+
+  sendJson(input.socket, {
+    type: "stream.open",
+    streamId,
+    channel: {
+      kind: "exec",
+      command: input.command,
+      ...(input.args === undefined ? {} : { args: [...input.args] }),
+      timeoutMs: input.timeoutMs,
+    },
+  });
+  await waitForTunnelHandshakeAck({
+    socket: input.socket,
+    streamId,
+    timeoutMs: input.timeoutMs,
+  });
+
+  const deadline = Date.now() + input.timeoutMs;
+  while (true) {
+    const nextMessage = await waitForNextWebSocketJsonMessage(
+      input.socket,
+      remainingTimeMs(deadline),
+    );
+
+    const streamComplete = StreamCompleteSchema.safeParse(nextMessage);
+    if (streamComplete.success && streamComplete.data.streamId === streamId) {
+      if (execResult === null) {
+        throw new Error("Received stream.complete before exec.result.");
+      }
+
+      return execResult;
+    }
+
+    const streamOpenError = StreamOpenErrorSchema.safeParse(nextMessage);
+    if (streamOpenError.success && streamOpenError.data.streamId === streamId) {
+      throw new Error(
+        `Tunnel stream.open failed with code '${streamOpenError.data.code}': ${streamOpenError.data.message}`,
+      );
+    }
+
+    const streamReset = StreamResetSchema.safeParse(nextMessage);
+    if (streamReset.success && streamReset.data.streamId === streamId) {
+      throw new Error(
+        `Tunnel stream.reset failed with code '${streamReset.data.code}': ${streamReset.data.message}`,
+      );
+    }
+
+    if (
+      typeof nextMessage === "object" &&
+      nextMessage !== null &&
+      Reflect.get(nextMessage, "type") === "stream.event" &&
+      Reflect.get(nextMessage, "streamId") === streamId
+    ) {
+      const event = Reflect.get(nextMessage, "event");
+      if (
+        typeof event === "object" &&
+        event !== null &&
+        Reflect.get(event, "type") === "exec.result"
+      ) {
+        const exitCode = Reflect.get(event, "exitCode");
+        const stdout = Reflect.get(event, "stdout");
+        const stderr = Reflect.get(event, "stderr");
+        const truncated = Reflect.get(event, "truncated");
+
+        if (
+          typeof exitCode === "number" &&
+          typeof stdout === "string" &&
+          typeof stderr === "string" &&
+          typeof truncated === "boolean"
+        ) {
+          execResult = {
+            exitCode,
+            stderr,
+            stdout,
+            truncated,
+          };
+          continue;
+        }
+      }
+    }
+
+    if (remainingTimeMs(deadline) === 0) {
+      throw new Error("Timed out waiting for exec tunnel result.");
+    }
+  }
+}
+
 describe("system sandbox openai codex app-server websocket tunnel", () => {
+  it(
+    "opens an exec stream on a ready sandbox tunnel and runs pwd",
+    async ({ fixture }) => {
+      await runSandboxScenario({
+        fixture,
+        includeAppContainerDiagnostics: true,
+        action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
+          const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+          const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+          const authenticatedSession = await runStep({
+            stepTrace,
+            stepName: "create authenticated session",
+            action: async () => {
+              return await fixture.authSession();
+            },
+          });
+
+          const connectionId = await createOpenAiConnection({
+            fixture,
+            authenticatedSession,
+            openAiApiKey,
+            displayName: `System OpenAI Exec Connection ${randomUUID()}`,
+            stepTrace,
+          });
+          const profileId = await createSandboxProfile({
+            fixture,
+            authenticatedSession,
+            displayName: `System OpenAI Exec Sandbox ${randomUUID()}`,
+            stepTrace,
+          });
+          await updateSandboxBindings({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+            stepName: "bind OpenAI agent integration",
+            bindings: [
+              {
+                connectionId,
+                kind: "agent",
+                config: {
+                  runtime: {
+                    runtimeId: "codex",
+                    config: {},
+                  },
+                  model: {
+                    defaultModel: "gpt-5.3-codex",
+                    options: {
+                      reasoningEffort: "medium",
+                    },
+                  },
+                },
+              },
+            ],
+          });
+          const sandboxInstanceId = await startSandboxInstance({
+            fixture,
+            authenticatedSession,
+            profileId,
+            stepTrace,
+          });
+          await waitForSandboxInstanceRunningStep({
+            fixture,
+            authenticatedSession,
+            sandboxInstanceId,
+            stepTrace,
+          });
+
+          const websocketUrl = await runStep({
+            stepTrace,
+            stepName: "mint websocket url for exec session",
+            action: async () => {
+              return await mintSandboxWebSocketUrl({
+                request: fixture.request,
+                cookie: authenticatedSession.cookie,
+                sandboxInstanceId,
+                dataPlaneGatewayBaseUrl,
+              });
+            },
+          });
+
+          const websocket = await runStep({
+            stepTrace,
+            stepName: "connect websocket tunnel for exec session",
+            action: async () => {
+              return await connectWebSocket(websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+            },
+          });
+          const detachWebSocketTrace = attachWebSocketTrace({
+            socket: websocket,
+            sink: websocketTraceEntries,
+          });
+          registerWebsocketCleanup({
+            socket: websocket,
+            detachTrace: detachWebSocketTrace,
+          });
+
+          const execResult = await runStep({
+            stepTrace,
+            stepName: "run pwd over exec tunnel",
+            action: async () => {
+              return await runExecOverTunnel({
+                command: "pwd",
+                socket: websocket,
+                timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+              });
+            },
+          });
+
+          expect(execResult.exitCode).toBe(0);
+          expect(execResult.stderr).toBe("");
+          expect(execResult.truncated).toBe(false);
+          expect(execResult.stdout.trim().length).toBeGreaterThan(0);
+        },
+      });
+    },
+    SYSTEM_TEST_TIMEOUT_MS,
+  );
+
   it(
     "connects to an agent endpoint and exchanges Codex app-server JSON-RPC messages",
     async ({ fixture }) => {

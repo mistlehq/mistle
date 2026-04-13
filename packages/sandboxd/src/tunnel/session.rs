@@ -45,8 +45,7 @@ use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL,
     CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
     CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
@@ -1791,18 +1790,6 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenExec(message) => {
-            if message.channel.command != "git" {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_open_error(
-                        message.stream_id,
-                        CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED,
-                        "only direct git commands are supported for exec streams",
-                    ),
-                )?;
-                return Ok(());
-            }
-
             let cancel_requested = Arc::new(AtomicBool::new(false));
             let child_pid = Arc::new(Mutex::new(None));
             session_state.pending_exec_opens.insert(
@@ -4331,8 +4318,7 @@ mod tests {
                         "streamId": 11,
                         "channel": {
                             "kind": "exec",
-                            "command": "git",
-                            "args": ["--version"],
+                            "command": "pwd",
                             "timeoutMs": 1000,
                             "maxOutputBytes": 4096
                         }
@@ -4365,7 +4351,12 @@ mod tests {
             let stdout = exec_result["event"]["stdout"]
                 .as_str()
                 .expect("exec.result stdout should be a string");
-            assert!(stdout.starts_with("git version "));
+            let expected_working_directory = std::env::current_dir()
+                .expect("test process should expose a current working directory");
+            assert_eq!(
+                std::path::Path::new(stdout.trim()),
+                expected_working_directory.as_path()
+            );
 
             let exec_complete = read_stream_text_message(&mut websocket);
             assert_eq!(

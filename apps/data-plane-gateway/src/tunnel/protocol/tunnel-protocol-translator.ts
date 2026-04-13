@@ -121,6 +121,15 @@ function parseFileUploadStreamOpen(payload: string) {
   return message;
 }
 
+function parseExecStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "exec") {
+    return undefined;
+  }
+
+  return message;
+}
+
 function hasPTYResizeSignal(message: StreamControlMessage): boolean {
   return message.type === "stream.signal" && message.signal.type === "pty.resize";
 }
@@ -511,6 +520,16 @@ export class TunnelProtocolTranslator {
         channelKind: "fileUpload",
         clientSessionId: input.clientSessionId,
         message: fileUploadStreamOpen,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    const execStreamOpen = parseExecStreamOpen(input.payload);
+    if (execStreamOpen !== undefined) {
+      return this.translateConnectionStreamOpen({
+        channelKind: "exec",
+        clientSessionId: input.clientSessionId,
+        message: execStreamOpen,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     }

@@ -71,6 +71,96 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
 
 describe("sandbox tunnel session lifecycle integration", () => {
   it(
+    "forwards exec stream opens to the bootstrap peer and relays the acknowledgement back to the client",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 88;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "exec",
+              command: "pwd",
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "exec",
+            command: "pwd",
+          },
+        });
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const forwardedOpenOk = await forwardedOpenOkPromise;
+
+        expect(forwardedOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "keeps the bootstrap peer connected after a connection peer disconnects and accepts a fresh connection token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();

@@ -40,8 +40,6 @@ pub const CONNECT_ERROR_CODE_PTY_SESSION_EXISTS: &str = "pty_session_exists";
 pub const CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED: &str = "pty_session_create_failed";
 /// `stream.open.error` code for PTY attach requests without a live session.
 pub const CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE: &str = "pty_session_unavailable";
-/// `stream.open.error` code for rejected one-shot exec requests.
-pub const CONNECT_ERROR_CODE_EXEC_COMMAND_REJECTED: &str = "exec_command_rejected";
 /// `stream.open.error` code for one-shot exec requests that cannot be started.
 pub const CONNECT_ERROR_CODE_EXEC_COMMAND_START_FAILED: &str = "exec_command_start_failed";
 /// `stream.open.error` code for processes streams that cannot be serviced.

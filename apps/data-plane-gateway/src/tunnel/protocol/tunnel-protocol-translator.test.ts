@@ -970,6 +970,38 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("forwards exec stream.open messages to the bootstrap peer", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 62,
+          channel: {
+            kind: "exec",
+            command: "pwd",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "exec",
+            command: "pwd",
+          },
+        }),
+      },
+    });
+  });
+
   it("rewrites bootstrap binary frames back to the client stream id", async () => {
     const { router, translator } = await createTranslatorHarness();
 
