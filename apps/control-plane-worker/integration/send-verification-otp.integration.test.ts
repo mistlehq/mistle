@@ -14,6 +14,9 @@ const TestTimeoutMs = 60_000;
 async function waitForWorkflowRunToFail(input: {
   listWorkflowRuns: () => Promise<{
     data: Array<{
+      error: {
+        message: string;
+      } | null;
       id: string;
       idempotencyKey: string | null;
       status: string;
@@ -23,7 +26,13 @@ async function waitForWorkflowRunToFail(input: {
   workflowName: string;
   idempotencyKey: string;
   timeoutMs: number;
-}): Promise<{ id: string; idempotencyKey: string | null; status: string; workflowName: string }> {
+}): Promise<{
+  error: { message: string } | null;
+  id: string;
+  idempotencyKey: string | null;
+  status: string;
+  workflowName: string;
+}> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < input.timeoutMs) {
@@ -67,7 +76,7 @@ describe("send verification otp integration", () => {
       await withOpenWorkflowRuntime({
         fixture: workflowFixture,
         run: async ({ runtime, workflowContext }) => {
-          const workflowDeadlineAt = new Date(Date.now() + 200);
+          const workflowDeadlineAt = new Date(Date.now() + 1_500);
           workflowContext.openWorkflow.implementWorkflow(
             SendVerificationOTPWorkflow.spec,
             SendVerificationOTPWorkflow.fn,
@@ -111,6 +120,7 @@ describe("send verification otp integration", () => {
             });
 
             expect(otpWorkflowRun.status).toBe("failed");
+            expect(otpWorkflowRun.error?.message).toContain("ECONNREFUSED");
             stopTicking = true;
             await tickUntilStopped;
           } finally {
