@@ -81,7 +81,7 @@ type SessionWorkbenchState = {
   };
   diffPanelState: {
     closePanel: () => void;
-    errorMessage: string | null;
+    errorNotice: ReturnType<typeof useSessionBranchDiff>["errorNotice"];
     isLoading: boolean;
     isVisible: boolean;
     openPanel: () => void;
@@ -275,7 +275,7 @@ export function useSessionWorkbenchController(input: {
       terminalPanelState,
       diffPanelState: {
         closePanel: diffPanelState.closePanel,
-        errorMessage: branchDiffState.errorMessage,
+        errorNotice: branchDiffState.errorNotice,
         isLoading: branchDiffState.isLoading,
         isVisible: diffPanelState.isVisible,
         openPanel: diffPanelState.openPanel,

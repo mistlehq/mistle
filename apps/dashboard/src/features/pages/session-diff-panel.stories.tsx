@@ -68,12 +68,16 @@ const StoryBranchPatch = [
 ].join("\n");
 
 type StoryDiffWorkbenchProps = {
-  errorMessage?: string | null;
+  errorNotice?: {
+    message: string;
+    title: string;
+    variant: "alert" | "default";
+  } | null;
   patch: string;
 };
 
 function StoryDiffWorkbench({
-  errorMessage = null,
+  errorNotice = null,
   patch,
 }: StoryDiffWorkbenchProps): React.JSX.Element {
   return renderSessionWorkbenchContentStory({
@@ -82,7 +86,7 @@ function StoryDiffWorkbench({
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: (
       <SessionDiffPanel
-        errorMessage={errorMessage}
+        errorNotice={errorNotice}
         patch={patch}
         summaryLabel="Compared with main"
         title="Current changes"
@@ -119,7 +123,11 @@ export const EmptyState: Story = {
 
 export const WorkspaceNotRepository: Story = {
   args: {
-    errorMessage: "Current workspace is not a git repository.",
+    errorNotice: {
+      message: "Current workspace is not a git repository.",
+      title: "Changes unavailable",
+      variant: "default",
+    },
     patch: "",
   },
 };

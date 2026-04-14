@@ -218,9 +218,15 @@ function SessionWorkbenchPageContent(input: {
     input.sandboxInstanceId,
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
-  const diffPanelErrorMessage = !workbench.connectionReadiness.canConnect
-    ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
-    : workbench.diffPanelState.errorMessage;
+  const diffPanelErrorNotice = !workbench.connectionReadiness.canConnect
+    ? {
+        message:
+          workbench.stoppedSessionMessage ??
+          "Changes are available only when the sandbox is running.",
+        title: "Could not load changes",
+        variant: "alert" as const,
+      }
+    : workbench.diffPanelState.errorNotice;
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
     : "";
@@ -363,7 +369,7 @@ function SessionWorkbenchPageContent(input: {
       }
       secondaryPanel={
         <SessionDiffPanel
-          errorMessage={diffPanelErrorMessage}
+          errorNotice={diffPanelErrorNotice}
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
           patch={diffPanelPatch}
           summaryLabel="Compared with main"
