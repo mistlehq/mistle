@@ -30,7 +30,7 @@ export function ChatThread({
   return (
     <div className="flex flex-col gap-10 pt-2">
       {chatTurnGroups.map((group) => (
-        <div className="flex flex-col gap-4" key={group.turnId}>
+        <div className="flex flex-col gap-4" data-turn-id={group.turnId} key={group.turnId}>
           {group.userEntry === null ? null : (
             <ChatUserMessage
               {...(group.userEntry.attachments === undefined
