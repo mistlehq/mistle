@@ -10,6 +10,7 @@ import {
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
+  initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
 };
@@ -23,6 +24,7 @@ const meta = {
   },
   decorators: [withDashboardPageStory],
   args: {
+    initialEntries: ["/sessions"],
     launchableProfiles: [
       buildStoryLaunchableSandboxProfile({
         id: "sbp_profile_alpha",
@@ -75,7 +77,7 @@ const meta = {
   render: function RenderStory(args): React.JSX.Element {
     return (
       <SessionsStoryHarness
-        initialEntries={["/sessions"]}
+        initialEntries={args.initialEntries}
         {...(args.launchableProfiles !== undefined
           ? { launchableProfiles: args.launchableProfiles }
           : {})}
