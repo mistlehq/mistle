@@ -23,7 +23,7 @@ import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
-import { CopyableValueField } from "../shared/copyable-value-field.js";
+import { CopyableValue } from "../shared/copyable-value.js";
 import {
   formatConnectionStatusLabel,
   formatResourceCountSummary,
@@ -603,13 +603,13 @@ function GitHubAppSetupSection(input: {
       )}
       <div className="flex flex-col gap-3">
         {resolvedPostInstallationSetupUrl === undefined ? null : (
-          <CopyableValueField
+          <CopyableValue
             label="Post-installation setup URL"
             value={resolvedPostInstallationSetupUrl}
           />
         )}
         {input.callbackUrl === undefined ? null : (
-          <CopyableValueField label="Webhook callback URL" value={input.callbackUrl} />
+          <CopyableValue label="Webhook callback URL" value={input.callbackUrl} />
         )}
       </div>
     </div>
@@ -912,7 +912,7 @@ function WebhookSourceCard(input: {
           )}
         </div>
         {input.source.callbackUrl === undefined ? null : (
-          <CopyableValueField label="Callback URL" value={input.source.callbackUrl} />
+          <CopyableValue label="Callback URL" value={input.source.callbackUrl} />
         )}
       </div>
     </div>

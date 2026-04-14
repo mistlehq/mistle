@@ -1,11 +1,9 @@
-import { systemScheduler } from "@mistle/time";
-import { Button, cn } from "@mistle/ui";
-import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { Button } from "@mistle/ui";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
 import { z } from "zod";
 
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
+import { CopyableValue } from "../shared/copyable-value.js";
 
 type RouteErrorDisplay = {
   title: string;
@@ -16,7 +14,6 @@ type RouteErrorDisplay = {
 type ResolveRouteErrorDisplayOptions = {
   showDiagnostics: boolean;
 };
-const COPY_SUCCESS_DISPLAY_MS = 1200;
 const RouteErrorMessageSchema = z.object({
   message: z.string().trim().min(1),
 });
@@ -147,60 +144,12 @@ type RouteErrorBoundaryProps = {
   runtimeEnv?: RuntimeEnv;
 };
 
-type CopyFeedbackState =
-  | {
-      status: "idle";
-    }
-  | {
-      status: "copied" | "failed";
-      detail: string;
-    };
-
 export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): React.JSX.Element {
   const error = useRouteError();
   const navigate = useNavigate();
   const resolvedRuntimeEnv = runtimeEnv ?? getRuntimeEnv();
   const showDiagnostics = shouldRenderRouteErrorDiagnostics(resolvedRuntimeEnv);
   const display = resolveRouteErrorDisplay(error, { showDiagnostics });
-  const [copyFeedback, setCopyFeedback] = useState<CopyFeedbackState>({
-    status: "idle",
-  });
-  const copyState = resolveVisibleCopyState(copyFeedback, display.detail);
-
-  async function handleCopyDetails(): Promise<void> {
-    if (display.detail === null) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(display.detail);
-      setCopyFeedback({
-        status: "copied",
-        detail: display.detail,
-      });
-    } catch {
-      setCopyFeedback({
-        status: "failed",
-        detail: display.detail,
-      });
-    }
-  }
-
-  useEffect(() => {
-    if (copyState !== "copied") {
-      return;
-    }
-
-    const handle = systemScheduler.schedule(() => {
-      setCopyFeedback({
-        status: "idle",
-      });
-    }, COPY_SUCCESS_DISPLAY_MS);
-
-    return () => {
-      systemScheduler.cancel(handle);
-    };
-  }, [copyState]);
 
   return (
     <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
@@ -212,36 +161,14 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
           </header>
           <div className="flex min-h-0 flex-1 flex-col gap-3 px-6 pb-6">
             {display.detail !== null ? (
-              <div className="bg-muted relative min-h-0 flex-1 rounded-md border">
-                <Button
-                  aria-label="Copy error details"
-                  className="absolute top-2 right-2 z-10"
-                  onClick={() => void handleCopyDetails()}
-                  size="icon-sm"
-                  title="Copy details"
-                  type="button"
-                  variant="ghost"
-                >
-                  {copyState === "copied" ? (
-                    <CheckIcon className="size-4 text-emerald-600 transition-colors duration-200" />
-                  ) : (
-                    <CopyIcon
-                      className={cn(
-                        "size-4 transition-colors duration-200",
-                        copyState === "failed" ? "text-destructive" : null,
-                      )}
-                    />
-                  )}
-                </Button>
-                <pre className="text-muted-foreground h-full overflow-auto p-3 text-xs whitespace-pre-wrap break-words">
-                  {display.detail}
-                </pre>
-                {copyState === "failed" ? (
-                  <p className="text-destructive mt-2 text-xs">
-                    Could not copy details automatically. Select and copy manually.
-                  </p>
-                ) : null}
-              </div>
+              <CopyableValue
+                copiedTitle="Copied"
+                copyAriaLabel="Copy error details"
+                copyTitle="Copy details"
+                failureMessage="Could not copy details automatically. Select and copy manually."
+                value={display.detail}
+                variant="panel"
+              />
             ) : null}
             {display.showSignInAction ? (
               <Button
@@ -257,15 +184,4 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
       </section>
     </main>
   );
-}
-
-export function resolveVisibleCopyState(
-  state: CopyFeedbackState,
-  currentDetail: string | null,
-): "idle" | "copied" | "failed" {
-  if (state.status === "idle" || currentDetail === null) {
-    return "idle";
-  }
-
-  return state.detail === currentDetail ? state.status : "idle";
 }

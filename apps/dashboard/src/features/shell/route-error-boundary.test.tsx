@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   RouteErrorBoundary,
   resolveRouteErrorDisplay,
-  resolveVisibleCopyState,
   shouldRenderRouteErrorDiagnostics,
 } from "./route-error-boundary.js";
 
@@ -87,18 +86,6 @@ describe("resolveRouteErrorDisplay", () => {
 
   it("shows diagnostics in development", () => {
     expect(shouldRenderRouteErrorDiagnostics({ isDevelopment: true })).toBe(true);
-  });
-
-  it("hides stale copy feedback after the displayed detail changes", () => {
-    expect(
-      resolveVisibleCopyState(
-        {
-          status: "copied",
-          detail: "first error detail",
-        },
-        "second error detail",
-      ),
-    ).toBe("idle");
   });
 });
 
