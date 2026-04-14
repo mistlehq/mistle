@@ -577,16 +577,18 @@ describe("IntegrationConnectionDetailView", () => {
             bindingCount: 0,
             canDelete: true,
             displayName: "GitHub Production",
-            postInstallationSetupUrl:
-              "http://localhost:5100/p/integration/callbacks/github-app-installation",
             installActionLabel: "Install GitHub App",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
-            setupDescription:
-              "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
-            setupStatusLabel: "Setup incomplete",
+            setup: {
+              description:
+                "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+              postInstallationSetupUrl:
+                "http://localhost:5100/p/integration/callbacks/github-app-installation",
+              statusLabel: "Setup incomplete",
+            },
             webhookInstructions:
               "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
           },

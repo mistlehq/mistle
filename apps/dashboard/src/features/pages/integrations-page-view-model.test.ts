@@ -235,9 +235,7 @@ describe("integrations page view model", () => {
         value: "mistle-labs",
       },
     ]);
-    expect(item?.setupStatusLabel).toBeUndefined();
-    expect(item?.setupDescription).toBeUndefined();
-    expect(item?.postInstallationSetupUrl).toBeUndefined();
+    expect(item?.setup).toBeUndefined();
     expect(item?.installActionLabel).toBe("Manage installation");
     expect(item?.webhookInstructions).toBe(
       "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
@@ -319,12 +317,12 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.setupStatusLabel).toBe("Setup incomplete");
+    expect(item?.setup?.statusLabel).toBe("Setup incomplete");
     expect(item?.installActionLabel).toBe("Install GitHub App");
-    expect(item?.setupDescription).toBe(
+    expect(item?.setup?.description).toBe(
       "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
     );
-    expect(item?.postInstallationSetupUrl).toBe(
+    expect(item?.setup?.postInstallationSetupUrl).toBe(
       "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
     );
     expect(item?.contextItems).toEqual([
@@ -399,8 +397,8 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.setupIsPending).toBe(true);
-    expect(item?.setupErrorMessage).toBe("Could not start GitHub App installation.");
+    expect(item?.setup?.isPending).toBe(true);
+    expect(item?.setup?.errorMessage).toBe("Could not start GitHub App installation.");
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

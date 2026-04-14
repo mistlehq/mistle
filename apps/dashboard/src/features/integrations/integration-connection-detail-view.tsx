@@ -56,12 +56,16 @@ export type IntegrationConnectionDetailItem = {
   displayName: string;
   id: string;
   installActionLabel?: string;
-  postInstallationSetupUrl?: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
-  setupDescription?: string;
-  setupErrorMessage?: string;
-  setupIsPending?: boolean;
-  setupStatusLabel?: string;
+  setup?:
+    | {
+        description?: string;
+        errorMessage?: string;
+        isPending?: boolean;
+        postInstallationSetupUrl?: string;
+        statusLabel?: string;
+      }
+    | undefined;
   status: "active" | "error" | "revoked";
   webhookInstructions?: string;
 };
@@ -169,8 +173,8 @@ export function IntegrationConnectionDetailView(
                       {formatConnectionStatusLabel(connection.status)}
                     </Badge>
                   )}
-                  {connection.setupStatusLabel === undefined ? null : (
-                    <Badge variant="outline">{connection.setupStatusLabel}</Badge>
+                  {connection.setup?.statusLabel === undefined ? null : (
+                    <Badge variant="outline">{connection.setup.statusLabel}</Badge>
                   )}
                 </div>
               </button>
@@ -244,11 +248,22 @@ function ConnectionDetailPane(input: {
   webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
   const deleteConnectionMessage = resolveDeleteConnectionMessage(input.connection);
+  const setup =
+    input.connection.setup === undefined
+      ? undefined
+      : {
+          ...input.connection.setup,
+          ...(input.connection.authMethodId === "github-app-installation" &&
+          input.webhookSourceState?.items[0]?.callbackUrl !== undefined
+            ? { callbackUrl: input.webhookSourceState.items[0].callbackUrl }
+            : {}),
+        };
   const hasSetupSection =
-    input.connection.setupDescription !== undefined ||
-    input.connection.setupErrorMessage !== undefined ||
-    input.connection.postInstallationSetupUrl !== undefined ||
-    input.webhookSourceState?.items[0]?.callbackUrl !== undefined;
+    setup !== undefined &&
+    (setup.description !== undefined ||
+      setup.errorMessage !== undefined ||
+      setup.postInstallationSetupUrl !== undefined ||
+      ("callbackUrl" in setup && setup.callbackUrl !== undefined));
 
   return (
     <section className="flex flex-col gap-8">
@@ -266,15 +281,15 @@ function ConnectionDetailPane(input: {
               </h2>
             )}
             {input.connection.status === "active" &&
-            input.connection.setupStatusLabel === undefined ? null : (
+            input.connection.setup?.statusLabel === undefined ? null : (
               <div className="flex flex-wrap items-center gap-2">
                 {input.connection.status === "active" ? null : (
                   <Badge variant="outline">
                     {formatConnectionStatusLabel(input.connection.status)}
                   </Badge>
                 )}
-                {input.connection.setupStatusLabel === undefined ? null : (
-                  <Badge variant="outline">{input.connection.setupStatusLabel}</Badge>
+                {input.connection.setup?.statusLabel === undefined ? null : (
+                  <Badge variant="outline">{input.connection.setup.statusLabel}</Badge>
                 )}
               </div>
             )}
@@ -324,7 +339,7 @@ function ConnectionDetailPane(input: {
           onEditApiKey={input.onEditApiKey}
           onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
           setupActionLabel={input.connection.installActionLabel}
-          setupIsPending={input.connection.setupIsPending ?? false}
+          setupIsPending={input.connection.setup?.isPending ?? false}
         />
       </SectionBlock>
 
@@ -332,21 +347,21 @@ function ConnectionDetailPane(input: {
         <SectionBlock title="Setup">
           <div className="flex flex-col gap-4">
             <GitHubAppSetupSection
-              {...(input.webhookSourceState?.items[0]?.callbackUrl === undefined
+              {...(setup === undefined ||
+              !("callbackUrl" in setup) ||
+              setup.callbackUrl === undefined
                 ? {}
-                : { callbackUrl: input.webhookSourceState.items[0].callbackUrl })}
-              {...(input.connection.setupDescription === undefined
+                : { callbackUrl: setup.callbackUrl })}
+              {...(setup?.description === undefined ? {} : { description: setup.description })}
+              {...(setup?.postInstallationSetupUrl === undefined
                 ? {}
-                : { description: input.connection.setupDescription })}
-              {...(input.connection.postInstallationSetupUrl === undefined
-                ? {}
-                : { postInstallationSetupUrl: input.connection.postInstallationSetupUrl })}
+                : { postInstallationSetupUrl: setup.postInstallationSetupUrl })}
             />
-            {input.connection.setupDescription === undefined ? null : (
-              <Notice title="Setup incomplete">{input.connection.setupDescription}</Notice>
+            {setup?.description === undefined ? null : (
+              <Notice title="Setup incomplete">{setup.description}</Notice>
             )}
-            {input.connection.setupErrorMessage === undefined ? null : (
-              <Notice variant="alert">{input.connection.setupErrorMessage}</Notice>
+            {setup?.errorMessage === undefined ? null : (
+              <Notice variant="alert">{setup.errorMessage}</Notice>
             )}
           </div>
         </SectionBlock>

@@ -450,8 +450,15 @@ type ScenarioDetailStorySpec = {
     lastSyncedAt?: string;
     syncState: "never-synced" | "syncing" | "ready" | "error";
   }[];
-  setupDescription?: string;
-  setupStatusLabel?: string;
+  setup?:
+    | {
+        description?: string;
+        errorMessage?: string;
+        isPending?: boolean;
+        postInstallationSetupUrl?: string;
+        statusLabel?: string;
+      }
+    | undefined;
   showCreateWebhookSource?: boolean;
   status?: "active" | "error" | "revoked";
   webhookInstructions?: string;
@@ -541,12 +548,7 @@ function createScenarioDetailViewStoryProps(
           ...(resource.lastSyncedAt === undefined ? {} : { lastSyncedAt: resource.lastSyncedAt }),
           syncState: resource.syncState,
         })),
-        ...(input.setupDescription === undefined
-          ? {}
-          : { setupDescription: input.setupDescription }),
-        ...(input.setupStatusLabel === undefined
-          ? {}
-          : { setupStatusLabel: input.setupStatusLabel }),
+        ...(input.setup === undefined ? {} : { setup: input.setup }),
         status: input.status ?? "active",
         ...(input.webhookInstructions === undefined
           ? {}

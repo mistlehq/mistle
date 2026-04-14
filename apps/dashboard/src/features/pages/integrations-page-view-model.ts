@@ -128,23 +128,18 @@ export function buildIntegrationConnectionDetailItems(input: {
               : {
                   installActionLabel: githubAppConnectionContext.installActionLabel,
                 }),
-            ...(githubAppConnectionContext.setupDescription === undefined
+            ...(githubAppConnectionContext.setup === undefined
               ? {}
               : {
-                  ...(githubAppConnectionContext.postInstallationSetupUrl === undefined
-                    ? {}
-                    : {
-                        postInstallationSetupUrl:
-                          githubAppConnectionContext.postInstallationSetupUrl,
-                      }),
-                  setupDescription: githubAppConnectionContext.setupDescription,
-                  ...(githubAppInstallationState?.errorMessage === undefined
-                    ? {}
-                    : { setupErrorMessage: githubAppInstallationState.errorMessage }),
-                  ...(githubAppInstallationState === undefined
-                    ? {}
-                    : { setupIsPending: githubAppInstallationState.isPending }),
-                  setupStatusLabel: githubAppConnectionContext.setupStatusLabel,
+                  setup: {
+                    ...githubAppConnectionContext.setup,
+                    ...(githubAppInstallationState?.errorMessage === undefined
+                      ? {}
+                      : { errorMessage: githubAppInstallationState.errorMessage }),
+                    ...(githubAppInstallationState === undefined
+                      ? {}
+                      : { isPending: githubAppInstallationState.isPending }),
+                  },
                 }),
             webhookInstructions: githubAppConnectionContext.webhookInstructions,
           }),
@@ -179,9 +174,13 @@ function resolveGitHubAppConnectionContext(
         value: string;
       }[];
       installActionLabel?: string;
-      postInstallationSetupUrl?: string;
-      setupDescription?: string;
-      setupStatusLabel?: string;
+      setup?:
+        | {
+            description: string;
+            postInstallationSetupUrl?: string;
+            statusLabel: string;
+          }
+        | undefined;
       webhookInstructions: string;
     }
   | undefined {
@@ -233,17 +232,19 @@ function resolveGitHubAppConnectionContext(
       : { installActionLabel: "Manage installation" }),
     ...(installationId === null
       ? {
-          setupDescription:
-            "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
-          ...(controlPlaneApiOrigin === undefined
-            ? {}
-            : {
-                postInstallationSetupUrl: new URL(
-                  GitHubAppInstallationCompletePath,
-                  controlPlaneApiOrigin,
-                ).toString(),
-              }),
-          setupStatusLabel: "Setup incomplete",
+          setup: {
+            description:
+              "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+            ...(controlPlaneApiOrigin === undefined
+              ? {}
+              : {
+                  postInstallationSetupUrl: new URL(
+                    GitHubAppInstallationCompletePath,
+                    controlPlaneApiOrigin,
+                  ).toString(),
+                }),
+            statusLabel: "Setup incomplete",
+          },
         }
       : {}),
     webhookInstructions:
