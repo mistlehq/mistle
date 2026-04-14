@@ -1,3 +1,4 @@
+import { JiraSupportedWebhookEvents } from "@mistle/integrations-definitions";
 import {
   Badge,
   Button,
@@ -16,7 +17,6 @@ import {
   ArrowClockwiseIcon,
   CaretDownIcon,
   CaretRightIcon,
-  PencilSimpleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -35,6 +35,12 @@ import type {
   IntegrationConnectionResource,
   IntegrationWebhookSource,
 } from "./integrations-service.js";
+
+const JiraWebhookEventDisplayNameByType = new Map(
+  JiraSupportedWebhookEvents.map((eventDefinition) => {
+    return [eventDefinition.eventType, eventDefinition.displayName] as const;
+  }),
+);
 
 export type IntegrationConnectionDetailResourceSummary = {
   count: number;
@@ -245,6 +251,17 @@ function ConnectionDetailPane(input: {
   webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
   const deleteConnectionMessage = resolveDeleteConnectionMessage(input.connection);
+  const isJiraConnection = isJiraConnectionMethod(input.connection.authMethodId);
+  const webhookSourceState = input.webhookSourceState;
+  const hasWebhookDetailsContent =
+    input.showWebhookSources === true &&
+    webhookSourceState !== undefined &&
+    (webhookSourceState.items.length > 0 ||
+      webhookSourceState.loadErrorMessage !== null ||
+      webhookSourceState.createErrorMessage !== null ||
+      webhookSourceState.deleteErrorMessage !== null ||
+      webhookSourceState.revealedWebhookSecret !== null ||
+      (!isJiraConnection && input.showCreateWebhookSource === true));
   const setup =
     input.connection.setup === undefined
       ? undefined
@@ -261,6 +278,19 @@ function ConnectionDetailPane(input: {
       setup.errorMessage !== undefined ||
       setup.postInstallationSetupUrl !== undefined ||
       ("callbackUrl" in setup && setup.callbackUrl !== undefined));
+  const shouldRenderStandaloneJiraWebhooksSection =
+    isJiraConnection && !hasSetupSection && hasWebhookDetailsContent;
+  const jiraManagedWebhookSource =
+    shouldRenderStandaloneJiraWebhooksSection && webhookSourceState?.items.length === 1
+      ? webhookSourceState.items[0]
+      : undefined;
+  const jiraManagedWebhookTitle =
+    jiraManagedWebhookSource?.displayName === undefined ||
+    jiraManagedWebhookSource.displayName.length === 0
+      ? "Jira admin webhook"
+      : jiraManagedWebhookSource.displayName;
+  const shouldRenderWebhookContentInDetails =
+    hasWebhookDetailsContent && !shouldRenderStandaloneJiraWebhooksSection;
 
   return (
     <section className="flex flex-col gap-8">
@@ -326,7 +356,24 @@ function ConnectionDetailPane(input: {
         <SectionBlock
           action={
             input.onStartGitHubAppInstallation === undefined ||
-            input.connection.installActionLabel === undefined ? null : (
+            input.connection.installActionLabel === undefined ? (
+              isJiraConnection &&
+              (input.webhookSourceState?.items.length ?? 0) === 0 &&
+              input.showCreateWebhookSource === true &&
+              input.onCreateWebhookSource !== undefined ? (
+                <Button
+                  disabled={input.webhookSourceState?.isCreating ?? false}
+                  onClick={() => {
+                    input.onCreateWebhookSource?.({ connectionId: input.connection.id });
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {input.webhookSourceState?.isCreating === true ? "Creating..." : "Create webhook"}
+                </Button>
+              ) : null
+            ) : (
               <Button
                 disabled={input.connection.setup?.isPending ?? false}
                 onClick={() => {
@@ -345,7 +392,7 @@ function ConnectionDetailPane(input: {
           title="Setup"
         >
           <div className="flex flex-col gap-4">
-            <GitHubAppSetupSection
+            <SetupSection
               {...(setup === undefined ||
               !("callbackUrl" in setup) ||
               setup.callbackUrl === undefined
@@ -363,16 +410,45 @@ function ConnectionDetailPane(input: {
         </SectionBlock>
       ) : null}
 
-      <SectionBlock title="Authentication">
+      <SectionBlock
+        action={
+          input.connection.authMethodId === "api-key" && input.onEditApiKey !== undefined ? (
+            <Button
+              aria-label="Edit API key"
+              onClick={() => {
+                input.onEditApiKey?.(input.connection.id);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Edit API key
+            </Button>
+          ) : hasSetupSection ||
+            input.onStartGitHubAppInstallation === undefined ||
+            input.connection.installActionLabel === undefined ? null : (
+            <Button
+              disabled={input.connection.setup?.isPending ?? false}
+              onClick={() => {
+                void input.onStartGitHubAppInstallation?.(input.connection.id);
+              }}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {input.connection.setup?.isPending === true
+                ? "Starting install..."
+                : input.connection.installActionLabel}
+            </Button>
+          )
+        }
+        title="Authentication"
+      >
         <ConnectionAuthSection
           authMethodId={input.connection.authMethodId}
           authMethodLabel={input.connection.authMethodLabel}
           connectionId={input.connection.id}
           onEditApiKey={input.onEditApiKey}
-          onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
-          showSetupAction={hasSetupSection !== true}
-          setupActionLabel={input.connection.installActionLabel}
-          setupIsPending={input.connection.setup?.isPending ?? false}
         />
       </SectionBlock>
 
@@ -387,30 +463,100 @@ function ConnectionDetailPane(input: {
         </SectionBlock>
       )}
 
-      {input.showWebhookSources === true && input.webhookSourceState !== undefined ? (
-        <SectionBlock title="Webhooks">
+      {shouldRenderStandaloneJiraWebhooksSection && webhookSourceState !== undefined ? (
+        <SectionBlock
+          action={
+            jiraManagedWebhookSource !== undefined &&
+            input.onDeleteWebhookSource !== undefined &&
+            jiraManagedWebhookSource.remoteRegistrationId !== undefined ? (
+              <Button
+                aria-label={`Delete webhook source ${jiraManagedWebhookSource.displayName}`}
+                disabled={
+                  webhookSourceState.deletingWebhookSourceId === jiraManagedWebhookSource.id
+                }
+                onClick={() => {
+                  input.onDeleteWebhookSource?.({
+                    connectionId: input.connection.id,
+                    webhookSourceId: jiraManagedWebhookSource.id,
+                  });
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {webhookSourceState.deletingWebhookSourceId === jiraManagedWebhookSource.id
+                  ? "Deleting..."
+                  : "Delete webhook"}
+              </Button>
+            ) : null
+          }
+          title={jiraManagedWebhookTitle}
+        >
           <WebhookSourcesSection
             connectionId={input.connection.id}
-            onCreateWebhookSource={
-              input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
-            }
+            hideDeleteAction={jiraManagedWebhookSource !== undefined}
+            onCreateWebhookSource={undefined}
             onDeleteWebhookSource={input.onDeleteWebhookSource}
-            state={input.webhookSourceState}
+            state={webhookSourceState}
           />
         </SectionBlock>
       ) : null}
 
-      {input.connection.contextItems === undefined ||
-      input.connection.contextItems.length === 0 ? null : (
+      {input.connection.contextItems === undefined || input.connection.contextItems.length === 0 ? (
+        shouldRenderWebhookContentInDetails ? (
+          <SectionBlock title="Details">
+            <div className="flex flex-col gap-4">
+              {shouldRenderWebhookContentInDetails && webhookSourceState !== undefined ? (
+                <WebhookSourcesSection
+                  connectionId={input.connection.id}
+                  hideDeleteAction={false}
+                  onCreateWebhookSource={
+                    !isJiraConnection && input.showCreateWebhookSource === true
+                      ? input.onCreateWebhookSource
+                      : undefined
+                  }
+                  onDeleteWebhookSource={input.onDeleteWebhookSource}
+                  state={webhookSourceState}
+                />
+              ) : null}
+            </div>
+          </SectionBlock>
+        ) : null
+      ) : (
         <SectionBlock title="Details">
-          <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-            {input.connection.contextItems.map((item) => (
-              <MetadataField key={item.label} label={item.label} value={item.value} />
-            ))}
+          <div className="flex flex-col gap-4">
+            <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+              {input.connection.contextItems.map((item) => (
+                <MetadataField key={item.label} label={item.label} value={item.value} />
+              ))}
+            </div>
+            {shouldRenderWebhookContentInDetails && webhookSourceState !== undefined ? (
+              <WebhookSourcesSection
+                connectionId={input.connection.id}
+                hideDeleteAction={false}
+                onCreateWebhookSource={
+                  !isJiraConnection && input.showCreateWebhookSource === true
+                    ? input.onCreateWebhookSource
+                    : undefined
+                }
+                onDeleteWebhookSource={input.onDeleteWebhookSource}
+                state={webhookSourceState}
+              />
+            ) : null}
           </div>
         </SectionBlock>
       )}
     </section>
+  );
+}
+
+function isJiraConnectionMethod(
+  authMethodId: IntegrationConnectionDetailItem["authMethodId"],
+): boolean {
+  return (
+    authMethodId === "jira-personal-api-token" ||
+    authMethodId === "jira-service-account-api-token" ||
+    authMethodId === "jira-service-account-oauth-client-credentials"
   );
 }
 
@@ -487,10 +633,6 @@ function ConnectionAuthSection(input: {
   authMethodLabel: string | null | undefined;
   connectionId: string;
   onEditApiKey: ((connectionId: string) => void) | undefined;
-  onStartGitHubAppInstallation: ((connectionId: string) => Promise<void> | void) | undefined;
-  showSetupAction: boolean;
-  setupActionLabel: string | undefined;
-  setupIsPending: boolean;
 }): React.JSX.Element | null {
   if (input.authMethodLabel === undefined || input.authMethodLabel === null) {
     return null;
@@ -503,28 +645,14 @@ function ConnectionAuthSection(input: {
         className="gap-3 flex flex-col"
         data-auth-method-id="api-key"
       >
-        <InlineField label="Method" value="API key" />
         <div
-          aria-label="Masked API key value"
-          className="gap-2 flex flex-col"
-          data-api-key-state="masked"
+          aria-label="API key authentication fields"
+          className="grid grid-cols-1 gap-3 md:grid-cols-2"
         >
-          <div className="flex items-center gap-1.5 text-sm">
-            <InlineField label="API key" value="**********" />
+          <MetadataField label="Method" value="API key" />
+          <div aria-label="Masked API key value" className="min-w-0" data-api-key-state="masked">
+            <MetadataField label="API key" value="**********" />
           </div>
-          {input.onEditApiKey ? (
-            <Button
-              aria-label="Edit API key"
-              onClick={() => {
-                input.onEditApiKey?.(input.connectionId);
-              }}
-              size="icon-sm"
-              type="button"
-              variant="ghost"
-            >
-              <PencilSimpleIcon aria-hidden className="size-4" />
-            </Button>
-          ) : null}
         </div>
       </div>
     );
@@ -534,45 +662,25 @@ function ConnectionAuthSection(input: {
     return (
       <div
         aria-label="Connection authentication"
-        className="gap-2 flex flex-col"
+        className="gap-3 flex flex-col"
         data-auth-method-id="slack-bot-token"
       >
-        <InlineField label="Method" value={input.authMethodLabel} />
-        <div aria-label="Masked Slack credential values" className="gap-2 flex flex-col text-sm">
-          <InlineField label="Bot token" value="**********" />
-          <InlineField label="Signing secret" value="**********" />
+        <div
+          aria-label="Masked Slack credential values"
+          className="grid grid-cols-1 gap-3 md:grid-cols-2"
+        >
+          <MetadataField label="Method" value={input.authMethodLabel} />
+          <MetadataField label="Bot token" value="**********" />
+          <MetadataField label="Signing secret" value="**********" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <InlineField label="Method" value={input.authMethodLabel} />
-      {!input.showSetupAction ||
-      input.onStartGitHubAppInstallation === undefined ||
-      input.setupActionLabel === undefined ? null : (
-        <Button
-          disabled={input.setupIsPending}
-          onClick={() => {
-            void input.onStartGitHubAppInstallation?.(input.connectionId);
-          }}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          {input.setupIsPending ? "Starting install..." : input.setupActionLabel}
-        </Button>
-      )}
+    <div className="min-w-0">
+      <MetadataField label="Method" value={input.authMethodLabel} />
     </div>
-  );
-}
-
-function InlineField(input: { label: string; value: string }): React.JSX.Element {
-  return (
-    <p className="text-sm leading-tight">
-      <span>{input.label}:</span> <span>{input.value}</span>
-    </p>
   );
 }
 
@@ -585,14 +693,37 @@ function MetadataField(input: { label: string; value: string }): React.JSX.Eleme
   );
 }
 
-function GitHubAppSetupSection(input: {
+function MetadataBadgeListField(input: {
+  items: readonly string[];
+  label: string;
+}): React.JSX.Element | null {
+  if (input.items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="gap-1.5 flex flex-col">
+      <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
+      <div className="flex flex-wrap gap-2">
+        {input.items.map((item) => (
+          <span className="rounded-full border px-2.5 py-1 text-xs" key={item}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SetupSection(input: {
   callbackUrl?: string;
   description?: string;
   postInstallationSetupUrl?: string;
 }): React.JSX.Element | null {
   if (
-    input.description === undefined ||
-    (input.callbackUrl === undefined && input.postInstallationSetupUrl === undefined)
+    input.description === undefined &&
+    input.callbackUrl === undefined &&
+    input.postInstallationSetupUrl === undefined
   ) {
     return null;
   }
@@ -609,17 +740,19 @@ function GitHubAppSetupSection(input: {
       {input.description === undefined ? null : (
         <p className="text-muted-foreground text-xs">{input.description}</p>
       )}
-      <div className="flex flex-col gap-3">
-        {resolvedPostInstallationSetupUrl === undefined ? null : (
-          <CopyableValue
-            label="Post-installation setup URL"
-            value={resolvedPostInstallationSetupUrl}
-          />
-        )}
-        {input.callbackUrl === undefined ? null : (
-          <CopyableValue label="Webhook callback URL" value={input.callbackUrl} />
-        )}
-      </div>
+      {resolvedPostInstallationSetupUrl === undefined && input.callbackUrl === undefined ? null : (
+        <div className="flex flex-col gap-3">
+          {resolvedPostInstallationSetupUrl === undefined ? null : (
+            <CopyableValue
+              label="Post-installation setup URL"
+              value={resolvedPostInstallationSetupUrl}
+            />
+          )}
+          {input.callbackUrl === undefined ? null : (
+            <CopyableValue label="Webhook callback URL" value={input.callbackUrl} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -796,6 +929,7 @@ function ResourceItemsPreview(input: {
 
 function WebhookSourcesSection(input: {
   connectionId: string;
+  hideDeleteAction: boolean;
   onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
@@ -804,8 +938,8 @@ function WebhookSourcesSection(input: {
 }): React.JSX.Element {
   return (
     <div className="gap-3 flex flex-col">
-      <div className="flex items-start justify-end gap-3">
-        {input.onCreateWebhookSource ? (
+      {input.onCreateWebhookSource ? (
+        <div className="flex items-start justify-end gap-3">
           <Button
             disabled={input.state.isCreating}
             onClick={() => {
@@ -819,8 +953,8 @@ function WebhookSourcesSection(input: {
           >
             {input.state.isCreating ? "Creating..." : "Create webhook"}
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {input.state.loadErrorMessage === null ? null : (
         <Notice variant="alert">{input.state.loadErrorMessage}</Notice>
@@ -849,6 +983,7 @@ function WebhookSourcesSection(input: {
             <WebhookSourceCard
               connectionId={input.connectionId}
               deletingWebhookSourceId={input.state.deletingWebhookSourceId}
+              hideDeleteAction={input.hideDeleteAction}
               key={source.id}
               onDeleteWebhookSource={input.onDeleteWebhookSource}
               source={source}
@@ -863,6 +998,7 @@ function WebhookSourcesSection(input: {
 function WebhookSourceCard(input: {
   connectionId: string;
   deletingWebhookSourceId: string | null;
+  hideDeleteAction: boolean;
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
@@ -870,37 +1006,66 @@ function WebhookSourceCard(input: {
 }): React.JSX.Element {
   const isDeleting = input.deletingWebhookSourceId === input.source.id;
   const isDeleteSupported =
-    input.onDeleteWebhookSource !== undefined && input.source.remoteRegistrationId !== undefined;
+    !input.hideDeleteAction &&
+    input.onDeleteWebhookSource !== undefined &&
+    input.source.remoteRegistrationId !== undefined;
+  const shouldShowHeader =
+    !input.hideDeleteAction && (input.source.displayName !== "" || isDeleteSupported);
+  const registeredEventLabels = resolveWebhookRegisteredEventLabels(input.source.providerMetadata);
 
   return (
-    <div className="gap-3 flex flex-col">
-      <div className="flex items-start justify-end gap-3">
-        {isDeleteSupported ? (
-          <Button
-            aria-label={`Delete webhook source ${input.source.displayName}`}
-            disabled={isDeleting}
-            onClick={() => {
-              input.onDeleteWebhookSource?.({
-                connectionId: input.connectionId,
-                webhookSourceId: input.source.id,
-              });
-            }}
-            size="icon-sm"
-            type="button"
-            variant="outline"
-          >
-            <TrashIcon aria-hidden className="size-4" />
-          </Button>
-        ) : null}
-      </div>
+    <div className="flex flex-col gap-3">
+      {shouldShowHeader ? (
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-muted-foreground text-xs uppercase tracking-wide">
+            {input.source.displayName}
+          </p>
+          {isDeleteSupported ? (
+            <Button
+              aria-label={`Delete webhook source ${input.source.displayName}`}
+              disabled={isDeleting}
+              onClick={() => {
+                input.onDeleteWebhookSource?.({
+                  connectionId: input.connectionId,
+                  webhookSourceId: input.source.id,
+                });
+              }}
+              size="icon-sm"
+              type="button"
+              variant="outline"
+            >
+              <TrashIcon aria-hidden className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="gap-3 flex flex-col">
         {input.source.remoteRegistrationId === undefined ? null : (
           <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
         )}
+        <MetadataBadgeListField items={registeredEventLabels} label="Registered events" />
         {input.source.callbackUrl === undefined ? null : (
           <CopyableValue label="Callback URL" value={input.source.callbackUrl} />
         )}
       </div>
     </div>
   );
+}
+
+function isStringArray(input: unknown): input is string[] {
+  return Array.isArray(input) && input.every((item) => typeof item === "string");
+}
+
+function resolveWebhookRegisteredEventLabels(
+  providerMetadata: IntegrationWebhookSource["providerMetadata"],
+): readonly string[] {
+  const registeredEvents = providerMetadata["registeredEvents"];
+
+  if (!isStringArray(registeredEvents)) {
+    return [];
+  }
+
+  return registeredEvents.map((eventType): string => {
+    return JiraWebhookEventDisplayNameByType.get(eventType) ?? eventType;
+  });
 }

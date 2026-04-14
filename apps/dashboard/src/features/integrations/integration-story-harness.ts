@@ -721,13 +721,38 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
         endpointKey: "ep_jira_dense",
         id: "iws_jira_dense",
         integrationConnectionId: "icn_jira_dense",
-        providerMetadata: {},
+        providerMetadata: {
+          registeredEvents: [
+            "jira:issue_created",
+            "jira:issue_updated",
+            "comment_created",
+            "comment_updated",
+          ],
+        },
         remoteRegistrationId: "10001",
         status: "active",
         targetKey: "jira-default",
         updatedAt: DenseStoryLastSyncedAt,
       },
     ],
+  });
+}
+
+export function createJiraSetupIncompleteDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
+    authMethod: {
+      familyId: "jira",
+      methodId: "jira-personal-api-token",
+      variantId: "jira-default",
+    },
+    bindingCount: 1,
+    connectionId: "icn_jira_setup_incomplete",
+    displayName: "Jira Production",
+    setup: {
+      description: "Create a Jira admin webhook to complete setup.",
+    },
+    showCreateWebhookSource: true,
+    webhookSources: [],
   });
 }
 

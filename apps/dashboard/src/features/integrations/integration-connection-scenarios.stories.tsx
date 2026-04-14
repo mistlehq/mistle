@@ -9,6 +9,7 @@ import {
   createGitHubAppDetailViewStoryProps,
   createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
+  createJiraSetupIncompleteDetailViewStoryProps,
   createLinearDetailViewStoryProps,
   createOpenAiDetailViewStoryProps,
   createPlanetScaleDetailViewStoryProps,
@@ -83,8 +84,16 @@ export const GitHubEnterpriseServer: Story = {
 };
 
 export const Jira: Story = {
+  name: "Jira Complete",
   args: {
     ...withoutStoryHandlers(createJiraDetailViewStoryProps()),
+  },
+};
+
+export const JiraSetupIncomplete: Story = {
+  name: "Jira Setup Incomplete",
+  args: {
+    ...withoutStoryHandlers(createJiraSetupIncompleteDetailViewStoryProps()),
   },
 };
 

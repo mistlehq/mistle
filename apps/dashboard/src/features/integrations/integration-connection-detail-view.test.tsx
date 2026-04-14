@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -435,9 +435,9 @@ describe("IntegrationConnectionDetailView", () => {
     const authSection = screen.getByLabelText("Connection authentication");
     expect(authSection.getAttribute("data-auth-method-id")).toBe("slack-bot-token");
     expect(screen.getByLabelText("Masked Slack credential values")).toBeTruthy();
-    expect(screen.getByText("Bot token:")).toBeTruthy();
-    expect(screen.getByText("Signing secret:")).toBeTruthy();
-    expect(screen.getAllByText("**********")).toHaveLength(2);
+    expect(within(authSection).getAllByText("Bot token")).toHaveLength(2);
+    expect(within(authSection).getByText("Signing secret")).toBeTruthy();
+    expect(within(authSection).getAllByText("**********")).toHaveLength(2);
   });
 
   it("shows delete for all connections and disables it when bindings prevent deletion", () => {
@@ -493,12 +493,12 @@ describe("IntegrationConnectionDetailView", () => {
       <IntegrationConnectionDetailView
         connections={[
           {
-            id: "icn_jira_primary",
+            id: "icn_webhook_primary",
             bindingCount: 0,
             canDelete: true,
-            displayName: "Jira Production",
-            authMethodId: "jira-personal-api-token",
-            authMethodLabel: "Personal API token",
+            displayName: "Webhook Connection",
+            authMethodId: "api-key",
+            authMethodLabel: "API key",
             status: "active",
             resources: [],
           },
@@ -514,7 +514,7 @@ describe("IntegrationConnectionDetailView", () => {
         webhookSourceStateByConnectionId={
           new Map([
             [
-              "icn_jira_primary",
+              "icn_webhook_primary",
               {
                 createErrorMessage: null,
                 deleteErrorMessage: null,
@@ -525,14 +525,21 @@ describe("IntegrationConnectionDetailView", () => {
                   {
                     id: "iws_jira_123",
                     targetKey: "jira-default",
-                    integrationConnectionId: "icn_jira_primary",
+                    integrationConnectionId: "icn_webhook_primary",
                     displayName: "Primary Jira webhook",
                     endpointKey: "ep_jira_123",
                     callbackUrl:
                       "https://control-plane.example.com/p/integration/webhooks/jira-default/ep_jira_123",
                     remoteRegistrationId: "10001",
                     status: "active",
-                    providerMetadata: {},
+                    providerMetadata: {
+                      registeredEvents: [
+                        "jira:issue_created",
+                        "jira:issue_updated",
+                        "comment_created",
+                        "comment_updated",
+                      ],
+                    },
                     createdAt: "2026-04-03T00:00:00.000Z",
                     updatedAt: "2026-04-03T00:00:00.000Z",
                   },
@@ -546,30 +553,83 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByText("Webhooks")).toBeTruthy();
+    expect(screen.getByText("Details")).toBeTruthy();
     expect(
       screen.queryByText("Copy the callback URL into your provider's webhook configuration."),
     ).toBeNull();
-    expect(screen.queryByText("Primary Jira webhook")).toBeNull();
+    expect(screen.getByText("Primary Jira webhook")).toBeTruthy();
     expect(screen.queryByText("Webhook source ID: iws_jira_123")).toBeNull();
     expect(screen.queryByText("Target")).toBeNull();
     expect(screen.queryByText("jira-default")).toBeNull();
     expect(screen.getByText("Provider registration")).toBeTruthy();
     expect(screen.getByText("10001")).toBeTruthy();
+    expect(screen.getByText("Registered events")).toBeTruthy();
+    expect(screen.getByText("Issue created")).toBeTruthy();
+    expect(screen.getByText("Issue updated")).toBeTruthy();
+    expect(screen.getByText("Comment created")).toBeTruthy();
+    expect(screen.getByText("Comment updated")).toBeTruthy();
     expect(screen.getByText("Callback URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
     expect(screen.queryByText("Endpoint key")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
-    expect(createdConnectionId).toBe("icn_jira_primary");
+    expect(createdConnectionId).toBe("icn_webhook_primary");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Delete webhook source Primary Jira webhook" }),
     );
     expect(deletedWebhookSource).toEqual({
-      connectionId: "icn_jira_primary",
+      connectionId: "icn_webhook_primary",
       webhookSourceId: "iws_jira_123",
     });
+  });
+
+  it("renders generic setup guidance without setup URLs", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_setup",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Production",
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+            setup: {
+              description: "Create a Jira admin webhook to complete setup.",
+            },
+          },
+        ]}
+        onCreateWebhookSource={() => {}}
+        showCreateWebhookSource={true}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_jira_setup",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByText("Setup")).toBeTruthy();
+    expect(screen.getByText("Create a Jira admin webhook to complete setup.")).toBeTruthy();
+    expect(screen.queryByText("Details")).toBeNull();
+    expect(screen.getByRole("button", { name: "Create webhook" })).toBeTruthy();
+    expect(screen.queryByText("Callback URL")).toBeNull();
   });
 
   it("does not show delete for implicit webhook sources", () => {
