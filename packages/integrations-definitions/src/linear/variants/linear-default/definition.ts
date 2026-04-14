@@ -15,6 +15,7 @@ import { resolveLinearBindingConfigForm } from "./binding-config-form.js";
 import { LinearBindingConfigSchema } from "./binding-config-schema.js";
 import { compileLinearBinding } from "./compile-binding.js";
 import { LinearConnectionConfigForm } from "./connection-config-form.js";
+import { AppendSessionLinkToLinearMcpMarkdownRequestMiddleware } from "./egress-request-middleware.server.js";
 import { LinearTargetConfigSchema } from "./target-config-schema.js";
 import { LinearToolIds } from "./tool-ids.js";
 
@@ -38,6 +39,7 @@ export const LinearDefinition: LinearIntegrationDefinition = {
   targetSecretSchema: LinearTargetSecretSchema,
   bindingConfigSchema: LinearBindingConfigSchema,
   bindingConfigForm: resolveLinearBindingConfigForm,
+  egressRequestMiddleware: [AppendSessionLinkToLinearMcpMarkdownRequestMiddleware],
   connectionMethods: [
     {
       id: IntegrationConnectionMethodIds.API_KEY,

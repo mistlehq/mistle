@@ -2,6 +2,7 @@ import { type CompileBindingInput, type CompileBindingResult } from "@mistle/int
 
 import { LinearCredentialSlotKeys, resolveLinearCredentialSecretType } from "./auth.js";
 import type { LinearBindingConfig } from "./binding-config-schema.js";
+import { LinearRequestMiddlewareIds } from "./egress-request-middleware.js";
 import type { LinearTargetConfig } from "./target-config-schema.js";
 import { LinearToolIds } from "./tool-ids.js";
 
@@ -36,6 +37,7 @@ function createLinearMcpRoute(input: {
       secretType: input.credentialSecretType,
       slotKey: LinearCredentialSlotKeys.API_KEY,
     },
+    requestMiddleware: [LinearRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MCP_MARKDOWN],
   };
 }
 
