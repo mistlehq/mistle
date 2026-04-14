@@ -10,6 +10,7 @@ export const tokenizerProxyDevelopmentPreset = {
         },
         control_plane_api: {
           base_url: "http://localhost:5100",
+          public_base_url: "http://localhost:5100",
         },
       },
     },

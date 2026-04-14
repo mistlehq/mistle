@@ -198,6 +198,7 @@ port = 8085
 
 [apps.tokenizer_proxy.control_plane_api]
 base_url = "http://control-plane-api:8080"
+public_base_url = "https://api.mistle.example"
 
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"
