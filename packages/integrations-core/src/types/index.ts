@@ -415,6 +415,26 @@ export type IntegrationConnectionMethodDefinition<
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
+export type ProxyRequestContext = {
+  sandboxInstanceId: string;
+  sessionUrl: string;
+};
+
+export type ProxyMutableRequest = {
+  method: string;
+  url: URL;
+  headers: Headers;
+  body: Uint8Array | undefined;
+};
+
+export type IntegrationEgressRequestMiddleware = {
+  id: string;
+  handle(input: {
+    ctx: ProxyRequestContext;
+    request: ProxyMutableRequest;
+  }): MaybePromise<ProxyMutableRequest>;
+};
+
 export type IntegrationMcpValue = string;
 
 export type IntegrationMcpTransport = "streamable-http" | "stdio";
@@ -1696,6 +1716,7 @@ export type IntegrationDefinition<
   >;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
+  egressRequestMiddleware?: ReadonlyArray<IntegrationEgressRequestMiddleware>;
   capabilities?: IntegrationCapabilityContributor<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,

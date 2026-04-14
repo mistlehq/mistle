@@ -132,6 +132,85 @@ describe("integration registry", () => {
     });
   });
 
+  it("rejects duplicate egress request middleware ids within one definition", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "openai",
+        variantId: "openai-default",
+        kind: "agent",
+        displayName: "OpenAI",
+        logoKey: "openai",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: ApiKeyConnectionMethods,
+        egressRequestMiddleware: [
+          {
+            id: "duplicate-middleware",
+            handle(input) {
+              return input.request;
+            },
+          },
+          {
+            id: "duplicate-middleware",
+            handle(input) {
+              return input.request;
+            },
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+
+    let caughtError: unknown;
+    try {
+      registry.register({
+        familyId: "openai",
+        variantId: "openai-default",
+        kind: "agent",
+        displayName: "OpenAI",
+        logoKey: "openai",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: ApiKeyConnectionMethods,
+        egressRequestMiddleware: [
+          {
+            id: "duplicate-middleware",
+            handle(input) {
+              return input.request;
+            },
+          },
+          {
+            id: "duplicate-middleware",
+            handle(input) {
+              return input.request;
+            },
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(IntegrationDefinitionRegistryError);
+    expect(caughtError).toMatchObject({
+      code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      message: expect.stringContaining("duplicate id"),
+    });
+  });
+
   it("lists definitions in deterministic order", () => {
     const registry = new IntegrationRegistry();
 
