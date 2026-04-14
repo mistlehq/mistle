@@ -78,30 +78,42 @@ export function AuthScreen(): React.JSX.Element {
 
   async function handleVerifyOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+
+    if (isVerifyingOtp) {
+      return;
+    }
+
     setAuthError(null);
 
-    const otpError = resolveOtpValidationError(otp);
+    const submittedOtp = new FormData(event.currentTarget).get("otp");
+    const otpValue = typeof submittedOtp === "string" ? submittedOtp.trim() : "";
+    const otpError = resolveOtpValidationError(otpValue);
     if (otpError) {
       setAuthError(otpError);
       return;
     }
 
-    const otpValue = otp.trim();
     setIsVerifyingOtp(true);
-    const signInResponse = await authClient.signIn.emailOtp({
-      email,
-      otp: otpValue,
-    });
-    setIsVerifyingOtp(false);
+    try {
+      const signInResponse = await authClient.signIn.emailOtp({
+        email,
+        otp: otpValue,
+      });
 
-    if (signInResponse.error) {
-      setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
+      if (signInResponse.error) {
+        setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
+        return;
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: SESSION_QUERY_KEY,
+      });
+    } catch {
+      setAuthError("Unable to verify OTP.");
       return;
+    } finally {
+      setIsVerifyingOtp(false);
     }
-
-    await queryClient.invalidateQueries({
-      queryKey: SESSION_QUERY_KEY,
-    });
   }
 
   async function handleSignInWithGoogle(): Promise<void> {
