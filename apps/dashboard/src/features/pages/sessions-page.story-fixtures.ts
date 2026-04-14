@@ -165,7 +165,7 @@ export function createSessionsPageStoryQueryClient(input?: {
       connectable: input.sandboxInstanceStatus.connectable,
       failureCode: input.sandboxInstanceStatus.failureCode ?? null,
       failureMessage: input.sandboxInstanceStatus.failureMessage ?? null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: null,
     });
   }

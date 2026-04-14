@@ -14,7 +14,6 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import { resolveRuntimePlanPrimaryRepositoryPath } from "./session-primary-repository-policy.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -188,9 +187,8 @@ export function useSessionWorkbenchController(input: {
     ptyState,
     queryClient,
   });
-  const initialSelectedRepositoryPath = resolveRuntimePlanPrimaryRepositoryPath({
-    runtimePlan: workbenchLifecycleState.sandboxStatusQuery.data?.runtimePlan,
-  });
+  const initialSelectedRepositoryPath =
+    workbenchLifecycleState.sandboxStatusQuery.data?.runtimeContext?.primaryRepositoryRoot;
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,

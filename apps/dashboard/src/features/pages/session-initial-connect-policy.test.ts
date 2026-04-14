@@ -1,71 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import {
-  MissingConnectableRuntimePlanMessage,
+  MissingConnectableRuntimeContextMessage,
   resolveInitialSessionConnectTarget,
 } from "./session-initial-connect-policy.js";
 
-function createRuntimePlan(): NonNullable<SandboxInstanceStatusResult["runtimePlan"]> {
-  return {
-    sandboxProfileId: "sbp_123",
-    version: 1,
-    image: {
-      source: "base",
-      imageRef: "img_123",
-    },
-    egressRoutes: [],
-    artifacts: [],
-    workspaceSources: [
-      {
-        sourceKind: "git-clone",
-        resourceKind: "repository",
-        path: "/root/acme/repo-1",
-        originUrl: "https://github.com/acme/repo-1.git",
-      },
-    ],
-    runtimeClients: [],
-    agentRuntimes: [
-      {
-        bindingId: "ibd_123",
-        runtimeId: "codex",
-        runtimeKey: "codex",
-        clientId: "rtc_123",
-        endpointKey: "endpoint_123",
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          newLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            cwd: "/root/acme/repo-1/packages/app",
-            command: "codex",
-            args: [],
-          },
-          resumeLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            cwd: "/root/acme/repo-1/packages/app",
-            command: "codex",
-            args: [],
-          },
-        },
-      },
-    ],
-  };
-}
-
 describe("session initial connect policy", () => {
-  it("throws when a connectable session is missing its runtime plan", () => {
+  it("throws when a connectable session is missing runtime context", () => {
     expect(() =>
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: null,
-        runtimePlan: null,
+        runtimeContext: null,
       }),
-    ).toThrow(MissingConnectableRuntimePlanMessage);
+    ).toThrow(MissingConnectableRuntimeContextMessage);
   });
 
   it("prefers the provider thread when automation state exposes one", () => {
@@ -73,7 +21,10 @@ describe("session initial connect policy", () => {
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: "thread_123",
-        runtimePlan: createRuntimePlan(),
+        runtimeContext: {
+          launchCwd: "/root/acme/repo-1/packages/app",
+          primaryRepositoryRoot: "/root/acme/repo-1",
+        },
       }),
     ).toEqual({
       type: "provider_thread",
@@ -81,12 +32,15 @@ describe("session initial connect policy", () => {
     });
   });
 
-  it("starts a new thread in the raw runtime-plan cwd once the plan is available", () => {
+  it("starts a new thread in the runtime context launch cwd", () => {
     expect(
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: null,
-        runtimePlan: createRuntimePlan(),
+        runtimeContext: {
+          launchCwd: "/root/acme/repo-1/packages/app",
+          primaryRepositoryRoot: "/root/acme/repo-1",
+        },
       }),
     ).toEqual({
       type: "new_thread",
@@ -94,23 +48,14 @@ describe("session initial connect policy", () => {
     });
   });
 
-  it("starts a new thread without a cwd when the runtime plan does not pin one", () => {
+  it("starts a new thread without a cwd when runtime context has no launch cwd", () => {
     expect(
       resolveInitialSessionConnectTarget({
         connectable: false,
         providerThreadId: null,
-        runtimePlan: {
-          sandboxProfileId: "sbp_123",
-          version: 1,
-          image: {
-            source: "base",
-            imageRef: "img_123",
-          },
-          egressRoutes: [],
-          artifacts: [],
-          workspaceSources: [],
-          runtimeClients: [],
-          agentRuntimes: [],
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
         },
       }),
     ).toEqual({

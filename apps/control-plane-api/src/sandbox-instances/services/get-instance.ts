@@ -6,6 +6,7 @@ import {
 } from "@mistle/db/control-plane";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
+import { resolveSandboxInstanceRuntimeContext } from "./runtime-context.js";
 import type { SandboxInstanceAutomationConversation, SandboxInstanceStatus } from "./types.js";
 
 async function resolveAutomationConversation(
@@ -120,7 +121,9 @@ export async function getInstance(
     connectable: sandboxInstance.connectable,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
-    runtimePlan: sandboxInstance.runtimePlan,
+    runtimeContext: resolveSandboxInstanceRuntimeContext({
+      runtimePlan: sandboxInstance.runtimePlan,
+    }),
     automationConversation,
   };
 }

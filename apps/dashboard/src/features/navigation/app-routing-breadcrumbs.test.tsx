@@ -288,7 +288,7 @@ describe("app routing breadcrumb integration", () => {
       connectable: true,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {
@@ -317,7 +317,7 @@ describe("app routing breadcrumb integration", () => {
       connectable: true,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {

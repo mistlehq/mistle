@@ -355,7 +355,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     const connectTarget = resolveInitialSessionConnectTarget({
       connectable: sandboxStatusQuery.data?.connectable ?? null,
       providerThreadId,
-      runtimePlan: sandboxStatusQuery.data?.runtimePlan ?? null,
+      runtimeContext: sandboxStatusQuery.data?.runtimeContext ?? null,
     });
 
     setHasAttemptedAutoConnect(true);
@@ -383,7 +383,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     resolvedLifecycleErrorMessage,
     providerThreadId,
     sandboxStatusQuery.data?.connectable,
-    sandboxStatusQuery.data?.runtimePlan,
+    sandboxStatusQuery.data?.runtimeContext,
     sessionConnectionState,
   ]);
 

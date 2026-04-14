@@ -45,6 +45,11 @@ export type SandboxInstanceAutomationConversation = {
   providerConversationId: string | null;
 };
 
+export type SandboxInstanceRuntimeContext = {
+  launchCwd: string | null;
+  primaryRepositoryRoot: string | null;
+};
+
 export type SandboxInstanceStatus = {
   id: string;
   title: string | null;
@@ -52,7 +57,7 @@ export type SandboxInstanceStatus = {
   connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
-  runtimePlan: NonNullable<GetSandboxInstanceResponse>["runtimePlan"];
+  runtimeContext: SandboxInstanceRuntimeContext | null;
   automationConversation: SandboxInstanceAutomationConversation | null;
 };
 

@@ -1,4 +1,4 @@
-import { DefaultSandboxWorkspaceDir, type CompiledRuntimePlan } from "@mistle/integrations-core";
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 
@@ -76,42 +76,6 @@ export function resolveRepositoryPathFromWorkingDirectory(input: {
   }
 
   return null;
-}
-
-export function resolveRuntimePlanPrimaryRepositoryCwd(input: {
-  runtimePlan: CompiledRuntimePlan | null | undefined;
-}): string | null | undefined {
-  if (input.runtimePlan === undefined) {
-    return undefined;
-  }
-
-  for (const agentRuntime of input.runtimePlan?.agentRuntimes ?? []) {
-    const primaryRepositoryCwd =
-      agentRuntime.ptyLaunch.newLaunch.cwd ?? agentRuntime.ptyLaunch.resumeLaunch.cwd;
-    if (primaryRepositoryCwd !== undefined) {
-      return normalizeRepositoryPath(primaryRepositoryCwd);
-    }
-  }
-
-  return null;
-}
-
-export function resolveRuntimePlanPrimaryRepositoryPath(input: {
-  runtimePlan: CompiledRuntimePlan | null | undefined;
-}): string | null | undefined {
-  const primaryRepositoryCwd = resolveRuntimePlanPrimaryRepositoryCwd(input);
-  if (primaryRepositoryCwd === undefined || primaryRepositoryCwd === null) {
-    return primaryRepositoryCwd;
-  }
-
-  const repositoryPaths = (input.runtimePlan?.workspaceSources ?? [])
-    .filter((workspaceSource) => workspaceSource.resourceKind === "repository")
-    .map((workspaceSource) => normalizeRepositoryPath(workspaceSource.path));
-
-  return resolveRepositoryPathFromWorkingDirectory({
-    currentWorkingDirectory: primaryRepositoryCwd,
-    repositoryPaths,
-  });
 }
 
 function toUnavailableSelectedOption(input: {

@@ -25,57 +25,6 @@ type JsonRpcRequest = {
   params?: unknown;
 };
 
-function createRuntimePlan(input: { launchCwd?: string; repositoryPath: string }) {
-  return {
-    sandboxProfileId: "sbp_repo_page",
-    version: 1,
-    image: {
-      source: "base",
-      imageRef: "img_repo_page",
-    },
-    egressRoutes: [],
-    artifacts: [],
-    workspaceSources: [
-      {
-        sourceKind: "git-clone",
-        resourceKind: "repository",
-        path: input.repositoryPath,
-        originUrl: "https://github.com/mistlehq/mistle.git",
-      },
-    ],
-    runtimeClients: [],
-    agentRuntimes: [
-      {
-        bindingId: "ibd_repo_page",
-        runtimeId: "codex",
-        runtimeKey: "codex",
-        clientId: "rtc_repo_page",
-        endpointKey: "endpoint_repo_page",
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          newLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            cwd: input.launchCwd ?? input.repositoryPath,
-            command: "codex",
-            args: [],
-          },
-          resumeLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            cwd: input.launchCwd ?? input.repositoryPath,
-            command: "codex",
-            args: ["resume", "$THREAD_ID"],
-          },
-        },
-      },
-    ],
-  };
-}
-
 function installNodeWebSocket(): () => void {
   const originalWebSocket = globalThis.WebSocket;
 
@@ -355,7 +304,10 @@ function createWorkbenchRequestHandler(input: {
     failureCode: null;
     failureMessage: null;
     id: string;
-    runtimePlan: ReturnType<typeof createRuntimePlan> | null;
+    runtimeContext: {
+      launchCwd: string | null;
+      primaryRepositoryRoot: string | null;
+    } | null;
     status: "running";
     title: string;
   }>;
@@ -415,10 +367,10 @@ describe("SessionWorkbenchPage primary repository", () => {
             connectable: true,
             failureCode: null,
             failureMessage: null,
-            runtimePlan: createRuntimePlan({
-              repositoryPath: "/root/mistlehq/mistle",
+            runtimeContext: {
               launchCwd: "/root/mistlehq/mistle/packages/dashboard",
-            }),
+              primaryRepositoryRoot: "/root/mistlehq/mistle",
+            },
             automationConversation: null,
           },
         ],
@@ -531,9 +483,10 @@ describe("SessionWorkbenchPage primary repository", () => {
               connectable: true,
               failureCode: null,
               failureMessage: null,
-              runtimePlan: createRuntimePlan({
-                repositoryPath: "/root/mistlehq/mistle",
-              }),
+              runtimeContext: {
+                launchCwd: "/root/mistlehq/mistle",
+                primaryRepositoryRoot: "/root/mistlehq/mistle",
+              },
               automationConversation: null,
             }),
           );

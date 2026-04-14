@@ -1,4 +1,3 @@
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,58 +6,8 @@ import {
   parseRepositoryPaths,
   resolvePrimaryRepositoryPresentation,
   resolveRepositoryPathFromWorkingDirectory,
-  resolveRuntimePlanPrimaryRepositoryCwd,
-  resolveRuntimePlanPrimaryRepositoryPath,
   toRepositoryOptions,
 } from "./session-primary-repository-policy.js";
-
-function createRuntimePlan(input: {
-  newLaunchCwd?: string;
-  resumeLaunchCwd?: string;
-  workspaceSources?: CompiledRuntimePlan["workspaceSources"];
-}): CompiledRuntimePlan {
-  return {
-    sandboxProfileId: "sbp_123",
-    version: 1,
-    image: {
-      source: "base",
-      imageRef: "img_123",
-    },
-    egressRoutes: [],
-    artifacts: [],
-    workspaceSources: input.workspaceSources ?? [],
-    runtimeClients: [],
-    agentRuntimes: [
-      {
-        bindingId: "ibd_123",
-        runtimeId: "codex",
-        runtimeKey: "codex",
-        clientId: "rtc_123",
-        endpointKey: "endpoint_123",
-        ptyLaunch: {
-          runtimeId: "codex",
-          displayName: "Codex",
-          newLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            ...(input.newLaunchCwd === undefined ? {} : { cwd: input.newLaunchCwd }),
-            command: "codex",
-            args: [],
-          },
-          resumeLaunch: {
-            ptySessionId: "main",
-            cols: 120,
-            rows: 40,
-            ...(input.resumeLaunchCwd === undefined ? {} : { cwd: input.resumeLaunchCwd }),
-            command: "codex",
-            args: [],
-          },
-        },
-      },
-    ],
-  };
-}
 
 describe("session primary repository policy", () => {
   it("parses repository roots from find output", () => {
@@ -108,61 +57,6 @@ describe("session primary repository policy", () => {
       { value: "/root/acme/repo-1", label: "acme/repo-1" },
       { value: "/tmp/external-repo", label: "/tmp/external-repo" },
     ]);
-  });
-
-  it("resolves the initial repository from the runtime plan cwd", () => {
-    expect(
-      resolveRuntimePlanPrimaryRepositoryPath({
-        runtimePlan: createRuntimePlan({
-          newLaunchCwd: "/root/acme/repo-1",
-          resumeLaunchCwd: "/root/acme/repo-1",
-          workspaceSources: [
-            {
-              sourceKind: "git-clone",
-              resourceKind: "repository",
-              path: "/root/acme/repo-1",
-              originUrl: "https://github.com/acme/repo-1.git",
-            },
-          ],
-        }),
-      }),
-    ).toBe("/root/acme/repo-1");
-  });
-
-  it("maps a nested runtime-plan cwd back to the containing repository root", () => {
-    expect(
-      resolveRuntimePlanPrimaryRepositoryPath({
-        runtimePlan: createRuntimePlan({
-          newLaunchCwd: "/root/acme/repo-1/packages/app",
-          workspaceSources: [
-            {
-              sourceKind: "git-clone",
-              resourceKind: "repository",
-              path: "/root/acme/repo-1",
-              originUrl: "https://github.com/acme/repo-1.git",
-            },
-          ],
-        }),
-      }),
-    ).toBe("/root/acme/repo-1");
-  });
-
-  it("returns the raw runtime-plan cwd for thread startup", () => {
-    expect(
-      resolveRuntimePlanPrimaryRepositoryCwd({
-        runtimePlan: createRuntimePlan({
-          newLaunchCwd: "/root/acme/repo-1/packages/app",
-        }),
-      }),
-    ).toBe("/root/acme/repo-1/packages/app");
-  });
-
-  it("returns null when the runtime plan does not pin a repository cwd", () => {
-    expect(
-      resolveRuntimePlanPrimaryRepositoryPath({
-        runtimePlan: createRuntimePlan({}),
-      }),
-    ).toBeNull();
   });
 
   it("resolves the containing repository root from a working directory", () => {

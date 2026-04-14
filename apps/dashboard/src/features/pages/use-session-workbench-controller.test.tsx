@@ -629,7 +629,7 @@ describe("useSessionWorkbenchController", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: null,
     });
 
@@ -653,31 +653,22 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(false);
   });
 
-  it("throws when a connectable session is missing its runtime plan", () => {
+  it("throws when a connectable session is missing runtime context", () => {
     expect(() =>
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: null,
-        runtimePlan: null,
+        runtimeContext: null,
       }),
-    ).toThrow("Expected a connectable sandbox session to include a runtime plan.");
+    ).toThrow("Expected a connectable sandbox session to include runtime context.");
 
     expect(
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: "thread_123",
-        runtimePlan: {
-          sandboxProfileId: "sbp_123",
-          version: 1,
-          image: {
-            source: "base",
-            imageRef: "img_123",
-          },
-          egressRoutes: [],
-          artifacts: [],
-          workspaceSources: [],
-          runtimeClients: [],
-          agentRuntimes: [],
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
         },
       }),
     ).toEqual({

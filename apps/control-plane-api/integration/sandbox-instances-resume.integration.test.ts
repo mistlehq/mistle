@@ -261,7 +261,7 @@ describe("sandbox instance resume integration", () => {
         connectable: false,
         failureCode: null,
         failureMessage: null,
-        runtimePlan: null,
+        runtimeContext: null,
         automationConversation: null,
       });
 
@@ -425,7 +425,7 @@ describe("sandbox instance resume integration", () => {
         connectable: false,
         failureCode: null,
         failureMessage: null,
-        runtimePlan: null,
+        runtimeContext: null,
         automationConversation: null,
       });
 
