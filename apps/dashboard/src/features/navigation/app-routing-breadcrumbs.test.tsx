@@ -278,6 +278,53 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-title">Session');
   });
 
+  it("renders Untitled when the session detail resolves with no title", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(createSandboxInstanceStatusQueryKey("sbi_123"), {
+      id: "sbi_123",
+      title: null,
+      status: "running",
+      connectable: true,
+      failureCode: null,
+      failureMessage: null,
+      runtimePlan: null,
+      automationConversation: null,
+    });
+    const router = createMemoryRouter(dashboardRoutes, {
+      initialEntries: ["/sessions/sbi_123"],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('aria-label="Session title"');
+    expect(markup).toContain("Untitled");
+    expect(markup).not.toContain("sbi_123");
+    expect(markup).not.toContain('href="/sessions"');
+  });
+
+  it("leaves the session header blank while the detail title is unresolved", () => {
+    const queryClient = new QueryClient();
+    const router = createMemoryRouter(dashboardRoutes, {
+      initialEntries: ["/sessions/sbi_123"],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(markup).not.toContain('aria-label="Session title"');
+    expect(markup).not.toContain("Untitled");
+    expect(markup).not.toContain("sbi_123");
+    expect(markup).not.toContain('href="/sessions"');
+    expect(markup).toContain('data-slot="meta-title">Session');
+  });
+
   it("renders automations breadcrumbs for list, create, and detail routes", async () => {
     const router = createMemoryRouter(automationRoutes, {
       initialEntries: ["/automations"],

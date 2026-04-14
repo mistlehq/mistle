@@ -3,7 +3,6 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { useMatch } from "react-router";
 
-import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 import { useAppPageMeta } from "./route-meta.js";
 
@@ -17,13 +16,6 @@ export function AppHeaderLeading(): React.JSX.Element | null {
   const sessionDetailMatch = useMatch("/sessions/:sandboxInstanceId");
   const sandboxInstanceId =
     pageMeta.title === "Session" ? (sessionDetailMatch?.params["sandboxInstanceId"] ?? null) : null;
-  const cachedSessionListTitle =
-    sandboxInstanceId === null
-      ? null
-      : resolveCachedSessionListTitle({
-          queryClient,
-          sandboxInstanceId,
-        });
   const cachedSessionStatus = useSyncExternalStore(
     (onStoreChange) => {
       return queryClient.getQueryCache().subscribe(() => {
@@ -38,33 +30,20 @@ export function AppHeaderLeading(): React.JSX.Element | null {
     return <AppBreadcrumbs />;
   }
 
+  const headerTitle = resolveSessionHeaderTitle(cachedSessionStatus);
+  if (headerTitle === null) {
+    return null;
+  }
+
   return (
     <OverflowTooltipText
       ariaLabel="Session title"
       className="text-sm font-medium"
       containerClassName="max-w-[28rem] flex-1"
-      text={resolveSessionHeaderTitle(cachedSessionStatus?.title ?? cachedSessionListTitle)}
+      text={headerTitle}
       tooltipSide="bottom"
     />
   );
-}
-
-function resolveCachedSessionListTitle(input: {
-  queryClient: QueryClient;
-  sandboxInstanceId: string;
-}): string | null {
-  const cachedLists = input.queryClient.getQueriesData<SandboxInstancesListResult>({
-    queryKey: ["sandbox-instances", "list"],
-  });
-
-  for (const [, listResult] of cachedLists) {
-    const matchedItem = listResult?.items.find((item) => item.id === input.sandboxInstanceId);
-    if (matchedItem?.title !== null && matchedItem?.title !== undefined) {
-      return matchedItem.title;
-    }
-  }
-
-  return null;
 }
 
 function createSandboxInstanceStatusQueryKey(
@@ -88,10 +67,14 @@ function resolveCachedSessionStatus(
   );
 }
 
-function resolveSessionHeaderTitle(title: string | null | undefined): string {
-  if (title === null || title === undefined || title.trim().length === 0) {
+function resolveSessionHeaderTitle(status: SandboxInstanceStatusSummary | null): string | null {
+  if (status === null) {
+    return null;
+  }
+
+  if (status.title === null || status.title.trim().length === 0) {
     return "Untitled";
   }
 
-  return title;
+  return status.title;
 }
