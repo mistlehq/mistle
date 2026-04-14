@@ -7,10 +7,7 @@ import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
-import {
-  getSandboxInstanceStatusQueryKey,
-  sandboxInstanceStatusQueryKey,
-} from "../sessions/sessions-query-keys.js";
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
@@ -216,7 +213,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         }
 
         input.queryClient.setQueryData(
-          getSandboxInstanceStatusQueryKey(sandboxInstanceId),
+          sandboxInstanceStatusQueryKey(sandboxInstanceId),
           sandboxStatus,
         );
         setHasAttemptedAutoConnect(false);
@@ -402,5 +399,3 @@ export function useSessionWorkbenchLifecycleState(input: {
     stoppedSessionMessage,
   };
 }
-
-export { getSandboxInstanceStatusQueryKey };

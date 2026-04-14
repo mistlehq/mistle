@@ -20,7 +20,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useReducer, useRef, useState, type RefObject } from "react";
 
-import { getSandboxInstanceStatusQueryKey } from "../../../pages/use-session-workbench-lifecycle-state.js";
+import { sandboxInstanceStatusQueryKey } from "../../../sessions/sessions-query-keys.js";
 import { patchSandboxInstanceTitle } from "../../../sessions/sessions-service.js";
 import {
   createInitialCodexApprovalRequestsState,
@@ -238,7 +238,7 @@ export function useCodexSessionState(input: {
     onSuccess: async (_result, input) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+          queryKey: sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
           exact: true,
         }),
         queryClient.invalidateQueries({

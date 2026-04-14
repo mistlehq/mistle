@@ -7,12 +7,14 @@ import type {
   LaunchableSandboxProfile,
   LaunchableSandboxProfilesResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
+import {
+  sandboxInstanceStatusQueryKey,
+  sandboxInstancesListQueryKey,
+} from "../sessions/sessions-query-keys.js";
 import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
-import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-lifecycle-state.js";
 
 type SessionsSidebarQueryState =
   | {
@@ -156,7 +158,7 @@ export function createSessionsPageStoryQueryClient(input?: {
   }
 
   if (input?.sandboxInstanceStatus !== undefined) {
-    queryClient.setQueryData(getSandboxInstanceStatusQueryKey(input.sandboxInstanceStatus.id), {
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey(input.sandboxInstanceStatus.id), {
       id: input.sandboxInstanceStatus.id,
       title: input.sandboxInstanceStatus.title,
       status: input.sandboxInstanceStatus.status,

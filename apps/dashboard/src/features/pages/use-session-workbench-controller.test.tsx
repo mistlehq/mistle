@@ -5,9 +5,9 @@ import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
-  getSandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
@@ -620,7 +620,7 @@ describe("useSessionWorkbenchController", () => {
     const queryClient = createControllerQueryClient({
       staleTime: Number.POSITIVE_INFINITY,
     });
-    queryClient.setQueryData(getSandboxInstanceStatusQueryKey(sandboxInstanceId), {
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
       title: null,
       id: sandboxInstanceId,
       status: "stopped",

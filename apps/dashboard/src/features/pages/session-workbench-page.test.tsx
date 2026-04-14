@@ -7,9 +7,9 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
-import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-controller.js";
 
 function HeaderActionsHarness(input: React.PropsWithChildren): React.JSX.Element {
   const [actions, setActions] = useState<React.ReactNode | null>(null);
@@ -36,7 +36,7 @@ function renderSessionWorkbenchPage(input?: {
   });
 
   if (input?.seededStatus !== undefined) {
-    queryClient.setQueryData(getSandboxInstanceStatusQueryKey(sandboxInstanceId), {
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
       failureCode: null,
       failureMessage: null,
       id: sandboxInstanceId,
@@ -89,7 +89,7 @@ describe("SessionWorkbenchPage", () => {
     });
 
     await act(async () => {
-      view.queryClient.setQueryData(getSandboxInstanceStatusQueryKey(sandboxInstanceId), {
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,

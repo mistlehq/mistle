@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useSessionComposerAttachmentControl,
@@ -35,10 +36,7 @@ import {
   resolveCodexRecoveryStateForRender,
   resolveCodexReconnectMessage,
 } from "./use-session-workbench-codex-recovery.js";
-import {
-  getSandboxInstanceStatusQueryKey,
-  useSessionWorkbenchLifecycleState,
-} from "./use-session-workbench-lifecycle-state.js";
+import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
@@ -119,7 +117,7 @@ type UseSessionWorkbenchControllerResult = {
 };
 
 export {
-  getSandboxInstanceStatusQueryKey,
+  sandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
