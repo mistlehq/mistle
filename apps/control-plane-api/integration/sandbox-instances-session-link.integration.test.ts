@@ -69,6 +69,42 @@ async function insertSandboxInstance(input: {
 }
 
 describe("sandbox instance session link integration", () => {
+  it("redirects a public session link to the dashboard session view without authentication", async ({
+    fixture,
+  }) => {
+    const controlPlaneRuntime = await createControlPlaneApiRuntime({
+      app: fixture.config,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      portAccess: IntegrationPortAccessConfig,
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      },
+    });
+
+    try {
+      const response = await controlPlaneRuntime.request(
+        "/p/sessions/sbi_cp_session_link_public_001",
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toBe(
+        "http://localhost:5173/sessions/sbi_cp_session_link_public_001",
+      );
+    } finally {
+      await controlPlaneRuntime.stop();
+    }
+  });
+
   it("redirects an authorized user to the dashboard session view", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
@@ -171,7 +207,7 @@ describe("sandbox instance session link integration", () => {
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({
         code: "UNAUTHORIZED",
-        message: "Authentication is required.",
+        message: "Unauthorized API request.",
       });
     } finally {
       await controlPlaneRuntime.stop();

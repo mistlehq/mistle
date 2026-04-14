@@ -534,7 +534,7 @@ function createSessionLinkUrl(input: {
   const sessionLinkUrl = new URL(input.controlPlanePublicBaseUrl);
   sessionLinkUrl.pathname = joinPath(
     sessionLinkUrl.pathname,
-    `v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/session-link`,
+    `p/sessions/${encodeURIComponent(input.sandboxInstanceId)}`,
   );
   sessionLinkUrl.search = "";
   sessionLinkUrl.hash = "";

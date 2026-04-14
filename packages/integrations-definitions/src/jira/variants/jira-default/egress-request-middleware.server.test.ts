@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { AppendSessionLinkToJiraDocumentRequestMiddleware } from "./egress-request-middleware.server.js";
 
-const SessionUrl =
-  "https://control-plane.example.test/v1/sandbox/instances/sandbox_123/session-link";
+const SessionUrl = "https://control-plane.example.test/p/sessions/sandbox_123";
 
 function createJiraRequest(input: { method: string; pathname: string; body: unknown }) {
   return {

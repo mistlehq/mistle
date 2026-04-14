@@ -888,7 +888,7 @@ describe("tokenizer proxy integration", () => {
       serviceToken: "integration-service-token",
       credentialValue: "slack-secret",
     });
-    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/v1/sandbox/instances/sandbox_123/session-link`;
+    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/p/sessions/sandbox_123`;
     const appendSessionLinkMiddleware: ResolvedRequestMiddleware = {
       id: "append-session-link",
       handle({ ctx, request }) {
@@ -966,7 +966,7 @@ describe("tokenizer proxy integration", () => {
       credentialValue: "slack-secret",
     });
     const sessionLinkUrl =
-      "https://public-control-plane.example.test/mistle/control-plane/v1/sandbox/instances/sandbox_123/session-link";
+      "https://public-control-plane.example.test/mistle/control-plane/p/sessions/sandbox_123";
     const appendSessionLinkMiddleware: ResolvedRequestMiddleware = {
       id: "append-prefixed-session-link",
       handle({ ctx, request }) {
@@ -1289,7 +1289,7 @@ describe("tokenizer proxy integration", () => {
         expiresAt: "2099-01-01T00:00:00.000Z",
       },
     });
-    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/v1/sandbox/instances/sandbox_123/session-link`;
+    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/p/sessions/sandbox_123`;
     const appendSigV4BodyMiddleware: ResolvedRequestMiddleware = {
       id: "append-session-link-before-sigv4",
       handle({ ctx, request }) {

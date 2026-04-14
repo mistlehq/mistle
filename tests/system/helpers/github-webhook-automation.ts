@@ -216,7 +216,7 @@ export function buildSandboxSessionLinkUrl(input: {
   sandboxInstanceId: string;
 }): string {
   const url = new URL(`https://${input.publicHostname}`);
-  url.pathname = `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/session-link`;
+  url.pathname = `/p/sessions/${encodeURIComponent(input.sandboxInstanceId)}`;
   url.search = "";
   url.hash = "";
   return url.toString();
