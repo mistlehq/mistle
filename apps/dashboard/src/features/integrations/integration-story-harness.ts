@@ -147,7 +147,7 @@ export function createRefreshingDetailViewStoryProps() {
   });
 }
 
-export function createDenseGitHubAppDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   const connectionId = "icn_github_dense";
 
   return {
@@ -373,7 +373,7 @@ export function createDenseGitHubAppDetailViewStoryProps(): IntegrationConnectio
   };
 }
 
-type DenseDetailStorySpec = {
+type ScenarioDetailStorySpec = {
   authMethodId?: string;
   authMethodLabel?: string;
   bindingCount?: number;
@@ -401,8 +401,8 @@ type DenseDetailStorySpec = {
   webhookSources?: readonly IntegrationWebhookSource[];
 };
 
-function createDenseResourceItems(
-  input: DenseDetailStorySpec,
+function createResourceItems(
+  input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps["resourceItemsByKey"] {
   const resources = input.resources ?? [];
   const familyId = input.familyId ?? "integration";
@@ -431,7 +431,7 @@ function createDenseResourceItems(
 }
 
 function createWebhookSourceSectionState(
-  input: DenseDetailStorySpec,
+  input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps["webhookSourceStateByConnectionId"] | undefined {
   if (input.webhookSources === undefined) {
     return undefined;
@@ -454,10 +454,10 @@ function createWebhookSourceSectionState(
   ]);
 }
 
-function createDenseDetailViewStoryProps(
-  input: DenseDetailStorySpec,
+function createScenarioDetailViewStoryProps(
+  input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps {
-  const resourceItemsByKey = createDenseResourceItems(input);
+  const resourceItemsByKey = createResourceItems(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
 
   return {
@@ -510,8 +510,8 @@ function createDenseDetailViewStoryProps(
 
 const DenseStoryLastSyncedAt = "2026-04-13T15:37:00.000Z";
 
-export function createDenseGitHubEnterpriseServerDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     familyId: "github",
     authMethodId: "github-app-installation",
     authMethodLabel: "GitHub App installation",
@@ -565,8 +565,8 @@ export function createDenseGitHubEnterpriseServerDetailViewStoryProps(): Integra
   });
 }
 
-export function createDenseGitHubApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createGitHubApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     familyId: "github",
     authMethodId: "api-key",
     authMethodLabel: "API key",
@@ -596,8 +596,8 @@ export function createDenseGitHubApiKeyDetailViewStoryProps(): IntegrationConnec
   });
 }
 
-export function createDenseGitHubEnterpriseServerApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createGitHubEnterpriseServerApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     familyId: "github",
     authMethodId: "api-key",
     authMethodLabel: "API key",
@@ -632,8 +632,8 @@ export function createDenseGitHubEnterpriseServerApiKeyDetailViewStoryProps(): I
   });
 }
 
-export function createDenseJiraDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     bindingCount: 1,
     connectionId: "icn_jira_dense",
     displayName: "Jira Production",
@@ -657,24 +657,24 @@ export function createDenseJiraDetailViewStoryProps(): IntegrationConnectionDeta
   });
 }
 
-export function createDenseJiraServiceAccountApiTokenDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createJiraServiceAccountApiTokenDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     bindingCount: 1,
     connectionId: "icn_jira_service_account_api_dense",
     displayName: "Jira Service Account",
   });
 }
 
-export function createDenseJiraServiceAccountOauthDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createJiraServiceAccountOauthDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     bindingCount: 1,
     connectionId: "icn_jira_service_account_oauth_dense",
     displayName: "Jira OAuth Service Account",
   });
 }
 
-export function createDenseLinearDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createLinearDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "api-key",
     authMethodLabel: "API key",
     connectionId: "icn_linear_dense",
@@ -682,8 +682,8 @@ export function createDenseLinearDetailViewStoryProps(): IntegrationConnectionDe
   });
 }
 
-export function createDenseSlackDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "slack-bot-token",
     authMethodLabel: "Bot token",
     bindingCount: 2,
@@ -707,8 +707,8 @@ export function createDenseSlackDetailViewStoryProps(): IntegrationConnectionDet
   });
 }
 
-export function createDenseOpenAiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createOpenAiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "api-key",
     authMethodLabel: "API key",
     connectionId: "icn_openai_dense",
@@ -716,8 +716,8 @@ export function createDenseOpenAiDetailViewStoryProps(): IntegrationConnectionDe
   });
 }
 
-export function createDenseOpenAiChatGptDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createOpenAiChatGptDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "chatgpt-device-code",
     authMethodLabel: "ChatGPT subscription",
     connectionId: "icn_openai_chatgpt_dense",
@@ -725,8 +725,8 @@ export function createDenseOpenAiChatGptDetailViewStoryProps(): IntegrationConne
   });
 }
 
-export function createDenseAwsDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createAwsDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "aws-assume-role",
     authMethodLabel: "Access key + AssumeRole",
     connectionId: "icn_aws_dense",
@@ -734,8 +734,8 @@ export function createDenseAwsDetailViewStoryProps(): IntegrationConnectionDetai
   });
 }
 
-export function createDenseDatadogDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createDatadogDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "api-key",
     authMethodLabel: "API key",
     connectionId: "icn_datadog_dense",
@@ -743,8 +743,8 @@ export function createDenseDatadogDetailViewStoryProps(): IntegrationConnectionD
   });
 }
 
-export function createDensePlanetScaleDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createPlanetScaleDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "oauth2-authorization-code",
     authMethodLabel: "PlanetScale OAuth",
     connectionId: "icn_planetscale_dense",
@@ -752,8 +752,8 @@ export function createDensePlanetScaleDetailViewStoryProps(): IntegrationConnect
   });
 }
 
-export function createDenseSigNozDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createDenseDetailViewStoryProps({
+export function createSigNozDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  return createScenarioDetailViewStoryProps({
     authMethodId: "oauth2-authorization-code",
     authMethodLabel: "SigNoz OAuth",
     connectionId: "icn_signoz_dense",
@@ -761,18 +761,18 @@ export function createDenseSigNozDetailViewStoryProps(): IntegrationConnectionDe
   });
 }
 
-export function createDenseIntegrationGalleryStoryProps(): IntegrationConnectionDetailViewProps {
+export function createIntegrationGalleryStoryProps(): IntegrationConnectionDetailViewProps {
   const storyProps = [
-    createDenseGitHubAppDetailViewStoryProps(),
-    createDenseGitHubEnterpriseServerDetailViewStoryProps(),
-    createDenseJiraDetailViewStoryProps(),
-    createDenseLinearDetailViewStoryProps(),
-    createDenseSlackDetailViewStoryProps(),
-    createDenseOpenAiDetailViewStoryProps(),
-    createDenseAwsDetailViewStoryProps(),
-    createDenseDatadogDetailViewStoryProps(),
-    createDensePlanetScaleDetailViewStoryProps(),
-    createDenseSigNozDetailViewStoryProps(),
+    createGitHubAppDetailViewStoryProps(),
+    createGitHubEnterpriseServerDetailViewStoryProps(),
+    createJiraDetailViewStoryProps(),
+    createLinearDetailViewStoryProps(),
+    createSlackDetailViewStoryProps(),
+    createOpenAiDetailViewStoryProps(),
+    createAwsDetailViewStoryProps(),
+    createDatadogDetailViewStoryProps(),
+    createPlanetScaleDetailViewStoryProps(),
+    createSigNozDetailViewStoryProps(),
   ];
 
   return {
@@ -792,7 +792,7 @@ export function createDenseIntegrationGalleryStoryProps(): IntegrationConnection
   };
 }
 
-export type DenseIntegrationDetailControlVariant =
+export type IntegrationDetailControlVariant =
   | "github-cloud:github-app-installation"
   | "github-cloud:api-key"
   | "github-enterprise-server:github-app-installation"
@@ -809,50 +809,50 @@ export type DenseIntegrationDetailControlVariant =
   | "planetscale-mcp:oauth2-authorization-code"
   | "signoz-mcp:oauth2-authorization-code";
 
-export function createDenseIntegrationDetailViewStoryPropsForVariant(
-  variant: DenseIntegrationDetailControlVariant,
+export function createIntegrationDetailViewStoryPropsForVariant(
+  variant: IntegrationDetailControlVariant,
 ): IntegrationConnectionDetailViewProps {
   if (variant === "github-cloud:github-app-installation") {
-    return createDenseGitHubAppDetailViewStoryProps();
+    return createGitHubAppDetailViewStoryProps();
   }
   if (variant === "github-cloud:api-key") {
-    return createDenseGitHubApiKeyDetailViewStoryProps();
+    return createGitHubApiKeyDetailViewStoryProps();
   }
   if (variant === "github-enterprise-server:github-app-installation") {
-    return createDenseGitHubEnterpriseServerDetailViewStoryProps();
+    return createGitHubEnterpriseServerDetailViewStoryProps();
   }
   if (variant === "github-enterprise-server:api-key") {
-    return createDenseGitHubEnterpriseServerApiKeyDetailViewStoryProps();
+    return createGitHubEnterpriseServerApiKeyDetailViewStoryProps();
   }
   if (variant === "jira-default:jira-personal-api-token") {
-    return createDenseJiraDetailViewStoryProps();
+    return createJiraDetailViewStoryProps();
   }
   if (variant === "jira-default:jira-service-account-api-token") {
-    return createDenseJiraServiceAccountApiTokenDetailViewStoryProps();
+    return createJiraServiceAccountApiTokenDetailViewStoryProps();
   }
   if (variant === "jira-default:jira-service-account-oauth-client-credentials") {
-    return createDenseJiraServiceAccountOauthDetailViewStoryProps();
+    return createJiraServiceAccountOauthDetailViewStoryProps();
   }
   if (variant === "linear-default:api-key") {
-    return createDenseLinearDetailViewStoryProps();
+    return createLinearDetailViewStoryProps();
   }
   if (variant === "slack-default:slack-bot-token") {
-    return createDenseSlackDetailViewStoryProps();
+    return createSlackDetailViewStoryProps();
   }
   if (variant === "openai-default:api-key") {
-    return createDenseOpenAiDetailViewStoryProps();
+    return createOpenAiDetailViewStoryProps();
   }
   if (variant === "openai-default:chatgpt-device-code") {
-    return createDenseOpenAiChatGptDetailViewStoryProps();
+    return createOpenAiChatGptDetailViewStoryProps();
   }
   if (variant === "aws-cli-default:aws-assume-role") {
-    return createDenseAwsDetailViewStoryProps();
+    return createAwsDetailViewStoryProps();
   }
   if (variant === "datadog-default:api-key") {
-    return createDenseDatadogDetailViewStoryProps();
+    return createDatadogDetailViewStoryProps();
   }
   if (variant === "planetscale-mcp:oauth2-authorization-code") {
-    return createDensePlanetScaleDetailViewStoryProps();
+    return createPlanetScaleDetailViewStoryProps();
   }
-  return createDenseSigNozDetailViewStoryProps();
+  return createSigNozDetailViewStoryProps();
 }
