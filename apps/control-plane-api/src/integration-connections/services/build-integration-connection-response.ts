@@ -5,7 +5,7 @@ type ConnectionMethodMetadata = {
   label: string;
 };
 
-type ProjectedIntegrationConnection = {
+type IntegrationConnectionResponse = {
   id: string;
   targetKey: string;
   displayName: string;
@@ -19,7 +19,7 @@ type ProjectedIntegrationConnection = {
   updatedAt: string;
 };
 
-type ProjectIntegrationConnectionInput = {
+type BuildIntegrationConnectionResponseInput = {
   connection: Pick<
     IntegrationConnection,
     | "id"
@@ -36,8 +36,8 @@ type ProjectIntegrationConnectionInput = {
 };
 
 export function buildIntegrationConnectionResponse(
-  input: ProjectIntegrationConnectionInput,
-): ProjectedIntegrationConnection {
+  input: BuildIntegrationConnectionResponseInput,
+): IntegrationConnectionResponse {
   const connectionMethodMetadata = resolveConnectionMethodMetadata({
     config: input.connection.config,
     connectionMethods: input.connectionMethods,
@@ -64,7 +64,7 @@ export function buildIntegrationConnectionResponse(
 function resolveConnectionMethodMetadata(input: {
   config: Record<string, unknown> | null;
   connectionMethods?: readonly ConnectionMethodMetadata[] | undefined;
-}): Pick<ProjectedIntegrationConnection, "connectionMethodId" | "connectionMethodLabel"> | {} {
+}): Pick<IntegrationConnectionResponse, "connectionMethodId" | "connectionMethodLabel"> | {} {
   if (input.config === null) {
     return {};
   }
