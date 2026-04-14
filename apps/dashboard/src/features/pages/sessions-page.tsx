@@ -87,50 +87,7 @@ export function shouldClearSelectedProfile(input: {
   return !input.selectableProfiles.some((profile) => profile.id === selectedProfileId);
 }
 
-export function SandboxSessionStatusBadge(input: {
-  status: SandboxLifecycleStatus;
-  failureCode: string | null;
-  failureMessage: string | null;
-}): React.JSX.Element {
-  const statusUi = resolveSandboxStatusBadgeUi(input.status);
-
-  if (input.failureMessage === null) {
-    return (
-      <Badge className={statusUi.className} variant={statusUi.variant}>
-        {statusUi.label}
-      </Badge>
-    );
-  }
-
-  const tooltipMessage = input.failureMessage;
-
-  return (
-    <Tooltip delay={0}>
-      <TooltipTrigger
-        aria-label="View failure details"
-        render={
-          <Badge
-            className={statusUi.className}
-            render={<span aria-hidden="true" />}
-            variant={statusUi.variant}
-          />
-        }
-      >
-        {statusUi.label}
-        <InfoIcon className="size-3.5" data-icon="inline-end" />
-      </TooltipTrigger>
-      <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
-        {tooltipMessage}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function SessionTitleCell(input: {
-  href?: string;
-  title: string;
-  isNavigable: boolean;
-}): React.JSX.Element {
+function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
   const [titleElement, setTitleElement] = useState<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -169,9 +126,7 @@ function SessionTitleCell(input: {
           input.href === undefined ? (
             <span className="flex max-w-full items-center gap-1">
               <span
-                className={`block min-w-0 flex-1 cursor-default truncate font-medium ${
-                  input.isNavigable ? "" : "text-muted-foreground"
-                }`}
+                className="block min-w-0 flex-1 cursor-default truncate font-medium text-muted-foreground"
                 ref={handleTitleRef}
               >
                 {input.title}
@@ -215,16 +170,38 @@ function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): stri
 function resolveUpdatedLabel(input: {
   status: SandboxLifecycleStatus;
   updatedAt: string;
-  failureCode: string | null;
   failureMessage: string | null;
 }): React.JSX.Element {
   if (input.status === "failed") {
+    const statusUi = resolveSandboxStatusBadgeUi(input.status);
+
+    if (input.failureMessage === null) {
+      return (
+        <Badge className={statusUi.className} variant={statusUi.variant}>
+          {statusUi.label}
+        </Badge>
+      );
+    }
+
     return (
-      <SandboxSessionStatusBadge
-        failureCode={input.failureCode}
-        failureMessage={input.failureMessage}
-        status={input.status}
-      />
+      <Tooltip delay={0}>
+        <TooltipTrigger
+          aria-label="View failure details"
+          render={
+            <Badge
+              className={statusUi.className}
+              render={<span aria-hidden="true" />}
+              variant={statusUi.variant}
+            />
+          }
+        >
+          {statusUi.label}
+          <InfoIcon className="size-3.5" data-icon="inline-end" />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
+          {input.failureMessage}
+        </TooltipContent>
+      </Tooltip>
     );
   }
 
@@ -369,25 +346,7 @@ export function SessionsPage(): React.JSX.Element {
     currentUserId: session.user.id,
     currentUserDisplayName,
   });
-  const displayedSessions = [
-    ...optimisticSessions,
-    ...(sandboxInstancesQuery.data?.items ?? []),
-  ].sort((left, right) => {
-    const statusRank: Record<SandboxLifecycleStatus, number> = {
-      pending: 0,
-      starting: 1,
-      running: 2,
-      failed: 3,
-      stopped: 4,
-    };
-
-    const rankDifference = statusRank[left.status] - statusRank[right.status];
-    if (rankDifference !== 0) {
-      return rankDifference;
-    }
-
-    return Date.parse(right.createdAt) - Date.parse(left.createdAt);
-  });
+  const displayedSessions = [...optimisticSessions, ...(sandboxInstancesQuery.data?.items ?? [])];
 
   function updatePagination(input: {
     nextLimit: number;
@@ -435,9 +394,7 @@ export function SessionsPage(): React.JSX.Element {
     });
   }
 
-  const sortedSessions = displayedSessions;
-
-  const hasSessions = sortedSessions.length > 0;
+  const hasSessions = displayedSessions.length > 0;
 
   const listErrorMessage = sandboxInstancesQuery.isError
     ? resolveApiErrorMessage({
@@ -568,7 +525,7 @@ export function SessionsPage(): React.JSX.Element {
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedSessions.map((session) => {
+                displayedSessions.map((session) => {
                   const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
 
                   return (
@@ -584,7 +541,6 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="max-w-0 align-top whitespace-normal">
                         <div className="flex min-w-0">
                           <SessionTitleCell
-                            isNavigable={isNavigable}
                             title={session.title ?? "Untitled"}
                             {...(isNavigable
                               ? {
@@ -609,7 +565,6 @@ export function SessionsPage(): React.JSX.Element {
                           {resolveUpdatedLabel({
                             status: session.status,
                             updatedAt: session.updatedAt,
-                            failureCode: session.failureCode,
                             failureMessage: session.failureMessage,
                           })}
                         </div>

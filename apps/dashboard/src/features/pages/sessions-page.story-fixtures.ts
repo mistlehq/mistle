@@ -1,9 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 
-import {
-  createAuthenticatedSessionFixture,
-  seedAuthenticatedSession,
-} from "../../test-support/auth-session.js";
+import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
@@ -151,5 +148,3 @@ export function createSessionsPageStoryQueryClient(input?: {
 
   return queryClient;
 }
-
-export const StoryAuthenticatedSession = createAuthenticatedSessionFixture();

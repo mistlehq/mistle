@@ -78,7 +78,7 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
             handle={ROUTE_HANDLES.automations}
             path="/automations"
           />
-          <Route element={<StoryRouteOutlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
+          <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
             <Route element={<SessionsPage />} index />
             <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
             <Route
@@ -185,10 +185,6 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
       />
     </AppShellHeaderActionsContext.Provider>
   );
-}
-
-function StoryRouteOutlet(): React.JSX.Element {
-  return <Outlet />;
 }
 
 function SessionDetailStoryPage(): React.JSX.Element {

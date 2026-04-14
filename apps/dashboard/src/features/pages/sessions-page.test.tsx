@@ -14,7 +14,6 @@ import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   buildOptimisticSessions,
   resolveSessionResultsSummary,
-  SandboxSessionStatusBadge,
   SessionsPage,
   shouldClearSelectedProfile,
 } from "./sessions-page.js";
@@ -236,40 +235,6 @@ describe("SessionsPage", () => {
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });
 
-  it("orders same-status sessions by most recent createdAt first", () => {
-    const queryClient = createSessionsPageQueryClient({
-      refetchOnMount: false,
-      staleTime: Number.POSITIVE_INFINITY,
-    });
-    seedSessionsList({
-      queryClient,
-      items: [
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_older_update",
-          title: "Older updated session",
-          status: "running",
-          createdAt: "2026-03-08T00:00:00.000Z",
-          updatedAt: "2026-03-09T00:00:00.000Z",
-        }),
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_newer_update",
-          title: "Newer updated session",
-          status: "running",
-          createdAt: "2026-03-10T00:00:00.000Z",
-          updatedAt: "2026-03-08T00:00:00.000Z",
-        }),
-      ],
-    });
-
-    const rendered = renderSessionsPage({
-      queryClient,
-    });
-
-    const rows = rendered.container.querySelectorAll("tbody tr");
-    expect(rows.item(0).textContent).toContain("Newer updated session");
-    expect(rows.item(1).textContent).toContain("Older updated session");
-  });
-
   it("truncates long session titles in the list so the full value can be shown in a tooltip", () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
@@ -346,19 +311,33 @@ describe("SessionsPage", () => {
   });
 
   it("renders a compact failure indicator with tooltip details", () => {
-    const markup = renderToStaticMarkup(
-      <SandboxSessionStatusBadge
-        status="failed"
-        failureCode="sandbox_start_failed"
-        failureMessage="Failed to start sandbox runtime."
-      />,
-    );
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_failed",
+          status: "failed",
+          failureCode: "sandbox_start_failed",
+          failureMessage: "Failed to start sandbox runtime.",
+        }),
+      ],
+    });
 
-    expect(markup).toContain("View failure details");
-    expect(markup).toContain("Failed");
-    expect(markup).not.toContain("sandbox_start_failed");
-    expect(markup).not.toContain("Failed to start sandbox runtime.");
-    expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
+    const rendered = renderSessionsPage({
+      queryClient,
+    });
+
+    expect(within(rendered.container).getByLabelText("View failure details")).toBeDefined();
+    expect(within(rendered.container).getByText("Failed")).toBeDefined();
+    expect(rendered.container.innerHTML).not.toContain("sandbox_start_failed");
+    expect(rendered.container.innerHTML).not.toContain("Failed to start sandbox runtime.");
+    expect(rendered.container.innerHTML).not.toContain(
+      "text-destructive whitespace-pre-wrap text-xs",
+    );
   });
 
   it("uses the same badge labels as the workbench header mapper", () => {

@@ -27,26 +27,6 @@ type SessionsSidebarStoryArgs = {
   showSessionsSidebar?: boolean;
 };
 
-function SessionsSidebarStory(input: SessionsSidebarStoryArgs): React.JSX.Element {
-  return (
-    <SessionsStoryHarness
-      initialEntries={input.initialEntries}
-      {...(input.launchableProfiles !== undefined
-        ? { launchableProfiles: input.launchableProfiles }
-        : {})}
-      {...(input.sandboxInstancesList !== undefined
-        ? { sandboxInstancesList: input.sandboxInstancesList }
-        : {})}
-      {...(input.sessionsSidebarQueryState !== undefined
-        ? { sessionsSidebarQueryState: input.sessionsSidebarQueryState }
-        : {})}
-      {...(input.showSessionsSidebar !== undefined
-        ? { showSessionsSidebar: input.showSessionsSidebar }
-        : {})}
-    />
-  );
-}
-
 function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
   return {
     items: [
@@ -131,7 +111,7 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
 
 const meta = {
   title: "Dashboard/Sessions/Sidebar",
-  component: SessionsSidebarStory,
+  component: SessionsStoryHarness,
   tags: ["autodocs"],
   decorators: [withDashboardPageStory],
   parameters: {
@@ -154,9 +134,25 @@ const meta = {
     sandboxInstancesList: buildMixedOpenableSessionsList(),
   },
   render: function RenderStory(args): React.JSX.Element {
-    return <SessionsSidebarStory {...args} />;
+    return (
+      <SessionsStoryHarness
+        initialEntries={args.initialEntries}
+        {...(args.launchableProfiles !== undefined
+          ? { launchableProfiles: args.launchableProfiles }
+          : {})}
+        {...(args.sandboxInstancesList !== undefined
+          ? { sandboxInstancesList: args.sandboxInstancesList }
+          : {})}
+        {...(args.sessionsSidebarQueryState !== undefined
+          ? { sessionsSidebarQueryState: args.sessionsSidebarQueryState }
+          : {})}
+        {...(args.showSessionsSidebar !== undefined
+          ? { showSessionsSidebar: args.showSessionsSidebar }
+          : {})}
+      />
+    );
   },
-} satisfies Meta<typeof SessionsSidebarStory>;
+} satisfies Meta<SessionsSidebarStoryArgs>;
 
 export default meta;
 

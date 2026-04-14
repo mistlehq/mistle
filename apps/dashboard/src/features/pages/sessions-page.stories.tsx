@@ -14,23 +14,9 @@ type SessionsPageStoryArgs = {
   sandboxInstancesList?: SandboxInstancesListResult;
 };
 
-function SessionsPageStory(input: SessionsPageStoryArgs): React.JSX.Element {
-  return (
-    <SessionsStoryHarness
-      initialEntries={["/sessions"]}
-      {...(input.launchableProfiles !== undefined
-        ? { launchableProfiles: input.launchableProfiles }
-        : {})}
-      {...(input.sandboxInstancesList !== undefined
-        ? { sandboxInstancesList: input.sandboxInstancesList }
-        : {})}
-    />
-  );
-}
-
 const meta = {
   title: "Dashboard/Sessions/Page",
-  component: SessionsPageStory,
+  component: SessionsStoryHarness,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
@@ -87,9 +73,19 @@ const meta = {
     },
   },
   render: function RenderStory(args): React.JSX.Element {
-    return <SessionsPageStory {...args} />;
+    return (
+      <SessionsStoryHarness
+        initialEntries={["/sessions"]}
+        {...(args.launchableProfiles !== undefined
+          ? { launchableProfiles: args.launchableProfiles }
+          : {})}
+        {...(args.sandboxInstancesList !== undefined
+          ? { sandboxInstancesList: args.sandboxInstancesList }
+          : {})}
+      />
+    );
   },
-} satisfies Meta<typeof SessionsPageStory>;
+} satisfies Meta<SessionsPageStoryArgs>;
 
 export default meta;
 
