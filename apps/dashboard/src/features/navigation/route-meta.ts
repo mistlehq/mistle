@@ -7,6 +7,7 @@ export type RouteTextResolverInput = {
 
 export type RouteTextValue = string | ((input: RouteTextResolverInput) => string);
 export type RouteHrefValue = string | ((input: RouteTextResolverInput) => string | null);
+export type RouteNodeValue = (input: RouteTextResolverInput) => React.ReactNode;
 
 export type AppRouteHandle = {
   appShellInsetOwner?: "app-shell" | "child";
@@ -17,6 +18,7 @@ export type AppRouteHandle = {
   title?: RouteTextValue;
   description?: RouteTextValue;
   headerIcon?: (input: RouteTextResolverInput) => React.ReactNode;
+  headerLeading?: RouteNodeValue;
   hideBreadcrumb?: boolean;
 };
 
@@ -67,6 +69,10 @@ function isRouteHeaderIconValue(
   return typeof value === "function";
 }
 
+function isRouteNodeValue(value: unknown): value is RouteNodeValue {
+  return typeof value === "function";
+}
+
 function normalizeParams(params: unknown): Readonly<Record<string, string | undefined>> {
   if (!isObjectRecord(params)) {
     return {};
@@ -101,6 +107,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const title = handle["title"];
   const description = handle["description"];
   const headerIcon = handle["headerIcon"];
+  const headerLeading = handle["headerLeading"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
 
   if (appShellInsetOwner === "app-shell" || appShellInsetOwner === "child") {
@@ -135,6 +142,10 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.headerIcon = headerIcon;
   }
 
+  if (isRouteNodeValue(headerLeading)) {
+    parsedHandle.headerLeading = headerLeading;
+  }
+
   if (typeof hideBreadcrumb === "boolean") {
     parsedHandle.hideBreadcrumb = hideBreadcrumb;
   }
@@ -148,6 +159,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.headerIcon === undefined &&
+    parsedHandle.headerLeading === undefined &&
     parsedHandle.hideBreadcrumb === undefined
   ) {
     return null;
@@ -247,6 +259,38 @@ export function resolveAppBreadcrumbsFromMatches(matches: unknown[]): AppBreadcr
 export function useAppPageMeta(): AppPageMeta {
   const matches = useMatches();
   return resolveAppPageMetaFromMatches(matches);
+}
+
+export function useAppHeaderLeadingContent(): React.ReactNode | null {
+  const matches = useMatches();
+  return resolveAppHeaderLeadingContentFromMatches(matches);
+}
+
+export function resolveAppHeaderLeadingContentFromMatches(
+  matches: unknown[],
+): React.ReactNode | null {
+  if (!Array.isArray(matches)) {
+    return null;
+  }
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.headerLeading === undefined) {
+      continue;
+    }
+
+    return handle.headerLeading({
+      params: normalizeParams(match.params),
+      data: match.data,
+    });
+  }
+
+  return null;
 }
 
 export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {

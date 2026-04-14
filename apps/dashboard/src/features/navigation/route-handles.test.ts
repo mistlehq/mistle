@@ -148,16 +148,9 @@ describe("route handles", () => {
     expect(detailBreadcrumb({ params: {} })).toBe("Edit profile");
   });
 
-  it("resolves session detail breadcrumb with sandbox instance id fallback", () => {
-    const detailBreadcrumb = ROUTE_HANDLES.sessionsDetail.breadcrumb;
-    expect(typeof detailBreadcrumb).toBe("function");
-
-    if (typeof detailBreadcrumb !== "function") {
-      throw new Error("sessionsDetail breadcrumb must be a function");
-    }
-
-    expect(detailBreadcrumb({ params: { sandboxInstanceId: "sbox_123" } })).toBe("sbox_123");
-    expect(detailBreadcrumb({ params: {} })).toBe("Session");
+  it("defines session detail header-leading content and hides breadcrumbs", () => {
+    expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
+    expect(typeof ROUTE_HANDLES.sessionsDetail.headerLeading).toBe("function");
   });
 
   it("resolves automation detail breadcrumb with edit fallback", () => {
