@@ -1,11 +1,15 @@
 import { createServer } from "node:http";
 
+import type { PutSandboxInstanceDeadlineAcceptedResponse } from "@mistle/data-plane-internal-client";
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import { SandboxInstanceDeadlineService } from "../../deadlines/sandbox-instance-deadline-service.js";
+import {
+  DefaultDataPlaneGatewayLifecycleDurations,
+  SandboxInstanceDeadlineService,
+} from "../../deadlines/sandbox-instance-deadline-service.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -281,10 +285,7 @@ async function createDisconnectTestHarness() {
         },
       },
       clock,
-      {
-        idleTimeoutMs: 300_000,
-        bootstrapDisconnectGraceMs: 60_000,
-      },
+      DefaultDataPlaneGatewayLifecycleDurations,
     ),
     clock,
     scheduler,
@@ -373,7 +374,7 @@ describe("TunnelSessionService", () => {
               kind: input.kind,
               generation: 1,
               workflowRunId: "owfr_test",
-            } satisfies SandboxInstanceDeadlinePutAcceptedResponse;
+            } satisfies PutSandboxInstanceDeadlineAcceptedResponse;
           },
           async deleteSandboxInstanceDeadline(input) {
             return {
@@ -384,10 +385,7 @@ describe("TunnelSessionService", () => {
           },
         },
         clock,
-        {
-          idleTimeoutMs: 300_000,
-          bootstrapDisconnectGraceMs: 60_000,
-        },
+        DefaultDataPlaneGatewayLifecycleDurations,
       ),
       clock,
       scheduler,

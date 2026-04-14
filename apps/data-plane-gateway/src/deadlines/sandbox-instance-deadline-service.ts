@@ -1,6 +1,24 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { Clock } from "@mistle/time";
 
+import { BOOTSTRAP_DISCONNECT_GRACE_MS, IDLE_TIMEOUT_MS } from "../runtime-state/durations.js";
+
+export type DataPlaneGatewayLifecycleDurations = {
+  idleTimeoutMs: number;
+  bootstrapDisconnectGraceMs: number;
+};
+
+export const DefaultDataPlaneGatewayLifecycleDurations: DataPlaneGatewayLifecycleDurations = {
+  idleTimeoutMs: IDLE_TIMEOUT_MS,
+  bootstrapDisconnectGraceMs: BOOTSTRAP_DISCONNECT_GRACE_MS,
+};
+
+export function resolveDataPlaneGatewayLifecycleDurations(
+  lifecycleDurations: DataPlaneGatewayLifecycleDurations | undefined,
+): DataPlaneGatewayLifecycleDurations {
+  return lifecycleDurations ?? DefaultDataPlaneGatewayLifecycleDurations;
+}
+
 export class SandboxInstanceDeadlineService {
   public constructor(
     private readonly dataPlaneClient: Pick<
@@ -8,10 +26,7 @@ export class SandboxInstanceDeadlineService {
       "putSandboxInstanceDeadline" | "deleteSandboxInstanceDeadline"
     >,
     private readonly clock: Clock,
-    private readonly lifecycleConfig: {
-      idleTimeoutMs: number;
-      bootstrapDisconnectGraceMs: number;
-    },
+    private readonly lifecycleDurations: DataPlaneGatewayLifecycleDurations,
   ) {}
 
   public async handleBootstrapAttach(input: {
@@ -32,7 +47,7 @@ export class SandboxInstanceDeadlineService {
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "idle",
       ownerLeaseId: input.ownerLeaseId,
-      dueAt: new Date(this.clock.nowMs() + this.lifecycleConfig.idleTimeoutMs).toISOString(),
+      dueAt: new Date(this.clock.nowMs() + this.lifecycleDurations.idleTimeoutMs).toISOString(),
     });
   }
 
@@ -48,7 +63,7 @@ export class SandboxInstanceDeadlineService {
       kind: "disconnect",
       ownerLeaseId: input.ownerLeaseId,
       dueAt: new Date(
-        this.clock.nowMs() + this.lifecycleConfig.bootstrapDisconnectGraceMs,
+        this.clock.nowMs() + this.lifecycleDurations.bootstrapDisconnectGraceMs,
       ).toISOString(),
     });
   }

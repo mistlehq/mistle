@@ -45,13 +45,13 @@ export type SystemTestFixture = {
   dataPlaneWorkerContainerId: string;
   dataPlaneGatewayBaseUrl: string;
   dataPlaneGatewayContainerId: string;
-  dataPlaneGatewayIdleTimeoutMs: number;
-  dataPlaneGatewayBootstrapDisconnectGraceMs: number;
   tokenizerProxyBaseUrl: string;
   tokenizerProxyContainerId: string;
   controlPlaneDatabaseUrl: string;
   internalAuthServiceToken: string;
   otlpTraceCaptureFilePath: string;
+  dataPlaneGatewayIdleTimeoutMs: number;
+  dataPlaneGatewayBootstrapDisconnectGraceMs: number;
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -182,8 +182,6 @@ export const SystemTestContextSchema = z
     dataPlaneWorkerContainerId: z.string().min(1),
     dataPlaneGatewayBaseUrl: z.url(),
     dataPlaneGatewayContainerId: z.string().min(1),
-    dataPlaneGatewayIdleTimeoutMs: z.number().int().positive(),
-    dataPlaneGatewayBootstrapDisconnectGraceMs: z.number().int().positive(),
     tokenizerProxyBaseUrl: z.url(),
     tokenizerProxyContainerId: z.string().min(1),
     mailpitHttpBaseUrl: z.url(),
@@ -191,6 +189,8 @@ export const SystemTestContextSchema = z
     internalAuthServiceToken: z.string().min(1),
     otlpTraceCaptureFilePath: z.string().min(1),
     sandboxNetworkName: z.string().min(1),
+    dataPlaneGatewayIdleTimeoutMs: z.number().int().positive(),
+    dataPlaneGatewayBootstrapDisconnectGraceMs: z.number().int().positive(),
   })
   .strict();
 
@@ -638,6 +638,10 @@ async function runPtyCommand(input: {
         );
       }
       continue;
+    }
+
+    if (frame.kind === "error") {
+      throw frame.error;
     }
 
     aggregatedOutput += frame.text;
@@ -1202,16 +1206,47 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             },
           },
         });
-        await waitForSandboxStatus(startedInstance.sandboxInstanceId, "running");
-        await waitForSandboxConnectable(startedInstance.sandboxInstanceId, true);
-        await waitForCondition({
-          description: `sandbox '${startedInstance.sandboxInstanceId}' runtime attachment readiness`,
-          timeoutMs: SandboxReadyTimeoutMs,
-          evaluate: async () => {
-            const snapshot = await readSandboxRuntimeState(startedInstance.sandboxInstanceId);
-            return snapshot.attachment !== null && snapshot.runtime.ready ? snapshot : null;
-          },
-        });
+        try {
+          await waitForSandboxStatus(startedInstance.sandboxInstanceId, "running");
+          await waitForSandboxConnectable(startedInstance.sandboxInstanceId, true);
+          await waitForCondition({
+            description: `sandbox '${startedInstance.sandboxInstanceId}' runtime attachment readiness`,
+            timeoutMs: SandboxReadyTimeoutMs,
+            evaluate: async () => {
+              const snapshot = await readSandboxRuntimeState(startedInstance.sandboxInstanceId);
+              return snapshot.attachment !== null && snapshot.runtime.ready ? snapshot : null;
+            },
+          });
+        } catch (error) {
+          const runtimeState = await readSandboxRuntimeState(
+            startedInstance.sandboxInstanceId,
+          ).catch(
+            (readError: unknown) =>
+              `runtime-state read failed: ${
+                readError instanceof Error ? readError.message : String(readError)
+              }`,
+          );
+          const sandboxDiagnostics = await readSandboxContainerDiagnostics({
+            networkName: systemTestContext.sandboxNetworkName,
+          });
+          const gatewayLogs = await readContainerLogsTail({
+            containerId: systemTestContext.dataPlaneGatewayContainerId,
+            tail: 160,
+          });
+          const dataPlaneApiLogs = await readContainerLogsTail({
+            containerId: systemTestContext.dataPlaneApiContainerId,
+            tail: 160,
+          });
+          const dataPlaneWorkerLogs = await readContainerLogsTail({
+            containerId: systemTestContext.dataPlaneWorkerContainerId,
+            tail: 160,
+          });
+          throw new Error(
+            `Sandbox startup failed for '${startedInstance.sandboxInstanceId}'. Runtime state: ${typeof runtimeState === "string" ? runtimeState : JSON.stringify(runtimeState)}. Sandbox diagnostics: ${sandboxDiagnostics}. Gateway logs: ${gatewayLogs}. Data-plane API logs: ${dataPlaneApiLogs}. Data-plane worker logs: ${dataPlaneWorkerLogs}. Cause: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
         return startedInstance.sandboxInstanceId;
       };
       const readSandboxRuntimeState = async (
@@ -1363,14 +1398,14 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             return currentDataPlaneGatewayBaseUrl;
           },
           dataPlaneGatewayContainerId: systemTestContext.dataPlaneGatewayContainerId,
-          dataPlaneGatewayIdleTimeoutMs: systemTestContext.dataPlaneGatewayIdleTimeoutMs,
-          dataPlaneGatewayBootstrapDisconnectGraceMs:
-            systemTestContext.dataPlaneGatewayBootstrapDisconnectGraceMs,
           tokenizerProxyBaseUrl: systemTestContext.tokenizerProxyBaseUrl,
           tokenizerProxyContainerId: systemTestContext.tokenizerProxyContainerId,
           controlPlaneDatabaseUrl: systemTestContext.controlPlaneDatabaseUrl,
           internalAuthServiceToken: systemTestContext.internalAuthServiceToken,
           otlpTraceCaptureFilePath: systemTestContext.otlpTraceCaptureFilePath,
+          dataPlaneGatewayIdleTimeoutMs: systemTestContext.dataPlaneGatewayIdleTimeoutMs,
+          dataPlaneGatewayBootstrapDisconnectGraceMs:
+            systemTestContext.dataPlaneGatewayBootstrapDisconnectGraceMs,
           controlPlaneApiClient,
           db,
           request,

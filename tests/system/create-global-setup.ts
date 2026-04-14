@@ -37,6 +37,22 @@ function createTelemetryEnvironmentOverrides(input: {
   };
 }
 
+function readGatewayLifecycleOrThrow(input: {
+  environment: Awaited<ReturnType<typeof startFullSystemEnvironment>>;
+}): {
+  idleTimeoutMs: number;
+  bootstrapDisconnectGraceMs: number;
+} {
+  const lifecycle = input.environment.dataPlaneGatewayLifecycle;
+  if (lifecycle === undefined) {
+    throw new Error(
+      "Expected full system environment to expose data-plane-gateway lifecycle values.",
+    );
+  }
+
+  return lifecycle;
+}
+
 export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
   return async function setup(): Promise<() => Promise<void>> {
     const otlpTraceCaptureFilePath = join(
@@ -79,12 +95,12 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       },
       tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
     });
-    const gatewayLifecycle = environment.dataPlaneGatewayLifecycle;
-    if (gatewayLifecycle === undefined) {
-      throw new Error("Expected full system environment to expose gateway lifecycle settings.");
-    }
 
     try {
+      const gatewayLifecycle = readGatewayLifecycleOrThrow({
+        environment,
+      });
+
       await writeTestContext({
         id: TestContextId,
         value: {
@@ -98,8 +114,6 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
           dataPlaneWorkerContainerId: environment.dataPlaneWorker.containerId,
           dataPlaneGatewayBaseUrl: environment.dataPlaneGateway.hostBaseUrl,
           dataPlaneGatewayContainerId: environment.dataPlaneGateway.containerId,
-          dataPlaneGatewayIdleTimeoutMs: gatewayLifecycle.idleTimeoutMs,
-          dataPlaneGatewayBootstrapDisconnectGraceMs: gatewayLifecycle.bootstrapDisconnectGraceMs,
           tokenizerProxyBaseUrl: environment.tokenizerProxy.hostBaseUrl,
           tokenizerProxyContainerId: environment.tokenizerProxy.containerId,
           mailpitHttpBaseUrl: environment.mailpit.httpBaseUrl,
@@ -107,6 +121,8 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
           internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
           otlpTraceCaptureFilePath,
           sandboxNetworkName: environment.sandboxNetworkName,
+          dataPlaneGatewayIdleTimeoutMs: gatewayLifecycle.idleTimeoutMs,
+          dataPlaneGatewayBootstrapDisconnectGraceMs: gatewayLifecycle.bootstrapDisconnectGraceMs,
         },
       });
     } catch (error) {

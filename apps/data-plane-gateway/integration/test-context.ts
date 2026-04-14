@@ -370,10 +370,6 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
               dataPlaneApi: {
                 baseUrl: dataPlaneApi.hostBaseUrl,
               },
-              lifecycle: {
-                idleTimeoutMs: 300_000,
-                bootstrapDisconnectGraceMs: 60_000,
-              },
             },
             internalAuth: {
               serviceToken: INTERNAL_AUTH_SERVICE_TOKEN,

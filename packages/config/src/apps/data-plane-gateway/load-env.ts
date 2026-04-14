@@ -2,7 +2,7 @@ import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   DataPlaneGatewayDatabaseConfigSchema,
   DataPlaneGatewayDataPlaneApiConfigSchema,
-  DataPlaneGatewayLifecycleConfigSchema,
+  PartialDataPlaneGatewayLifecycleConfigSchema,
   PartialDataPlaneGatewayRuntimeStateConfigSchema,
   PartialDataPlaneGatewayRuntimeStateValkeyConfigSchema,
   type PartialDataPlaneGatewayConfigInput,
@@ -58,7 +58,7 @@ const loadDataPlaneApiEnv = createEnvLoader<typeof DataPlaneGatewayDataPlaneApiC
   },
 ]);
 
-const loadLifecycleEnv = createEnvLoader<typeof DataPlaneGatewayLifecycleConfigSchema>([
+const loadLifecycleEnv = createEnvLoader<typeof PartialDataPlaneGatewayLifecycleConfigSchema>([
   {
     key: "idleTimeoutMs",
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS",

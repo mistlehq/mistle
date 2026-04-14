@@ -22,7 +22,9 @@ describe("sandbox disconnect deadline cleared on reattach", () => {
           fixture.dataPlaneGatewayIdleTimeoutMs
         ) {
           throw new Error(
-            `Expected disconnect grace plus buffer to remain below idle timeout. disconnectGraceMs=${String(fixture.dataPlaneGatewayBootstrapDisconnectGraceMs)} idleTimeoutMs=${String(fixture.dataPlaneGatewayIdleTimeoutMs)}`,
+            `Expected disconnect grace plus buffer to remain below idle timeout. disconnectGraceMs=${String(
+              fixture.dataPlaneGatewayBootstrapDisconnectGraceMs,
+            )} idleTimeoutMs=${String(fixture.dataPlaneGatewayIdleTimeoutMs)}`,
           );
         }
 

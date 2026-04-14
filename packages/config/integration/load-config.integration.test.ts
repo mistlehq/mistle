@@ -309,8 +309,8 @@ const dataPlaneGatewayEnvConfig = {
     baseUrl: "http://127.0.0.1:5002",
   },
   lifecycle: {
-    idleTimeoutMs: 300_000,
-    bootstrapDisconnectGraceMs: 60_000,
+    idleTimeoutMs: 300000,
+    bootstrapDisconnectGraceMs: 60000,
   },
 } as const;
 
@@ -641,6 +641,49 @@ describe("loadConfig integrations", () => {
           host: "localhost",
           port: 5303,
         },
+      },
+    });
+  });
+
+  it("loads data-plane-gateway lifecycle config from env when provided", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: "20000",
+        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: "8000",
+      }),
+    });
+
+    expect(config).toEqual({
+      global: globalProductionConfig,
+      app: {
+        ...dataPlaneGatewayEnvConfig,
+        lifecycle: {
+          idleTimeoutMs: 20000,
+          bootstrapDisconnectGraceMs: 8000,
+        },
+      },
+    });
+  });
+
+  it("loads data-plane-gateway without lifecycle config when omitted from env", () => {
+    const env = createIntegrationEnv({
+      NODE_ENV: "production",
+    });
+    delete env.MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS;
+    delete env.MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS;
+
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      env,
+    });
+
+    expect(config).toEqual({
+      global: globalProductionConfig,
+      app: {
+        ...dataPlaneGatewayEnvConfig,
+        lifecycle: undefined,
       },
     });
   });

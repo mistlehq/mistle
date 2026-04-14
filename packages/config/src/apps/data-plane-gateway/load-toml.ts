@@ -38,9 +38,13 @@ export function loadDataPlaneGatewayFromToml(
     dataPlaneApi: {
       baseUrl: dataPlaneApi.base_url,
     },
-    lifecycle: {
-      idleTimeoutMs: lifecycle.idle_timeout_ms,
-      bootstrapDisconnectGraceMs: lifecycle.bootstrap_disconnect_grace_ms,
-    },
+    ...(Object.keys(lifecycle).length > 0
+      ? {
+          lifecycle: {
+            idleTimeoutMs: lifecycle.idle_timeout_ms,
+            bootstrapDisconnectGraceMs: lifecycle.bootstrap_disconnect_grace_ms,
+          },
+        }
+      : {}),
   });
 }

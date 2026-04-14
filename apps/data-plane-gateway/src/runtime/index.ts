@@ -7,7 +7,10 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
-import { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
+import {
+  resolveDataPlaneGatewayLifecycleDurations,
+  SandboxInstanceDeadlineService,
+} from "../deadlines/sandbox-instance-deadline-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -156,7 +159,7 @@ export function createDataPlaneGatewayRuntime(
   const sandboxInstanceDeadlineService = new SandboxInstanceDeadlineService(
     dataPlaneClient,
     systemClock,
-    config.app.lifecycle,
+    resolveDataPlaneGatewayLifecycleDurations(config.app.lifecycle),
   );
 
   registerSandboxRuntimeStateRoute({
