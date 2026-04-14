@@ -35,7 +35,7 @@ type ProjectIntegrationConnectionInput = {
   connectionMethods?: readonly ConnectionMethodMetadata[] | undefined;
 };
 
-export function projectIntegrationConnection(
+export function buildIntegrationConnectionResponse(
   input: ProjectIntegrationConnectionInput,
 ): ProjectedIntegrationConnection {
   const connectionMethodMetadata = resolveConnectionMethodMetadata({

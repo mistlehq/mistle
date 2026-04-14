@@ -26,8 +26,8 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
-import { projectIntegrationConnection } from "./project-integration-connection.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -209,7 +209,7 @@ export async function listIntegrationConnections(
                 })) ?? true);
 
           return {
-            ...projectIntegrationConnection({
+            ...buildIntegrationConnectionResponse({
               connection,
               ...(definition === undefined
                 ? {}
