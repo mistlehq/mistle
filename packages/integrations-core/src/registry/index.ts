@@ -162,6 +162,25 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
     }
   }
 
+  const middlewareIds = new Set<string>();
+  for (const middleware of input.egressRequestMiddleware ?? []) {
+    if (middleware.id.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition egressRequestMiddleware[*].id must be non-empty.",
+      );
+    }
+
+    if (middlewareIds.has(middleware.id)) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        `Integration definition egressRequestMiddleware contains duplicate id '${middleware.id}'.`,
+      );
+    }
+
+    middlewareIds.add(middleware.id);
+  }
+
   const webhookSource = input.webhookSource;
   if (webhookSource === undefined) {
     return;

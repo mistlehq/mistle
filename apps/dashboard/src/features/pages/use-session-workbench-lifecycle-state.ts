@@ -9,8 +9,10 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
+import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
+import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -30,6 +32,32 @@ import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
+
+export function resolveSandboxStatusRefetchInterval(input: {
+  automationConversation: SandboxInstanceStatusResult["automationConversation"];
+  connectable: boolean | null;
+  isAutoResumingStoppedSandbox: boolean;
+  status: "pending" | "starting" | "running" | "stopped" | "failed" | null;
+}): false | number {
+  if (
+    shouldWaitForAutomationSessionThread({
+      sandboxStatus: input.status,
+      automationConversation: input.automationConversation,
+    })
+  ) {
+    return AutomationSessionStatusRefetchIntervalMs;
+  }
+
+  if (input.isAutoResumingStoppedSandbox && input.status === "stopped") {
+    return 1_000;
+  }
+
+  if (input.connectable === true) {
+    return false;
+  }
+
+  return input.status === "failed" || input.status === "stopped" ? false : 1_000;
+}
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
@@ -96,23 +124,12 @@ export function useSessionWorkbenchLifecycleState(input: {
     enabled: input.sandboxInstanceId !== null,
     retry: false,
     refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      const connectable = query.state.data?.connectable ?? null;
-      const automationConversation = query.state.data?.automationConversation ?? null;
-      if (
-        shouldWaitForAutomationSessionThread({
-          sandboxStatus: status ?? null,
-          automationConversation,
-        })
-      ) {
-        return AutomationSessionStatusRefetchIntervalMs;
-      }
-
-      if (isAutoResumingStoppedSandbox && status === "stopped") {
-        return 1_000;
-      }
-
-      return connectable === true || status === "failed" || status === "stopped" ? false : 1_000;
+      return resolveSandboxStatusRefetchInterval({
+        automationConversation: query.state.data?.automationConversation ?? null,
+        connectable: query.state.data?.connectable ?? null,
+        isAutoResumingStoppedSandbox,
+        status: query.state.data?.status ?? null,
+      });
     },
   });
   const markRecoveryBoundary = useCallback(() => {
@@ -151,7 +168,9 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
-  const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
+  const sandboxStatus = sandboxStatusQuery.data;
+  const automationConversation = sandboxStatus?.automationConversation ?? null;
+  const providerThreadId = automationConversation?.providerConversationId ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
     automationConversation,
@@ -159,7 +178,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
-    sandboxConnectable: sandboxStatusQuery.data?.connectable ?? null,
+    sandboxConnectable: sandboxStatus?.connectable ?? null,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({
@@ -334,22 +353,16 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
+    const connectInput = resolveInitialSessionConnectInput({
+      connectable: sandboxStatus?.connectable ?? null,
+      providerThreadId,
+      runtimeContext: sandboxStatus?.runtimeContext ?? null,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+
     setHasAttemptedAutoConnect(true);
-    const providerThreadId = automationConversation?.providerConversationId ?? null;
-    connectSession(
-      providerThreadId === null
-        ? {
-            sandboxInstanceId: input.sandboxInstanceId,
-            targetThreadId: null,
-          }
-        : {
-            sandboxInstanceId: input.sandboxInstanceId,
-            targetThreadId: providerThreadId,
-            providerThreadId,
-          },
-    );
+    connectSession(connectInput);
   }, [
-    automationConversation,
     connectSession,
     input.mainPanelTransitionState,
     connectionReadiness.canConnect,
@@ -358,6 +371,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
+    providerThreadId,
+    sandboxStatus?.runtimeContext,
+    sandboxStatus?.connectable,
     sessionConnectionState,
   ]);
 
@@ -378,7 +394,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
+  const sandboxFailureMessage = sandboxStatus?.failureMessage ?? null;
   const sessionReconnectMessage = codexRecoveryState.sessionReconnectState.message;
   const workbenchStatus = resolveSessionWorkbenchStatus({
     sandboxStatusReadState,

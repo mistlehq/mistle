@@ -13,6 +13,7 @@ import {
   resolveJiraCredentialSecretType,
 } from "./auth.js";
 import type { JiraBindingConfig } from "./binding-config-schema.js";
+import { JiraRequestMiddlewareIds } from "./egress-request-middleware.js";
 import type { JiraTargetConfig } from "./target-config-schema.js";
 import { JiraToolIds } from "./tool-ids.js";
 
@@ -95,6 +96,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
             secretType: credentialSecretType,
             slotKey: JiraCredentialSlotKeys.PERSONAL_API_TOKEN_API_KEY,
           },
+          requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
         },
       ],
       artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
@@ -124,6 +126,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
             secretType: JiraCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
             slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN,
           },
+          requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
         },
       ],
       artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],
@@ -147,6 +150,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
           secretType: credentialSecretType,
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_API_TOKEN_API_KEY,
         },
+        requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
       },
     ],
     artifacts: includesJiraCli ? [createJiraCliArtifact(upstreamBaseUrl)] : [],

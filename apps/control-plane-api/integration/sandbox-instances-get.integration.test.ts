@@ -7,7 +7,11 @@ import {
   sandboxProfiles,
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstanceRuntimePlans,
+  sandboxInstances,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
 import { SandboxInstanceStatusResponseSchema } from "../src/sandbox-instances/index.js";
@@ -23,6 +27,57 @@ import { it } from "./test-context.js";
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
 const startedSandboxContainerIds: string[] = [];
+
+function createRuntimePlan() {
+  return {
+    sandboxProfileId: "sbp_cp_get_runtime_context",
+    version: 1,
+    image: {
+      source: "base" as const,
+      imageRef: "registry:runtime-context",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [
+      {
+        sourceKind: "git-clone" as const,
+        resourceKind: "repository" as const,
+        path: "/root/acme/repo-1",
+        originUrl: "https://github.com/acme/repo-1.git",
+      },
+    ],
+    agentRuntimes: [
+      {
+        bindingId: "ibd_runtime_context",
+        runtimeId: "codex",
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server",
+        ptyLaunch: {
+          runtimeId: "codex",
+          displayName: "Codex",
+          newLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: "/root/acme/repo-1/packages/app",
+            command: "codex",
+            args: [],
+          },
+          resumeLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: "/root/acme/repo-1/packages/app",
+            command: "codex",
+            args: [],
+          },
+        },
+      },
+    ],
+  };
+}
 
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
@@ -125,7 +180,7 @@ describe("sandbox instances get integration", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: {
         conversationId: "cnv_cp_get_001",
         routeId: "cvr_cp_get_001",
@@ -218,7 +273,7 @@ describe("sandbox instances get integration", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: {
         conversationId: "cnv_cp_get_pending_001",
         routeId: "cvr_cp_get_pending_001",
@@ -387,7 +442,7 @@ describe("sandbox instances get integration", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: {
         conversationId: "cnv_cp_get_003_a",
         routeId: "cvr_cp_get_003_a",
@@ -508,12 +563,64 @@ describe("sandbox instances get integration", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: {
         conversationId: "cnv_cp_get_004_b",
         routeId: "cvr_cp_get_004_b",
         providerConversationId: null,
       },
+    });
+  });
+
+  it("derives runtime context from the persisted runtime plan", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_runtime_context",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const session = await fixture.authSession({
+      email: "integration-sandbox-instances-get-runtime-context@example.com",
+    });
+
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_cp_get_runtime_context",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_cp_get_runtime_context",
+      title: "Runtime context session",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-cp-get-runtime-context",
+      status: SandboxInstanceStatuses.STARTING,
+      startedByKind: "user",
+      startedById: session.userId,
+      source: "dashboard",
+      createdAt: "2026-03-21T00:00:00.000Z",
+      updatedAt: "2026-03-21T00:00:00.000Z",
+    });
+    await dataPlaneFixture.db.insert(sandboxInstanceRuntimePlans).values({
+      sandboxInstanceId: "sbi_cp_get_runtime_context",
+      revision: 1,
+      compiledRuntimePlan: createRuntimePlan(),
+      compiledFromProfileId: "sbp_cp_get_runtime_context",
+      compiledFromProfileVersion: 1,
+    });
+
+    const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_runtime_context", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+
+    expect(body.runtimeContext).toEqual({
+      launchCwd: "/root/acme/repo-1/packages/app",
+      primaryRepositoryRoot: "/root/acme/repo-1",
     });
   });
 });

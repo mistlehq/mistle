@@ -232,12 +232,22 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     });
   }
 
+  const requestMiddleware = toOptionalNonEmptyStringArray(input.requestMiddleware);
+  if (input.requestMiddleware !== undefined && requestMiddleware === undefined) {
+    throw new EgressGrantError({
+      code: EgressGrantErrorCode.REQUEST_MIDDLEWARE_INVALID,
+      message: "Egress grant requestMiddleware must contain only non-empty values.",
+    });
+  }
+
   const slotKey = toNonEmptyString(input.slotKey);
   const resolverKey = toNonEmptyString(input.resolverKey);
   const baseClaims = {
     sub: requireClaim(input.sub, EgressGrantErrorCode.SUBJECT_REQUIRED, "sub"),
     jti: requireClaim(input.jti, EgressGrantErrorCode.JTI_REQUIRED, "jti"),
     bindingId: requireClaim(input.bindingId, EgressGrantErrorCode.BINDING_ID_REQUIRED, "bindingId"),
+    familyId: requireClaim(input.familyId, EgressGrantErrorCode.FAMILY_ID_REQUIRED, "familyId"),
+    variantId: requireClaim(input.variantId, EgressGrantErrorCode.VARIANT_ID_REQUIRED, "variantId"),
     connectionId: requireClaim(
       input.connectionId,
       EgressGrantErrorCode.CONNECTION_ID_REQUIRED,
@@ -257,6 +267,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     ...(resolverKey === undefined ? {} : { resolverKey }),
     ...(allowedMethods === undefined ? {} : { allowedMethods }),
     ...(allowedPathPrefixes === undefined ? {} : { allowedPathPrefixes }),
+    ...(requestMiddleware === undefined ? {} : { requestMiddleware }),
   };
 
   if (authInjectionType === "aws_sigv4") {

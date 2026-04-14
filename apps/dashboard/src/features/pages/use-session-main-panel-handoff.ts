@@ -272,7 +272,7 @@ export function useSessionMainPanelHandoff(
 
       dispatch({
         type: "cli_handoff_failed",
-        errorMessage: error instanceof Error ? error.message : "Could not start Codex CLI.",
+        errorMessage: error instanceof Error ? error.message : "Could not start Codex TUI.",
       });
     }
   }, [

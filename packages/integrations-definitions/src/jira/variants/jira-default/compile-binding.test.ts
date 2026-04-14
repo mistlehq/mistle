@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { JiraConnectionMethodIds, JiraCredentialSlotKeys } from "./auth.js";
 import { compileJiraBinding } from "./compile-binding.js";
+import { JiraRequestMiddlewareIds } from "./egress-request-middleware.js";
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
@@ -129,6 +130,7 @@ describe("compileJiraBinding", () => {
           secretType: "api_key",
           slotKey: JiraCredentialSlotKeys.PERSONAL_API_TOKEN_API_KEY,
         },
+        requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
       },
     ]);
     expect(compiled.artifacts).toHaveLength(1);
@@ -216,6 +218,7 @@ describe("compileJiraBinding", () => {
           secretType: "api_key",
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_API_TOKEN_API_KEY,
         },
+        requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
       },
     ]);
     expect(compiled.artifacts).toHaveLength(1);
@@ -278,6 +281,7 @@ describe("compileJiraBinding", () => {
           secretType: "oauth2_access_token",
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN,
         },
+        requestMiddleware: [JiraRequestMiddlewareIds.APPEND_SESSION_LINK_TO_DOCUMENT],
       },
     ]);
     expect(compiled.artifacts).toHaveLength(1);

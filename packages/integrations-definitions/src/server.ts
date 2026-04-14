@@ -1,11 +1,13 @@
 import {
   IntegrationRegistry,
+  type IntegrationEgressRequestMiddleware,
   type AnyIntegrationDefinition,
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
 import { AwsDefinition } from "./aws/server.js";
 import { DatadogDefinition } from "./datadog/index.js";
+import { resolveDefinitionEgressRequestMiddleware } from "./egress-request-middleware.server.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { JiraDefinition } from "./jira/index.js";
 import { LinearDefinition } from "./linear/index.js";
@@ -17,6 +19,7 @@ import { SlackDefinition } from "./slack/index.js";
 
 export * from "./aws/server.js";
 export * from "./datadog/index.js";
+export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
@@ -56,4 +59,17 @@ export function createDefinitionsBundle(): IntegrationDefinitionsBundle {
     integrationRegistry: createIntegrationRegistry(),
     agentRuntimeRegistry: createAgentRuntimeRegistry(),
   };
+}
+
+export function resolveIntegrationEgressRequestMiddleware(input: {
+  familyId: string;
+  variantId: string;
+  middlewareId: string;
+}): IntegrationEgressRequestMiddleware | undefined {
+  const definition = createIntegrationRegistry().getDefinition({
+    familyId: input.familyId,
+    variantId: input.variantId,
+  });
+
+  return resolveDefinitionEgressRequestMiddleware(definition, input.middlewareId);
 }

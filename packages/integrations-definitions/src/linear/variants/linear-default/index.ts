@@ -4,5 +4,6 @@ export * from "./binding-config-schema.js";
 export * from "./compile-binding.js";
 export * from "./connection-config-form.js";
 export * from "./definition.js";
+export * from "./egress-request-middleware.js";
 export * from "./target-config-schema.js";
 export * from "./tool-ids.js";

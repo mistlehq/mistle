@@ -4,6 +4,8 @@ import {
   BranchDiffCommandTimeoutMs,
   buildBranchDiffGitExecRequest,
   getSessionBranchDiffQueryKey,
+  normalizeBranchDiffError,
+  resolveBranchDiffErrorNotice,
 } from "./use-session-branch-diff.js";
 
 describe("useSessionBranchDiff helpers", () => {
@@ -41,5 +43,47 @@ describe("useSessionBranchDiff helpers", () => {
         cwd: "/root/acme/repo-2",
       }),
     ).toEqual(["session-branch-diff", "sbi_test", "/root/acme/repo-2"]);
+  });
+
+  it("maps not-a-repository errors to a non-alert notice", () => {
+    expect(
+      normalizeBranchDiffError({
+        kind: "not_git_repository",
+        message: "Current workspace is not a git repository.",
+      }),
+    ).toEqual({
+      message: "Current workspace is not a git repository.",
+      title: "Changes unavailable",
+      variant: "default",
+    });
+  });
+
+  it("maps missing-main errors to a non-alert notice", () => {
+    expect(
+      resolveBranchDiffErrorNotice({
+        kind: "missing_main",
+        message: "Local branch `main` does not exist.",
+      }),
+    ).toEqual({
+      message: "Local branch `main` does not exist.",
+      title: "Changes unavailable",
+      variant: "default",
+    });
+  });
+
+  it("maps generic git failures to an alert notice", () => {
+    expect(normalizeBranchDiffError(new Error("fatal: bad revision 'main'"))).toEqual({
+      message: "fatal: bad revision 'main'",
+      title: "Could not load changes",
+      variant: "alert",
+    });
+  });
+
+  it("maps timeout failures to an alert notice", () => {
+    expect(normalizeBranchDiffError(new Error("command timed out after 15000ms"))).toEqual({
+      message: "Timed out loading changes compared with main.",
+      title: "Could not load changes",
+      variant: "alert",
+    });
   });
 });

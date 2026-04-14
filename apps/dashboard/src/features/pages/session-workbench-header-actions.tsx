@@ -145,7 +145,7 @@ export function SessionWorkbenchHeaderActions(input: {
         type="button"
         variant="ghost"
       >
-        CLI
+        TUI
       </Button>
       <Button
         aria-label={input.diffControl.ariaLabel}

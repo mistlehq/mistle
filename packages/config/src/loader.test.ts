@@ -197,6 +197,7 @@ describe("parseConfigRecord", () => {
           },
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
+            publicBaseUrl: "https://mistle.example.test",
           },
         },
       },
@@ -399,6 +400,7 @@ describe("parseConfigRecord", () => {
           },
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
+            publicBaseUrl: "https://mistle.example.test",
           },
         },
       },
@@ -597,6 +599,7 @@ describe("parseConfigRecord", () => {
           },
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
+            publicBaseUrl: "https://mistle.example.test",
           },
         },
       },

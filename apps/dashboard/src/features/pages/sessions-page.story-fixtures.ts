@@ -87,6 +87,10 @@ export function createSessionsPageStoryQueryClient(input?: {
     title: string | null;
     status: "pending" | "starting" | "running" | "stopped" | "failed";
     connectable: boolean;
+    runtimeContext?: {
+      launchCwd: string | null;
+      primaryRepositoryRoot: string | null;
+    } | null;
     failureCode?: string | null;
     failureMessage?: string | null;
   };
@@ -165,7 +169,7 @@ export function createSessionsPageStoryQueryClient(input?: {
       connectable: input.sandboxInstanceStatus.connectable,
       failureCode: input.sandboxInstanceStatus.failureCode ?? null,
       failureMessage: input.sandboxInstanceStatus.failureMessage ?? null,
-      runtimePlan: null,
+      runtimeContext: input.sandboxInstanceStatus.runtimeContext ?? null,
       automationConversation: null,
     });
   }

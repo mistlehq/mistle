@@ -23,6 +23,8 @@ export async function createEgressGrantByRuleId(input: {
           sub: input.sandboxInstanceId,
           jti: route.egressRuleId,
           bindingId: route.bindingId,
+          familyId: route.familyId,
+          variantId: route.variantId,
           connectionId: route.credentialResolver.connectionId,
           secretType: route.credentialResolver.secretType,
           upstreamBaseUrl: route.upstream.baseUrl,
@@ -67,6 +69,9 @@ export async function createEgressGrantByRuleId(input: {
           ...(route.match.pathPrefixes === undefined
             ? {}
             : { allowedPathPrefixes: route.match.pathPrefixes }),
+          ...(route.requestMiddleware === undefined
+            ? {}
+            : { requestMiddleware: route.requestMiddleware }),
         },
         ttlSeconds: SandboxStartupGrantTtlSeconds,
       }),

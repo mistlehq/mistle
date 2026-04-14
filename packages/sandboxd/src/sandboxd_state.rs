@@ -436,6 +436,8 @@ mod tests {
                 crate::runtime::CompiledEgressRoute {
                     egress_rule_id: "egress_rule_bind_openai_agent".to_string(),
                     binding_id: "bind_openai_agent".to_string(),
+                    family_id: "openai".to_string(),
+                    variant_id: "openai-default".to_string(),
                     r#match: crate::runtime::CompiledEgressRouteMatch {
                         hosts: vec!["api.openai.com".to_string()],
                         path_prefixes: Some(vec!["/v1/responses".to_string()]),
@@ -446,20 +448,26 @@ mod tests {
                     },
                     auth_injection: crate::runtime::CompiledEgressRouteAuthInjection {
                         r#type: crate::runtime::CompiledEgressRouteAuthInjectionType::Bearer,
-                        target: "authorization".to_string(),
+                        target: Some("authorization".to_string()),
                         username: None,
+                        service: None,
+                        region: None,
                     },
                     additional_headers: None,
+                    additional_credential_headers: None,
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_test".to_string(),
                         secret_type: "api_key".to_string(),
                         slot_key: None,
                         resolver_key: None,
                     },
+                    request_middleware: None,
                 },
                 crate::runtime::CompiledEgressRoute {
                     egress_rule_id: "egress_rule_bind_github".to_string(),
                     binding_id: "bind_github".to_string(),
+                    family_id: "github".to_string(),
+                    variant_id: "github-default".to_string(),
                     r#match: crate::runtime::CompiledEgressRouteMatch {
                         hosts: vec!["github.com".to_string()],
                         path_prefixes: Some(vec!["/mistlehq/private-repo.git".to_string()]),
@@ -470,16 +478,20 @@ mod tests {
                     },
                     auth_injection: crate::runtime::CompiledEgressRouteAuthInjection {
                         r#type: crate::runtime::CompiledEgressRouteAuthInjectionType::Basic,
-                        target: "authorization".to_string(),
+                        target: Some("authorization".to_string()),
                         username: Some("x-access-token".to_string()),
+                        service: None,
+                        region: None,
                     },
                     additional_headers: None,
+                    additional_credential_headers: None,
                     credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
                         connection_id: "icn_github".to_string(),
                         secret_type: "github_app_installation_token".to_string(),
                         slot_key: None,
                         resolver_key: Some("github_app_installation_token".to_string()),
                     },
+                    request_middleware: None,
                 },
             ],
             artifacts: Vec::new(),

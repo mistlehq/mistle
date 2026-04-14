@@ -24,6 +24,7 @@ export const it = vitestIt.extend<{ fixture: TokenizerProxyIntegrationFixture }>
           },
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
+            publicBaseUrl: "https://public-control-plane.example.test",
           },
         },
         internalAuthServiceToken: "integration-service-token",

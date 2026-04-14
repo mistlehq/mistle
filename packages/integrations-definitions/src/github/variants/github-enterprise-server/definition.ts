@@ -1,5 +1,6 @@
 import { GitHubCredentialResolverKeys } from "../../shared/credential-resolver-keys.js";
 import { GitHubAppInstallationCredentialResolver } from "../../shared/credential-resolver.server.js";
+import { AppendSessionLinkToGitHubMarkdownRequestMiddleware } from "../../shared/egress-request-middleware.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
   createGitHubResourceDefinitions,
@@ -15,6 +16,7 @@ import { GitHubEnterpriseServerWebhookHandler } from "./webhook.server.js";
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerBaseIntegrationDefinition = {
   ...GitHubEnterpriseServerBaseDefinition,
+  egressRequestMiddleware: [AppendSessionLinkToGitHubMarkdownRequestMiddleware],
   credentialResolvers: {
     custom: {
       [GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN]:

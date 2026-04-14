@@ -88,9 +88,9 @@ export function SessionWorkbenchHeaderActionsStoryHarness(
           <SessionWorkbenchHeaderActions
             cliControl={{
               ...StoryActionButtonControl,
-              ariaLabel: "CLI",
+              ariaLabel: "TUI",
               className: StoryActionButtonControl.className,
-              title: "Open Codex CLI",
+              title: "Open Codex TUI",
             }}
             diffControl={{
               ...StoryActionButtonControl,

@@ -265,6 +265,64 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/p/sessions/{instanceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Redirect to the dashboard session view for a sandbox instance. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/automations/webhooks": {
     parameters: {
       query?: never;
@@ -4038,310 +4096,9 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              runtimePlan: {
-                agentRuntimes: {
-                  bindingId: string;
-                  clientId: string;
-                  endpointKey: string;
-                  ptyLaunch: {
-                    displayName: string;
-                    newLaunch: {
-                      args: (
-                        | {
-                            /** @enum {string} */
-                            kind: "literal";
-                            value: string;
-                          }
-                        | {
-                            /** @enum {string} */
-                            kind: "threadId";
-                          }
-                      )[];
-                      cols: number;
-                      command: string;
-                      cwd?: string;
-                      ptySessionId: string;
-                      rows: number;
-                    };
-                    resumeLaunch: {
-                      args: (
-                        | {
-                            /** @enum {string} */
-                            kind: "literal";
-                            value: string;
-                          }
-                        | {
-                            /** @enum {string} */
-                            kind: "threadId";
-                          }
-                      )[];
-                      cols: number;
-                      command: string;
-                      cwd?: string;
-                      ptySessionId: string;
-                      rows: number;
-                    };
-                    runtimeId: string;
-                  };
-                  runtimeId: string;
-                  runtimeKey: string;
-                }[];
-                artifacts: {
-                  artifactKey: string;
-                  description?: string;
-                  env?: {
-                    [key: string]: string;
-                  };
-                  lifecycle: {
-                    install: (
-                      | {
-                          asset:
-                            | {
-                                fileName: string;
-                                /** @enum {string} */
-                                format: "binary";
-                                /** @enum {string} */
-                                kind: "exact";
-                              }
-                            | {
-                                extractedPath: string;
-                                fileName: string;
-                                /** @enum {string} */
-                                format: "tar.gz";
-                                /** @enum {string} */
-                                kind: "exact";
-                              }
-                            | {
-                                aarch64:
-                                  | {
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "binary";
-                                    }
-                                  | {
-                                      extractedPath: string;
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "tar.gz";
-                                    };
-                                /** @enum {string} */
-                                kind: "by_arch";
-                                x86_64:
-                                  | {
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "binary";
-                                    }
-                                  | {
-                                      extractedPath: string;
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "tar.gz";
-                                    };
-                              };
-                          installPath: string;
-                          /** @enum {string} */
-                          op: "github_release_install";
-                          release:
-                            | {
-                                /** @enum {string} */
-                                kind: "latest";
-                              }
-                            | {
-                                /** @enum {string} */
-                                kind: "tag";
-                                /** @enum {string} */
-                                match: "exact";
-                                tag: string;
-                              }
-                            | {
-                                /** @enum {string} */
-                                kind: "tag";
-                                /** @enum {string} */
-                                match: "latest_matching_prefix";
-                                prefix: string;
-                              };
-                          repository: string;
-                          timeoutMs?: number;
-                        }
-                      | {
-                          force?: boolean;
-                          /** @enum {string} */
-                          op: "mise_install";
-                          timeoutMs?: number;
-                          tools: string[];
-                        }
-                      | {
-                          command: {
-                            args: string[];
-                            cwd?: string;
-                            env?: {
-                              [key: string]: string;
-                            };
-                            timeoutMs?: number;
-                          };
-                          /** @enum {string} */
-                          op: "exec";
-                        }
-                    )[];
-                  };
-                  name: string;
-                }[];
-                egressRoutes: {
-                  additionalCredentialHeaders?: {
-                    credentialResolver: {
-                      connectionId: string;
-                      resolverKey?: string;
-                      secretType: string;
-                      slotKey?: string;
-                    };
-                    header: string;
-                  }[];
-                  additionalHeaders?: {
-                    [key: string]: string;
-                  };
-                  authInjection:
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "bearer";
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "basic";
-                        username?: string;
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "header";
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "query";
-                      }
-                    | {
-                        region: string;
-                        service: string;
-                        /** @enum {string} */
-                        type: "aws_sigv4";
-                      };
-                  bindingId: string;
-                  credentialResolver: {
-                    connectionId: string;
-                    resolverKey?: string;
-                    secretType: string;
-                    slotKey?: string;
-                  };
-                  egressRuleId: string;
-                  match: {
-                    hosts: string[];
-                    methods?: string[];
-                    pathPrefixes?: string[];
-                  };
-                  upstream: {
-                    baseUrl: string;
-                  };
-                }[];
-                image:
-                  | {
-                      imageRef: string;
-                      sandboxProfileId: string;
-                      /** @enum {string} */
-                      source: "profile-base";
-                      version: number;
-                    }
-                  | {
-                      imageRef: string;
-                      /** @enum {string} */
-                      source: "base";
-                    };
-                runtimeClients: {
-                  clientId: string;
-                  endpoints: {
-                    /** @enum {string} */
-                    connectionMode: "dedicated" | "shared";
-                    endpointKey: string;
-                    processKey?: string;
-                    transport: {
-                      /** @enum {string} */
-                      type: "ws";
-                      /** Format: uri */
-                      url: string;
-                    };
-                  }[];
-                  processes: {
-                    command: {
-                      args: string[];
-                      cwd?: string;
-                      env?: {
-                        [key: string]: string;
-                      };
-                      timeoutMs?: number;
-                    };
-                    processKey: string;
-                    readiness:
-                      | {
-                          /** @enum {string} */
-                          type: "none";
-                        }
-                      | {
-                          host: string;
-                          port: number;
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "tcp";
-                        }
-                      | {
-                          expectedStatus: number;
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "http";
-                          /** Format: uri */
-                          url: string;
-                        }
-                      | {
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "ws";
-                          /** Format: uri */
-                          url: string;
-                        };
-                    stop: {
-                      gracePeriodMs?: number;
-                      /** @enum {string} */
-                      signal: "sigterm" | "sigkill";
-                      timeoutMs: number;
-                    };
-                  }[];
-                  setup: {
-                    env: {
-                      [key: string]: string;
-                    };
-                    files: {
-                      content: string;
-                      fileId: string;
-                      mode: number;
-                      path: string;
-                      /** @enum {string} */
-                      writeMode?: "overwrite" | "if-absent";
-                    }[];
-                    launchArgs?: string[];
-                  };
-                }[];
-                sandboxProfileId: string;
-                version: number;
-                workspaceSources: {
-                  /** Format: uri */
-                  originUrl: string;
-                  path: string;
-                  /** @enum {string} */
-                  resourceKind: "repository";
-                  /** @enum {string} */
-                  sourceKind: "git-clone";
-                }[];
+              runtimeContext: {
+                launchCwd: string | null;
+                primaryRepositoryRoot: string | null;
               } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
@@ -4690,310 +4447,9 @@ export interface paths {
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              runtimePlan: {
-                agentRuntimes: {
-                  bindingId: string;
-                  clientId: string;
-                  endpointKey: string;
-                  ptyLaunch: {
-                    displayName: string;
-                    newLaunch: {
-                      args: (
-                        | {
-                            /** @enum {string} */
-                            kind: "literal";
-                            value: string;
-                          }
-                        | {
-                            /** @enum {string} */
-                            kind: "threadId";
-                          }
-                      )[];
-                      cols: number;
-                      command: string;
-                      cwd?: string;
-                      ptySessionId: string;
-                      rows: number;
-                    };
-                    resumeLaunch: {
-                      args: (
-                        | {
-                            /** @enum {string} */
-                            kind: "literal";
-                            value: string;
-                          }
-                        | {
-                            /** @enum {string} */
-                            kind: "threadId";
-                          }
-                      )[];
-                      cols: number;
-                      command: string;
-                      cwd?: string;
-                      ptySessionId: string;
-                      rows: number;
-                    };
-                    runtimeId: string;
-                  };
-                  runtimeId: string;
-                  runtimeKey: string;
-                }[];
-                artifacts: {
-                  artifactKey: string;
-                  description?: string;
-                  env?: {
-                    [key: string]: string;
-                  };
-                  lifecycle: {
-                    install: (
-                      | {
-                          asset:
-                            | {
-                                fileName: string;
-                                /** @enum {string} */
-                                format: "binary";
-                                /** @enum {string} */
-                                kind: "exact";
-                              }
-                            | {
-                                extractedPath: string;
-                                fileName: string;
-                                /** @enum {string} */
-                                format: "tar.gz";
-                                /** @enum {string} */
-                                kind: "exact";
-                              }
-                            | {
-                                aarch64:
-                                  | {
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "binary";
-                                    }
-                                  | {
-                                      extractedPath: string;
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "tar.gz";
-                                    };
-                                /** @enum {string} */
-                                kind: "by_arch";
-                                x86_64:
-                                  | {
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "binary";
-                                    }
-                                  | {
-                                      extractedPath: string;
-                                      fileName: string;
-                                      /** @enum {string} */
-                                      format: "tar.gz";
-                                    };
-                              };
-                          installPath: string;
-                          /** @enum {string} */
-                          op: "github_release_install";
-                          release:
-                            | {
-                                /** @enum {string} */
-                                kind: "latest";
-                              }
-                            | {
-                                /** @enum {string} */
-                                kind: "tag";
-                                /** @enum {string} */
-                                match: "exact";
-                                tag: string;
-                              }
-                            | {
-                                /** @enum {string} */
-                                kind: "tag";
-                                /** @enum {string} */
-                                match: "latest_matching_prefix";
-                                prefix: string;
-                              };
-                          repository: string;
-                          timeoutMs?: number;
-                        }
-                      | {
-                          force?: boolean;
-                          /** @enum {string} */
-                          op: "mise_install";
-                          timeoutMs?: number;
-                          tools: string[];
-                        }
-                      | {
-                          command: {
-                            args: string[];
-                            cwd?: string;
-                            env?: {
-                              [key: string]: string;
-                            };
-                            timeoutMs?: number;
-                          };
-                          /** @enum {string} */
-                          op: "exec";
-                        }
-                    )[];
-                  };
-                  name: string;
-                }[];
-                egressRoutes: {
-                  additionalCredentialHeaders?: {
-                    credentialResolver: {
-                      connectionId: string;
-                      resolverKey?: string;
-                      secretType: string;
-                      slotKey?: string;
-                    };
-                    header: string;
-                  }[];
-                  additionalHeaders?: {
-                    [key: string]: string;
-                  };
-                  authInjection:
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "bearer";
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "basic";
-                        username?: string;
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "header";
-                      }
-                    | {
-                        target: string;
-                        /** @enum {string} */
-                        type: "query";
-                      }
-                    | {
-                        region: string;
-                        service: string;
-                        /** @enum {string} */
-                        type: "aws_sigv4";
-                      };
-                  bindingId: string;
-                  credentialResolver: {
-                    connectionId: string;
-                    resolverKey?: string;
-                    secretType: string;
-                    slotKey?: string;
-                  };
-                  egressRuleId: string;
-                  match: {
-                    hosts: string[];
-                    methods?: string[];
-                    pathPrefixes?: string[];
-                  };
-                  upstream: {
-                    baseUrl: string;
-                  };
-                }[];
-                image:
-                  | {
-                      imageRef: string;
-                      sandboxProfileId: string;
-                      /** @enum {string} */
-                      source: "profile-base";
-                      version: number;
-                    }
-                  | {
-                      imageRef: string;
-                      /** @enum {string} */
-                      source: "base";
-                    };
-                runtimeClients: {
-                  clientId: string;
-                  endpoints: {
-                    /** @enum {string} */
-                    connectionMode: "dedicated" | "shared";
-                    endpointKey: string;
-                    processKey?: string;
-                    transport: {
-                      /** @enum {string} */
-                      type: "ws";
-                      /** Format: uri */
-                      url: string;
-                    };
-                  }[];
-                  processes: {
-                    command: {
-                      args: string[];
-                      cwd?: string;
-                      env?: {
-                        [key: string]: string;
-                      };
-                      timeoutMs?: number;
-                    };
-                    processKey: string;
-                    readiness:
-                      | {
-                          /** @enum {string} */
-                          type: "none";
-                        }
-                      | {
-                          host: string;
-                          port: number;
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "tcp";
-                        }
-                      | {
-                          expectedStatus: number;
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "http";
-                          /** Format: uri */
-                          url: string;
-                        }
-                      | {
-                          timeoutMs: number;
-                          /** @enum {string} */
-                          type: "ws";
-                          /** Format: uri */
-                          url: string;
-                        };
-                    stop: {
-                      gracePeriodMs?: number;
-                      /** @enum {string} */
-                      signal: "sigterm" | "sigkill";
-                      timeoutMs: number;
-                    };
-                  }[];
-                  setup: {
-                    env: {
-                      [key: string]: string;
-                    };
-                    files: {
-                      content: string;
-                      fileId: string;
-                      mode: number;
-                      path: string;
-                      /** @enum {string} */
-                      writeMode?: "overwrite" | "if-absent";
-                    }[];
-                    launchArgs?: string[];
-                  };
-                }[];
-                sandboxProfileId: string;
-                version: number;
-                workspaceSources: {
-                  /** Format: uri */
-                  originUrl: string;
-                  path: string;
-                  /** @enum {string} */
-                  resourceKind: "repository";
-                  /** @enum {string} */
-                  sourceKind: "git-clone";
-                }[];
+              runtimeContext: {
+                launchCwd: string | null;
+                primaryRepositoryRoot: string | null;
               } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
@@ -5077,6 +4533,103 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/instances/{instanceId}/session-link": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Redirect to the dashboard session view for a sandbox instance. */
+        302: {
+          headers: {
+            Location: string;
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

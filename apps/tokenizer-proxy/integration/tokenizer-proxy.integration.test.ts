@@ -2,6 +2,7 @@
  * This suite uses an extended integration `it` fixture imported from test context.
  */
 
+import { createHash } from "node:crypto";
 import {
   createServer,
   request as httpRequest,
@@ -10,15 +11,30 @@ import {
 } from "node:http";
 import { gzipSync } from "node:zlib";
 
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { mintEgressGrant } from "@mistle/sandbox-egress-auth";
 import { reserveAvailablePort, startHttpEcho } from "@mistle/test-harness";
+import { Hono } from "hono";
 import { describe, expect } from "vitest";
 
-import { EgressRequestHeaders } from "../src/egress/constants.js";
+import {
+  CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+  CREDENTIAL_CACHE_MAX_ENTRIES,
+  CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
+  CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+  EGRESS_BASE_PATH,
+  EGRESS_WILDCARD_BASE_PATH,
+  EgressRequestHeaders,
+} from "../src/egress/constants.js";
+import { CredentialCache } from "../src/egress/credential-cache.js";
+import { createEgressProxyHandler } from "../src/egress/proxy-handler.js";
 import { createTokenizerProxyRuntime } from "../src/runtime/index.js";
+import { startServer } from "../src/server.js";
+import type { AppContextBindings } from "../src/types.js";
 import { it } from "./test-context.js";
 
 const ControlPlaneInternalAuthHeader = "x-mistle-service-token";
+const PublicControlPlaneBaseUrl = "https://public-control-plane.example.test";
 
 type StartedControlPlaneCredentialServer = {
   baseUrl: string;
@@ -32,11 +48,23 @@ const IntegrationEgressGrantConfig = {
   tokenAudience: "tokenizer-proxy",
 } as const;
 
+type StartedTokenizerProxyServer = {
+  baseUrl: string;
+  stop: () => Promise<void>;
+};
+
+type RequestMiddlewareResolver = NonNullable<
+  Parameters<typeof createEgressProxyHandler>[0]["resolveRequestMiddleware"]
+>;
+type ResolvedRequestMiddleware = NonNullable<ReturnType<RequestMiddlewareResolver>>;
+
 async function mintIntegrationEgressGrant(
   input: {
     egressRuleId: string;
     upstreamBaseUrl: string;
     bindingId: string;
+    familyId?: string;
+    variantId?: string;
     connectionId: string;
     secretType: string;
     additionalHeaders?: Readonly<Record<string, string>>;
@@ -49,6 +77,7 @@ async function mintIntegrationEgressGrant(
     }>;
     slotKey?: string;
     resolverKey?: string;
+    requestMiddleware?: ReadonlyArray<string>;
     allowedMethods?: ReadonlyArray<string>;
     allowedPathPrefixes?: ReadonlyArray<string>;
   } & (
@@ -70,6 +99,8 @@ async function mintIntegrationEgressGrant(
       sub: "sandbox_123",
       jti: input.egressRuleId,
       bindingId: input.bindingId,
+      familyId: input.familyId ?? "test",
+      variantId: input.variantId ?? "test-default",
       connectionId: input.connectionId,
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,
@@ -93,6 +124,9 @@ async function mintIntegrationEgressGrant(
           }),
       ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
       ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
+      ...(input.requestMiddleware === undefined
+        ? {}
+        : { requestMiddleware: input.requestMiddleware }),
       ...(input.allowedMethods === undefined ? {} : { allowedMethods: input.allowedMethods }),
       ...(input.allowedPathPrefixes === undefined
         ? {}
@@ -100,6 +134,80 @@ async function mintIntegrationEgressGrant(
     },
     ttlSeconds: 60,
   });
+}
+
+function createRuntimeConfig(input: {
+  host: string;
+  port: number;
+  controlPlaneBaseUrl: string;
+  controlPlanePublicBaseUrl?: string;
+}) {
+  return {
+    app: {
+      server: {
+        host: input.host,
+        port: input.port,
+      },
+      controlPlaneApi: {
+        baseUrl: input.controlPlaneBaseUrl,
+        publicBaseUrl: input.controlPlanePublicBaseUrl ?? PublicControlPlaneBaseUrl,
+      },
+    },
+    internalAuthServiceToken: "integration-service-token",
+    egressGrantConfig: IntegrationEgressGrantConfig,
+  } as const;
+}
+
+async function startTokenizerProxyWithRequestMiddleware(input: {
+  host: string;
+  port: number;
+  controlPlaneBaseUrl: string;
+  controlPlanePublicBaseUrl?: string;
+  resolveRequestMiddleware: RequestMiddlewareResolver;
+}): Promise<StartedTokenizerProxyServer> {
+  const app = new Hono<AppContextBindings>();
+  const controlPlaneInternalClient = new ControlPlaneInternalClient({
+    baseUrl: input.controlPlaneBaseUrl,
+    internalAuthServiceToken: "integration-service-token",
+    requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+  });
+  const credentialCache = new CredentialCache({
+    maxEntries: CREDENTIAL_CACHE_MAX_ENTRIES,
+    defaultTtlSeconds: CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+    refreshSkewSeconds: CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
+    now: () => Date.now(),
+  });
+  const egressProxyHandler = createEgressProxyHandler({
+    controlPlaneInternalClient,
+    credentialCache,
+    egressGrantConfig: IntegrationEgressGrantConfig,
+    resolveRequestMiddleware: input.resolveRequestMiddleware,
+  });
+
+  app.use("*", async (ctx, next) => {
+    ctx.set("config", createRuntimeConfig(input).app);
+    ctx.set("internalAuthServiceToken", "integration-service-token");
+    await next();
+  });
+  app.all(EGRESS_BASE_PATH, egressProxyHandler);
+  app.all(EGRESS_WILDCARD_BASE_PATH, egressProxyHandler);
+
+  const startedServer = startServer({
+    app,
+    host: input.host,
+    port: input.port,
+  });
+
+  return {
+    baseUrl: `http://${input.host}:${String(input.port)}`,
+    stop: async () => startedServer.close(),
+  };
+}
+
+function createRequestMiddlewareResolver(
+  middlewares: ReadonlyArray<ResolvedRequestMiddleware>,
+): RequestMiddlewareResolver {
+  return ({ middlewareId }) => middlewares.find((middleware) => middleware.id === middlewareId);
 }
 
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
@@ -462,6 +570,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -519,6 +628,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -577,6 +687,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -638,6 +749,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -720,6 +832,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -768,6 +881,477 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
+  it("resolves and applies request middleware before forwarding the upstream request", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "slack-secret",
+    });
+    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/p/sessions/sandbox_123`;
+    const appendSessionLinkMiddleware: ResolvedRequestMiddleware = {
+      id: "append-session-link",
+      handle({ ctx, request }) {
+        const currentBody =
+          request.body === undefined ? "" : Buffer.from(request.body).toString("utf8");
+        request.headers.set("x-session-link-url", ctx.sessionUrl);
+        request.body = Buffer.from(`${currentBody}\n\n${ctx.sessionUrl}`);
+        return request;
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_slack",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_slack",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_slack",
+      secretType: "bot_token",
+      requestMiddleware: ["append-session-link"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/api/chat.postMessage"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([appendSessionLinkMiddleware]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/api/chat.postMessage`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "hello from middleware",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body) || !("body" in body)) {
+        throw new Error("Expected echoed upstream request details.");
+      }
+      expect(body).toMatchObject({
+        method: "POST",
+        path: "/api/chat.postMessage",
+        body: `hello from middleware\n\n${sessionLinkUrl}`,
+      });
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer slack-secret");
+      expect(readHeaderValue(body.headers, "x-session-link-url")).toBe(sessionLinkUrl);
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_slack",
+          connectionId: "icn_slack",
+          secretType: "bot_token",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("preserves the configured control-plane path prefix when building the session link URL", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "slack-secret",
+    });
+    const sessionLinkUrl =
+      "https://public-control-plane.example.test/mistle/control-plane/p/sessions/sandbox_123";
+    const appendSessionLinkMiddleware: ResolvedRequestMiddleware = {
+      id: "append-prefixed-session-link",
+      handle({ ctx, request }) {
+        request.body = Buffer.from(ctx.sessionUrl);
+        return request;
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_slack_prefixed_public_base",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_slack",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_slack",
+      secretType: "bot_token",
+      requestMiddleware: ["append-prefixed-session-link"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/api/chat.postMessage"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      controlPlanePublicBaseUrl: "https://public-control-plane.example.test/mistle/control-plane",
+      resolveRequestMiddleware: createRequestMiddlewareResolver([appendSessionLinkMiddleware]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/api/chat.postMessage`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "ignored",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        body: sessionLinkUrl,
+      });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("continues forwarding when request middleware cannot be resolved", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_test_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_comment",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      requestMiddleware: ["missing-session-link-middleware"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos/mistlehq/mistle/issues/123/comments"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/issues/123/comments`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "comment without resolved middleware",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body) || !("body" in body)) {
+        throw new Error("Expected echoed upstream request details.");
+      }
+      expect(body).toMatchObject({
+        method: "POST",
+        path: "/repos/mistlehq/mistle/issues/123/comments",
+        body: "comment without resolved middleware",
+      });
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghs_test_token");
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("continues forwarding when request middleware throws during execution", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_test_token",
+    });
+    const throwingMiddleware: ResolvedRequestMiddleware = {
+      id: "throwing-middleware",
+      handle() {
+        throw new Error("middleware exploded");
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_comment_throw",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      requestMiddleware: ["throwing-middleware"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos/mistlehq/mistle/issues/124/comments"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([throwingMiddleware]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/issues/124/comments`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "comment after thrown middleware",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        body: "comment after thrown middleware",
+      });
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed upstream request details.");
+      }
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghs_test_token");
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("continues forwarding when request middleware returns an invalid URL change", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_test_token",
+    });
+    const invalidUrlMiddleware: ResolvedRequestMiddleware = {
+      id: "invalid-url-middleware",
+      handle({ request }) {
+        request.url = new URL("https://attacker.invalid/escaped");
+        return request;
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_comment_invalid_url",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      requestMiddleware: ["invalid-url-middleware"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos/mistlehq/mistle/issues/125/comments"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([invalidUrlMiddleware]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/issues/125/comments`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "comment after invalid url middleware",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        path: "/repos/mistlehq/mistle/issues/125/comments",
+        body: "comment after invalid url middleware",
+      });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("runs request middleware before additional headers and auth injection", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "xoxb-ordering-secret",
+    });
+    const observePreInjectionMiddleware: ResolvedRequestMiddleware = {
+      id: "observe-pre-injection-state",
+      handle({ request }) {
+        request.headers.set(
+          "x-middleware-chatgpt-account-id",
+          request.headers.get("chatgpt-account-id") ?? "missing",
+        );
+        request.headers.set(
+          "x-middleware-authorization",
+          request.headers.get("authorization") ?? "missing",
+        );
+        return request;
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_slack_ordering",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_slack",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
+      connectionId: "icn_slack",
+      secretType: "bot_token",
+      requestMiddleware: ["observe-pre-injection-state"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/api/chat.update"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([observePreInjectionMiddleware]),
+    });
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/api/chat.update`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "ordering check",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed upstream request headers.");
+      }
+      expect(readHeaderValue(body.headers, "x-middleware-chatgpt-account-id")).toBe("missing");
+      expect(readHeaderValue(body.headers, "x-middleware-authorization")).toBe("missing");
+      expect(readHeaderValue(body.headers, "chatgpt-account-id")).toBe("acct_from_grant");
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer xoxb-ordering-secret");
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
+  it("signs the middleware-mutated request body for aws sigv4 egress", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      responseBody: {
+        kind: "aws_session",
+        accessKeyId: "ASIAEXAMPLEACCESS",
+        secretAccessKey: "example-secret-access-key",
+        sessionToken: "example-session-token",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      },
+    });
+    const sessionLinkUrl = `${PublicControlPlaneBaseUrl}/p/sessions/sandbox_123`;
+    const appendSigV4BodyMiddleware: ResolvedRequestMiddleware = {
+      id: "append-session-link-before-sigv4",
+      handle({ ctx, request }) {
+        const currentBody =
+          request.body === undefined ? "" : Buffer.from(request.body).toString("utf8");
+        request.body = Buffer.from(`${currentBody}\n\n${ctx.sessionUrl}`);
+        return request;
+      },
+    };
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_linear_sigv4",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_aws",
+      authInjectionType: "aws_sigv4",
+      authInjectionService: "execute-api",
+      authInjectionRegion: "us-east-1",
+      connectionId: "icn_aws",
+      secretType: "aws_secret_access_key",
+      resolverKey: "assume-role-session",
+      requestMiddleware: ["append-session-link-before-sigv4"],
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/mcp"],
+    });
+    const runtime = await startTokenizerProxyWithRequestMiddleware({
+      host,
+      port,
+      controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      resolveRequestMiddleware: createRequestMiddlewareResolver([appendSigV4BodyMiddleware]),
+    });
+
+    try {
+      const response = await fetch(`http://${host}:${String(port)}/tokenizer-proxy/egress/mcp`, {
+        method: "POST",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+          "content-type": "text/plain",
+        },
+        body: "linear create issue",
+      });
+      const body: unknown = await response.json();
+      const expectedBody = `linear create issue\n\n${sessionLinkUrl}`;
+      const expectedSha256 = createHash("sha256").update(expectedBody).digest("hex");
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body) || !("body" in body)) {
+        throw new Error("Expected echoed upstream request details.");
+      }
+      expect(body).toMatchObject({
+        method: "POST",
+        path: "/mcp",
+        body: expectedBody,
+      });
+      expect(readHeaderValue(body.headers, "x-amz-content-sha256")).toBe(expectedSha256);
+      expect(readHeaderValue(body.headers, "x-amz-security-token")).toBe("example-session-token");
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  }, 60_000);
+
   it("supports additional credential-backed headers for HTTP egress", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
@@ -806,6 +1390,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -881,6 +1466,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -958,6 +1544,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -1029,6 +1616,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -1122,6 +1710,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -1209,6 +1798,7 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",

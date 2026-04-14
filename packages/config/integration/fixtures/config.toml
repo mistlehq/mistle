@@ -179,3 +179,4 @@ port = 5305
 
 [apps.tokenizer_proxy.control_plane_api]
 base_url = "http://127.0.0.1:5100"
+public_base_url = "https://mistle.example.test"

@@ -34,6 +34,12 @@ const meta = {
           title: args.sessionTitle,
           status: args.sandboxStatus,
           connectable: args.connectable,
+          runtimeContext: args.connectable
+            ? {
+                launchCwd: null,
+                primaryRepositoryRoot: null,
+              }
+            : null,
         }}
         sandboxInstancesList={{
           items: [

@@ -48,10 +48,10 @@ function SessionWorkbenchPageContent(input: {
   const diffButtonTitle = isDiffOpenDisabled
     ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
     : diffButtonLabel;
-  const cliButtonLabel = "CLI";
+  const cliButtonLabel = "TUI";
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
-    : (workbench.primaryPanelState.disabledReason ?? "Open Codex CLI");
+    : (workbench.primaryPanelState.disabledReason ?? "Open Codex TUI");
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusLabel =
     headerStatusKind === "error"
@@ -218,9 +218,15 @@ function SessionWorkbenchPageContent(input: {
     input.sandboxInstanceId,
     workbench.terminalPanelState.isVisible ? "visible" : "hidden",
   ].join(":");
-  const diffPanelErrorMessage = !workbench.connectionReadiness.canConnect
-    ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
-    : workbench.diffPanelState.errorMessage;
+  const diffPanelErrorNotice = !workbench.connectionReadiness.canConnect
+    ? {
+        message:
+          workbench.stoppedSessionMessage ??
+          "Changes are available only when the sandbox is running.",
+        title: "Could not load changes",
+        variant: "alert" as const,
+      }
+    : workbench.diffPanelState.errorNotice;
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
     : "";
@@ -241,12 +247,12 @@ function SessionWorkbenchPageContent(input: {
             title:
               workbench.primaryPanelState.error.kind === "chat_restore_failed"
                 ? "Could not restore chat"
-                : "Could not start Codex CLI",
+                : "Could not start Codex TUI",
             description:
               workbench.primaryPanelState.error.message ??
               (workbench.primaryPanelState.error.kind === "chat_restore_failed"
                 ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
-                : "Could not start Codex CLI."),
+                : "Could not start Codex TUI."),
           }
         : null;
   if (input.sandboxInstanceId === null) {
@@ -363,7 +369,7 @@ function SessionWorkbenchPageContent(input: {
       }
       secondaryPanel={
         <SessionDiffPanel
-          errorMessage={diffPanelErrorMessage}
+          errorNotice={diffPanelErrorNotice}
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
           patch={diffPanelPatch}
           summaryLabel="Compared with main"

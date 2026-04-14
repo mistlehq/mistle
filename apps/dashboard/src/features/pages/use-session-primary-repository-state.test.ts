@@ -1,78 +1,103 @@
+// @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook } from "@testing-library/react";
+import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
-import {
-  buildRepositoryDiscoveryFindArgs,
-  DefaultSandboxWorkspaceDir,
-  parseRepositoryPaths,
-  resolveCurrentRepositoryPath,
-  toRepositoryOptions,
-} from "./use-session-primary-repository-state.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
+import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 
-describe("useSessionPrimaryRepositoryState helpers", () => {
-  it("parses repository roots from find output", () => {
-    expect(
-      parseRepositoryPaths({
-        findOutput: [
-          "/root/platform/.git",
-          "/root/acme/repo-1/.git",
-          "",
-          "/root/acme/repo-1/.git",
-          "/root/acme/repo-2/.git",
-        ].join("\n"),
-      }),
-    ).toEqual(["/root/acme/repo-1", "/root/acme/repo-2", "/root/platform"]);
+function createWrapper(queryClient: QueryClient) {
+  return function Wrapper({ children }: PropsWithChildren): React.JSX.Element {
+    return createElement(QueryClientProvider, { client: queryClient }, children);
+  };
+}
+
+describe("useSessionPrimaryRepositoryState", () => {
+  it("adopts the runtime-plan repository once it becomes available after repository discovery", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const sandboxInstanceId = "sbi_runtime_plan_race";
+    const repositoryPath = "/root/acme/repo-1";
+
+    queryClient.setQueryData(["session-primary-repository-options", sandboxInstanceId], {
+      repositoryOptions: [{ value: repositoryPath, label: "acme/repo-1" }],
+    });
+
+    const { result, rerender } = renderHook(
+      (props: { initialSelectedRepositoryPath?: string | null }) =>
+        useSessionPrimaryRepositoryState({
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          ...(props.initialSelectedRepositoryPath === undefined
+            ? {}
+            : { initialSelectedRepositoryPath: props.initialSelectedRepositoryPath }),
+          sandboxInstanceId,
+        }),
+      {
+        initialProps: {
+          initialSelectedRepositoryPath: null,
+        } as { initialSelectedRepositoryPath?: string | null },
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    expect(result.current.selectedRepositoryPath).toBeNull();
+
+    rerender({
+      initialSelectedRepositoryPath: repositoryPath,
+    });
+
+    expect(result.current.selectedRepositoryPath).toBe(repositoryPath);
   });
 
-  it("builds a find command that supports repositories and worktree checkouts", () => {
-    expect(
-      buildRepositoryDiscoveryFindArgs({
-        workspaceRoot: DefaultSandboxWorkspaceDir,
-      }),
-    ).toEqual([
-      "/root",
-      "-mindepth",
-      "1",
-      "-maxdepth",
-      "3",
-      "(",
-      "-type",
-      "d",
-      "-o",
-      "-type",
-      "f",
-      ")",
-      "-name",
-      ".git",
-    ]);
-  });
+  it("does not overwrite a user-selected repository when a later initial value arrives", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const sandboxInstanceId = "sbi_user_selection";
 
-  it("builds repository labels relative to the workspace root", () => {
-    expect(
-      toRepositoryOptions({
-        repositoryPaths: ["/root/acme/repo-1", "/tmp/external-repo"],
-        workspaceRoot: DefaultSandboxWorkspaceDir,
-      }),
-    ).toEqual([
-      { value: "/root/acme/repo-1", label: "acme/repo-1" },
-      { value: "/tmp/external-repo", label: "/tmp/external-repo" },
-    ]);
-  });
+    queryClient.setQueryData(["session-primary-repository-options", sandboxInstanceId], {
+      repositoryOptions: [
+        { value: "/root/acme/repo-1", label: "acme/repo-1" },
+        { value: "/root/acme/repo-2", label: "acme/repo-2" },
+      ],
+    });
 
-  it("resolves the current repository from the current working directory", () => {
-    expect(
-      resolveCurrentRepositoryPath({
-        currentWorkingDirectory: "/root/acme/repo-1/packages/dashboard",
-        repositoryPaths: ["/root/acme/repo-1", "/root/acme"],
-      }),
-    ).toBe("/root/acme/repo-1");
-  });
+    const { result, rerender } = renderHook(
+      (props: { initialSelectedRepositoryPath?: string | null }) =>
+        useSessionPrimaryRepositoryState({
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          ...(props.initialSelectedRepositoryPath === undefined
+            ? {}
+            : { initialSelectedRepositoryPath: props.initialSelectedRepositoryPath }),
+          sandboxInstanceId,
+        }),
+      {
+        initialProps: {
+          initialSelectedRepositoryPath: null,
+        } as { initialSelectedRepositoryPath?: string | null },
+        wrapper: createWrapper(queryClient),
+      },
+    );
 
-  it("returns null when the current working directory is outside all repositories", () => {
-    expect(
-      resolveCurrentRepositoryPath({
-        currentWorkingDirectory: "/root",
-        repositoryPaths: ["/root/acme/repo-1", "/root/acme/repo-2"],
-      }),
-    ).toBeNull();
+    act(() => {
+      result.current.setSelectedRepositoryPath("/root/acme/repo-2");
+    });
+
+    rerender({
+      initialSelectedRepositoryPath: "/root/acme/repo-1",
+    });
+
+    expect(result.current.selectedRepositoryPath).toBe("/root/acme/repo-2");
   });
 });

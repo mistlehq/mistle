@@ -40,6 +40,10 @@ type SessionsStoryHarnessProps = {
     title: string | null;
     status: "pending" | "starting" | "running" | "stopped" | "failed";
     connectable: boolean;
+    runtimeContext?: {
+      launchCwd: string | null;
+      primaryRepositoryRoot: string | null;
+    } | null;
     failureCode?: string | null;
     failureMessage?: string | null;
   };

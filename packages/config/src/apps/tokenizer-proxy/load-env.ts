@@ -23,6 +23,10 @@ const loadControlPlaneApiEnv = createEnvLoader<typeof TokenizerProxyControlPlane
     key: "baseUrl",
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL",
   },
+  {
+    key: "publicBaseUrl",
+    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL",
+  },
 ]);
 
 export function loadTokenizerProxyFromEnv(

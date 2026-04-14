@@ -403,6 +403,7 @@ const tokenizerProxyEnvConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
+    publicBaseUrl: "https://public-control-plane.example.test",
   },
 } as const;
 
@@ -414,6 +415,7 @@ const tokenizerProxyFixtureConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5100",
+    publicBaseUrl: "https://mistle.example.test",
   },
 } as const;
 
@@ -896,6 +898,8 @@ describe("loadConfig integrations", () => {
       configPath: configFixturePath,
       env: {
         MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "https://control-plane.local",
+        MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL:
+          "https://public-control-plane.local",
       },
     });
 
@@ -905,6 +909,7 @@ describe("loadConfig integrations", () => {
         ...tokenizerProxyFixtureConfig,
         controlPlaneApi: {
           baseUrl: "https://control-plane.local",
+          publicBaseUrl: "https://public-control-plane.local",
         },
       },
     });

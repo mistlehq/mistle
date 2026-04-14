@@ -13,7 +13,11 @@ const SessionDiffPanelOptions = {
 } as const;
 
 type SessionDiffPanelProps = {
-  errorMessage?: string | null;
+  errorNotice?: {
+    message: string;
+    title: string;
+    variant: "alert" | "default";
+  } | null;
   isLoading?: boolean;
   patch: string;
   summaryLabel: string;
@@ -51,7 +55,7 @@ function getFileDiffLineStats(fileDiff: FileDiffMetadata): {
 }
 
 export function SessionDiffPanel({
-  errorMessage = null,
+  errorNotice = null,
   isLoading = false,
   patch,
   summaryLabel,
@@ -77,10 +81,10 @@ export function SessionDiffPanel({
           <Spinner aria-label="Loading changes" className="size-4" />
           <span>Loading changes compared with main.</span>
         </div>
-      ) : errorMessage !== null ? (
+      ) : errorNotice !== null ? (
         <div className="min-h-0 flex-1 overflow-auto p-2">
-          <Notice title="Could not load changes" variant="alert">
-            {errorMessage}
+          <Notice title={errorNotice.title} variant={errorNotice.variant}>
+            {errorNotice.message}
           </Notice>
         </div>
       ) : parsedPatch.kind === "raw" ? (

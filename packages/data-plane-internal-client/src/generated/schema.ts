@@ -322,14 +322,17 @@ export interface paths {
                   slotKey?: string;
                 };
                 egressRuleId: string;
+                familyId: string;
                 match: {
                   hosts: string[];
                   methods?: string[];
                   pathPrefixes?: string[];
                 };
+                requestMiddleware?: string[];
                 upstream: {
                   baseUrl: string;
                 };
+                variantId: string;
               }[];
               image:
                 | {
@@ -728,14 +731,17 @@ export interface paths {
                     slotKey?: string;
                   };
                   egressRuleId: string;
+                  familyId: string;
                   match: {
                     hosts: string[];
                     methods?: string[];
                     pathPrefixes?: string[];
                   };
+                  requestMiddleware?: string[];
                   upstream: {
                     baseUrl: string;
                   };
+                  variantId: string;
                 }[];
                 image:
                   | {

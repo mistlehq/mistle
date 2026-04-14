@@ -23,7 +23,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createDefaultBindingConfig,
@@ -574,16 +574,14 @@ function LoadedSandboxProfileMetaSection(input: {
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AutoSaveEditableHeading
+        <AutoSaveTitleHeading
           ariaLabel="Profile name"
-          displayText={metaState.pageTitle}
           disabled={metaState.isUpdating}
+          emptyDisplayText={metaState.pageTitle}
           editButtonLabel="Edit profile name"
-          value={metaState.formState.displayName}
           onSave={metaState.onProfileNameSave}
-          validate={(nextValue) => {
-            return nextValue.trim().length === 0 ? "Profile name is required." : null;
-          }}
+          requiredLabel="Profile name"
+          value={metaState.formState.displayName}
         />
       </div>
     </>

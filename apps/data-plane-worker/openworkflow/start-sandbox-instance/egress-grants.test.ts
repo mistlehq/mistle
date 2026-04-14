@@ -90,6 +90,9 @@ describe("createEgressGrantByRuleId", () => {
           {
             egressRuleId: "egress_rule_github",
             bindingId: "ibd_github",
+            familyId: "github",
+            variantId: "github-cloud",
+            requestMiddleware: ["append-session-link-to-github-markdown"],
             match: {
               hosts: ["api.github.com"],
               pathPrefixes: ["/repos"],
@@ -145,6 +148,9 @@ describe("createEgressGrantByRuleId", () => {
       sub: "sbi_123",
       jti: "egress_rule_github",
       bindingId: "ibd_github",
+      familyId: "github",
+      variantId: "github-cloud",
+      requestMiddleware: ["append-session-link-to-github-markdown"],
       connectionId: "icn_github",
       secretType: "github_app_installation_token",
       upstreamBaseUrl: "https://api.github.com",
@@ -261,6 +267,8 @@ describe("createEgressGrantByRuleId", () => {
           {
             egressRuleId: "egress_rule_aws",
             bindingId: "ibd_aws",
+            familyId: "aws",
+            variantId: "aws-cli-default",
             match: {
               hosts: ["sts.us-east-1.amazonaws.com"],
               methods: ["POST"],
@@ -301,6 +309,8 @@ describe("createEgressGrantByRuleId", () => {
       sub: "sbi_aws_123",
       jti: "egress_rule_aws",
       bindingId: "ibd_aws",
+      familyId: "aws",
+      variantId: "aws-cli-default",
       connectionId: "icn_aws",
       secretType: "aws_secret_access_key",
       upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",

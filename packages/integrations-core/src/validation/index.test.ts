@@ -44,6 +44,8 @@ function createPtyLaunch(input: { runtimeId: string; displayName?: string; comma
 function createRoute(input: {
   egressRuleId: string;
   bindingId: string;
+  familyId?: string;
+  variantId?: string;
   hosts: string[];
   pathPrefixes?: string[];
 }): EgressCredentialRoute {
@@ -58,6 +60,8 @@ function createRoute(input: {
   return {
     egressRuleId: input.egressRuleId,
     bindingId: input.bindingId,
+    familyId: input.familyId ?? "test",
+    variantId: input.variantId ?? "test-default",
     match,
     upstream: {
       baseUrl: "https://example.com",
@@ -76,6 +80,8 @@ function createRoute(input: {
 function createAwsRoute(input: {
   egressRuleId: string;
   bindingId: string;
+  familyId?: string;
+  variantId?: string;
   hosts: string[];
   pathPrefixes?: string[];
 }): EgressCredentialRoute {
@@ -90,6 +96,8 @@ function createAwsRoute(input: {
   return {
     egressRuleId: input.egressRuleId,
     bindingId: input.bindingId,
+    familyId: input.familyId ?? "aws",
+    variantId: input.variantId ?? "aws-cli-default",
     match,
     upstream: {
       baseUrl: "https://sts.us-east-1.amazonaws.com",

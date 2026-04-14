@@ -99,7 +99,7 @@ export const WithErrorNoticees: Story = {
 export const WithCliEntryFailureNotice: Story = {
   args: {
     alert: {
-      title: "Could not start Codex CLI",
+      title: "Could not start Codex TUI",
       description: "codex executable missing from the sandbox image",
     },
   },

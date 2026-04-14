@@ -13,6 +13,8 @@ import {
 function createRoute(input: {
   egressRuleId: string;
   bindingId: string;
+  familyId?: string;
+  variantId?: string;
   hosts: string[];
   methods?: string[];
   pathPrefixes?: string[];
@@ -32,6 +34,8 @@ function createRoute(input: {
   return {
     egressRuleId: input.egressRuleId,
     bindingId: input.bindingId,
+    familyId: input.familyId ?? "test",
+    variantId: input.variantId ?? "test-default",
     match,
     upstream: {
       baseUrl: "https://api.example.com",

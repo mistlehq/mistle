@@ -19,6 +19,7 @@ export function loadTokenizerProxyFromToml(
     },
     controlPlaneApi: {
       baseUrl: controlPlaneApi.base_url,
+      publicBaseUrl: controlPlaneApi.public_base_url,
     },
   });
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LinearCredentialSlotKeys } from "./auth.js";
 import { compileLinearBinding } from "./compile-binding.js";
+import { LinearRequestMiddlewareIds } from "./egress-request-middleware.js";
 import { LinearToolIds } from "./tool-ids.js";
 
 describe("compileLinearBinding", () => {
@@ -144,6 +145,7 @@ describe("compileLinearBinding", () => {
           secretType: "api_key",
           slotKey: LinearCredentialSlotKeys.API_KEY,
         },
+        requestMiddleware: [LinearRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MCP_MARKDOWN],
       },
     ]);
     expect(compiled.artifacts).toEqual([]);

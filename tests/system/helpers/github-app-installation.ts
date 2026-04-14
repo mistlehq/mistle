@@ -1,30 +1,16 @@
 import { createSign } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
-
-const IntegrationTargetsProvisionManifestPath = fileURLToPath(
-  new URL("../../../integration-targets.provision.json", import.meta.url),
-);
 const GitHubAppInstallationResponseSchema = z.looseObject({
   id: z.union([z.string().min(1), z.number().int().positive()]),
   app_id: z.union([z.string().min(1), z.number().int().positive()]),
   app_slug: z.string().min(1),
 });
-
-const IntegrationTargetProvisionManifestSchema = z
-  .object({
-    version: z.number().int().positive(),
-    targets: z.array(
-      z.object({
-        targetKey: z.string().min(1),
-        config: z.record(z.string(), z.unknown()),
-        secrets: z.record(z.string(), z.string()).optional(),
-      }),
-    ),
-  })
-  .strict();
+const GitHubAppWebhookConfigResponseSchema = z.looseObject({
+  url: z.string().min(1),
+  content_type: z.string().min(1).optional(),
+  insecure_ssl: z.union([z.string().min(1), z.number().int().nonnegative()]).optional(),
+});
 
 type ProvisionedGitHubTarget = {
   appId: string;
@@ -41,27 +27,24 @@ function normalizeEscapedNewlines(value: string): string {
 }
 
 async function readProvisionedGitHubTarget(targetKey: string): Promise<ProvisionedGitHubTarget> {
-  const rawManifest = await readFile(IntegrationTargetsProvisionManifestPath, "utf8");
-  const manifest = IntegrationTargetProvisionManifestSchema.parse(JSON.parse(rawManifest));
-  const target = manifest.targets.find((candidate) => candidate.targetKey === targetKey);
-  if (target === undefined) {
-    throw new Error(`Integration target provision manifest is missing target '${targetKey}'.`);
-  }
-
-  const appId = target.config["app_id"];
+  const appId = process.env.MISTLE_TEST_GITHUB_APP_ID;
   if (typeof appId !== "string" || appId.length === 0) {
-    throw new Error(`Provisioned GitHub target '${targetKey}' is missing config 'app_id'.`);
+    throw new Error(
+      `GitHub system tests for target '${targetKey}' require env MISTLE_TEST_GITHUB_APP_ID.`,
+    );
   }
 
-  const appSlug = target.config["app_slug"];
+  const appSlug = process.env.MISTLE_TEST_GITHUB_APP_SLUG;
   if (typeof appSlug !== "string" || appSlug.length === 0) {
-    throw new Error(`Provisioned GitHub target '${targetKey}' is missing config 'app_slug'.`);
+    throw new Error(
+      `GitHub system tests for target '${targetKey}' require env MISTLE_TEST_GITHUB_APP_SLUG.`,
+    );
   }
 
-  const appPrivateKeyPem = target.secrets?.["app_private_key_pem"];
+  const appPrivateKeyPem = process.env.MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM;
   if (typeof appPrivateKeyPem !== "string" || appPrivateKeyPem.length === 0) {
     throw new Error(
-      `Provisioned GitHub target '${targetKey}' is missing secret 'app_private_key_pem'.`,
+      `GitHub system tests for target '${targetKey}' require env MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM.`,
     );
   }
 
@@ -87,6 +70,87 @@ function createGitHubAppJwt(input: { appId: string; appPrivateKeyPem: string }):
   signer.end();
   const signature = signer.sign(input.appPrivateKeyPem).toString("base64url");
   return `${header}.${payload}.${signature}`;
+}
+
+function createGitHubAppAuthorizationHeader(): string {
+  const provisionedTarget = {
+    appId: process.env.MISTLE_TEST_GITHUB_APP_ID,
+    appPrivateKeyPem: process.env.MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM,
+  };
+
+  if (
+    typeof provisionedTarget.appId !== "string" ||
+    provisionedTarget.appId.length === 0 ||
+    typeof provisionedTarget.appPrivateKeyPem !== "string" ||
+    provisionedTarget.appPrivateKeyPem.length === 0
+  ) {
+    throw new Error(
+      "GitHub system tests require env MISTLE_TEST_GITHUB_APP_ID and MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM.",
+    );
+  }
+
+  return `Bearer ${createGitHubAppJwt({
+    appId: provisionedTarget.appId,
+    appPrivateKeyPem: normalizeEscapedNewlines(provisionedTarget.appPrivateKeyPem),
+  })}`;
+}
+
+export async function readGitHubAppWebhookConfig(): Promise<{
+  url: string;
+  contentType?: string;
+  insecureSsl?: string;
+}> {
+  const response = await fetch("https://api.github.com/app/hook/config", {
+    headers: {
+      authorization: createGitHubAppAuthorizationHeader(),
+      accept: "application/vnd.github+json",
+      "user-agent": "mistle-system-tests",
+      "x-github-api-version": "2022-11-28",
+    },
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Failed to read GitHub App webhook config: status ${String(response.status)} body ${responseText}`,
+    );
+  }
+
+  const parsed = GitHubAppWebhookConfigResponseSchema.parse(JSON.parse(responseText));
+  return {
+    url: parsed.url,
+    ...(parsed.content_type === undefined ? {} : { contentType: parsed.content_type }),
+    ...(parsed.insecure_ssl === undefined ? {} : { insecureSsl: parsed.insecure_ssl.toString() }),
+  };
+}
+
+export async function updateGitHubAppWebhookConfig(input: {
+  url: string;
+  contentType?: string;
+  insecureSsl?: string;
+}): Promise<void> {
+  const response = await fetch("https://api.github.com/app/hook/config", {
+    method: "PATCH",
+    headers: {
+      authorization: createGitHubAppAuthorizationHeader(),
+      accept: "application/vnd.github+json",
+      "content-type": "application/json",
+      "user-agent": "mistle-system-tests",
+      "x-github-api-version": "2022-11-28",
+    },
+    body: JSON.stringify({
+      url: input.url,
+      ...(input.contentType === undefined ? {} : { content_type: input.contentType }),
+      ...(input.insecureSsl === undefined ? {} : { insecure_ssl: input.insecureSsl }),
+    }),
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Failed to update GitHub App webhook config: status ${String(response.status)} body ${responseText}`,
+    );
+  }
 }
 
 export async function resolveGitHubAppInstallationId(input: {

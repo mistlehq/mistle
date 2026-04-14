@@ -30,14 +30,27 @@ GitHub App installation gives access through the installed GitHub App and suppor
 
 ### Create The GitHub App
 
-Create a GitHub App in GitHub.com or GHES and collect:
+Create a GitHub App in GitHub.com or GHES.
 
-1. App ID
-2. App slug
-3. A generated private key PEM
-4. A webhook secret
+Configure these values:
 
-Grant the minimum repository permissions Mistle needs for your use case. For example, code-hosting workflows usually need repository metadata plus read/write permissions for contents, pull requests, issues, and actions.
+1. **GitHub App name** (eg. `Mistle GitHub App`)
+2. **Homepage URL** - Any valid URL for your organization
+3. **Callback URL** - Not necessary. Omit.
+4. **Webhook secret**: create a secret that you will also enter in Mistle
+5. **Permissions** - consider the following permissions in **Repository Permissions**:
+
+   | Permission    | Access         | Enables                                                                                               |
+   | ------------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+   | Actions       | Read and write | Trigger runs.<br />Rerun/cancel runs.<br />Inspect workflow runs and artifacts.                       |
+   | Checks        | Read-only      | Read check runs.                                                                                      |
+   | Contents      | Read and write | Clone/fetch repos.<br />Branch, commit, push.<br />Open PRs from branches.<br />Create releases/tags. |
+   | Issues        | Read and write | Create issues.<br />Update issues.<br />Comment on issues.                                            |
+   | Metadata      | Read-only      | List repos.<br />Read basic repo context.                                                             |
+   | Pull requests | Read and write | Open/update PRs.<br />Request reviewers.<br />Comment/review PRs.<br />Merge PRs (repo rules apply).  |
+
+6. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
+7. **Private key** - Generate and download a PEM private key from GitHub App settings.
 
 ### Connect It In Mistle
 
@@ -53,15 +66,22 @@ Enter:
 | `webhookSecret`    | Shared webhook secret configured on the GitHub App |
 
 `installation_id` and `setup_action` are stored automatically after the installation flow completes. You do not enter those manually.
+`app_slug` must be the actual GitHub App slug from GitHub, not a display name guess.
 
 ### Copy The URLs From Mistle Into GitHub
 
-After you create the GitHub App connection, open that connection's detail page in Mistle. The product already shows the exact values to copy into GitHub:
+After you create the GitHub App connection, open that connection's detail page in Mistle and copy:
 
 - `Webhook callback URL`
 - `Post-installation setup URL`
 
-Copy those values directly into your GitHub App settings, then return to Mistle and click **Install GitHub App**.
+Copy those values directly into your GitHub App settings:
+
+1. Set the GitHub App's `Webhook URL` to Mistle's `Webhook callback URL`.
+2. Set the GitHub App's `Setup URL` to Mistle's `Post-installation setup URL`.
+3. Ensure the webhook is active in GitHub.
+
+Return to Mistle and click **Install GitHub App**.
 
 ## GitHub Enterprise Server
 

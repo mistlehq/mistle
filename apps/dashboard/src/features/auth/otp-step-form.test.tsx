@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { systemSleeper } from "@mistle/time";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -110,5 +111,8 @@ describe("OtpStepForm", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("submit-count").textContent).toBe("1");
     });
+
+    // input-otp schedules uncancelled 0/10/50ms timers; let them settle before jsdom teardown.
+    await systemSleeper.sleep(60);
   });
 });

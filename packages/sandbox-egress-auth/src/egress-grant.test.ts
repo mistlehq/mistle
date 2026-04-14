@@ -20,6 +20,8 @@ const defaultClaims: EgressGrantClaims = {
   sub: "sbi_123",
   jti: "egress_rule_openai",
   bindingId: "ibd_openai",
+  familyId: "openai",
+  variantId: "openai-default",
   connectionId: "icn_openai",
   secretType: "api_key",
   upstreamBaseUrl: "https://api.openai.com/v1",
@@ -40,12 +42,15 @@ const defaultClaims: EgressGrantClaims = {
   resolverKey: "default",
   allowedMethods: ["GET", "POST"],
   allowedPathPrefixes: ["/v1"],
+  requestMiddleware: ["append-session-link-to-openai-response"],
 };
 
 const awsClaims: EgressGrantClaims = {
   sub: "sbi_aws_123",
   jti: "egress_rule_aws",
   bindingId: "ibd_aws",
+  familyId: "aws",
+  variantId: "aws-cli-default",
   connectionId: "icn_aws",
   secretType: "aws_secret_access_key",
   upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
@@ -96,6 +101,8 @@ describe("egress-grant", () => {
       sub: defaultClaims.sub,
       jti: defaultClaims.jti,
       bindingId: defaultClaims.bindingId,
+      familyId: defaultClaims.familyId,
+      variantId: defaultClaims.variantId,
       connectionId: defaultClaims.connectionId,
       secretType: defaultClaims.secretType,
       upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -212,6 +219,34 @@ describe("egress-grant", () => {
     });
   });
 
+  it("rejects empty familyId and variantId claim values during minting", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...defaultClaims,
+          familyId: "   ",
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.FAMILY_ID_REQUIRED,
+    });
+
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...defaultClaims,
+          variantId: "   ",
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.VARIANT_ID_REQUIRED,
+    });
+  });
+
   it("rejects invalid allowedMethods and allowedPathPrefixes during minting", async () => {
     await expect(
       mintEgressGrant({
@@ -237,6 +272,21 @@ describe("egress-grant", () => {
       }),
     ).rejects.toMatchObject({
       code: EgressGrantErrorCode.ALLOWED_PATH_PREFIXES_INVALID,
+    });
+  });
+
+  it("rejects invalid requestMiddleware during minting", async () => {
+    await expect(
+      mintEgressGrant({
+        config: defaultConfig,
+        claims: {
+          ...defaultClaims,
+          requestMiddleware: ["append-session-link", ""],
+        },
+        ttlSeconds: 60,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.REQUEST_MIDDLEWARE_INVALID,
     });
   });
 
@@ -432,6 +482,8 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: defaultClaims.bindingId,
+        familyId: defaultClaims.familyId,
+        variantId: defaultClaims.variantId,
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -466,6 +518,8 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: defaultClaims.bindingId,
+        familyId: defaultClaims.familyId,
+        variantId: defaultClaims.variantId,
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -488,6 +542,8 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: "   ",
+        familyId: defaultClaims.familyId,
+        variantId: defaultClaims.variantId,
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,

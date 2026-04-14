@@ -1,5 +1,8 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import { resolveProviderEgressTelemetryHandler } from "@mistle/integrations-definitions/server";
+import {
+  resolveIntegrationEgressRequestMiddleware,
+  resolveProviderEgressTelemetryHandler,
+} from "@mistle/integrations-definitions/server";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { Hash } from "@smithy/hash-node";
@@ -27,6 +30,7 @@ type CreateEgressProxyHandlerInput = {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   egressGrantConfig: EgressGrantConfig;
+  resolveRequestMiddleware?: RequestMiddlewareResolver;
 };
 
 type CredentialResolverInput = {
@@ -42,6 +46,17 @@ type ErrorResponse = {
 };
 
 type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
+type ProxyRequestContext = {
+  sandboxInstanceId: string;
+  sessionUrl: string;
+};
+type ProxyMutableRequest = {
+  method: string;
+  url: URL;
+  headers: Headers;
+  body: Uint8Array | undefined;
+};
+type RequestMiddlewareResolver = typeof resolveIntegrationEgressRequestMiddleware;
 
 const EgressTracer = trace.getTracer("@mistle/tokenizer-proxy");
 
@@ -362,7 +377,7 @@ async function applyAwsSigV4AuthInjection(input: {
   method: string;
   upstreamUrl: URL;
   outgoingHeaders: Headers;
-  outgoingBody: ArrayBuffer | undefined;
+  outgoingBody: Uint8Array | undefined;
   service: string;
   region: string;
   credential: AwsSessionCredential;
@@ -391,7 +406,7 @@ async function applyAwsSigV4AuthInjection(input: {
       query: toQueryParameterBag(input.upstreamUrl.searchParams),
       headers: Object.fromEntries(headersToSign.entries()),
       ...(port === undefined ? {} : { port }),
-      ...(input.outgoingBody === undefined ? {} : { body: new Uint8Array(input.outgoingBody) }),
+      ...(input.outgoingBody === undefined ? {} : { body: input.outgoingBody }),
     }),
   );
 
@@ -458,12 +473,12 @@ function removeInternalHeaders(headers: Headers): void {
 
 async function readOutgoingRequestBody(
   ctx: Context<AppContextBindings>,
-): Promise<ArrayBuffer | undefined> {
+): Promise<Uint8Array | undefined> {
   if (ctx.req.method === "GET" || ctx.req.method === "HEAD") {
     return undefined;
   }
 
-  return ctx.req.arrayBuffer();
+  return new Uint8Array(await ctx.req.arrayBuffer());
 }
 
 function buildOutgoingRequestHeaders(ctx: Context<AppContextBindings>): Headers {
@@ -510,6 +525,156 @@ function extractDebugHeaders(headers: Headers): Record<string, string> {
 
 function truncateForDebug(value: string, maxLength: number): string {
   return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
+}
+
+function createSessionLinkUrl(input: {
+  controlPlanePublicBaseUrl: string;
+  sandboxInstanceId: string;
+}): string {
+  const sessionLinkUrl = new URL(input.controlPlanePublicBaseUrl);
+  sessionLinkUrl.pathname = joinPath(
+    sessionLinkUrl.pathname,
+    `p/sessions/${encodeURIComponent(input.sandboxInstanceId)}`,
+  );
+  sessionLinkUrl.search = "";
+  sessionLinkUrl.hash = "";
+  return sessionLinkUrl.toString();
+}
+
+function cloneProxyMutableRequest(request: ProxyMutableRequest): ProxyMutableRequest {
+  return {
+    method: request.method,
+    url: new URL(request.url.toString()),
+    headers: new Headers(request.headers),
+    body: request.body === undefined ? undefined : new Uint8Array(request.body),
+  };
+}
+
+function toFetchBody(body: Uint8Array): ArrayBuffer {
+  const copiedBody = new Uint8Array(body.byteLength);
+  copiedBody.set(body);
+  return copiedBody.buffer;
+}
+
+function validateMiddlewareRequestResult(input: {
+  previousRequest: ProxyMutableRequest;
+  candidateRequest: ProxyMutableRequest;
+  middlewareId: string;
+}): ProxyMutableRequest {
+  if (input.candidateRequest.method !== input.previousRequest.method) {
+    throw new Error(`Request middleware '${input.middlewareId}' must not change the HTTP method.`);
+  }
+
+  if (!(input.candidateRequest.url instanceof URL)) {
+    throw new Error(`Request middleware '${input.middlewareId}' must return a URL instance.`);
+  }
+
+  if (input.candidateRequest.url.toString() !== input.previousRequest.url.toString()) {
+    throw new Error(`Request middleware '${input.middlewareId}' must not change the target URL.`);
+  }
+
+  if (!(input.candidateRequest.headers instanceof Headers)) {
+    throw new Error(`Request middleware '${input.middlewareId}' must return Headers.`);
+  }
+
+  if (
+    input.candidateRequest.body !== undefined &&
+    !(input.candidateRequest.body instanceof Uint8Array)
+  ) {
+    throw new Error(
+      `Request middleware '${input.middlewareId}' must return Uint8Array request bodies.`,
+    );
+  }
+
+  return cloneProxyMutableRequest(input.candidateRequest);
+}
+
+async function applyRequestMiddleware(input: {
+  egressGrant: AuthorizedEgressGrant;
+  requestContext: ProxyRequestContext;
+  request: ProxyMutableRequest;
+  resolveRequestMiddleware: RequestMiddlewareResolver;
+  requestPath: string;
+}): Promise<ProxyMutableRequest> {
+  let currentRequest = input.request;
+
+  for (const middlewareId of input.egressGrant.requestMiddleware ?? []) {
+    const middlewareSpan = EgressTracer.startSpan(
+      "tokenizer_proxy.egress.apply_request_middleware",
+      {
+        attributes: {
+          "http.request.method": currentRequest.method,
+          "url.path": input.requestPath,
+          "mistle.egress.rule_id": input.egressGrant.egressRuleId,
+          "mistle.integration.binding_id": input.egressGrant.bindingId,
+          "mistle.integration.family_id": input.egressGrant.familyId,
+          "mistle.integration.variant_id": input.egressGrant.variantId,
+          "mistle.egress.request_middleware.id": middlewareId,
+        },
+      },
+    );
+
+    try {
+      const middleware = input.resolveRequestMiddleware({
+        familyId: input.egressGrant.familyId,
+        variantId: input.egressGrant.variantId,
+        middlewareId,
+      });
+
+      if (middleware === undefined) {
+        logger.error(
+          {
+            middlewareId,
+            familyId: input.egressGrant.familyId,
+            variantId: input.egressGrant.variantId,
+            egressRuleId: input.egressGrant.egressRuleId,
+            method: currentRequest.method,
+            path: input.requestPath,
+          },
+          "Failed to resolve egress request middleware",
+        );
+        middlewareSpan.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: "request middleware resolution failed",
+        });
+        continue;
+      }
+
+      const candidateRequest = cloneProxyMutableRequest(currentRequest);
+      const middlewareResult = await middleware.handle({
+        ctx: input.requestContext,
+        request: candidateRequest,
+      });
+
+      currentRequest = validateMiddlewareRequestResult({
+        previousRequest: currentRequest,
+        candidateRequest: middlewareResult,
+        middlewareId,
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          middlewareId,
+          familyId: input.egressGrant.familyId,
+          variantId: input.egressGrant.variantId,
+          egressRuleId: input.egressGrant.egressRuleId,
+          method: currentRequest.method,
+          path: input.requestPath,
+        },
+        "Failed to apply egress request middleware",
+      );
+      middlewareSpan.recordException(error instanceof Error ? error : new Error(String(error)));
+      middlewareSpan.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: "request middleware execution failed",
+      });
+    } finally {
+      middlewareSpan.end();
+    }
+  }
+
+  return currentRequest;
 }
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
@@ -701,11 +866,33 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           upstreamBaseUrl: egressGrant.upstreamBaseUrl,
         });
         span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
-        const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
+        let outgoingRequest: ProxyMutableRequest = {
+          method: ctx.req.method,
+          url: upstreamUrl,
+          headers: buildOutgoingRequestHeaders(ctx),
+          body: await readOutgoingRequestBody(ctx),
+        };
+
+        if ((egressGrant.requestMiddleware?.length ?? 0) > 0) {
+          outgoingRequest = await applyRequestMiddleware({
+            egressGrant,
+            requestContext: {
+              sandboxInstanceId: egressGrant.sub,
+              sessionUrl: createSessionLinkUrl({
+                controlPlanePublicBaseUrl: ctx.get("config").controlPlaneApi.publicBaseUrl,
+                sandboxInstanceId: egressGrant.sub,
+              }),
+            },
+            request: outgoingRequest,
+            resolveRequestMiddleware:
+              input.resolveRequestMiddleware ?? resolveIntegrationEgressRequestMiddleware,
+            requestPath: ctx.req.path,
+          });
+        }
 
         if (egressGrant.additionalHeaders !== undefined) {
           applyAdditionalHeaders({
-            outgoingHeaders,
+            outgoingHeaders: outgoingRequest.headers,
             additionalHeaders: egressGrant.additionalHeaders,
           });
         }
@@ -715,7 +902,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               controlPlaneInternalClient: input.controlPlaneInternalClient,
               credentialCache: input.credentialCache,
               bindingId: egressGrant.bindingId,
-              outgoingHeaders,
+              outgoingHeaders: outgoingRequest.headers,
               additionalCredentialHeaders: egressGrant.additionalCredentialHeaders,
             });
           } catch (error) {
@@ -741,7 +928,6 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             );
           }
         }
-        const outgoingBody = await readOutgoingRequestBody(ctx);
 
         if (egressGrant.authInjectionType === "aws_sigv4") {
           const telemetryHandler = resolveProviderEgressTelemetryHandler(
@@ -756,8 +942,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           const awsSigV4Attributes = telemetryHandler.createRequestTelemetryAttributes({
             service: egressGrant.authInjectionService,
             region: egressGrant.authInjectionRegion,
-            hasBody: outgoingBody !== undefined,
-            bodyByteLength: outgoingBody?.byteLength ?? 0,
+            hasBody: outgoingRequest.body !== undefined,
+            bodyByteLength: outgoingRequest.body?.byteLength ?? 0,
           });
           span.setAttributes(awsSigV4Attributes);
 
@@ -770,10 +956,10 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 signingSpan.setAttributes(awsSigV4Attributes);
                 try {
                   await applyAwsSigV4AuthInjection({
-                    method: ctx.req.method,
-                    upstreamUrl,
-                    outgoingHeaders,
-                    outgoingBody,
+                    method: outgoingRequest.method,
+                    upstreamUrl: outgoingRequest.url,
+                    outgoingHeaders: outgoingRequest.headers,
+                    outgoingBody: outgoingRequest.body,
                     service: egressGrant.authInjectionService,
                     region: egressGrant.authInjectionRegion,
                     credential: resolveAwsSessionCredentialOrThrow({
@@ -819,8 +1005,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           const staticAuthInjection = resolveStaticAuthInjectionOrThrow(egressGrant);
 
           applyAuthInjection({
-            upstreamUrl,
-            outgoingHeaders,
+            upstreamUrl: outgoingRequest.url,
+            outgoingHeaders: outgoingRequest.headers,
             ...staticAuthInjection,
             secretValue: resolveStaticCredentialValueOrThrow({
               credential: resolvedCredential,
@@ -834,13 +1020,21 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           upstreamResponse = await EgressTracer.startActiveSpan(
             "tokenizer_proxy.egress.fetch_upstream",
             async (upstreamSpan) => {
-              upstreamSpan.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
-              upstreamSpan.setAttribute("http.request.method", ctx.req.method);
+              upstreamSpan.setAttributes(
+                createUpstreamTelemetryAttributes({ upstreamUrl: outgoingRequest.url }),
+              );
+              upstreamSpan.setAttribute("http.request.method", outgoingRequest.method);
               try {
-                return await fetch(upstreamUrl, {
-                  method: ctx.req.method,
-                  headers: outgoingHeaders,
-                  ...(outgoingBody === undefined ? {} : { body: outgoingBody }),
+                const fetchInit: RequestInit = {
+                  method: outgoingRequest.method,
+                  headers: outgoingRequest.headers,
+                };
+                if (outgoingRequest.body !== undefined) {
+                  fetchInit.body = toFetchBody(outgoingRequest.body);
+                }
+
+                return await fetch(outgoingRequest.url, {
+                  ...fetchInit,
                 });
               } catch (error) {
                 upstreamSpan.recordException(
@@ -861,7 +1055,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             {
               err: error,
               egressRuleId: egressGrant.egressRuleId,
-              upstreamBaseUrl: egressGrant.upstreamBaseUrl,
+              upstreamBaseUrl: outgoingRequest.url.toString(),
             },
             "Failed to forward egress request to upstream",
           );
@@ -901,14 +1095,14 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           const upstreamResponseClone = upstreamResponse.clone();
           const upstreamResponseBody = truncateForDebug(await upstreamResponseClone.text(), 500);
           const outgoingBodyText =
-            outgoingBody === undefined
+            outgoingRequest.body === undefined
               ? undefined
-              : truncateForDebug(Buffer.from(outgoingBody).toString("utf8"), 500);
+              : truncateForDebug(Buffer.from(outgoingRequest.body).toString("utf8"), 500);
           logger.warn(
             {
               statusCode: upstreamResponse.status,
-              upstreamUrl: upstreamUrl.toString(),
-              outgoingHeaders: extractDebugHeaders(outgoingHeaders),
+              upstreamUrl: outgoingRequest.url.toString(),
+              outgoingHeaders: extractDebugHeaders(outgoingRequest.headers),
               outgoingBody: outgoingBodyText,
               upstreamResponseBody,
               egressRuleId: egressGrant.egressRuleId,

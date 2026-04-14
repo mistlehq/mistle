@@ -415,6 +415,26 @@ export type IntegrationConnectionMethodDefinition<
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
+export type ProxyRequestContext = {
+  sandboxInstanceId: string;
+  sessionUrl: string;
+};
+
+export type ProxyMutableRequest = {
+  method: string;
+  url: URL;
+  headers: Headers;
+  body: Uint8Array | undefined;
+};
+
+export type IntegrationEgressRequestMiddleware = {
+  id: string;
+  handle(input: {
+    ctx: ProxyRequestContext;
+    request: ProxyMutableRequest;
+  }): MaybePromise<ProxyMutableRequest>;
+};
+
 export type IntegrationMcpValue = string;
 
 export type IntegrationMcpTransport = "streamable-http" | "stdio";
@@ -998,6 +1018,8 @@ export type EgressCredentialHeaderInjection = {
 export type EgressCredentialRoute = {
   egressRuleId: string;
   bindingId: string;
+  familyId: string;
+  variantId: string;
   match: {
     hosts: ReadonlyArray<string>;
     pathPrefixes?: ReadonlyArray<string>;
@@ -1036,6 +1058,7 @@ export type EgressCredentialRoute = {
   additionalHeaders?: Readonly<Record<string, string>>;
   additionalCredentialHeaders?: ReadonlyArray<EgressCredentialHeaderInjection>;
   credentialResolver: EgressCredentialResolverRef;
+  requestMiddleware?: ReadonlyArray<string>;
 };
 
 export type RuntimeExecCommand = {
@@ -1267,7 +1290,10 @@ export type CompiledRuntimeClient = RuntimeClientBase<string>;
 
 export type RuntimeClient = RuntimeClientBase<string>;
 
-export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "egressRuleId" | "bindingId">;
+export type CompileBindingEgressRoute = Omit<
+  EgressCredentialRoute,
+  "egressRuleId" | "bindingId" | "familyId" | "variantId"
+>;
 
 export type CompileBindingAgentRuntime = {
   runtimeId: string;
@@ -1690,6 +1716,7 @@ export type IntegrationDefinition<
   >;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
+  egressRequestMiddleware?: ReadonlyArray<IntegrationEgressRequestMiddleware>;
   capabilities?: IntegrationCapabilityContributor<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,

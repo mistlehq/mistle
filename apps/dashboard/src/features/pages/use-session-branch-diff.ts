@@ -9,8 +9,25 @@ import type { SessionWorkbenchTransportManager } from "./use-session-workbench-t
 
 const BranchDiffCommandTimeoutMs = 15_000;
 
+type BranchDiffError = {
+  kind:
+    | "command_failed"
+    | "missing_main"
+    | "missing_merge_base"
+    | "missing_session_id"
+    | "not_git_repository"
+    | "timeout";
+  message: string;
+};
+
+type BranchDiffErrorNotice = {
+  message: string;
+  title: string;
+  variant: "alert" | "default";
+};
+
 type SessionBranchDiffState = {
-  errorMessage: string | null;
+  errorNotice: BranchDiffErrorNotice | null;
   isLoading: boolean;
   patch: string;
 };
@@ -18,6 +35,10 @@ type SessionBranchDiffState = {
 type BranchDiffLoadResult = {
   patch: string;
 };
+
+function createBranchDiffError(input: BranchDiffError): BranchDiffError {
+  return input;
+}
 
 export function buildBranchDiffGitExecRequest(input: {
   args: string[];
@@ -68,6 +89,38 @@ function formatGitFailureDetails(result: ExecCommandResult): string {
   return details;
 }
 
+function isBranchDiffError(error: unknown): error is BranchDiffError {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const maybeKind = "kind" in error ? error.kind : null;
+  const maybeMessage = "message" in error ? error.message : null;
+
+  return typeof maybeKind === "string" && typeof maybeMessage === "string";
+}
+
+function resolveBranchDiffErrorNotice(error: BranchDiffError): BranchDiffErrorNotice {
+  switch (error.kind) {
+    case "missing_main":
+    case "not_git_repository":
+      return {
+        message: error.message,
+        title: "Changes unavailable",
+        variant: "default",
+      };
+    case "command_failed":
+    case "missing_merge_base":
+    case "missing_session_id":
+    case "timeout":
+      return {
+        message: error.message,
+        title: "Could not load changes",
+        variant: "alert",
+      };
+  }
+}
+
 async function readMergeBase(input: {
   cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -80,12 +133,18 @@ async function readMergeBase(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (mergeBaseResult.exitCode !== 0) {
-    throw new Error(formatGitFailureDetails(mergeBaseResult));
+    throw createBranchDiffError({
+      kind: "command_failed",
+      message: formatGitFailureDetails(mergeBaseResult),
+    });
   }
 
   const mergeBase = mergeBaseResult.stdout.trim();
   if (mergeBase.length === 0) {
-    throw new Error("Could not resolve the merge-base with `main`.");
+    throw createBranchDiffError({
+      kind: "missing_merge_base",
+      message: "Could not resolve the merge-base with `main`.",
+    });
   }
 
   return mergeBase;
@@ -104,7 +163,10 @@ async function readTrackedWorktreeDiff(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (diffResult.exitCode !== 0) {
-    throw new Error(formatGitFailureDetails(diffResult));
+    throw createBranchDiffError({
+      kind: "command_failed",
+      message: formatGitFailureDetails(diffResult),
+    });
   }
 
   return diffResult;
@@ -122,7 +184,10 @@ async function listUntrackedFiles(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (result.exitCode !== 0) {
-    throw new Error(formatGitFailureDetails(result));
+    throw createBranchDiffError({
+      kind: "command_failed",
+      message: formatGitFailureDetails(result),
+    });
   }
 
   const paths = result.stdout.split("\0");
@@ -145,7 +210,10 @@ async function readUntrackedFilePatch(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (result.exitCode !== 0 && result.exitCode !== 1) {
-    throw new Error(formatGitFailureDetails(result));
+    throw createBranchDiffError({
+      kind: "command_failed",
+      message: formatGitFailureDetails(result),
+    });
   }
 
   return result;
@@ -163,7 +231,10 @@ async function loadBranchDiff(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (repoCheck.exitCode !== 0 || repoCheck.stdout.trim() !== "true") {
-    throw new Error("Current workspace is not a git repository.");
+    throw createBranchDiffError({
+      kind: "not_git_repository",
+      message: "Current workspace is not a git repository.",
+    });
   }
 
   const baseCheck = await runGitCommand({
@@ -173,7 +244,10 @@ async function loadBranchDiff(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (baseCheck.exitCode !== 0) {
-    throw new Error("Local branch `main` does not exist.");
+    throw createBranchDiffError({
+      kind: "missing_main",
+      message: "Local branch `main` does not exist.",
+    });
   }
 
   const mergeBase = await readMergeBase({
@@ -211,16 +285,35 @@ async function loadBranchDiff(input: {
   return { patch };
 }
 
-function normalizeBranchDiffError(error: unknown): string {
-  if (!(error instanceof Error)) {
-    return "Could not load changes compared with main.";
+function normalizeBranchDiffError(error: unknown): BranchDiffErrorNotice {
+  if (isBranchDiffError(error)) {
+    return resolveBranchDiffErrorNotice(error);
   }
 
-  if (error.message.includes("command timed out")) {
-    return "Timed out loading changes compared with main.";
+  if (error instanceof Error && error.message.includes("command timed out")) {
+    return resolveBranchDiffErrorNotice(
+      createBranchDiffError({
+        kind: "timeout",
+        message: "Timed out loading changes compared with main.",
+      }),
+    );
   }
 
-  return error.message;
+  if (error instanceof Error) {
+    return resolveBranchDiffErrorNotice(
+      createBranchDiffError({
+        kind: "command_failed",
+        message: error.message,
+      }),
+    );
+  }
+
+  return resolveBranchDiffErrorNotice(
+    createBranchDiffError({
+      kind: "command_failed",
+      message: "Could not load changes compared with main.",
+    }),
+  );
 }
 
 export function useSessionBranchDiff(input: {
@@ -234,7 +327,10 @@ export function useSessionBranchDiff(input: {
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;
       if (sandboxInstanceId === null) {
-        throw new Error("Session id is required.");
+        throw createBranchDiffError({
+          kind: "missing_session_id",
+          message: "Session id is required.",
+        });
       }
 
       return await loadBranchDiff({
@@ -251,10 +347,10 @@ export function useSessionBranchDiff(input: {
   });
 
   return {
-    errorMessage: query.isError ? normalizeBranchDiffError(query.error) : null,
+    errorNotice: query.isError ? normalizeBranchDiffError(query.error) : null,
     isLoading: query.isLoading || query.isFetching,
     patch: query.data?.patch ?? "",
   };
 }
 
-export { BranchDiffCommandTimeoutMs, normalizeBranchDiffError };
+export { BranchDiffCommandTimeoutMs, normalizeBranchDiffError, resolveBranchDiffErrorNotice };

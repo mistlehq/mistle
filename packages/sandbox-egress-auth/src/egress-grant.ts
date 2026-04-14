@@ -57,6 +57,8 @@ export async function mintEgressGrant(input: {
   try {
     return await new SignJWT({
       bindingId: claims.bindingId,
+      familyId: claims.familyId,
+      variantId: claims.variantId,
       connectionId: claims.connectionId,
       secretType: claims.secretType,
       upstreamBaseUrl: claims.upstreamBaseUrl,
@@ -85,6 +87,9 @@ export async function mintEgressGrant(input: {
       ...(claims.allowedPathPrefixes === undefined
         ? {}
         : { allowedPathPrefixes: claims.allowedPathPrefixes }),
+      ...(claims.requestMiddleware === undefined
+        ? {}
+        : { requestMiddleware: claims.requestMiddleware }),
     })
       .setProtectedHeader({ alg: "HS256" })
       .setSubject(claims.sub)
@@ -134,6 +139,14 @@ export async function verifyEgressGrant(input: {
         typeof verificationResult.payload.bindingId === "string"
           ? verificationResult.payload.bindingId
           : "",
+      familyId:
+        typeof verificationResult.payload.familyId === "string"
+          ? verificationResult.payload.familyId
+          : "",
+      variantId:
+        typeof verificationResult.payload.variantId === "string"
+          ? verificationResult.payload.variantId
+          : "",
       connectionId:
         typeof verificationResult.payload.connectionId === "string"
           ? verificationResult.payload.connectionId
@@ -178,6 +191,9 @@ export async function verifyEgressGrant(input: {
         : {}),
       ...(isStringArray(verificationResult.payload.allowedPathPrefixes)
         ? { allowedPathPrefixes: verificationResult.payload.allowedPathPrefixes }
+        : {}),
+      ...(isStringArray(verificationResult.payload.requestMiddleware)
+        ? { requestMiddleware: verificationResult.payload.requestMiddleware }
         : {}),
     };
   } catch (error) {

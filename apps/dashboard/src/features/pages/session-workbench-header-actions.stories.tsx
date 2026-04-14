@@ -28,14 +28,14 @@ type Story = StoryObj<typeof meta>;
 
 const StorybookArgs = {
   cliControl: {
-    ariaLabel: "CLI",
+    ariaLabel: "TUI",
     className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
     disabled: false,
     onClick: () => {
       return;
     },
     pressed: false,
-    title: "Open Codex CLI",
+    title: "Open Codex TUI",
   },
   diffControl: {
     ariaLabel: "Open changes",

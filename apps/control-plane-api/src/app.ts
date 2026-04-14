@@ -21,6 +21,7 @@ import { createCorsMiddleware } from "./middleware/cors.js";
 import { withActiveOrganizationAccess } from "./middleware/with-active-organization-access.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
 import { createOrganizationRoutes } from "./organizations/index.js";
+import { createPublicSessionLinksRoutes } from "./public-session-links/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
 import type {
@@ -121,6 +122,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
   const meRoutes = withAuthSession(createMeRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
+  const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withActiveOrganizationAccess(createSandboxInstancesRoutes());
   const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
@@ -133,6 +135,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(integrationWebhooksRoutes.basePath, integrationWebhooksRoutes.routes);
   app.route(meRoutes.basePath, meRoutes.routes);
   app.route(organizationRoutes.basePath, organizationRoutes.routes);
+  app.route(publicSessionLinksRoutes.basePath, publicSessionLinksRoutes.routes);
   app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);
   app.route(sandboxProfilesRoutes.basePath, sandboxProfilesRoutes.routes);
 }

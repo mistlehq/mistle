@@ -4,7 +4,6 @@ import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
-import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
 import { SandboxInstancesNotFoundCodes } from "./constants.js";
 
@@ -62,7 +61,13 @@ export const sandboxInstanceStatusResponseSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
-    runtimePlan: CompiledRuntimePlanSchema.nullable(),
+    runtimeContext: z
+      .object({
+        launchCwd: z.string().min(1).nullable(),
+        primaryRepositoryRoot: z.string().min(1).nullable(),
+      })
+      .strict()
+      .nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),
@@ -76,6 +81,12 @@ export const sandboxInstanceStatusResponseSchema = z
 export const sandboxInstancesNotFoundResponseSchema = createCodeMessageErrorSchema(
   z.literal(SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND),
 );
+
+export const redirectLocationHeaderSchema = z
+  .object({
+    Location: z.string().min(1),
+  })
+  .strict();
 
 export const sandboxInstanceListItemSchema = z
   .object({

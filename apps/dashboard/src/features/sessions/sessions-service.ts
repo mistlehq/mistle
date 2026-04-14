@@ -1,4 +1,3 @@
-import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
@@ -23,7 +22,13 @@ const SandboxInstanceStatusResponseSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
-    runtimePlan: CompiledRuntimePlanSchema.nullable(),
+    runtimeContext: z
+      .object({
+        launchCwd: z.string().min(1).nullable(),
+        primaryRepositoryRoot: z.string().min(1).nullable(),
+      })
+      .strict()
+      .nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),
@@ -33,6 +38,9 @@ const SandboxInstanceStatusResponseSchema = z
       .nullable(),
   })
   .strict();
+
+const SandboxInstanceRuntimeContextSchema =
+  SandboxInstanceStatusResponseSchema.shape.runtimeContext;
 
 const SandboxInstanceConnectionTokenSchema = z
   .object({
@@ -65,20 +73,9 @@ export type StartSandboxInstanceResult = {
   sandboxInstanceId: string;
 };
 
-export type SandboxInstanceStatusResult = {
-  id: string;
-  title: string | null;
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
-  connectable: boolean;
-  failureCode: string | null;
-  failureMessage: string | null;
-  runtimePlan: z.output<typeof CompiledRuntimePlanSchema> | null;
-  automationConversation: {
-    conversationId: string;
-    routeId: string | null;
-    providerConversationId: string | null;
-  } | null;
-};
+export type SandboxInstanceRuntimeContext = z.output<typeof SandboxInstanceRuntimeContextSchema>;
+
+export type SandboxInstanceStatusResult = z.output<typeof SandboxInstanceStatusResponseSchema>;
 
 export type MintSandboxConnectionTokenResult = {
   instanceId: string;

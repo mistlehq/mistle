@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
+import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -21,6 +22,7 @@ import {
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
+import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
 
 function createControllerQueryClient(input?: {
   gcTime?: number;
@@ -627,7 +629,7 @@ describe("useSessionWorkbenchController", () => {
       connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
+      runtimeContext: null,
       automationConversation: null,
     });
 
@@ -638,6 +640,44 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
     expect(result.current.workbench.stoppedSessionMessage).toBeNull();
+  });
+
+  it("stops polling once a session is connectable", () => {
+    expect(
+      resolveSandboxStatusRefetchInterval({
+        automationConversation: null,
+        connectable: true,
+        isAutoResumingStoppedSandbox: false,
+        status: "running",
+      }),
+    ).toBe(false);
+  });
+
+  it("throws when a connectable session is missing runtime context", () => {
+    expect(() =>
+      resolveInitialSessionConnectInput({
+        connectable: true,
+        providerThreadId: null,
+        sandboxInstanceId: "sbi_123",
+        runtimeContext: null,
+      }),
+    ).toThrow("Expected a connectable sandbox session to include runtime context.");
+
+    expect(
+      resolveInitialSessionConnectInput({
+        connectable: true,
+        providerThreadId: "thread_123",
+        sandboxInstanceId: "sbi_123",
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
+        },
+      }),
+    ).toEqual({
+      providerThreadId: "thread_123",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: "thread_123",
+    });
   });
 
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {

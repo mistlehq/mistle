@@ -250,7 +250,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
       summary: {
         createdAt,
         id: input.id,
-        name: "CLI Test Thread",
+        name: "TUI Test Thread",
         updatedAt: createdAt,
       },
       turnCount: input.turnCount ?? 0,
@@ -688,12 +688,15 @@ function createWorkbenchRequestHandler(
       response.end(
         JSON.stringify({
           id: statusSandboxInstanceId,
-          title: "CLI Test Session",
+          title: "TUI Test Session",
           status: "running",
           connectable: true,
           failureCode: null,
           failureMessage: null,
-          runtimePlan: null,
+          runtimeContext: {
+            launchCwd: null,
+            primaryRepositoryRoot: null,
+          },
           automationConversation:
             options.providerConversationId === null || options.providerConversationId === undefined
               ? null
@@ -814,7 +817,7 @@ async function withSessionWorkbenchCliHarness(
       : optionsOrRun;
   const runner = typeof optionsOrRun === "function" ? optionsOrRun : maybeRun;
   if (runner === undefined) {
-    throw new Error("Expected CLI harness runner to be provided.");
+    throw new Error("Expected TUI harness runner to be provided.");
   }
   const harness = await renderSessionWorkbenchCliHarness(options);
 
