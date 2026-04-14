@@ -6,6 +6,7 @@ import {
   Label,
   REGEXP_ONLY_DIGITS,
 } from "@mistle/ui";
+import { useRef } from "react";
 
 type OtpStepFormProps = {
   email: string;
@@ -18,9 +19,14 @@ type OtpStepFormProps = {
 
 export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
   const otpSlotClassName = "h-12 min-w-0 flex-1 text-base tabular-nums sm:h-14 sm:text-lg";
+  const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <form className="gap-4 flex flex-col" onSubmit={(event) => void props.onSubmit(event)}>
+    <form
+      className="gap-4 flex flex-col"
+      onSubmit={(event) => void props.onSubmit(event)}
+      ref={formRef}
+    >
       <div className="gap-2 flex flex-col">
         <p className="text-muted-foreground text-sm leading-relaxed">
           We sent a one-time code to{" "}
@@ -40,6 +46,7 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
           maxLength={6}
           name="otp"
           onChange={props.onOtpChange}
+          onComplete={() => formRef.current?.requestSubmit()}
           pattern={REGEXP_ONLY_DIGITS}
           value={props.otp}
         >
