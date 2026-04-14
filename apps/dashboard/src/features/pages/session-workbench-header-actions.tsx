@@ -1,13 +1,15 @@
 import {
   Badge,
   Button,
+  Notice,
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import { GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
 
 import { resolveSelectableValue } from "../shared/select-value.js";
 
@@ -19,6 +21,9 @@ export type SessionWorkbenchHeaderRepositoryOption = {
 type SessionWorkbenchHeaderRepositoryControl = {
   ariaLabel: string;
   disabled?: boolean;
+  errorMessage?: string;
+  isRefreshing?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onValueChange: (nextValue: string) => void;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedValue: string | null;
@@ -52,6 +57,16 @@ export function SessionWorkbenchHeaderActions(input: {
       : (repositoryControl.options.find(
           (option) => option.value === repositoryControl.selectedValue,
         )?.label ?? null);
+  const repositoryIndicator =
+    repositoryControl === undefined ? null : repositoryControl.isRefreshing === true ? (
+      <span
+        aria-label="Refreshing repositories"
+        className="text-muted-foreground inline-flex shrink-0 items-center justify-center"
+        role="status"
+      >
+        <ArrowClockwiseIcon aria-hidden className="size-3.5 animate-spin" />
+      </span>
+    ) : undefined;
 
   return (
     <div className="flex items-center gap-2">
@@ -77,6 +92,7 @@ export function SessionWorkbenchHeaderActions(input: {
           <span aria-hidden className="h-5 w-px bg-stone-200" />
           <Select
             disabled={repositoryControl.disabled}
+            onOpenChange={repositoryControl.onOpenChange}
             onValueChange={(nextValue) => {
               if (nextValue === null) {
                 return;
@@ -92,6 +108,7 @@ export function SessionWorkbenchHeaderActions(input: {
             <SelectTrigger
               aria-label={repositoryControl.ariaLabel}
               className="h-8 w-48 min-w-0 border-stone-200 bg-transparent text-xs shadow-none hover:bg-stone-100"
+              indicator={repositoryIndicator}
               title={repositoryControl.title ?? repositoryControl.ariaLabel}
             >
               <SelectValue placeholder="Primary repository">
@@ -104,6 +121,19 @@ export function SessionWorkbenchHeaderActions(input: {
                   {option.label}
                 </SelectItem>
               ))}
+              {repositoryControl.errorMessage === undefined ? null : (
+                <>
+                  <SelectSeparator />
+                  <Notice
+                    variant="alert"
+                    appearance="subtle"
+                    className="rounded-none border-0 bg-transparent px-3 py-2 text-xs"
+                    role="note"
+                  >
+                    {repositoryControl.errorMessage}
+                  </Notice>
+                </>
+              )}
             </SelectContent>
           </Select>
         </>

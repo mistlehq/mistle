@@ -16,11 +16,29 @@ type SessionRepositoryDiscoveryResult = {
 
 type SessionPrimaryRepositoryState = {
   errorMessage: string | null;
-  isLoading: boolean;
+  isInitialLoading: boolean;
+  isRefreshing: boolean;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+  refreshRepositories: () => Promise<void>;
   selectedRepositoryPath: string | null;
   setSelectedRepositoryPath: (nextValue: string | null) => void;
 };
+
+function toUnavailableSelectedOption(input: {
+  selectedRepositoryPath: string;
+  workspaceRoot: string;
+}): SessionWorkbenchHeaderRepositoryOption {
+  const label =
+    input.selectedRepositoryPath.startsWith(`${input.workspaceRoot}/`) &&
+    input.selectedRepositoryPath.length > input.workspaceRoot.length + 1
+      ? input.selectedRepositoryPath.slice(input.workspaceRoot.length + 1)
+      : input.selectedRepositoryPath;
+
+  return {
+    value: input.selectedRepositoryPath,
+    label: `${label} (unavailable)`,
+  };
+}
 
 async function runExecCommand(input: {
   command: string;
@@ -178,6 +196,18 @@ export function useSessionPrimaryRepositoryState(input: {
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
+  const refreshedSelectionMissing =
+    selectedRepositoryPath !== null &&
+    query.data !== undefined &&
+    !query.data.repositoryOptions.some((option) => option.value === selectedRepositoryPath);
+  const selectedUnavailableOption =
+    refreshedSelectionMissing && selectedRepositoryPath !== null
+      ? toUnavailableSelectedOption({
+          selectedRepositoryPath,
+          workspaceRoot: DefaultSandboxWorkspaceDir,
+        })
+      : null;
+  const repositoryOptions = query.data?.repositoryOptions ?? [];
 
   useEffect(() => {
     initialSelectionSandboxInstanceIdRef.current = null;
@@ -202,15 +232,22 @@ export function useSessionPrimaryRepositoryState(input: {
       ? query.error instanceof Error
         ? query.error.message
         : null
-      : null,
-    isLoading: query.isLoading || query.isFetching,
+      : refreshedSelectionMissing
+        ? "The selected repository is no longer available in this sandbox."
+        : null,
+    isInitialLoading: query.isLoading,
+    isRefreshing: query.isFetching && query.data !== undefined,
     options: [
       {
         label: "None",
         value: SessionRepositoryNoneValue,
       },
-      ...(query.data?.repositoryOptions ?? []),
+      ...(selectedUnavailableOption === null ? [] : [selectedUnavailableOption]),
+      ...repositoryOptions,
     ],
+    refreshRepositories: async () => {
+      await query.refetch();
+    },
     selectedRepositoryPath,
     setSelectedRepositoryPath,
   };

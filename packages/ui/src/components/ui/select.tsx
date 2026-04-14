@@ -38,9 +38,11 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
 function SelectTrigger({
   className,
   size = "default",
+  indicator,
   children,
   ...props
 }: SelectPrimitive.Trigger.Props & {
+  indicator?: React.ReactNode;
   size?: "sm" | "default";
 }) {
   return (
@@ -54,9 +56,11 @@ function SelectTrigger({
       {...props}
     >
       {children}
-      <SelectPrimitive.Icon
-        render={<CaretDownIcon className="text-muted-foreground size-4 pointer-events-none" />}
-      />
+      {indicator ?? (
+        <SelectPrimitive.Icon
+          render={<CaretDownIcon className="text-muted-foreground size-4 pointer-events-none" />}
+        />
+      )}
     </SelectPrimitive.Trigger>
   );
 }

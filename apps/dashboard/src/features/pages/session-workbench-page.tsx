@@ -95,9 +95,18 @@ function SessionWorkbenchPageContent(input: {
           ariaLabel: "Primary repository",
           disabled:
             !workbench.connectionReadiness.canConnect ||
-            workbench.primaryRepositoryState.isLoading ||
+            (workbench.primaryRepositoryState.isInitialLoading &&
+              workbench.primaryRepositoryState.options.length === 1) ||
             workbench.primaryRepositoryControlState.isSwitching ||
             workbench.primaryRepositoryControlState.disabledReason !== null,
+          isRefreshing: workbench.primaryRepositoryState.isRefreshing,
+          onOpenChange: (open) => {
+            if (!open) {
+              return;
+            }
+
+            void workbench.primaryRepositoryState.refreshRepositories();
+          },
           onValueChange: (nextValue) => {
             void workbench.primaryRepositoryControlState.switchPrimaryRepository(
               nextValue === SessionRepositoryNoneValue ? null : nextValue,
@@ -114,9 +123,11 @@ function SessionWorkbenchPageContent(input: {
                 "Primary repository is available only when the sandbox is running.")
               : workbench.primaryRepositoryControlState.isSwitching
                 ? "Switching the active chat thread for the selected repository."
-                : workbench.primaryRepositoryState.isLoading
+                : workbench.primaryRepositoryState.isInitialLoading
                   ? "Loading repositories from the active sandbox."
-                  : "Primary repository"),
+                  : workbench.primaryRepositoryState.isRefreshing
+                    ? "Refreshing repositories from the active sandbox."
+                    : "Primary repository"),
         }}
         status={{
           kind: headerStatusKind,
@@ -157,8 +168,10 @@ function SessionWorkbenchPageContent(input: {
       workbench.diffPanelState.togglePanel,
       workbench.portAccessState,
       workbench.primaryRepositoryState.errorMessage,
-      workbench.primaryRepositoryState.isLoading,
+      workbench.primaryRepositoryState.isInitialLoading,
+      workbench.primaryRepositoryState.isRefreshing,
       workbench.primaryRepositoryState.options,
+      workbench.primaryRepositoryState.refreshRepositories,
       workbench.primaryRepositoryState.selectedRepositoryPath,
       workbench.primaryRepositoryControlState.disabledReason,
       workbench.primaryRepositoryControlState.isSwitching,
