@@ -80,7 +80,6 @@ export function useCodexSessionConnection(input: {
   connectionGenerationRef: RefObject<number>;
   ensureCurrentGeneration: (generation: number) => void;
   handleChatNotificationReceived: (notification: CodexJsonRpcNotification) => void;
-  handleSessionNotificationReceived: (notification: CodexJsonRpcNotification) => void;
   onServerRequestNotification: (notification: CodexJsonRpcNotification) => void;
   onServerRequestReceived: (request: CodexJsonRpcServerRequest) => void;
   refreshThreadCollections: (input?: {
@@ -264,7 +263,6 @@ export function useCodexSessionConnection(input: {
 
           if (event.type === "notification") {
             input.onServerRequestNotification(event.notification);
-            input.handleSessionNotificationReceived(event.notification);
             input.handleChatNotificationReceived(event.notification);
             if (event.notification.method === "turn/completed") {
               void input
@@ -293,7 +291,6 @@ export function useCodexSessionConnection(input: {
     [
       input.connectionGenerationRef,
       input.handleChatNotificationReceived,
-      input.handleSessionNotificationReceived,
       input.onServerRequestNotification,
       input.onServerRequestReceived,
       input.refreshThreadCollections,

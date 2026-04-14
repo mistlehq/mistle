@@ -234,7 +234,6 @@ export function useCodexSessionState(input: {
     connectionGenerationRef,
     ensureCurrentGeneration,
     handleChatNotificationReceived: handleNotificationReceived,
-    handleSessionNotificationReceived: () => {},
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
