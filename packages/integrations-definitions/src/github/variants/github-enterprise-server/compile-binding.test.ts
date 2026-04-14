@@ -5,6 +5,7 @@ import type {
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { GitHubRequestMiddlewareIds } from "../../shared/egress-request-middleware.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 
@@ -155,6 +156,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           secretType: "api_key",
           slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
         },
+        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
       },
     ]);
 
@@ -334,6 +336,9 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     expect(compiled.egressRoutes[1]?.credentialResolver.resolverKey).toBe(
       "github_app_installation_token",
     );
+    expect(compiled.egressRoutes[1]?.requestMiddleware).toEqual([
+      GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN,
+    ]);
   });
 
   it("fails fast when github app installation config omits installation_id", () => {

@@ -5,6 +5,7 @@ import type {
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { GitHubRequestMiddlewareIds } from "../../shared/egress-request-middleware.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
@@ -155,6 +156,7 @@ describe("compileGitHubCloudBinding", () => {
           secretType: "api_key",
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
         },
+        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
       },
       {
         match: {
@@ -410,6 +412,9 @@ describe("compileGitHubCloudBinding", () => {
     expect(compiled.egressRoutes[1]?.credentialResolver.resolverKey).toBe(
       "github_app_installation_token",
     );
+    expect(compiled.egressRoutes[1]?.requestMiddleware).toEqual([
+      GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN,
+    ]);
     expect(compiled.egressRoutes[2]?.credentialResolver.secretType).toBe(
       "github_app_installation_token",
     );

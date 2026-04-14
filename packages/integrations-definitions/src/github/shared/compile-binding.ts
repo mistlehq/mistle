@@ -11,6 +11,7 @@ import { GitHubConnectionConfigSchema, resolveGitHubCredentialSecretType } from 
 import type { GitHubBindingConfig } from "./binding-config-schema.js";
 import { GitHubApiMethods, GitHubGitHttpMethods } from "./constants.js";
 import { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
+import { GitHubRequestMiddlewareIds } from "./egress-request-middleware.js";
 import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import { GitHubToolIds } from "./tool-ids.js";
@@ -278,6 +279,7 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
           target: "authorization",
         },
         credentialResolver,
+        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
       },
       ...(uploadRouteHost === undefined
         ? []
