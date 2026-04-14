@@ -1,7 +1,7 @@
 import { DefaultSandboxWorkspaceDir, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import { ExecStreamClient } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
@@ -159,7 +159,9 @@ export function useSessionPrimaryRepositoryState(input: {
   initialSelectedRepositoryPath?: string | null;
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
-  const initialSelectionSandboxInstanceIdRef = useRef<string | null>(null);
+  const hasHydratedInitialSelectionRef = useRef(false);
+  const lastAppliedInitialSelectionRef = useRef<string | null | undefined>(undefined);
+  const userSelectionTouchedRef = useRef(false);
   const [selectedRepositoryPath, setSelectedRepositoryPath] = useState<string | null>(null);
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null,
@@ -192,7 +194,9 @@ export function useSessionPrimaryRepositoryState(input: {
   const repositoryOptions = query.data?.repositoryOptions ?? [];
 
   useEffect(() => {
-    initialSelectionSandboxInstanceIdRef.current = null;
+    hasHydratedInitialSelectionRef.current = false;
+    lastAppliedInitialSelectionRef.current = undefined;
+    userSelectionTouchedRef.current = false;
     setSelectedRepositoryPath(null);
   }, [input.sandboxInstanceId]);
 
@@ -205,13 +209,35 @@ export function useSessionPrimaryRepositoryState(input: {
       return;
     }
 
-    if (initialSelectionSandboxInstanceIdRef.current === input.sandboxInstanceId) {
+    if (!hasHydratedInitialSelectionRef.current) {
+      hasHydratedInitialSelectionRef.current = true;
+      lastAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
+      setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
       return;
     }
 
-    initialSelectionSandboxInstanceIdRef.current = input.sandboxInstanceId;
+    if (
+      userSelectionTouchedRef.current ||
+      lastAppliedInitialSelectionRef.current !== null ||
+      input.initialSelectedRepositoryPath === null ||
+      selectedRepositoryPath !== null
+    ) {
+      return;
+    }
+
+    lastAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
     setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
-  }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId, query.data]);
+  }, [
+    input.initialSelectedRepositoryPath,
+    input.sandboxInstanceId,
+    query.data,
+    selectedRepositoryPath,
+  ]);
+
+  const handleSetSelectedRepositoryPath = useCallback((nextValue: string | null) => {
+    userSelectionTouchedRef.current = true;
+    setSelectedRepositoryPath(nextValue);
+  }, []);
 
   return {
     errorMessage: query.isError
@@ -235,7 +261,7 @@ export function useSessionPrimaryRepositoryState(input: {
       await query.refetch();
     },
     selectedRepositoryPath,
-    setSelectedRepositoryPath,
+    setSelectedRepositoryPath: handleSetSelectedRepositoryPath,
   };
 }
 
