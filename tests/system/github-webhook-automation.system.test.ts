@@ -6,10 +6,12 @@ import { randomUUID } from "node:crypto";
 
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
+  buildCodexTurnInputItems,
   CodexJsonRpcClient,
   AgentStreamClient,
   readCodexThread,
   resumeCodexThread,
+  startCodexTurn,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
@@ -35,6 +37,7 @@ const WebhookDeliveryTimeoutMs = 3 * 60_000;
 const AutomationRunTimeoutMs = 3 * 60_000;
 const ResourceSyncTimeoutMs = 2 * 60_000;
 const ThreadReadTimeoutMs = 90_000;
+const AgentReplyTimeoutMs = 3 * 60_000;
 
 const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
@@ -104,6 +107,8 @@ const GitHubIssueCommentResponseSchema = z.looseObject({
   id: z.number().int().positive(),
   body: z.string().min(1),
 });
+
+const GitHubIssueCommentListResponseSchema = z.array(GitHubIssueCommentResponseSchema);
 
 function hasRequiredEnv(): boolean {
   return RequiredEnvNames.every((name) => {
@@ -265,6 +270,17 @@ async function closeGitHubIssue(input: {
   ).catch(() => undefined);
 }
 
+function buildSandboxSessionLinkUrl(input: {
+  publicHostname: string;
+  sandboxInstanceId: string;
+}): string {
+  const url = new URL(`https://${input.publicHostname}`);
+  url.pathname = `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/session-link`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 async function waitForCondition<T>(input: {
   description: string;
   timeoutMs: number;
@@ -282,6 +298,121 @@ async function waitForCondition<T>(input: {
   }
 
   throw new Error(`Timed out waiting for ${input.description} after ${String(input.timeoutMs)}ms.`);
+}
+
+async function waitForGitHubIssueComment(input: {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  token: string;
+  expectedSubstring: string;
+  timeoutMs: number;
+}): Promise<z.infer<typeof GitHubIssueCommentResponseSchema>> {
+  return waitForCondition({
+    description: `GitHub issue comment containing '${input.expectedSubstring}'`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      const comments = await githubRequestJson({
+        method: "GET",
+        path: `/repos/${input.owner}/${input.repo}/issues/${String(input.issueNumber)}/comments`,
+        token: input.token,
+        description: "GitHub issue comment listing",
+        schema: GitHubIssueCommentListResponseSchema,
+      });
+
+      for (let index = comments.length - 1; index >= 0; index -= 1) {
+        const comment = comments[index];
+        if (comment !== undefined && comment.body.includes(input.expectedSubstring)) {
+          return comment;
+        }
+      }
+
+      return null;
+    },
+  });
+}
+
+async function waitForCodexTurnCompleted(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  turnId: string;
+  timeoutMs: number;
+}): Promise<void> {
+  await waitForCondition({
+    description: `Codex turn '${input.turnId}' to complete`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      const thread = await readCodexThread({
+        rpcClient: input.rpcClient,
+        threadId: input.threadId,
+      });
+      const turn = thread.turns.find((candidate) => candidate.id === input.turnId);
+      if (turn === undefined || turn.status === null) {
+        return null;
+      }
+
+      if (turn.status === "failed") {
+        throw new Error(`Codex turn '${input.turnId}' failed.`);
+      }
+
+      return turn.status === "completed" ? true : null;
+    },
+  });
+}
+
+function turnContainsCommandExecution(input: {
+  items: readonly unknown[];
+  expectedCommandSubstring: string;
+}): boolean {
+  return input.items.some((item) => {
+    if (!isRecord(item) || item.type !== "commandExecution") {
+      return false;
+    }
+
+    return (
+      typeof item.command === "string" && item.command.includes(input.expectedCommandSubstring)
+    );
+  });
+}
+
+async function waitForCodexCommandExecution(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  turnId: string;
+  expectedCommandSubstring: string;
+  timeoutMs: number;
+}): Promise<void> {
+  await waitForCondition({
+    description: `Codex turn '${input.turnId}' to execute '${input.expectedCommandSubstring}'`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      const thread = await readCodexThread({
+        rpcClient: input.rpcClient,
+        threadId: input.threadId,
+      });
+      const turn = thread.turns.find((candidate) => candidate.id === input.turnId);
+      if (turn === undefined) {
+        return null;
+      }
+
+      if (
+        turnContainsCommandExecution({
+          items: turn.items,
+          expectedCommandSubstring: input.expectedCommandSubstring,
+        })
+      ) {
+        return true;
+      }
+
+      if (turn.status === "completed" || turn.status === "failed") {
+        throw new Error(
+          `Codex turn '${input.turnId}' completed without executing '${input.expectedCommandSubstring}'.`,
+        );
+      }
+
+      return null;
+    },
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -352,7 +483,7 @@ describeIf("system GitHub webhook automation", () => {
   });
 
   it(
-    "routes a real GitHub issue comment webhook into an automation conversation thread",
+    "routes a real GitHub issue comment webhook into an automation conversation thread and appends a session link to the agent GitHub reply",
     async ({ fixture }) => {
       const repository = parseGitHubRepository(requireEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"));
       const githubToken = requireEnv("MISTLE_TEST_GITHUB_TOKEN");
@@ -366,6 +497,7 @@ describeIf("system GitHub webhook automation", () => {
 
       const payloadMarker = `mistle-system-webhook-${randomUUID()}`;
       const expectedInputSubstring = `GitHub issue comment webhook: ${payloadMarker}`;
+      const agentReplyMarker = `mistle-system-agent-reply-${randomUUID()}`;
       const session = await fixture.authSession();
       const openAiConnection = await requestJsonOrThrow({
         request: fixture.request,
@@ -905,6 +1037,52 @@ describeIf("system GitHub webhook automation", () => {
         });
 
         expect(threadRead.threadId).toBe(providerConversationId);
+
+        const expectedSessionLinkUrl = buildSandboxSessionLinkUrl({
+          publicHostname: requireEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
+          sandboxInstanceId: route.sandboxInstanceId,
+        });
+        const expectedSessionFooter = `\n\n---\n[🔗 View session](${expectedSessionLinkUrl})`;
+        const agentReplyTurn = await startCodexTurn({
+          rpcClient: codexRpcClient,
+          threadId: providerConversationId,
+          input: buildCodexTurnInputItems({
+            text: [
+              `Use the gh CLI command gh issue comment to post one reply on GitHub issue #${String(issue.number)} in ${repository.owner}/${repository.repo}.`,
+              `The comment must contain this exact first line: ${agentReplyMarker}`,
+              "Add one short second line: Automated system test reply.",
+              `Do not include this webhook marker: ${payloadMarker}`,
+              "Do not use code fences or markdown block quotes.",
+            ].join("\n"),
+            attachments: [],
+          }),
+        });
+
+        await waitForCodexCommandExecution({
+          rpcClient: codexRpcClient,
+          threadId: providerConversationId,
+          turnId: agentReplyTurn.turnId,
+          expectedCommandSubstring: "gh issue comment",
+          timeoutMs: AgentReplyTimeoutMs,
+        });
+
+        const agentComment = await waitForGitHubIssueComment({
+          owner: repository.owner,
+          repo: repository.repo,
+          issueNumber: issue.number,
+          token: githubToken,
+          expectedSubstring: agentReplyMarker,
+          timeoutMs: AgentReplyTimeoutMs,
+        });
+        expect(agentComment.body).toContain(agentReplyMarker);
+        expect(agentComment.body.endsWith(expectedSessionFooter)).toBe(true);
+
+        await waitForCodexTurnCompleted({
+          rpcClient: codexRpcClient,
+          threadId: providerConversationId,
+          turnId: agentReplyTurn.turnId,
+          timeoutMs: AgentReplyTimeoutMs,
+        });
       } finally {
         rpcClient?.dispose();
         sessionClient?.disconnect();
