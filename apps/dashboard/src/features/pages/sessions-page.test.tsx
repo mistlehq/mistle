@@ -236,6 +236,40 @@ describe("SessionsPage", () => {
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });
 
+  it("orders same-status sessions by most recent createdAt first", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_older_update",
+          title: "Older updated session",
+          status: "running",
+          createdAt: "2026-03-08T00:00:00.000Z",
+          updatedAt: "2026-03-09T00:00:00.000Z",
+        }),
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_newer_update",
+          title: "Newer updated session",
+          status: "running",
+          createdAt: "2026-03-10T00:00:00.000Z",
+          updatedAt: "2026-03-08T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const rendered = renderSessionsPage({
+      queryClient,
+    });
+
+    const rows = rendered.container.querySelectorAll("tbody tr");
+    expect(rows.item(0).textContent).toContain("Newer updated session");
+    expect(rows.item(1).textContent).toContain("Older updated session");
+  });
+
   it("truncates long session titles in the list so the full value can be shown in a tooltip", () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
@@ -366,7 +400,7 @@ describe("SessionsPage", () => {
       ),
     });
 
-    fireEvent.click(screen.getByText("Alpha Profile"));
+    fireEvent.click(screen.getByRole("link", { name: /untitled/i }));
 
     expect(screen.getByText("/sessions/sbi_stopped")).toBeDefined();
   });
@@ -385,7 +419,9 @@ describe("SessionsPage", () => {
       queryClient,
     });
 
-    expect(within(rendered.container).getByRole("link")).toBeDefined();
+    expect(within(rendered.container).getByRole("link").getAttribute("href")).toBe(
+      "/sessions/sbi_running",
+    );
   });
 
   it("renders failed sessions as non-navigable rows", () => {

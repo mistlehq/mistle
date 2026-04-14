@@ -20,7 +20,7 @@ import {
 import { ArrowSquareOutIcon, InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -126,7 +126,11 @@ export function SandboxSessionStatusBadge(input: {
   );
 }
 
-function SessionTitleCell(input: { title: string; isNavigable: boolean }): React.JSX.Element {
+function SessionTitleCell(input: {
+  href?: string;
+  title: string;
+  isNavigable: boolean;
+}): React.JSX.Element {
   const [titleElement, setTitleElement] = useState<HTMLSpanElement | null>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
@@ -162,24 +166,31 @@ function SessionTitleCell(input: { title: string; isNavigable: boolean }): React
     <Tooltip delay={0} disabled={!isTruncated}>
       <TooltipTrigger
         render={
-          <span className="flex max-w-full items-center gap-1">
-            <span
-              className={`block min-w-0 flex-1 cursor-default truncate font-medium ${
-                input.isNavigable
-                  ? "group-hover/session-row:underline group-focus-within/session-row:underline"
-                  : "text-muted-foreground"
-              }`}
-              ref={handleTitleRef}
-            >
-              {input.title}
+          input.href === undefined ? (
+            <span className="flex max-w-full items-center gap-1">
+              <span
+                className={`block min-w-0 flex-1 cursor-default truncate font-medium ${
+                  input.isNavigable ? "" : "text-muted-foreground"
+                }`}
+                ref={handleTitleRef}
+              >
+                {input.title}
+              </span>
             </span>
-            {input.isNavigable ? (
+          ) : (
+            <Link className="flex max-w-full items-center gap-1" to={input.href}>
+              <span
+                className="block min-w-0 flex-1 cursor-default truncate font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
+                ref={handleTitleRef}
+              >
+                {input.title}
+              </span>
               <ArrowSquareOutIcon
                 aria-hidden
                 className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
               />
-            ) : null}
-          </span>
+            </Link>
+          )
         }
       />
       <TooltipContent showArrow={false} side="top" variant="light">
@@ -288,7 +299,6 @@ export function resolveSessionResultsSummary(input: {
 }
 
 export function SessionsPage(): React.JSX.Element {
-  const navigate = useNavigate();
   const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
   // Tradeoff: the selection intentionally snapshots the launchable profile, including latestVersion.
@@ -569,39 +579,18 @@ export function SessionsPage(): React.JSX.Element {
                           : "group/session-row hover:bg-transparent"
                       }
                       key={session.id}
-                      onClick={() => {
-                        if (!isNavigable) {
-                          return;
-                        }
-
-                        void navigate(`/sessions/${encodeURIComponent(session.id)}`);
-                      }}
-                      onKeyDown={(event) => {
-                        if (!isNavigable) {
-                          return;
-                        }
-
-                        if (event.key !== "Enter" && event.key !== " ") {
-                          return;
-                        }
-
-                        event.preventDefault();
-                        void navigate(`/sessions/${encodeURIComponent(session.id)}`);
-                      }}
-                      {...(isNavigable
-                        ? {
-                            role: "link",
-                            tabIndex: 0,
-                          }
-                        : {
-                            "aria-disabled": true,
-                          })}
+                      {...(isNavigable ? {} : { "aria-disabled": true })}
                     >
                       <TableCell className="max-w-0 align-top whitespace-normal">
                         <div className="flex min-w-0">
                           <SessionTitleCell
                             isNavigable={isNavigable}
                             title={session.title ?? "Untitled"}
+                            {...(isNavigable
+                              ? {
+                                  href: `/sessions/${encodeURIComponent(session.id)}`,
+                                }
+                              : {})}
                           />
                         </div>
                       </TableCell>
