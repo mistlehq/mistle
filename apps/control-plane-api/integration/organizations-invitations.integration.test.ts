@@ -189,6 +189,70 @@ describe("organization invitations integration", () => {
     });
   });
 
+  it("excludes accepted invitations from the invitations listing and total", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "integration-org-invitations-hide-accepted@example.com",
+    });
+
+    await fixture.db
+      .update(users)
+      .set({
+        name: "Org Owner",
+      })
+      .where(eq(users.id, ownerSession.userId));
+    await fixture.db.insert(invitations).values([
+      {
+        organizationId: ownerSession.organizationId,
+        email: "still-pending@example.com",
+        role: "member",
+        inviterId: ownerSession.userId,
+        status: "pending",
+        expiresAt: new Date("3026-03-10T00:00:00.000Z"),
+        createdAt: new Date("2026-03-04T00:00:00.000Z"),
+      },
+      {
+        organizationId: ownerSession.organizationId,
+        email: "already-accepted@example.com",
+        role: "admin",
+        inviterId: ownerSession.userId,
+        status: "accepted",
+        expiresAt: new Date("3026-03-11T00:00:00.000Z"),
+        createdAt: new Date("2026-03-05T00:00:00.000Z"),
+      },
+    ]);
+
+    const response = await fixture.request(
+      "/v1/organization/invitations?limit=25&offset=0&search=",
+      {
+        headers: {
+          cookie: ownerSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      invitations: [
+        {
+          id: expect.any(String),
+          organizationId: ownerSession.organizationId,
+          email: "still-pending@example.com",
+          role: "member",
+          inviterId: ownerSession.userId,
+          inviterName: "Org Owner",
+          status: "pending",
+          expiresAt: "3026-03-10T00:00:00.000Z",
+          createdAt: "2026-03-04T00:00:00.000Z",
+        },
+      ],
+      limit: 25,
+      offset: 0,
+      total: 1,
+    });
+  });
+
   it("allows admins and members to list invitations", async ({ fixture }) => {
     const ownerSession = await fixture.authSession({
       email: "integration-org-invitations-authorization-owner@example.com",
