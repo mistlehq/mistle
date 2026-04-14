@@ -22,7 +22,7 @@ import {
 import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
-import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
 import { CopyableValue } from "../shared/copyable-value.js";
 import {
   formatConnectionStatusLabel,

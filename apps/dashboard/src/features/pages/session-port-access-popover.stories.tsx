@@ -129,6 +129,12 @@ const StoryProcesses: ProcessEntry[] = [
   },
 ];
 
+const StoryPrimaryProcess = StoryProcesses[0];
+
+if (StoryPrimaryProcess === undefined) {
+  throw new Error("Session port access story fixtures must include at least one process.");
+}
+
 function createStoryState(overrides?: Partial<SessionPortAccessState>): SessionPortAccessState {
   return {
     buttonDisabledReason: null,
@@ -195,7 +201,7 @@ export const Empty: Story = {
 export const OpeningProcess: Story = {
   args: {
     state: createStoryState({
-      isOpeningProcessKey: createProcessKey(StoryProcesses[0]),
+      isOpeningProcessKey: createProcessKey(StoryPrimaryProcess),
     }),
   },
 };
