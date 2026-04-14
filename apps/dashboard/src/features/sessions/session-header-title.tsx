@@ -1,13 +1,16 @@
-import { OverflowTooltipText } from "@mistle/ui";
-import { type QueryClient, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-import { resolveSessionTitleLabel } from "./session-title-presentation.js";
+import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import {
+  applyPatchedSessionTitleToCache,
+  resolveCachedSessionStatus,
+  resolveSessionHeaderTitleDisplayText,
+  resolveSessionHeaderTitleInputValue,
+  validateSessionHeaderTitle,
+} from "./session-header-title-model.js";
 import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
-
-type SandboxInstanceStatusSummary = {
-  title: string | null;
-};
+import { patchSandboxInstanceTitle } from "./sessions-service.js";
 
 export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.JSX.Element | null {
   const queryClient = useQueryClient();
@@ -20,29 +23,48 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
     () => resolveCachedSessionStatus(queryClient, input.sandboxInstanceId),
     () => resolveCachedSessionStatus(queryClient, input.sandboxInstanceId),
   );
+  const patchTitleMutation = useMutation({
+    mutationFn: async (title: string) => {
+      return patchSandboxInstanceTitle({
+        instanceId: input.sandboxInstanceId,
+        title,
+      });
+    },
+    onSuccess: async (patchedTitle) => {
+      applyPatchedSessionTitleToCache(queryClient, patchedTitle);
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sandboxInstanceStatusQueryKey(patchedTitle.id),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["sandbox-instances", "list"],
+        }),
+      ]);
+    },
+  });
 
   if (cachedSessionStatus === null) {
     return null;
   }
 
   return (
-    <OverflowTooltipText
+    <AutoSaveEditableHeading
       ariaLabel="Session title"
-      className="text-sm font-medium"
-      containerClassName="max-w-[28rem] flex-1"
-      text={resolveSessionTitleLabel(cachedSessionStatus.title)}
-      tooltipSide="bottom"
+      displayText={resolveSessionHeaderTitleDisplayText(cachedSessionStatus.title)}
+      editButtonLabel="Edit session title"
+      headingClassName="truncate text-sm font-medium"
+      headingTag="div"
+      inputClassName="text-sm font-medium"
+      maxWidthClassName="max-w-[28rem] flex-1"
+      onSave={async (title) => {
+        await patchTitleMutation.mutateAsync(title);
+      }}
+      validate={validateSessionHeaderTitle}
+      value={resolveSessionHeaderTitleInputValue(cachedSessionStatus.title)}
+      {...(patchTitleMutation.error instanceof Error
+        ? { errorMessage: patchTitleMutation.error.message }
+        : {})}
     />
-  );
-}
-
-function resolveCachedSessionStatus(
-  queryClient: QueryClient,
-  sandboxInstanceId: string,
-): SandboxInstanceStatusSummary | null {
-  return (
-    queryClient.getQueryData<SandboxInstanceStatusSummary>(
-      sandboxInstanceStatusQueryKey(sandboxInstanceId),
-    ) ?? null
   );
 }

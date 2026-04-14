@@ -17,17 +17,14 @@ import {
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo, useReducer, useRef, useState, type RefObject } from "react";
 
-import { sandboxInstanceStatusQueryKey } from "../../../sessions/sessions-query-keys.js";
-import { patchSandboxInstanceTitle } from "../../../sessions/sessions-service.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
-import { parseThreadNameUpdate } from "./codex-session-events.js";
 import { type ConnectedCodexSession, type StartSessionStep } from "./codex-session-types.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
 import { resolvePrimaryRepositoryThreadSwitchAction } from "./primary-repository-thread-switch.js";
@@ -49,7 +46,6 @@ import {
   resolveCodexCliLaunchTarget,
   type CodexCliLaunchTarget,
 } from "./session-thread-authority.js";
-import { resolveThreadTitlePatchInput } from "./thread-title-updates.js";
 import { useCodexChatController, type CodexChatState } from "./use-codex-chat-controller.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
 
@@ -148,7 +144,6 @@ export function useCodexSessionState(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   sessionEventUnsubscribersRef: RefObject<(() => void)[]>;
 }): UseCodexSessionStateResult {
-  const queryClient = useQueryClient();
   const rpcClientRef = input.rpcClientRef;
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
@@ -228,47 +223,6 @@ export function useCodexSessionState(input: {
     });
   }, []);
 
-  const patchThreadTitleMutation = useMutation({
-    mutationFn: async (input: { sandboxInstanceId: string; title: string }) => {
-      return patchSandboxInstanceTitle({
-        instanceId: input.sandboxInstanceId,
-        title: input.title,
-      });
-    },
-    onSuccess: async (_result, input) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
-          exact: true,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["sandbox-instances", "list"],
-        }),
-      ]);
-    },
-    onError: (error) => {
-      setSessionErrorMessage(
-        error instanceof Error ? error.message : "Could not update sandbox session title.",
-      );
-    },
-  });
-
-  const handleSessionNotificationReceived = useCallback(
-    (notification: CodexJsonRpcNotification) => {
-      const threadNameUpdate = parseThreadNameUpdate(notification);
-      const patchInput = resolveThreadTitlePatchInput({
-        sessionSnapshot: sessionSnapshotRef.current,
-        threadNameUpdate,
-      });
-      if (patchInput === null) {
-        return;
-      }
-
-      patchThreadTitleMutation.mutate(patchInput);
-    },
-    [patchThreadTitleMutation],
-  );
-
   const handleServerRequestReceived = useCallback((request: CodexJsonRpcServerRequest) => {
     dispatchServerRequestsAction({
       type: "server_request_received",
@@ -280,7 +234,7 @@ export function useCodexSessionState(input: {
     connectionGenerationRef,
     ensureCurrentGeneration,
     handleChatNotificationReceived: handleNotificationReceived,
-    handleSessionNotificationReceived,
+    handleSessionNotificationReceived: () => {},
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
