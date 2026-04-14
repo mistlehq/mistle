@@ -450,6 +450,7 @@ fn applies_typed_mise_install_steps() {
 }
 
 #[test]
+#[ignore = "requires a live GitHub release download"]
 fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
     let test_dir = create_temp_test_dir("runtime_plan_apply_github_release");
     let install_path = test_dir.join("gh");
