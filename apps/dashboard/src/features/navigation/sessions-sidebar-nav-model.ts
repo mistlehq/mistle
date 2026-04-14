@@ -46,10 +46,6 @@ function resolveProfileName(input: SessionsSidebarSourceItem): string {
   return input.sandboxProfileDisplayName ?? input.sandboxProfileId;
 }
 
-function resolveInstanceLabel(input: SessionsSidebarSourceItem): string {
-  return resolveSessionTitleLabel(input.title);
-}
-
 function resolveMetadataLabel(
   input: Pick<SessionsSidebarSourceItem, "keepaliveActive" | "status" | "updatedAt"> & {
     nowEpochMs?: number;
@@ -104,7 +100,7 @@ export function buildSessionsSidebarNavGroups(
 
     group.items.push({
       id: item.id,
-      label: resolveInstanceLabel(item),
+      label: resolveSessionTitleLabel(item.title),
       metadataLabel: resolveMetadataLabel({
         status: item.status,
         keepaliveActive: item.keepaliveActive,
