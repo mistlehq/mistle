@@ -1,12 +1,60 @@
+import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
   buildRepositoryDiscoveryFindArgs,
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
-  resolveCurrentRepositoryPath,
+  resolveRuntimePlanPrimaryRepositoryPath,
   toRepositoryOptions,
 } from "./use-session-primary-repository-state.js";
+
+function createRuntimePlan(input: {
+  newLaunchCwd?: string;
+  resumeLaunchCwd?: string;
+}): CompiledRuntimePlan {
+  return {
+    sandboxProfileId: "sbp_123",
+    version: 1,
+    image: {
+      source: "base",
+      imageRef: "img_123",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    workspaceSources: [],
+    runtimeClients: [],
+    agentRuntimes: [
+      {
+        bindingId: "ibd_123",
+        runtimeId: "codex",
+        runtimeKey: "codex",
+        clientId: "rtc_123",
+        endpointKey: "endpoint_123",
+        ptyLaunch: {
+          runtimeId: "codex",
+          displayName: "Codex",
+          newLaunch: {
+            ptySessionId: "main",
+            cols: 120,
+            rows: 40,
+            ...(input.newLaunchCwd === undefined ? {} : { cwd: input.newLaunchCwd }),
+            command: "codex",
+            args: [],
+          },
+          resumeLaunch: {
+            ptySessionId: "main",
+            cols: 120,
+            rows: 40,
+            ...(input.resumeLaunchCwd === undefined ? {} : { cwd: input.resumeLaunchCwd }),
+            command: "codex",
+            args: [],
+          },
+        },
+      },
+    ],
+  };
+}
 
 describe("useSessionPrimaryRepositoryState helpers", () => {
   it("parses repository roots from find output", () => {
@@ -58,20 +106,21 @@ describe("useSessionPrimaryRepositoryState helpers", () => {
     ]);
   });
 
-  it("resolves the current repository from the current working directory", () => {
+  it("resolves the initial repository from the runtime plan cwd", () => {
     expect(
-      resolveCurrentRepositoryPath({
-        currentWorkingDirectory: "/root/acme/repo-1/packages/dashboard",
-        repositoryPaths: ["/root/acme/repo-1", "/root/acme"],
+      resolveRuntimePlanPrimaryRepositoryPath({
+        runtimePlan: createRuntimePlan({
+          newLaunchCwd: "/root/acme/repo-1",
+          resumeLaunchCwd: "/root/acme/repo-1",
+        }),
       }),
     ).toBe("/root/acme/repo-1");
   });
 
-  it("returns null when the current working directory is outside all repositories", () => {
+  it("returns null when the runtime plan does not pin a repository cwd", () => {
     expect(
-      resolveCurrentRepositoryPath({
-        currentWorkingDirectory: "/root",
-        repositoryPaths: ["/root/acme/repo-1", "/root/acme/repo-2"],
+      resolveRuntimePlanPrimaryRepositoryPath({
+        runtimePlan: createRuntimePlan({}),
       }),
     ).toBeNull();
   });

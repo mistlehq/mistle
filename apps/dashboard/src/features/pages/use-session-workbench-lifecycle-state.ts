@@ -25,6 +25,7 @@ import {
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
+import { resolveRuntimePlanPrimaryRepositoryPath } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-recovery.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -152,6 +153,9 @@ export function useSessionWorkbenchLifecycleState(input: {
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
+  const initialPrimaryRepositoryPath = resolveRuntimePlanPrimaryRepositoryPath({
+    runtimePlan: sandboxStatusQuery.data?.runtimePlan,
+  });
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
     automationConversation,
@@ -339,6 +343,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     connectSession(
       providerThreadId === null
         ? {
+            ...(initialPrimaryRepositoryPath === undefined
+              ? {}
+              : { initialCwd: initialPrimaryRepositoryPath }),
             sandboxInstanceId: input.sandboxInstanceId,
             targetThreadId: null,
           }
@@ -351,6 +358,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     automationConversation,
     connectSession,
+    initialPrimaryRepositoryPath,
     input.mainPanelTransitionState,
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,

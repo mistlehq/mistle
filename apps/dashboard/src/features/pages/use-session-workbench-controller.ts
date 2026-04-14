@@ -29,7 +29,10 @@ import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionPortAccess } from "./use-session-port-access.js";
-import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
+import {
+  resolveRuntimePlanPrimaryRepositoryPath,
+  useSessionPrimaryRepositoryState,
+} from "./use-session-primary-repository-state.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   reduceCodexRecoveryState,
@@ -187,10 +190,22 @@ export function useSessionWorkbenchController(input: {
     ptyState,
     queryClient,
   });
+  const initialSelectedRepositoryPath = resolveRuntimePlanPrimaryRepositoryPath({
+    runtimePlan: workbenchLifecycleState.sandboxStatusQuery.data?.runtimePlan,
+  });
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
-    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-    sandboxInstanceId: input.sandboxInstanceId,
+    ...(initialSelectedRepositoryPath === undefined
+      ? {
+          enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+          ensureTransportConnected: transportManager.ensureTransportConnected,
+          sandboxInstanceId: input.sandboxInstanceId,
+        }
+      : {
+          enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+          ensureTransportConnected: transportManager.ensureTransportConnected,
+          initialSelectedRepositoryPath,
+          sandboxInstanceId: input.sandboxInstanceId,
+        }),
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
   const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;

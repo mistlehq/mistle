@@ -86,6 +86,7 @@ export function resolveInitialCodexThreadAction(input: {
 }
 
 export async function establishCodexThread(input: {
+  initialCwd?: string | null;
   rpcClient: CodexJsonRpcClient;
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
@@ -128,6 +129,9 @@ export async function establishCodexThread(input: {
 
       if (failureAction === "start_new") {
         const startedThread = await startCodexThread({
+          ...(input.initialCwd === undefined || input.initialCwd === null
+            ? {}
+            : { cwd: input.initialCwd }),
           rpcClient: input.rpcClient,
           model: DefaultCodexModel,
         });
@@ -154,6 +158,9 @@ export async function establishCodexThread(input: {
   }
 
   const startedThread = await startCodexThread({
+    ...(input.initialCwd === undefined || input.initialCwd === null
+      ? {}
+      : { cwd: input.initialCwd }),
     rpcClient: input.rpcClient,
     model: DefaultCodexModel,
   });
@@ -168,6 +175,7 @@ export async function establishCodexThread(input: {
 }
 
 export async function establishInitialCodexThread(input: {
+  initialCwd?: string | null;
   rpcClient: CodexJsonRpcClient;
   targetThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];

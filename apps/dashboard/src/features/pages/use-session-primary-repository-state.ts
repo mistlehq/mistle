@@ -1,4 +1,4 @@
-import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
+import { DefaultSandboxWorkspaceDir, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import { ExecStreamClient } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -10,7 +10,6 @@ const SessionRepositoryDiscoveryTimeoutMs = 15_000;
 const SessionRepositoryNoneValue = "__none__";
 
 type SessionRepositoryDiscoveryResult = {
-  currentRepositoryPath: string | null;
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
 };
 
@@ -112,25 +111,18 @@ export function toRepositoryOptions(input: {
   }));
 }
 
-export function resolveCurrentRepositoryPath(input: {
-  currentWorkingDirectory: string;
-  repositoryPaths: readonly string[];
-}): string | null {
-  const currentWorkingDirectory = normalizeRepositoryPath(input.currentWorkingDirectory.trim());
-  const sortedRepositoryPaths = [...input.repositoryPaths].sort((left, right) => {
-    if (right.length !== left.length) {
-      return right.length - left.length;
-    }
+export function resolveRuntimePlanPrimaryRepositoryPath(input: {
+  runtimePlan: CompiledRuntimePlan | null | undefined;
+}): string | null | undefined {
+  if (input.runtimePlan === undefined) {
+    return undefined;
+  }
 
-    return left.localeCompare(right);
-  });
-
-  for (const repositoryPath of sortedRepositoryPaths) {
-    if (
-      currentWorkingDirectory === repositoryPath ||
-      currentWorkingDirectory.startsWith(`${repositoryPath}/`)
-    ) {
-      return repositoryPath;
+  for (const agentRuntime of input.runtimePlan?.agentRuntimes ?? []) {
+    const primaryRepositoryPath =
+      agentRuntime.ptyLaunch.newLaunch.cwd ?? agentRuntime.ptyLaunch.resumeLaunch.cwd;
+    if (primaryRepositoryPath !== undefined) {
+      return primaryRepositoryPath;
     }
   }
 
@@ -141,30 +133,19 @@ async function loadSessionRepositoryDiscovery(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<SessionRepositoryDiscoveryResult> {
-  const [findOutput, workingDirectoryOutput] = await Promise.all([
-    runExecCommand({
-      args: buildRepositoryDiscoveryFindArgs({
-        workspaceRoot: DefaultSandboxWorkspaceDir,
-      }),
-      command: "find",
-      ensureTransportConnected: input.ensureTransportConnected,
-      sandboxInstanceId: input.sandboxInstanceId,
+  const findOutput = await runExecCommand({
+    args: buildRepositoryDiscoveryFindArgs({
+      workspaceRoot: DefaultSandboxWorkspaceDir,
     }),
-    runExecCommand({
-      command: "pwd",
-      ensureTransportConnected: input.ensureTransportConnected,
-      sandboxInstanceId: input.sandboxInstanceId,
-    }),
-  ]);
+    command: "find",
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const repositoryPaths = parseRepositoryPaths({
     findOutput,
   });
 
   return {
-    currentRepositoryPath: resolveCurrentRepositoryPath({
-      currentWorkingDirectory: workingDirectoryOutput,
-      repositoryPaths,
-    }),
     repositoryOptions: toRepositoryOptions({
       repositoryPaths,
       workspaceRoot: DefaultSandboxWorkspaceDir,
@@ -175,6 +156,7 @@ async function loadSessionRepositoryDiscovery(input: {
 export function useSessionPrimaryRepositoryState(input: {
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  initialSelectedRepositoryPath?: string | null;
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
   const initialSelectionSandboxInstanceIdRef = useRef<string | null>(null);
@@ -215,7 +197,11 @@ export function useSessionPrimaryRepositoryState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null || query.data === undefined) {
+    if (
+      input.sandboxInstanceId === null ||
+      query.data === undefined ||
+      input.initialSelectedRepositoryPath === undefined
+    ) {
       return;
     }
 
@@ -224,8 +210,8 @@ export function useSessionPrimaryRepositoryState(input: {
     }
 
     initialSelectionSandboxInstanceIdRef.current = input.sandboxInstanceId;
-    setSelectedRepositoryPath(query.data.currentRepositoryPath);
-  }, [input.sandboxInstanceId, query.data]);
+    setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
+  }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId, query.data]);
 
   return {
     errorMessage: query.isError

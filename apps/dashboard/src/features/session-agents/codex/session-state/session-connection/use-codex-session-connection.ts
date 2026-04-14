@@ -39,10 +39,12 @@ export type ConnectCodexSessionInput =
   | {
       sandboxInstanceId: string;
       targetThreadId: string;
+      initialCwd?: never;
       providerThreadId?: string | null;
       selectionPolicy?: never;
     }
   | {
+      initialCwd?: string | null;
       sandboxInstanceId: string;
       targetThreadId: null;
       providerThreadId?: never;
@@ -358,6 +360,9 @@ export function useCodexSessionConnection(input: {
       });
 
       const establishedThread = await establishInitialCodexThread({
+        ...(connectInput.targetThreadId === null && connectInput.initialCwd !== undefined
+          ? { initialCwd: connectInput.initialCwd }
+          : {}),
         rpcClient,
         targetThreadId: connectInput.targetThreadId,
         availableThreads: threadCollections.availableThreads,
