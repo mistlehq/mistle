@@ -12,7 +12,7 @@ import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/ses
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
-import { resolveInitialSessionConnectTarget } from "./session-initial-connect-policy.js";
+import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -168,7 +168,8 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
-  const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
+  const sandboxStatus = sandboxStatusQuery.data;
+  const automationConversation = sandboxStatus?.automationConversation ?? null;
   const providerThreadId = automationConversation?.providerConversationId ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
@@ -177,7 +178,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
-    sandboxConnectable: sandboxStatusQuery.data?.connectable ?? null,
+    sandboxConnectable: sandboxStatus?.connectable ?? null,
     isStatusPending: sandboxStatusQuery.isPending,
   });
   const stoppedSessionMessage = resolveStoppedSessionMessageForWorkbenchEntryPhase({
@@ -352,26 +353,15 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
-    const connectTarget = resolveInitialSessionConnectTarget({
-      connectable: sandboxStatusQuery.data?.connectable ?? null,
+    const connectInput = resolveInitialSessionConnectInput({
+      connectable: sandboxStatus?.connectable ?? null,
       providerThreadId,
-      runtimeContext: sandboxStatusQuery.data?.runtimeContext ?? null,
+      runtimeContext: sandboxStatus?.runtimeContext ?? null,
+      sandboxInstanceId: input.sandboxInstanceId,
     });
 
     setHasAttemptedAutoConnect(true);
-    connectSession(
-      connectTarget.type === "provider_thread"
-        ? {
-            sandboxInstanceId: input.sandboxInstanceId,
-            targetThreadId: connectTarget.threadId,
-            providerThreadId: connectTarget.threadId,
-          }
-        : {
-            ...(connectTarget.cwd === undefined ? {} : { initialCwd: connectTarget.cwd }),
-            sandboxInstanceId: input.sandboxInstanceId,
-            targetThreadId: null,
-          },
-    );
+    connectSession(connectInput);
   }, [
     connectSession,
     input.mainPanelTransitionState,
@@ -382,8 +372,8 @@ export function useSessionWorkbenchLifecycleState(input: {
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
     providerThreadId,
-    sandboxStatusQuery.data?.connectable,
-    sandboxStatusQuery.data?.runtimeContext,
+    sandboxStatus?.runtimeContext,
+    sandboxStatus?.connectable,
     sessionConnectionState,
   ]);
 
@@ -404,7 +394,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
+  const sandboxFailureMessage = sandboxStatus?.failureMessage ?? null;
   const sessionReconnectMessage = codexRecoveryState.sessionReconnectState.message;
   const workbenchStatus = resolveSessionWorkbenchStatus({
     sandboxStatusReadState,

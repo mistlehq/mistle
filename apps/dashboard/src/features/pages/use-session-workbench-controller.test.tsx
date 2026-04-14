@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { resolveInitialSessionConnectTarget } from "./session-initial-connect-policy.js";
+import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -655,25 +655,28 @@ describe("useSessionWorkbenchController", () => {
 
   it("throws when a connectable session is missing runtime context", () => {
     expect(() =>
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: true,
         providerThreadId: null,
+        sandboxInstanceId: "sbi_123",
         runtimeContext: null,
       }),
     ).toThrow("Expected a connectable sandbox session to include runtime context.");
 
     expect(
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: true,
         providerThreadId: "thread_123",
+        sandboxInstanceId: "sbi_123",
         runtimeContext: {
           launchCwd: null,
           primaryRepositoryRoot: null,
         },
       }),
     ).toEqual({
-      type: "provider_thread",
-      threadId: "thread_123",
+      providerThreadId: "thread_123",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: "thread_123",
     });
   });
 

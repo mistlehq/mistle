@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -54,5 +54,50 @@ describe("useSessionPrimaryRepositoryState", () => {
     });
 
     expect(result.current.selectedRepositoryPath).toBe(repositoryPath);
+  });
+
+  it("does not overwrite a user-selected repository when a later initial value arrives", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const sandboxInstanceId = "sbi_user_selection";
+
+    queryClient.setQueryData(["session-primary-repository-options", sandboxInstanceId], {
+      repositoryOptions: [
+        { value: "/root/acme/repo-1", label: "acme/repo-1" },
+        { value: "/root/acme/repo-2", label: "acme/repo-2" },
+      ],
+    });
+
+    const { result, rerender } = renderHook(
+      (props: { initialSelectedRepositoryPath?: string | null }) =>
+        useSessionPrimaryRepositoryState({
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          ...(props.initialSelectedRepositoryPath === undefined
+            ? {}
+            : { initialSelectedRepositoryPath: props.initialSelectedRepositoryPath }),
+          sandboxInstanceId,
+        }),
+      {
+        initialProps: {
+          initialSelectedRepositoryPath: null,
+        } as { initialSelectedRepositoryPath?: string | null },
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.setSelectedRepositoryPath("/root/acme/repo-2");
+    });
+
+    rerender({
+      initialSelectedRepositoryPath: "/root/acme/repo-1",
+    });
+
+    expect(result.current.selectedRepositoryPath).toBe("/root/acme/repo-2");
   });
 });

@@ -187,8 +187,8 @@ export function useSessionWorkbenchController(input: {
     ptyState,
     queryClient,
   });
-  const initialSelectedRepositoryPath =
-    workbenchLifecycleState.sandboxStatusQuery.data?.runtimeContext?.primaryRepositoryRoot;
+  const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
+  const initialSelectedRepositoryPath = sandboxStatus?.runtimeContext?.primaryRepositoryRoot;
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,

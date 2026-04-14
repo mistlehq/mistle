@@ -39,6 +39,9 @@ const SandboxInstanceStatusResponseSchema = z
   })
   .strict();
 
+const SandboxInstanceRuntimeContextSchema =
+  SandboxInstanceStatusResponseSchema.shape.runtimeContext;
+
 const SandboxInstanceConnectionTokenSchema = z
   .object({
     instanceId: z.string().min(1),
@@ -70,23 +73,9 @@ export type StartSandboxInstanceResult = {
   sandboxInstanceId: string;
 };
 
-export type SandboxInstanceStatusResult = {
-  id: string;
-  title: string | null;
-  status: "pending" | "starting" | "running" | "stopped" | "failed";
-  connectable: boolean;
-  failureCode: string | null;
-  failureMessage: string | null;
-  runtimeContext: {
-    launchCwd: string | null;
-    primaryRepositoryRoot: string | null;
-  } | null;
-  automationConversation: {
-    conversationId: string;
-    routeId: string | null;
-    providerConversationId: string | null;
-  } | null;
-};
+export type SandboxInstanceRuntimeContext = z.output<typeof SandboxInstanceRuntimeContextSchema>;
+
+export type SandboxInstanceStatusResult = z.output<typeof SandboxInstanceStatusResponseSchema>;
 
 export type MintSandboxConnectionTokenResult = {
   instanceId: string;

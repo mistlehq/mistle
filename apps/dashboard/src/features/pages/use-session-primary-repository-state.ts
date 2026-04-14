@@ -85,8 +85,7 @@ export function useSessionPrimaryRepositoryState(input: {
   initialSelectedRepositoryPath?: string | null;
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
-  const hasHydratedInitialSelectionRef = useRef(false);
-  const lastAppliedInitialSelectionRef = useRef<string | null | undefined>(undefined);
+  const lastAutoAppliedInitialSelectionRef = useRef<string | null | undefined>(undefined);
   const userSelectionTouchedRef = useRef(false);
   const [selectedRepositoryPath, setSelectedRepositoryPath] = useState<string | null>(null);
   const query = useQuery({
@@ -107,22 +106,22 @@ export function useSessionPrimaryRepositoryState(input: {
     staleTime: Number.POSITIVE_INFINITY,
   });
   const repositoryOptions = query.data?.repositoryOptions ?? [];
+  const queryErrorMessage =
+    query.isError && query.error instanceof Error
+      ? query.error.message
+      : query.isError
+        ? null
+        : null;
   const presentation = resolvePrimaryRepositoryPresentation({
     repositoryOptions,
     selectedRepositoryPath,
-    queryErrorMessage:
-      query.isError && query.error instanceof Error
-        ? query.error.message
-        : query.isError
-          ? null
-          : null,
+    queryErrorMessage,
     queryState: query.isError ? "error" : query.data !== undefined ? "loaded" : "idle",
     workspaceRoot: DefaultSandboxWorkspaceDir,
   });
 
   useEffect(() => {
-    hasHydratedInitialSelectionRef.current = false;
-    lastAppliedInitialSelectionRef.current = undefined;
+    lastAutoAppliedInitialSelectionRef.current = undefined;
     userSelectionTouchedRef.current = false;
     setSelectedRepositoryPath(null);
   }, [input.sandboxInstanceId]);
@@ -132,23 +131,18 @@ export function useSessionPrimaryRepositoryState(input: {
       return;
     }
 
-    if (!hasHydratedInitialSelectionRef.current) {
-      hasHydratedInitialSelectionRef.current = true;
-      lastAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
-      setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
+    if (userSelectionTouchedRef.current) {
       return;
     }
 
     if (
-      userSelectionTouchedRef.current ||
-      lastAppliedInitialSelectionRef.current !== null ||
-      input.initialSelectedRepositoryPath === null ||
-      selectedRepositoryPath !== null
+      lastAutoAppliedInitialSelectionRef.current === input.initialSelectedRepositoryPath ||
+      (lastAutoAppliedInitialSelectionRef.current !== undefined && selectedRepositoryPath !== null)
     ) {
       return;
     }
 
-    lastAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
+    lastAutoAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
     setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
   }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId, selectedRepositoryPath]);
 

@@ -53,31 +53,6 @@ export function toRepositoryOptions(input: {
   }));
 }
 
-export function resolveRepositoryPathFromWorkingDirectory(input: {
-  currentWorkingDirectory: string;
-  repositoryPaths: readonly string[];
-}): string | null {
-  const currentWorkingDirectory = normalizeRepositoryPath(input.currentWorkingDirectory.trim());
-  const sortedRepositoryPaths = [...input.repositoryPaths].sort((left, right) => {
-    if (right.length !== left.length) {
-      return right.length - left.length;
-    }
-
-    return left.localeCompare(right);
-  });
-
-  for (const repositoryPath of sortedRepositoryPaths) {
-    if (
-      currentWorkingDirectory === repositoryPath ||
-      currentWorkingDirectory.startsWith(`${repositoryPath}/`)
-    ) {
-      return repositoryPath;
-    }
-  }
-
-  return null;
-}
-
 function toUnavailableSelectedOption(input: {
   selectedRepositoryPath: string;
   workspaceRoot: string;

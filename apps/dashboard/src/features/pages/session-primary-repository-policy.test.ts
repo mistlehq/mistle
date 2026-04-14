@@ -5,7 +5,6 @@ import {
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
   resolvePrimaryRepositoryPresentation,
-  resolveRepositoryPathFromWorkingDirectory,
   toRepositoryOptions,
 } from "./session-primary-repository-policy.js";
 
@@ -57,15 +56,6 @@ describe("session primary repository policy", () => {
       { value: "/root/acme/repo-1", label: "acme/repo-1" },
       { value: "/tmp/external-repo", label: "/tmp/external-repo" },
     ]);
-  });
-
-  it("resolves the containing repository root from a working directory", () => {
-    expect(
-      resolveRepositoryPathFromWorkingDirectory({
-        currentWorkingDirectory: "/root/acme/repo-1/packages/app",
-        repositoryPaths: ["/root/acme/repo-1", "/root/acme/repo-2"],
-      }),
-    ).toBe("/root/acme/repo-1");
   });
 
   it("surfaces an unavailable selected repository when refresh removes it", () => {

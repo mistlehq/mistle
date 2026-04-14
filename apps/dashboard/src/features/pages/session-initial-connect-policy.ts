@@ -1,32 +1,36 @@
-import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-
-export type InitialSessionConnectTarget =
-  | { type: "provider_thread"; threadId: string }
-  | { type: "new_thread"; cwd?: string | null };
+import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/use-codex-session-connection.js";
+import type { SandboxInstanceRuntimeContext } from "../sessions/sessions-service.js";
 
 export const MissingConnectableRuntimeContextMessage =
   "Expected a connectable sandbox session to include runtime context.";
 
-export function resolveInitialSessionConnectTarget(input: {
+export function resolveInitialSessionConnectInput(input: {
   connectable: boolean | null;
   providerThreadId: string | null;
-  runtimeContext: SandboxInstanceStatusResult["runtimeContext"];
-}): InitialSessionConnectTarget {
+  runtimeContext: SandboxInstanceRuntimeContext | null;
+  sandboxInstanceId: string;
+}): ConnectCodexSessionInput {
   if (input.connectable === true && input.runtimeContext === null) {
     throw new Error(MissingConnectableRuntimeContextMessage);
   }
 
+  if (input.runtimeContext === null) {
+    throw new Error("Runtime context is required to connect a session.");
+  }
+
   if (input.providerThreadId !== null) {
     return {
-      type: "provider_thread",
-      threadId: input.providerThreadId,
+      providerThreadId: input.providerThreadId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetThreadId: input.providerThreadId,
     };
   }
 
-  const initialCwd = input.runtimeContext?.launchCwd;
+  const initialCwd = input.runtimeContext.launchCwd;
 
   return {
-    type: "new_thread",
-    ...(initialCwd === undefined || initialCwd === null ? {} : { cwd: initialCwd }),
+    sandboxInstanceId: input.sandboxInstanceId,
+    targetThreadId: null,
+    ...(initialCwd === undefined || initialCwd === null ? {} : { initialCwd }),
   };
 }

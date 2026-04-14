@@ -2,15 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   MissingConnectableRuntimeContextMessage,
-  resolveInitialSessionConnectTarget,
+  resolveInitialSessionConnectInput,
 } from "./session-initial-connect-policy.js";
 
 describe("session initial connect policy", () => {
   it("throws when a connectable session is missing runtime context", () => {
     expect(() =>
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: true,
         providerThreadId: null,
+        sandboxInstanceId: "sbi_123",
         runtimeContext: null,
       }),
     ).toThrow(MissingConnectableRuntimeContextMessage);
@@ -18,48 +19,54 @@ describe("session initial connect policy", () => {
 
   it("prefers the provider thread when automation state exposes one", () => {
     expect(
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: true,
         providerThreadId: "thread_123",
+        sandboxInstanceId: "sbi_123",
         runtimeContext: {
           launchCwd: "/root/acme/repo-1/packages/app",
           primaryRepositoryRoot: "/root/acme/repo-1",
         },
       }),
     ).toEqual({
-      type: "provider_thread",
-      threadId: "thread_123",
+      providerThreadId: "thread_123",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: "thread_123",
     });
   });
 
   it("starts a new thread in the runtime context launch cwd", () => {
     expect(
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: true,
         providerThreadId: null,
+        sandboxInstanceId: "sbi_123",
         runtimeContext: {
           launchCwd: "/root/acme/repo-1/packages/app",
           primaryRepositoryRoot: "/root/acme/repo-1",
         },
       }),
     ).toEqual({
-      type: "new_thread",
-      cwd: "/root/acme/repo-1/packages/app",
+      initialCwd: "/root/acme/repo-1/packages/app",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: null,
     });
   });
 
   it("starts a new thread without a cwd when runtime context has no launch cwd", () => {
     expect(
-      resolveInitialSessionConnectTarget({
+      resolveInitialSessionConnectInput({
         connectable: false,
         providerThreadId: null,
+        sandboxInstanceId: "sbi_123",
         runtimeContext: {
           launchCwd: null,
           primaryRepositoryRoot: null,
         },
       }),
     ).toEqual({
-      type: "new_thread",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: null,
     });
   });
 });

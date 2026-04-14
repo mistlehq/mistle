@@ -447,7 +447,9 @@ describe("SessionsPage integration", () => {
           response.end(
             JSON.stringify({
               id: "sbi_started",
+              title: null,
               status: "starting",
+              connectable: false,
               failureCode: null,
               failureMessage: null,
               runtimeContext: null,
