@@ -104,11 +104,11 @@ export function SessionWorkbenchHeaderActions(input: {
           >
             <SelectTrigger
               aria-label={repositoryControl.ariaLabel}
-              className="h-8 w-48 min-w-0 border-stone-200 bg-transparent text-xs shadow-none hover:bg-stone-100"
+              className="h-8 w-48 min-w-0 border-stone-200 bg-transparent text-sm shadow-none hover:bg-stone-100"
               indicator={repositoryIndicator}
               title={repositoryControl.title ?? repositoryControl.ariaLabel}
             >
-              <SelectValue placeholder="Primary repository">
+              <SelectValue className="min-w-0 truncate" placeholder="Primary repository">
                 {selectedRepositoryLabel ?? "Primary repository"}
               </SelectValue>
             </SelectTrigger>
