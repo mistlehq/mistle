@@ -26,6 +26,9 @@ export const StorySandboxInstanceId = "sbi_storybook";
 const textEncoder = new TextEncoder();
 
 export type SessionConversationStoryArgs = {
+  activeTurnId: React.ComponentProps<typeof SessionConversationMainContent>["activeTurnId"];
+  isTurnInProgress: React.ComponentProps<typeof SessionConversationMainContent>["isTurnInProgress"];
+  pendingTurnId: React.ComponentProps<typeof SessionConversationMainContent>["pendingTurnId"];
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
   composerViewModel: ChatComposerViewModel;
   statusMessage: ChatComposerStatusMessage | null;
@@ -39,6 +42,9 @@ export type SessionConversationStoryArgs = {
 };
 
 export const StorySessionConversationPaneArgs = {
+  activeTurnId: null,
+  isTurnInProgress: false,
+  pendingTurnId: null,
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
   composerViewModel: SessionComposerFixtureProps,
   statusMessage: null,

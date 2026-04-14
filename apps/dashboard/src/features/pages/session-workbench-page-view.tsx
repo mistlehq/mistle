@@ -15,6 +15,7 @@ type SessionWorkbenchPageViewProps = {
   alert: SessionWorkbenchAlert | null;
   isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
+  mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   bottomPanel: React.ReactNode;
@@ -38,6 +39,7 @@ export function SessionWorkbenchPageView({
   alert,
   isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
+  mainContentScrollContainerRef,
   mainContent,
   primaryBottomPanel,
   bottomPanel,
@@ -79,6 +81,7 @@ export function SessionWorkbenchPageView({
       <div
         aria-label="Conversation chat"
         className={mainContentRegionClassName}
+        ref={mainContentScrollContainerRef}
         role="region"
         style={mainContentScrollbarGutterStyle}
       >

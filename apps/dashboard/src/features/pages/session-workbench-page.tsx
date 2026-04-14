@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
@@ -35,6 +35,7 @@ function SessionWorkbenchPageContent(input: {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
@@ -259,12 +260,17 @@ function SessionWorkbenchPageContent(input: {
         secondaryPanelSize={38}
         mainContent={
           <SessionConversationMainContent
+            activeTurnId={null}
+            isTurnInProgress={false}
+            pendingTurnId={null}
             chatEntries={[]}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
+            scrollContainerRef={conversationScrollContainerRef}
             serverRequestPanelEntries={[]}
           />
         }
+        mainContentScrollContainerRef={conversationScrollContainerRef}
         sandboxInstanceId={null}
       />
     );
@@ -303,10 +309,14 @@ function SessionWorkbenchPageContent(input: {
       }
       mainContent={renderPrimaryPanelMainContent({
         conversation: {
+          activeTurnId: conversationPane.chatState.activeTurnId,
+          isTurnInProgress: conversationPane.chatState.status === "inProgress",
+          pendingTurnId: conversationPane.chatState.pendingTurnId,
           chatEntries: conversationPane.chatState.entries,
           isRespondingToServerRequest:
             conversationPane.serverRequestsState.isRespondingToServerRequest,
           onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+          scrollContainerRef: conversationScrollContainerRef,
           serverRequestPanelEntries: unmatchedServerRequests,
         },
         cli: {
@@ -317,6 +327,7 @@ function SessionWorkbenchPageContent(input: {
         },
         transitionState: workbench.primaryPanelState.transitionState,
       })}
+      mainContentScrollContainerRef={conversationScrollContainerRef}
       onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
       onSecondaryPanelResize={workbench.diffPanelState.setPanelSize}
       primaryBottomPanel={
@@ -350,9 +361,13 @@ function SessionWorkbenchPageContent(input: {
 
 type PrimaryPanelConversationContent = Pick<
   React.ComponentProps<typeof SessionConversationMainContent>,
+  | "activeTurnId"
+  | "isTurnInProgress"
+  | "pendingTurnId"
   | "chatEntries"
   | "isRespondingToServerRequest"
   | "onRespondToServerRequest"
+  | "scrollContainerRef"
   | "serverRequestPanelEntries"
 >;
 
