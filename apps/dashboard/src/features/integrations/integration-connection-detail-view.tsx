@@ -2,7 +2,7 @@ import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
-import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
 import {
   formatConnectionStatusLabel,
   formatResourceHeading,
@@ -281,12 +281,12 @@ function EditableConnectionTitle(input: {
   const connectionErrorMessage = input.titleEditor.errorMessageByConnectionId[input.connection.id];
 
   return (
-    <AutoSaveEditableHeading
+    <AutoSaveTitleHeading
       ariaLabel="Connection name"
       disabled={input.titleEditor.disabled}
+      emptyDisplayText={input.connection.displayName}
       editButtonLabel="Edit connection name"
       headingClassName="text-base font-semibold leading-tight"
-      value={input.connection.displayName}
       maxWidthClassName="max-w-3xl"
       onEditStart={() => {
         input.titleEditor.onStartEditing(input.connection.id);
@@ -295,9 +295,8 @@ function EditableConnectionTitle(input: {
         await input.titleEditor.onSave(input.connection.id, nextValue.trim());
       }}
       placeholder="Connection name"
-      validate={(nextValue) => {
-        return nextValue.trim().length === 0 ? "Connection name is required." : null;
-      }}
+      requiredLabel="Connection name"
+      value={input.connection.displayName}
       {...(connectionErrorMessage === undefined ? {} : { errorMessage: connectionErrorMessage })}
     />
   );

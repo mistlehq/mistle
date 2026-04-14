@@ -57,4 +57,12 @@ describe("SessionHeaderTitle", () => {
     expect(await screen.findByText("Session title is required.")).toBeDefined();
     expect(screen.getByRole("textbox", { name: "Session title" })).toBeDefined();
   });
+
+  it("renders Untitled for blank persisted titles", () => {
+    renderSessionHeaderTitle({
+      title: "   ",
+    });
+
+    expect(screen.getByText("Untitled")).toBeDefined();
+  });
 });

@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AutoSaveEditableHeading } from "./auto-save-editable-heading.js";
+import { AutoSaveEditableHeading, AutoSaveTitleHeading } from "./auto-save-editable-heading.js";
 
 describe("AutoSaveEditableHeading", () => {
   afterEach(() => {
@@ -396,5 +396,70 @@ describe("AutoSaveEditableHeading", () => {
     });
 
     expect(screen.getByRole("textbox", { name: "Heading" })).toHaveProperty("value", "New Title");
+  });
+});
+
+describe("AutoSaveTitleHeading", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("uses the empty display text without seeding the edit input", () => {
+    render(
+      <AutoSaveTitleHeading
+        ariaLabel="Session title"
+        editButtonLabel="Edit session title"
+        emptyDisplayText="Untitled"
+        onSave={async () => {}}
+        requiredLabel="Session title"
+        value={null}
+      />,
+    );
+
+    expect(screen.getByText("Untitled")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit session title" }));
+
+    expect(screen.getByRole("textbox", { name: "Session title" })).toHaveProperty("value", "");
+  });
+
+  it("treats blank persisted values like missing titles", () => {
+    render(
+      <AutoSaveTitleHeading
+        ariaLabel="Session title"
+        editButtonLabel="Edit session title"
+        emptyDisplayText="Untitled"
+        onSave={async () => {}}
+        requiredLabel="Session title"
+        value="   "
+      />,
+    );
+
+    expect(screen.getByText("Untitled")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit session title" }));
+
+    expect(screen.getByRole("textbox", { name: "Session title" })).toHaveProperty("value", "");
+  });
+
+  it("applies the required-label validation message", async () => {
+    render(
+      <AutoSaveTitleHeading
+        ariaLabel="Session title"
+        editButtonLabel="Edit session title"
+        emptyDisplayText="Untitled"
+        onSave={async () => {}}
+        requiredLabel="Session title"
+        value="Existing title"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit session title" }));
+
+    const input = screen.getByRole("textbox", { name: "Session title" });
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
+
+    expect(await screen.findByText("Session title is required.")).toBeDefined();
   });
 });

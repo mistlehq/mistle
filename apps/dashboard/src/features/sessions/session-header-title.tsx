@@ -1,13 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
 import {
   applyPatchedSessionTitleToCache,
   resolveCachedSessionStatus,
-  resolveSessionHeaderTitleDisplayText,
-  resolveSessionHeaderTitleInputValue,
-  validateSessionHeaderTitle,
 } from "./session-header-title-model.js";
 import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
 import { patchSandboxInstanceTitle } from "./sessions-service.js";
@@ -49,9 +46,9 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
   }
 
   return (
-    <AutoSaveEditableHeading
+    <AutoSaveTitleHeading
       ariaLabel="Session title"
-      displayText={resolveSessionHeaderTitleDisplayText(cachedSessionStatus.title)}
+      emptyDisplayText="Untitled"
       editButtonLabel="Edit session title"
       headingClassName="truncate text-sm font-medium"
       headingTag="div"
@@ -60,8 +57,8 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
       onSave={async (title) => {
         await patchTitleMutation.mutateAsync(title);
       }}
-      validate={validateSessionHeaderTitle}
-      value={resolveSessionHeaderTitleInputValue(cachedSessionStatus.title)}
+      requiredLabel="Session title"
+      value={cachedSessionStatus.title}
       {...(patchTitleMutation.error instanceof Error
         ? { errorMessage: patchTitleMutation.error.message }
         : {})}

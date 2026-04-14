@@ -4,29 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyPatchedSessionTitleToCache,
   resolveCachedSessionStatus,
-  resolveSessionHeaderTitleDisplayText,
-  resolveSessionHeaderTitleInputValue,
-  validateSessionHeaderTitle,
 } from "./session-header-title-model.js";
 import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
 
 describe("session header title model", () => {
-  it("uses Untitled as the display text when the persisted title is missing", () => {
-    expect(resolveSessionHeaderTitleDisplayText(null)).toBe("Untitled");
-  });
-
-  it("uses an empty input value when the persisted title is missing", () => {
-    expect(resolveSessionHeaderTitleInputValue(null)).toBe("");
-  });
-
-  it("rejects blank titles", () => {
-    expect(validateSessionHeaderTitle("   ")).toBe("Session title is required.");
-  });
-
-  it("accepts non-blank titles", () => {
-    expect(validateSessionHeaderTitle(" Investigate sandbox startup ")).toBeNull();
-  });
-
   it("reads cached session status from the status query", () => {
     const queryClient = new QueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {

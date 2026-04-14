@@ -201,6 +201,15 @@ export type AutoSaveEditableHeadingProps = {
   scheduler?: Scheduler;
 };
 
+export type AutoSaveTitleHeadingProps = Omit<
+  AutoSaveEditableHeadingProps,
+  "displayText" | "validate" | "value"
+> & {
+  emptyDisplayText: string;
+  requiredLabel: string;
+  value: string | null;
+};
+
 function useAutoSaveEditableHeadingState(input: AutoSaveEditableHeadingProps): {
   displayedHeadingValue: string;
   headingToneClassName: string;
@@ -453,5 +462,21 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
       />
     </>
+  );
+}
+
+export function AutoSaveTitleHeading(input: AutoSaveTitleHeadingProps): React.JSX.Element {
+  const { emptyDisplayText, requiredLabel, value, ...editableHeadingProps } = input;
+  const normalizedValue = value === null || value.trim().length === 0 ? null : value;
+
+  return (
+    <AutoSaveEditableHeading
+      displayText={normalizedValue ?? emptyDisplayText}
+      validate={(nextValue) => {
+        return nextValue.trim().length > 0 ? null : `${requiredLabel} is required.`;
+      }}
+      value={normalizedValue ?? ""}
+      {...editableHeadingProps}
+    />
   );
 }
