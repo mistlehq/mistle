@@ -3,11 +3,31 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { OtpStepForm } from "./otp-step-form.js";
 
 describe("OtpStepForm", () => {
+  beforeAll(() => {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class ResizeObserver {
+        disconnect(): void {}
+        observe(): void {}
+        unobserve(): void {}
+      },
+      writable: true,
+    });
+
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value() {
+        return null;
+      },
+      writable: true,
+    });
+  });
+
   it("provides a programmatic label for the one-time code input", () => {
     const markup = renderToStaticMarkup(
       <OtpStepForm
