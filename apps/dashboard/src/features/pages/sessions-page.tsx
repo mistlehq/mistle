@@ -27,6 +27,7 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
+import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
@@ -502,7 +503,7 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="max-w-0 align-top whitespace-normal">
                         <div className="flex min-w-0">
                           <SessionTitleCell
-                            title={session.title ?? "Untitled"}
+                            title={resolveSessionTitleLabel(session.title)}
                             {...(isNavigable
                               ? {
                                   href: `/sessions/${encodeURIComponent(session.id)}`,

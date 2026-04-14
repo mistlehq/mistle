@@ -3,6 +3,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { useMatch } from "react-router";
 
+import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 import { useAppPageMeta } from "./route-meta.js";
 
@@ -30,8 +31,7 @@ export function AppHeaderLeading(): React.JSX.Element | null {
     return <AppBreadcrumbs />;
   }
 
-  const headerTitle = resolveSessionHeaderTitle(cachedSessionStatus);
-  if (headerTitle === null) {
+  if (cachedSessionStatus === null) {
     return null;
   }
 
@@ -40,7 +40,7 @@ export function AppHeaderLeading(): React.JSX.Element | null {
       ariaLabel="Session title"
       className="text-sm font-medium"
       containerClassName="max-w-[28rem] flex-1"
-      text={headerTitle}
+      text={resolveSessionTitleLabel(cachedSessionStatus.title)}
       tooltipSide="bottom"
     />
   );
@@ -65,16 +65,4 @@ function resolveCachedSessionStatus(
       createSandboxInstanceStatusQueryKey(sandboxInstanceId),
     ) ?? null
   );
-}
-
-function resolveSessionHeaderTitle(status: SandboxInstanceStatusSummary | null): string | null {
-  if (status === null) {
-    return null;
-  }
-
-  if (status.title === null || status.title.trim().length === 0) {
-    return "Untitled";
-  }
-
-  return status.title;
 }
