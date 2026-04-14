@@ -558,6 +558,8 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
             {
               "egressRuleId": "egress_rule_bind_openai_agent",
               "bindingId": "bind_openai_agent",
+              "familyId": "openai",
+              "variantId": "openai-default",
               "match": {
                 "hosts": ["api.openai.com"],
                 "pathPrefixes": ["/v1/responses"],

@@ -104,6 +104,41 @@ describe("AppendSessionLinkToGitHubMarkdownRequestMiddleware", () => {
     });
   });
 
+  it("appends the markdown footer to GraphQL addComment mutations", async () => {
+    const request = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        query:
+          "mutation CommentCreate($input:AddCommentInput!){addComment(input: $input){commentEdge{node{url}}}}",
+        variables: {
+          input: {
+            subjectId: "I_kwDOExample",
+            body: "Issue comment from gh",
+          },
+        },
+      },
+    });
+
+    const result = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request,
+    });
+
+    expect(JSON.parse(new TextDecoder().decode(result.body))).toEqual({
+      query:
+        "mutation CommentCreate($input:AddCommentInput!){addComment(input: $input){commentEdge{node{url}}}}",
+      variables: {
+        input: {
+          subjectId: "I_kwDOExample",
+          body: `Issue comment from gh\n\n---\n[🔗 View session](${SessionUrl})`,
+        },
+      },
+    });
+  });
+
   it("appends the markdown footer for GitHub Enterprise Server API paths", async () => {
     const request = createGitHubRequest({
       baseUrl: "https://ghe.example.com",
@@ -166,6 +201,43 @@ describe("AppendSessionLinkToGitHubMarkdownRequestMiddleware", () => {
 
     expect(JSON.parse(new TextDecoder().decode(result.body))).toEqual({
       body: "Issue body",
+    });
+  });
+
+  it("does not mutate unrelated GraphQL mutations", async () => {
+    const request = createGitHubRequest({
+      pathname: "/graphql",
+      body: {
+        query:
+          "mutation CreateIssue($input:CreateIssueInput!){createIssue(input: $input){issue{id}}}",
+        variables: {
+          input: {
+            repositoryId: "R_kgDOExample",
+            title: "Issue title",
+            body: "Issue body",
+          },
+        },
+      },
+    });
+
+    const result = await AppendSessionLinkToGitHubMarkdownRequestMiddleware.handle({
+      ctx: {
+        sandboxInstanceId: "sandbox_123",
+        sessionUrl: SessionUrl,
+      },
+      request,
+    });
+
+    expect(JSON.parse(new TextDecoder().decode(result.body))).toEqual({
+      query:
+        "mutation CreateIssue($input:CreateIssueInput!){createIssue(input: $input){issue{id}}}",
+      variables: {
+        input: {
+          repositoryId: "R_kgDOExample",
+          title: "Issue title",
+          body: "Issue body",
+        },
+      },
     });
   });
 });

@@ -25,11 +25,15 @@ pub struct CompiledRuntimePlan {
 pub struct CompiledEgressRoute {
     pub egress_rule_id: String,
     pub binding_id: String,
+    pub family_id: String,
+    pub variant_id: String,
     pub r#match: CompiledEgressRouteMatch,
     pub upstream: CompiledEgressRouteUpstream,
     pub auth_injection: CompiledEgressRouteAuthInjection,
     pub additional_headers: Option<BTreeMap<String, String>>,
+    pub additional_credential_headers: Option<Vec<CompiledEgressRouteCredentialHeaderInjection>>,
     pub credential_resolver: CompiledEgressRouteCredentialResolver,
+    pub request_middleware: Option<Vec<String>>,
 }
 
 /// The request match constraints that select one egress route.
@@ -53,8 +57,10 @@ pub struct CompiledEgressRouteUpstream {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CompiledEgressRouteAuthInjection {
     pub r#type: CompiledEgressRouteAuthInjectionType,
-    pub target: String,
+    pub target: Option<String>,
     pub username: Option<String>,
+    pub service: Option<String>,
+    pub region: Option<String>,
 }
 
 /// The auth-injection strategies the runtime plan can request.
@@ -68,6 +74,16 @@ pub enum CompiledEgressRouteAuthInjectionType {
     Header,
     #[serde(rename = "query")]
     Query,
+    #[serde(rename = "aws_sigv4")]
+    AwsSigv4,
+}
+
+/// One supplemental header whose value is injected from a credential resolver.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledEgressRouteCredentialHeaderInjection {
+    pub header: String,
+    pub credential_resolver: CompiledEgressRouteCredentialResolver,
 }
 
 /// The credential source that backs one mediated egress route.
@@ -341,11 +357,9 @@ where
         (RuntimeArtifactGitHubReleaseAssetFormatWire::TarGz, None) => Err(
             serde::de::Error::custom("tar.gz assets must include extractedPath"),
         ),
-        (RuntimeArtifactGitHubReleaseAssetFormatWire::Binary, Some(_)) => {
-            Err(serde::de::Error::custom(
-                "binary assets must not include extractedPath",
-            ))
-        }
+        (RuntimeArtifactGitHubReleaseAssetFormatWire::Binary, Some(_)) => Err(
+            serde::de::Error::custom("binary assets must not include extractedPath"),
+        ),
     }
 }
 
@@ -575,6 +589,7 @@ pub enum WorkspaceSourceResourceKind {
 #[cfg(test)]
 mod tests {
     use super::{
+        CompiledEgressRoute, CompiledEgressRouteAuthInjectionType,
         RuntimeArtifactGitHubReleaseInstallAsset, RuntimeArtifactGitHubReleaseSelector,
         RuntimeArtifactInstallStep,
     };
@@ -650,5 +665,101 @@ mod tests {
             step,
             RuntimeArtifactInstallStep::GitHubReleaseInstall { .. }
         ));
+    }
+
+    #[test]
+    fn decodes_egress_route_with_request_middleware_and_credential_headers() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_bind_github",
+          "bindingId": "bind_github",
+          "familyId": "github",
+          "variantId": "github-default",
+          "match": {
+            "hosts": ["api.github.com"],
+            "pathPrefixes": ["/repos"],
+            "methods": ["POST"]
+          },
+          "upstream": {
+            "baseUrl": "https://api.github.com"
+          },
+          "authInjection": {
+            "type": "bearer",
+            "target": "authorization"
+          },
+          "additionalHeaders": {
+            "accept": "application/vnd.github+json"
+          },
+          "additionalCredentialHeaders": [
+            {
+              "header": "x-extra-token",
+              "credentialResolver": {
+                "connectionId": "icn_extra",
+                "secretType": "api_key",
+                "slotKey": "extra"
+              }
+            }
+          ],
+          "credentialResolver": {
+            "connectionId": "icn_github",
+            "secretType": "github_app_installation_token",
+            "resolverKey": "github_app_installation_token"
+          },
+          "requestMiddleware": ["append-session-link-to-github-markdown-body"]
+        }))
+        .expect("egress route should decode");
+
+        assert_eq!(route.family_id, "github");
+        assert_eq!(route.variant_id, "github-default");
+        assert_eq!(
+            route.request_middleware,
+            Some(vec![
+                "append-session-link-to-github-markdown-body".to_string()
+            ])
+        );
+        assert_eq!(
+            route
+                .additional_credential_headers
+                .expect("additional credential headers should decode")
+                .len(),
+            1
+        );
+        assert!(matches!(
+            route.auth_injection.r#type,
+            CompiledEgressRouteAuthInjectionType::Bearer
+        ));
+    }
+
+    #[test]
+    fn decodes_aws_sigv4_auth_injection_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_bind_s3",
+          "bindingId": "bind_s3",
+          "familyId": "aws",
+          "variantId": "aws-default",
+          "match": {
+            "hosts": ["s3.amazonaws.com"]
+          },
+          "upstream": {
+            "baseUrl": "https://s3.amazonaws.com"
+          },
+          "authInjection": {
+            "type": "aws_sigv4",
+            "service": "s3",
+            "region": "us-east-1"
+          },
+          "credentialResolver": {
+            "connectionId": "icn_aws",
+            "secretType": "aws_access_key"
+          }
+        }))
+        .expect("aws sigv4 egress route should decode");
+
+        assert!(matches!(
+            route.auth_injection.r#type,
+            CompiledEgressRouteAuthInjectionType::AwsSigv4
+        ));
+        assert_eq!(route.auth_injection.service.as_deref(), Some("s3"));
+        assert_eq!(route.auth_injection.region.as_deref(), Some("us-east-1"));
+        assert_eq!(route.auth_injection.target, None);
     }
 }
