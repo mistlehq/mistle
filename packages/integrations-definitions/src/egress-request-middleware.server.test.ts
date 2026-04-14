@@ -8,6 +8,7 @@ import {
   resolveDefinitionEgressRequestMiddleware,
   resolveIntegrationEgressRequestMiddleware,
 } from "./server.js";
+import { SlackRequestMiddlewareIds } from "./slack/variants/slack-default/egress-request-middleware.js";
 
 const TestMiddleware: IntegrationEgressRequestMiddleware = {
   id: "test-middleware",
@@ -38,13 +39,15 @@ describe("egress request middleware registry", () => {
     expect(resolveDefinitionEgressRequestMiddleware(undefined, "test-middleware")).toBeUndefined();
   });
 
-  it("returns undefined for built-in definitions before provider middleware is registered", () => {
+  it("resolves request middleware from built-in provider definitions", () => {
     expect(
       resolveIntegrationEgressRequestMiddleware({
         familyId: "slack",
         variantId: "slack-default",
-        middlewareId: "append-session-link-to-slack-text",
+        middlewareId: SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT,
       }),
-    ).toBeUndefined();
+    ).toMatchObject({
+      id: SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT,
+    });
   });
 });

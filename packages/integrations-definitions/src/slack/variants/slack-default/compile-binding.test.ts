@@ -12,6 +12,7 @@ import {
   SlackCredentialSecretTypes,
 } from "./auth.js";
 import { compileSlackBinding } from "./compile-binding.js";
+import { SlackRequestMiddlewareIds } from "./egress-request-middleware.js";
 import { SlackCliToolId } from "./tool-ids.js";
 
 function artifactBinPath(name: string): string {
@@ -135,6 +136,7 @@ describe("compileSlackBinding", () => {
           secretType: SlackCredentialSecretTypes.API_KEY,
           slotKey: SlackBotTokenSlotKey,
         },
+        requestMiddleware: [SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT],
       },
     ]);
 

@@ -6,6 +6,7 @@ import {
 
 import { SlackCredentialSecretTypes, SlackCredentialSlotKeys } from "./auth.js";
 import type { SlackBindingConfig } from "./binding-config-schema.js";
+import { SlackRequestMiddlewareIds } from "./egress-request-middleware.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 import { SlackToolIds } from "./tool-ids.js";
 
@@ -85,6 +86,7 @@ export function compileSlackBinding(input: SlackCompileBindingInput): CompileBin
           secretType: SlackCredentialSecretTypes.API_KEY,
           slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
         },
+        requestMiddleware: [SlackRequestMiddlewareIds.APPEND_SESSION_LINK_TO_TEXT],
       },
     ],
     artifacts: includesSlackCli ? [createSlackCliArtifact(upstreamBaseUrl)] : [],
