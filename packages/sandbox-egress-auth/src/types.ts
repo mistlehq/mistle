@@ -18,6 +18,8 @@ type EgressGrantClaimsBase = {
   sub: string;
   jti: string;
   bindingId: string;
+  familyId: string;
+  variantId: string;
   connectionId: string;
   secretType: string;
   upstreamBaseUrl: string;
@@ -27,6 +29,7 @@ type EgressGrantClaimsBase = {
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
+  requestMiddleware?: ReadonlyArray<string>;
 };
 
 export type EgressGrantClaims =
@@ -49,6 +52,8 @@ type EgressGrantClaimsInputBase = {
   sub: string | undefined;
   jti: string | undefined;
   bindingId: string | undefined;
+  familyId: string | undefined;
+  variantId: string | undefined;
   connectionId: string | undefined;
   secretType: string | undefined;
   upstreamBaseUrl: string | undefined;
@@ -58,6 +63,7 @@ type EgressGrantClaimsInputBase = {
   resolverKey?: string | undefined;
   allowedMethods?: ReadonlyArray<string> | undefined;
   allowedPathPrefixes?: ReadonlyArray<string> | undefined;
+  requestMiddleware?: ReadonlyArray<string> | undefined;
 };
 
 export type EgressGrantClaimsInput = EgressGrantClaimsInputBase & {

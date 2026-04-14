@@ -37,6 +37,8 @@ async function mintIntegrationEgressGrant(
     egressRuleId: string;
     upstreamBaseUrl: string;
     bindingId: string;
+    familyId?: string;
+    variantId?: string;
     connectionId: string;
     secretType: string;
     additionalHeaders?: Readonly<Record<string, string>>;
@@ -70,6 +72,8 @@ async function mintIntegrationEgressGrant(
       sub: "sandbox_123",
       jti: input.egressRuleId,
       bindingId: input.bindingId,
+      familyId: input.familyId ?? "test",
+      variantId: input.variantId ?? "test-default",
       connectionId: input.connectionId,
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,

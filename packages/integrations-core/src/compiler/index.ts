@@ -526,6 +526,8 @@ function compileBindingResultToCompiledBindingResult(input: {
   version: number;
   targetKey: string;
   bindingId: string;
+  familyId: string;
+  variantId: string;
   compileBindingResult: CompileBindingResult;
 }): CompiledBindingResult {
   return {
@@ -536,6 +538,8 @@ function compileBindingResultToCompiledBindingResult(input: {
         routeIndex,
       }),
       bindingId: input.bindingId,
+      familyId: input.familyId,
+      variantId: input.variantId,
     })),
     artifacts: resolveRuntimeArtifacts({
       artifacts: input.compileBindingResult.artifacts,
@@ -754,6 +758,8 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       version: input.version,
       targetKey: bindingInput.targetKey,
       bindingId: bindingInput.binding.id,
+      familyId: bindingInput.target.familyId,
+      variantId: bindingInput.target.variantId,
       compileBindingResult,
     });
 

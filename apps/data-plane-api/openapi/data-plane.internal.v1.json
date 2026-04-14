@@ -102,6 +102,14 @@
                               "type": "string",
                               "minLength": 1
                             },
+                            "familyId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "variantId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
                             "match": {
                               "type": "object",
                               "properties": {
@@ -293,11 +301,20 @@
                               },
                               "required": ["connectionId", "secretType"],
                               "additionalProperties": false
+                            },
+                            "requestMiddleware": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              }
                             }
                           },
                           "required": [
                             "egressRuleId",
                             "bindingId",
+                            "familyId",
+                            "variantId",
                             "match",
                             "upstream",
                             "authInjection",
@@ -1604,6 +1621,14 @@
                                 "type": "string",
                                 "minLength": 1
                               },
+                              "familyId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "variantId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
                               "match": {
                                 "type": "object",
                                 "properties": {
@@ -1795,11 +1820,20 @@
                                 },
                                 "required": ["connectionId", "secretType"],
                                 "additionalProperties": false
+                              },
+                              "requestMiddleware": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
                               }
                             },
                             "required": [
                               "egressRuleId",
                               "bindingId",
+                              "familyId",
+                              "variantId",
                               "match",
                               "upstream",
                               "authInjection",

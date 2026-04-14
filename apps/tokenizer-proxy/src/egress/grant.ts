@@ -8,6 +8,8 @@ type AuthorizedEgressGrantBase = {
   sub: string;
   jti: string;
   bindingId: string;
+  familyId: string;
+  variantId: string;
   connectionId: string;
   secretType: string;
   upstreamBaseUrl: string;
@@ -23,6 +25,7 @@ type AuthorizedEgressGrantBase = {
   resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
+  requestMiddleware?: ReadonlyArray<string>;
   egressRuleId: string;
 };
 
@@ -141,6 +144,8 @@ export async function authorizeEgressGrant(input: {
       sub: verifiedGrant.sub,
       jti: verifiedGrant.jti,
       bindingId: verifiedGrant.bindingId,
+      familyId: verifiedGrant.familyId,
+      variantId: verifiedGrant.variantId,
       connectionId: verifiedGrant.connectionId,
       secretType: verifiedGrant.secretType,
       upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
@@ -163,6 +168,9 @@ export async function authorizeEgressGrant(input: {
       ...(verifiedGrant.allowedPathPrefixes === undefined
         ? {}
         : { allowedPathPrefixes: verifiedGrant.allowedPathPrefixes }),
+      ...(verifiedGrant.requestMiddleware === undefined
+        ? {}
+        : { requestMiddleware: verifiedGrant.requestMiddleware }),
       egressRuleId: verifiedGrant.jti,
     };
   }
@@ -171,6 +179,8 @@ export async function authorizeEgressGrant(input: {
     sub: verifiedGrant.sub,
     jti: verifiedGrant.jti,
     bindingId: verifiedGrant.bindingId,
+    familyId: verifiedGrant.familyId,
+    variantId: verifiedGrant.variantId,
     connectionId: verifiedGrant.connectionId,
     secretType: verifiedGrant.secretType,
     upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
@@ -194,6 +204,9 @@ export async function authorizeEgressGrant(input: {
     ...(verifiedGrant.allowedPathPrefixes === undefined
       ? {}
       : { allowedPathPrefixes: verifiedGrant.allowedPathPrefixes }),
+    ...(verifiedGrant.requestMiddleware === undefined
+      ? {}
+      : { requestMiddleware: verifiedGrant.requestMiddleware }),
     egressRuleId: verifiedGrant.jti,
   };
 }

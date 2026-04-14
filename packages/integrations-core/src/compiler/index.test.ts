@@ -842,6 +842,8 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.egressRoutes[0]).toMatchObject({
       egressRuleId: "egress_rule_bind_openai_agent",
       bindingId: "bind_openai_agent",
+      familyId: "openai",
+      variantId: "openai-default",
     });
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
@@ -937,6 +939,94 @@ describe("compileRuntimePlan", () => {
         },
       },
     ]);
+  });
+
+  it("preserves request middleware declared by compiled egress routes", () => {
+    const registry = new IntegrationRegistry();
+    registry.register({
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "connector",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: OpenAiTargetConfigSchema,
+      targetSecretSchema: EmptyTargetSecretsSchema,
+      bindingConfigSchema: ConnectorBindingConfigSchema,
+      connectionMethods: ApiKeyConnectionMethods,
+      compileBinding: (input) => ({
+        egressRoutes: [
+          {
+            match: {
+              hosts: ["api.github.com"],
+              pathPrefixes: ["/repos"],
+              methods: ["POST"],
+            },
+            upstream: {
+              baseUrl: "https://api.github.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              connectionId: input.connection.id,
+              secretType: "api_key",
+            },
+            requestMiddleware: ["append-session-link-to-github-markdown"],
+          },
+        ],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "github-cloud",
+          target: {
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.github.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_github_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_github_connector",
+            kind: "connector",
+            connectionId: "conn_github_org_123",
+            config: {
+              defaultModel: "unused",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.egressRoutes).toContainEqual(
+      expect.objectContaining({
+        egressRuleId: "egress_rule_bind_github_connector",
+        bindingId: "bind_github_connector",
+        familyId: "github",
+        variantId: "github-cloud",
+        requestMiddleware: ["append-session-link-to-github-markdown"],
+      }),
+    );
   });
 
   it("supports github release binary install refs in artifact lifecycle hooks", () => {

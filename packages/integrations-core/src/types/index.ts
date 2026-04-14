@@ -998,6 +998,8 @@ export type EgressCredentialHeaderInjection = {
 export type EgressCredentialRoute = {
   egressRuleId: string;
   bindingId: string;
+  familyId: string;
+  variantId: string;
   match: {
     hosts: ReadonlyArray<string>;
     pathPrefixes?: ReadonlyArray<string>;
@@ -1036,6 +1038,7 @@ export type EgressCredentialRoute = {
   additionalHeaders?: Readonly<Record<string, string>>;
   additionalCredentialHeaders?: ReadonlyArray<EgressCredentialHeaderInjection>;
   credentialResolver: EgressCredentialResolverRef;
+  requestMiddleware?: ReadonlyArray<string>;
 };
 
 export type RuntimeExecCommand = {
@@ -1267,7 +1270,10 @@ export type CompiledRuntimeClient = RuntimeClientBase<string>;
 
 export type RuntimeClient = RuntimeClientBase<string>;
 
-export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "egressRuleId" | "bindingId">;
+export type CompileBindingEgressRoute = Omit<
+  EgressCredentialRoute,
+  "egressRuleId" | "bindingId" | "familyId" | "variantId"
+>;
 
 export type CompileBindingAgentRuntime = {
   runtimeId: string;

@@ -27,6 +27,8 @@ const EgressCredentialRouteSchema = z
   .object({
     egressRuleId: z.string().min(1),
     bindingId: z.string().min(1),
+    familyId: z.string().min(1),
+    variantId: z.string().min(1),
     match: z
       .object({
         hosts: z.array(z.string().min(1)).readonly(),
@@ -100,6 +102,7 @@ const EgressCredentialRouteSchema = z
         resolverKey: z.string().min(1).optional(),
       })
       .strict(),
+    requestMiddleware: z.array(z.string().min(1)).readonly().optional(),
   })
   .strict();
 
@@ -637,6 +640,8 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
   return {
     egressRuleId: route.egressRuleId,
     bindingId: route.bindingId,
+    familyId: route.familyId,
+    variantId: route.variantId,
     match: {
       hosts: route.match.hosts,
       ...(route.match.pathPrefixes === undefined ? {} : { pathPrefixes: route.match.pathPrefixes }),
@@ -658,6 +663,9 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
         ? {}
         : { resolverKey: route.credentialResolver.resolverKey }),
     },
+    ...(route.requestMiddleware === undefined
+      ? {}
+      : { requestMiddleware: route.requestMiddleware }),
   };
 }
 

@@ -29,6 +29,8 @@ const RuntimePlanSchema = z.object({
     z.object({
       egressRuleId: z.string().min(1),
       bindingId: z.string().min(1),
+      familyId: z.string().min(1),
+      variantId: z.string().min(1),
       match: z.object({
         hosts: z.array(z.string().min(1)),
         pathPrefixes: z.array(z.string()).optional(),
@@ -67,6 +69,7 @@ const RuntimePlanSchema = z.object({
         slotKey: z.string().min(1).optional(),
         resolverKey: z.string().min(1).optional(),
       }),
+      requestMiddleware: z.array(z.string().min(1)).optional(),
     }),
   ),
   artifacts: z.array(
@@ -256,6 +259,8 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
       {
         egressRuleId: "egress_rule_1",
         bindingId: "binding_1",
+        familyId: "github",
+        variantId: "github-cloud",
         match: {
           hosts: ["api.github.com"],
           pathPrefixes: ["/repos"],

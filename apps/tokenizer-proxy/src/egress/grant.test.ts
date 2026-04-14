@@ -12,6 +12,7 @@ const TestGrantConfig = {
 async function createGrant(input?: {
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
+  requestMiddleware?: ReadonlyArray<string>;
   additionalCredentialHeaders?: ReadonlyArray<{
     header: string;
     connectionId: string;
@@ -26,6 +27,8 @@ async function createGrant(input?: {
       sub: "sandbox_123",
       jti: "egress_rule_openai",
       bindingId: "ibd_openai",
+      familyId: "openai",
+      variantId: "openai-default",
       connectionId: "icn_openai",
       secretType: "api_key",
       upstreamBaseUrl: "https://api.openai.com/v1",
@@ -38,6 +41,9 @@ async function createGrant(input?: {
       ...(input?.allowedPathPrefixes === undefined
         ? {}
         : { allowedPathPrefixes: input.allowedPathPrefixes }),
+      ...(input?.requestMiddleware === undefined
+        ? {}
+        : { requestMiddleware: input.requestMiddleware }),
     },
     ttlSeconds: 60,
   });
@@ -50,6 +56,8 @@ async function createAwsGrant(): Promise<string> {
       sub: "sandbox_aws_123",
       jti: "egress_rule_aws",
       bindingId: "ibd_aws",
+      familyId: "aws",
+      variantId: "aws-cli-default",
       connectionId: "icn_aws",
       secretType: "aws_secret_access_key",
       upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
@@ -78,6 +86,8 @@ describe("authorizeEgressGrant", () => {
     ).resolves.toMatchObject({
       egressRuleId: "egress_rule_openai",
       bindingId: "ibd_openai",
+      familyId: "openai",
+      variantId: "openai-default",
       connectionId: "icn_openai",
       upstreamBaseUrl: "https://api.openai.com/v1",
     });
@@ -111,6 +121,25 @@ describe("authorizeEgressGrant", () => {
           slotKey: "openai.openai-default.api-key.secondary",
         },
       ],
+    });
+  });
+
+  it("returns family, variant, and request middleware metadata from the verified grant", async () => {
+    const grantToken = await createGrant({
+      requestMiddleware: ["append-session-link-to-openai-text"],
+    });
+
+    await expect(
+      authorizeEgressGrant({
+        grantToken,
+        config: TestGrantConfig,
+        method: "POST",
+        targetPath: "/v1/responses",
+      }),
+    ).resolves.toMatchObject({
+      familyId: "openai",
+      variantId: "openai-default",
+      requestMiddleware: ["append-session-link-to-openai-text"],
     });
   });
 
@@ -176,6 +205,8 @@ describe("authorizeEgressGrant", () => {
       }),
     ).resolves.toMatchObject({
       egressRuleId: "egress_rule_aws",
+      familyId: "aws",
+      variantId: "aws-cli-default",
       authInjectionType: "aws_sigv4",
       authInjectionService: "sts",
       authInjectionRegion: "us-east-1",

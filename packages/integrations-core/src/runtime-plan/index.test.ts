@@ -57,6 +57,8 @@ describe("assembleCompiledRuntimePlan", () => {
             {
               egressRuleId: "egress_rule_aws",
               bindingId: "ibd_aws",
+              familyId: "aws",
+              variantId: "aws-cli-default",
               match: {
                 hosts: ["sts.us-east-1.amazonaws.com"],
                 methods: ["POST"],
@@ -170,6 +172,8 @@ describe("assembleCompiledRuntimePlan", () => {
             {
               egressRuleId: "egress_rule_b",
               bindingId: "bind_b",
+              familyId: "github",
+              variantId: "github-cloud",
               match: {
                 hosts: ["api.github.com", "github.com"],
               },
@@ -261,6 +265,8 @@ describe("assembleCompiledRuntimePlan", () => {
             {
               egressRuleId: "egress_rule_a",
               bindingId: "bind_a",
+              familyId: "openai",
+              variantId: "openai-default",
               match: {
                 hosts: ["api.openai.com"],
                 methods: ["POST"],
@@ -757,6 +763,8 @@ describe("assembleCompiledRuntimePlan", () => {
         {
           egressRuleId: "egress_rule_openai",
           bindingId: "bind_openai",
+          familyId: "openai",
+          variantId: "openai-default",
           match: {
             hosts: ["api.openai.com"],
           },
@@ -767,6 +775,7 @@ describe("assembleCompiledRuntimePlan", () => {
             type: "bearer",
             target: "authorization",
           },
+          requestMiddleware: ["append-session-link-to-openai-text"],
           additionalHeaders: {
             "X-Trace-ID": " trace_123 ",
             " ChatGPT-Account-ID ": " acct_123 ",
@@ -787,6 +796,7 @@ describe("assembleCompiledRuntimePlan", () => {
       "chatgpt-account-id": "acct_123",
       "x-trace-id": "trace_123",
     });
+    expect(plan.egressRoutes[0]?.requestMiddleware).toEqual(["append-session-link-to-openai-text"]);
   });
 
   it("rejects additional egress headers that collapse to the same normalized name", () => {
@@ -802,6 +812,8 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRuleId: "egress_rule_openai",
             bindingId: "bind_openai",
+            familyId: "openai",
+            variantId: "openai-default",
             match: {
               hosts: ["api.openai.com"],
             },
@@ -842,6 +854,8 @@ describe("assembleCompiledRuntimePlan", () => {
         {
           egressRuleId: "egress_rule_datadog",
           bindingId: "bind_datadog",
+          familyId: "datadog",
+          variantId: "datadog-default",
           match: {
             hosts: ["mcp.datadoghq.com"],
           },
@@ -900,6 +914,8 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRuleId: "egress_rule_datadog",
             bindingId: "bind_datadog",
+            familyId: "datadog",
+            variantId: "datadog-default",
             match: {
               hosts: ["mcp.datadoghq.com"],
             },
@@ -953,6 +969,8 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRuleId: "egress_rule_aws",
             bindingId: "bind_aws",
+            familyId: "aws",
+            variantId: "aws-cli-default",
             match: {
               hosts: ["sts.amazonaws.com"],
             },
