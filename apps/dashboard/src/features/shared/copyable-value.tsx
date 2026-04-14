@@ -55,6 +55,10 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     };
   }, [copyState]);
 
+  useEffect(() => {
+    setCopyState("idle");
+  }, [input.value]);
+
   const button = (
     <Button
       aria-label={copyAriaLabel}
