@@ -24,6 +24,7 @@ type SessionWorkbenchHeaderRepositoryControl = {
   disabled?: boolean;
   errorMessage?: string;
   isRefreshing?: boolean;
+  open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onValueChange: (nextValue: string) => void;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
@@ -60,13 +61,7 @@ export function SessionWorkbenchHeaderActions(input: {
         )?.label ?? null);
   const repositoryIndicator =
     repositoryControl === undefined ? null : repositoryControl.isRefreshing === true ? (
-      <span
-        aria-label="Refreshing repositories"
-        className="text-muted-foreground inline-flex shrink-0 items-center justify-center"
-        role="status"
-      >
-        <Spinner className="size-3.5" />
-      </span>
+      <Spinner aria-label="Refreshing repositories" className="size-3.5 text-muted-foreground" />
     ) : undefined;
 
   return (
@@ -93,6 +88,7 @@ export function SessionWorkbenchHeaderActions(input: {
           <span aria-hidden className="h-5 w-px bg-stone-200" />
           <Select
             disabled={repositoryControl.disabled}
+            {...(repositoryControl.open === undefined ? {} : { open: repositoryControl.open })}
             onOpenChange={repositoryControl.onOpenChange}
             onValueChange={(nextValue) => {
               if (nextValue === null) {

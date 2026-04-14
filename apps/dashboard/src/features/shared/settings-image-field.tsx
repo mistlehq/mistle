@@ -91,7 +91,7 @@ export function SettingsImageField(props: SettingsImageFieldProps): React.JSX.El
               )}
             >
               {props.busy ? (
-                <Spinner aria-label={busyAnnouncement} className="size-4 text-white" />
+                <Spinner aria-hidden className="size-4 text-white" />
               ) : (
                 <PencilSimpleIcon aria-hidden className="size-4 text-white" weight="fill" />
               )}

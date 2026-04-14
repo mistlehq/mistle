@@ -115,7 +115,7 @@ export function SessionPortAccessPopover(input: {
                     </p>
                     <p className="text-xs text-stone-500">PID {String(process.pid)}</p>
                   </div>
-                  {isOpening ? <Spinner className="size-4 text-stone-500" /> : null}
+                  {isOpening ? <Spinner aria-hidden className="size-4 text-stone-500" /> : null}
                 </div>
                 <p className="text-xs text-stone-600">{createListenersLabel(process)}</p>
               </button>
