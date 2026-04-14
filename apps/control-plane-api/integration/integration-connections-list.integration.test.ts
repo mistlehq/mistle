@@ -345,11 +345,64 @@ describe("integration connections list integration", () => {
       expect.arrayContaining([
         expect.objectContaining({
           id: "icn_github_app_support",
+          connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          connectionMethodLabel: "GitHub App installation",
           supportsWebhookSources: true,
         }),
         expect.objectContaining({
           id: "icn_github_api_key_no_support",
+          connectionMethodId: IntegrationConnectionMethodIds.API_KEY,
+          connectionMethodLabel: "API key",
           supportsWebhookSources: false,
+        }),
+      ]),
+    );
+  });
+
+  it("returns auth method metadata resolved from the integration definition", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-list-jira-auth-method@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "jira-default-auth-method",
+      familyId: "jira",
+      variantId: "jira-default",
+      enabled: true,
+      config: {
+        site_url: "https://mistle.atlassian.net",
+        cloud_id: "cloud_123",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_jira_service_account",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: "jira-default-auth-method",
+      displayName: "Jira service account",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "jira-service-account-api-token",
+      },
+    });
+
+    const response = await fixture.request("/v1/integration/connections", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
+
+    expect(body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "icn_jira_service_account",
+          connectionMethodId: "jira-service-account-api-token",
+          connectionMethodLabel: "Service account API token",
         }),
       ]),
     );

@@ -27,6 +27,7 @@ import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
+import { projectIntegrationConnection } from "./project-integration-connection.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -58,6 +59,8 @@ type IntegrationConnectionListItem = {
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
+  connectionMethodId?: string;
+  connectionMethodLabel?: string;
   supportsWebhookSources?: boolean;
   resources?: Array<{
     kind: string;
@@ -206,22 +209,17 @@ export async function listIntegrationConnections(
                 })) ?? true);
 
           return {
+            ...projectIntegrationConnection({
+              connection,
+              ...(definition === undefined
+                ? {}
+                : { connectionMethods: definition.connectionMethods }),
+            }),
             ...buildResourceSummary(connection, {
               integrationRegistry,
             }),
-            id: connection.id,
-            targetKey: connection.targetKey,
-            displayName: connection.displayName,
-            status: connection.status,
             bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
             automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
-            ...(connection.externalSubjectId === null
-              ? {}
-              : { externalSubjectId: connection.externalSubjectId }),
-            ...(connection.config === null ? {} : { config: connection.config }),
-            ...(connection.targetSnapshotConfig === null
-              ? {}
-              : { targetSnapshotConfig: connection.targetSnapshotConfig }),
             ...(supportsWebhookSources === undefined ? {} : { supportsWebhookSources }),
             createdAt: normalizeTimestamp(connection.createdAt),
             updatedAt: normalizeTimestamp(connection.updatedAt),

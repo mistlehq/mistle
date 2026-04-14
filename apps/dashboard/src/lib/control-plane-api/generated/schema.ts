@@ -908,6 +908,8 @@ export interface paths {
                 config?: {
                   [key: string]: unknown;
                 };
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
                 createdAt: string;
                 displayName: string;
                 externalSubjectId?: string;
@@ -1034,6 +1036,8 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              connectionMethodId?: string;
+              connectionMethodLabel?: string;
               createdAt: string;
               displayName: string;
               externalSubjectId?: string;
@@ -1249,6 +1253,8 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              connectionMethodId?: string;
+              connectionMethodLabel?: string;
               createdAt: string;
               displayName: string;
               externalSubjectId?: string;
@@ -2507,6 +2513,8 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              connectionMethodId?: string;
+              connectionMethodLabel?: string;
               createdAt: string;
               displayName: string;
               externalSubjectId?: string;

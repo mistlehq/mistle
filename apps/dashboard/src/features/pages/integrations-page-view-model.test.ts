@@ -16,7 +16,6 @@ import {
   createIntegrationConnectionResourceKey,
   createRefreshingResourceKey,
   getIntegrationConnectionResourceSummaries,
-  resolveEditableConnectionMethodId,
   shouldPollIntegrationDetailResources,
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
@@ -194,6 +193,8 @@ describe("integrations page view model", () => {
             app_id: "123",
             app_slug: "mistle-github-app",
           },
+          connectionMethodId: "github-app-installation",
+          connectionMethodLabel: "GitHub App installation",
           externalSubjectId: "mistle-labs",
           resources: [
             {
@@ -256,6 +257,8 @@ describe("integrations page view model", () => {
           config: {
             connection_method: "slack-bot-token",
           },
+          connectionMethodId: "slack-bot-token",
+          connectionMethodLabel: "Bot token",
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -280,6 +283,8 @@ describe("integrations page view model", () => {
             accessKeyId: "AKIAEXAMPLE",
             roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
           },
+          connectionMethodId: "aws-assume-role",
+          connectionMethodLabel: "Access key + AssumeRole",
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -304,6 +309,8 @@ describe("integrations page view model", () => {
             app_id: "123",
             app_slug: "mistle-github-app",
           },
+          connectionMethodId: "github-app-installation",
+          connectionMethodLabel: "GitHub App installation",
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -336,16 +343,28 @@ describe("integrations page view model", () => {
     ]);
   });
 
-  it("resolves aws-assume-role as an editable connection method", () => {
-    expect(
-      resolveEditableConnectionMethodId({
-        id: "icn_aws_123",
-        targetKey: "aws-cli-default",
-        config: {
-          connection_method: "aws-assume-role",
-        },
-      }),
-    ).toBe("aws-assume-role");
+  it("builds detail items from server-resolved Jira auth metadata", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_jira_123",
+          targetKey: "jira-default",
+          displayName: "Jira Engineering",
+          status: "active",
+          config: {
+            connection_method: "jira-service-account-api-token",
+          },
+          connectionMethodId: "jira-service-account-api-token",
+          connectionMethodLabel: "Service account API token",
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authMethodId).toBe("jira-service-account-api-token");
+    expect(item?.authMethodLabel).toBe("Service account API token");
   });
 
   it("includes GitHub App installation mutation state in detail items", () => {
@@ -361,6 +380,8 @@ describe("integrations page view model", () => {
             app_id: "123",
             app_slug: "mistle-github-app",
           },
+          connectionMethodId: "github-app-installation",
+          connectionMethodLabel: "GitHub App installation",
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -571,18 +592,26 @@ describe("integrations page view model", () => {
     ).toBe(false);
   });
 
-  it("fails fast when editing a connection with an unsupported method", () => {
-    expect(() =>
-      resolveEditableConnectionMethodId({
-        id: "icn_123",
-        targetKey: "github",
-        config: {
-          connection_method: "bearer-token",
-        },
-      }),
-    ).toThrow(
-      "Unsupported connection method for integration connection 'icn_123' on target 'github'.",
-    );
+  it("omits auth metadata when the backend has not resolved a connection method", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_123",
+          targetKey: "github",
+          displayName: "GitHub 123",
+          status: "active",
+          config: {
+            connection_method: "bearer-token",
+          },
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authMethodId).toBeNull();
+    expect(item?.authMethodLabel).toBeUndefined();
   });
 });
 

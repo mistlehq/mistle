@@ -1625,6 +1625,14 @@
                             "type": "object",
                             "additionalProperties": {}
                           },
+                          "connectionMethodId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "connectionMethodLabel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "resources": {
                             "type": "array",
                             "items": {
@@ -3157,6 +3165,14 @@
                       "type": "object",
                       "additionalProperties": {}
                     },
+                    "connectionMethodId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connectionMethodLabel": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "resources": {
                       "type": "array",
                       "items": {
@@ -3400,6 +3416,14 @@
                     "targetSnapshotConfig": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "connectionMethodId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connectionMethodLabel": {
+                      "type": "string",
+                      "minLength": 1
                     },
                     "resources": {
                       "type": "array",
@@ -3784,6 +3808,14 @@
                     "targetSnapshotConfig": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "connectionMethodId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "connectionMethodLabel": {
+                      "type": "string",
+                      "minLength": 1
                     },
                     "resources": {
                       "type": "array",

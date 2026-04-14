@@ -1,14 +1,9 @@
-import {
-  formatConnectionMethodLabel,
-  resolveConnectionMethodId,
-} from "../integrations/connection-auth.js";
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
 import {
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethod,
-  type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
 import type {
   IntegrationConnection,
@@ -90,19 +85,6 @@ export function buildOpenCreateIntegrationConnectionInput(
   };
 }
 
-export function resolveEditableConnectionMethodId(
-  connection: Pick<IntegrationConnection, "config" | "id" | "targetKey">,
-): IntegrationConnectionMethodId {
-  const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
-  if (connectionMethodId === null) {
-    throw new Error(
-      `Unsupported connection method for integration connection '${connection.id}' on target '${connection.targetKey}'.`,
-    );
-  }
-
-  return connectionMethodId;
-}
-
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   controlPlaneApiOrigin?: string;
@@ -116,7 +98,6 @@ export function buildIntegrationConnectionDetailItems(input: {
   refreshingResourceKeys: ReadonlySet<string>;
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
-    const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
     const githubAppConnectionContext = resolveGitHubAppConnectionContext(
@@ -132,12 +113,12 @@ export function buildIntegrationConnectionDetailItems(input: {
       status: connection.status,
       bindingCount,
       canDelete: bindingCount === 0 && automationCount === 0,
-      ...(connectionMethodId === null
+      ...(connection.connectionMethodId === undefined
         ? { authMethodId: null }
-        : { authMethodId: connectionMethodId }),
-      ...(connectionMethodId === null
+        : { authMethodId: connection.connectionMethodId }),
+      ...(connection.connectionMethodLabel === undefined
         ? {}
-        : { authMethodLabel: formatConnectionMethodLabel(connectionMethodId) }),
+        : { authMethodLabel: connection.connectionMethodLabel }),
       ...(githubAppConnectionContext === undefined
         ? {}
         : {

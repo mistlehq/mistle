@@ -200,6 +200,8 @@ export const IntegrationConnectionSchema = z
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
+    connectionMethodId: z.string().min(1).optional(),
+    connectionMethodLabel: z.string().min(1).optional(),
     resources: z
       .array(
         z
