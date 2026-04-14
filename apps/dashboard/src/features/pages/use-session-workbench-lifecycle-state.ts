@@ -37,7 +37,6 @@ export function resolveSandboxStatusRefetchInterval(input: {
   automationConversation: SandboxInstanceStatusResult["automationConversation"];
   connectable: boolean | null;
   isAutoResumingStoppedSandbox: boolean;
-  runtimePlan: SandboxInstanceStatusResult["runtimePlan"];
   status: "pending" | "starting" | "running" | "stopped" | "failed" | null;
 }): false | number {
   if (
@@ -54,7 +53,7 @@ export function resolveSandboxStatusRefetchInterval(input: {
   }
 
   if (input.connectable === true) {
-    return input.runtimePlan === null ? 1_000 : false;
+    return false;
   }
 
   return input.status === "failed" || input.status === "stopped" ? false : 1_000;
@@ -129,7 +128,6 @@ export function useSessionWorkbenchLifecycleState(input: {
         automationConversation: query.state.data?.automationConversation ?? null,
         connectable: query.state.data?.connectable ?? null,
         isAutoResumingStoppedSandbox,
-        runtimePlan: query.state.data?.runtimePlan ?? null,
         status: query.state.data?.status ?? null,
       });
     },
@@ -359,9 +357,6 @@ export function useSessionWorkbenchLifecycleState(input: {
       providerThreadId,
       runtimePlan: sandboxStatusQuery.data?.runtimePlan ?? null,
     });
-    if (connectTarget.type === "wait_for_runtime_plan") {
-      return;
-    }
 
     setHasAttemptedAutoConnect(true);
     connectSession(
@@ -378,7 +373,6 @@ export function useSessionWorkbenchLifecycleState(input: {
           },
     );
   }, [
-    automationConversation,
     connectSession,
     input.mainPanelTransitionState,
     connectionReadiness.canConnect,

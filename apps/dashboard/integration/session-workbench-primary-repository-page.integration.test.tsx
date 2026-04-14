@@ -415,16 +415,6 @@ describe("SessionWorkbenchPage primary repository", () => {
             connectable: true,
             failureCode: null,
             failureMessage: null,
-            runtimePlan: null,
-            automationConversation: null,
-          },
-          {
-            id: "sbi_repo_page",
-            title: "Repo Page Test Session",
-            status: "running",
-            connectable: true,
-            failureCode: null,
-            failureMessage: null,
             runtimePlan: createRuntimePlan({
               repositoryPath: "/root/mistlehq/mistle",
               launchCwd: "/root/mistlehq/mistle/packages/dashboard",

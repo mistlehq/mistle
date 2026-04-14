@@ -2,25 +2,25 @@ import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.j
 import { resolveRuntimePlanPrimaryRepositoryCwd } from "./session-primary-repository-policy.js";
 
 export type InitialSessionConnectTarget =
-  | { type: "wait_for_runtime_plan" }
   | { type: "provider_thread"; threadId: string }
   | { type: "new_thread"; cwd?: string | null };
+
+export const MissingConnectableRuntimePlanMessage =
+  "Expected a connectable sandbox session to include a runtime plan.";
 
 export function resolveInitialSessionConnectTarget(input: {
   connectable: boolean | null;
   providerThreadId: string | null;
   runtimePlan: SandboxInstanceStatusResult["runtimePlan"];
 }): InitialSessionConnectTarget {
+  if (input.connectable === true && input.runtimePlan === null) {
+    throw new Error(MissingConnectableRuntimePlanMessage);
+  }
+
   if (input.providerThreadId !== null) {
     return {
       type: "provider_thread",
       threadId: input.providerThreadId,
-    };
-  }
-
-  if (input.connectable === true && input.runtimePlan === null) {
-    return {
-      type: "wait_for_runtime_plan",
     };
   }
 
@@ -30,6 +30,6 @@ export function resolveInitialSessionConnectTarget(input: {
 
   return {
     type: "new_thread",
-    ...(initialCwd === undefined ? {} : { cwd: initialCwd }),
+    ...(initialCwd === undefined || initialCwd === null ? {} : { cwd: initialCwd }),
   };
 }

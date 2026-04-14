@@ -642,22 +642,30 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.stoppedSessionMessage).toBeNull();
   });
 
-  it("keeps polling connectable sessions until the runtime plan is available", () => {
+  it("stops polling once a session is connectable", () => {
     expect(
       resolveSandboxStatusRefetchInterval({
         automationConversation: null,
         connectable: true,
         isAutoResumingStoppedSandbox: false,
-        runtimePlan: null,
         status: "running",
       }),
-    ).toBe(1_000);
+    ).toBe(false);
+  });
+
+  it("throws when a connectable session is missing its runtime plan", () => {
+    expect(() =>
+      resolveInitialSessionConnectTarget({
+        connectable: true,
+        providerThreadId: null,
+        runtimePlan: null,
+      }),
+    ).toThrow("Expected a connectable sandbox session to include a runtime plan.");
 
     expect(
-      resolveSandboxStatusRefetchInterval({
-        automationConversation: null,
+      resolveInitialSessionConnectTarget({
         connectable: true,
-        isAutoResumingStoppedSandbox: false,
+        providerThreadId: "thread_123",
         runtimePlan: {
           sandboxProfileId: "sbp_123",
           version: 1,
@@ -671,27 +679,6 @@ describe("useSessionWorkbenchController", () => {
           runtimeClients: [],
           agentRuntimes: [],
         },
-        status: "running",
-      }),
-    ).toBe(false);
-  });
-
-  it("resolves a wait target until the runtime plan is available for a new session", () => {
-    expect(
-      resolveInitialSessionConnectTarget({
-        connectable: true,
-        providerThreadId: null,
-        runtimePlan: null,
-      }),
-    ).toEqual({
-      type: "wait_for_runtime_plan",
-    });
-
-    expect(
-      resolveInitialSessionConnectTarget({
-        connectable: true,
-        providerThreadId: "thread_123",
-        runtimePlan: null,
       }),
     ).toEqual({
       type: "provider_thread",

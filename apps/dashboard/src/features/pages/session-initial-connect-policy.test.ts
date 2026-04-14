@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import { resolveInitialSessionConnectTarget } from "./session-initial-connect-policy.js";
+import {
+  MissingConnectableRuntimePlanMessage,
+  resolveInitialSessionConnectTarget,
+} from "./session-initial-connect-policy.js";
 
 function createRuntimePlan(): NonNullable<SandboxInstanceStatusResult["runtimePlan"]> {
   return {
@@ -55,16 +58,14 @@ function createRuntimePlan(): NonNullable<SandboxInstanceStatusResult["runtimePl
 }
 
 describe("session initial connect policy", () => {
-  it("waits for the runtime plan before auto-connecting a new session", () => {
-    expect(
+  it("throws when a connectable session is missing its runtime plan", () => {
+    expect(() =>
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: null,
         runtimePlan: null,
       }),
-    ).toEqual({
-      type: "wait_for_runtime_plan",
-    });
+    ).toThrow(MissingConnectableRuntimePlanMessage);
   });
 
   it("prefers the provider thread when automation state exposes one", () => {
@@ -72,7 +73,7 @@ describe("session initial connect policy", () => {
       resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: "thread_123",
-        runtimePlan: null,
+        runtimePlan: createRuntimePlan(),
       }),
     ).toEqual({
       type: "provider_thread",
@@ -90,6 +91,30 @@ describe("session initial connect policy", () => {
     ).toEqual({
       type: "new_thread",
       cwd: "/root/acme/repo-1/packages/app",
+    });
+  });
+
+  it("starts a new thread without a cwd when the runtime plan does not pin one", () => {
+    expect(
+      resolveInitialSessionConnectTarget({
+        connectable: false,
+        providerThreadId: null,
+        runtimePlan: {
+          sandboxProfileId: "sbp_123",
+          version: 1,
+          image: {
+            source: "base",
+            imageRef: "img_123",
+          },
+          egressRoutes: [],
+          artifacts: [],
+          workspaceSources: [],
+          runtimeClients: [],
+          agentRuntimes: [],
+        },
+      }),
+    ).toEqual({
+      type: "new_thread",
     });
   });
 });
