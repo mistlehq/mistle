@@ -7,6 +7,10 @@ import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
+import {
+  getSandboxInstanceStatusQueryKey,
+  sandboxInstanceStatusQueryKey,
+} from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
@@ -29,11 +33,6 @@ import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
-export function getSandboxInstanceStatusQueryKey(
-  sandboxInstanceId: string | null,
-): readonly ["sandbox-instance-status", string | null] {
-  return ["sandbox-instance-status", sandboxInstanceId];
-}
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
@@ -80,7 +79,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   } = input.lifecycle;
   const { disconnectPty } = input.ptyState.actions;
   const sandboxStatusQuery = useQuery({
-    queryKey: getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+    queryKey:
+      input.sandboxInstanceId === null
+        ? (["sandbox-instance-status", null] as const)
+        : sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
     meta: {
       [TopLoadingBarQueryMeta.SUPPRESS]: true,
     },
@@ -198,6 +200,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
+    const sandboxInstanceId = input.sandboxInstanceId;
     let isActive = true;
     setHasAttemptedAutoResume(true);
     setIsAutoResumingStoppedSandbox(true);
@@ -205,7 +208,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     clearLifecycleErrorMessage();
 
     void resumeSandboxInstance({
-      instanceId: input.sandboxInstanceId,
+      instanceId: sandboxInstanceId,
     })
       .then((sandboxStatus) => {
         if (!isActive) {
@@ -213,7 +216,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         }
 
         input.queryClient.setQueryData(
-          getSandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+          getSandboxInstanceStatusQueryKey(sandboxInstanceId),
           sandboxStatus,
         );
         setHasAttemptedAutoConnect(false);
@@ -399,3 +402,5 @@ export function useSessionWorkbenchLifecycleState(input: {
     stoppedSessionMessage,
   };
 }
+
+export { getSandboxInstanceStatusQueryKey };

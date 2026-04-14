@@ -3,6 +3,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
 import { resolveSessionTitleLabel } from "./session-title-presentation.js";
+import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
 
 type SandboxInstanceStatusSummary = {
   title: string | null;
@@ -35,19 +36,13 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
   );
 }
 
-function createSandboxInstanceStatusQueryKey(
-  sandboxInstanceId: string,
-): readonly ["sandbox-instance-status", string] {
-  return ["sandbox-instance-status", sandboxInstanceId];
-}
-
 function resolveCachedSessionStatus(
   queryClient: QueryClient,
   sandboxInstanceId: string,
 ): SandboxInstanceStatusSummary | null {
   return (
     queryClient.getQueryData<SandboxInstanceStatusSummary>(
-      createSandboxInstanceStatusQueryKey(sandboxInstanceId),
+      sandboxInstanceStatusQueryKey(sandboxInstanceId),
     ) ?? null
   );
 }

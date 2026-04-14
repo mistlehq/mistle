@@ -9,9 +9,38 @@ import {
 } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { AppHeaderLeading } from "./app-header-leading.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
 import { useAppPageMeta } from "./route-meta.js";
+
+function expectMarkupToContainCurrentPageLabel(markup: string, label: string): void {
+  expect(markup).toMatch(new RegExp(`aria-current="page"[\\s\\S]*title="${escapeRegExp(label)}"`));
+}
+
+function expectMarkupToContainHref(markup: string, href: string): void {
+  expect(markup).toContain(`href="${href}"`);
+}
+
+function expectMarkupToContainMetaTitle(markup: string, title: string): void {
+  expect(markup).toContain(`data-slot="meta-title">${title}`);
+}
+
+function expectMarkupToContainMetaDescription(markup: string, description: string): void {
+  expect(markup).toContain(`data-slot="meta-description">${description}`);
+}
+
+function expectMarkupToContainEmptyMetaDescription(markup: string): void {
+  expect(markup).toContain('data-slot="meta-description"></p>');
+}
+
+function expectMarkupToContainEmptyMetaTitle(markup: string): void {
+  expect(markup).toContain('data-slot="meta-title"></p>');
+}
+
+function escapeRegExp(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function PageHarness(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
@@ -122,18 +151,16 @@ describe("app routing breadcrumb integration", () => {
     });
     let markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain("Settings");
-    expect(markup).toContain("Personal");
-    expect(markup).toContain("meta-title");
-    expect(markup).toContain("Personal");
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainCurrentPageLabel(markup, "Personal");
+    expectMarkupToContainMetaTitle(markup, "Personal");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/settings/organization/members");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/settings/organization/general"');
-    expect(markup).toContain("Members");
-    expect(markup).toContain('data-slot="meta-title">Members');
+    expectMarkupToContainHref(markup, "/settings/organization/general");
+    expectMarkupToContainCurrentPageLabel(markup, "Members");
+    expectMarkupToContainMetaTitle(markup, "Members");
   });
 
   it("updates breadcrumbs across top-level integrations routes", async () => {
@@ -142,26 +169,25 @@ describe("app routing breadcrumb integration", () => {
     });
     let markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain("Integrations");
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('data-slot="meta-title">Integrations');
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainCurrentPageLabel(markup, "Integrations");
+    expectMarkupToContainMetaTitle(markup, "Integrations");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/integrations/github");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/integrations"');
-    expect(markup).toContain("Github");
-    expect(markup).toContain('data-slot="meta-title">GitHub');
-    expect(markup).toContain('data-slot="meta-description">github');
+    expectMarkupToContainHref(markup, "/integrations");
+    expectMarkupToContainCurrentPageLabel(markup, "Github");
+    expectMarkupToContainMetaTitle(markup, "GitHub");
+    expectMarkupToContainMetaDescription(markup, "github");
 
     await router.navigate("/integrations/github/add");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/integrations"');
-    expect(markup).toContain("Add");
-    expect(markup).toContain('data-slot="meta-title">Add GitHub Connection');
-    expect(markup).toContain('data-slot="meta-description">github');
+    expectMarkupToContainHref(markup, "/integrations");
+    expectMarkupToContainCurrentPageLabel(markup, "Add");
+    expectMarkupToContainMetaTitle(markup, "Add GitHub Connection");
+    expectMarkupToContainMetaDescription(markup, "github");
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
@@ -204,21 +230,19 @@ describe("app routing breadcrumb integration", () => {
     });
     let markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/sandbox-profiles"');
-    expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("Create");
-    expect(markup).toContain('data-slot="meta-title">Create');
-    expect(markup).toContain("Create a sandbox profile.");
+    expectMarkupToContainHref(markup, "/sandbox-profiles");
+    expectMarkupToContainCurrentPageLabel(markup, "Create");
+    expectMarkupToContainMetaTitle(markup, "Create");
+    expectMarkupToContainMetaDescription(markup, "Create a sandbox profile.");
 
     await router.navigate("/sandbox-profiles/sbp_abc");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/sandbox-profiles"');
-    expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("Edit profile");
+    expectMarkupToContainHref(markup, "/sandbox-profiles");
+    expectMarkupToContainCurrentPageLabel(markup, "Edit profile");
     expect(markup).not.toContain("sbp_abc");
-    expect(markup).toContain('data-slot="meta-title">Edit profile');
-    expect(markup).toContain("Edit sandbox profile configuration.");
+    expectMarkupToContainMetaTitle(markup, "Edit profile");
+    expectMarkupToContainMetaDescription(markup, "Edit sandbox profile configuration.");
   });
 
   it("renders home and sessions breadcrumbs", async () => {
@@ -227,31 +251,32 @@ describe("app routing breadcrumb integration", () => {
     });
     let markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain("Home");
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('data-slot="meta-title">Home');
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainCurrentPageLabel(markup, "Home");
+    expectMarkupToContainMetaTitle(markup, "Home");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/sessions");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain("Sessions");
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('data-slot="meta-title">Sessions');
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainCurrentPageLabel(markup, "Sessions");
+    expectMarkupToContainMetaTitle(markup, "Sessions");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/sessions/new");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/sessions"');
-    expect(markup).toContain("New");
-    expect(markup).toContain('data-slot="meta-title">New session');
-    expect(markup).toContain("Start a sandbox-backed session from a sandbox profile.");
+    expectMarkupToContainHref(markup, "/sessions");
+    expectMarkupToContainCurrentPageLabel(markup, "New");
+    expectMarkupToContainMetaTitle(markup, "New session");
+    expectMarkupToContainMetaDescription(
+      markup,
+      "Start a sandbox-backed session from a sandbox profile.",
+    );
   });
 
   it("replaces the session detail breadcrumb trail with the session title", () => {
     const queryClient = new QueryClient();
-    queryClient.setQueryData(createSandboxInstanceStatusQueryKey("sbi_123"), {
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       id: "sbi_123",
       title: "Investigate flaky title rendering",
       status: "running",
@@ -275,12 +300,12 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Investigate flaky title rendering");
     expect(markup).not.toContain("sbi_123");
     expect(markup).not.toContain('href="/sessions"');
-    expect(markup).toContain('data-slot="meta-title">Session');
+    expectMarkupToContainMetaTitle(markup, "Session");
   });
 
   it("renders Untitled when the session detail resolves with no title", () => {
     const queryClient = new QueryClient();
-    queryClient.setQueryData(createSandboxInstanceStatusQueryKey("sbi_123"), {
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       id: "sbi_123",
       title: null,
       status: "running",
@@ -331,27 +356,26 @@ describe("app routing breadcrumb integration", () => {
     });
     let markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain("Automations");
-    expect(markup).toContain('aria-current="page"');
-    expect(markup).toContain('data-slot="meta-title">Automations');
-    expect(markup).toContain("Manage webhook automations.");
+    expectMarkupToContainCurrentPageLabel(markup, "Automations");
+    expectMarkupToContainMetaTitle(markup, "Automations");
+    expectMarkupToContainMetaDescription(markup, "Manage webhook automations.");
 
     await router.navigate("/automations/new");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/automations"');
-    expect(markup).toContain("Create");
-    expect(markup).toContain('data-slot="meta-title">Create automation');
+    expectMarkupToContainHref(markup, "/automations");
+    expectMarkupToContainCurrentPageLabel(markup, "Create");
+    expectMarkupToContainMetaTitle(markup, "Create automation");
     expect(markup).not.toContain("Create a webhook automation.");
 
     await router.navigate("/automations/aut_123");
     markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('href="/automations"');
-    expect(markup).toContain("Edit automation");
+    expectMarkupToContainHref(markup, "/automations");
+    expectMarkupToContainCurrentPageLabel(markup, "Edit automation");
     expect(markup).not.toContain("aut_123");
-    expect(markup).toContain('data-slot="meta-title"></p>');
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainEmptyMetaTitle(markup);
+    expectMarkupToContainEmptyMetaDescription(markup);
   });
 
   it("does not render supporting description text for create automation", () => {
@@ -360,14 +384,8 @@ describe("app routing breadcrumb integration", () => {
     });
     const markup = renderRoutingMarkup(router);
 
-    expect(markup).toContain('data-slot="meta-title">Create automation');
-    expect(markup).toContain('data-slot="meta-description"></p>');
+    expectMarkupToContainMetaTitle(markup, "Create automation");
+    expectMarkupToContainEmptyMetaDescription(markup);
     expect(markup).not.toContain("Create a webhook automation.");
   });
 });
-
-function createSandboxInstanceStatusQueryKey(
-  sandboxInstanceId: string | null,
-): readonly ["sandbox-instance-status", string | null] {
-  return ["sandbox-instance-status", sandboxInstanceId];
-}
