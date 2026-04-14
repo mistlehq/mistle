@@ -26,7 +26,7 @@ import {
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
-import { resolveRuntimePlanPrimaryRepositoryPath } from "./use-session-primary-repository-state.js";
+import { resolveRuntimePlanPrimaryRepositoryCwd } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-recovery.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
@@ -58,6 +58,16 @@ export function resolveSandboxStatusRefetchInterval(input: {
   }
 
   return input.status === "failed" || input.status === "stopped" ? false : 1_000;
+}
+
+export function shouldDeferAutoConnectUntilRuntimePlan(input: {
+  connectable: boolean | null;
+  providerThreadId: string | null;
+  runtimePlan: SandboxInstanceStatusResult["runtimePlan"];
+}): boolean {
+  return (
+    input.connectable === true && input.providerThreadId === null && input.runtimePlan === null
+  );
 }
 
 export function useSessionWorkbenchLifecycleState(input: {
@@ -171,7 +181,8 @@ export function useSessionWorkbenchLifecycleState(input: {
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
   const automationConversation = sandboxStatusQuery.data?.automationConversation ?? null;
-  const initialPrimaryRepositoryPath = resolveRuntimePlanPrimaryRepositoryPath({
+  const providerThreadId = automationConversation?.providerConversationId ?? null;
+  const initialPrimaryRepositoryCwd = resolveRuntimePlanPrimaryRepositoryCwd({
     runtimePlan: sandboxStatusQuery.data?.runtimePlan,
   });
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
@@ -357,13 +368,22 @@ export function useSessionWorkbenchLifecycleState(input: {
     }
 
     setHasAttemptedAutoConnect(true);
-    const providerThreadId = automationConversation?.providerConversationId ?? null;
+    if (
+      shouldDeferAutoConnectUntilRuntimePlan({
+        connectable: sandboxStatusQuery.data?.connectable ?? null,
+        providerThreadId,
+        runtimePlan: sandboxStatusQuery.data?.runtimePlan ?? null,
+      })
+    ) {
+      return;
+    }
+
     connectSession(
       providerThreadId === null
         ? {
-            ...(initialPrimaryRepositoryPath === undefined
+            ...(initialPrimaryRepositoryCwd === undefined
               ? {}
-              : { initialCwd: initialPrimaryRepositoryPath }),
+              : { initialCwd: initialPrimaryRepositoryCwd }),
             sandboxInstanceId: input.sandboxInstanceId,
             targetThreadId: null,
           }
@@ -376,7 +396,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [
     automationConversation,
     connectSession,
-    initialPrimaryRepositoryPath,
+    initialPrimaryRepositoryCwd,
     input.mainPanelTransitionState,
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
@@ -384,6 +404,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStartingSession,
     isWaitingForAutomationThread,
     resolvedLifecycleErrorMessage,
+    providerThreadId,
+    sandboxStatusQuery.data?.connectable,
+    sandboxStatusQuery.data?.runtimePlan,
     sessionConnectionState,
   ]);
 

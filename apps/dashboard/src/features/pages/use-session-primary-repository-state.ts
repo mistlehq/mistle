@@ -95,7 +95,32 @@ export function toRepositoryOptions(input: {
   }));
 }
 
-export function resolveRuntimePlanPrimaryRepositoryPath(input: {
+export function resolveRepositoryPathFromWorkingDirectory(input: {
+  currentWorkingDirectory: string;
+  repositoryPaths: readonly string[];
+}): string | null {
+  const currentWorkingDirectory = normalizeRepositoryPath(input.currentWorkingDirectory.trim());
+  const sortedRepositoryPaths = [...input.repositoryPaths].sort((left, right) => {
+    if (right.length !== left.length) {
+      return right.length - left.length;
+    }
+
+    return left.localeCompare(right);
+  });
+
+  for (const repositoryPath of sortedRepositoryPaths) {
+    if (
+      currentWorkingDirectory === repositoryPath ||
+      currentWorkingDirectory.startsWith(`${repositoryPath}/`)
+    ) {
+      return repositoryPath;
+    }
+  }
+
+  return null;
+}
+
+export function resolveRuntimePlanPrimaryRepositoryCwd(input: {
   runtimePlan: CompiledRuntimePlan | null | undefined;
 }): string | null | undefined {
   if (input.runtimePlan === undefined) {
@@ -103,14 +128,32 @@ export function resolveRuntimePlanPrimaryRepositoryPath(input: {
   }
 
   for (const agentRuntime of input.runtimePlan?.agentRuntimes ?? []) {
-    const primaryRepositoryPath =
+    const primaryRepositoryCwd =
       agentRuntime.ptyLaunch.newLaunch.cwd ?? agentRuntime.ptyLaunch.resumeLaunch.cwd;
-    if (primaryRepositoryPath !== undefined) {
-      return primaryRepositoryPath;
+    if (primaryRepositoryCwd !== undefined) {
+      return normalizeRepositoryPath(primaryRepositoryCwd);
     }
   }
 
   return null;
+}
+
+export function resolveRuntimePlanPrimaryRepositoryPath(input: {
+  runtimePlan: CompiledRuntimePlan | null | undefined;
+}): string | null | undefined {
+  const primaryRepositoryCwd = resolveRuntimePlanPrimaryRepositoryCwd(input);
+  if (primaryRepositoryCwd === undefined || primaryRepositoryCwd === null) {
+    return primaryRepositoryCwd;
+  }
+
+  const repositoryPaths = (input.runtimePlan?.workspaceSources ?? [])
+    .filter((workspaceSource) => workspaceSource.resourceKind === "repository")
+    .map((workspaceSource) => normalizeRepositoryPath(workspaceSource.path));
+
+  return resolveRepositoryPathFromWorkingDirectory({
+    currentWorkingDirectory: primaryRepositoryCwd,
+    repositoryPaths,
+  });
 }
 
 async function loadSessionRepositoryDiscovery(input: {

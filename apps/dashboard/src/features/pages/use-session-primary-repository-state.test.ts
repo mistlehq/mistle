@@ -11,6 +11,8 @@ import {
   buildRepositoryDiscoveryFindArgs,
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
+  resolveRepositoryPathFromWorkingDirectory,
+  resolveRuntimePlanPrimaryRepositoryCwd,
   resolveRuntimePlanPrimaryRepositoryPath,
   useSessionPrimaryRepositoryState,
   toRepositoryOptions,
@@ -19,6 +21,7 @@ import {
 function createRuntimePlan(input: {
   newLaunchCwd?: string;
   resumeLaunchCwd?: string;
+  workspaceSources?: CompiledRuntimePlan["workspaceSources"];
 }): CompiledRuntimePlan {
   return {
     sandboxProfileId: "sbp_123",
@@ -29,7 +32,7 @@ function createRuntimePlan(input: {
     },
     egressRoutes: [],
     artifacts: [],
-    workspaceSources: [],
+    workspaceSources: input.workspaceSources ?? [],
     runtimeClients: [],
     agentRuntimes: [
       {
@@ -125,9 +128,45 @@ describe("useSessionPrimaryRepositoryState helpers", () => {
         runtimePlan: createRuntimePlan({
           newLaunchCwd: "/root/acme/repo-1",
           resumeLaunchCwd: "/root/acme/repo-1",
+          workspaceSources: [
+            {
+              sourceKind: "git-clone",
+              resourceKind: "repository",
+              path: "/root/acme/repo-1",
+              originUrl: "https://github.com/acme/repo-1.git",
+            },
+          ],
         }),
       }),
     ).toBe("/root/acme/repo-1");
+  });
+
+  it("maps a nested runtime-plan cwd back to the containing repository root", () => {
+    expect(
+      resolveRuntimePlanPrimaryRepositoryPath({
+        runtimePlan: createRuntimePlan({
+          newLaunchCwd: "/root/acme/repo-1/packages/app",
+          workspaceSources: [
+            {
+              sourceKind: "git-clone",
+              resourceKind: "repository",
+              path: "/root/acme/repo-1",
+              originUrl: "https://github.com/acme/repo-1.git",
+            },
+          ],
+        }),
+      }),
+    ).toBe("/root/acme/repo-1");
+  });
+
+  it("returns the raw runtime-plan cwd for thread startup", () => {
+    expect(
+      resolveRuntimePlanPrimaryRepositoryCwd({
+        runtimePlan: createRuntimePlan({
+          newLaunchCwd: "/root/acme/repo-1/packages/app",
+        }),
+      }),
+    ).toBe("/root/acme/repo-1/packages/app");
   });
 
   it("returns null when the runtime plan does not pin a repository cwd", () => {
@@ -136,6 +175,15 @@ describe("useSessionPrimaryRepositoryState helpers", () => {
         runtimePlan: createRuntimePlan({}),
       }),
     ).toBeNull();
+  });
+
+  it("resolves the containing repository root from a working directory", () => {
+    expect(
+      resolveRepositoryPathFromWorkingDirectory({
+        currentWorkingDirectory: "/root/acme/repo-1/packages/app",
+        repositoryPaths: ["/root/acme/repo-1", "/root/acme/repo-2"],
+      }),
+    ).toBe("/root/acme/repo-1");
   });
 
   it("adopts the runtime-plan repository once it becomes available after repository discovery", () => {

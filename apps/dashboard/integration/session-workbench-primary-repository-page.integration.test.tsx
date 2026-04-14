@@ -25,7 +25,7 @@ type JsonRpcRequest = {
   params?: unknown;
 };
 
-function createRuntimePlan(input: { repositoryPath: string }) {
+function createRuntimePlan(input: { launchCwd?: string; repositoryPath: string }) {
   return {
     sandboxProfileId: "sbp_repo_page",
     version: 1,
@@ -35,7 +35,14 @@ function createRuntimePlan(input: { repositoryPath: string }) {
     },
     egressRoutes: [],
     artifacts: [],
-    workspaceSources: [],
+    workspaceSources: [
+      {
+        sourceKind: "git-clone",
+        resourceKind: "repository",
+        path: input.repositoryPath,
+        originUrl: "https://github.com/mistlehq/mistle.git",
+      },
+    ],
     runtimeClients: [],
     agentRuntimes: [
       {
@@ -51,7 +58,7 @@ function createRuntimePlan(input: { repositoryPath: string }) {
             ptySessionId: "main",
             cols: 120,
             rows: 40,
-            cwd: input.repositoryPath,
+            cwd: input.launchCwd ?? input.repositoryPath,
             command: "codex",
             args: [],
           },
@@ -59,7 +66,7 @@ function createRuntimePlan(input: { repositoryPath: string }) {
             ptySessionId: "main",
             cols: 120,
             rows: 40,
-            cwd: input.repositoryPath,
+            cwd: input.launchCwd ?? input.repositoryPath,
             command: "codex",
             args: ["resume", "$THREAD_ID"],
           },
@@ -139,8 +146,10 @@ function HeaderActionsHost(input: { children: ReactNode }): React.JSX.Element {
 
 async function startWorkbenchTunnelServer(): Promise<{
   close: () => Promise<void>;
+  threadStartCwds: string[];
   url: string;
 }> {
+  const threadStartCwds: string[] = [];
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -289,6 +298,24 @@ async function startWorkbenchTunnelServer(): Promise<{
             },
           });
           return;
+        case "thread/start": {
+          const requestParameters =
+            request.params !== undefined &&
+            request.params !== null &&
+            typeof request.params === "object"
+              ? (request.params as { cwd?: string })
+              : {};
+          threadStartCwds.push(requestParameters.cwd ?? "");
+          sendAgentJson({
+            id: requestId,
+            result: {
+              thread: {
+                id: `thread_started_${String(threadStartCwds.length)}`,
+              },
+            },
+          });
+          return;
+        }
         default:
           sendAgentJson({
             id: requestId,
@@ -316,6 +343,7 @@ async function startWorkbenchTunnelServer(): Promise<{
         });
       });
     },
+    threadStartCwds,
     url: `ws://127.0.0.1:${String(address.port)}`,
   };
 }
@@ -399,6 +427,7 @@ describe("SessionWorkbenchPage primary repository", () => {
             failureMessage: null,
             runtimePlan: createRuntimePlan({
               repositoryPath: "/root/mistlehq/mistle",
+              launchCwd: "/root/mistlehq/mistle/packages/dashboard",
             }),
             automationConversation: null,
           },
@@ -422,6 +451,9 @@ describe("SessionWorkbenchPage primary repository", () => {
           const combobox = screen.getByRole("combobox", { name: "Primary repository" });
           expect(combobox.getAttribute("data-disabled")).toBeNull();
           expect((combobox as HTMLInputElement).value).toBe("mistlehq/mistle");
+          expect(tunnelServer.threadStartCwds).toEqual([
+            "/root/mistlehq/mistle/packages/dashboard",
+          ]);
         },
         { timeout: 40_000 },
       );

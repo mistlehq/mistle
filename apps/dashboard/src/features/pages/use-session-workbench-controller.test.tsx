@@ -21,7 +21,10 @@ import {
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
-import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
+import {
+  resolveSandboxStatusRefetchInterval,
+  shouldDeferAutoConnectUntilRuntimePlan,
+} from "./use-session-workbench-lifecycle-state.js";
 
 function createControllerQueryClient(input?: {
   gcTime?: number;
@@ -671,6 +674,44 @@ describe("useSessionWorkbenchController", () => {
           agentRuntimes: [],
         },
         status: "running",
+      }),
+    ).toBe(false);
+  });
+
+  it("defers auto-connect for new sessions until the runtime plan is available", () => {
+    expect(
+      shouldDeferAutoConnectUntilRuntimePlan({
+        connectable: true,
+        providerThreadId: null,
+        runtimePlan: null,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldDeferAutoConnectUntilRuntimePlan({
+        connectable: true,
+        providerThreadId: "thread_123",
+        runtimePlan: null,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldDeferAutoConnectUntilRuntimePlan({
+        connectable: true,
+        providerThreadId: null,
+        runtimePlan: {
+          sandboxProfileId: "sbp_123",
+          version: 1,
+          image: {
+            source: "base",
+            imageRef: "img_123",
+          },
+          egressRoutes: [],
+          artifacts: [],
+          workspaceSources: [],
+          runtimeClients: [],
+          agentRuntimes: [],
+        },
       }),
     ).toBe(false);
   });
