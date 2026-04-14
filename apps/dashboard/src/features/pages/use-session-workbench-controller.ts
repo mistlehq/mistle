@@ -14,6 +14,7 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import { resolveRuntimePlanPrimaryRepositoryPath } from "./session-primary-repository-policy.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -29,10 +30,7 @@ import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionPortAccess } from "./use-session-port-access.js";
-import {
-  resolveRuntimePlanPrimaryRepositoryPath,
-  useSessionPrimaryRepositoryState,
-} from "./use-session-primary-repository-state.js";
+import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import {
   reduceCodexRecoveryState,

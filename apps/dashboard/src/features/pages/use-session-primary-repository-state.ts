@@ -1,8 +1,14 @@
-import { DefaultSandboxWorkspaceDir, type CompiledRuntimePlan } from "@mistle/integrations-core";
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { ExecStreamClient } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  buildRepositoryDiscoveryFindArgs,
+  parseRepositoryPaths,
+  resolvePrimaryRepositoryPresentation,
+  toRepositoryOptions,
+} from "./session-primary-repository-policy.js";
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
@@ -47,113 +53,6 @@ async function runExecCommand(input: {
   }
 
   return result.stdout;
-}
-
-function normalizeRepositoryPath(path: string): string {
-  return path.replace(/\/+$/, "");
-}
-
-export function buildRepositoryDiscoveryFindArgs(input: { workspaceRoot: string }): string[] {
-  return [
-    input.workspaceRoot,
-    "-mindepth",
-    "1",
-    "-maxdepth",
-    "3",
-    "(",
-    "-type",
-    "d",
-    "-o",
-    "-type",
-    "f",
-    ")",
-    "-name",
-    ".git",
-  ];
-}
-
-export function parseRepositoryPaths(input: { findOutput: string }): string[] {
-  const parsedPaths = input.findOutput
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && line.endsWith("/.git"))
-    .map((line) => normalizeRepositoryPath(line.slice(0, -"/.git".length)));
-
-  return [...new Set(parsedPaths)].sort((left, right) => left.localeCompare(right));
-}
-
-export function toRepositoryOptions(input: {
-  repositoryPaths: readonly string[];
-  workspaceRoot: string;
-}): ReadonlyArray<SessionWorkbenchHeaderRepositoryOption> {
-  return input.repositoryPaths.map((path) => ({
-    value: path,
-    label:
-      path.startsWith(`${input.workspaceRoot}/`) && path.length > input.workspaceRoot.length + 1
-        ? path.slice(input.workspaceRoot.length + 1)
-        : path,
-  }));
-}
-
-export function resolveRepositoryPathFromWorkingDirectory(input: {
-  currentWorkingDirectory: string;
-  repositoryPaths: readonly string[];
-}): string | null {
-  const currentWorkingDirectory = normalizeRepositoryPath(input.currentWorkingDirectory.trim());
-  const sortedRepositoryPaths = [...input.repositoryPaths].sort((left, right) => {
-    if (right.length !== left.length) {
-      return right.length - left.length;
-    }
-
-    return left.localeCompare(right);
-  });
-
-  for (const repositoryPath of sortedRepositoryPaths) {
-    if (
-      currentWorkingDirectory === repositoryPath ||
-      currentWorkingDirectory.startsWith(`${repositoryPath}/`)
-    ) {
-      return repositoryPath;
-    }
-  }
-
-  return null;
-}
-
-export function resolveRuntimePlanPrimaryRepositoryCwd(input: {
-  runtimePlan: CompiledRuntimePlan | null | undefined;
-}): string | null | undefined {
-  if (input.runtimePlan === undefined) {
-    return undefined;
-  }
-
-  for (const agentRuntime of input.runtimePlan?.agentRuntimes ?? []) {
-    const primaryRepositoryCwd =
-      agentRuntime.ptyLaunch.newLaunch.cwd ?? agentRuntime.ptyLaunch.resumeLaunch.cwd;
-    if (primaryRepositoryCwd !== undefined) {
-      return normalizeRepositoryPath(primaryRepositoryCwd);
-    }
-  }
-
-  return null;
-}
-
-export function resolveRuntimePlanPrimaryRepositoryPath(input: {
-  runtimePlan: CompiledRuntimePlan | null | undefined;
-}): string | null | undefined {
-  const primaryRepositoryCwd = resolveRuntimePlanPrimaryRepositoryCwd(input);
-  if (primaryRepositoryCwd === undefined || primaryRepositoryCwd === null) {
-    return primaryRepositoryCwd;
-  }
-
-  const repositoryPaths = (input.runtimePlan?.workspaceSources ?? [])
-    .filter((workspaceSource) => workspaceSource.resourceKind === "repository")
-    .map((workspaceSource) => normalizeRepositoryPath(workspaceSource.path));
-
-  return resolveRepositoryPathFromWorkingDirectory({
-    currentWorkingDirectory: primaryRepositoryCwd,
-    repositoryPaths,
-  });
 }
 
 async function loadSessionRepositoryDiscovery(input: {
@@ -208,6 +107,18 @@ export function useSessionPrimaryRepositoryState(input: {
     staleTime: Number.POSITIVE_INFINITY,
   });
   const repositoryOptions = query.data?.repositoryOptions ?? [];
+  const presentation = resolvePrimaryRepositoryPresentation({
+    repositoryOptions,
+    selectedRepositoryPath,
+    queryErrorMessage:
+      query.isError && query.error instanceof Error
+        ? query.error.message
+        : query.isError
+          ? null
+          : null,
+    queryState: query.isError ? "error" : query.data !== undefined ? "loaded" : "idle",
+    workspaceRoot: DefaultSandboxWorkspaceDir,
+  });
 
   useEffect(() => {
     hasHydratedInitialSelectionRef.current = false;
@@ -247,11 +158,7 @@ export function useSessionPrimaryRepositoryState(input: {
   }, []);
 
   return {
-    errorMessage: query.isError
-      ? query.error instanceof Error
-        ? query.error.message
-        : null
-      : null,
+    errorMessage: presentation.errorMessage,
     isInitialLoading: query.isLoading,
     isRefreshing: query.isFetching && query.data !== undefined,
     options: [
@@ -259,7 +166,7 @@ export function useSessionPrimaryRepositoryState(input: {
         label: "None",
         value: SessionRepositoryNoneValue,
       },
-      ...repositoryOptions,
+      ...presentation.options,
     ],
     refreshRepositories: async () => {
       await query.refetch();

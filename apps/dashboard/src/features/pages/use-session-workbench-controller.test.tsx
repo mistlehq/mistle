@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
+import { resolveInitialSessionConnectTarget } from "./session-initial-connect-policy.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -21,10 +22,7 @@ import {
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
-import {
-  resolveSandboxStatusRefetchInterval,
-  shouldDeferAutoConnectUntilRuntimePlan,
-} from "./use-session-workbench-lifecycle-state.js";
+import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
 
 function createControllerQueryClient(input?: {
   gcTime?: number;
@@ -678,42 +676,27 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(false);
   });
 
-  it("defers auto-connect for new sessions until the runtime plan is available", () => {
+  it("resolves a wait target until the runtime plan is available for a new session", () => {
     expect(
-      shouldDeferAutoConnectUntilRuntimePlan({
+      resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: null,
         runtimePlan: null,
       }),
-    ).toBe(true);
+    ).toEqual({
+      type: "wait_for_runtime_plan",
+    });
 
     expect(
-      shouldDeferAutoConnectUntilRuntimePlan({
+      resolveInitialSessionConnectTarget({
         connectable: true,
         providerThreadId: "thread_123",
         runtimePlan: null,
       }),
-    ).toBe(false);
-
-    expect(
-      shouldDeferAutoConnectUntilRuntimePlan({
-        connectable: true,
-        providerThreadId: null,
-        runtimePlan: {
-          sandboxProfileId: "sbp_123",
-          version: 1,
-          image: {
-            source: "base",
-            imageRef: "img_123",
-          },
-          egressRoutes: [],
-          artifacts: [],
-          workspaceSources: [],
-          runtimeClients: [],
-          agentRuntimes: [],
-        },
-      }),
-    ).toBe(false);
+    ).toEqual({
+      type: "provider_thread",
+      threadId: "thread_123",
+    });
   });
 
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {
