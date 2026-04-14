@@ -260,7 +260,8 @@ describe("SessionsPage", () => {
     );
 
     expect(markup).toContain("This session title is intentionally extremely long");
-    expect(markup).toContain('class="block min-w-0 flex-1 cursor-default truncate font-medium');
+    expect(markup).toContain('class="min-w-0 flex-1"');
+    expect(markup).toContain('class="block truncate cursor-default font-medium');
     expect(markup).toContain(
       'data-slot="table" class="w-full caption-bottom text-sm min-w-[40rem] table-fixed"',
     );

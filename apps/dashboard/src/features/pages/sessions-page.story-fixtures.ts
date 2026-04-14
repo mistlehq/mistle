@@ -12,6 +12,7 @@ import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
+import { getSandboxInstanceStatusQueryKey } from "./use-session-workbench-lifecycle-state.js";
 
 type SessionsSidebarQueryState =
   | {
@@ -79,6 +80,14 @@ export function buildSandboxInstanceListItemFixture(
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sandboxInstanceStatus?: {
+    id: string;
+    title: string | null;
+    status: "pending" | "starting" | "running" | "stopped" | "failed";
+    connectable: boolean;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+  };
   sessionsSidebarQueryState?: SessionsSidebarQueryState;
 }): QueryClient {
   const queryClient = new QueryClient({
@@ -143,6 +152,19 @@ export function createSessionsPageStoryQueryClient(input?: {
           sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
         );
       },
+    });
+  }
+
+  if (input?.sandboxInstanceStatus !== undefined) {
+    queryClient.setQueryData(getSandboxInstanceStatusQueryKey(input.sandboxInstanceStatus.id), {
+      id: input.sandboxInstanceStatus.id,
+      title: input.sandboxInstanceStatus.title,
+      status: input.sandboxInstanceStatus.status,
+      connectable: input.sandboxInstanceStatus.connectable,
+      failureCode: input.sandboxInstanceStatus.failureCode ?? null,
+      failureMessage: input.sandboxInstanceStatus.failureMessage ?? null,
+      runtimePlan: null,
+      automationConversation: null,
     });
   }
 

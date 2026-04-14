@@ -20,13 +20,13 @@ export interface AppShellViewProps {
   sidebarHeaderContent: React.ReactNode;
   sidebarContent: React.ReactNode;
   sidebarFooterContent: React.ReactNode;
-  breadcrumbs: React.ReactNode | null;
+  headerLeadingContent: React.ReactNode | null;
   contentInsetOwner: "app-shell" | "child";
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
-  showBreadcrumbs: boolean;
+  showHeaderLeadingContent: boolean;
 }
 
 export function AppShellView(input: AppShellViewProps): React.JSX.Element {
@@ -66,7 +66,10 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
 }
 
 function AppShellStickyHeader(
-  input: Pick<AppShellViewProps, "breadcrumbs" | "headerActions" | "showBreadcrumbs">,
+  input: Pick<
+    AppShellViewProps,
+    "headerLeadingContent" | "headerActions" | "showHeaderLeadingContent"
+  >,
 ): React.JSX.Element {
   const { isMobile, openMobile, state } = useSidebar();
   const shouldRenderSidebarTrigger = isMobile ? !openMobile : state === "collapsed";
@@ -74,9 +77,9 @@ function AppShellStickyHeader(
   return (
     <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
       {shouldRenderSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null}
-      {input.showBreadcrumbs ? (
+      {input.showHeaderLeadingContent ? (
         <div className={`${shouldRenderSidebarTrigger ? "ml-2" : ""} min-w-0 flex-1`}>
-          {input.breadcrumbs}
+          {input.headerLeadingContent}
         </div>
       ) : (
         <div className="flex-1" />

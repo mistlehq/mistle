@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createMemoryRouter,
@@ -8,7 +9,7 @@ import {
 } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { AppBreadcrumbs } from "./app-breadcrumbs.js";
+import { AppHeaderLeading } from "./app-header-leading.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
 import { useAppPageMeta } from "./route-meta.js";
 
@@ -16,10 +17,20 @@ function PageHarness(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   return (
     <div>
-      <AppBreadcrumbs />
+      <AppHeaderLeading />
       <p data-slot="meta-title">{pageMeta.title ?? "MISSING_TITLE"}</p>
       <p data-slot="meta-description">{pageMeta.supportingText ?? "MISSING_DESCRIPTION"}</p>
     </div>
+  );
+}
+
+function renderRoutingMarkup(router: ReturnType<typeof createMemoryRouter>): string {
+  const queryClient = new QueryClient();
+
+  return renderToStaticMarkup(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
   );
 }
 
@@ -96,6 +107,11 @@ describe("app routing breadcrumb integration", () => {
       <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
         <Route element={<PageHarness />} index />
         <Route element={<PageHarness />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
+        <Route
+          element={<PageHarness />}
+          handle={ROUTE_HANDLES.sessionsDetail}
+          path=":sandboxInstanceId"
+        />
       </Route>
     </Route>,
   );
@@ -104,7 +120,7 @@ describe("app routing breadcrumb integration", () => {
     const router = createMemoryRouter(settingsRoutes, {
       initialEntries: ["/settings/personal"],
     });
-    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    let markup = renderRoutingMarkup(router);
 
     expect(markup).toContain("Settings");
     expect(markup).toContain("Personal");
@@ -113,7 +129,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-description"></p>');
 
     await router.navigate("/settings/organization/members");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/settings/organization/general"');
     expect(markup).toContain("Members");
@@ -124,7 +140,7 @@ describe("app routing breadcrumb integration", () => {
     const router = createMemoryRouter(integrationRoutes, {
       initialEntries: ["/integrations"],
     });
-    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    let markup = renderRoutingMarkup(router);
 
     expect(markup).toContain("Integrations");
     expect(markup).toContain('aria-current="page"');
@@ -132,7 +148,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-description"></p>');
 
     await router.navigate("/integrations/github");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/integrations"');
     expect(markup).toContain("Github");
@@ -140,7 +156,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-description">github');
 
     await router.navigate("/integrations/github/add");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/integrations"');
     expect(markup).toContain("Add");
@@ -159,7 +175,7 @@ describe("app routing breadcrumb integration", () => {
       const router = createMemoryRouter(settingsRoutes, {
         initialEntries: [destination],
       });
-      const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+      const markup = renderRoutingMarkup(router);
       expect(markup).not.toContain("MISSING_TITLE");
       expect(markup).not.toContain("MISSING_DESCRIPTION");
     }
@@ -176,7 +192,7 @@ describe("app routing breadcrumb integration", () => {
       const router = createMemoryRouter(integrationRoutes, {
         initialEntries: [destination],
       });
-      const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+      const markup = renderRoutingMarkup(router);
       expect(markup).not.toContain("MISSING_TITLE");
       expect(markup).not.toContain("MISSING_DESCRIPTION");
     }
@@ -186,7 +202,7 @@ describe("app routing breadcrumb integration", () => {
     const router = createMemoryRouter(sandboxProfileRoutes, {
       initialEntries: ["/sandbox-profiles/new"],
     });
-    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    let markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
@@ -195,7 +211,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Create a sandbox profile.");
 
     await router.navigate("/sandbox-profiles/sbp_abc");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
@@ -209,7 +225,7 @@ describe("app routing breadcrumb integration", () => {
     const router = createMemoryRouter(dashboardRoutes, {
       initialEntries: ["/"],
     });
-    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    let markup = renderRoutingMarkup(router);
 
     expect(markup).toContain("Home");
     expect(markup).toContain('aria-current="page"');
@@ -217,7 +233,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-description"></p>');
 
     await router.navigate("/sessions");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain("Sessions");
     expect(markup).toContain('aria-current="page"');
@@ -225,7 +241,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-description"></p>');
 
     await router.navigate("/sessions/new");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/sessions"');
     expect(markup).toContain("New");
@@ -233,11 +249,40 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Start a sandbox-backed session from a sandbox profile.");
   });
 
+  it("replaces the session detail breadcrumb trail with the session title", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(createSandboxInstanceStatusQueryKey("sbi_123"), {
+      id: "sbi_123",
+      title: "Investigate flaky title rendering",
+      status: "running",
+      connectable: true,
+      failureCode: null,
+      failureMessage: null,
+      runtimePlan: null,
+      automationConversation: null,
+    });
+    const router = createMemoryRouter(dashboardRoutes, {
+      initialEntries: ["/sessions/sbi_123"],
+    });
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('aria-label="Session title"');
+    expect(markup).toContain("Investigate flaky title rendering");
+    expect(markup).not.toContain("sbi_123");
+    expect(markup).not.toContain('href="/sessions"');
+    expect(markup).toContain('data-slot="meta-title">Session');
+  });
+
   it("renders automations breadcrumbs for list, create, and detail routes", async () => {
     const router = createMemoryRouter(automationRoutes, {
       initialEntries: ["/automations"],
     });
-    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    let markup = renderRoutingMarkup(router);
 
     expect(markup).toContain("Automations");
     expect(markup).toContain('aria-current="page"');
@@ -245,7 +290,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Manage webhook automations.");
 
     await router.navigate("/automations/new");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/automations"');
     expect(markup).toContain("Create");
@@ -253,7 +298,7 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).not.toContain("Create a webhook automation.");
 
     await router.navigate("/automations/aut_123");
-    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('href="/automations"');
     expect(markup).toContain("Edit automation");
@@ -266,10 +311,16 @@ describe("app routing breadcrumb integration", () => {
     const router = createMemoryRouter(automationRoutes, {
       initialEntries: ["/automations/new"],
     });
-    const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    const markup = renderRoutingMarkup(router);
 
     expect(markup).toContain('data-slot="meta-title">Create automation');
     expect(markup).toContain('data-slot="meta-description"></p>');
     expect(markup).not.toContain("Create a webhook automation.");
   });
 });
+
+function createSandboxInstanceStatusQueryKey(
+  sandboxInstanceId: string | null,
+): readonly ["sandbox-instance-status", string | null] {
+  return ["sandbox-instance-status", sandboxInstanceId];
+}

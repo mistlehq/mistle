@@ -152,9 +152,10 @@ const meta = {
   component: AppShellViewStory,
   tags: ["autodocs"],
   argTypes: {
-    breadcrumbs: {
+    headerLeadingContent: {
       control: false,
-      description: "Optional header breadcrumb content shown when `showBreadcrumbs` is enabled.",
+      description:
+        "Optional leading header content shown when `showHeaderLeadingContent` is enabled.",
     },
     contentInsetOwner: {
       control: "inline-radio",
@@ -174,9 +175,9 @@ const meta = {
       control: false,
       description: "Primary page content rendered inside the shell content region.",
     },
-    showBreadcrumbs: {
+    showHeaderLeadingContent: {
       control: "boolean",
-      description: "Toggles whether the breadcrumb region is shown in the sticky header.",
+      description: "Toggles whether the header-leading region is shown in the sticky header.",
     },
     showSessionsSidebar: {
       control: "boolean",
@@ -215,10 +216,10 @@ const meta = {
       include: [
         "contentInsetOwner",
         "viewportMode",
-        "showBreadcrumbs",
+        "showHeaderLeadingContent",
         "showSessionsSidebar",
         "locationPathname",
-        "breadcrumbs",
+        "headerLeadingContent",
         "headerActions",
         "mainContent",
         "sidebarHeaderContent",
@@ -230,7 +231,7 @@ const meta = {
     },
   },
   args: {
-    breadcrumbs: <p className="truncate text-sm">Sessions / Storybook Session</p>,
+    headerLeadingContent: <p className="truncate text-sm">Sessions / Storybook Session</p>,
     contentInsetOwner: "app-shell",
     headerActions: (
       <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
@@ -246,7 +247,7 @@ const meta = {
         </p>
       </div>
     ),
-    showBreadcrumbs: true,
+    showHeaderLeadingContent: true,
     showSessionsSidebar: false,
     sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,

@@ -16,7 +16,6 @@ type SessionsPageStoryArgs = {
 
 const meta = {
   title: "Dashboard/Sessions/Page",
-  component: SessionsStoryHarness,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",

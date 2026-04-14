@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createMemoryRouter,
@@ -12,6 +13,16 @@ import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 
 function BreadcrumbHarness(): React.JSX.Element {
   return <AppBreadcrumbs />;
+}
+
+function renderBreadcrumbMarkup(router: ReturnType<typeof createMemoryRouter>): string {
+  const queryClient = new QueryClient();
+
+  return renderToStaticMarkup(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("app-breadcrumbs", () => {
@@ -43,7 +54,7 @@ describe("app-breadcrumbs", () => {
       },
     );
 
-    const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    const markup = renderBreadcrumbMarkup(router);
 
     expect(markup).toContain("Settings");
     expect(markup).toContain("Account");
@@ -74,7 +85,7 @@ describe("app-breadcrumbs", () => {
       },
     );
 
-    const markup = renderToStaticMarkup(<RouterProvider router={router} />);
+    const markup = renderBreadcrumbMarkup(router);
     expect(markup).toContain('href="/integrations"');
   });
 });

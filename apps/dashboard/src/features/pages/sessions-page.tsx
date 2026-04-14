@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Notice,
+  OverflowTooltipText,
   Table,
   TableBody,
   TableCell,
@@ -88,70 +89,30 @@ export function shouldClearSelectedProfile(input: {
 }
 
 function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
-  const [titleElement, setTitleElement] = useState<HTMLSpanElement | null>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-
-  useEffect(() => {
-    if (titleElement === null) {
-      setIsTruncated(false);
-      return;
-    }
-
-    const updateTruncation = () => {
-      setIsTruncated(titleElement.scrollWidth > titleElement.clientWidth);
-    };
-
-    updateTruncation();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver(updateTruncation);
-    resizeObserver.observe(titleElement);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [input.title, titleElement]);
-
-  function handleTitleRef(element: HTMLSpanElement | null): void {
-    setTitleElement(element);
+  if (input.href === undefined) {
+    return (
+      <span className="flex max-w-full items-center gap-1">
+        <OverflowTooltipText
+          className="cursor-default font-medium text-muted-foreground"
+          containerClassName="flex-1"
+          text={input.title}
+        />
+      </span>
+    );
   }
 
   return (
-    <Tooltip delay={0} disabled={!isTruncated}>
-      <TooltipTrigger
-        render={
-          input.href === undefined ? (
-            <span className="flex max-w-full items-center gap-1">
-              <span
-                className="block min-w-0 flex-1 cursor-default truncate font-medium text-muted-foreground"
-                ref={handleTitleRef}
-              >
-                {input.title}
-              </span>
-            </span>
-          ) : (
-            <Link className="flex max-w-full items-center gap-1" to={input.href}>
-              <span
-                className="block min-w-0 flex-1 cursor-default truncate font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
-                ref={handleTitleRef}
-              >
-                {input.title}
-              </span>
-              <ArrowSquareOutIcon
-                aria-hidden
-                className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
-              />
-            </Link>
-          )
-        }
+    <Link className="flex max-w-full items-center gap-1" to={input.href}>
+      <OverflowTooltipText
+        className="cursor-default font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
+        containerClassName="flex-1"
+        text={input.title}
       />
-      <TooltipContent showArrow={false} side="top" variant="light">
-        {input.title}
-      </TooltipContent>
-    </Tooltip>
+      <ArrowSquareOutIcon
+        aria-hidden
+        className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
+      />
+    </Link>
   );
 }
 

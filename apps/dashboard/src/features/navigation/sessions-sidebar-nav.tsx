@@ -3,6 +3,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
   Input,
+  OverflowTooltipText,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -11,9 +12,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
 } from "@mistle/ui";
 import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
@@ -186,53 +184,12 @@ function SessionsSidebarItemLabel(input: {
   label: string;
   metadataLabel: string;
 }): React.JSX.Element {
-  const [labelElement, setLabelElement] = useState<HTMLSpanElement | null>(null);
-  const [isTruncated, setIsTruncated] = useState(false);
-
-  useEffect(() => {
-    if (labelElement === null) {
-      setIsTruncated(false);
-      return;
-    }
-
-    const updateTruncation = () => {
-      setIsTruncated(labelElement.scrollWidth > labelElement.clientWidth);
-    };
-
-    updateTruncation();
-
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver(updateTruncation);
-    resizeObserver.observe(labelElement);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [input.label, labelElement]);
-
-  const labelClassName = "block min-w-0 flex-1 truncate text-[13px] leading-tight";
-
-  function handleLabelRef(element: HTMLSpanElement | null): void {
-    setLabelElement(element);
-  }
-
   return (
     <div className="min-w-0 flex-1">
-      <Tooltip disabled={!isTruncated}>
-        <TooltipTrigger
-          render={
-            <span className={labelClassName} ref={handleLabelRef}>
-              {input.label}
-            </span>
-          }
-        />
-        <TooltipContent showArrow={false} side="top" variant="light">
-          {input.label}
-        </TooltipContent>
-      </Tooltip>
+      <OverflowTooltipText
+        className="min-w-0 flex-1 text-[13px] leading-tight"
+        text={input.label}
+      />
       <div
         className={`pt-px text-[10px] leading-tight font-medium ${
           input.metadataLabel === "Working" ? "text-sky-700" : "text-muted-foreground"
