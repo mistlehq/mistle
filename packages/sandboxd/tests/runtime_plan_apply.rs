@@ -410,6 +410,7 @@ fn applies_typed_exec_artifact_install_steps() {
 }
 
 #[test]
+#[ignore = "requires a host mise binary; command construction is covered in unit tests"]
 fn applies_typed_mise_install_steps() {
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
