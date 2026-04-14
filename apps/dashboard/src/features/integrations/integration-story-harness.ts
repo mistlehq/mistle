@@ -1,3 +1,6 @@
+import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
+
 import {
   buildIntegrationConnectionDetailItems,
   buildIntegrationConnectionResourceItemsByKey,
@@ -10,6 +13,58 @@ import type {
   IntegrationConnectionResource,
   IntegrationWebhookSource,
 } from "./integrations-service.js";
+
+const IntegrationRegistry = createBrowserIntegrationRegistry();
+
+type StoryAuthMethodSpec = {
+  familyId: string;
+  methodId: string;
+  variantId: string;
+};
+
+function getDefinitionOrThrow(input: {
+  familyId: string;
+  variantId: string;
+}): AnyIntegrationDefinition {
+  const definition = IntegrationRegistry.getDefinition(input);
+  if (definition === null) {
+    throw new Error(
+      `Missing browser integration definition '${input.familyId}/${input.variantId}' for Storybook.`,
+    );
+  }
+
+  if (definition === undefined) {
+    throw new Error(
+      `Browser integration definition '${input.familyId}/${input.variantId}' resolved to undefined.`,
+    );
+  }
+
+  return definition;
+}
+
+function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): {
+  authMethodId: string;
+  authMethodLabel: string;
+} {
+  const definition = getDefinitionOrThrow({
+    familyId: input.familyId,
+    variantId: input.variantId,
+  });
+  const method = definition.connectionMethods?.find((connectionMethod) => {
+    return connectionMethod.id === input.methodId;
+  });
+
+  if (method === undefined) {
+    throw new Error(
+      `Missing connection method '${input.methodId}' for '${input.familyId}/${input.variantId}' in Storybook.`,
+    );
+  }
+
+  return {
+    authMethodId: method.id,
+    authMethodLabel: method.label,
+  };
+}
 
 export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
   {
@@ -154,8 +209,11 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
     connections: [
       {
         id: connectionId,
-        authMethodId: "github-app-installation",
-        authMethodLabel: "GitHub App installation",
+        ...resolveAuthMethodOrThrow({
+          familyId: "github",
+          methodId: "github-app-installation",
+          variantId: "github-cloud",
+        }),
         bindingCount: 3,
         canDelete: false,
         contextItems: [
@@ -374,8 +432,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
 }
 
 type ScenarioDetailStorySpec = {
-  authMethodId?: string;
-  authMethodLabel?: string;
+  authMethod?: StoryAuthMethodSpec;
   bindingCount?: number;
   connectionId: string;
   contextItems?: readonly {
@@ -457,6 +514,8 @@ function createWebhookSourceSectionState(
 function createScenarioDetailViewStoryProps(
   input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps {
+  const authMethod =
+    input.authMethod === undefined ? undefined : resolveAuthMethodOrThrow(input.authMethod);
   const resourceItemsByKey = createResourceItems(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
 
@@ -465,8 +524,7 @@ function createScenarioDetailViewStoryProps(
       {
         bindingCount: input.bindingCount ?? 0,
         canDelete: input.bindingCount === undefined || input.bindingCount === 0,
-        ...(input.authMethodId === undefined ? {} : { authMethodId: input.authMethodId }),
-        ...(input.authMethodLabel === undefined ? {} : { authMethodLabel: input.authMethodLabel }),
+        ...(authMethod === undefined ? {} : authMethod),
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,
         id: input.connectionId,
@@ -513,8 +571,11 @@ const DenseStoryLastSyncedAt = "2026-04-13T15:37:00.000Z";
 export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
     familyId: "github",
-    authMethodId: "github-app-installation",
-    authMethodLabel: "GitHub App installation",
+    authMethod: {
+      familyId: "github",
+      methodId: "github-app-installation",
+      variantId: "github-enterprise-server",
+    },
     bindingCount: 2,
     connectionId: "icn_github_ghes_dense",
     contextItems: [
@@ -565,75 +626,13 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
   });
 }
 
-export function createGitHubApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    familyId: "github",
-    authMethodId: "api-key",
-    authMethodLabel: "API key",
-    bindingCount: 2,
-    connectionId: "icn_github_api_key_dense",
-    contextItems: [
-      { label: "API base URL", value: "https://api.github.com" },
-      { label: "Owner", value: "mistlehq" },
-    ],
-    displayName: "GitHub Personal Access Token",
-    resources: [
-      {
-        count: 11,
-        items: ["mistlehq/company-os", "mistlehq/mistle", "mistlehq/tools", "mistlehq/mistle-next"],
-        kind: "repository",
-        lastSyncedAt: DenseStoryLastSyncedAt,
-        syncState: "ready",
-      },
-      {
-        count: 21,
-        items: ["main", "integration-form-page", "migrate-website", "fix/github-target-errors"],
-        kind: "branch",
-        lastSyncedAt: DenseStoryLastSyncedAt,
-        syncState: "ready",
-      },
-    ],
-  });
-}
-
-export function createGitHubEnterpriseServerApiKeyDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    familyId: "github",
-    authMethodId: "api-key",
-    authMethodLabel: "API key",
-    bindingCount: 1,
-    connectionId: "icn_github_ghes_api_key_dense",
-    contextItems: [
-      { label: "API base URL", value: "https://github.acme.example/api/v3" },
-      { label: "Owner", value: "platform" },
-    ],
-    displayName: "GitHub Enterprise Token",
-    resources: [
-      {
-        count: 7,
-        items: [
-          "platform/control-plane",
-          "platform/dashboard",
-          "platform/data-plane",
-          "platform/agents",
-        ],
-        kind: "repository",
-        lastSyncedAt: DenseStoryLastSyncedAt,
-        syncState: "ready",
-      },
-      {
-        count: 18,
-        items: ["main", "release/2026.04", "feat/self-hosted-webhooks", "ops/incident-runbook"],
-        kind: "branch",
-        lastSyncedAt: DenseStoryLastSyncedAt,
-        syncState: "ready",
-      },
-    ],
-  });
-}
-
 export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
+    authMethod: {
+      familyId: "jira",
+      methodId: "jira-personal-api-token",
+      variantId: "jira-default",
+    },
     bindingCount: 1,
     connectionId: "icn_jira_dense",
     displayName: "Jira Production",
@@ -657,26 +656,13 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
   });
 }
 
-export function createJiraServiceAccountApiTokenDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    bindingCount: 1,
-    connectionId: "icn_jira_service_account_api_dense",
-    displayName: "Jira Service Account",
-  });
-}
-
-export function createJiraServiceAccountOauthDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    bindingCount: 1,
-    connectionId: "icn_jira_service_account_oauth_dense",
-    displayName: "Jira OAuth Service Account",
-  });
-}
-
 export function createLinearDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "api-key",
-    authMethodLabel: "API key",
+    authMethod: {
+      familyId: "linear",
+      methodId: "api-key",
+      variantId: "linear-default",
+    },
     connectionId: "icn_linear_dense",
     displayName: "Linear Workspace",
   });
@@ -684,8 +670,11 @@ export function createLinearDetailViewStoryProps(): IntegrationConnectionDetailV
 
 export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "slack-bot-token",
-    authMethodLabel: "Bot token",
+    authMethod: {
+      familyId: "slack",
+      methodId: "slack-bot-token",
+      variantId: "slack-default",
+    },
     bindingCount: 2,
     connectionId: "icn_slack_dense",
     displayName: "Slack Engineering",
@@ -709,26 +698,23 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
 
 export function createOpenAiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "api-key",
-    authMethodLabel: "API key",
+    authMethod: {
+      familyId: "openai",
+      methodId: "api-key",
+      variantId: "openai-default",
+    },
     connectionId: "icn_openai_dense",
     displayName: "OpenAI Production",
   });
 }
 
-export function createOpenAiChatGptDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    authMethodId: "chatgpt-device-code",
-    authMethodLabel: "ChatGPT subscription",
-    connectionId: "icn_openai_chatgpt_dense",
-    displayName: "OpenAI ChatGPT Subscription",
-  });
-}
-
 export function createAwsDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "aws-assume-role",
-    authMethodLabel: "Access key + AssumeRole",
+    authMethod: {
+      familyId: "aws",
+      methodId: "aws-assume-role",
+      variantId: "aws-cli-default",
+    },
     connectionId: "icn_aws_dense",
     displayName: "AWS Engineering",
   });
@@ -736,8 +722,11 @@ export function createAwsDetailViewStoryProps(): IntegrationConnectionDetailView
 
 export function createDatadogDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "api-key",
-    authMethodLabel: "API key",
+    authMethod: {
+      familyId: "datadog",
+      methodId: "api-key",
+      variantId: "datadog-default",
+    },
     connectionId: "icn_datadog_dense",
     displayName: "Datadog Production",
   });
@@ -745,8 +734,11 @@ export function createDatadogDetailViewStoryProps(): IntegrationConnectionDetail
 
 export function createPlanetScaleDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "oauth2-authorization-code",
-    authMethodLabel: "PlanetScale OAuth",
+    authMethod: {
+      familyId: "planetscale",
+      methodId: "oauth2-authorization-code",
+      variantId: "planetscale-mcp",
+    },
     connectionId: "icn_planetscale_dense",
     displayName: "PlanetScale Hosted MCP",
   });
@@ -754,8 +746,11 @@ export function createPlanetScaleDetailViewStoryProps(): IntegrationConnectionDe
 
 export function createSigNozDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   return createScenarioDetailViewStoryProps({
-    authMethodId: "oauth2-authorization-code",
-    authMethodLabel: "SigNoz OAuth",
+    authMethod: {
+      familyId: "signoz",
+      methodId: "oauth2-authorization-code",
+      variantId: "signoz-mcp",
+    },
     connectionId: "icn_signoz_dense",
     displayName: "SigNoz Hosted MCP",
   });
@@ -790,69 +785,4 @@ export function createIntegrationGalleryStoryProps(): IntegrationConnectionDetai
       ),
     ),
   };
-}
-
-export type IntegrationDetailControlVariant =
-  | "github-cloud:github-app-installation"
-  | "github-cloud:api-key"
-  | "github-enterprise-server:github-app-installation"
-  | "github-enterprise-server:api-key"
-  | "jira-default:jira-personal-api-token"
-  | "jira-default:jira-service-account-api-token"
-  | "jira-default:jira-service-account-oauth-client-credentials"
-  | "linear-default:api-key"
-  | "slack-default:slack-bot-token"
-  | "openai-default:api-key"
-  | "openai-default:chatgpt-device-code"
-  | "aws-cli-default:aws-assume-role"
-  | "datadog-default:api-key"
-  | "planetscale-mcp:oauth2-authorization-code"
-  | "signoz-mcp:oauth2-authorization-code";
-
-export function createIntegrationDetailViewStoryPropsForVariant(
-  variant: IntegrationDetailControlVariant,
-): IntegrationConnectionDetailViewProps {
-  if (variant === "github-cloud:github-app-installation") {
-    return createGitHubAppDetailViewStoryProps();
-  }
-  if (variant === "github-cloud:api-key") {
-    return createGitHubApiKeyDetailViewStoryProps();
-  }
-  if (variant === "github-enterprise-server:github-app-installation") {
-    return createGitHubEnterpriseServerDetailViewStoryProps();
-  }
-  if (variant === "github-enterprise-server:api-key") {
-    return createGitHubEnterpriseServerApiKeyDetailViewStoryProps();
-  }
-  if (variant === "jira-default:jira-personal-api-token") {
-    return createJiraDetailViewStoryProps();
-  }
-  if (variant === "jira-default:jira-service-account-api-token") {
-    return createJiraServiceAccountApiTokenDetailViewStoryProps();
-  }
-  if (variant === "jira-default:jira-service-account-oauth-client-credentials") {
-    return createJiraServiceAccountOauthDetailViewStoryProps();
-  }
-  if (variant === "linear-default:api-key") {
-    return createLinearDetailViewStoryProps();
-  }
-  if (variant === "slack-default:slack-bot-token") {
-    return createSlackDetailViewStoryProps();
-  }
-  if (variant === "openai-default:api-key") {
-    return createOpenAiDetailViewStoryProps();
-  }
-  if (variant === "openai-default:chatgpt-device-code") {
-    return createOpenAiChatGptDetailViewStoryProps();
-  }
-  if (variant === "aws-cli-default:aws-assume-role") {
-    return createAwsDetailViewStoryProps();
-  }
-  if (variant === "datadog-default:api-key") {
-    return createDatadogDetailViewStoryProps();
-  }
-  if (variant === "planetscale-mcp:oauth2-authorization-code") {
-    return createPlanetScaleDetailViewStoryProps();
-  }
-  return createSigNozDetailViewStoryProps();
 }
