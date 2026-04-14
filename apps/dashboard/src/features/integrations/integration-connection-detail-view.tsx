@@ -247,7 +247,8 @@ function ConnectionDetailPane(input: {
   const hasSetupSection =
     input.connection.setupDescription !== undefined ||
     input.connection.setupErrorMessage !== undefined ||
-    input.connection.postInstallationSetupUrl !== undefined;
+    input.connection.postInstallationSetupUrl !== undefined ||
+    input.webhookSourceState?.items[0]?.callbackUrl !== undefined;
 
   return (
     <section className="flex flex-col gap-8">
@@ -721,7 +722,7 @@ function ResourcesSection(input: {
       {input.resources.map((resource, index) => (
         <ResourceScopeRow
           connectionId={input.connectionId}
-          key={resource.kind}
+          key={`${input.connectionId}:${resource.kind}`}
           onRefreshResource={input.onRefreshResource}
           resource={resource}
           resourceItems={

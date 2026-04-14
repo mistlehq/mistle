@@ -237,6 +237,99 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
   });
 
+  it("resets expanded resource state when switching connections", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 2,
+                syncState: "ready",
+                lastSyncedAt: "2026-03-11T04:25:00.000Z",
+              },
+            ],
+          },
+          {
+            id: "icn_github_archive",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Archive Mirror",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 2,
+                syncState: "ready",
+                lastSyncedAt: "2026-03-11T04:25:00.000Z",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: null,
+                isLoading: false,
+                items: [
+                  {
+                    id: "repo_1",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/dashboard",
+                    displayName: "mistle/dashboard",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                ],
+                kind: "repositories",
+              },
+            ],
+            [
+              "icn_github_archive:repositories",
+              {
+                errorMessage: null,
+                isLoading: false,
+                items: [
+                  {
+                    id: "repo_2",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/archive",
+                    displayName: "mistle/archive",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                ],
+                kind: "repositories",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("mistle/dashboard")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
+    expect(screen.queryByText("mistle/dashboard")).toBeNull();
+    expect(screen.queryByText("mistle/archive")).toBeNull();
+    expect(screen.getByRole("button", { name: "Expand repository resources" })).toBeTruthy();
+  });
+
   it("clears a stale connection save error when a new edit session starts", () => {
     function ErrorHarness(): React.JSX.Element {
       const [errorMessageByConnectionId, setErrorMessageByConnectionId] = useState<
