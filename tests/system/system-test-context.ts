@@ -62,6 +62,12 @@ export type SystemTestFixture = {
   createOrganization: (input: { cookie: string; name: string; slug: string }) => Promise<string>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
   startSandboxAndWaitReady: () => Promise<string>;
+  runSandboxPtyCommand: (input: {
+    sandboxInstanceId: string;
+    command: string;
+    cwd?: string;
+    timeoutMs?: number;
+  }) => Promise<{ exitCode: number; output: string }>;
   openPtyAndAssertRoundTrip: (sandboxInstanceId: string) => Promise<void>;
   restartContainer: (containerId: string) => Promise<void>;
   stopContainer: (containerId: string) => Promise<void>;
@@ -88,6 +94,7 @@ const OpenAiApiKey = "sk-system-sandbox-restart";
 const SandboxReadyTimeoutMs = 3 * 60_000;
 const SandboxStatusPollIntervalMs = 1_000;
 const PtyRoundTripTimeoutMs = 30_000;
+const PtyCommandDefaultTimeoutMs = 60_000;
 const WebSocketConnectTimeoutMs = 30_000;
 const TestContextId = "system";
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
@@ -1269,19 +1276,26 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
 
         return SandboxRuntimeStateSnapshotSchema.parse(payload);
       };
-      const openPtyAndAssertRoundTrip = async (sandboxInstanceId: string): Promise<void> => {
+      const runSandboxPtyCommand = async (input: {
+        sandboxInstanceId: string;
+        command: string;
+        cwd?: string;
+        timeoutMs?: number;
+      }): Promise<{ exitCode: number; output: string }> => {
         const sandboxContext = await ensureSandboxControlContext();
+        const commandTimeoutMs = input.timeoutMs ?? PtyCommandDefaultTimeoutMs;
+
         try {
           await waitForCondition({
-            description: `sandbox '${sandboxInstanceId}' runtime attachment readiness before PTY`,
+            description: `sandbox '${input.sandboxInstanceId}' runtime attachment readiness before PTY command`,
             timeoutMs: SandboxReadyTimeoutMs,
             evaluate: async () => {
               let snapshot: z.infer<typeof SandboxRuntimeStateSnapshotSchema>;
               try {
-                snapshot = await readSandboxRuntimeState(sandboxInstanceId);
+                snapshot = await readSandboxRuntimeState(input.sandboxInstanceId);
               } catch (error) {
                 throw new RetryableWaitError(
-                  `sandbox runtime-state read failed before PTY: ${
+                  `sandbox runtime-state read failed before PTY command: ${
                     error instanceof Error ? error.message : String(error)
                   }`,
                 );
@@ -1290,8 +1304,8 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             },
           });
 
-          await waitForCondition({
-            description: `sandbox '${sandboxInstanceId}' PTY round-trip`,
+          return await waitForCondition({
+            description: `sandbox '${input.sandboxInstanceId}' PTY command '${input.command}'`,
             timeoutMs: SandboxReadyTimeoutMs,
             evaluate: async () => {
               let websocket: WebSocket | undefined;
@@ -1300,7 +1314,7 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
               try {
                 const connectionToken = await requestJsonOrThrow({
                   request,
-                  path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/connection-tokens`,
+                  path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
                   expectedStatus: 201,
                   description: "sandbox connection token minting",
                   schema: SandboxInstanceConnectionTokenResponseSchema,
@@ -1319,34 +1333,22 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
                   WebSocketConnectTimeoutMs,
                 );
                 const pump = createPtyFramePump(websocket);
-                const marker = `mistle-roundtrip-${randomUUID()}`;
                 streamId = await connectPtyChannel({
                   socket: websocket,
                   pump,
-                  cwd: "/root",
+                  cwd: input.cwd ?? "/root",
                 });
-                const result = await runPtyCommand({
+
+                return await runPtyCommand({
                   socket: websocket,
                   pump,
                   streamId,
-                  command: `printf '%s\\n' ${shellQuote(marker)}`,
-                  timeoutMs: PtyRoundTripTimeoutMs,
+                  command: input.command,
+                  timeoutMs: commandTimeoutMs,
                 });
-                if (result.exitCode !== 0) {
-                  throw new Error(
-                    `PTY round-trip command failed with exit code ${String(result.exitCode)}. Output: ${result.output}`,
-                  );
-                }
-                if (!result.output.includes(marker)) {
-                  throw new Error(
-                    `PTY round-trip output did not include expected marker '${marker}'. Output: ${result.output}`,
-                  );
-                }
-
-                return {};
               } catch (error) {
                 throw new RetryableWaitError(
-                  `sandbox PTY round-trip attempt failed: ${
+                  `sandbox PTY command attempt failed: ${
                     error instanceof Error ? error.message : String(error)
                   }`,
                 );
@@ -1363,6 +1365,45 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
               }
             },
           });
+        } catch (error) {
+          const runtimeState = await readSandboxRuntimeState(input.sandboxInstanceId).catch(
+            (readError: unknown) =>
+              `runtime-state read failed: ${
+                readError instanceof Error ? readError.message : String(readError)
+              }`,
+          );
+          const sandboxDiagnostics = await readSandboxContainerDiagnostics({
+            networkName: systemTestContext.sandboxNetworkName,
+          });
+          const gatewayLogs = await readContainerLogsTail({
+            containerId: systemTestContext.dataPlaneGatewayContainerId,
+            tail: 160,
+          });
+          throw new Error(
+            `PTY command failed for sandbox '${input.sandboxInstanceId}'. Runtime state: ${typeof runtimeState === "string" ? runtimeState : JSON.stringify(runtimeState)}. Sandbox diagnostics: ${sandboxDiagnostics}. Gateway logs: ${gatewayLogs}. Cause: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      };
+      const openPtyAndAssertRoundTrip = async (sandboxInstanceId: string): Promise<void> => {
+        try {
+          const marker = `mistle-roundtrip-${randomUUID()}`;
+          const result = await runSandboxPtyCommand({
+            sandboxInstanceId,
+            command: `printf '%s\\n' ${shellQuote(marker)}`,
+            timeoutMs: PtyRoundTripTimeoutMs,
+          });
+          if (result.exitCode !== 0) {
+            throw new Error(
+              `PTY round-trip command failed with exit code ${String(result.exitCode)}. Output: ${result.output}`,
+            );
+          }
+          if (!result.output.includes(marker)) {
+            throw new Error(
+              `PTY round-trip output did not include expected marker '${marker}'. Output: ${result.output}`,
+            );
+          }
         } catch (error) {
           const runtimeState = await readSandboxRuntimeState(sandboxInstanceId).catch(
             (readError: unknown) =>
@@ -1416,6 +1457,7 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           createOrganization,
           authSession,
           startSandboxAndWaitReady,
+          runSandboxPtyCommand,
           openPtyAndAssertRoundTrip,
           restartContainer: async (containerId) => {
             await runDockerLifecycleCommand({
