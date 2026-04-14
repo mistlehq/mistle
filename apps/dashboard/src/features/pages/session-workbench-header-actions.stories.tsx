@@ -70,7 +70,7 @@ function createStory(input: SessionWorkbenchHeaderActionsStoryHarnessProps): Sto
   };
 }
 
-export const WithPrimaryRepositorySelector = createStory({
+export const Default = createStory({
   repositoryOptions: StoryRepositoryOptions,
   repositorySelectedValue: "/root/mistle",
   status: "connected",
@@ -78,7 +78,7 @@ export const WithPrimaryRepositorySelector = createStory({
 
 export const WithRepositorySelectorRefreshingOpen = createStory({
   repositoryIsRefreshing: true,
-  repositoryOpen: true,
+  repositoryStartsOpen: true,
   repositoryOptions: [
     ...StoryRepositoryOptions,
     { value: "/root/mistle-temp-docs", label: "mistle-temp-docs" },

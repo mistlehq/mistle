@@ -24,7 +24,6 @@ type SessionWorkbenchHeaderRepositoryControl = {
   disabled?: boolean;
   errorMessage?: string;
   isRefreshing?: boolean;
-  open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onValueChange: (nextValue: string) => void;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
@@ -88,7 +87,6 @@ export function SessionWorkbenchHeaderActions(input: {
           <span aria-hidden className="h-5 w-px bg-stone-200" />
           <Select
             disabled={repositoryControl.disabled}
-            {...(repositoryControl.open === undefined ? {} : { open: repositoryControl.open })}
             onOpenChange={repositoryControl.onOpenChange}
             onValueChange={(nextValue) => {
               if (nextValue === null) {

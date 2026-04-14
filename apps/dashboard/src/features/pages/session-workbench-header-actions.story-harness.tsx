@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { SessionWorkbenchStoryChrome } from "./session-story-support.js";
 import {
@@ -11,7 +11,7 @@ type StoryStatus = "connected" | "not_connected";
 type SessionWorkbenchHeaderActionsStoryHarnessProps = {
   repositoryErrorMessage?: string;
   repositoryIsRefreshing?: boolean;
-  repositoryOpen?: boolean;
+  repositoryStartsOpen?: boolean;
   repositoryOptions?: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   repositorySelectedValue?: string | null;
   repositoryDisabled?: boolean;
@@ -40,9 +40,31 @@ function createHeaderStatus(status: StoryStatus): {
 export function SessionWorkbenchHeaderActionsStoryHarness(
   input: SessionWorkbenchHeaderActionsStoryHarnessProps,
 ): React.JSX.Element {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const openAnimationFrameRef = useRef<number | null>(null);
+  const hasOpenedRef = useRef(false);
   const [selectedRepositoryValue, setSelectedRepositoryValue] = useState<string | null>(
     input.repositorySelectedValue ?? null,
   );
+
+  useEffect(() => {
+    if (!input.repositoryStartsOpen || hasOpenedRef.current) {
+      return;
+    }
+
+    openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      const trigger = rootRef.current?.querySelector<HTMLButtonElement>('[role="combobox"]');
+      trigger?.click();
+      hasOpenedRef.current = true;
+      openAnimationFrameRef.current = null;
+    });
+
+    return () => {
+      if (openAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(openAnimationFrameRef.current);
+      }
+    };
+  }, [input.repositoryStartsOpen]);
 
   const repositoryControl =
     input.repositoryOptions === undefined
@@ -54,45 +76,46 @@ export function SessionWorkbenchHeaderActionsStoryHarness(
             ? {}
             : { errorMessage: input.repositoryErrorMessage }),
           ...(input.repositoryIsRefreshing ? { isRefreshing: true } : {}),
-          ...(input.repositoryOpen === undefined ? {} : { open: input.repositoryOpen }),
           onValueChange: setSelectedRepositoryValue,
           options: input.repositoryOptions,
           selectedValue: selectedRepositoryValue,
         };
 
   return (
-    <SessionWorkbenchStoryChrome
-      headerActions={
-        <SessionWorkbenchHeaderActions
-          cliControl={{
-            ...StoryActionButtonControl,
-            ariaLabel: "CLI",
-            className: StoryActionButtonControl.className,
-            title: "Open Codex CLI",
-          }}
-          diffControl={{
-            ...StoryActionButtonControl,
-            ariaLabel: "Open changes",
-            className: StoryActionButtonControl.className,
-            title: "Open changes",
-          }}
-          {...(repositoryControl === undefined ? {} : { repositoryControl })}
-          status={createHeaderStatus(input.status)}
-          terminalControl={{
-            ...StoryActionButtonControl,
-            ariaLabel: "Open terminal",
-            className: StoryActionButtonControl.className,
-            title: "Open terminal",
-          }}
-        />
-      }
-    >
-      <div className="flex h-full items-center justify-center bg-background">
-        <div className="rounded-xl border bg-card px-6 py-10 shadow-xs">
-          Session workbench header preview
+    <div ref={rootRef}>
+      <SessionWorkbenchStoryChrome
+        headerActions={
+          <SessionWorkbenchHeaderActions
+            cliControl={{
+              ...StoryActionButtonControl,
+              ariaLabel: "CLI",
+              className: StoryActionButtonControl.className,
+              title: "Open Codex CLI",
+            }}
+            diffControl={{
+              ...StoryActionButtonControl,
+              ariaLabel: "Open changes",
+              className: StoryActionButtonControl.className,
+              title: "Open changes",
+            }}
+            {...(repositoryControl === undefined ? {} : { repositoryControl })}
+            status={createHeaderStatus(input.status)}
+            terminalControl={{
+              ...StoryActionButtonControl,
+              ariaLabel: "Open terminal",
+              className: StoryActionButtonControl.className,
+              title: "Open terminal",
+            }}
+          />
+        }
+      >
+        <div className="flex h-full items-center justify-center bg-background">
+          <div className="rounded-xl border bg-card px-6 py-10 shadow-xs">
+            Session workbench header preview
+          </div>
         </div>
-      </div>
-    </SessionWorkbenchStoryChrome>
+      </SessionWorkbenchStoryChrome>
+    </div>
   );
 }
 
