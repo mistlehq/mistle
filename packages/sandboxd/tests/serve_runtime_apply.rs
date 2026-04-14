@@ -47,7 +47,10 @@ fn daemon_applies_startup_input_after_init_submission() {
               "lifecycle": {
                 "install": [
                   {
-                    "args": ["sh", "-c", format!("printf startup > {}", startup_output_path.display())]
+                    "op": "exec",
+                    "command": {
+                      "args": ["sh", "-c", format!("printf startup > {}", startup_output_path.display())]
+                    }
                   }
                 ]
               }
