@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { AppHeaderLeading } from "./app-header-leading.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
-import { useAppPageMeta } from "./route-meta.js";
+import { useAppHeaderLeadingModel, useAppPageMeta } from "./route-meta.js";
 
 function expectMarkupToContainCurrentPageLabel(markup: string, label: string): void {
   expect(markup).toMatch(new RegExp(`aria-current="page"[\\s\\S]*title="${escapeRegExp(label)}"`));
@@ -43,10 +43,11 @@ function escapeRegExp(value: string): string {
 }
 
 function PageHarness(): React.JSX.Element {
+  const headerLeadingModel = useAppHeaderLeadingModel();
   const pageMeta = useAppPageMeta();
   return (
     <div>
-      <AppHeaderLeading />
+      <AppHeaderLeading model={headerLeadingModel} />
       <p data-slot="meta-title">{pageMeta.title ?? "MISSING_TITLE"}</p>
       <p data-slot="meta-description">{pageMeta.supportingText ?? "MISSING_DESCRIPTION"}</p>
     </div>

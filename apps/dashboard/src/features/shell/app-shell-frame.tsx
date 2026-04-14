@@ -9,7 +9,6 @@ import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-ic
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
-import { AppHeaderLeading } from "../navigation/app-header-leading.js";
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
@@ -48,7 +47,6 @@ function IntegrationsNavIcon(props: {
 
 export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
-  | "headerLeadingContent"
   | "contentInsetOwner"
   | "showHeaderLeadingContent"
   | "sidebarContent"
@@ -97,7 +95,6 @@ export function resolveAppShellFrame(input: {
 
   if (input.inSettings) {
     return {
-      headerLeadingContent: showHeaderLeadingContent ? <AppHeaderLeading /> : null,
       contentInsetOwner: "child",
       showHeaderLeadingContent,
       sidebarContent: <SettingsSectionNav />,
@@ -110,7 +107,6 @@ export function resolveAppShellFrame(input: {
   }
 
   return {
-    headerLeadingContent: showHeaderLeadingContent ? <AppHeaderLeading /> : null,
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     showHeaderLeadingContent,
     sidebarContent: showDedicatedSessionsSidebar ? (

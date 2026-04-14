@@ -13,6 +13,7 @@ import {
 
 import { AppHeaderLeading } from "../navigation/app-header-leading.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
+import { useAppHeaderLeadingModel } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
@@ -125,6 +126,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const location = useLocation();
   const navigate = useNavigate();
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
+  const headerLeadingModel = useAppHeaderLeadingModel();
   const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
     input.initialShowSessionsSidebar === true,
@@ -198,7 +200,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
       <AppShellView
         {...appShellFrame}
-        headerLeadingContent={<AppHeaderLeading />}
+        headerLeadingContent={<AppHeaderLeading model={headerLeadingModel} />}
         headerActions={headerActions}
         mainContent={<Outlet />}
       />

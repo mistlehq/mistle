@@ -36,6 +36,18 @@ export type AppPageMeta = {
   supportingText: string | null;
 };
 
+export type AppHeaderLeadingModel =
+  | {
+      kind: "none";
+    }
+  | {
+      kind: "breadcrumbs";
+    }
+  | {
+      kind: "custom";
+      content: React.ReactNode;
+    };
+
 type MatchLike = {
   handle: unknown;
   params: unknown;
@@ -261,16 +273,14 @@ export function useAppPageMeta(): AppPageMeta {
   return resolveAppPageMetaFromMatches(matches);
 }
 
-export function useAppHeaderLeadingContent(): React.ReactNode | null {
+export function useAppHeaderLeadingModel(): AppHeaderLeadingModel {
   const matches = useMatches();
-  return resolveAppHeaderLeadingContentFromMatches(matches);
+  return resolveAppHeaderLeadingModelFromMatches(matches);
 }
 
-export function resolveAppHeaderLeadingContentFromMatches(
-  matches: unknown[],
-): React.ReactNode | null {
+export function resolveAppHeaderLeadingModelFromMatches(matches: unknown[]): AppHeaderLeadingModel {
   if (!Array.isArray(matches)) {
-    return null;
+    return { kind: "none" };
   }
 
   for (let index = matches.length - 1; index >= 0; index -= 1) {
@@ -284,13 +294,18 @@ export function resolveAppHeaderLeadingContentFromMatches(
       continue;
     }
 
-    return handle.headerLeading({
-      params: normalizeParams(match.params),
-      data: match.data,
-    });
+    return {
+      kind: "custom",
+      content: handle.headerLeading({
+        params: normalizeParams(match.params),
+        data: match.data,
+      }),
+    };
   }
 
-  return null;
+  return resolveAppBreadcrumbsFromMatches(matches).length > 0
+    ? { kind: "breadcrumbs" }
+    : { kind: "none" };
 }
 
 export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {

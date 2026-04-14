@@ -1,12 +1,16 @@
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
-import { useAppHeaderLeadingContent } from "./route-meta.js";
+import type { AppHeaderLeadingModel } from "./route-meta.js";
 
-export function AppHeaderLeading(): React.JSX.Element | null {
-  const headerLeadingContent = useAppHeaderLeadingContent();
-
-  if (headerLeadingContent !== null) {
-    return <>{headerLeadingContent}</>;
+export function AppHeaderLeading(input: {
+  model: AppHeaderLeadingModel;
+}): React.JSX.Element | null {
+  if (input.model.kind === "custom") {
+    return <>{input.model.content}</>;
   }
 
-  return <AppBreadcrumbs />;
+  if (input.model.kind === "breadcrumbs") {
+    return <AppBreadcrumbs />;
+  }
+
+  return null;
 }

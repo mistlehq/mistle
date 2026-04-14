@@ -5,7 +5,8 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { authClient } from "../../lib/auth/client.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { useAppPageMeta } from "../navigation/route-meta.js";
+import { AppHeaderLeading } from "../navigation/app-header-leading.js";
+import { useAppHeaderLeadingModel, useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
 import {
@@ -39,6 +40,7 @@ const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
+  const headerLeadingModel = useAppHeaderLeadingModel();
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -211,7 +213,12 @@ export function AppShell(): React.JSX.Element {
 
   return (
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-      <AppShellView headerActions={headerActions} mainContent={<Outlet />} {...appShellFrame} />
+      <AppShellView
+        headerLeadingContent={<AppHeaderLeading model={headerLeadingModel} />}
+        headerActions={headerActions}
+        mainContent={<Outlet />}
+        {...appShellFrame}
+      />
     </AppShellHeaderActionsContext.Provider>
   );
 }
