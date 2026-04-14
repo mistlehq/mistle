@@ -1,4 +1,4 @@
-import { Button, Input, ScrollArea, Notice } from "@mistle/ui";
+import { Button, Input, Notice, ScrollArea, Spinner } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 import { useCallback } from "react";
 
@@ -134,10 +134,11 @@ export function IntegrationResourceStringArrayWidgetView(
           type="button"
           variant="outline"
         >
-          <ArrowClockwiseIcon
-            aria-hidden
-            className={props.isRefreshing ? "size-4 animate-spin" : "size-4"}
-          />
+          {props.isRefreshing ? (
+            <Spinner aria-label={props.refreshLabel} className="size-4" />
+          ) : (
+            <ArrowClockwiseIcon aria-hidden className="size-4" />
+          )}
         </Button>
       </div>
       {viewModel.messageSections.length > 0 ? (

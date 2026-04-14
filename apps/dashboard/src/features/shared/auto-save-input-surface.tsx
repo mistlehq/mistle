@@ -1,5 +1,5 @@
-import { Input, cn } from "@mistle/ui";
-import { ArrowClockwiseIcon, CheckCircleIcon } from "@phosphor-icons/react";
+import { Input, Spinner, cn } from "@mistle/ui";
+import { CheckCircleIcon } from "@phosphor-icons/react";
 
 export type AutoSaveInputVisualStatus = "idle" | "saving" | "saved" | "saved-fading";
 
@@ -62,7 +62,7 @@ function AutoSaveInputIndicator(input: {
   if (input.status === "saving") {
     return (
       <div className="text-muted-foreground flex items-center justify-end">
-        <ArrowClockwiseIcon aria-hidden className="size-3.5 animate-spin" />
+        <Spinner className="size-3.5" />
         <span className="sr-only">Saving</span>
       </div>
     );

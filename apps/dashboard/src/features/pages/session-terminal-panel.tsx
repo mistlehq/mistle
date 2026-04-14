@@ -3,8 +3,8 @@ import type {
   SandboxPtyResetInfo,
   SandboxPtyState,
 } from "@mistle/sandbox-session-client";
-import { Button } from "@mistle/ui";
-import { MinusIcon, SpinnerGapIcon, XIcon } from "@phosphor-icons/react";
+import { Button, Spinner } from "@mistle/ui";
+import { MinusIcon, XIcon } from "@phosphor-icons/react";
 import { useEffect, useReducer, useRef } from "react";
 
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -245,9 +245,7 @@ function SessionTerminalToolbarStatus(input: {
       <span className="sr-only">{liveStatusText}</span>
       <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
         <SessionPtyPanelHeader title="Terminal" />
-        {input.isRecovering ? (
-          <SpinnerGapIcon className="size-4 shrink-0 animate-spin text-stone-500" />
-        ) : null}
+        {input.isRecovering ? <Spinner className="size-4 shrink-0 text-stone-500" /> : null}
       </div>
     </div>
   );

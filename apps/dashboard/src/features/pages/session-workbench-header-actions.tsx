@@ -6,10 +6,11 @@ import {
   SelectContent,
   SelectItem,
   SelectSeparator,
+  Spinner,
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import { ArrowClockwiseIcon, GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
+import { GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
 
 import { resolveSelectableValue } from "../shared/select-value.js";
 
@@ -64,7 +65,7 @@ export function SessionWorkbenchHeaderActions(input: {
         className="text-muted-foreground inline-flex shrink-0 items-center justify-center"
         role="status"
       >
-        <ArrowClockwiseIcon aria-hidden className="size-3.5 animate-spin" />
+        <Spinner className="size-3.5" />
       </span>
     ) : undefined;
 

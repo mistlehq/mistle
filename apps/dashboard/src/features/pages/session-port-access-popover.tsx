@@ -7,8 +7,9 @@ import {
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
+  Spinner,
 } from "@mistle/ui";
-import { CpuIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { CpuIcon } from "@phosphor-icons/react";
 
 import {
   createProcessKey,
@@ -83,7 +84,7 @@ export function SessionPortAccessPopover(input: {
           ) : null}
           {input.state.isLoadingProcesses ? (
             <div className="flex items-center gap-2 px-3 py-6 text-sm text-stone-600">
-              <SpinnerGapIcon className="size-4 animate-spin" />
+              <Spinner className="size-4" />
               Loading running processes…
             </div>
           ) : null}
@@ -114,9 +115,7 @@ export function SessionPortAccessPopover(input: {
                     </p>
                     <p className="text-xs text-stone-500">PID {String(process.pid)}</p>
                   </div>
-                  {isOpening ? (
-                    <SpinnerGapIcon className="size-4 animate-spin text-stone-500" />
-                  ) : null}
+                  {isOpening ? <Spinner className="size-4 text-stone-500" /> : null}
                 </div>
                 <p className="text-xs text-stone-600">{createListenersLabel(process)}</p>
               </button>
