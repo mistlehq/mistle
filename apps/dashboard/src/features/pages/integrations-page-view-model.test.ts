@@ -320,7 +320,7 @@ describe("integrations page view model", () => {
     expect(item?.setup?.statusLabel).toBe("Setup incomplete");
     expect(item?.installActionLabel).toBe("Install GitHub App");
     expect(item?.setup?.description).toBe(
-      "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+      "Set these URLs in your GitHub App settings, then install the app.",
     );
     expect(item?.setup?.postInstallationSetupUrl).toBe(
       "https://control-plane.example.com/p/integration/callbacks/github-app-installation",

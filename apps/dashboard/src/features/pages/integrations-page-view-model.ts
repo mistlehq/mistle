@@ -233,8 +233,7 @@ function resolveGitHubAppConnectionContext(
     ...(installationId === null
       ? {
           setup: {
-            description:
-              "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+            description: "Set these URLs in your GitHub App settings, then install the app.",
             ...(controlPlaneApiOrigin === undefined
               ? {}
               : {

@@ -23,6 +23,7 @@ import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveEditableHeading } from "../shared/auto-save-editable-heading.js";
+import { CopyableValueField } from "../shared/copyable-value-field.js";
 import {
   formatConnectionStatusLabel,
   formatResourceCountSummary,
@@ -357,9 +358,6 @@ function ConnectionDetailPane(input: {
                 ? {}
                 : { postInstallationSetupUrl: setup.postInstallationSetupUrl })}
             />
-            {setup?.description === undefined ? null : (
-              <Notice title="Setup incomplete">{setup.description}</Notice>
-            )}
             {setup?.errorMessage === undefined ? null : (
               <Notice variant="alert">{setup.errorMessage}</Notice>
             )}
@@ -382,9 +380,12 @@ function ConnectionDetailPane(input: {
         <SectionBlock title="Webhooks">
           <WebhookSourcesSection
             connectionId={input.connection.id}
-            {...(input.connection.webhookInstructions === undefined
+            {...(input.connection.setup !== undefined &&
+            input.connection.authMethodId === "github-app-installation"
               ? {}
-              : { descriptionText: input.connection.webhookInstructions })}
+              : input.connection.webhookInstructions === undefined
+                ? {}
+                : { descriptionText: input.connection.webhookInstructions })}
             onCreateWebhookSource={
               input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
             }
@@ -597,19 +598,18 @@ function GitHubAppSetupSection(input: {
 
   return (
     <div className="gap-3 flex flex-col">
-      <div className="gap-1 flex flex-col">
-        <h4 className="font-medium text-sm">GitHub App setup</h4>
+      {input.description === undefined ? null : (
         <p className="text-muted-foreground text-xs">{input.description}</p>
-      </div>
-      <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+      )}
+      <div className="flex flex-col gap-3">
         {resolvedPostInstallationSetupUrl === undefined ? null : (
-          <MetadataField
+          <CopyableValueField
             label="Post-installation setup URL"
             value={resolvedPostInstallationSetupUrl}
           />
         )}
         {input.callbackUrl === undefined ? null : (
-          <MetadataField label="Webhook callback URL" value={input.callbackUrl} />
+          <CopyableValueField label="Webhook callback URL" value={input.callbackUrl} />
         )}
       </div>
     </div>
@@ -901,13 +901,18 @@ function WebhookSourceCard(input: {
           </Button>
         ) : null}
       </div>
-      <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-        <MetadataField label="Target" value={input.source.targetKey} />
+      <div className="gap-3 flex flex-col">
+        <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+          <MetadataField label="Target" value={input.source.targetKey} />
+          {input.source.remoteRegistrationId === undefined ? null : (
+            <MetadataField
+              label="Provider registration"
+              value={input.source.remoteRegistrationId}
+            />
+          )}
+        </div>
         {input.source.callbackUrl === undefined ? null : (
-          <MetadataField label="Callback URL" value={input.source.callbackUrl} />
-        )}
-        {input.source.remoteRegistrationId === undefined ? null : (
-          <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
+          <CopyableValueField label="Callback URL" value={input.source.callbackUrl} />
         )}
       </div>
     </div>

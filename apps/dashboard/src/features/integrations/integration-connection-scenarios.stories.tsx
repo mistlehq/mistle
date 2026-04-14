@@ -7,6 +7,7 @@ import {
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
   createGitHubAppDetailViewStoryProps,
+  createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
   createLinearDetailViewStoryProps,
   createOpenAiDetailViewStoryProps,
@@ -64,6 +65,13 @@ export const GitHubApp: Story = {
   name: "GitHub App",
   args: {
     ...withoutStoryHandlers(createGitHubAppDetailViewStoryProps()),
+  },
+};
+
+export const GitHubAppSetupIncomplete: Story = {
+  name: "GitHub App Setup Incomplete",
+  args: {
+    ...withoutStoryHandlers(createGitHubAppSetupIncompleteDetailViewStoryProps()),
   },
 };
 

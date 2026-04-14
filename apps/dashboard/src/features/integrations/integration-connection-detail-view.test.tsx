@@ -583,8 +583,7 @@ describe("IntegrationConnectionDetailView", () => {
             status: "active",
             resources: [],
             setup: {
-              description:
-                "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
+              description: "Set these URLs in your GitHub App settings, then install the app.",
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/github-app-installation",
               statusLabel: "Setup incomplete",
@@ -632,14 +631,18 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(
-      screen.getAllByText(
-        "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
-      ),
-    ).toHaveLength(2);
-    expect(screen.getAllByText("Setup incomplete")).toHaveLength(3);
-    expect(screen.getByText("GitHub App setup")).toBeTruthy();
+      screen.getByText("Set these URLs in your GitHub App settings, then install the app."),
+    ).toBeTruthy();
+    expect(screen.getAllByText("Setup incomplete")).toHaveLength(2);
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
     expect(screen.getByText("Post-installation setup URL")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Webhook callback URL" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Post-installation setup URL" })).toBeTruthy();
+    expect(
+      screen.queryByText(
+        "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+      ),
+    ).toBeNull();
     expect(
       screen.getByText(
         "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
@@ -721,5 +724,6 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
     expect(screen.getByText("GitHub App webhook")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Callback URL" })).toBeTruthy();
   });
 });

@@ -431,6 +431,81 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
   };
 }
 
+export function createGitHubAppSetupIncompleteDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_github_setup_incomplete";
+
+  return {
+    connections: [
+      {
+        id: connectionId,
+        ...resolveAuthMethodOrThrow({
+          familyId: "github",
+          methodId: "github-app-installation",
+          variantId: "github-cloud",
+        }),
+        bindingCount: 0,
+        canDelete: true,
+        contextItems: [
+          {
+            label: "App ID",
+            value: "3079908",
+          },
+          {
+            label: "App slug",
+            value: "jon-mistle-github-app",
+          },
+          {
+            label: "Installation",
+            value: "Pending",
+          },
+        ],
+        displayName: "GitHub App Setup",
+        installActionLabel: "Install GitHub App",
+        resources: [],
+        setup: {
+          description: "Set these URLs in your GitHub App settings, then install the app.",
+          postInstallationSetupUrl:
+            "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
+          statusLabel: "Setup incomplete",
+        },
+        status: "active",
+        webhookInstructions:
+          "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
+      },
+    ],
+    showWebhookSources: true,
+    webhookSourceStateByConnectionId: new Map([
+      [
+        connectionId,
+        {
+          createErrorMessage: null,
+          deleteErrorMessage: null,
+          deletingWebhookSourceId: null,
+          isCreating: false,
+          isLoading: false,
+          items: [
+            {
+              callbackUrl:
+                "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_setup_incomplete",
+              createdAt: "2026-04-13T15:37:00.000Z",
+              displayName: "GitHub App webhook",
+              endpointKey: "ep_github_setup_incomplete",
+              id: "iws_github_setup_incomplete",
+              integrationConnectionId: connectionId,
+              providerMetadata: {},
+              status: "active",
+              targetKey: "github-cloud",
+              updatedAt: "2026-04-13T15:37:00.000Z",
+            },
+          ],
+          loadErrorMessage: null,
+          revealedWebhookSecret: null,
+        },
+      ],
+    ]),
+  };
+}
+
 type ScenarioDetailStorySpec = {
   authMethod?: StoryAuthMethodSpec;
   bindingCount?: number;
