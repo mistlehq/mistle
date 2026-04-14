@@ -11,7 +11,7 @@ describe("IntegrationConnectionDetailView", () => {
     cleanup();
   });
 
-  it("renders stacked connections and exposes refresh actions", () => {
+  it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
     let startedGitHubAppInstallationConnectionId: string | null = null;
     render(
@@ -74,6 +74,42 @@ describe("IntegrationConnectionDetailView", () => {
                     status: "accessible",
                     metadata: {},
                   },
+                  {
+                    id: "repo_2",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/control-plane-api",
+                    displayName: "mistle/control-plane-api",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                  {
+                    id: "repo_3",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/data-plane-api",
+                    displayName: "mistle/data-plane-api",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                  {
+                    id: "repo_4",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/ui",
+                    displayName: "mistle/ui",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                  {
+                    id: "repo_5",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/docs",
+                    displayName: "mistle/docs",
+                    status: "accessible",
+                    metadata: {},
+                  },
                 ],
                 kind: "repositories",
               },
@@ -84,19 +120,42 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(
-      screen.getAllByText("GitHub returned a 403 while reading repository visibility."),
-    ).toHaveLength(1);
-    expect(screen.getByText("Engineering GitHub")).toBeTruthy();
-    expect(screen.getByText("Archive Mirror")).toBeTruthy();
+      screen.getByRole("button", { name: "Select connection Engineering GitHub" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select connection Archive Mirror" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Select connection" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Engineering GitHub" })).toBeTruthy();
+    expect(screen.getAllByText("Resources")).toHaveLength(1);
+    expect(screen.getByText("Repository")).toBeTruthy();
+    expect(screen.getByText("- 41")).toBeTruthy();
+    expect(screen.queryByText("- 0")).toBeNull();
+    const expandRepositoryButton = screen.getByRole("button", {
+      name: "Expand repository resources",
+    });
+    expect(screen.queryByText("mistle/dashboard")).toBeNull();
+    expect(screen.queryByText("mistle/docs")).toBeNull();
+    fireEvent.click(expandRepositoryButton);
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
-    const [refreshButton] = screen.getAllByRole("button", { name: "Refresh repositories" });
-    if (refreshButton === undefined) {
-      throw new Error("Expected a refresh repositories button.");
-    }
+    expect(screen.getByText("mistle/docs")).toBeTruthy();
+    const collapseRepositoryButton = screen.getByRole("button", {
+      name: "Collapse repository resources",
+    });
+    fireEvent.click(collapseRepositoryButton);
+    expect(screen.queryByText("mistle/dashboard")).toBeNull();
+    expect(screen.queryByText("mistle/docs")).toBeNull();
+    const refreshButton = screen.getByRole("button", { name: "Refresh repositories" });
     fireEvent.click(refreshButton);
     expect(refreshedKind).toBe("repositories");
     fireEvent.click(screen.getByRole("button", { name: "Manage installation" }));
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
+    fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
+    expect(screen.getByRole("heading", { name: "Archive Mirror" })).toBeTruthy();
+    expect(screen.getByText("Repository")).toBeTruthy();
+    expect(screen.getByText("- 0")).toBeTruthy();
+    expect(
+      screen.getByText("GitHub returned a 403 while reading repository visibility."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Manage installation" })).toBeNull();
   });
 
   it("renders an empty state when no connections are available", () => {
@@ -172,12 +231,8 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    const editButtons = screen.getAllByRole("button", { name: "Edit connection name" });
-    const secondEditButton = editButtons[1];
-    if (secondEditButton === undefined) {
-      throw new Error("Expected a second edit connection name button.");
-    }
-    fireEvent.click(secondEditButton);
+    fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit connection name" }));
     expect(startedEditingConnectionId).toBe("icn_github_archive");
     expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
   });
@@ -292,7 +347,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getAllByText("**********")).toHaveLength(2);
   });
 
-  it("shows delete only for unbound connections", () => {
+  it("shows delete for all connections and disables it when bindings prevent deletion", () => {
     let deletedConnectionId: string | null = null;
 
     render(
@@ -325,7 +380,14 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Delete connection Bound connection" })).toBeNull();
+    const boundDeleteButton = screen.getByRole("button", {
+      name: "Delete connection Bound connection",
+    });
+    expect(boundDeleteButton).toHaveProperty("disabled", true);
+    expect(boundDeleteButton.getAttribute("title")).toBe(
+      "This connection can't be deleted while it has 2 bindings.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Select connection Free connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete connection Free connection" }));
     expect(deletedConnectionId).toBe("icn_free");
   });
@@ -479,7 +541,7 @@ describe("IntegrationConnectionDetailView", () => {
         "Set the webhook callback URL and post-installation setup URL in your GitHub App settings, then install the app to finish setup.",
       ),
     ).toHaveLength(2);
-    expect(screen.getAllByText("Setup incomplete")).toHaveLength(2);
+    expect(screen.getAllByText("Setup incomplete")).toHaveLength(3);
     expect(screen.getByText("GitHub App setup")).toBeTruthy();
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
     expect(screen.getByText("Post-installation setup URL")).toBeTruthy();

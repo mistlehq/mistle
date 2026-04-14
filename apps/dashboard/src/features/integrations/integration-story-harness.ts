@@ -669,31 +669,79 @@ export function createLinearDetailViewStoryProps(): IntegrationConnectionDetailV
 }
 
 export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  return createScenarioDetailViewStoryProps({
-    authMethod: {
-      familyId: "slack",
-      methodId: "slack-bot-token",
-      variantId: "slack-default",
+  const storyProps = [
+    {
+      bindingCount: 2,
+      connectionId: "icn_slack_engineering",
+      displayName: "Slack Engineering",
+      endpointKey: "ep_slack_engineering",
+      webhookSourceId: "iws_slack_engineering",
     },
-    bindingCount: 2,
-    connectionId: "icn_slack_dense",
-    displayName: "Slack Engineering",
-    webhookSources: [
-      {
-        callbackUrl:
-          "https://control-plane.example.com/p/integration/webhooks/slack-default/ep_slack_dense",
-        createdAt: DenseStoryLastSyncedAt,
-        displayName: "Slack Events API webhook",
-        endpointKey: "ep_slack_dense",
-        id: "iws_slack_dense",
-        integrationConnectionId: "icn_slack_dense",
-        providerMetadata: {},
-        status: "active",
-        targetKey: "slack-default",
-        updatedAt: DenseStoryLastSyncedAt,
+    {
+      bindingCount: 1,
+      connectionId: "icn_slack_support",
+      displayName: "Slack Support",
+      endpointKey: "ep_slack_support",
+      webhookSourceId: "iws_slack_support",
+    },
+    {
+      bindingCount: 3,
+      connectionId: "icn_slack_growth",
+      displayName: "Slack Growth",
+      endpointKey: "ep_slack_growth",
+      webhookSourceId: "iws_slack_growth",
+    },
+    {
+      bindingCount: 0,
+      connectionId: "icn_slack_ops",
+      displayName: "Slack Ops",
+      endpointKey: "ep_slack_ops",
+      webhookSourceId: "iws_slack_ops",
+    },
+    {
+      bindingCount: 1,
+      connectionId: "icn_slack_design",
+      displayName: "Slack Design",
+      endpointKey: "ep_slack_design",
+      webhookSourceId: "iws_slack_design",
+    },
+  ].map((connection) =>
+    createScenarioDetailViewStoryProps({
+      authMethod: {
+        familyId: "slack",
+        methodId: "slack-bot-token",
+        variantId: "slack-default",
       },
-    ],
-  });
+      bindingCount: connection.bindingCount,
+      connectionId: connection.connectionId,
+      displayName: connection.displayName,
+      webhookSources: [
+        {
+          callbackUrl: `https://control-plane.example.com/p/integration/webhooks/slack-default/${connection.endpointKey}`,
+          createdAt: DenseStoryLastSyncedAt,
+          displayName: "Slack Events API webhook",
+          endpointKey: connection.endpointKey,
+          id: connection.webhookSourceId,
+          integrationConnectionId: connection.connectionId,
+          providerMetadata: {},
+          status: "active",
+          targetKey: "slack-default",
+          updatedAt: DenseStoryLastSyncedAt,
+        },
+      ],
+    }),
+  );
+
+  return {
+    connections: storyProps.flatMap((story) => story.connections),
+    onRefreshResource: () => {},
+    showWebhookSources: true,
+    webhookSourceStateByConnectionId: new Map(
+      storyProps.flatMap((story) =>
+        Array.from(story.webhookSourceStateByConnectionId?.entries() ?? []),
+      ),
+    ),
+  };
 }
 
 export function createOpenAiDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
@@ -754,35 +802,4 @@ export function createSigNozDetailViewStoryProps(): IntegrationConnectionDetailV
     connectionId: "icn_signoz_dense",
     displayName: "SigNoz Hosted MCP",
   });
-}
-
-export function createIntegrationGalleryStoryProps(): IntegrationConnectionDetailViewProps {
-  const storyProps = [
-    createGitHubAppDetailViewStoryProps(),
-    createGitHubEnterpriseServerDetailViewStoryProps(),
-    createJiraDetailViewStoryProps(),
-    createLinearDetailViewStoryProps(),
-    createSlackDetailViewStoryProps(),
-    createOpenAiDetailViewStoryProps(),
-    createAwsDetailViewStoryProps(),
-    createDatadogDetailViewStoryProps(),
-    createPlanetScaleDetailViewStoryProps(),
-    createSigNozDetailViewStoryProps(),
-  ];
-
-  return {
-    connections: storyProps.flatMap((story) => story.connections),
-    onEditApiKey: () => {},
-    onRefreshResource: () => {},
-    resourceItemsByKey: new Map(
-      storyProps.flatMap((story) => Array.from(story.resourceItemsByKey?.entries() ?? [])),
-    ),
-    showCreateWebhookSource: true,
-    showWebhookSources: true,
-    webhookSourceStateByConnectionId: new Map(
-      storyProps.flatMap((story) =>
-        Array.from(story.webhookSourceStateByConnectionId?.entries() ?? []),
-      ),
-    ),
-  };
 }

@@ -7,7 +7,6 @@ import {
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
   createGitHubAppDetailViewStoryProps,
-  createIntegrationGalleryStoryProps,
   createJiraDetailViewStoryProps,
   createLinearDetailViewStoryProps,
   createOpenAiDetailViewStoryProps,
@@ -48,6 +47,12 @@ const meta = {
     onEditApiKey: (_connectionId: string) => {},
     onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
     onStartGitHubAppInstallation: async (_connectionId: string) => {},
+    titleEditor: {
+      disabled: false,
+      errorMessageByConnectionId: {},
+      onStartEditing: (_connectionId: string) => {},
+      onSave: async (_connectionId: string, _draftValue: string) => {},
+    },
   },
 } satisfies Meta<typeof IntegrationConnectionDetailView>;
 
@@ -118,11 +123,5 @@ export const SigNoz: Story = {
   name: "SigNoz",
   args: {
     ...withoutStoryHandlers(createSigNozDetailViewStoryProps()),
-  },
-};
-
-export const Gallery: Story = {
-  args: {
-    ...withoutStoryHandlers(createIntegrationGalleryStoryProps()),
   },
 };

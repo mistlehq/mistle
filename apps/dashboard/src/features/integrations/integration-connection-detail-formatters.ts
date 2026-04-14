@@ -39,7 +39,7 @@ export function formatResourceMetadata(input: {
 
   if (input.syncState === "syncing") {
     if (input.lastSyncedAt !== undefined) {
-      return `Last synced ${formatDateTime(input.lastSyncedAt)}.`;
+      return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
     }
     return "Resources have not been synced yet.";
   }
@@ -52,18 +52,23 @@ export function formatResourceMetadata(input: {
     return "Resources are ready.";
   }
 
-  return `Last synced ${formatDateTime(input.lastSyncedAt)}.`;
+  return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
 }
 
 export function formatResourceHeading(input: { count: number; kind: string }): string {
-  const words = input.kind
+  const label = formatResourceLabel(input.kind);
+  return `${label} (${input.count})`;
+}
+
+export function formatResourceLabel(kind: string): string {
+  const words = kind
     .split(/[_-]+/g)
     .filter((part) => part.length > 0)
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`);
   const [firstWord, ...remainingWords] = words;
 
   if (firstWord === undefined) {
-    return `Resources (${input.count})`;
+    return "Resource";
   }
 
   const singularFirstWord = firstWord.endsWith("ies")
@@ -72,7 +77,11 @@ export function formatResourceHeading(input: { count: number; kind: string }): s
       ? firstWord.slice(0, -1)
       : firstWord;
 
-  return [`${singularFirstWord}`, ...remainingWords, `Resources (${input.count})`].join(" ");
+  return [singularFirstWord, ...remainingWords].join(" ");
+}
+
+export function formatResourceCountSummary(input: { count: number; kind: string }): string {
+  return `${input.count} resources`;
 }
 
 export function formatResourceInlineMetadata(input: {
