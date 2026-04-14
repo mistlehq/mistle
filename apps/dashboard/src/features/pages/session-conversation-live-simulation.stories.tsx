@@ -9,8 +9,15 @@ import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
-import { StorySessionConversationPaneArgs } from "./session-story-support.js";
+import {
+  SessionWorkbenchStoryChrome,
+  StorySessionConversationPaneArgs,
+} from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+
+type SessionWorkbenchLiveSimulationStoryArgs = React.ComponentProps<
+  typeof SessionWorkbenchPageView
+>;
 
 const LiveHarnessSeedEntries: readonly ChatEntry[] = [
   {
@@ -337,7 +344,30 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof SessionWorkbenchPageView>;
+  args: {
+    sandboxInstanceId: null,
+    alert: null,
+    bottomPanel: <></>,
+    bottomPanelSize: 28,
+    isBottomPanelVisible: true,
+    isSecondaryPanelVisible: false,
+    mainContent: <></>,
+    onBottomPanelResize: () => {},
+    onSecondaryPanelResize: () => {},
+    primaryBottomPanel: <></>,
+    secondaryPanel: <></>,
+    secondaryPanelSize: 28,
+  },
+  decorators: [
+    function StoryDecorator(Story): React.JSX.Element {
+      return (
+        <SessionWorkbenchStoryChrome>
+          <Story />
+        </SessionWorkbenchStoryChrome>
+      );
+    },
+  ],
+} satisfies Meta<SessionWorkbenchLiveSimulationStoryArgs>;
 
 export default meta;
 

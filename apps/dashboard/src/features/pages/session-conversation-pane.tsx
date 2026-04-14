@@ -53,7 +53,7 @@ function findPinnedTurnElement(input: {
   }
 
   const turnElements = input.threadRootElement.querySelectorAll<HTMLDivElement>("[data-turn-id]");
-  for (const turnElement of turnElements) {
+  for (const turnElement of Array.from(turnElements)) {
     if (turnElement.dataset["turnId"] === input.pinnedTurnId) {
       return turnElement;
     }

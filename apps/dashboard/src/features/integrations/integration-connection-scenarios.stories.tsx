@@ -16,16 +16,38 @@ import {
   createDenseSlackDetailViewStoryProps,
 } from "./integration-story-harness.js";
 
+function withoutStoryHandlers(
+  input: React.ComponentProps<typeof IntegrationConnectionDetailView>,
+): Omit<
+  React.ComponentProps<typeof IntegrationConnectionDetailView>,
+  | "onCreateWebhookSource"
+  | "onDeleteWebhookSource"
+  | "onEditApiKey"
+  | "onRefreshResource"
+  | "onStartGitHubAppInstallation"
+> {
+  const {
+    onCreateWebhookSource: _onCreateWebhookSource,
+    onDeleteWebhookSource: _onDeleteWebhookSource,
+    onEditApiKey: _onEditApiKey,
+    onRefreshResource: _onRefreshResource,
+    onStartGitHubAppInstallation: _onStartGitHubAppInstallation,
+    ...rest
+  } = input;
+
+  return rest;
+}
+
 const meta = {
   title: "Dashboard/Integrations/Connection/Scenarios",
   component: IntegrationConnectionDetailView,
   decorators: [withDashboardCenteredStory],
   args: {
-    onCreateWebhookSource: () => {},
-    onDeleteWebhookSource: () => {},
-    onEditApiKey: () => {},
-    onRefreshResource: () => {},
-    onStartGitHubAppInstallation: () => {},
+    onCreateWebhookSource: (_input: { connectionId: string }) => {},
+    onDeleteWebhookSource: (_input: { connectionId: string; webhookSourceId: string }) => {},
+    onEditApiKey: (_connectionId: string) => {},
+    onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
+    onStartGitHubAppInstallation: async (_connectionId: string) => {},
   },
 } satisfies Meta<typeof IntegrationConnectionDetailView>;
 
@@ -36,71 +58,71 @@ type Story = StoryObj<typeof meta>;
 export const GitHubApp: Story = {
   name: "GitHub App",
   args: {
-    ...createDenseGitHubAppDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseGitHubAppDetailViewStoryProps()),
   },
 };
 
 export const GitHubEnterpriseServer: Story = {
   name: "GitHub Enterprise Server",
   args: {
-    ...createDenseGitHubEnterpriseServerDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseGitHubEnterpriseServerDetailViewStoryProps()),
   },
 };
 
 export const Jira: Story = {
   args: {
-    ...createDenseJiraDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseJiraDetailViewStoryProps()),
   },
 };
 
 export const Linear: Story = {
   args: {
-    ...createDenseLinearDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseLinearDetailViewStoryProps()),
   },
 };
 
 export const Slack: Story = {
   args: {
-    ...createDenseSlackDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseSlackDetailViewStoryProps()),
   },
 };
 
 export const OpenAi: Story = {
   name: "OpenAI",
   args: {
-    ...createDenseOpenAiDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseOpenAiDetailViewStoryProps()),
   },
 };
 
 export const Aws: Story = {
   name: "AWS",
   args: {
-    ...createDenseAwsDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseAwsDetailViewStoryProps()),
   },
 };
 
 export const Datadog: Story = {
   args: {
-    ...createDenseDatadogDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseDatadogDetailViewStoryProps()),
   },
 };
 
 export const PlanetScale: Story = {
   name: "PlanetScale",
   args: {
-    ...createDensePlanetScaleDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDensePlanetScaleDetailViewStoryProps()),
   },
 };
 
 export const SigNoz: Story = {
   name: "SigNoz",
   args: {
-    ...createDenseSigNozDetailViewStoryProps(),
+    ...withoutStoryHandlers(createDenseSigNozDetailViewStoryProps()),
   },
 };
 
 export const Gallery: Story = {
   args: {
-    ...createDenseIntegrationGalleryStoryProps(),
+    ...withoutStoryHandlers(createDenseIntegrationGalleryStoryProps()),
   },
 };
