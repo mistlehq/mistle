@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -26,11 +26,15 @@ function SessionPortAccessPopoverHarness(): React.JSX.Element {
           processes: [
             {
               pid: 4321,
-              command: "vite",
+              command: "node server.js",
               listeners: [
                 {
                   bindAddress: "127.0.0.1",
-                  port: 5173,
+                  port: 3000,
+                },
+                {
+                  bindAddress: "::1",
+                  port: 3000,
                 },
               ],
             },
@@ -44,12 +48,14 @@ function SessionPortAccessPopoverHarness(): React.JSX.Element {
 }
 
 describe("SessionPortAccessPopover", () => {
-  it("renders listener rows and opens the selected port when a row is clicked", async () => {
+  it("groups same-port listeners and opens the selected port when a row is clicked", async () => {
     render(<SessionPortAccessPopoverHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open processes" }));
 
-    const portLabel = await screen.findByText("5173");
+    expect(await screen.findByText(/::1, 127\.0\.0\.1/)).toBeTruthy();
+
+    const portLabel = await screen.findByText("3000");
     const listenerButton = portLabel.closest("button");
     if (!(listenerButton instanceof HTMLButtonElement)) {
       throw new Error("Expected the listener row to be rendered as a button.");
@@ -57,6 +63,7 @@ describe("SessionPortAccessPopover", () => {
 
     fireEvent.click(listenerButton);
 
-    expect(screen.getByTestId("selected-port").textContent).toBe("5173");
+    expect(within(screen.getByRole("dialog")).getAllByTitle("Open port 3000")).toHaveLength(1);
+    expect(screen.getByTestId("selected-port").textContent).toBe("3000");
   });
 });

@@ -22,18 +22,46 @@ import type { SessionPortAccessState } from "./use-session-port-access.js";
 type ProcessListenerEntry = {
   listenerProcess: ProcessEntry;
   processLabel: string;
+  bindAddresses: string[];
 };
 
 function createProcessListenerEntries(processes: ProcessEntry[]): ProcessListenerEntry[] {
   return processes
     .flatMap((process) => {
-      return process.listeners.map((listener) => ({
-        listenerProcess: {
-          ...process,
-          listeners: [listener],
-        },
-        processLabel: createProcessLabel(process),
-      }));
+      const listenersByPort = new Map<number, ProcessEntry["listeners"]>();
+
+      for (const listener of process.listeners) {
+        const listenersForPort = listenersByPort.get(listener.port) ?? [];
+        listenersForPort.push(listener);
+        listenersByPort.set(listener.port, listenersForPort);
+      }
+
+      return [...listenersByPort.entries()].flatMap(([port, listeners]) => {
+        const firstListener = listeners[0];
+        if (firstListener === undefined) {
+          return [];
+        }
+
+        return [
+          {
+            listenerProcess: {
+              ...process,
+              listeners: [
+                {
+                  bindAddress: firstListener.bindAddress,
+                  port,
+                },
+              ],
+            },
+            processLabel: createProcessLabel(process),
+            bindAddresses: listeners
+              .map((listener) => listener.bindAddress)
+              .sort((left, right) => {
+                return left.localeCompare(right);
+              }),
+          },
+        ];
+      });
     })
     .sort((left, right) => {
       const leftListener = resolvePrimaryProcessListener(left.listenerProcess);
@@ -51,7 +79,6 @@ function createProcessListenerEntries(processes: ProcessEntry[]): ProcessListene
 
       return (
         leftListener.port - rightListener.port ||
-        leftListener.bindAddress.localeCompare(rightListener.bindAddress) ||
         left.processLabel.localeCompare(right.processLabel)
       );
     });
@@ -137,13 +164,13 @@ export function SessionPortAccessPopover(input: {
                 }}
                 primary={
                   <p className="truncate text-sm text-stone-700 group-hover/open-target-row:underline group-focus-visible/open-target-row:underline">
-                    {primaryListener.bindAddress}:
+                    {entry.bindAddresses.join(", ")}:
                     <span className="font-semibold text-stone-950">
                       {String(primaryListener.port)}
                     </span>
                   </p>
                 }
-                secondary={<p className="truncate text-sm text-stone-600">{entry.processLabel}</p>}
+                secondary={<p className="truncate text-xs text-stone-600">{entry.processLabel}</p>}
                 title={createOpenLabel(entry.listenerProcess)}
               />
             );

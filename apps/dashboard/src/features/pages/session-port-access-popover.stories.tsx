@@ -8,16 +8,6 @@ import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 const StoryProcesses: ProcessEntry[] = [
   {
-    pid: 4321,
-    command: "vite dev --host 127.0.0.1 --port 5173",
-    listeners: [
-      {
-        bindAddress: "127.0.0.1",
-        port: 5173,
-      },
-    ],
-  },
-  {
     pid: 6402,
     command: "node server.js",
     listeners: [
@@ -27,7 +17,113 @@ const StoryProcesses: ProcessEntry[] = [
       },
       {
         bindAddress: "::1",
+        port: 3000,
+      },
+      {
+        bindAddress: "127.0.0.1",
         port: 3001,
+      },
+    ],
+  },
+  {
+    pid: 4321,
+    command: "vite dev --host 127.0.0.1 --port 5173",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 5173,
+      },
+      {
+        bindAddress: "127.0.0.1",
+        port: 24678,
+      },
+    ],
+  },
+  {
+    pid: 7788,
+    command: "python -m http.server 8000",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 8000,
+      },
+      {
+        bindAddress: "::1",
+        port: 8000,
+      },
+      {
+        bindAddress: "127.0.0.1",
+        port: 8001,
+      },
+    ],
+  },
+  {
+    pid: 9901,
+    command: "storybook dev -p 6006",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 6006,
+      },
+      {
+        bindAddress: "127.0.0.1",
+        port: 6007,
+      },
+    ],
+  },
+  {
+    pid: 1204,
+    command: "grafana-server --homepath /usr/share/grafana",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 9000,
+      },
+      {
+        bindAddress: "::1",
+        port: 9000,
+      },
+      {
+        bindAddress: "127.0.0.1",
+        port: 9090,
+      },
+    ],
+  },
+  {
+    pid: 5432,
+    command: "postgres -D /var/lib/postgresql/data",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 5432,
+      },
+      {
+        bindAddress: "::1",
+        port: 5432,
+      },
+    ],
+  },
+  {
+    pid: 6379,
+    command: "redis-server *:6379",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 6379,
+      },
+      {
+        bindAddress: "::1",
+        port: 6379,
+      },
+    ],
+  },
+  {
+    pid: 9091,
+    command: "prometheus --config.file=prometheus.yml --web.listen-address=127.0.0.1:9091",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 9091,
       },
     ],
   },
