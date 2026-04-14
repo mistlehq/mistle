@@ -26,7 +26,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
           name: "save_issue",
           arguments: {
             title: "Webhook regression",
-            team: "MIS",
+            team: "MIST",
             description: "Issue body",
           },
         },
@@ -49,7 +49,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
         name: "save_issue",
         arguments: {
           title: "Webhook regression",
-          team: "MIS",
+          team: "MIST",
           description: `Issue body\n\n---\n[🔗 View session](${SessionUrl})`,
         },
       },
@@ -65,7 +65,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
         params: {
           name: "save_comment",
           arguments: {
-            issueId: "MIS-123",
+            issueId: "MIST-123",
             body: "Comment body",
           },
         },
@@ -87,7 +87,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
       params: {
         name: "save_comment",
         arguments: {
-          issueId: "MIS-123",
+          issueId: "MIST-123",
           body: `Comment body\n\n---\n[🔗 View session](${SessionUrl})`,
         },
       },
@@ -103,7 +103,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
         params: {
           name: "save_comment",
           arguments: {
-            issueId: "MIS-123",
+            issueId: "MIST-123",
             body: `Comment body\n\n---\n[🔗 View session](${SessionUrl})`,
           },
         },
@@ -125,7 +125,7 @@ describe("AppendSessionLinkToLinearMcpMarkdownRequestMiddleware", () => {
       params: {
         name: "save_comment",
         arguments: {
-          issueId: "MIS-123",
+          issueId: "MIST-123",
           body: `Comment body\n\n---\n[🔗 View session](${SessionUrl})`,
         },
       },
