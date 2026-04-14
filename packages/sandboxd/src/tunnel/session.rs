@@ -1697,8 +1697,17 @@ fn any_populated_sandbox_user_scope(
             kill_file: scope_root.join("cgroup.kill"),
             scope_root,
         };
-        let populated =
-            is_scope_populated(&scope_paths).map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
+        let populated = match is_scope_populated(&scope_paths) {
+            Ok(populated) => populated,
+            Err(crate::cgroups::CgroupError::ReadFile { error, .. })
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                continue;
+            }
+            Err(error) => {
+                return Err(TunnelSessionError::Pty(error.to_string()));
+            }
+        };
         if populated {
             return Ok(true);
         }

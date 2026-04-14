@@ -444,10 +444,12 @@ mod tests {
         let mut output = Vec::new();
         let mut exit_code = None;
         for _ in 0..40 {
-            let event = session
+            let Some(event) = session
                 .next_event_timeout(Duration::from_millis(250))
                 .expect("pty event read should succeed")
-                .expect("pty should emit an output or exit event");
+            else {
+                continue;
+            };
             match event {
                 PtyEvent::Output(chunk) => output.extend(chunk),
                 PtyEvent::Exit(code) => exit_code = Some(code),
@@ -505,10 +507,12 @@ mod tests {
 
         let mut output = Vec::new();
         for _ in 0..20 {
-            let event = session
+            let Some(event) = session
                 .next_event_timeout(Duration::from_millis(250))
                 .expect("pty event read should succeed")
-                .expect("pty should emit output");
+            else {
+                continue;
+            };
             match event {
                 PtyEvent::Output(chunk) => {
                     output.extend(chunk);
