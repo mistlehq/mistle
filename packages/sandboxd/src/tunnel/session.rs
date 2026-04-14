@@ -3439,6 +3439,10 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     use base64::Engine;
+    #[cfg(target_os = "linux")]
+    use nix::sys::signal::{Signal, kill};
+    #[cfg(target_os = "linux")]
+    use nix::unistd::Pid;
     use serde_json::{Value, json};
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
@@ -3454,6 +3458,8 @@ mod tests {
     };
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
+    #[cfg(target_os = "linux")]
+    use crate::time::Sleeper;
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
