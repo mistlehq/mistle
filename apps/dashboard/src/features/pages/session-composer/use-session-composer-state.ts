@@ -313,6 +313,7 @@ export function useSessionComposerState(input: SessionComposerStateInput): Sessi
       modelOptions: input.configControl.modelOptions,
       selectedModel: input.configControl.selectedModel,
       selectedReasoningEffort: input.configControl.selectedReasoningEffort,
+      isSubmitPending: input.turnControl.isStarting,
       submitMode: submitAction.submitMode,
       submitLabel,
       submitDisabled,

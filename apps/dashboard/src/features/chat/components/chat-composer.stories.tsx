@@ -93,3 +93,12 @@ export const WithPendingImageAttachments: Story = {
     ...SessionComposerFixturePropsWithPendingImageAttachments,
   },
 };
+
+export const SendingPendingStart: Story = {
+  args: {
+    composerText: "Summarize the current regression risk.",
+    isSubmitPending: true,
+    submitDisabled: true,
+    submitLabel: "Sending...",
+  },
+};

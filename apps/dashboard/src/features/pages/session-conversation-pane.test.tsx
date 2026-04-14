@@ -267,6 +267,25 @@ describe("SessionConversationBottomPanel", () => {
     expect(screen.getByRole("textbox")).toBeTruthy();
   });
 
+  it("renders a working indicator directly above the composer when a turn is active", () => {
+    render(
+      <SessionConversationBottomPanel
+        chatEntries={[]}
+        composerViewModel={{
+          ...SessionComposerFixtureProps,
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={[]}
+        showWorkingIndicator
+        statusMessage={null}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "Working" })).toBeTruthy();
+    expect(screen.getByRole("textbox")).toBeTruthy();
+  });
+
   it("shows upload failures in the rendered pane and keeps pending attachments visible", async () => {
     const { container } = render(
       <RenderedComposerPaneHarness

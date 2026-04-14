@@ -62,6 +62,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
+  isSubmitPending: false,
   submitMode: "start",
   submitLabel: "Send",
   submitDisabled: false,

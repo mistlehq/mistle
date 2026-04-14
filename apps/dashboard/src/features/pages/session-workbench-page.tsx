@@ -354,6 +354,10 @@ function SessionWorkbenchPageContent(input: {
             onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
             key={input.sandboxInstanceId ?? "missing-session"}
             serverRequestPanelEntries={unmatchedServerRequests}
+            showWorkingIndicator={
+              conversationPane.chatState.activeTurnId !== null &&
+              conversationPane.chatState.status === "inProgress"
+            }
           />
         ) : null
       }
@@ -415,6 +419,7 @@ function renderPrimaryPanelMainContent(input: {
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
+    isSubmitPending: false,
     pendingAttachments: [],
     modelOptions: [],
     selectedModel: null,

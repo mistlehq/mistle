@@ -90,12 +90,24 @@ export const UploadingImageAttachments: Story = {
   },
 };
 
-export const ExploringStatusBanner: Story = {
+export const WithWorkingFooter: Story = {
   args: {
-    statusMessage: {
-      message: "Exploring",
-      variant: "default",
+    activeTurnId: "turn-2",
+    chatEntries: CodexFixtureSessionEntries,
+    isTurnInProgress: true,
+    showWorkingIndicator: true,
+  },
+};
+
+export const PendingStartWithoutWorkingFooter: Story = {
+  args: {
+    composerViewModel: {
+      ...SessionComposerFixtureProps,
+      isSubmitPending: true,
+      submitDisabled: true,
+      submitLabel: "Sending...",
     },
+    showWorkingIndicator: false,
   },
 };
 

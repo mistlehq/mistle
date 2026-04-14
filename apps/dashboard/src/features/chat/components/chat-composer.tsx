@@ -8,7 +8,13 @@ import {
   SelectValue,
   Textarea,
 } from "@mistle/ui";
-import { ArrowCircleUpIcon, PlusIcon, StopCircleIcon, XIcon } from "@phosphor-icons/react";
+import {
+  ArrowCircleUpIcon,
+  CircleNotchIcon,
+  PlusIcon,
+  StopCircleIcon,
+  XIcon,
+} from "@phosphor-icons/react";
 import { useRef } from "react";
 
 import { resolveSelectableValue } from "../../shared/select-value.js";
@@ -38,6 +44,7 @@ export type ChatComposerViewModel = {
   }[];
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
+  isSubmitPending: boolean;
   submitMode: "start" | "steer" | "interrupt";
   submitLabel: string;
   submitDisabled: boolean;
@@ -59,6 +66,7 @@ export function ChatComposer({
   modelOptions,
   selectedModel,
   selectedReasoningEffort,
+  isSubmitPending,
   submitMode,
   submitLabel,
   submitDisabled,
@@ -79,9 +87,11 @@ export function ChatComposer({
       : "Ask anything";
   const composerActionIcon =
     submitMode === "interrupt" ? (
-      <StopCircleIcon aria-hidden="true" weight="fill" />
+      <StopCircleIcon aria-hidden="true" className="size-5" weight="fill" />
+    ) : isSubmitPending ? (
+      <CircleNotchIcon aria-hidden="true" className="size-5 animate-spin" weight="fill" />
     ) : (
-      <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
+      <ArrowCircleUpIcon aria-hidden="true" className="size-5" weight="fill" />
     );
   const selectableModelValue = resolveSelectableValue({
     selectedValue: selectedModel,
@@ -253,7 +263,10 @@ export function ChatComposer({
 
         <Button
           aria-label={submitLabel}
-          className="shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent"
+          className={[
+            "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
+            isSubmitPending ? "disabled:opacity-100" : null,
+          ].join(" ")}
           disabled={submitDisabled}
           onClick={onSubmit}
           size="icon-fill"

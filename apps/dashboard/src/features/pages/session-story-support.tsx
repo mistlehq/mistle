@@ -31,6 +31,7 @@ export type SessionConversationStoryArgs = {
   pendingTurnId: React.ComponentProps<typeof SessionConversationMainContent>["pendingTurnId"];
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
   composerViewModel: ChatComposerViewModel;
+  showWorkingIndicator: boolean;
   statusMessage: ChatComposerStatusMessage | null;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: React.ComponentProps<
@@ -47,6 +48,7 @@ export const StorySessionConversationPaneArgs = {
   pendingTurnId: null,
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
   composerViewModel: SessionComposerFixtureProps,
+  showWorkingIndicator: false,
   statusMessage: null,
   isRespondingToServerRequest: false,
   onRespondToServerRequest: noopRespondToServerRequest,

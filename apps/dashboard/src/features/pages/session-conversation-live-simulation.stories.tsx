@@ -91,7 +91,13 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
   const [nextTurnIndex, setNextTurnIndex] = useState(1);
   const [streamChunkIndex, setStreamChunkIndex] = useState(0);
   const submitMode =
-    activeTurnId === null ? "start" : composerText.trim().length === 0 ? "interrupt" : "steer";
+    pendingTurnId !== null
+      ? "start"
+      : activeTurnId === null
+        ? "start"
+        : composerText.trim().length === 0
+          ? "interrupt"
+          : "steer";
   const submitLabel = submitMode === "start" ? "Send" : submitMode === "steer" ? "Steer" : "Stop";
   const statusMessage =
     activeTurnId === null
@@ -249,6 +255,7 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
           composerViewModel={{
             ...SessionComposerFixtureProps,
             composerText,
+            isSubmitPending: pendingTurnId !== null,
             modelOptions: CodexFixtureSessionModelOptions,
             onComposerTextChange: setComposerText,
             onSubmit: () => {
@@ -264,13 +271,16 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
 
               completeActiveTurn();
             },
-            submitDisabled: submitMode === "interrupt" ? false : composerText.trim().length === 0,
-            submitLabel,
+            submitDisabled:
+              pendingTurnId !== null ||
+              (submitMode === "interrupt" ? false : composerText.trim().length === 0),
+            submitLabel: pendingTurnId !== null ? "Sending..." : submitLabel,
             submitMode,
           }}
           isRespondingToServerRequest={false}
           onRespondToServerRequest={StorySessionConversationPaneArgs.onRespondToServerRequest}
           serverRequestPanelEntries={[]}
+          showWorkingIndicator={activeTurnId !== null && pendingTurnId === null}
           statusMessage={statusMessage}
         />
       }

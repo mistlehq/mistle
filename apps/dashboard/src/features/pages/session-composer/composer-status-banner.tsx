@@ -1,6 +1,5 @@
-import { AnimatedStatusText } from "@mistle/ui";
-
 import type { ChatComposerStatusMessage } from "../../chat/components/chat-composer.js";
+import { SessionComposerActivityRow } from "./session-composer-activity-row.js";
 
 export function ComposerStatusBanner(input: {
   statusMessage: ChatComposerStatusMessage;
@@ -22,20 +21,13 @@ export function ComposerStatusBanner(input: {
     );
   }
 
-  const textClassName = input.statusMessage.variant === "alert" ? "text-destructive" : undefined;
-
   return (
-    <div
-      aria-live={input.statusMessage.variant === "alert" ? "assertive" : "polite"}
-      className="mb-3 px-1 text-sm"
-      role={input.statusMessage.variant === "alert" ? "alert" : "status"}
-    >
-      <AnimatedStatusText
+    <div aria-live={input.statusMessage.variant === "alert" ? "assertive" : "polite"}>
+      <SessionComposerActivityRow
         active={input.statusMessage.presentation === "loading"}
-        className={textClassName}
-      >
-        {input.statusMessage.message}
-      </AnimatedStatusText>
+        role={input.statusMessage.variant === "alert" ? "alert" : "status"}
+        text={input.statusMessage.message}
+      />
     </div>
   );
 }

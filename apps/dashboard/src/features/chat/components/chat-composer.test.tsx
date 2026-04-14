@@ -12,6 +12,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     selectedModel: "gpt-5.4-codex",
     selectedReasoningEffort: "medium",
+    isSubmitPending: false,
     submitMode: "start",
     submitLabel: "Send",
     submitDisabled: false,
@@ -37,6 +38,21 @@ describe("ChatComposer", () => {
     render(<ChatComposer {...createBaseComposerProps()} />);
 
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
+  it("renders a spinner icon while a start-turn request is pending", () => {
+    const { container } = render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        isSubmitPending
+        submitDisabled
+        submitLabel="Sending..."
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Sending..." })).toBeTruthy();
+    const spinnerIcon = container.querySelector("svg.animate-spin");
+    expect(spinnerIcon).toBeTruthy();
   });
 
   it("disables send when turns are not submit-ready", () => {

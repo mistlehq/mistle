@@ -11,6 +11,7 @@ import { CodexApprovalRequestsPanel } from "../session-agents/codex/approvals/in
 import type { CodexApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
 import {
   ComposerStatusBanner,
+  SessionComposerActivityRow,
   useSessionComposerState,
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
@@ -35,11 +36,13 @@ type SessionConversationSharedPanelProps = {
 
 type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps & {
   composerViewModel: ChatComposerViewModel;
+  showWorkingIndicator?: boolean;
   statusMessage: ChatComposerStatusMessage | null;
 };
 
 type SessionConversationBottomPanelControllerProps = SessionConversationSharedPanelProps & {
   composerStateInput: SessionComposerStateInput;
+  showWorkingIndicator?: boolean;
 };
 
 const PinnedTurnTopInsetPx = 12;
@@ -291,6 +294,7 @@ export function SessionConversationBottomPanel({
   isRespondingToServerRequest,
   onRespondToServerRequest,
   composerViewModel,
+  showWorkingIndicator = false,
   statusMessage,
 }: SessionConversationBottomPanelProps): React.JSX.Element {
   return (
@@ -301,6 +305,9 @@ export function SessionConversationBottomPanel({
         onRespondToServerRequest={onRespondToServerRequest}
       />
       {statusMessage === null ? null : <ComposerStatusBanner statusMessage={statusMessage} />}
+      {showWorkingIndicator ? (
+        <SessionComposerActivityRow active ariaLabel="Working" text="Working..." />
+      ) : null}
       <ChatComposer {...composerViewModel} />
     </>
   );
@@ -308,6 +315,7 @@ export function SessionConversationBottomPanel({
 
 export function SessionConversationBottomPanelController({
   composerStateInput,
+  showWorkingIndicator,
   ...bottomPanelProps
 }: SessionConversationBottomPanelControllerProps): React.JSX.Element {
   const composerUiState = useSessionComposerState(composerStateInput);
@@ -317,6 +325,7 @@ export function SessionConversationBottomPanelController({
       {...bottomPanelProps}
       composerViewModel={composerUiState.composerViewModel}
       statusMessage={composerUiState.statusMessage}
+      {...(showWorkingIndicator === undefined ? {} : { showWorkingIndicator })}
     />
   );
 }
