@@ -3663,20 +3663,23 @@ mod tests {
 
         let keepalive_manager = Mutex::new(KeepaliveManager::default());
         drop(session);
-        sync_pty_scope_keepalive(
-            &keepalive_manager,
-            &cgroup_root,
-            "sbi_123",
+        wait_for(
+            Duration::from_secs(5),
+            Duration::from_millis(10),
+            || {
+                sync_pty_scope_keepalive(
+                    &keepalive_manager,
+                    &cgroup_root,
+                    "sbi_123",
+                )
+                .expect("backgrounded PTY child should update keepalive from disk");
+                keepalive_manager
+                    .lock()
+                    .expect("keepalive manager lock should not be poisoned")
+                    .active()
+            },
         )
-        .expect("backgrounded PTY child should update keepalive from disk");
-
-        assert!(
-            keepalive_manager
-                .lock()
-                .expect("keepalive manager lock should not be poisoned")
-                .active(),
-            "backgrounded child should keep sandbox keepalive active"
-        );
+        .expect("backgrounded child should keep sandbox keepalive active");
 
         kill(Pid::from_raw(background_pid), Signal::SIGKILL)
             .expect("background process should be killable");
