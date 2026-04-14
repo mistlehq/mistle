@@ -5,6 +5,13 @@ import { useEffect, useState } from "react";
 
 const COPY_SUCCESS_DISPLAY_MS = 1200;
 
+type CopyFeedback =
+  | { state: "idle" }
+  | {
+      state: "copied" | "failed";
+      value: string;
+    };
+
 type CopyableValueProps =
   | {
       copiedTitle?: string;
@@ -25,39 +32,51 @@ type CopyableValueProps =
     };
 
 export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>({ state: "idle" });
 
   const copyAriaLabel =
     input.copyAriaLabel ?? (input.variant === "panel" ? "Copy value" : `Copy ${input.label}`);
   const idleTitle =
     input.copyTitle ?? (input.variant === "panel" ? "Copy value" : `Copy ${input.label}`);
+  const visibleCopyState =
+    copyFeedback.state === "idle" || copyFeedback.value !== input.value
+      ? "idle"
+      : copyFeedback.state;
 
   async function handleCopy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(input.value);
-      setCopyState("copied");
+      setCopyFeedback({
+        state: "copied",
+        value: input.value,
+      });
     } catch {
-      setCopyState("failed");
+      setCopyFeedback({
+        state: "failed",
+        value: input.value,
+      });
     }
   }
 
   useEffect(() => {
-    if (copyState !== "copied") {
+    if (copyFeedback.state !== "copied") {
       return;
     }
 
     const handle = systemScheduler.schedule(() => {
-      setCopyState("idle");
+      setCopyFeedback((currentFeedback) => {
+        if (currentFeedback.state !== "copied" || currentFeedback.value !== copyFeedback.value) {
+          return currentFeedback;
+        }
+
+        return { state: "idle" };
+      });
     }, COPY_SUCCESS_DISPLAY_MS);
 
     return () => {
       systemScheduler.cancel(handle);
     };
-  }, [copyState]);
-
-  useEffect(() => {
-    setCopyState("idle");
-  }, [input.value]);
+  }, [copyFeedback]);
 
   const button = (
     <Button
@@ -67,16 +86,16 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
         void handleCopy();
       }}
       size="icon-sm"
-      title={copyState === "copied" ? (input.copiedTitle ?? "Copied") : idleTitle}
+      title={visibleCopyState === "copied" ? (input.copiedTitle ?? "Copied") : idleTitle}
       type="button"
       variant={input.variant === "panel" ? "ghost" : "outline"}
     >
-      {copyState === "copied" ? (
+      {visibleCopyState === "copied" ? (
         <CheckIcon aria-hidden className="size-4 text-emerald-600" />
       ) : (
         <CopyIcon
           aria-hidden
-          className={cn(copyState === "failed" ? "text-destructive" : null, "size-4")}
+          className={cn(visibleCopyState === "failed" ? "text-destructive" : null, "size-4")}
         />
       )}
     </Button>
@@ -89,7 +108,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
         <pre className="text-muted-foreground h-full overflow-auto p-3 text-xs whitespace-pre-wrap break-words">
           {input.value}
         </pre>
-        {copyState === "failed" ? (
+        {visibleCopyState === "failed" ? (
           <p className="text-destructive mt-2 px-3 pb-3 text-xs">
             {input.failureMessage ?? "Could not copy automatically."}
           </p>
@@ -105,7 +124,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
         <p className="min-w-0 flex-1 break-all px-1 font-mono text-xs">{input.value}</p>
         {button}
       </div>
-      {copyState === "failed" ? (
+      {visibleCopyState === "failed" ? (
         <p className="text-destructive text-xs">
           {input.failureMessage ?? "Could not copy automatically."}
         </p>
