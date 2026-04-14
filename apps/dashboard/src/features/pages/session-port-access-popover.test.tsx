@@ -44,18 +44,18 @@ function SessionPortAccessPopoverHarness(): React.JSX.Element {
 }
 
 describe("SessionPortAccessPopover", () => {
-  it("renders processes and calls openProcess when a row is clicked", async () => {
+  it("renders listener rows and opens the selected port when a row is clicked", async () => {
     render(<SessionPortAccessPopoverHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open processes" }));
 
-    const processLabel = await screen.findByText("vite");
-    const processButton = processLabel.closest("button");
-    if (!(processButton instanceof HTMLButtonElement)) {
-      throw new Error("Expected the process row to be rendered as a button.");
+    const portLabel = await screen.findByText("5173");
+    const listenerButton = portLabel.closest("button");
+    if (!(listenerButton instanceof HTMLButtonElement)) {
+      throw new Error("Expected the listener row to be rendered as a button.");
     }
 
-    fireEvent.click(processButton);
+    fireEvent.click(listenerButton);
 
     expect(screen.getByTestId("selected-port").textContent).toBe("5173");
   });

@@ -9,8 +9,9 @@ import {
   PopoverTrigger,
   Spinner,
 } from "@mistle/ui";
-import { ArrowSquareOutIcon, CpuIcon } from "@phosphor-icons/react";
+import { CpuIcon } from "@phosphor-icons/react";
 
+import { OpenTargetRow } from "./open-target-row.js";
 import {
   createProcessKey,
   createProcessLabel,
@@ -18,18 +19,42 @@ import {
 } from "./session-port-access-model.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
 
-function resolvePrimaryProcessPort(process: ProcessEntry): number {
-  return resolvePrimaryProcessListener(process)?.port ?? Number.POSITIVE_INFINITY;
-}
+type ProcessListenerEntry = {
+  listenerProcess: ProcessEntry;
+  processLabel: string;
+};
 
-function createListenersLabel(process: ProcessEntry): string {
-  if (process.listeners.length === 0) {
-    return "No loopback listeners";
-  }
+function createProcessListenerEntries(processes: ProcessEntry[]): ProcessListenerEntry[] {
+  return processes
+    .flatMap((process) => {
+      return process.listeners.map((listener) => ({
+        listenerProcess: {
+          ...process,
+          listeners: [listener],
+        },
+        processLabel: createProcessLabel(process),
+      }));
+    })
+    .sort((left, right) => {
+      const leftListener = resolvePrimaryProcessListener(left.listenerProcess);
+      const rightListener = resolvePrimaryProcessListener(right.listenerProcess);
 
-  return process.listeners
-    .map((listener) => `${listener.bindAddress}:${String(listener.port)}`)
-    .join(", ");
+      if (leftListener === null && rightListener === null) {
+        return left.processLabel.localeCompare(right.processLabel);
+      }
+      if (leftListener === null) {
+        return 1;
+      }
+      if (rightListener === null) {
+        return -1;
+      }
+
+      return (
+        leftListener.port - rightListener.port ||
+        leftListener.bindAddress.localeCompare(rightListener.bindAddress) ||
+        left.processLabel.localeCompare(right.processLabel)
+      );
+    });
 }
 
 function createOpenLabel(process: ProcessEntry): string {
@@ -45,9 +70,7 @@ export function SessionPortAccessPopover(input: {
   state: SessionPortAccessState;
 }): React.JSX.Element {
   const isButtonDisabled = input.state.buttonDisabledReason !== null;
-  const sortedProcesses = [...input.state.processes].sort((left, right) => {
-    return resolvePrimaryProcessPort(left) - resolvePrimaryProcessPort(right);
-  });
+  const listenerEntries = createProcessListenerEntries(input.state.processes);
 
   return (
     <Popover onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
@@ -75,7 +98,7 @@ export function SessionPortAccessPopover(input: {
         <PopoverHeader className="border-b border-stone-200 px-4 py-3">
           <PopoverTitle>Processes</PopoverTitle>
           <PopoverDescription>
-            Select a process to open its primary HTTP port in a new tab.
+            Select a process to open its HTTP port in a new tab.
           </PopoverDescription>
         </PopoverHeader>
         <div className="flex max-h-96 flex-col gap-1 overflow-y-auto p-2">
@@ -85,45 +108,44 @@ export function SessionPortAccessPopover(input: {
             </p>
           ) : null}
           {input.state.isLoadingProcesses ? (
-            <div className="flex items-center gap-2 px-3 py-6 text-sm text-stone-600">
+            <div className="flex items-center gap-2 px-3 py-3 text-sm text-stone-600">
               <Spinner className="size-4" />
               Loading running processes…
             </div>
           ) : null}
-          {!input.state.isLoadingProcesses && input.state.processes.length === 0 ? (
-            <p className="px-3 py-6 text-sm text-stone-600">
+          {!input.state.isLoadingProcesses && listenerEntries.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-stone-600">
               No loopback-listening processes found.
             </p>
           ) : null}
-          {sortedProcesses.map((process) => {
-            const primaryListener = resolvePrimaryProcessListener(process);
-            const isOpening = input.state.isOpeningProcessKey === createProcessKey(process);
+          {listenerEntries.map((entry) => {
+            const primaryListener = resolvePrimaryProcessListener(entry.listenerProcess);
+            const isOpening =
+              input.state.isOpeningProcessKey === createProcessKey(entry.listenerProcess);
+
+            if (primaryListener === null) {
+              return null;
+            }
 
             return (
-              <button
-                key={createProcessKey(process)}
-                className="group/process-row flex w-full flex-col gap-1 rounded-md px-3 py-3 text-left hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={primaryListener === null || input.state.isOpeningProcessKey !== null}
+              <OpenTargetRow
+                key={createProcessKey(entry.listenerProcess)}
+                disabled={input.state.isOpeningProcessKey !== null}
+                isLoading={isOpening}
                 onClick={() => {
-                  void input.state.openProcess(process);
+                  void input.state.openProcess(entry.listenerProcess);
                 }}
-                title={createOpenLabel(process)}
-                type="button"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-1 items-center gap-1">
-                    <p className="truncate text-sm font-medium text-stone-950 group-hover/process-row:underline group-focus-visible/process-row:underline">
-                      {createProcessLabel(process)}
-                    </p>
-                    <ArrowSquareOutIcon
-                      aria-hidden
-                      className="size-4 shrink-0 opacity-0 transition-[opacity,transform] group-hover/process-row:translate-x-0.5 group-hover/process-row:opacity-100 group-focus-visible/process-row:translate-x-0.5 group-focus-visible/process-row:opacity-100"
-                    />
-                  </div>
-                  {isOpening ? <Spinner aria-hidden className="size-4 text-stone-500" /> : null}
-                </div>
-                <p className="text-xs text-stone-600">{createListenersLabel(process)}</p>
-              </button>
+                primary={
+                  <p className="truncate text-sm text-stone-700 group-hover/open-target-row:underline group-focus-visible/open-target-row:underline">
+                    {primaryListener.bindAddress}:
+                    <span className="font-semibold text-stone-950">
+                      {String(primaryListener.port)}
+                    </span>
+                  </p>
+                }
+                secondary={<p className="truncate text-sm text-stone-600">{entry.processLabel}</p>}
+                title={createOpenLabel(entry.listenerProcess)}
+              />
             );
           })}
         </div>
