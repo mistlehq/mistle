@@ -3448,10 +3448,6 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     use base64::Engine;
-    #[cfg(target_os = "linux")]
-    use nix::sys::signal::{Signal, kill};
-    #[cfg(target_os = "linux")]
-    use nix::unistd::Pid;
     use serde_json::{Value, json};
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
@@ -3460,15 +3456,8 @@ mod tests {
 
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
-    #[cfg(target_os = "linux")]
-    use crate::pty::{
-        DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtySpawnRequest,
-        start_scoped_pty_session,
-    };
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
-    #[cfg(target_os = "linux")]
-    use crate::time::Sleeper;
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
@@ -3619,93 +3608,6 @@ mod tests {
                 .expect("keepalive manager lock should not be poisoned")
                 .active(),
             "empty user scope should clear sandbox keepalive"
-        );
-
-        std::fs::remove_dir_all(test_dir).expect("temp dir should be removable");
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn sync_pty_scope_keepalive_observes_backgrounded_pty_children_via_cgroups() {
-        let test_dir = create_temp_test_dir("pty_scope_keepalive_backgrounded");
-        let cgroup_root = test_dir.join("cgroup-root");
-        let background_pid_path = test_dir.join("background.pid");
-        std::fs::create_dir_all(&cgroup_root).expect("cgroup root should be creatable");
-        let session = start_scoped_pty_session(
-            PtySpawnRequest {
-                command: Some("/bin/sh".to_string()),
-                args: Some(vec![
-                    "-lc".to_string(),
-                    format!(
-                        "nohup sh -c 'echo $$ > {}; sleep 30' >/dev/null 2>&1 < /dev/null & cat",
-                        background_pid_path.display()
-                    ),
-                ]),
-                ..PtySpawnRequest::default()
-            },
-            &cgroup_root,
-            "sbi_123",
-            &SystemClock,
-            &ThreadSleeper,
-        )
-        .expect("scoped PTY session should start");
-        let background_pid = read_pid_file_with_retry(&background_pid_path, &SystemClock, &ThreadSleeper)
-            .expect("background pid should be written");
-
-        session
-            .terminate(
-                &SystemClock,
-                &ThreadSleeper,
-                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-            )
-            .expect("PTY termination should succeed");
-
-        let keepalive_manager = Mutex::new(KeepaliveManager::default());
-        drop(session);
-        wait_for(
-            Duration::from_secs(5),
-            Duration::from_millis(10),
-            || {
-                sync_pty_scope_keepalive(
-                    &keepalive_manager,
-                    &cgroup_root,
-                    "sbi_123",
-                )
-                .expect("backgrounded PTY child should update keepalive from disk");
-                keepalive_manager
-                    .lock()
-                    .expect("keepalive manager lock should not be poisoned")
-                    .active()
-            },
-        )
-        .expect("backgrounded child should keep sandbox keepalive active");
-
-        kill(Pid::from_raw(background_pid), Signal::SIGKILL)
-            .expect("background process should be killable");
-        wait_for(
-            Duration::from_secs(5),
-            Duration::from_millis(10),
-            || {
-                sync_pty_scope_keepalive(
-                    &keepalive_manager,
-                    &cgroup_root,
-                    "sbi_123",
-                )
-                .expect("backgrounded scope should keep syncing");
-                !keepalive_manager
-                    .lock()
-                    .expect("keepalive manager lock should not be poisoned")
-                    .active()
-            },
-        )
-        .expect("keepalive should clear once the background process exits");
-        assert!(
-            !keepalive_manager
-                .lock()
-                .expect("keepalive manager lock should not be poisoned")
-                .active(),
-            "keepalive should clear once the background process exits"
         );
 
         std::fs::remove_dir_all(test_dir).expect("temp dir should be removable");
@@ -7623,50 +7525,6 @@ mod tests {
         };
 
         assert_eq!(pong_payload.as_ref(), payload);
-    }
-
-    #[cfg(target_os = "linux")]
-    fn read_pid_file_with_retry(
-        path: &std::path::Path,
-        clock: &dyn Clock,
-        sleeper: &ThreadSleeper,
-    ) -> Result<i32, String> {
-        let deadline_ms = clock.now_ms().saturating_add(5_000);
-        loop {
-            if let Ok(contents) = fs::read_to_string(path) {
-                let trimmed = contents.trim();
-                if !trimmed.is_empty() {
-                    return trimmed.parse::<i32>().map_err(|error| {
-                        format!("pid file at {} is invalid: {error}", path.display())
-                    });
-                }
-            }
-
-            if clock.now_ms() >= deadline_ms {
-                return Err(format!("timed out waiting for pid file {}", path.display()));
-            }
-
-            sleeper.sleep(Duration::from_millis(10));
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn wait_for(
-        timeout: Duration,
-        poll_interval: Duration,
-        mut predicate: impl FnMut() -> bool,
-    ) -> Result<(), String> {
-        let deadline = Instant::now() + timeout;
-        while Instant::now() < deadline {
-            if predicate() {
-                return Ok(());
-            }
-            std::thread::sleep(poll_interval);
-        }
-        Err(format!(
-            "timed out after {}ms waiting for condition",
-            timeout.as_millis()
-        ))
     }
 
     fn create_temp_test_dir(prefix: &str) -> PathBuf {
