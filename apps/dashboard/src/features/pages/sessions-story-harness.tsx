@@ -11,7 +11,7 @@ import {
   useParams,
 } from "react-router";
 
-import { AppHeaderLeading } from "../navigation/app-header-leading.js";
+import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { useAppHeaderLeadingModel } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -200,7 +200,13 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
       <AppShellView
         {...appShellFrame}
-        headerLeadingContent={<AppHeaderLeading model={headerLeadingModel} />}
+        headerLeadingContent={
+          headerLeadingModel.kind === "custom" ? (
+            <>{headerLeadingModel.content}</>
+          ) : headerLeadingModel.kind === "breadcrumbs" ? (
+            <AppBreadcrumbs breadcrumbs={headerLeadingModel.breadcrumbs} />
+          ) : null
+        }
         headerActions={headerActions}
         mainContent={<Outlet />}
       />

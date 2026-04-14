@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAppBreadcrumbsFromMatches, resolveAppPageMetaFromMatches } from "./route-meta.js";
+import {
+  resolveAppBreadcrumbsFromMatches,
+  resolveAppHeaderLeadingModelFromMatches,
+  resolveAppPageMetaFromMatches,
+} from "./route-meta.js";
 
 describe("route breadcrumb metadata", () => {
   it("keeps non-page group crumbs non-clickable while preserving page breadcrumb", () => {
@@ -142,7 +146,9 @@ describe("route breadcrumb metadata", () => {
           handle: {
             title: "Integration connection",
             description: "github-cloud",
-            headerIcon: () => "Custom icon",
+            header: {
+              icon: () => "Custom icon",
+            },
           },
           params: {},
           pathname: "/integrations/github-cloud",
@@ -177,6 +183,85 @@ describe("route breadcrumb metadata", () => {
       title: "Create automation",
       headerIcon: null,
       supportingText: "",
+    });
+  });
+
+  it("resolves breadcrumb header-leading content when no custom override is present", () => {
+    expect(
+      resolveAppHeaderLeadingModelFromMatches([
+        {
+          handle: {
+            breadcrumb: "Settings",
+          },
+          params: {},
+          pathname: "/settings",
+        },
+        {
+          handle: {
+            breadcrumb: "Members",
+          },
+          params: {},
+          pathname: "/settings/members",
+        },
+      ]),
+    ).toEqual({
+      kind: "breadcrumbs",
+      breadcrumbs: [
+        {
+          isCurrent: false,
+          label: "Settings",
+          to: "/settings",
+        },
+        {
+          isCurrent: true,
+          label: "Members",
+          to: null,
+        },
+      ],
+    });
+  });
+
+  it("resolves custom header-leading content from the deepest route handle", () => {
+    expect(
+      resolveAppHeaderLeadingModelFromMatches([
+        {
+          handle: {
+            breadcrumb: "Sessions",
+          },
+          params: {},
+          pathname: "/sessions",
+        },
+        {
+          handle: {
+            header: {
+              leading: () => "Session Title",
+            },
+          },
+          params: {
+            sandboxInstanceId: "sbx_123",
+          },
+          pathname: "/sessions/sbx_123",
+        },
+      ]),
+    ).toEqual({
+      kind: "custom",
+      content: "Session Title",
+    });
+  });
+
+  it("resolves no header-leading content when routes provide neither breadcrumbs nor overrides", () => {
+    expect(
+      resolveAppHeaderLeadingModelFromMatches([
+        {
+          handle: {
+            appShellInsetOwner: "child",
+          },
+          params: {},
+          pathname: "/workspace",
+        },
+      ]),
+    ).toEqual({
+      kind: "none",
     });
   });
 });

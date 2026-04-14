@@ -11,9 +11,11 @@ import { Fragment } from "react";
 import { NavLink } from "react-router";
 
 import { useAppBreadcrumbs } from "./route-meta.js";
+import type { AppBreadcrumb } from "./route-meta.js";
 
-export function AppBreadcrumbs(): React.JSX.Element | null {
-  const breadcrumbs = useAppBreadcrumbs();
+export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.JSX.Element | null {
+  const routeBreadcrumbs = useAppBreadcrumbs();
+  const breadcrumbs = input.breadcrumbs ?? routeBreadcrumbs;
   const shouldCollapseOnMobile = breadcrumbs.length > 2;
 
   if (breadcrumbs.length === 0) {

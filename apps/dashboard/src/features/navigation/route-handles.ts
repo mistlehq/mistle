@@ -163,14 +163,18 @@ export const ROUTE_HANDLES = {
     breadcrumb: resolveIntegrationDetailBreadcrumb,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
-    headerIcon: resolveIntegrationDetailHeaderIcon,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
   },
   integrationCreate: {
     appShellInsetOwner: "child",
     breadcrumb: "Add",
     title: resolveIntegrationCreateTitle,
     description: resolveIntegrationDetailSubtitle,
-    headerIcon: resolveIntegrationDetailHeaderIcon,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
   },
   sessions: {
     breadcrumb: "Sessions",
@@ -185,7 +189,9 @@ export const ROUTE_HANDLES = {
   },
   sessionsDetail: {
     hideBreadcrumb: true,
-    headerLeading: resolveSessionDetailHeaderLeading,
+    header: {
+      leading: resolveSessionDetailHeaderLeading,
+    },
     title: "Session",
     description: "Interact with one sandbox-backed Codex session.",
   },
@@ -271,7 +277,9 @@ export const ROUTE_HANDLES = {
     breadcrumb: resolveIntegrationDetailBreadcrumb,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
-    headerIcon: resolveIntegrationDetailHeaderIcon,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
   },
 } as const satisfies Record<string, AppRouteHandle>;
 

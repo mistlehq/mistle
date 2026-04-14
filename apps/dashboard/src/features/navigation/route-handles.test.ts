@@ -14,11 +14,11 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.integrations.description).toBe("");
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationCreate.description).toBe("function");
-    expect(ROUTE_HANDLES.integrationCreate.headerIcon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationCreate.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
-    expect(ROUTE_HANDLES.integrationDetail.headerIcon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
     expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
@@ -65,7 +65,7 @@ describe("route handles", () => {
 
     expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe("function");
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.headerIcon).toBeDefined();
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.header?.icon).toBeDefined();
   });
 
   it("defines intended breadcrumb clickability for parent crumbs", () => {
@@ -150,7 +150,7 @@ describe("route handles", () => {
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {
     expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
-    expect(typeof ROUTE_HANDLES.sessionsDetail.headerLeading).toBe("function");
+    expect(typeof ROUTE_HANDLES.sessionsDetail.header?.leading).toBe("function");
   });
 
   it("resolves automation detail breadcrumb with edit fallback", () => {

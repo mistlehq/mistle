@@ -10,7 +10,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { AppHeaderLeading } from "./app-header-leading.js";
+import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
 import { useAppHeaderLeadingModel, useAppPageMeta } from "./route-meta.js";
 
@@ -47,7 +47,11 @@ function PageHarness(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   return (
     <div>
-      <AppHeaderLeading model={headerLeadingModel} />
+      {headerLeadingModel.kind === "custom" ? (
+        <>{headerLeadingModel.content}</>
+      ) : headerLeadingModel.kind === "breadcrumbs" ? (
+        <AppBreadcrumbs breadcrumbs={headerLeadingModel.breadcrumbs} />
+      ) : null}
       <p data-slot="meta-title">{pageMeta.title ?? "MISSING_TITLE"}</p>
       <p data-slot="meta-description">{pageMeta.supportingText ?? "MISSING_DESCRIPTION"}</p>
     </div>

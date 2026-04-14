@@ -5,7 +5,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { authClient } from "../../lib/auth/client.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { AppHeaderLeading } from "../navigation/app-header-leading.js";
+import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppHeaderLeadingModel, useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
@@ -214,7 +214,13 @@ export function AppShell(): React.JSX.Element {
   return (
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
       <AppShellView
-        headerLeadingContent={<AppHeaderLeading model={headerLeadingModel} />}
+        headerLeadingContent={
+          headerLeadingModel.kind === "custom" ? (
+            <>{headerLeadingModel.content}</>
+          ) : headerLeadingModel.kind === "breadcrumbs" ? (
+            <AppBreadcrumbs breadcrumbs={headerLeadingModel.breadcrumbs} />
+          ) : null
+        }
         headerActions={headerActions}
         mainContent={<Outlet />}
         {...appShellFrame}
