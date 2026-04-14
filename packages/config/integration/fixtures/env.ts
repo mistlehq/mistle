@@ -101,6 +101,8 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_APPS_TOKENIZER_PROXY_HOST: "127.0.0.1",
   MISTLE_APPS_TOKENIZER_PROXY_PORT: "5005",
   MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5000",
+  MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL:
+    "https://public-control-plane.example.test",
 };
 
 export function createIntegrationEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

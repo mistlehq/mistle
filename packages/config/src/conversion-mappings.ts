@@ -510,4 +510,9 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     tomlPath: ["apps", "tokenizer_proxy", "control_plane_api", "base_url"],
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL",
   },
+  {
+    configPath: ["apps", "tokenizer_proxy", "controlPlaneApi", "publicBaseUrl"],
+    tomlPath: ["apps", "tokenizer_proxy", "control_plane_api", "public_base_url"],
+    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL",
+  },
 ];

@@ -11,10 +11,15 @@ const TokenizerProxyControlPlaneBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 }, "controlPlaneApi.baseUrl must use http or https.");
+const TokenizerProxyControlPlanePublicBaseUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+}, "controlPlaneApi.publicBaseUrl must use http or https.");
 
 export const TokenizerProxyControlPlaneApiConfigSchema = z
   .object({
     baseUrl: TokenizerProxyControlPlaneBaseUrlSchema,
+    publicBaseUrl: TokenizerProxyControlPlanePublicBaseUrlSchema,
   })
   .strict();
 
