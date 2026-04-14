@@ -4,6 +4,7 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import {
   isSandboxResourceNotFoundError,
   SandboxInspectDispositions,
@@ -30,6 +31,27 @@ type GetSandboxInstanceByInspectionContext = {
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
   sandboxProvider: SandboxProvider;
 };
+
+async function readPersistedRuntimePlan(input: {
+  db: DataPlaneDatabase;
+  sandboxInstanceId: string;
+}) {
+  const persistedRuntimePlan = await input.db.query.sandboxInstanceRuntimePlans.findFirst({
+    columns: {
+      compiledRuntimePlan: true,
+    },
+    where: (table, { and, eq, isNull }) =>
+      and(eq(table.sandboxInstanceId, input.sandboxInstanceId), isNull(table.supersededAt)),
+  });
+
+  if (persistedRuntimePlan === undefined) {
+    return null;
+  }
+
+  return CompiledRuntimePlanSchema.parse(persistedRuntimePlan.compiledRuntimePlan);
+}
+
+type PersistedRuntimePlan = Awaited<ReturnType<typeof readPersistedRuntimePlan>>;
 
 async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
@@ -179,6 +201,7 @@ async function inspectStartingSandboxInstance(
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
+    runtimePlan: PersistedRuntimePlan;
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
@@ -202,7 +225,7 @@ async function inspectStartingSandboxInstance(
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -228,7 +251,7 @@ async function inspectStartingSandboxInstance(
       connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -245,7 +268,7 @@ async function inspectStartingSandboxInstance(
     connectable: false,
     failureCode: dispositionOutcome.failureCode,
     failureMessage: dispositionOutcome.failureMessage,
-    runtimePlan: null,
+    runtimePlan: sandboxInstance.runtimePlan,
   };
 }
 
@@ -254,6 +277,7 @@ function readPendingSandboxInstance(sandboxInstance: {
   title: string | null;
   failureCode: string | null;
   failureMessage: string | null;
+  runtimePlan: PersistedRuntimePlan;
 }): NonNullable<GetSandboxInstanceResponse> {
   return {
     id: sandboxInstance.id,
@@ -262,7 +286,7 @@ function readPendingSandboxInstance(sandboxInstance: {
     connectable: false,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
-    runtimePlan: null,
+    runtimePlan: sandboxInstance.runtimePlan,
   };
 }
 
@@ -274,6 +298,7 @@ async function inspectStoppedSandboxInstance(
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
+    runtimePlan: PersistedRuntimePlan;
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
@@ -296,7 +321,7 @@ async function inspectStoppedSandboxInstance(
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -311,7 +336,7 @@ async function inspectStoppedSandboxInstance(
       connectable: false,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -327,7 +352,7 @@ async function inspectStoppedSandboxInstance(
     connectable: false,
     failureCode: "provider_runtime_not_resumable",
     failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
-    runtimePlan: null,
+    runtimePlan: sandboxInstance.runtimePlan,
   };
 }
 
@@ -339,6 +364,7 @@ async function inspectRunningSandboxInstance(
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
+    runtimePlan: PersistedRuntimePlan;
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
@@ -361,7 +387,7 @@ async function inspectRunningSandboxInstance(
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -383,7 +409,7 @@ async function inspectRunningSandboxInstance(
       connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: null,
+      runtimePlan: sandboxInstance.runtimePlan,
     };
   }
 
@@ -398,7 +424,7 @@ async function inspectRunningSandboxInstance(
     connectable: false,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
-    runtimePlan: null,
+    runtimePlan: sandboxInstance.runtimePlan,
   };
 }
 
@@ -440,6 +466,11 @@ export async function getSandboxInstanceByInspection(
     return null;
   }
 
+  const runtimePlan = await readPersistedRuntimePlan({
+    db: ctx.db,
+    sandboxInstanceId: sandboxInstance.id,
+  });
+
   if (sandboxInstance.runtimeProvider !== ctx.sandboxProvider) {
     throw new Error(
       `Sandbox instance '${sandboxInstance.id}' runtime provider '${sandboxInstance.runtimeProvider}' does not match configured provider '${ctx.sandboxProvider}'.`,
@@ -455,17 +486,29 @@ export async function getSandboxInstanceByInspection(
         connectable: false,
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: null,
+        runtimePlan,
       };
     case SandboxInstanceStatuses.STOPPED:
-      return inspectStoppedSandboxInstance(ctx, sandboxInstance);
+      return inspectStoppedSandboxInstance(ctx, {
+        ...sandboxInstance,
+        runtimePlan,
+      });
     case SandboxInstanceStatuses.PENDING:
-      return readPendingSandboxInstance(sandboxInstance);
+      return readPendingSandboxInstance({
+        ...sandboxInstance,
+        runtimePlan,
+      });
     case SandboxInstanceStatuses.STARTING: {
-      return inspectStartingSandboxInstance(ctx, sandboxInstance);
+      return inspectStartingSandboxInstance(ctx, {
+        ...sandboxInstance,
+        runtimePlan,
+      });
     }
     case SandboxInstanceStatuses.RUNNING: {
-      return inspectRunningSandboxInstance(ctx, sandboxInstance);
+      return inspectRunningSandboxInstance(ctx, {
+        ...sandboxInstance,
+        runtimePlan,
+      });
     }
     default:
       throw new Error("Unsupported sandbox instance status.");

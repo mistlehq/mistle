@@ -194,18 +194,10 @@ export function useSessionWorkbenchController(input: {
     runtimePlan: workbenchLifecycleState.sandboxStatusQuery.data?.runtimePlan,
   });
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
-    ...(initialSelectedRepositoryPath === undefined
-      ? {
-          enabled: workbenchLifecycleState.connectionReadiness.canConnect,
-          ensureTransportConnected: transportManager.ensureTransportConnected,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }
-      : {
-          enabled: workbenchLifecycleState.connectionReadiness.canConnect,
-          ensureTransportConnected: transportManager.ensureTransportConnected,
-          initialSelectedRepositoryPath,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
+    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    ...(initialSelectedRepositoryPath === undefined ? {} : { initialSelectedRepositoryPath }),
+    sandboxInstanceId: input.sandboxInstanceId,
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
   const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;

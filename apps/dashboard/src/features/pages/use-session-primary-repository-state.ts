@@ -23,22 +23,6 @@ type SessionPrimaryRepositoryState = {
   setSelectedRepositoryPath: (nextValue: string | null) => void;
 };
 
-function toUnavailableSelectedOption(input: {
-  selectedRepositoryPath: string;
-  workspaceRoot: string;
-}): SessionWorkbenchHeaderRepositoryOption {
-  const label =
-    input.selectedRepositoryPath.startsWith(`${input.workspaceRoot}/`) &&
-    input.selectedRepositoryPath.length > input.workspaceRoot.length + 1
-      ? input.selectedRepositoryPath.slice(input.workspaceRoot.length + 1)
-      : input.selectedRepositoryPath;
-
-  return {
-    value: input.selectedRepositoryPath,
-    label: `${label} (unavailable)`,
-  };
-}
-
 async function runExecCommand(input: {
   command: string;
   args?: string[];
@@ -180,17 +164,6 @@ export function useSessionPrimaryRepositoryState(input: {
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const refreshedSelectionMissing =
-    selectedRepositoryPath !== null &&
-    query.data !== undefined &&
-    !query.data.repositoryOptions.some((option) => option.value === selectedRepositoryPath);
-  const selectedUnavailableOption =
-    refreshedSelectionMissing && selectedRepositoryPath !== null
-      ? toUnavailableSelectedOption({
-          selectedRepositoryPath,
-          workspaceRoot: DefaultSandboxWorkspaceDir,
-        })
-      : null;
   const repositoryOptions = query.data?.repositoryOptions ?? [];
 
   useEffect(() => {
@@ -201,11 +174,7 @@ export function useSessionPrimaryRepositoryState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (
-      input.sandboxInstanceId === null ||
-      query.data === undefined ||
-      input.initialSelectedRepositoryPath === undefined
-    ) {
+    if (input.sandboxInstanceId === null || input.initialSelectedRepositoryPath === undefined) {
       return;
     }
 
@@ -227,12 +196,7 @@ export function useSessionPrimaryRepositoryState(input: {
 
     lastAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
     setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
-  }, [
-    input.initialSelectedRepositoryPath,
-    input.sandboxInstanceId,
-    query.data,
-    selectedRepositoryPath,
-  ]);
+  }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId, selectedRepositoryPath]);
 
   const handleSetSelectedRepositoryPath = useCallback((nextValue: string | null) => {
     userSelectionTouchedRef.current = true;
@@ -244,9 +208,7 @@ export function useSessionPrimaryRepositoryState(input: {
       ? query.error instanceof Error
         ? query.error.message
         : null
-      : refreshedSelectionMissing
-        ? "The selected repository is no longer available in this sandbox."
-        : null,
+      : null,
     isInitialLoading: query.isLoading,
     isRefreshing: query.isFetching && query.data !== undefined,
     options: [
@@ -254,7 +216,6 @@ export function useSessionPrimaryRepositoryState(input: {
         label: "None",
         value: SessionRepositoryNoneValue,
       },
-      ...(selectedUnavailableOption === null ? [] : [selectedUnavailableOption]),
       ...repositoryOptions,
     ],
     refreshRepositories: async () => {

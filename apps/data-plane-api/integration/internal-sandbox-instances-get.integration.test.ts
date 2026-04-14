@@ -1,5 +1,7 @@
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-internal-client";
+import type { StartSandboxInstanceInput } from "@mistle/data-plane-internal-client";
 import {
+  sandboxInstanceRuntimePlans,
   sandboxInstances,
   SandboxInstanceStatuses,
   SandboxStopReasons,
@@ -19,6 +21,61 @@ import { it, type DataPlaneApiIntegrationFixture } from "./test-context.js";
 
 const RuntimeAttachmentReadyTimeoutMs = 5_000;
 const RuntimeAttachmentReadyPollIntervalMs = 50;
+
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  version: number;
+  cwd: string;
+}): StartSandboxInstanceInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    image: {
+      source: "base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [
+      {
+        sourceKind: "git-clone",
+        resourceKind: "repository",
+        path: input.cwd,
+        originUrl: "https://github.com/mistlehq/mistle.git",
+      },
+    ],
+    agentRuntimes: [
+      {
+        bindingId: "ibd_runtime_plan",
+        runtimeId: "codex",
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server",
+        ptyLaunch: {
+          runtimeId: "codex",
+          displayName: "Codex",
+          newLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: input.cwd,
+            command: "codex",
+            args: [],
+          },
+          resumeLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: input.cwd,
+            command: "codex",
+            args: [],
+          },
+        },
+      },
+    ],
+  };
+}
 
 type RuntimeStateSnapshot = {
   ownerLeaseId: string | null;
@@ -400,6 +457,17 @@ describe("internal sandbox instances get integration", () => {
         startedById: "usr_conventional_get",
         source: "dashboard",
       });
+      await fixture.db.insert(sandboxInstanceRuntimePlans).values({
+        sandboxInstanceId: "sbi_conventional_get_running_attached",
+        revision: 1,
+        compiledRuntimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_conventional_get",
+          version: 5,
+          cwd: "/root/mistlehq/mistle",
+        }),
+        compiledFromProfileId: "sbp_conventional_get",
+        compiledFromProfileVersion: 5,
+      });
 
       const bootstrapToken = await mintValidBootstrapToken({
         sandboxInstanceId: "sbi_conventional_get_running_attached",
@@ -441,7 +509,11 @@ describe("internal sandbox instances get integration", () => {
         connectable: true,
         failureCode: null,
         failureMessage: null,
-        runtimePlan: null,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_conventional_get",
+          version: 5,
+          cwd: "/root/mistlehq/mistle",
+        }),
       });
     } finally {
       if (bootstrapSocket !== null) {

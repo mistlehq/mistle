@@ -21,6 +21,7 @@ import {
   shouldWaitForAutomationSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
+import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
 
 function createControllerQueryClient(input?: {
   gcTime?: number;
@@ -638,6 +639,40 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
     expect(result.current.workbench.stoppedSessionMessage).toBeNull();
+  });
+
+  it("keeps polling connectable sessions until the runtime plan is available", () => {
+    expect(
+      resolveSandboxStatusRefetchInterval({
+        automationConversation: null,
+        connectable: true,
+        isAutoResumingStoppedSandbox: false,
+        runtimePlan: null,
+        status: "running",
+      }),
+    ).toBe(1_000);
+
+    expect(
+      resolveSandboxStatusRefetchInterval({
+        automationConversation: null,
+        connectable: true,
+        isAutoResumingStoppedSandbox: false,
+        runtimePlan: {
+          sandboxProfileId: "sbp_123",
+          version: 1,
+          image: {
+            source: "base",
+            imageRef: "img_123",
+          },
+          egressRoutes: [],
+          artifacts: [],
+          workspaceSources: [],
+          runtimeClients: [],
+          agentRuntimes: [],
+        },
+        status: "running",
+      }),
+    ).toBe(false);
   });
 
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {

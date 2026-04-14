@@ -9,6 +9,7 @@ import {
 } from "../sessions/session-connect-policy.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
+import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
@@ -31,6 +32,33 @@ import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
+
+export function resolveSandboxStatusRefetchInterval(input: {
+  automationConversation: SandboxInstanceStatusResult["automationConversation"];
+  connectable: boolean | null;
+  isAutoResumingStoppedSandbox: boolean;
+  runtimePlan: SandboxInstanceStatusResult["runtimePlan"];
+  status: "pending" | "starting" | "running" | "stopped" | "failed" | null;
+}): false | number {
+  if (
+    shouldWaitForAutomationSessionThread({
+      sandboxStatus: input.status,
+      automationConversation: input.automationConversation,
+    })
+  ) {
+    return AutomationSessionStatusRefetchIntervalMs;
+  }
+
+  if (input.isAutoResumingStoppedSandbox && input.status === "stopped") {
+    return 1_000;
+  }
+
+  if (input.connectable === true) {
+    return input.runtimePlan === null ? 1_000 : false;
+  }
+
+  return input.status === "failed" || input.status === "stopped" ? false : 1_000;
+}
 
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
@@ -97,23 +125,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     enabled: input.sandboxInstanceId !== null,
     retry: false,
     refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      const connectable = query.state.data?.connectable ?? null;
-      const automationConversation = query.state.data?.automationConversation ?? null;
-      if (
-        shouldWaitForAutomationSessionThread({
-          sandboxStatus: status ?? null,
-          automationConversation,
-        })
-      ) {
-        return AutomationSessionStatusRefetchIntervalMs;
-      }
-
-      if (isAutoResumingStoppedSandbox && status === "stopped") {
-        return 1_000;
-      }
-
-      return connectable === true || status === "failed" || status === "stopped" ? false : 1_000;
+      return resolveSandboxStatusRefetchInterval({
+        automationConversation: query.state.data?.automationConversation ?? null,
+        connectable: query.state.data?.connectable ?? null,
+        isAutoResumingStoppedSandbox,
+        runtimePlan: query.state.data?.runtimePlan ?? null,
+        status: query.state.data?.status ?? null,
+      });
     },
   });
   const markRecoveryBoundary = useCallback(() => {
