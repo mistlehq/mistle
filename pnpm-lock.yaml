@@ -772,22 +772,12 @@ importers:
 
   packages/integrations-core:
     dependencies:
-      shell-quote:
-        specifier: ^1.8.3
-        version: 1.8.3
       smol-toml:
         specifier: ^1.6.1
         version: 1.6.1
       zod:
         specifier: ^4.3.6
         version: 4.3.6
-    devDependencies:
-      '@types/shell-quote':
-        specifier: ^1.7.5
-        version: 1.7.5
-      testcontainers:
-        specifier: ^11.13.0
-        version: 11.13.0
 
   packages/integrations-definitions:
     dependencies:
@@ -6492,9 +6482,6 @@ packages:
   '@types/sarif@2.1.7':
     resolution: {integrity: sha512-kRz0VEkJqWLf1LLVN4pT1cg1Z9wAuvI6L97V3m2f5B76Tg8d413ddvLBPTEHAZJlnn4XSvu0FkZtViCQGVyrXQ==}
 
-  '@types/shell-quote@1.7.5':
-    resolution: {integrity: sha512-+UE8GAGRPbJVQDdxi16dgadcBfQ+KG2vgZhV1+3A1XmHbmwcdwhCUwIdy+d3pAGrbvgRoVSjeI9vOWyq376Yzw==}
-
   '@types/ssh2-streams@0.1.13':
     resolution: {integrity: sha512-faHyY3brO9oLEA0QlcO8N2wT7R0+1sHWZvQ+y3rMLwdY1ZyS1z0W3t65j9PqT4HmQ6ALzNe7RZlNuCNE0wBSWA==}
 
@@ -11568,10 +11555,6 @@ packages:
   shebang-regex@3.0.0:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
-
-  shell-quote@1.8.3:
-    resolution: {integrity: sha512-ObmnIF4hXNg1BqhnHmgbDETF8dLPCggZWBjkQfhZpbszZnYur5DUljTcCHii5LC3J5E0yeO/1LIMyH+UvHQgyw==}
-    engines: {node: '>= 0.4'}
 
   shiki@1.29.2:
     resolution: {integrity: sha512-njXuliz/cP+67jU2hukkxCNuH1yUi4QfdZZY+sMr5PPrIyXSu5iTb/qYC4BiWWB0vZ+7TbdvYUCeL23zpwCfbg==}
@@ -18937,8 +18920,6 @@ snapshots:
 
   '@types/sarif@2.1.7': {}
 
-  '@types/shell-quote@1.7.5': {}
-
   '@types/ssh2-streams@0.1.13':
     dependencies:
       '@types/node': 25.5.1
@@ -25203,8 +25184,6 @@ snapshots:
       shebang-regex: 3.0.0
 
   shebang-regex@3.0.0: {}
-
-  shell-quote@1.8.3: {}
 
   shiki@1.29.2:
     dependencies:

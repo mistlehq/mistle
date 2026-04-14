@@ -38,12 +38,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "shell-quote": "^1.8.3",
     "smol-toml": "^1.6.1",
     "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@types/shell-quote": "^1.7.5",
-    "testcontainers": "^11.13.0"
   }
 }
