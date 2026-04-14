@@ -1,4 +1,4 @@
-import { Badge, Button, Notice, Spinner } from "@mistle/ui";
+import { Badge, Button, Notice } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
@@ -512,11 +512,10 @@ function ResourceSection(input: {
               type="button"
               variant="outline"
             >
-              {input.resource.isRefreshing === true ? (
-                <Spinner aria-label={`Refresh ${input.resource.kind}`} className="size-4" />
-              ) : (
-                <ArrowClockwiseIcon aria-hidden className="size-4" />
-              )}
+              <ArrowClockwiseIcon
+                aria-hidden
+                className={input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"}
+              />
               <span>Sync</span>
             </Button>
           </div>
