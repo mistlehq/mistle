@@ -203,10 +203,6 @@ fn supports_attach_streams_and_detaches_secondary_close() {
             Message::Binary(payload) => {
                 let frame =
                     decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode");
-                assert_ne!(
-                    frame.stream_id, 2,
-                    "detached secondary stream should not receive further PTY output"
-                );
                 if frame.stream_id == 1 {
                     let payload =
                         String::from_utf8(frame.payload).expect("payload should be utf8");
@@ -225,6 +221,62 @@ fn supports_attach_streams_and_detaches_secondary_close() {
 
     assert!(saw_primary_window, "expected primary stream.window after primary write");
     assert!(saw_primary_output, "expected primary PTY output after primary write");
+
+    let encoded_follow_up_input =
+        sandboxd::tunnel::protocol::encode_stream_data_frame(1, PAYLOAD_KIND_RAW_BYTES, b"again\n")
+            .expect("follow-up primary input frame should encode");
+    client_socket
+        .send(Message::Binary(encoded_follow_up_input.into()))
+        .expect("client should send follow-up bytes through the primary stream");
+
+    let mut saw_follow_up_window = false;
+    let mut saw_follow_up_output = false;
+    for _ in 0..4 {
+        match client_socket
+            .read()
+            .expect("socket should receive PTY frames after follow-up primary write")
+        {
+            Message::Text(payload) => {
+                let message: Value =
+                    serde_json::from_str(payload.as_str()).expect("text payload should be valid json");
+                if message["type"] == "stream.window" && message["streamId"] == 1 {
+                    assert_eq!(message["bytes"], 6);
+                    saw_follow_up_window = true;
+                }
+            }
+            Message::Binary(payload) => {
+                let frame =
+                    decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode");
+                assert_ne!(
+                    frame.stream_id, 2,
+                    "detached secondary stream should not receive newly produced PTY output"
+                );
+                if frame.stream_id == 1 {
+                    let payload =
+                        String::from_utf8(frame.payload).expect("payload should be utf8");
+                    if payload == "again\r\n" {
+                        saw_follow_up_output = true;
+                    }
+                }
+            }
+            other_message => {
+                panic!("unexpected websocket message after follow-up primary write: {other_message:?}")
+            }
+        }
+
+        if saw_follow_up_window && saw_follow_up_output {
+            break;
+        }
+    }
+
+    assert!(
+        saw_follow_up_window,
+        "expected primary stream.window after follow-up primary write"
+    );
+    assert!(
+        saw_follow_up_output,
+        "expected primary PTY output after follow-up primary write"
+    );
 
     client_socket
         .send(Message::Text(
