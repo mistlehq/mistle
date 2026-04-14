@@ -10,14 +10,14 @@ describe("SessionWorkbenchHeaderActions", () => {
     render(
       <SessionWorkbenchHeaderActions
         cliControl={{
-          ariaLabel: "CLI",
+          ariaLabel: "TUI",
           className: "",
           disabled: false,
           onClick: () => {
             return;
           },
           pressed: false,
-          title: "Open Codex CLI",
+          title: "Open Codex TUI",
         }}
         diffControl={{
           ariaLabel: "Open changes",
@@ -64,14 +64,14 @@ describe("SessionWorkbenchHeaderActions", () => {
     render(
       <SessionWorkbenchHeaderActions
         cliControl={{
-          ariaLabel: "CLI",
+          ariaLabel: "TUI",
           className: "",
           disabled: false,
           onClick: () => {
             return;
           },
           pressed: false,
-          title: "Open Codex CLI",
+          title: "Open Codex TUI",
         }}
         diffControl={{
           ariaLabel: "Open changes",
@@ -107,14 +107,14 @@ describe("SessionWorkbenchHeaderActions", () => {
     render(
       <SessionWorkbenchHeaderActions
         cliControl={{
-          ariaLabel: "CLI",
+          ariaLabel: "TUI",
           className: "",
           disabled: false,
           onClick: () => {
             return;
           },
           pressed: false,
-          title: "Open Codex CLI",
+          title: "Open Codex TUI",
         }}
         diffControl={{
           ariaLabel: "Open changes",
@@ -162,14 +162,14 @@ describe("SessionWorkbenchHeaderActions", () => {
     render(
       <SessionWorkbenchHeaderActions
         cliControl={{
-          ariaLabel: "CLI",
+          ariaLabel: "TUI",
           className: "",
           disabled: false,
           onClick: () => {
             return;
           },
           pressed: false,
-          title: "Open Codex CLI",
+          title: "Open Codex TUI",
         }}
         diffControl={{
           ariaLabel: "Open changes",

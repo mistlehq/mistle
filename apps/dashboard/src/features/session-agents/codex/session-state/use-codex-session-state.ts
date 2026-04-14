@@ -750,7 +750,7 @@ export function useCodexSessionState(input: {
 
     const rpcClient = rpcClientRef.current;
     if (rpcClient === null) {
-      throw new Error("Connect to a sandbox session before starting Codex CLI.");
+      throw new Error("Connect to a sandbox session before starting Codex TUI.");
     }
 
     const thread = await readCodexThreadState({
@@ -764,7 +764,7 @@ export function useCodexSessionState(input: {
 
     if (providerThreadId !== null && launchTarget.type === "start_new") {
       throw new Error(
-        `The linked provider conversation '${providerThreadId}' is not resumable for Codex CLI.`,
+        `The linked provider conversation '${providerThreadId}' is not resumable for Codex TUI.`,
       );
     }
 

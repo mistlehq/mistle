@@ -20,6 +20,8 @@ type SessionDiffPanelProps = {
   title?: string;
 };
 
+const NonDestructiveDiffErrorMessages = new Set(["Current workspace is not a git repository."]);
+
 function resolveFileDiffPath(fileDiff: FileDiffMetadata): string {
   return resolveRawDiffPath(fileDiff.name || fileDiff.prevName || "");
 }
@@ -50,6 +52,23 @@ function getFileDiffLineStats(fileDiff: FileDiffMetadata): {
   );
 }
 
+function resolveDiffPanelErrorNotice(input: { errorMessage: string }): {
+  title: string;
+  variant: "alert" | "default";
+} {
+  if (NonDestructiveDiffErrorMessages.has(input.errorMessage)) {
+    return {
+      title: "Changes unavailable",
+      variant: "default",
+    };
+  }
+
+  return {
+    title: "Could not load changes",
+    variant: "alert",
+  };
+}
+
 export function SessionDiffPanel({
   errorMessage = null,
   isLoading = false,
@@ -59,6 +78,7 @@ export function SessionDiffPanel({
 }: SessionDiffPanelProps): React.JSX.Element {
   const parsedPatch = useMemo(() => parseSessionDiffPatch(patch), [patch]);
   const files = parsedPatch.kind === "parsed" ? parsedPatch.files : [];
+  const errorNotice = errorMessage === null ? null : resolveDiffPanelErrorNotice({ errorMessage });
 
   return (
     <section className="bg-background flex h-full min-h-0 flex-col">
@@ -77,9 +97,9 @@ export function SessionDiffPanel({
           <Spinner aria-label="Loading changes" className="size-4" />
           <span>Loading changes compared with main.</span>
         </div>
-      ) : errorMessage !== null ? (
+      ) : errorMessage !== null && errorNotice !== null ? (
         <div className="min-h-0 flex-1 overflow-auto p-2">
-          <Notice title="Could not load changes" variant="alert">
+          <Notice title={errorNotice.title} variant={errorNotice.variant}>
             {errorMessage}
           </Notice>
         </div>

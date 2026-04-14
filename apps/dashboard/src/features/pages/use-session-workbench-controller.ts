@@ -217,12 +217,12 @@ export function useSessionWorkbenchController(input: {
     input.sandboxInstanceId === null
       ? "Session id is required."
       : sessionSnapshot === null
-        ? "CLI is available after the session is connected."
+        ? "TUI is available after the session is connected."
         : !workbenchLifecycleState.connectionReadiness.canConnect
           ? (workbenchLifecycleState.stoppedSessionMessage ??
-            "CLI is available only when the sandbox is running.")
+            "TUI is available only when the sandbox is running.")
           : handoff.transitionState !== "stable_chat"
-            ? "Finish the current primary-panel transition before opening Codex CLI."
+            ? "Finish the current primary-panel transition before opening Codex TUI."
             : null;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -288,7 +288,7 @@ export function useSessionWorkbenchController(input: {
       portAccessState,
       primaryRepositoryControlState: {
         disabledReason: isPrimaryRepositorySwitchBlockedByCli
-          ? "Exit Codex CLI before switching the primary repository."
+          ? "Exit Codex TUI before switching the primary repository."
           : null,
         isSwitching: isSwitchingPrimaryRepository,
         switchPrimaryRepository,

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
   Spinner,
 } from "@mistle/ui";
-import { CpuIcon } from "@phosphor-icons/react";
+import { ArrowSquareOutIcon, CpuIcon } from "@phosphor-icons/react";
 
 import {
   createProcessKey,
@@ -17,6 +17,10 @@ import {
   resolvePrimaryProcessListener,
 } from "./session-port-access-model.js";
 import type { SessionPortAccessState } from "./use-session-port-access.js";
+
+function resolvePrimaryProcessPort(process: ProcessEntry): number {
+  return resolvePrimaryProcessListener(process)?.port ?? Number.POSITIVE_INFINITY;
+}
 
 function createListenersLabel(process: ProcessEntry): string {
   if (process.listeners.length === 0) {
@@ -41,6 +45,9 @@ export function SessionPortAccessPopover(input: {
   state: SessionPortAccessState;
 }): React.JSX.Element {
   const isButtonDisabled = input.state.buttonDisabledReason !== null;
+  const sortedProcesses = [...input.state.processes].sort((left, right) => {
+    return resolvePrimaryProcessPort(left) - resolvePrimaryProcessPort(right);
+  });
 
   return (
     <Popover onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
@@ -64,19 +71,14 @@ export function SessionPortAccessPopover(input: {
       >
         <CpuIcon className="size-4" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 p-0">
+      <PopoverContent align="end" className="w-96 gap-0 p-0">
         <PopoverHeader className="border-b border-stone-200 px-4 py-3">
           <PopoverTitle>Processes</PopoverTitle>
           <PopoverDescription>
-            Select a running process to open its primary HTTP port in a new tab.
+            Select a process to open its primary HTTP port in a new tab.
           </PopoverDescription>
-          {input.state.observedAt !== null ? (
-            <p className="text-muted-foreground text-xs">
-              Last updated at {new Date(input.state.observedAt).toLocaleTimeString()}
-            </p>
-          ) : null}
         </PopoverHeader>
-        <div className="flex max-h-96 flex-col overflow-y-auto p-2">
+        <div className="flex max-h-96 flex-col gap-1 overflow-y-auto p-2">
           {input.state.errorMessage !== null ? (
             <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
               {input.state.errorMessage}
@@ -93,14 +95,14 @@ export function SessionPortAccessPopover(input: {
               No loopback-listening processes found.
             </p>
           ) : null}
-          {input.state.processes.map((process) => {
+          {sortedProcesses.map((process) => {
             const primaryListener = resolvePrimaryProcessListener(process);
             const isOpening = input.state.isOpeningProcessKey === createProcessKey(process);
 
             return (
               <button
                 key={createProcessKey(process)}
-                className="flex w-full flex-col gap-1 rounded-md px-3 py-3 text-left hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group/process-row flex w-full flex-col gap-1 rounded-md px-3 py-3 text-left hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={primaryListener === null || input.state.isOpeningProcessKey !== null}
                 onClick={() => {
                   void input.state.openProcess(process);
@@ -109,11 +111,14 @@ export function SessionPortAccessPopover(input: {
                 type="button"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-stone-950">
+                  <div className="flex min-w-0 flex-1 items-center gap-1">
+                    <p className="truncate text-sm font-medium text-stone-950 group-hover/process-row:underline group-focus-visible/process-row:underline">
                       {createProcessLabel(process)}
                     </p>
-                    <p className="text-xs text-stone-500">PID {String(process.pid)}</p>
+                    <ArrowSquareOutIcon
+                      aria-hidden
+                      className="size-4 shrink-0 opacity-0 transition-[opacity,transform] group-hover/process-row:translate-x-0.5 group-hover/process-row:opacity-100 group-focus-visible/process-row:translate-x-0.5 group-focus-visible/process-row:opacity-100"
+                    />
                   </div>
                   {isOpening ? <Spinner aria-hidden className="size-4 text-stone-500" /> : null}
                 </div>

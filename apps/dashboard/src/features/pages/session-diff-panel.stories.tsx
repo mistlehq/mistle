@@ -68,16 +68,25 @@ const StoryBranchPatch = [
 ].join("\n");
 
 type StoryDiffWorkbenchProps = {
+  errorMessage?: string | null;
   patch: string;
 };
 
-function StoryDiffWorkbench({ patch }: StoryDiffWorkbenchProps): React.JSX.Element {
+function StoryDiffWorkbench({
+  errorMessage = null,
+  patch,
+}: StoryDiffWorkbenchProps): React.JSX.Element {
   return renderSessionWorkbenchContentStory({
     isSecondaryPanelVisible: true,
     mainContent: createStorySessionMainContent(),
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: (
-      <SessionDiffPanel patch={patch} summaryLabel="Compared with main" title="Current changes" />
+      <SessionDiffPanel
+        errorMessage={errorMessage}
+        patch={patch}
+        summaryLabel="Compared with main"
+        title="Current changes"
+      />
     ),
     secondaryPanelSize: 42,
   });
@@ -104,6 +113,13 @@ export const AgainstMain: Story = {};
 
 export const EmptyState: Story = {
   args: {
+    patch: "",
+  },
+};
+
+export const WorkspaceNotRepository: Story = {
+  args: {
+    errorMessage: "Current workspace is not a git repository.",
     patch: "",
   },
 };
