@@ -12,15 +12,15 @@ import {
   withSessionWorkbenchCliHarness,
 } from "./helpers/session-workbench-cli-harness.js";
 
-describe("SessionWorkbenchPage CLI mode integration", () => {
+describe("SessionWorkbenchPage TUI mode integration", () => {
   afterEach(() => {
     cleanup();
   });
 
   describe("primary panel flow", () => {
-    it("runs Codex CLI in the primary panel while keeping the side terminal available", async () => {
+    it("runs Codex TUI in the primary panel while keeping the side terminal available", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
 
@@ -29,49 +29,49 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
         fireEvent.click(await waitForEnabledButton("Open terminal"));
         expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
 
-        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+        fireEvent.click(screen.getByRole("button", { name: "TUI" }));
         await tunnelServer.waitForPtyClose(cliPty.streamId);
         await tunnelServer.waitForThreadResume("thread_cli_from_cli");
 
         await waitForChatReady();
-        expect(screen.queryByTitle("Codex CLI")).toBeNull();
+        expect(screen.queryByTitle("Codex TUI")).toBeNull();
       });
     });
 
-    it("starts a new CLI session when the connected chat thread is not materialized yet", async () => {
+    it("starts a new TUI session when the connected chat thread is not materialized yet", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
 
         expectCliPty(cliPty);
       });
     });
 
-    it("fails CLI entry for an unmaterialized provider-backed thread instead of starting a new CLI thread", async () => {
+    it("fails TUI entry for an unmaterialized provider-backed thread instead of starting a new TUI thread", async () => {
       await withSessionWorkbenchCliHarness(
         {
           providerConversationId: "thread_provider_empty",
           providerThreadTurnCount: 0,
         },
         async () => {
-          fireEvent.click(await waitForEnabledButton("CLI"));
+          fireEvent.click(await waitForEnabledButton("TUI"));
 
-          expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+          expect(await screen.findByText("Could not start Codex TUI")).toBeDefined();
           expect(
             screen.getByText(
-              "The linked provider conversation 'thread_provider_empty' is not resumable for Codex CLI.",
+              "The linked provider conversation 'thread_provider_empty' is not resumable for Codex TUI.",
             ),
           ).toBeDefined();
         },
       );
     });
 
-    it("opens the CLI after the side terminal without PTY session collisions", async () => {
+    it("opens the TUI after the side terminal without PTY session collisions", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
         fireEvent.click(await waitForEnabledButton("Open terminal"));
         expectTerminalPty(await waitForPtySession(tunnelServer, "terminal"));
 
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         expectCliPty(await waitForPtySession(tunnelServer, "cli"));
 
         expect(screen.getByRole("button", { name: "Terminal" }).getAttribute("aria-pressed")).toBe(
@@ -80,9 +80,9 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     });
 
-    it("returns to chat even after the CLI PTY has already exited", async () => {
+    it("returns to chat even after the TUI PTY has already exited", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
         tunnelServer.emitPtyExit(cliPty.streamId);
@@ -92,29 +92,29 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       });
     }, 15_000);
 
-    it("shows a CLI entry failure alert in the chat view and leaves chat active", async () => {
+    it("shows a TUI entry failure alert in the chat view and leaves chat active", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls }) => {
         controls.failNextCliOpen("codex executable missing");
 
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
 
-        expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+        expect(await screen.findByText("Could not start Codex TUI")).toBeDefined();
         expect(screen.getByText("codex executable missing")).toBeDefined();
         expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
         expect(screen.queryByRole("button", { name: "Return to chat" })).toBeNull();
       });
     });
 
-    it("preserves the active resumable thread when CLI launch fails before handoff completes", async () => {
+    it("preserves the active resumable thread when TUI launch fails before handoff completes", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
         controls.failNextCliOpen("codex executable missing");
 
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
 
-        expect(await screen.findByText("Could not start Codex CLI")).toBeDefined();
+        expect(await screen.findByText("Could not start Codex TUI")).toBeDefined();
         await waitForChatReady();
 
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         expectCliPty(await waitForPtySession(tunnelServer, "cli"));
         await tunnelServer.waitForThreadResume("thread_cli_test");
       });
@@ -122,7 +122,7 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
     it("shows a restore failure alert in chat without offering a retry action", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
         controls.setConnectionTokenFailure(true);
@@ -141,11 +141,11 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
 
     it("fails restore explicitly instead of hanging forever when reconnect never establishes an active thread", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
         tunnelServer.hangNextThreadList();
-        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+        fireEvent.click(screen.getByRole("button", { name: "TUI" }));
 
         await waitFor(
           () => {
@@ -163,22 +163,22 @@ describe("SessionWorkbenchPage CLI mode integration", () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
         tunnelServer.omitLoadedThreadForNextCliOpen();
 
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
-        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+        fireEvent.click(screen.getByRole("button", { name: "TUI" }));
 
         await waitForChatReady();
       });
     }, 15_000);
 
-    it("does not try to reconnect chat through the provisional empty thread after leaving CLI", async () => {
+    it("does not try to reconnect chat through the provisional empty thread after leaving TUI", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {
-        fireEvent.click(await waitForEnabledButton("CLI"));
+        fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
         expectCliPty(cliPty);
         tunnelServer.hangResumeForThread("thread_cli_test");
-        fireEvent.click(screen.getByRole("button", { name: "CLI" }));
+        fireEvent.click(screen.getByRole("button", { name: "TUI" }));
 
         await tunnelServer.waitForThreadResume("thread_cli_from_cli");
         await waitForChatReady();
