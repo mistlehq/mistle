@@ -317,7 +317,6 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.setup?.statusLabel).toBe("Setup incomplete");
     expect(item?.installActionLabel).toBe("Install GitHub App");
     expect(item?.setup?.description).toBe(
       "Set these URLs in your GitHub App settings, then install the app.",

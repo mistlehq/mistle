@@ -466,7 +466,6 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
           description: "Set these URLs in your GitHub App settings, then install the app.",
           postInstallationSetupUrl:
             "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
-          statusLabel: "Setup incomplete",
         },
         status: "active",
         webhookInstructions:
@@ -531,7 +530,6 @@ type ScenarioDetailStorySpec = {
         errorMessage?: string;
         isPending?: boolean;
         postInstallationSetupUrl?: string;
-        statusLabel?: string;
       }
     | undefined;
   showCreateWebhookSource?: boolean;

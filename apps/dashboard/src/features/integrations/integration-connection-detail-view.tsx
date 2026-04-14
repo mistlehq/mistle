@@ -64,7 +64,6 @@ export type IntegrationConnectionDetailItem = {
         errorMessage?: string;
         isPending?: boolean;
         postInstallationSetupUrl?: string;
-        statusLabel?: string;
       }
     | undefined;
   status: "active" | "error" | "revoked";
@@ -174,9 +173,6 @@ export function IntegrationConnectionDetailView(
                       {formatConnectionStatusLabel(connection.status)}
                     </Badge>
                   )}
-                  {connection.setup?.statusLabel === undefined ? null : (
-                    <Badge variant="outline">{connection.setup.statusLabel}</Badge>
-                  )}
                 </div>
               </button>
             );
@@ -281,17 +277,11 @@ function ConnectionDetailPane(input: {
                 {input.connection.displayName}
               </h2>
             )}
-            {input.connection.status === "active" &&
-            input.connection.setup?.statusLabel === undefined ? null : (
+            {input.connection.status === "active" ? null : (
               <div className="flex flex-wrap items-center gap-2">
-                {input.connection.status === "active" ? null : (
-                  <Badge variant="outline">
-                    {formatConnectionStatusLabel(input.connection.status)}
-                  </Badge>
-                )}
-                {input.connection.setup?.statusLabel === undefined ? null : (
-                  <Badge variant="outline">{input.connection.setup.statusLabel}</Badge>
-                )}
+                <Badge variant="outline">
+                  {formatConnectionStatusLabel(input.connection.status)}
+                </Badge>
               </div>
             )}
           </div>
@@ -332,20 +322,28 @@ function ConnectionDetailPane(input: {
         </div>
       </header>
 
-      <SectionBlock title="Authentication">
-        <ConnectionAuthSection
-          authMethodId={input.connection.authMethodId}
-          authMethodLabel={input.connection.authMethodLabel}
-          connectionId={input.connection.id}
-          onEditApiKey={input.onEditApiKey}
-          onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
-          setupActionLabel={input.connection.installActionLabel}
-          setupIsPending={input.connection.setup?.isPending ?? false}
-        />
-      </SectionBlock>
-
       {hasSetupSection ? (
-        <SectionBlock title="Setup">
+        <SectionBlock
+          action={
+            input.onStartGitHubAppInstallation === undefined ||
+            input.connection.installActionLabel === undefined ? null : (
+              <Button
+                disabled={input.connection.setup?.isPending ?? false}
+                onClick={() => {
+                  void input.onStartGitHubAppInstallation?.(input.connection.id);
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {input.connection.setup?.isPending === true
+                  ? "Starting install..."
+                  : input.connection.installActionLabel}
+              </Button>
+            )
+          }
+          title="Setup"
+        >
           <div className="flex flex-col gap-4">
             <GitHubAppSetupSection
               {...(setup === undefined ||
@@ -365,6 +363,19 @@ function ConnectionDetailPane(input: {
         </SectionBlock>
       ) : null}
 
+      <SectionBlock title="Authentication">
+        <ConnectionAuthSection
+          authMethodId={input.connection.authMethodId}
+          authMethodLabel={input.connection.authMethodLabel}
+          connectionId={input.connection.id}
+          onEditApiKey={input.onEditApiKey}
+          onStartGitHubAppInstallation={input.onStartGitHubAppInstallation}
+          showSetupAction={hasSetupSection !== true}
+          setupActionLabel={input.connection.installActionLabel}
+          setupIsPending={input.connection.setup?.isPending ?? false}
+        />
+      </SectionBlock>
+
       {input.connection.resources.length === 0 ? null : (
         <SectionBlock title="Resources">
           <ResourcesSection
@@ -380,12 +391,6 @@ function ConnectionDetailPane(input: {
         <SectionBlock title="Webhooks">
           <WebhookSourcesSection
             connectionId={input.connection.id}
-            {...(input.connection.setup !== undefined &&
-            input.connection.authMethodId === "github-app-installation"
-              ? {}
-              : input.connection.webhookInstructions === undefined
-                ? {}
-                : { descriptionText: input.connection.webhookInstructions })}
             onCreateWebhookSource={
               input.showCreateWebhookSource === true ? input.onCreateWebhookSource : undefined
             }
@@ -410,6 +415,7 @@ function ConnectionDetailPane(input: {
 }
 
 function SectionBlock(input: {
+  action?: React.ReactNode;
   children: React.ReactNode;
   description?: string;
   title: string;
@@ -417,7 +423,7 @@ function SectionBlock(input: {
   return (
     <section className="flex flex-col gap-0">
       <div className="flex flex-col gap-0">
-        <SectionHeader title={input.title} />
+        <SectionHeader action={input.action} title={input.title} />
         {input.description === undefined ? null : (
           <p className="text-muted-foreground text-xs">{input.description}</p>
         )}
@@ -482,6 +488,7 @@ function ConnectionAuthSection(input: {
   connectionId: string;
   onEditApiKey: ((connectionId: string) => void) | undefined;
   onStartGitHubAppInstallation: ((connectionId: string) => Promise<void> | void) | undefined;
+  showSetupAction: boolean;
   setupActionLabel: string | undefined;
   setupIsPending: boolean;
 }): React.JSX.Element | null {
@@ -542,7 +549,8 @@ function ConnectionAuthSection(input: {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <InlineField label="Method" value={input.authMethodLabel} />
-      {input.onStartGitHubAppInstallation === undefined ||
+      {!input.showSetupAction ||
+      input.onStartGitHubAppInstallation === undefined ||
       input.setupActionLabel === undefined ? null : (
         <Button
           disabled={input.setupIsPending}
@@ -788,7 +796,6 @@ function ResourceItemsPreview(input: {
 
 function WebhookSourcesSection(input: {
   connectionId: string;
-  descriptionText?: string;
   onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
@@ -797,13 +804,7 @@ function WebhookSourcesSection(input: {
 }): React.JSX.Element {
   return (
     <div className="gap-3 flex flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <div className="gap-1 flex flex-col">
-          <p className="text-muted-foreground text-xs">
-            {input.descriptionText ??
-              "Copy the callback URL into your provider's webhook configuration."}
-          </p>
-        </div>
+      <div className="flex items-start justify-end gap-3">
         {input.onCreateWebhookSource ? (
           <Button
             disabled={input.state.isCreating}
@@ -873,16 +874,7 @@ function WebhookSourceCard(input: {
 
   return (
     <div className="gap-3 flex flex-col">
-      <div className="flex items-start justify-between gap-3">
-        <div className="gap-1 flex flex-col">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{input.source.displayName}</span>
-            {input.source.status === "active" ? null : (
-              <Badge variant="outline">{input.source.status}</Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground text-xs">Webhook source ID: {input.source.id}</p>
-        </div>
+      <div className="flex items-start justify-end gap-3">
         {isDeleteSupported ? (
           <Button
             aria-label={`Delete webhook source ${input.source.displayName}`}
@@ -902,15 +894,9 @@ function WebhookSourceCard(input: {
         ) : null}
       </div>
       <div className="gap-3 flex flex-col">
-        <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-          <MetadataField label="Target" value={input.source.targetKey} />
-          {input.source.remoteRegistrationId === undefined ? null : (
-            <MetadataField
-              label="Provider registration"
-              value={input.source.remoteRegistrationId}
-            />
-          )}
-        </div>
+        {input.source.remoteRegistrationId === undefined ? null : (
+          <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
+        )}
         {input.source.callbackUrl === undefined ? null : (
           <CopyableValue label="Callback URL" value={input.source.callbackUrl} />
         )}

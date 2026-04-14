@@ -178,7 +178,6 @@ function resolveGitHubAppConnectionContext(
         | {
             description: string;
             postInstallationSetupUrl?: string;
-            statusLabel: string;
           }
         | undefined;
       webhookInstructions: string;
@@ -242,7 +241,6 @@ function resolveGitHubAppConnectionContext(
                     controlPlaneApiOrigin,
                   ).toString(),
                 }),
-            statusLabel: "Setup incomplete",
           },
         }
       : {}),

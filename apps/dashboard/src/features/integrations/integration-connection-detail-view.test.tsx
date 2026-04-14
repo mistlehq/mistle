@@ -548,9 +548,15 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.getByText("Webhooks")).toBeTruthy();
     expect(
-      screen.getByText("Copy the callback URL into your provider's webhook configuration."),
-    ).toBeTruthy();
-    expect(screen.getByText("Primary Jira webhook")).toBeTruthy();
+      screen.queryByText("Copy the callback URL into your provider's webhook configuration."),
+    ).toBeNull();
+    expect(screen.queryByText("Primary Jira webhook")).toBeNull();
+    expect(screen.queryByText("Webhook source ID: iws_jira_123")).toBeNull();
+    expect(screen.queryByText("Target")).toBeNull();
+    expect(screen.queryByText("jira-default")).toBeNull();
+    expect(screen.getByText("Provider registration")).toBeTruthy();
+    expect(screen.getByText("10001")).toBeTruthy();
+    expect(screen.getByText("Callback URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
     expect(screen.queryByText("Endpoint key")).toBeNull();
 
@@ -586,7 +592,6 @@ describe("IntegrationConnectionDetailView", () => {
               description: "Set these URLs in your GitHub App settings, then install the app.",
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/github-app-installation",
-              statusLabel: "Setup incomplete",
             },
             webhookInstructions:
               "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
@@ -633,7 +638,6 @@ describe("IntegrationConnectionDetailView", () => {
     expect(
       screen.getByText("Set these URLs in your GitHub App settings, then install the app."),
     ).toBeTruthy();
-    expect(screen.getAllByText("Setup incomplete")).toHaveLength(2);
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
     expect(screen.getByText("Post-installation setup URL")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy Webhook callback URL" })).toBeTruthy();
@@ -723,7 +727,6 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
-    expect(screen.getByText("GitHub App webhook")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy Callback URL" })).toBeTruthy();
   });
 });
