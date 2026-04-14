@@ -82,6 +82,12 @@ export const sandboxInstancesNotFoundResponseSchema = createCodeMessageErrorSche
   z.literal(SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND),
 );
 
+export const redirectLocationHeaderSchema = z
+  .object({
+    Location: z.string().min(1),
+  })
+  .strict();
+
 export const sandboxInstanceListItemSchema = z
   .object({
     id: z.string().min(1),
