@@ -450,7 +450,7 @@ fn applies_typed_mise_install_steps() {
 }
 
 #[test]
-#[ignore = "requires a live GitHub release download"]
+#[ignore = "requires a live GitHub release download; exercised by pnpm test:integration:rust"]
 fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
     let test_dir = create_temp_test_dir("runtime_plan_apply_github_release");
     let install_path = test_dir.join("gh");
@@ -498,7 +498,8 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
                       "format": "tar.gz",
                       "extractedPath": extracted_path
                     },
-                    "installPath": install_path.display().to_string()
+                    "installPath": install_path.display().to_string(),
+                    "timeoutMs": 30_000
                   }
                 ]
               }

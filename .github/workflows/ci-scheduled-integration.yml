@@ -74,10 +74,10 @@ jobs:
       - name: Generate integration config
         run: nix develop --command pnpm run config:init:integration
 
-      - name: Run scheduled integration suite in Nix shell
+      - name: Run scheduled integration suites in Nix shell
         env:
           MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
-        run: nix develop --command pnpm test:integration
+        run: nix develop --command pnpm test:integration:all
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}

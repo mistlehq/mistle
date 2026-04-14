@@ -6,6 +6,7 @@
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "cargo check --locked --all-targets",
     "test": "cargo test --locked",
+    "test:integration": "cargo test --locked -- --ignored",
     "format": "cargo fmt",
     "format:check": "cargo fmt --check"
   }
