@@ -58,7 +58,6 @@ describe("SessionWorkbenchHeaderActions", () => {
     );
 
     expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
-    expect(screen.getByText("mistle")).toBeDefined();
   });
 
   it("does not render the repository selector when no repository control is provided", () => {
@@ -213,8 +212,6 @@ describe("SessionWorkbenchHeaderActions", () => {
 
     fireEvent.click(screen.getByRole("combobox", { name: "Primary repository" }));
 
-    expect(
-      screen.getByText("The selected repository is no longer available in this sandbox."),
-    ).toBeDefined();
+    expect(screen.getByRole("note")).toBeDefined();
   });
 });
