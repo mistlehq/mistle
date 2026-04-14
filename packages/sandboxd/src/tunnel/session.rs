@@ -43,7 +43,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::{client_async_tls_with_config, connect_async};
 use url::Url;
 
-use crate::cgroups::DEFAULT_CGROUP_ROOT;
+use crate::cgroups::{DEFAULT_CGROUP_ROOT, UserScopePaths, is_scope_populated};
 use crate::keepalive::KeepaliveManager;
 use crate::protocol::startup::StartupInput;
 use crate::pty::{
@@ -649,6 +649,20 @@ async fn run_connected_tunnel_session(
     };
 
     loop {
+        if let Err(error) = sync_pty_scope_keepalive(
+            runtime.keepalive_manager.as_ref(),
+            loop_context.cgroup_root,
+            loop_context.sandbox_instance_id,
+        ) {
+            eprintln!(
+                "sandboxd bootstrap connected session will restart after error: {error}"
+            );
+            mark_tunnel_disconnected(runtime);
+            return ConnectedTunnelSessionResult {
+                outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+                startup_completed,
+            };
+        }
         {
             let publishable_state = runtime
                 .keepalive_manager
@@ -1627,6 +1641,71 @@ fn poll_pty_sessions(
     Ok(did_work)
 }
 
+fn sync_pty_scope_keepalive(
+    keepalive_manager: &Mutex<KeepaliveManager>,
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+) -> Result<(), TunnelSessionError> {
+    let any_user_scope_populated =
+        any_populated_sandbox_user_scope(cgroup_root, sandbox_instance_id)?;
+
+    keepalive_manager
+        .lock()
+        .expect("keepalive manager lock should not be poisoned")
+        .set_user_active(any_user_scope_populated);
+
+    Ok(())
+}
+
+fn any_populated_sandbox_user_scope(
+    cgroup_root: &Path,
+    sandbox_instance_id: &str,
+) -> Result<bool, TunnelSessionError> {
+    let user_root = cgroup_root.join(sandbox_instance_id).join("user");
+    let entries = match fs::read_dir(&user_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(TunnelSessionError::Pty(format!(
+                "failed to read sandbox user cgroup root {}: {error}",
+                user_root.display()
+            )));
+        }
+    };
+
+    for entry_result in entries {
+        let entry = entry_result.map_err(|error| {
+            TunnelSessionError::Pty(format!(
+                "failed to read sandbox user cgroup entry under {}: {error}",
+                user_root.display()
+            ))
+        })?;
+        let entry_type = entry.file_type().map_err(|error| {
+            TunnelSessionError::Pty(format!(
+                "failed to inspect sandbox user cgroup entry {}: {error}",
+                entry.path().display()
+            ))
+        })?;
+        if !entry_type.is_dir() {
+            continue;
+        }
+
+        let scope_root = entry.path();
+        let scope_paths = UserScopePaths {
+            procs_file: scope_root.join("cgroup.procs"),
+            events_file: scope_root.join("cgroup.events"),
+            kill_file: scope_root.join("cgroup.kill"),
+            scope_root,
+        };
+        let populated =
+            is_scope_populated(&scope_paths).map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
+        if populated {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
 fn send_processes_snapshot(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     session_state: &mut TunnelSessionMutableState,
@@ -2903,38 +2982,47 @@ fn handle_pty_close(
     clock: &dyn Clock,
     sleeper: &dyn Sleeper,
 ) -> Result<(), TunnelSessionError> {
-    let Some(pty_state) = pty_sessions.get_mut(pty_session_id) else {
-        return Ok(());
+    let termination_outcome = {
+        let Some(pty_state) = pty_sessions.get_mut(pty_session_id) else {
+            return Ok(());
+        };
+
+        if !pty_state.attached_stream_ids.contains(&stream_id) {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    stream_id,
+                    STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
+                    format!(
+                        "stream close streamId {stream_id} is not attached to the active PTY session"
+                    ),
+                ),
+            )?;
+            return Ok(());
+        }
+
+        if stream_id != pty_state.primary_stream_id {
+            pty_state.attached_stream_ids.remove(&stream_id);
+            pty_state.send_windows_by_stream_id.remove(&stream_id);
+            return Ok(());
+        }
+
+        (
+            pty_state.primary_stream_id,
+            pty_state.attached_stream_ids.iter().copied().collect::<Vec<_>>(),
+            pty_state.session.terminate(
+                clock,
+                sleeper,
+                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
+            ),
+        )
     };
 
-    if !pty_state.attached_stream_ids.contains(&stream_id) {
-        write_tunnel_text(
-            tunnel_writer_sender,
-            stream_reset(
-                stream_id,
-                STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
-                format!(
-                    "stream close streamId {stream_id} is not attached to the active PTY session"
-                ),
-            ),
-        )?;
-        return Ok(());
-    }
-
-    if stream_id != pty_state.primary_stream_id {
-        pty_state.attached_stream_ids.remove(&stream_id);
-        pty_state.send_windows_by_stream_id.remove(&stream_id);
-        return Ok(());
-    }
-
-    match pty_state.session.terminate(
-        clock,
-        sleeper,
-        DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-        DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-    ) {
+    let (primary_stream_id, attached_stream_ids, termination_result) = termination_outcome;
+    match termination_result {
         Ok(exit_code) => {
-            for attached_stream_id in pty_state.attached_stream_ids.iter().copied() {
+            for attached_stream_id in attached_stream_ids {
                 write_tunnel_text(
                     tunnel_writer_sender,
                     pty_exit_event(attached_stream_id, exit_code),
@@ -2946,7 +3034,7 @@ fn handle_pty_close(
             write_tunnel_text(
                 tunnel_writer_sender,
                 stream_reset(
-                    pty_state.primary_stream_id,
+                    primary_stream_id,
                     STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
                     error.to_string(),
                 ),
@@ -3333,7 +3421,7 @@ mod tests {
         TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
         TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
         connect_bootstrap_websocket, handle_tunnel_session_event, resolve_bootstrap_tunnel_url,
-        run_connected_tunnel_session_catching_panics,
+        run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
     };
 
     use std::collections::BTreeMap;
@@ -3359,6 +3447,11 @@ mod tests {
 
     use crate::keepalive::KeepaliveManager;
     use crate::protocol::startup::{StartupInput, StartupMode};
+    #[cfg(target_os = "linux")]
+    use crate::pty::{
+        DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtySpawnRequest,
+        start_scoped_pty_session,
+    };
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::time::{Clock, SystemClock, ThreadSleeper};
@@ -3470,6 +3563,134 @@ mod tests {
 
         assert_eq!(decoded.text, "prefix ");
         assert!(decoded.truncated);
+    }
+
+    #[test]
+    fn sync_pty_scope_keepalive_reads_populated_user_scopes_from_disk() {
+        let test_dir = create_temp_test_dir("pty_scope_keepalive");
+        let scope_paths = crate::cgroups::create_user_scope(&test_dir, "sbi_123", "scope_123")
+            .expect("user scope should be created");
+        std::fs::write(&scope_paths.events_file, "populated 1\n")
+            .expect("scope events should be writable");
+        let keepalive_manager = Mutex::new(KeepaliveManager::default());
+
+        sync_pty_scope_keepalive(
+            &keepalive_manager,
+            &test_dir,
+            "sbi_123",
+        )
+        .expect("populated user scope should sync");
+
+        assert!(
+            keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "populated user scope should keep the sandbox active"
+        );
+
+        std::fs::write(&scope_paths.events_file, "populated 0\n")
+            .expect("scope events should be writable");
+        sync_pty_scope_keepalive(
+            &keepalive_manager,
+            &test_dir,
+            "sbi_123",
+        )
+        .expect("empty user scope should sync");
+
+        assert!(
+            !keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "empty user scope should clear sandbox keepalive"
+        );
+
+        std::fs::remove_dir_all(test_dir).expect("temp dir should be removable");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sync_pty_scope_keepalive_observes_backgrounded_pty_children_via_cgroups() {
+        let test_dir = create_temp_test_dir("pty_scope_keepalive_backgrounded");
+        let cgroup_root = test_dir.join("cgroup-root");
+        let background_pid_path = test_dir.join("background.pid");
+        std::fs::create_dir_all(&cgroup_root).expect("cgroup root should be creatable");
+        let session = start_scoped_pty_session(
+            PtySpawnRequest {
+                command: Some("/bin/sh".to_string()),
+                args: Some(vec![
+                    "-lc".to_string(),
+                    format!(
+                        "nohup sh -c 'echo $$ > {}; sleep 30' >/dev/null 2>&1 < /dev/null & cat",
+                        background_pid_path.display()
+                    ),
+                ]),
+                ..PtySpawnRequest::default()
+            },
+            &cgroup_root,
+            "sbi_123",
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect("scoped PTY session should start");
+        let background_pid = read_pid_file_with_retry(&background_pid_path, &SystemClock, &ThreadSleeper)
+            .expect("background pid should be written");
+
+        session
+            .terminate(
+                &SystemClock,
+                &ThreadSleeper,
+                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
+            )
+            .expect("PTY termination should succeed");
+
+        let keepalive_manager = Mutex::new(KeepaliveManager::default());
+        drop(session);
+        sync_pty_scope_keepalive(
+            &keepalive_manager,
+            &cgroup_root,
+            "sbi_123",
+        )
+        .expect("backgrounded PTY child should update keepalive from disk");
+
+        assert!(
+            keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "backgrounded child should keep sandbox keepalive active"
+        );
+
+        kill(Pid::from_raw(background_pid), Signal::SIGKILL)
+            .expect("background process should be killable");
+        wait_for(
+            Duration::from_secs(5),
+            Duration::from_millis(10),
+            || {
+                sync_pty_scope_keepalive(
+                    &keepalive_manager,
+                    &cgroup_root,
+                    "sbi_123",
+                )
+                .expect("backgrounded scope should keep syncing");
+                !keepalive_manager
+                    .lock()
+                    .expect("keepalive manager lock should not be poisoned")
+                    .active()
+            },
+        )
+        .expect("keepalive should clear once the background process exits");
+        assert!(
+            !keepalive_manager
+                .lock()
+                .expect("keepalive manager lock should not be poisoned")
+                .active(),
+            "keepalive should clear once the background process exits"
+        );
+
+        std::fs::remove_dir_all(test_dir).expect("temp dir should be removable");
     }
 
     #[test]
@@ -7384,5 +7605,59 @@ mod tests {
         };
 
         assert_eq!(pong_payload.as_ref(), payload);
+    }
+
+    #[cfg(target_os = "linux")]
+    fn read_pid_file_with_retry(
+        path: &std::path::Path,
+        clock: &dyn Clock,
+        sleeper: &ThreadSleeper,
+    ) -> Result<i32, String> {
+        let deadline_ms = clock.now_ms().saturating_add(5_000);
+        loop {
+            if let Ok(contents) = fs::read_to_string(path) {
+                let trimmed = contents.trim();
+                if !trimmed.is_empty() {
+                    return trimmed.parse::<i32>().map_err(|error| {
+                        format!("pid file at {} is invalid: {error}", path.display())
+                    });
+                }
+            }
+
+            if clock.now_ms() >= deadline_ms {
+                return Err(format!("timed out waiting for pid file {}", path.display()));
+            }
+
+            sleeper.sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn wait_for(
+        timeout: Duration,
+        poll_interval: Duration,
+        mut predicate: impl FnMut() -> bool,
+    ) -> Result<(), String> {
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            if predicate() {
+                return Ok(());
+            }
+            std::thread::sleep(poll_interval);
+        }
+        Err(format!(
+            "timed out after {}ms waiting for condition",
+            timeout.as_millis()
+        ))
+    }
+
+    fn create_temp_test_dir(prefix: &str) -> PathBuf {
+        let path = PathBuf::from("/tmp").join(format!(
+            "sbd_{prefix}_{}_{}",
+            std::process::id(),
+            REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        fs::create_dir_all(&path).expect("temp test dir should be creatable");
+        path
     }
 }
