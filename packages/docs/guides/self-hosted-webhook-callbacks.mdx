@@ -30,3 +30,9 @@ These integrations currently depend on callback or webhook reachability:
 - Jira managed webhook sources
 
 Provider-specific setup details still belong in each connection guide. This page only defines the operator-owned platform requirement: the base URL must be reachable from the provider.
+
+## Running Locally
+
+When you test a self-hosted setup locally, provider callback and webhook delivery still require a public URL that can reach your control plane.
+
+In this repository's local development workflow, use the Cloudflare named tunnel started by `pnpm dev`, then configure provider apps and webhook registrations with the printed public control-plane URL instead of `localhost`.
