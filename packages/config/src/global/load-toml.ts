@@ -15,6 +15,7 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
   const sandboxPublish = asObjectRecord(sandbox.publish);
   const sandboxPublishAccess = asObjectRecord(sandboxPublish.access);
   const sandboxPublishSession = asObjectRecord(sandboxPublish.session);
+  const sandboxStorage = asObjectRecord(sandbox.storage);
 
   return PartialGlobalConfigSchema.parse({
     env: global.env,
@@ -67,6 +68,7 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
     typeof sandboxBootstrap.token_secret === "string" ||
     typeof sandboxConnect.token_secret === "string" ||
     typeof sandboxEgress.token_secret === "string" ||
+    typeof sandboxStorage.backend === "string" ||
     typeof sandboxPublish.base_domain === "string" ||
     typeof sandboxPublishAccess.token_secret === "string" ||
     typeof sandboxPublishSession.cookie_signing_secret === "string"
@@ -91,6 +93,13 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
               tokenIssuer: sandboxEgress.token_issuer,
               tokenAudience: sandboxEgress.token_audience,
             },
+            ...(typeof sandboxStorage.backend === "string"
+              ? {
+                  storage: {
+                    backend: sandboxStorage.backend,
+                  },
+                }
+              : {}),
             publish: {
               baseDomain: sandboxPublish.base_domain,
               access: {

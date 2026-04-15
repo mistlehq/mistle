@@ -2,6 +2,13 @@ import { z } from "zod";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 
+export const SandboxStorageBackends = {
+  ARCHIL: "archil",
+} as const;
+
+export type SandboxStorageBackend =
+  (typeof SandboxStorageBackends)[keyof typeof SandboxStorageBackends];
+
 const GlobalTelemetryEndpointSchema = z
   .url()
   .refine((value) => {
@@ -99,6 +106,18 @@ export const PartialGlobalSandboxPublishConfigSchema = z
   })
   .strict();
 
+export const GlobalSandboxStorageConfigSchema = z
+  .object({
+    backend: z.enum([SandboxStorageBackends.ARCHIL]),
+  })
+  .strict();
+
+export const PartialGlobalSandboxStorageConfigSchema = z
+  .object({
+    backend: z.enum([SandboxStorageBackends.ARCHIL]).optional(),
+  })
+  .strict();
+
 export const GlobalSandboxConfigSchema = z
   .object({
     provider: z.enum(SandboxProviders),
@@ -109,6 +128,7 @@ export const GlobalSandboxConfigSchema = z
     bootstrap: GlobalSandboxTokenConfigSchema,
     egress: GlobalSandboxTokenConfigSchema,
     publish: GlobalSandboxPublishConfigSchema,
+    storage: GlobalSandboxStorageConfigSchema.optional(),
   })
   .strict();
 
@@ -122,6 +142,7 @@ export const PartialGlobalSandboxConfigSchema = z
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
     egress: GlobalSandboxTokenConfigSchema.partial().optional(),
     publish: PartialGlobalSandboxPublishConfigSchema.optional(),
+    storage: PartialGlobalSandboxStorageConfigSchema.optional(),
   })
   .strict();
 

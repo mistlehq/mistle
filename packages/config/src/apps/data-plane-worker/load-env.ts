@@ -1,10 +1,14 @@
 import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-env.js";
+import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
+  DataPlaneWorkerControlPlaneApiConfigSchema,
   PartialDataPlaneWorkerRuntimeStateConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxE2BConfigSchema,
+  DataPlaneWorkerSandboxStorageArchilMountConfigSchema,
+  DataPlaneWorkerSandboxStorageArchilConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -60,6 +64,13 @@ const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneWorkerRuntime
   },
 ]);
 
+const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneWorkerControlPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
+  },
+]);
+
 const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>([
   {
     key: "socketPath",
@@ -105,6 +116,53 @@ const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfi
   },
 ]);
 
+const loadSandboxStorageArchilEnv = createEnvLoader<
+  typeof DataPlaneWorkerSandboxStorageArchilConfigSchema
+>([
+  {
+    key: "apiKey",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+  },
+  {
+    key: "region",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
+  },
+  {
+    key: "namePrefix",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
+  },
+  {
+    key: "mounts",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    parse: (value) => {
+      try {
+        const parsedValue = JSON.parse(value);
+        if (!Array.isArray(parsedValue)) {
+          throw new Error("Expected a JSON array.");
+        }
+
+        return parsedValue.map((item) => {
+          const mount = asObjectRecord(item);
+
+          return DataPlaneWorkerSandboxStorageArchilMountConfigSchema.parse({
+            type: mount.type,
+            bucket: mount.bucket,
+            endpoint: mount.endpoint,
+            accessKeyId: mount.accessKeyId,
+            secretAccessKey: mount.secretAccessKey,
+          });
+        });
+      } catch (error) {
+        throw new Error(
+          `Invalid MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  },
+]);
+
 export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneWorkerConfigInput {
@@ -130,9 +188,15 @@ export function loadDataPlaneWorkerFromEnv(
     partialConfig.runtimeState = runtimeState;
   }
 
+  const controlPlaneApi = loadControlPlaneApiEnv(env);
+  if (hasEntries(controlPlaneApi)) {
+    partialConfig.controlPlaneApi = controlPlaneApi;
+  }
+
   const sandbox = loadSandboxEnv(env);
   const sandboxDocker = loadSandboxDockerEnv(env);
   const sandboxE2B = loadSandboxE2BEnv(env);
+  const sandboxStorageArchil = loadSandboxStorageArchilEnv(env);
 
   if (hasEntries(sandbox) || hasEntries(sandboxDocker) || hasEntries(sandboxE2B)) {
     const sandboxConfig: Record<string, unknown> = {
@@ -148,6 +212,12 @@ export function loadDataPlaneWorkerFromEnv(
     }
 
     partialConfig.sandbox = sandboxConfig;
+  }
+
+  if (hasEntries(sandboxStorageArchil)) {
+    partialConfig.sandboxStorage = {
+      archil: sandboxStorageArchil,
+    };
   }
 
   return PartialDataPlaneWorkerConfigSchema.parse(partialConfig);

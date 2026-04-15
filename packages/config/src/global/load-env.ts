@@ -4,6 +4,7 @@ import {
   PartialGlobalConfigSchema,
   PartialGlobalSandboxConfigSchema,
   PartialGlobalSandboxPublishConfigSchema,
+  PartialGlobalSandboxStorageConfigSchema,
   GlobalSandboxTokenConfigSchema,
   GlobalSandboxPublishSessionConfigSchema,
   type PartialGlobalConfigInput,
@@ -157,10 +158,18 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
   },
 ]);
 
+const loadSandboxStorageEnv = createEnvLoader<typeof PartialGlobalSandboxStorageConfigSchema>([
+  {
+    key: "backend",
+    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND",
+  },
+]);
+
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
   const partialTelemetry = loadTelemetryEnv(env);
   const partialSandbox = loadSandboxEnv(env);
+  const partialSandboxStorage = loadSandboxStorageEnv(env);
   const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
   const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
   const partialSandboxEgressToken = loadSandboxEgressTokenEnv(env);
@@ -177,6 +186,7 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
     hasEntries(partialSandboxBootstrapToken) ||
     hasEntries(partialSandboxConnectToken) ||
     hasEntries(partialSandboxEgressToken) ||
+    hasEntries(partialSandboxStorage) ||
     hasEntries(partialSandboxPublish) ||
     hasEntries(partialSandboxPublishAccessToken) ||
     hasEntries(partialSandboxPublishSession)
@@ -198,6 +208,11 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
       ...(hasEntries(partialSandboxEgressToken)
         ? {
             egress: partialSandboxEgressToken,
+          }
+        : {}),
+      ...(hasEntries(partialSandboxStorage)
+        ? {
+            storage: partialSandboxStorage,
           }
         : {}),
       ...(hasEntries(partialSandboxPublish) ||

@@ -11,6 +11,7 @@ export function loadDataPlaneApiFromToml(
   const database = asObjectRecord(dataPlaneApi.database);
   const workflow = asObjectRecord(dataPlaneApi.workflow);
   const runtimeState = asObjectRecord(dataPlaneApi.runtime_state);
+  const controlPlaneApi = asObjectRecord(dataPlaneApi.control_plane_api);
   const sandbox = asObjectRecord(dataPlaneApi.sandbox);
   const sandboxDocker = asObjectRecord(sandbox.docker);
   const sandboxE2B = asObjectRecord(sandbox.e2b);
@@ -46,6 +47,13 @@ export function loadDataPlaneApiFromToml(
     runtimeState: {
       gatewayBaseUrl: runtimeState.gateway_base_url,
     },
+    ...(typeof controlPlaneApi.base_url === "string"
+      ? {
+          controlPlaneApi: {
+            baseUrl: controlPlaneApi.base_url,
+          },
+        }
+      : {}),
     sandbox: sandboxConfig,
   });
 }

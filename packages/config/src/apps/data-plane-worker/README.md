@@ -16,6 +16,7 @@ Namespace in final config:
 | `tunnel.bootstrapTokenTtlSeconds`     | `number` (`>=1`)    | Lifetime for sandbox bootstrap tunnel token in seconds.        | None      | `[apps.data_plane_worker.tunnel].bootstrap_token_ttl_seconds`      | `MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS` (`Number`) |
 | `tunnel.exchangeTokenTtlSeconds`      | `number` (`>=1`)    | Lifetime for sandbox tunnel exchange token in seconds.         | None      | `[apps.data_plane_worker.tunnel].exchange_token_ttl_seconds`       | `MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS` (`Number`)  |
 | `runtimeState.gatewayBaseUrl`         | `string`            | Internal gateway base URL used for worker runtime-state reads. | None      | `[apps.data_plane_worker.runtime_state].gateway_base_url`          | `MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL`                |
+| `controlPlaneApi.baseUrl`             | `string`            | Internal control-plane API base URL used for storage APIs.     | None      | `[apps.data_plane_worker.control_plane_api].base_url`              | `MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL`                    |
 | `sandbox.tokenizerProxyEgressBaseUrl` | `string`            | Base URL used for sandbox-runtime tokenizer proxy egress hops. | None      | `[apps.data_plane_worker.sandbox].tokenizer_proxy_egress_base_url` | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL`       |
 | `sandbox.sandboxdTestFaultsEnabled`   | `boolean`           | Enables sandboxd test-only fault routes in sandbox-local envs. | None      | `[apps.data_plane_worker.sandbox].sandboxd_test_faults_enabled`    | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED`          |
 | `sandbox.docker.socketPath`           | `string`            | Docker daemon socket path used when provider is docker.        | None      | `[apps.data_plane_worker.sandbox.docker].socket_path`              | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH`                    |
@@ -24,6 +25,10 @@ Namespace in final config:
 | `sandbox.e2b.domain`                  | `string` (optional) | Optional E2B domain override.                                  | `e2b.app` | `[apps.data_plane_worker.sandbox.e2b].domain`                      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN`                            |
 | `sandbox.e2b.cpuCount`                | `number` (`>=1`)    | Optional E2B template CPU default used for new sandboxes.      | `2`       | `[apps.data_plane_worker.sandbox.e2b].cpu_count`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT`                         |
 | `sandbox.e2b.memoryMb`                | `number` (`>=1`)    | Optional E2B template memory default in MB for new sandboxes.  | `4096`    | `[apps.data_plane_worker.sandbox.e2b].memory_mb`                   | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB`                         |
+| `sandboxStorage.archil.apiKey`        | `string`            | Managed Archil API key used for durable sandbox provisioning.  | None      | `[apps.data_plane_worker.sandbox_storage.archil].api_key`          | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY`                |
+| `sandboxStorage.archil.region`        | `string`            | Deployment-wide Archil region used for managed disks.          | None      | `[apps.data_plane_worker.sandbox_storage.archil].region`           | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION`                 |
+| `sandboxStorage.archil.namePrefix`    | `string` (optional) | Optional prefix applied to new Archil disk names.              | None      | `[apps.data_plane_worker.sandbox_storage.archil].name_prefix`      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX`            |
+| `sandboxStorage.archil.mounts`        | `0..1` entries      | Optional managed Archil mount definition for created disks.    | None      | `[[apps.data_plane_worker.sandbox_storage.archil.mounts]]`         | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON`            |
 
 Notes:
 
@@ -32,3 +37,4 @@ Notes:
 - `sandbox.sandboxdTestFaultsEnabled` is intended only for non-release/test environments where sandboxd fault injection must be enabled explicitly.
 - Docker and E2B both consume the same `global.sandbox.defaultBaseImage` OCI reference.
 - Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `2` vCPU and `4096` MB.
+- `sandboxStorage.archil.mounts` currently supports only `s3-compatible` and must contain at most one entry.

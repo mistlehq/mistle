@@ -1,6 +1,7 @@
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   type PartialDataPlaneApiConfigInput,
+  DataPlaneApiControlPlaneApiConfigSchema,
   DataPlaneApiDatabaseConfigSchema,
   DataPlaneApiRuntimeStateConfigSchema,
   DataPlaneApiSandboxDockerConfigSchema,
@@ -51,6 +52,13 @@ const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfi
   },
 ]);
 
+const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneApiControlPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL",
+  },
+]);
+
 const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneApiSandboxDockerConfigSchema>([
   {
     key: "socketPath",
@@ -90,6 +98,11 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
   const runtimeState = loadRuntimeStateEnv(env);
   if (hasEntries(runtimeState)) {
     partialConfig.runtimeState = runtimeState;
+  }
+
+  const controlPlaneApi = loadControlPlaneApiEnv(env);
+  if (hasEntries(controlPlaneApi)) {
+    partialConfig.controlPlaneApi = controlPlaneApi;
   }
 
   const sandboxDocker = loadSandboxDockerEnv(env);

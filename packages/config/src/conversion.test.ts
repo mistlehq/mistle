@@ -35,6 +35,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: "fixture-publish-cookie-secret",
       MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+      MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
@@ -50,6 +51,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5302",
+      MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "test-data-plane-api-key",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN: "sandbox.e2b.app",
@@ -62,10 +64,16 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+      MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN: "worker.sandbox.e2b.app",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT: "4",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB: "16384",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: "test-archil-api-key",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: "mistle-",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON:
+        '[{"type":"s3-compatible","bucket":"mistle-sandbox-storage","endpoint":"https://s3.example.com","accessKeyId":"archil-access-key-id","secretAccessKey":"archil-secret-access-key"}]',
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });
@@ -89,6 +97,9 @@ describe("convertEnvToTomlRecord", () => {
         },
         sandbox: {
           provider: "docker",
+          storage: {
+            backend: "archil",
+          },
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
           internal_gateway_ws_url: "ws://127.0.0.1:5302/tunnel/sandbox",
           bootstrap: {
@@ -155,6 +166,9 @@ describe("convertEnvToTomlRecord", () => {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5302",
           },
+          control_plane_api: {
+            base_url: "http://127.0.0.1:5100",
+          },
           sandbox: {
             docker: {
               socket_path: "/var/run/docker.sock",
@@ -173,6 +187,9 @@ describe("convertEnvToTomlRecord", () => {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
           },
+          control_plane_api: {
+            base_url: "http://127.0.0.1:5100",
+          },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
             e2b: {
@@ -180,6 +197,22 @@ describe("convertEnvToTomlRecord", () => {
               domain: "worker.sandbox.e2b.app",
               cpu_count: 4,
               memory_mb: 16384,
+            },
+          },
+          sandbox_storage: {
+            archil: {
+              api_key: "test-archil-api-key",
+              region: "gcp-us-central1",
+              name_prefix: "mistle-",
+              mounts: [
+                {
+                  type: "s3-compatible",
+                  bucket: "mistle-sandbox-storage",
+                  endpoint: "https://s3.example.com",
+                  access_key_id: "archil-access-key-id",
+                  secret_access_key: "archil-secret-access-key",
+                },
+              ],
             },
           },
         },
@@ -225,6 +258,9 @@ describe("convertTomlToEnvRecord", () => {
         },
         sandbox: {
           provider: "docker",
+          storage: {
+            backend: "archil",
+          },
           default_base_image: "registry.example.com/mistle/sandbox-base:prod",
           internal_gateway_ws_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
           bootstrap: {
@@ -286,6 +322,9 @@ describe("convertTomlToEnvRecord", () => {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5302",
           },
+          control_plane_api: {
+            base_url: "http://control-plane-api:8080",
+          },
           sandbox: {
             docker: {
               socket_path: "/var/run/docker.sock",
@@ -304,6 +343,9 @@ describe("convertTomlToEnvRecord", () => {
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
           },
+          control_plane_api: {
+            base_url: "http://control-plane-api:8080",
+          },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
             e2b: {
@@ -311,6 +353,22 @@ describe("convertTomlToEnvRecord", () => {
               domain: "worker.sandbox.e2b.app",
               cpu_count: 4,
               memory_mb: 16384,
+            },
+          },
+          sandbox_storage: {
+            archil: {
+              api_key: "test-archil-api-key",
+              region: "gcp-us-central1",
+              name_prefix: "mistle-",
+              mounts: [
+                {
+                  type: "s3-compatible",
+                  bucket: "mistle-sandbox-storage",
+                  endpoint: "https://s3.example.com",
+                  access_key_id: "archil-access-key-id",
+                  secret_access_key: "archil-secret-access-key",
+                },
+              ],
             },
           },
         },
@@ -356,6 +414,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: "prod-publish-cookie-secret",
       MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+      MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
       MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://data-plane-gateway:8084/tunnel/sandbox",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
@@ -368,6 +427,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5302",
+      MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: "http://control-plane-api:8080",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "test-data-plane-api-key",
       MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN: "sandbox.e2b.app",
@@ -380,10 +440,16 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+      MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://control-plane-api:8080",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN: "worker.sandbox.e2b.app",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT: "4",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB: "16384",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: "test-archil-api-key",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: "mistle-",
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON:
+        '[{"type":"s3-compatible","bucket":"mistle-sandbox-storage","endpoint":"https://s3.example.com","accessKeyId":"archil-access-key-id","secretAccessKey":"archil-secret-access-key"}]',
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });

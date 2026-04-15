@@ -4,11 +4,13 @@ import { ControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js"
 import { ControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
 import {
   DataPlaneApiConfigSchema,
+  getDataPlaneApiPersistentSandboxValidationIssue,
   getDataPlaneApiSandboxProviderValidationIssue,
 } from "./apps/data-plane-api/schema.js";
 import { DataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import {
   DataPlaneWorkerConfigSchema,
+  getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
 } from "./apps/data-plane-worker/schema.js";
 import { TokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
@@ -42,20 +44,44 @@ export const ConfigSchema = z
       });
     }
 
+    const dataPlaneApiPersistentIssue = getDataPlaneApiPersistentSandboxValidationIssue({
+      globalSandboxStorageBackend: value.global.sandbox.storage?.backend,
+      appConfig: value.apps.data_plane_api,
+    });
+
+    if (dataPlaneApiPersistentIssue !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["apps", "data_plane_api", ...dataPlaneApiPersistentIssue.path],
+        message: dataPlaneApiPersistentIssue.message,
+      });
+    }
+
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
       globalSandboxProvider: value.global.sandbox.provider,
       appSandbox: value.apps.data_plane_worker.sandbox,
     });
 
-    if (issue === null) {
-      return;
+    if (issue !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["apps", "data_plane_worker", ...issue.path],
+        message: issue.message,
+      });
     }
 
-    ctx.addIssue({
-      code: "custom",
-      path: ["apps", "data_plane_worker", ...issue.path],
-      message: issue.message,
+    const dataPlaneWorkerPersistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
+      globalSandboxStorageBackend: value.global.sandbox.storage?.backend,
+      appConfig: value.apps.data_plane_worker,
     });
+
+    if (dataPlaneWorkerPersistentIssue !== null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["apps", "data_plane_worker", ...dataPlaneWorkerPersistentIssue.path],
+        message: dataPlaneWorkerPersistentIssue.message,
+      });
+    }
   })
   .strict();
 

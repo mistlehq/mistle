@@ -1,3 +1,5 @@
+import { asObjectRecord } from "./core/record.js";
+
 export type EnvValueFormat = "default" | "csv" | "json";
 
 export type ConfigEnvTomlMapping = {
@@ -5,6 +7,7 @@ export type ConfigEnvTomlMapping = {
   tomlPath: readonly string[];
   envVar: string;
   envValueFormat?: EnvValueFormat;
+  toTomlValue?: (value: unknown) => unknown;
 };
 
 export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
@@ -57,6 +60,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["global", "sandbox", "provider"],
     tomlPath: ["global", "sandbox", "provider"],
     envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
+  },
+  {
+    configPath: ["global", "sandbox", "storage", "backend"],
+    tomlPath: ["global", "sandbox", "storage", "backend"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND",
   },
   {
     configPath: ["global", "sandbox", "defaultBaseImage"],
@@ -361,6 +369,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_api", "controlPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "data_plane_api", "control_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_api", "sandbox", "docker", "socketPath"],
     tomlPath: ["apps", "data_plane_api", "sandbox", "docker", "socket_path"],
     envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH",
@@ -461,6 +474,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_worker", "controlPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "data_plane_worker", "control_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_worker", "sandbox", "tokenizerProxyEgressBaseUrl"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "tokenizer_proxy_egress_base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
@@ -499,6 +517,52 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_worker", "sandbox", "e2b", "memoryMb"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "e2b", "memory_mb"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandboxStorage", "archil", "apiKey"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandboxStorage", "archil", "region"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox_storage", "archil", "region"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandboxStorage", "archil", "namePrefix"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox_storage", "archil", "name_prefix"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandboxStorage", "archil", "mounts"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    envValueFormat: "json",
+    toTomlValue: (value) => {
+      if (!Array.isArray(value)) {
+        throw new Error(
+          "Invalid value for MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON. Expected an array.",
+        );
+      }
+
+      return value.map((mount) => {
+        if (typeof mount !== "object" || mount === null || Array.isArray(mount)) {
+          throw new Error(
+            "Invalid value for MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON. Expected mount objects.",
+          );
+        }
+
+        const objectMount = asObjectRecord(mount);
+
+        return {
+          type: objectMount.type,
+          bucket: objectMount.bucket,
+          endpoint: objectMount.endpoint,
+          access_key_id: objectMount.accessKeyId,
+          secret_access_key: objectMount.secretAccessKey,
+        };
+      });
+    },
   },
   {
     configPath: ["apps", "tokenizer_proxy", "server", "host"],

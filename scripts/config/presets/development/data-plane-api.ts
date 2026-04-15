@@ -19,6 +19,9 @@ export const dataPlaneApiDevelopmentPreset = {
         runtime_state: {
           gateway_base_url: "http://127.0.0.1:5202",
         },
+        control_plane_api: {
+          base_url: "http://localhost:5100",
+        },
       },
     },
   },

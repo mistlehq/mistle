@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DataPlaneApiConfigSchema,
   DataPlaneApiSandboxConfigSchema,
+  getDataPlaneApiPersistentSandboxValidationIssue,
   getDataPlaneApiSandboxProviderValidationIssue,
 } from "./schema.js";
 
@@ -20,6 +22,38 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
       },
     });
   });
+
+  it("accepts control-plane API config alongside sandbox config", () => {
+    const parsed = DataPlaneApiConfigSchema.parse({
+      server: {
+        host: "127.0.0.1",
+        port: 5200,
+      },
+      database: {
+        url: "postgresql://127.0.0.1/mistle",
+        migrationUrl: "postgresql://127.0.0.1/mistle",
+      },
+      workflow: {
+        databaseUrl: "postgresql://127.0.0.1/mistle",
+        namespaceId: "development",
+      },
+      runtimeState: {
+        gatewayBaseUrl: "http://127.0.0.1:5202",
+      },
+      controlPlaneApi: {
+        baseUrl: "http://127.0.0.1:5100",
+      },
+      sandbox: {
+        docker: {
+          socketPath: "/var/run/docker.sock",
+        },
+      },
+    });
+
+    expect(parsed.controlPlaneApi).toEqual({
+      baseUrl: "http://127.0.0.1:5100",
+    });
+  });
 });
 
 describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
@@ -33,6 +67,38 @@ describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
       path: ["sandbox", "docker"],
       message:
         "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
+    });
+  });
+});
+
+describe("getDataPlaneApiPersistentSandboxValidationIssue", () => {
+  it("requires control-plane API config when Archil storage is enabled", () => {
+    const issue = getDataPlaneApiPersistentSandboxValidationIssue({
+      globalSandboxStorageBackend: "archil",
+      appConfig: {
+        server: {
+          host: "127.0.0.1",
+          port: 5200,
+        },
+        database: {
+          url: "postgresql://127.0.0.1/mistle",
+          migrationUrl: "postgresql://127.0.0.1/mistle",
+        },
+        workflow: {
+          databaseUrl: "postgresql://127.0.0.1/mistle",
+          namespaceId: "development",
+        },
+        runtimeState: {
+          gatewayBaseUrl: "http://127.0.0.1:5202",
+        },
+        sandbox: {},
+      },
+    });
+
+    expect(issue).toEqual({
+      path: ["controlPlaneApi"],
+      message:
+        "apps.data_plane_api.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
     });
   });
 });

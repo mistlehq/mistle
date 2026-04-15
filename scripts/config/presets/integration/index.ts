@@ -31,12 +31,18 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.DOCKER,
+        storage: {
+          backend: "archil",
+        },
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway:5202/tunnel/sandbox",
       },
     },
     apps: {
       data_plane_api: {
+        control_plane_api: {
+          base_url: "http://control-plane-api:5100",
+        },
         sandbox: {
           docker: {
             socket_path: "/var/run/docker.sock",
@@ -44,6 +50,9 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
         },
       },
       data_plane_worker: {
+        control_plane_api: {
+          base_url: "http://control-plane-api:5100",
+        },
         sandbox: {
           tokenizer_proxy_egress_base_url: "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
           docker: {
@@ -57,7 +66,16 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
     ["apps", "data_plane_api", "sandbox", "e2b"],
     ["apps", "data_plane_worker", "sandbox", "e2b"],
   ],
-  requiredConfigValues: [],
+  requiredConfigValues: [
+    {
+      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
+      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+    },
+    {
+      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
+      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    },
+  ],
   outputFileName: IntegrationConfigFileNames.DOCKER,
 };
 
@@ -67,12 +85,18 @@ const E2B_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.E2B,
+        storage: {
+          backend: "archil",
+        },
         gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
         internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
       },
     },
     apps: {
       data_plane_api: {
+        control_plane_api: {
+          base_url: "http://control-plane-api:5100",
+        },
         sandbox: {
           e2b: {
             domain: "e2b.app",
@@ -80,6 +104,9 @@ const E2B_PRESET: IntegrationProviderPreset = {
         },
       },
       data_plane_worker: {
+        control_plane_api: {
+          base_url: "http://control-plane-api:5100",
+        },
         sandbox: {
           tokenizer_proxy_egress_base_url: "https://api.mistle.example/tokenizer-proxy/egress",
           e2b: {
@@ -101,6 +128,14 @@ const E2B_PRESET: IntegrationProviderPreset = {
     {
       path: ["apps", "data_plane_worker", "sandbox", "e2b", "api_key"],
       envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
+    },
+    {
+      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
+      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+    },
+    {
+      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
+      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
     },
   ],
   outputFileName: IntegrationConfigFileNames.E2B,

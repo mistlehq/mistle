@@ -22,6 +22,9 @@ export const globalDevelopmentPreset = {
       },
       sandbox: {
         provider: "docker",
+        storage: {
+          backend: "archil",
+        },
         default_base_image: "localhost:5001/mistle/sandbox-base:dev",
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway-relay:5202/tunnel/sandbox",

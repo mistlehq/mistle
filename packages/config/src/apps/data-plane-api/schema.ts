@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { type SandboxStorageBackend, SandboxStorageBackends } from "../../global/schema.js";
+
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
 
@@ -32,6 +34,18 @@ export const DataPlaneApiWorkflowConfigSchema = z
 export const DataPlaneApiRuntimeStateConfigSchema = z
   .object({
     gatewayBaseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
+export const DataPlaneApiControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
+export const PartialDataPlaneApiControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema.optional(),
   })
   .strict();
 
@@ -69,6 +83,7 @@ export const DataPlaneApiConfigSchema = z
     workflow: DataPlaneApiWorkflowConfigSchema,
     runtimeState: DataPlaneApiRuntimeStateConfigSchema,
     sandbox: DataPlaneApiSandboxConfigSchema,
+    controlPlaneApi: DataPlaneApiControlPlaneApiConfigSchema.optional(),
   })
   .strict();
 
@@ -79,6 +94,7 @@ export const PartialDataPlaneApiConfigSchema = z
     workflow: DataPlaneApiWorkflowConfigSchema.partial().optional(),
     runtimeState: DataPlaneApiRuntimeStateConfigSchema.partial().optional(),
     sandbox: PartialDataPlaneApiSandboxConfigSchema.optional(),
+    controlPlaneApi: PartialDataPlaneApiControlPlaneApiConfigSchema.optional(),
   })
   .strict();
 
@@ -86,6 +102,11 @@ const DataPlaneApiProviderRequirementMessages = {
   DOCKER:
     "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
   E2B: "apps.data_plane_api.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
+} as const;
+
+const DataPlaneApiPersistentSandboxRequirementMessages = {
+  CONTROL_PLANE_API:
+    "apps.data_plane_api.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
 } as const;
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
@@ -110,6 +131,27 @@ export function getDataPlaneApiSandboxProviderValidationIssue(input: {
   }
 
   return null;
+}
+
+export function getDataPlaneApiPersistentSandboxValidationIssue(input: {
+  globalSandboxStorageBackend: SandboxStorageBackend | undefined;
+  appConfig: DataPlaneApiConfig;
+}): {
+  path: readonly ["controlPlaneApi"];
+  message: string;
+} | null {
+  if (input.globalSandboxStorageBackend !== SandboxStorageBackends.ARCHIL) {
+    return null;
+  }
+
+  if (input.appConfig.controlPlaneApi !== undefined) {
+    return null;
+  }
+
+  return {
+    path: ["controlPlaneApi"],
+    message: DataPlaneApiPersistentSandboxRequirementMessages.CONTROL_PLANE_API,
+  };
 }
 
 export type DataPlaneApiConfig = z.infer<typeof DataPlaneApiConfigSchema>;

@@ -93,7 +93,11 @@ function mapConfigToTomlRoot(configRoot: Record<string, unknown>): Record<string
       continue;
     }
 
-    tomlRoot = setValueAtPath(tomlRoot, mapping.tomlPath, value);
+    tomlRoot = setValueAtPath(
+      tomlRoot,
+      mapping.tomlPath,
+      mapping.toTomlValue === undefined ? value : mapping.toTomlValue(value),
+    );
   }
 
   return tomlRoot;

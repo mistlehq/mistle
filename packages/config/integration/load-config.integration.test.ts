@@ -47,6 +47,9 @@ const globalDevelopmentConfig = {
   },
   sandbox: {
     provider: "docker",
+    storage: {
+      backend: "archil",
+    },
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -100,6 +103,9 @@ const globalProductionConfig = {
   },
   sandbox: {
     provider: "docker",
+    storage: {
+      backend: "archil",
+    },
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -268,6 +274,9 @@ const dataPlaneApiEnvConfig = {
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5000",
+  },
   sandbox: {
     docker: {
       socketPath: "/var/run/docker.sock",
@@ -287,6 +296,9 @@ const dataPlaneApiFixtureConfig = {
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5302",
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
   },
 } as const;
 
@@ -349,11 +361,30 @@ const dataPlaneWorkerEnvConfig = {
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5000",
+  },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
+    },
+  },
+  sandboxStorage: {
+    archil: {
+      apiKey: "fixture-archil-api-key",
+      region: "gcp-us-central1",
+      namePrefix: "mistle-",
+      mounts: [
+        {
+          type: "s3-compatible",
+          bucket: "mistle-sandbox-storage",
+          endpoint: "https://s3.example.com",
+          accessKeyId: "fixture-access-key-id",
+          secretAccessKey: "fixture-secret-access-key",
+        },
+      ],
     },
   },
 } as const;
@@ -367,6 +398,9 @@ const dataPlaneWorkerFixtureConfig = {
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5302",
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
   },
 } as const;
 
@@ -387,11 +421,30 @@ const dataPlaneWorkerDockerFixtureConfig = {
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
+  },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
+    },
+  },
+  sandboxStorage: {
+    archil: {
+      apiKey: "fixture-archil-api-key",
+      region: "gcp-us-central1",
+      namePrefix: "mistle-",
+      mounts: [
+        {
+          type: "s3-compatible",
+          bucket: "mistle-sandbox-storage",
+          endpoint: "https://s3.example.com",
+          accessKeyId: "fixture-access-key-id",
+          secretAccessKey: "fixture-secret-access-key",
+        },
+      ],
     },
   },
 } as const;
@@ -843,6 +896,35 @@ describe("loadConfig integrations", () => {
       }),
     ).toThrow(
       /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
+    );
+  });
+
+  it("rejects data-plane-worker config when Archil storage is enabled but worker control-plane API config is missing", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_WORKER,
+        env: createIntegrationEnv({
+          MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
+        }),
+      }),
+    ).toThrow(
+      /apps\.data_plane_worker\.control_plane_api\.base_url is required when global\.sandbox\.storage\.backend is 'archil'/,
+    );
+  });
+
+  it("rejects data-plane-worker config when Archil storage is enabled but worker Archil config is missing", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_WORKER,
+        env: createIntegrationEnv({
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
+        }),
+      }),
+    ).toThrow(
+      /apps\.data_plane_worker\.sandbox_storage\.archil is required when global\.sandbox\.storage\.backend is 'archil'/,
     );
   });
 

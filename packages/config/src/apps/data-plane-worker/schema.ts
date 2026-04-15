@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { type SandboxStorageBackend, SandboxStorageBackends } from "../../global/schema.js";
+
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
 
@@ -39,6 +41,18 @@ export const DataPlaneWorkerRuntimeStateConfigSchema = z
 export const PartialDataPlaneWorkerRuntimeStateConfigSchema = z
   .object({
     gatewayBaseUrl: HttpBaseUrlSchema.optional(),
+  })
+  .strict();
+
+export const DataPlaneWorkerControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema.optional(),
   })
   .strict();
 
@@ -85,6 +99,53 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
   })
   .strict();
 
+export const SandboxStorageArchilMountTypes = {
+  S3_COMPATIBLE: "s3-compatible",
+} as const;
+
+export type SandboxStorageArchilMountType =
+  (typeof SandboxStorageArchilMountTypes)[keyof typeof SandboxStorageArchilMountTypes];
+
+export const DataPlaneWorkerSandboxStorageArchilMountConfigSchema = z
+  .object({
+    type: z.enum([SandboxStorageArchilMountTypes.S3_COMPATIBLE]),
+    bucket: z.string().trim().min(1),
+    endpoint: HttpBaseUrlSchema,
+    accessKeyId: z.string().trim().min(1),
+    secretAccessKey: z.string().trim().min(1),
+  })
+  .strict();
+
+export const DataPlaneWorkerSandboxStorageArchilConfigSchema = z
+  .object({
+    apiKey: z.string().trim().min(1),
+    region: z.string().trim().min(1),
+    namePrefix: z.string().trim().min(1).optional(),
+    mounts: z.array(DataPlaneWorkerSandboxStorageArchilMountConfigSchema).max(1).optional(),
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerSandboxStorageArchilConfigSchema = z
+  .object({
+    apiKey: z.string().trim().min(1).optional(),
+    region: z.string().trim().min(1).optional(),
+    namePrefix: z.string().trim().min(1).optional(),
+    mounts: z.array(DataPlaneWorkerSandboxStorageArchilMountConfigSchema).max(1).optional(),
+  })
+  .strict();
+
+export const DataPlaneWorkerSandboxStorageConfigSchema = z
+  .object({
+    archil: DataPlaneWorkerSandboxStorageArchilConfigSchema.optional(),
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerSandboxStorageConfigSchema = z
+  .object({
+    archil: PartialDataPlaneWorkerSandboxStorageArchilConfigSchema.optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerConfigSchema = z
   .object({
     database: DataPlaneWorkerDatabaseConfigSchema,
@@ -92,6 +153,8 @@ export const DataPlaneWorkerConfigSchema = z
     tunnel: DataPlaneWorkerTunnelConfigSchema,
     runtimeState: DataPlaneWorkerRuntimeStateConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
+    controlPlaneApi: DataPlaneWorkerControlPlaneApiConfigSchema.optional(),
+    sandboxStorage: DataPlaneWorkerSandboxStorageConfigSchema.optional(),
   })
   .strict();
 
@@ -102,6 +165,8 @@ export const PartialDataPlaneWorkerConfigSchema = z
     tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneWorkerRuntimeStateConfigSchema.optional(),
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
+    controlPlaneApi: PartialDataPlaneWorkerControlPlaneApiConfigSchema.optional(),
+    sandboxStorage: PartialDataPlaneWorkerSandboxStorageConfigSchema.optional(),
   })
   .strict();
 
@@ -109,6 +174,13 @@ const DataPlaneWorkerProviderRequirementMessages = {
   DOCKER:
     "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
   E2B: "apps.data_plane_worker.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
+} as const;
+
+const DataPlaneWorkerPersistentSandboxRequirementMessages = {
+  CONTROL_PLANE_API:
+    "apps.data_plane_worker.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
+  ARCHIL:
+    "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
 } as const;
 
 export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
@@ -129,6 +201,34 @@ export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
     return {
       path: ["sandbox", "e2b"],
       message: DataPlaneWorkerProviderRequirementMessages.E2B,
+    };
+  }
+
+  return null;
+}
+
+export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
+  globalSandboxStorageBackend: SandboxStorageBackend | undefined;
+  appConfig: DataPlaneWorkerConfig;
+}): {
+  path: readonly ["controlPlaneApi"] | readonly ["sandboxStorage", "archil"];
+  message: string;
+} | null {
+  if (input.globalSandboxStorageBackend !== SandboxStorageBackends.ARCHIL) {
+    return null;
+  }
+
+  if (input.appConfig.controlPlaneApi === undefined) {
+    return {
+      path: ["controlPlaneApi"],
+      message: DataPlaneWorkerPersistentSandboxRequirementMessages.CONTROL_PLANE_API,
+    };
+  }
+
+  if (input.appConfig.sandboxStorage?.archil === undefined) {
+    return {
+      path: ["sandboxStorage", "archil"],
+      message: DataPlaneWorkerPersistentSandboxRequirementMessages.ARCHIL,
     };
   }
 

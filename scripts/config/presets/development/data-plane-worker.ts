@@ -20,6 +20,9 @@ export const dataPlaneWorkerDevelopmentPreset = {
         runtime_state: {
           gateway_base_url: "http://127.0.0.1:5202",
         },
+        control_plane_api: {
+          base_url: "http://localhost:5100",
+        },
         sandbox: {
           tokenizer_proxy_egress_base_url:
             "http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress",
@@ -30,6 +33,22 @@ export const dataPlaneWorkerDevelopmentPreset = {
           e2b: {
             api_key: "replace-with-e2b-api-key",
             domain: "e2b.app",
+          },
+        },
+        sandbox_storage: {
+          archil: {
+            api_key: "replace-with-archil-api-key",
+            region: "gcp-us-central1",
+            name_prefix: "mistle-",
+            mounts: [
+              {
+                type: "s3-compatible",
+                bucket: "mistle-sandbox-storage",
+                endpoint: "http://seaweedfs:8333",
+                access_key_id: "replace-with-archil-mount-access-key-id",
+                secret_access_key: "replace-with-archil-mount-secret-access-key",
+              },
+            ],
           },
         },
       },

@@ -14,14 +14,37 @@ export function loadDataPlaneWorkerFromToml(
   const workflow = asObjectRecord(dataPlaneWorker.workflow);
   const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
   const runtimeState = asObjectRecord(dataPlaneWorker.runtime_state);
+  const controlPlaneApi = asObjectRecord(dataPlaneWorker.control_plane_api);
   const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
   const sandboxDocker = asObjectRecord(sandbox.docker);
   const sandboxE2B = asObjectRecord(sandbox.e2b);
+  const sandboxStorage = asObjectRecord(dataPlaneWorker.sandbox_storage);
+  const sandboxStorageArchil = asObjectRecord(sandboxStorage.archil);
+
+  let sandboxStorageArchilMounts: Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(sandboxStorageArchil.mounts)) {
+    sandboxStorageArchilMounts = sandboxStorageArchil.mounts.map((item) => {
+      const mount = asObjectRecord(item);
+
+      return {
+        type: mount.type,
+        bucket: mount.bucket,
+        endpoint: mount.endpoint,
+        accessKeyId: mount.access_key_id,
+        secretAccessKey: mount.secret_access_key,
+      };
+    });
+  }
 
   const sandboxConfig: Record<string, unknown> = {
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
-    sandboxdTestFaultsEnabled: sandbox.sandboxd_test_faults_enabled,
   };
+
+  if (typeof sandbox.sandboxd_test_faults_enabled === "boolean") {
+    sandboxConfig.sandboxdTestFaultsEnabled = sandbox.sandboxd_test_faults_enabled;
+  }
+
+  const sandboxStorageConfig: Record<string, unknown> = {};
 
   if (hasEntries(sandboxDocker)) {
     sandboxConfig.docker = {
@@ -36,6 +59,20 @@ export function loadDataPlaneWorkerFromToml(
       domain: sandboxE2B.domain,
       cpuCount: sandboxE2B.cpu_count,
       memoryMb: sandboxE2B.memory_mb,
+    };
+  }
+
+  if (
+    typeof sandboxStorageArchil.api_key === "string" ||
+    typeof sandboxStorageArchil.region === "string" ||
+    typeof sandboxStorageArchil.name_prefix === "string" ||
+    sandboxStorageArchilMounts !== undefined
+  ) {
+    sandboxStorageConfig.archil = {
+      apiKey: sandboxStorageArchil.api_key,
+      region: sandboxStorageArchil.region,
+      namePrefix: sandboxStorageArchil.name_prefix,
+      mounts: sandboxStorageArchilMounts,
     };
   }
 
@@ -56,6 +93,14 @@ export function loadDataPlaneWorkerFromToml(
     runtimeState: {
       gatewayBaseUrl: runtimeState.gateway_base_url,
     },
+    ...(typeof controlPlaneApi.base_url === "string"
+      ? {
+          controlPlaneApi: {
+            baseUrl: controlPlaneApi.base_url,
+          },
+        }
+      : {}),
     sandbox: sandboxConfig,
+    sandboxStorage: sandboxStorageConfig,
   });
 }
