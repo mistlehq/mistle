@@ -204,6 +204,8 @@ domain = "e2b.app"
 [apps.data_plane_worker.sandbox_storage.archil]
 api_key = "replace-with-archil-api-key"
 # Region availability: https://docs.archil.com/reference/regions
+# Use a real remote S3-compatible bucket for Archil-backed development/test work.
+# Do not assume a local SeaweedFS endpoint is a supported Archil backing store.
 region = "gcp-us-central1"
 name_prefix = "mistle-"
 

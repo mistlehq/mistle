@@ -53,6 +53,9 @@ Notes:
 - If integration config generation explicitly enables Archil storage, provider
   presets require a fully populated managed Archil profile with `api_key`,
   `region`, and a non-empty `mounts` array.
+- Archil-backed development and test configs should point at a real remote
+  S3-compatible bucket. Do not assume the local SeaweedFS object store is a
+  supported Archil backing store.
 
 ## Preset Modules
 

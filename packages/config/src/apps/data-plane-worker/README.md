@@ -38,3 +38,6 @@ Notes:
 - Docker and E2B both consume the same `global.sandbox.defaultBaseImage` OCI reference.
 - Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `2` vCPU and `4096` MB.
 - `sandboxStorage.archil.mounts` currently supports only `s3-compatible` and must contain at most one entry.
+- Archil-backed development and test configs should use a real remote
+  S3-compatible bucket. Do not assume a local SeaweedFS endpoint is a
+  supported Archil backing store.
