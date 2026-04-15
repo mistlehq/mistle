@@ -5,7 +5,7 @@ import {
   InternalSandboxStorageBadRequestResponseSchema,
   ResolveSandboxStorageCredentialRequestSchema,
   ResolveSandboxStorageCredentialResponseSchema,
-} from "./schema.js";
+} from "../schemas.js";
 
 export const route = createRoute({
   method: "post",

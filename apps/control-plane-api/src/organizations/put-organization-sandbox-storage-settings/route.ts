@@ -9,7 +9,7 @@ import {
 import {
   PutOrganizationSandboxStorageSettingsRequestSchema,
   PutOrganizationSandboxStorageSettingsResponseSchema,
-} from "./schema.js";
+} from "../schemas.js";
 
 export const route = createRoute({
   method: "put",

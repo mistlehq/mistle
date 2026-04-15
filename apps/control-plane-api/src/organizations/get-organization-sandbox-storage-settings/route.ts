@@ -5,7 +5,7 @@ import {
   UnauthorizedResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { GetOrganizationSandboxStorageSettingsResponseSchema } from "./schema.js";
+import { GetOrganizationSandboxStorageSettingsResponseSchema } from "../schemas.js";
 
 export const route = createRoute({
   method: "get",
