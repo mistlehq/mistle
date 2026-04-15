@@ -237,19 +237,30 @@ pub struct CodexProxy {
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), CodexProxyError>>>,
     control_handle: CodexProxyControlHandle,
-    #[cfg(test)]
-    supervisor_command_sender: Option<mpsc::Sender<CodexProxySupervisorCommand>>,
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
 #[derive(Clone, Debug)]
 pub struct CodexProxyControlHandle {
     listen_url: String,
+    supervisor_handle: SandboxdSupervisorHandle,
+    supervisor_command_sender: mpsc::Sender<CodexProxySupervisorCommand>,
 }
 
 impl CodexProxyControlHandle {
     pub fn listen_url(&self) -> &str {
         &self.listen_url
+    }
+
+    pub fn snapshot(&self) -> Option<crate::supervision::ComponentHealthSnapshot> {
+        self.supervisor_handle
+            .component_snapshot(SupervisedComponent::CodexProxy)
+    }
+
+    pub fn request_restart(&self) -> Result<(), String> {
+        self.supervisor_command_sender
+            .send(CodexProxySupervisorCommand::RestartCurrentRuntime)
+            .map_err(|error| format!("failed to request Codex proxy restart: {error}"))
     }
 }
 
@@ -261,9 +272,8 @@ struct CodexProxySupervisorConfig {
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
 }
 
-#[cfg(test)]
 enum CodexProxySupervisorCommand {
-    ForceCurrentRuntimeShutdown,
+    RestartCurrentRuntime,
 }
 
 struct ActiveCodexProxyRuntime {
@@ -292,10 +302,7 @@ impl CodexProxy {
 
     #[cfg(test)]
     fn force_current_runtime_shutdown_for_test(&self) {
-        if let Some(supervisor_command_sender) = &self.supervisor_command_sender {
-            let _ = supervisor_command_sender
-                .send(CodexProxySupervisorCommand::ForceCurrentRuntimeShutdown);
-        }
+        let _ = self.control_handle.request_restart();
     }
 
     /// Stops the listener and waits for background proxy tasks to exit.
@@ -400,12 +407,13 @@ pub fn start_codex_proxy_with_supervisor(
     supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
 
     let listen_url = active_runtime.listen_url.clone();
+    let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
     let control_handle = CodexProxyControlHandle {
         listen_url: listen_url.clone(),
+        supervisor_handle: supervisor_handle.clone(),
+        supervisor_command_sender: supervisor_command_sender.clone(),
     };
     let shutdown_requested = Arc::new(AtomicBool::new(false));
-    #[cfg(test)]
-    let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
     let supervisor_thread = thread::spawn({
         let shutdown_requested = shutdown_requested.clone();
         let supervisor_handle = supervisor_handle.clone();
@@ -415,7 +423,6 @@ pub fn start_codex_proxy_with_supervisor(
                 active_runtime,
                 shutdown_requested,
                 supervisor_handle,
-                #[cfg(test)]
                 supervisor_command_receiver,
             )
         }
@@ -426,8 +433,6 @@ pub fn start_codex_proxy_with_supervisor(
         shutdown_requested,
         supervisor_thread: Some(supervisor_thread),
         control_handle,
-        #[cfg(test)]
-        supervisor_command_sender: Some(supervisor_command_sender),
         supervisor_handle,
     })
 }
@@ -563,7 +568,7 @@ fn run_codex_proxy_supervisor(
     mut active_runtime: ActiveCodexProxyRuntime,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_handle: SandboxdSupervisorHandle,
-    #[cfg(test)] supervisor_command_receiver: mpsc::Receiver<CodexProxySupervisorCommand>,
+    supervisor_command_receiver: mpsc::Receiver<CodexProxySupervisorCommand>,
 ) -> Result<(), CodexProxyError> {
     let mut restart_attempt_index = 0_usize;
     let mut last_session_manager_health = active_runtime.session_manager_health_state();
@@ -574,9 +579,8 @@ fn run_codex_proxy_supervisor(
             return active_runtime.join();
         }
 
-        #[cfg(test)]
         match supervisor_command_receiver.try_recv() {
-            Ok(CodexProxySupervisorCommand::ForceCurrentRuntimeShutdown) => {
+            Ok(CodexProxySupervisorCommand::RestartCurrentRuntime) => {
                 active_runtime.request_shutdown();
             }
             Err(TryRecvError::Empty) => {}
