@@ -3902,7 +3902,9 @@ mod tests {
         encode_stream_data_frame,
     };
     use crate::tunnel::session::{TunnelSession, decode_bounded_output};
-    use crate::tunnel::telemetry::{TelemetryRelay, decode_telemetry_data_frame};
+    use crate::tunnel::telemetry::{
+        SANDBOX_TELEMETRY_LOG_STREAM_ID, TelemetryRelay, decode_telemetry_data_frame,
+    };
 
     static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(900);
 
@@ -7872,6 +7874,17 @@ mod tests {
                 Message::Binary(payload) => {
                     let telemetry_payload = decode_telemetry_data_frame(payload.as_ref())
                         .expect("telemetry frame should decode");
+                    socket
+                        .send(Message::Text(
+                            json!({
+                                "type": "telemetry.window",
+                                "streamId": SANDBOX_TELEMETRY_LOG_STREAM_ID,
+                                "bytes": telemetry_payload.len()
+                            })
+                            .to_string()
+                            .into(),
+                        ))
+                        .expect("gateway should replenish telemetry stream credit");
                     return serde_json::from_slice(&telemetry_payload)
                         .expect("telemetry frame should contain one json log line");
                 }
