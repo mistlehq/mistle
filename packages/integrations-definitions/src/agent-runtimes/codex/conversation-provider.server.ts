@@ -302,15 +302,13 @@ async function sendJsonRpcRequest(
 }
 
 async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<void> {
-  const initializeHandle = rpcClient.callWithHandle("initialize", {
-    clientInfo: CodexConversationProviderInitializeClientInfo,
-  });
-  const initializeResult = await withRequestTimeout("initialize", initializeHandle).catch(
-    (error: unknown) => {
+  const initializeResult = await rpcClient
+    .initialize({
+      clientInfo: CodexConversationProviderInitializeClientInfo,
+    })
+    .catch((error: unknown) => {
       throw wrapProviderRequestFailure("initialize", error);
-    },
-  );
-  await rpcClient.notify("initialized", {});
+    });
   if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,

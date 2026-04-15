@@ -135,6 +135,8 @@ export type GitHubRepository = {
 };
 
 export type GitHubWebhookAutomationConversation = {
+  automationRunId: string;
+  automationInstructionsSnapshot: string | null;
   issueNumber: number;
   payloadMarker: string;
   expectedInputSubstring: string;
@@ -671,11 +673,19 @@ function hasAssistantMessageText(input: {
   threadReadResult: unknown;
   expectedSubstring: string;
 }): boolean {
-  if (!isRecord(input.threadReadResult)) {
+  return collectAssistantMessageTexts(input.threadReadResult).some((text) =>
+    text.includes(input.expectedSubstring),
+  );
+}
+
+function collectAssistantMessageTexts(threadReadResult: unknown): string[] {
+  const assistantTexts: string[] = [];
+
+  if (!isRecord(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
 
-  const thread = input.threadReadResult.thread;
+  const thread = threadReadResult.thread;
   if (!isRecord(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
@@ -701,14 +711,12 @@ function hasAssistantMessageText(input: {
           continue;
         }
 
-        if (contentItem.text.includes(input.expectedSubstring)) {
-          return true;
-        }
+        assistantTexts.push(contentItem.text);
       }
     }
   }
 
-  return false;
+  return assistantTexts;
 }
 
 export async function waitForCodexAssistantMessageText(input: {
@@ -717,23 +725,43 @@ export async function waitForCodexAssistantMessageText(input: {
   expectedSubstring: string;
   timeoutMs: number;
 }): Promise<CodexThreadReadResult> {
-  return waitForCondition({
-    description: `Codex assistant message containing '${input.expectedSubstring}'`,
-    timeoutMs: input.timeoutMs,
-    evaluate: async () => {
-      const result = await readCodexThread({
-        rpcClient: input.rpcClient,
-        threadId: input.threadId,
-      });
+  let lastAssistantTexts: string[] = [];
 
-      return hasAssistantMessageText({
-        threadReadResult: result.response,
-        expectedSubstring: input.expectedSubstring,
-      })
-        ? result
-        : null;
-    },
-  });
+  try {
+    return await waitForCondition({
+      description: `Codex assistant message containing '${input.expectedSubstring}'`,
+      timeoutMs: input.timeoutMs,
+      evaluate: async () => {
+        const result = await readCodexThread({
+          rpcClient: input.rpcClient,
+          threadId: input.threadId,
+        });
+
+        lastAssistantTexts = collectAssistantMessageTexts(result.response);
+
+        return hasAssistantMessageText({
+          threadReadResult: result.response,
+          expectedSubstring: input.expectedSubstring,
+        })
+          ? result
+          : null;
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Timed out waiting for ")) {
+      const recentAssistantTexts = lastAssistantTexts
+        .slice(0, 3)
+        .map((text) => JSON.stringify(text))
+        .join(", ");
+      const suffix =
+        recentAssistantTexts.length === 0
+          ? " No assistant text messages were observed."
+          : ` Recent assistant texts: ${recentAssistantTexts}`;
+      throw new Error(`${error.message}${suffix}`);
+    }
+
+    throw error;
+  }
 }
 
 async function createOpenAiConnection(input: {
@@ -1496,6 +1524,8 @@ export async function startGitHubWebhookAutomationConversation(input: {
     }
 
     return {
+      automationRunId: automationRun.id,
+      automationInstructionsSnapshot: automationRun.instructions,
       issueNumber,
       payloadMarker,
       expectedInputSubstring,

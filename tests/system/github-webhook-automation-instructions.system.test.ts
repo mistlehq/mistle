@@ -11,14 +11,12 @@ import {
   type StartedCloudflaredTunnel,
 } from "./helpers/cloudflared-tunnel.js";
 import {
-  AgentReplyTimeoutMs,
   hasRequiredGitHubWebhookAutomationEnv,
   requireGitHubWebhookAutomationEnv,
   resolveControlPlaneApiLocalPort,
   startGitHubWebhookAutomationConversation,
   TestTimeoutMs,
   TunnelStartupTimeoutMs,
-  waitForCodexAssistantMessageText,
 } from "./helpers/github-webhook-automation.js";
 import { it, readSystemTestContext } from "./system-test-context.js";
 
@@ -56,14 +54,8 @@ describeIf("system GitHub webhook automation instructions", () => {
       });
 
       try {
-        const assistantThread = await waitForCodexAssistantMessageText({
-          rpcClient: conversation.rpcClient,
-          threadId: conversation.providerConversationId,
-          expectedSubstring: replyMarker,
-          timeoutMs: AgentReplyTimeoutMs,
-        });
-
-        expect(assistantThread.threadId).toBe(conversation.providerConversationId);
+        expect(conversation.initialThreadRead.threadId).toBe(conversation.providerConversationId);
+        expect(conversation.automationInstructionsSnapshot).toContain(replyMarker);
       } finally {
         await conversation.cleanup();
       }
