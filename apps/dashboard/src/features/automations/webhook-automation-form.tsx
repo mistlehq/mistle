@@ -47,6 +47,7 @@ export type WebhookAutomationFormValues = {
   sandboxProfileId: string;
   enabled: boolean;
   inputTemplate: string;
+  instructions: string;
   conversationKeyTemplate: string;
   triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -150,6 +151,7 @@ function SelectField(input: {
 
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const inputTemplateLabelId = "automation-input-template-label";
+  const instructionsLabelId = "automation-instructions-label";
   const submitLabel = input.mode === "create" ? "Create" : "Save";
   const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.webhookEventOptions,
@@ -438,6 +440,33 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                     : undefined
                 }
                 className="text-right text-xs"
+              />
+            </FieldContent>
+          </Field>
+        </div>
+
+        <div className="border-t p-4">
+          <Field>
+            <FieldHeader>
+              <div className="space-y-1">
+                <FieldLabel id={instructionsLabelId}>Automation Instructions</FieldLabel>
+                <FieldDescription>
+                  Optional. These instructions apply only to this automation. Sandbox profile
+                  binding instructions still apply separately.
+                </FieldDescription>
+              </div>
+            </FieldHeader>
+            <FieldContent>
+              <AgentInstructionsEditor
+                ariaLabelledBy={instructionsLabelId}
+                disabled={input.isDeleting || input.isSaving}
+                invalid={false}
+                onChange={(nextValue) => {
+                  input.onValueChange("instructions", nextValue);
+                }}
+                placeholderText="Optional automation-specific instructions."
+                tokens={[]}
+                value={input.values.instructions}
               />
             </FieldContent>
           </Field>

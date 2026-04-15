@@ -97,6 +97,7 @@ const SampleAutomation: WebhookAutomation = {
   enabled: true,
   integrationWebhookSourceId: GitHubWebhookSourceId,
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+  instructions: "Use the repository conventions.",
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
   eventTypes: ["push", "pull_request"],
@@ -121,6 +122,7 @@ const BaseFormValues: WebhookAutomationFormValues = {
   sandboxProfileId: "sbp_repo",
   enabled: true,
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+  instructions: "",
   conversationKeyTemplate: "{{event.id}}",
   triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {},
@@ -133,6 +135,7 @@ describe("toWebhookAutomationFormValues", () => {
       sandboxProfileId: "",
       enabled: true,
       inputTemplate: DefaultWebhookAutomationMessageTemplate,
+      instructions: "",
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -145,6 +148,7 @@ describe("toWebhookAutomationFormValues", () => {
       sandboxProfileId: "sbp_repo",
       enabled: true,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: "Use the repository conventions.",
       conversationKeyTemplate: "{{event.repository.id}}",
       triggerIds: [
         createWebhookAutomationTriggerId({
@@ -168,6 +172,7 @@ describe("toWebhookAutomationFormValues", () => {
       }),
     ).toMatchObject({
       inputTemplate: "Handle {{payload.comment.body}}",
+      instructions: "Use the repository conventions.",
     });
   });
 
@@ -251,6 +256,7 @@ describe("validateWebhookAutomationFormValues", () => {
           sandboxProfileId: "",
           enabled: true,
           inputTemplate: "",
+          instructions: "",
           conversationKeyTemplate: "",
           triggerIds: [],
           triggerParameterValues: {},
@@ -368,6 +374,7 @@ describe("automation payload transforms", () => {
       enabled: true,
       integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
@@ -394,6 +401,7 @@ describe("automation payload transforms", () => {
       enabled: false,
       integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -423,6 +431,7 @@ describe("automation payload transforms", () => {
       enabled: true,
       integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
@@ -468,6 +477,7 @@ describe("automation payload transforms", () => {
       enabled: true,
       integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],
@@ -502,6 +512,7 @@ describe("automation payload transforms", () => {
       enabled: true,
       integrationWebhookSourceId: GitHubWebhookSourceId,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      instructions: null,
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.issue_comment.created"],
@@ -515,6 +526,20 @@ describe("automation payload transforms", () => {
       target: {
         sandboxProfileId: "sbp_repo",
       },
+    });
+  });
+
+  it("maps non-empty automation instructions into the submission payload", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          instructions: " Keep replies under 5 lines. ",
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      instructions: "Keep replies under 5 lines.",
     });
   });
 });

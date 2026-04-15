@@ -57,7 +57,8 @@ const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: RepoMaintainerSandboxProfileId,
   enabled: true,
-  inputTemplate: "Event type: {{webhookEvent.eventType}}\nPayload: {{payload}}",
+  inputTemplate: "Please review the changes made.\n\nPayload:\n{{payload}}",
+  instructions: "Reply tersely and mention the review checklist.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
@@ -88,6 +89,7 @@ describe("WebhookAutomationForm", () => {
               name: "",
               sandboxProfileId: "",
               inputTemplate: "",
+              instructions: "",
               conversationKeyTemplate: "",
               triggerIds: [],
               triggerParameterValues: {},
@@ -205,22 +207,24 @@ describe("WebhookAutomationForm", () => {
     ).toBe(false);
   });
 
-  it("shows the agent instructions editor copy", () => {
+  it("shows the message template and automation instructions editors", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
     expect(currentForm.getByRole("textbox", { name: "Message Template" })).toBeDefined();
-    const editor = container.querySelector('[data-slot="agent-instructions-editor"]');
+    expect(currentForm.getByRole("textbox", { name: "Automation Instructions" })).toBeDefined();
+    const editors = container.querySelectorAll('[data-slot="agent-instructions-editor"]');
+    const messageTemplateEditor = editors[0];
 
-    if (editor === null) {
-      throw new Error("Expected the agent instructions editor to be rendered.");
+    if (!(messageTemplateEditor instanceof HTMLElement)) {
+      throw new Error("Expected the message template editor to be rendered.");
     }
 
-    expect(editor.getAttribute("data-editor-state")).toBe("empty");
+    expect(messageTemplateEditor.getAttribute("data-editor-state")).toBe("empty");
     expect(currentForm.queryByRole("heading", { name: "Message Template" })).toBeNull();
   });
 
-  it("renders triggers before agent instructions", () => {
+  it("renders triggers before the message template editor", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
@@ -349,6 +353,7 @@ describe("WebhookAutomationForm", () => {
             sandboxProfileId: "",
             triggerIds: [],
             inputTemplate: "",
+            instructions: "",
             conversationKeyTemplate: "",
           }}
         />
@@ -392,7 +397,7 @@ describe("WebhookAutomationForm", () => {
     ).toBeDefined();
   });
 
-  it("shows the no-trigger helper copy under the message template", () => {
+  it("shows the no-trigger helper copy under the message template editor", () => {
     renderFormWithOptions({
       mode: "create",
       values: buildFormValues({

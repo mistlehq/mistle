@@ -62,6 +62,7 @@ export const WebhookAutomationSchema = z
     id: z.string().min(1),
     idempotencyKeyTemplate: z.string().nullable(),
     inputTemplate: z.string(),
+    instructions: z.string().nullable(),
     integrationWebhookSourceId: z.string().min(1),
     kind: z.literal("webhook"),
     name: z.string().min(1),
@@ -100,6 +101,7 @@ export type CreateWebhookAutomationInput = {
   eventTypes?: string[] | null;
   payloadFilter?: Record<string, unknown> | null;
   inputTemplate: string;
+  instructions?: string | null;
   conversationKeyTemplate: string;
   idempotencyKeyTemplate?: string | null;
   target: {
@@ -115,6 +117,7 @@ export type UpdateWebhookAutomationPatch = {
   eventTypes?: string[] | null;
   payloadFilter?: Record<string, unknown> | null;
   inputTemplate?: string;
+  instructions?: string | null;
   conversationKeyTemplate?: string;
   idempotencyKeyTemplate?: string | null;
   target?: {

@@ -61,5 +61,6 @@ describe("WebhookAutomationEditorPage", () => {
 
     expect(editorText).toContain("Event type: {{webhookEvent.eventType}}");
     expect(editorText).toContain("Payload: {{payload}}");
+    expect(screen.getByRole("textbox", { name: "Automation Instructions" })).toBeDefined();
   });
 });

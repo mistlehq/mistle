@@ -91,6 +91,9 @@ export class CodexJsonRpcClient {
     this.#sessionClient.markInitializing();
     const initializeResult = await this.call("initialize", {
       clientInfo: input?.clientInfo ?? CodexDashboardInitializeClientInfo,
+      capabilities: {
+        experimentalApi: true,
+      },
     });
     const sendGuarantee = this.#sessionClient.sendGuarantee;
     await this.notify("initialized", {});

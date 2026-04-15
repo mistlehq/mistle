@@ -398,6 +398,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   sandboxProfileId: "",
   enabled: true,
   inputTemplate: DefaultWebhookAutomationMessageTemplate,
+  instructions: "",
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -407,7 +408,14 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
-  inputTemplate: ["Event type: {{webhookEvent.eventType}}", "Payload: {{payload}}"].join("\n"),
+  inputTemplate: [
+    "Please review the changes made.",
+    "",
+    "Event type: {{webhookEvent.eventType}}",
+    "Payload:",
+    "{{payload}}",
+  ].join("\n"),
+  instructions: "Keep the response concise and include a short risk summary.",
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {

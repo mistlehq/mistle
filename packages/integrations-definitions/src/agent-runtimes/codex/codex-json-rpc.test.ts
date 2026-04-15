@@ -442,6 +442,9 @@ describe("openai codex json-rpc client", () => {
           name: "codex_cli_rs",
           version: "0.1.0",
         },
+        capabilities: {
+          experimentalApi: true,
+        },
       },
     });
     expect(JSON.parse(await server.initializedNotification)).toMatchObject({

@@ -667,6 +667,75 @@ function hasPersistedUserMessageText(input: {
   return false;
 }
 
+function hasAssistantMessageText(input: {
+  threadReadResult: unknown;
+  expectedSubstring: string;
+}): boolean {
+  if (!isRecord(input.threadReadResult)) {
+    throw new Error("thread/read result must be an object.");
+  }
+
+  const thread = input.threadReadResult.thread;
+  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+    throw new Error("thread/read result.thread.turns must be an array.");
+  }
+
+  for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = thread.turns[turnIndex];
+    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+      continue;
+    }
+
+    for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+      const item = turn.items[itemIndex];
+      if (!isRecord(item) || item.type !== "assistantMessage" || !Array.isArray(item.content)) {
+        continue;
+      }
+
+      for (const contentItem of item.content) {
+        if (!isRecord(contentItem)) {
+          continue;
+        }
+
+        if (contentItem.type !== "text" || typeof contentItem.text !== "string") {
+          continue;
+        }
+
+        if (contentItem.text.includes(input.expectedSubstring)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+export async function waitForCodexAssistantMessageText(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  expectedSubstring: string;
+  timeoutMs: number;
+}): Promise<CodexThreadReadResult> {
+  return waitForCondition({
+    description: `Codex assistant message containing '${input.expectedSubstring}'`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      const result = await readCodexThread({
+        rpcClient: input.rpcClient,
+        threadId: input.threadId,
+      });
+
+      return hasAssistantMessageText({
+        threadReadResult: result.response,
+        expectedSubstring: input.expectedSubstring,
+      })
+        ? result
+        : null;
+    },
+  });
+}
+
 async function createOpenAiConnection(input: {
   fixture: SystemTestFixture;
   session: AuthenticatedSession;
@@ -954,6 +1023,7 @@ async function createWebhookAutomation(input: {
   githubWebhookSource: GitHubWebhookSource;
   sandboxProfileId: string;
   payloadMarker: string;
+  instructions?: string;
 }): Promise<void> {
   const automation = await requestJsonOrThrow({
     request: input.fixture.request,
@@ -980,6 +1050,7 @@ async function createWebhookAutomation(input: {
           },
         },
         inputTemplate: "GitHub issue comment webhook: {{payload.comment.body}}",
+        instructions: input.instructions ?? null,
         conversationKeyTemplate: "github-issue-{{payload.issue.number}}",
         idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
         target: {
@@ -997,6 +1068,7 @@ async function createWebhookAutomation(input: {
 
 export async function startGitHubWebhookAutomationConversation(input: {
   fixture: SystemTestFixture;
+  automationInstructions?: string;
 }): Promise<GitHubWebhookAutomationConversation> {
   const repository = parseGitHubRepository(
     requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"),
@@ -1170,6 +1242,9 @@ export async function startGitHubWebhookAutomationConversation(input: {
       githubWebhookSource,
       sandboxProfileId,
       payloadMarker,
+      ...(input.automationInstructions === undefined
+        ? {}
+        : { instructions: input.automationInstructions }),
     });
 
     originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
