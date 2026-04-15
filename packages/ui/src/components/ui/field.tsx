@@ -51,7 +51,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
 
 /** Label above control, full-width children; base layout for `horizontal` on narrow viewports. */
 const fieldOrientationVerticalClasses =
-  "gap-2.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto [&_[data-slot=select-trigger]]:w-full";
+  "gap-1.5 flex-col [&>*]:w-full [&>.sr-only]:w-auto [&_[data-slot=select-trigger]]:w-full";
 
 /** Row layout from `md` viewport breakpoint. */
 const fieldOrientationHorizontalClasses =
