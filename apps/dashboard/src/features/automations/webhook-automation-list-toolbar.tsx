@@ -15,7 +15,7 @@ export function WebhookAutomationListToolbar(input: {
     <ListSearchFilterToolbar
       filterAriaLabel="Filter automations"
       filterOptions={WEBHOOK_AUTOMATION_LIST_FILTER_OPTIONS}
-      filterTriggerClassName="h-10 w-28"
+      filterTriggerClassName="w-28"
       filterValue={input.activeFilter}
       onFilterValueChange={(nextValue) =>
         input.onFilterChange(toWebhookAutomationListFilter(nextValue))

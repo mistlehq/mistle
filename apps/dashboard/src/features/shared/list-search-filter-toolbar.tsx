@@ -1,7 +1,7 @@
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
-import { MagnifyingGlassIcon } from "@phosphor-icons/react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
 
 import { resolveSelectableValue } from "./select-value.js";
+import { ToolbarSearchInput } from "./toolbar-search-input.js";
 
 export type ListSearchFilterToolbarOption = {
   value: string;
@@ -31,19 +31,12 @@ export function ListSearchFilterToolbar(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="relative w-full sm:w-72 md:w-[22rem]">
-        <MagnifyingGlassIcon
-          aria-hidden
-          className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2"
-        />
-        <Input
-          aria-label={input.searchAriaLabel}
-          className="h-10 pr-2 pl-10"
-          onChange={(event) => input.onSearchValueChange(event.target.value)}
-          placeholder={input.searchPlaceholder}
-          value={input.searchValue}
-        />
-      </div>
+      <ToolbarSearchInput
+        ariaLabel={input.searchAriaLabel}
+        onValueChange={input.onSearchValueChange}
+        placeholder={input.searchPlaceholder}
+        value={input.searchValue}
+      />
 
       <Select
         onValueChange={(nextValue) => {
@@ -60,7 +53,7 @@ export function ListSearchFilterToolbar(input: {
       >
         <SelectTrigger
           aria-label={input.filterAriaLabel}
-          className={input.filterTriggerClassName ?? "h-10 w-24"}
+          className={input.filterTriggerClassName ?? "w-24"}
         >
           <SelectValue placeholder="Filter">
             {getFilterLabel({

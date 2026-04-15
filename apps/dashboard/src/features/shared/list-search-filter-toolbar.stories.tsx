@@ -54,7 +54,7 @@ const meta = {
     searchPlaceholder: "Search automations",
     filterAriaLabel: "Filter automations",
     filterOptions: SampleFilterOptions,
-    filterTriggerClassName: "h-10 w-28",
+    filterTriggerClassName: "w-28",
   },
 } satisfies Meta<typeof InteractiveToolbar>;
 
@@ -74,6 +74,6 @@ export const MembersStyle: Story = {
       { value: "members", label: "Members" },
       { value: "invitations", label: "Invitations" },
     ],
-    filterTriggerClassName: "h-10 w-24",
+    filterTriggerClassName: "w-24",
   },
 };

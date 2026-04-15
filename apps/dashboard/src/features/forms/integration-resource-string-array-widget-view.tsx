@@ -129,7 +129,7 @@ export function IntegrationResourceStringArrayWidgetView(
           aria-label={props.refreshLabel}
           disabled={props.isRefreshing}
           onClick={props.onRefresh}
-          size="icon-sm"
+          size="icon"
           title={props.refreshTooltip}
           type="button"
           variant="outline"
