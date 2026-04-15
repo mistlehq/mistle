@@ -97,12 +97,12 @@ function createAgentInstructionsEditorTheme(): ReturnType<typeof EditorView.them
       borderRadius: "inherit",
       fontFamily: "inherit",
       lineHeight: "var(--text-sm--line-height)",
-      minHeight: "calc(var(--spacing) * 48)",
+      minHeight: "calc(var(--spacing) * 28)",
     },
     ".cm-content": {
       paddingBlock: "calc(var(--spacing) * 2)",
       paddingInline: "calc(var(--spacing) * 2.5)",
-      minHeight: "calc(var(--spacing) * 48)",
+      minHeight: "calc(var(--spacing) * 28)",
       caretColor: "currentColor",
     },
     ".cm-line": {

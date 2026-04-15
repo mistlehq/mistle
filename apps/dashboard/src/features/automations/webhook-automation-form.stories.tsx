@@ -13,7 +13,7 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
-import { InitialWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 
@@ -54,12 +54,10 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   {
     value: "sbp_repo_maintainer",
     label: "Repo Maintainer",
-    description: "Latest version pinned at runtime",
   },
   {
     value: "sbp_finance_investigator",
     label: "Finance Investigator",
-    description: "Version 12 available",
   },
 ];
 
@@ -399,7 +397,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
   enabled: true,
-  inputTemplate: InitialWebhookAutomationInputTemplate,
+  inputTemplate: DefaultWebhookAutomationMessageTemplate,
   conversationKeyTemplate: "",
   triggerIds: [],
   triggerParameterValues: {},
@@ -409,13 +407,7 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
-  inputTemplate: [
-    "Please review the changes made.",
-    "",
-    "Event type: {{webhookEvent.eventType}}",
-    "Payload:",
-    "{{payload}}",
-  ].join("\n"),
+  inputTemplate: ["Event type: {{webhookEvent.eventType}}", "Payload: {{payload}}"].join("\n"),
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   triggerIds: [PullRequestOpenedTriggerId],
   triggerParameterValues: {

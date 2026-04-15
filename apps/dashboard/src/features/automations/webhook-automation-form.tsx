@@ -23,10 +23,7 @@ import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
-import {
-  UntouchedWebhookAutomationInputTemplateError,
-  WebhookAutomationInputTemplatePlaceholder,
-} from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -83,10 +80,6 @@ function shouldRenderInlineFieldError(input: {
 }): boolean {
   if (input.message === undefined) {
     return false;
-  }
-
-  if (input.key === "inputTemplate") {
-    return input.message === UntouchedWebhookAutomationInputTemplateError;
   }
 
   return input.key !== "name" && input.key !== "sandboxProfileId";
@@ -401,19 +394,24 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <Field>
             <FieldHeader>
               <div className="space-y-1">
-                <FieldLabel id={inputTemplateLabelId}>Agent Instructions</FieldLabel>
+                <FieldLabel id={inputTemplateLabelId}>Message Template</FieldLabel>
                 {hasSelectedTrigger ? (
                   <FieldDescription>
-                    Type <InlineCode variant="muted">{"{{"}</InlineCode> to insert available fields.
-                    Use Liquid filters like{" "}
-                    <InlineCode variant="muted">
-                      {`{{ payload.event.thread_ts | default: payload.event.ts }}`}
-                    </InlineCode>{" "}
-                    for optional values.
+                    <span className="block">
+                      Template for the message sent to the agent each time this automation is
+                      triggered.
+                    </span>
+                    <span className="block">
+                      Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event
+                      fields.
+                    </span>
                   </FieldDescription>
                 ) : (
                   <FieldDescription>
-                    Select a trigger to unlock event-specific payload fields.
+                    <span className="block">
+                      Template for the message sent when this automation is triggered.
+                    </span>
+                    <span className="block">Select a trigger to insert event fields.</span>
                   </FieldDescription>
                 )}
               </div>
@@ -426,7 +424,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                 onChange={(nextValue) => {
                   input.onValueChange("inputTemplate", nextValue);
                 }}
-                placeholderText={WebhookAutomationInputTemplatePlaceholder}
+                placeholderText={DefaultWebhookAutomationMessageTemplate}
                 tokens={agentInstructionTokens}
                 value={input.values.inputTemplate}
               />

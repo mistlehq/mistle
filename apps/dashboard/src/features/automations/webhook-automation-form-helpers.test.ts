@@ -7,7 +7,7 @@ import {
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
-import { InitialWebhookAutomationInputTemplate } from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -132,7 +132,7 @@ describe("toWebhookAutomationFormValues", () => {
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: InitialWebhookAutomationInputTemplate,
+      inputTemplate: DefaultWebhookAutomationMessageTemplate,
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -337,31 +337,12 @@ describe("validateWebhookAutomationFormValues", () => {
     });
   });
 
-  it("rejects the untouched seeded input template", () => {
+  it("accepts the seeded input template without requiring customization", () => {
     expect(
       validateWebhookAutomationFormValues(
         {
           ...BaseFormValues,
-          inputTemplate: InitialWebhookAutomationInputTemplate,
-          conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
-        },
-        GitHubEventOptions,
-      ),
-    ).toEqual({
-      inputTemplate: "Please replace the instructions placeholder with your own instructions.",
-    });
-  });
-
-  it("accepts the seeded template after the placeholder instructions are replaced", () => {
-    expect(
-      validateWebhookAutomationFormValues(
-        {
-          ...BaseFormValues,
-          inputTemplate: InitialWebhookAutomationInputTemplate.replace(
-            "Replace this with your instructions.",
-            "Review the event and draft a concise response.",
-          ),
+          inputTemplate: DefaultWebhookAutomationMessageTemplate,
           conversationKeyTemplate:
             "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
         },

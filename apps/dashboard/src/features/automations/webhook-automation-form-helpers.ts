@@ -4,10 +4,7 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import {
-  InitialWebhookAutomationInputTemplate,
-  UntouchedWebhookAutomationInputTemplateError,
-} from "./webhook-automation-input-template.js";
+import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
@@ -91,7 +88,7 @@ export function toWebhookAutomationFormValues(
       name: "",
       sandboxProfileId: "",
       enabled: true,
-      inputTemplate: InitialWebhookAutomationInputTemplate,
+      inputTemplate: DefaultWebhookAutomationMessageTemplate,
       conversationKeyTemplate: "",
       triggerIds: [],
       triggerParameterValues: {},
@@ -168,8 +165,6 @@ export function validateWebhookAutomationFormValues(
 
   if (trimmedInputTemplate.length === 0) {
     errors.inputTemplate = "Input template is required.";
-  } else if (trimmedInputTemplate === InitialWebhookAutomationInputTemplate.trim()) {
-    errors.inputTemplate = UntouchedWebhookAutomationInputTemplateError;
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {

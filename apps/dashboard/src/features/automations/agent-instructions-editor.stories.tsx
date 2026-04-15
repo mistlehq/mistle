@@ -51,7 +51,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
             <Field>
               <FieldHeader>
                 <div className="space-y-1">
-                  <FieldLabel id="story-agent-instructions-label">Agent Instructions</FieldLabel>
+                  <FieldLabel id="story-agent-instructions-label">Message Template</FieldLabel>
                   <FieldDescription>
                     <span className="block">
                       These are the instructions the agent will receive.
@@ -162,9 +162,7 @@ function PlaygroundHarness(): React.JSX.Element {
             <Field>
               <FieldHeader>
                 <div className="space-y-1">
-                  <FieldLabel id="playground-agent-instructions-label">
-                    Agent Instructions
-                  </FieldLabel>
+                  <FieldLabel id="playground-agent-instructions-label">Message Template</FieldLabel>
                   <FieldDescription>
                     <span className="block">
                       Type inside the editor as if this were the real form.
@@ -235,12 +233,7 @@ export const Invalid: Story = {
 export const Disabled: Story = {
   args: {
     disabled: true,
-    value: [
-      "Review the webhook event and decide what action to take.",
-      "",
-      "Event type: {{webhookEvent.eventType}}",
-      "Payload: {{payload}}",
-    ].join("\n"),
+    value: ["Event type: {{webhookEvent.eventType}}", "Payload: {{payload}}"].join("\n"),
     withSelectedTriggers: true,
   },
 };

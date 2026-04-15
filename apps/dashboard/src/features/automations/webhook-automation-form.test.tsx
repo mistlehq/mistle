@@ -4,17 +4,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import {
-  AgentInstructionsNoTriggerHelpText,
-  buildAgentInstructionTokenCatalog,
-} from "./agent-instructions-token-catalog.js";
+import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { UntouchedWebhookAutomationInputTemplateError } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -38,7 +34,6 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   {
     value: RepoMaintainerSandboxProfileId,
     label: "Repo Maintainer",
-    description: "Latest version pinned at runtime",
   },
 ];
 
@@ -62,7 +57,7 @@ const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: RepoMaintainerSandboxProfileId,
   enabled: true,
-  inputTemplate: "Please review the changes made.\n\nPayload:\n{{payload}}",
+  inputTemplate: "Event type: {{webhookEvent.eventType}}\nPayload: {{payload}}",
   conversationKeyTemplate: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
   triggerIds: [
     createWebhookAutomationTriggerId({
@@ -214,7 +209,7 @@ describe("WebhookAutomationForm", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
-    expect(currentForm.getByRole("textbox", { name: "Agent Instructions" })).toBeDefined();
+    expect(currentForm.getByRole("textbox", { name: "Message Template" })).toBeDefined();
     const editor = container.querySelector('[data-slot="agent-instructions-editor"]');
 
     if (editor === null) {
@@ -222,7 +217,7 @@ describe("WebhookAutomationForm", () => {
     }
 
     expect(editor.getAttribute("data-editor-state")).toBe("empty");
-    expect(currentForm.queryByRole("heading", { name: "Agent Instructions" })).toBeNull();
+    expect(currentForm.queryByRole("heading", { name: "Message Template" })).toBeNull();
   });
 
   it("renders triggers before agent instructions", () => {
@@ -232,7 +227,7 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const [triggersHeading] = currentForm.getAllByRole("heading", { name: "Triggers" });
-    const inputTemplateField = currentForm.getByRole("textbox", { name: "Agent Instructions" });
+    const inputTemplateField = currentForm.getByRole("textbox", { name: "Message Template" });
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -245,7 +240,7 @@ describe("WebhookAutomationForm", () => {
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
-      container.textContent?.indexOf("Agent Instructions") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Message Template") ?? Number.POSITIVE_INFINITY,
     );
   });
 
@@ -316,7 +311,7 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const automationNameInput = currentForm.getByDisplayValue("Repo triage");
-    const inputTemplateEditor = currentForm.getByRole("textbox", { name: "Agent Instructions" });
+    const inputTemplateEditor = currentForm.getByRole("textbox", { name: "Message Template" });
 
     expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
     expect(inputTemplateEditor.getAttribute("aria-invalid")).toBe("true");
@@ -326,7 +321,7 @@ describe("WebhookAutomationForm", () => {
     expect(selectTriggers[1]?.getAttribute("aria-invalid")).toBe("true");
   });
 
-  it("shows the required-fields summary without inline copy for generic input template errors", () => {
+  it("shows the required-fields summary and inline copy for generic input template errors", () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <WebhookAutomationForm
@@ -363,37 +358,8 @@ describe("WebhookAutomationForm", () => {
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
     expect(screen.queryByText("Automation name is required.")).toBeNull();
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
-    expect(screen.queryByText("Input template is required.")).toBeNull();
+    expect(screen.getByText("Input template is required.")).toBeDefined();
     expect(screen.getByText("Please add a trigger")).toBeDefined();
-  });
-
-  it("renders the placeholder-specific instructions error inline", () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <WebhookAutomationForm
-          connectionOptions={ConnectionOptions}
-          fieldErrors={{
-            inputTemplate: UntouchedWebhookAutomationInputTemplateError,
-          }}
-          formError={null}
-          validationSummaryError="Please address the fields highlighted in red."
-          isDeleting={false}
-          isSaving={false}
-          mode="create"
-          onDelete={null}
-          onSubmit={() => {}}
-          onValueChange={() => {}}
-          sandboxProfileOptions={SandboxProfileOptions}
-          triggerPickerDisabledState={null}
-          webhookEventOptions={WebhookEventOptions}
-          values={FormValues}
-        />
-      </QueryClientProvider>,
-    );
-
-    expect(
-      screen.getAllByText(UntouchedWebhookAutomationInputTemplateError).length,
-    ).toBeGreaterThan(0);
   });
 
   it("shows save failures at the top of the form", () => {
@@ -426,7 +392,7 @@ describe("WebhookAutomationForm", () => {
     ).toBeDefined();
   });
 
-  it("shows the no-trigger helper copy under agent instructions", () => {
+  it("shows the no-trigger helper copy under the message template", () => {
     renderFormWithOptions({
       mode: "create",
       values: buildFormValues({
@@ -435,7 +401,9 @@ describe("WebhookAutomationForm", () => {
       }),
     });
 
-    expect(screen.getAllByText(AgentInstructionsNoTriggerHelpText).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Select a trigger to insert event fields.").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("builds agent instruction tokens from the selected trigger payload paths", () => {
