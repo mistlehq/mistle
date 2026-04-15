@@ -19,6 +19,8 @@ export function PageTitleField(input: {
   onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }): React.JSX.Element {
   const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
+  const inputClassName =
+    "h-10 w-full border-x-0 border-t-0 rounded-none px-0 py-0 text-xl font-semibold leading-none shadow-none focus-visible:ring-0 aria-invalid:ring-0";
 
   return (
     <div className={containerClassName}>
@@ -30,7 +32,7 @@ export function PageTitleField(input: {
       <AutoSaveInputSurface
         ariaLabel={input.ariaLabel}
         id={input.fieldId}
-        inputClassName={`h-10 w-full py-0 text-xl font-semibold leading-none ${input.className ?? ""}`}
+        inputClassName={`${inputClassName} ${input.className ?? ""}`}
         onChange={input.onChange}
         value={input.value}
         {...(input.autoFocus === undefined ? {} : { autoFocus: input.autoFocus })}

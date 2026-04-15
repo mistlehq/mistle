@@ -47,7 +47,7 @@ export function AutoSaveInputSurface(input: {
       </div>
       {input.errorMessage === undefined ? null : (
         <div aria-live="polite" role="status">
-          <div className="flex items-center justify-end text-xs text-destructive">
+          <div className="flex items-center justify-start text-xs text-destructive">
             <span>{input.errorMessage}</span>
           </div>
         </div>

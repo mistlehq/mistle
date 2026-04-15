@@ -34,21 +34,21 @@ describe("SessionHeaderTitle", () => {
     return queryClient;
   }
 
-  it("renders the cached title and exposes an edit control", () => {
+  it("renders the cached title in an inline editable field", () => {
     renderSessionHeaderTitle({
       title: "Investigate flaky title rendering",
     });
 
-    expect(screen.getByText("Investigate flaky title rendering")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Edit session title" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Session title" })).toHaveProperty(
+      "value",
+      "Investigate flaky title rendering",
+    );
   });
 
   it("shows validation feedback when the edited title is blank", async () => {
     renderSessionHeaderTitle({
       title: "Investigate flaky title rendering",
     });
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit session title" }));
 
     const input = screen.getByRole("textbox", { name: "Session title" });
     fireEvent.change(input, { target: { value: "   " } });
@@ -58,11 +58,13 @@ describe("SessionHeaderTitle", () => {
     expect(screen.getByRole("textbox", { name: "Session title" })).toBeDefined();
   });
 
-  it("renders Untitled for blank persisted titles", () => {
+  it("uses Untitled as the placeholder for blank persisted titles", () => {
     renderSessionHeaderTitle({
       title: "   ",
     });
 
-    expect(screen.getByText("Untitled")).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Session title" }).getAttribute("placeholder")).toBe(
+      "Untitled",
+    );
   });
 });

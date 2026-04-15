@@ -312,7 +312,7 @@ describe("app routing breadcrumb integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain('aria-label="Edit session title"');
+    expect(markup).toContain('aria-label="Session title"');
     expect(markup).toContain("Investigate flaky title rendering");
     expect(markup).not.toContain("sbi_123");
     expect(markup).not.toContain('href="/sessions"');
@@ -341,8 +341,8 @@ describe("app routing breadcrumb integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain('aria-label="Edit session title"');
-    expect(markup).toContain("Untitled");
+    expect(markup).toContain('aria-label="Session title"');
+    expect(markup).toContain('placeholder="Untitled"');
     expect(markup).not.toContain("sbi_123");
     expect(markup).not.toContain('href="/sessions"');
   });
@@ -359,8 +359,8 @@ describe("app routing breadcrumb integration", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).not.toContain('aria-label="Edit session title"');
-    expect(markup).not.toContain("Untitled");
+    expect(markup).not.toContain('aria-label="Session title"');
+    expect(markup).not.toContain('placeholder="Untitled"');
     expect(markup).not.toContain("sbi_123");
     expect(markup).not.toContain('href="/sessions"');
     expect(markup).toContain('data-slot="meta-title">Session');

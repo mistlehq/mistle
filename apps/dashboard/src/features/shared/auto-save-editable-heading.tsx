@@ -436,6 +436,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         {liveMessage}
       </p>
       <EditableHeading
+        alwaysEditing={true}
         ariaLabel={input.ariaLabel}
         draftValue={heading.state.draftValue}
         editButtonLabel={input.editButtonLabel}
@@ -448,7 +449,11 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         }}
         onDraftValueChange={heading.onChangeDraft}
         onEditStart={heading.onEnterEditMode}
-        placeholder={input.placeholder}
+        placeholder={
+          input.value.trim().length === 0 && input.displayText !== undefined
+            ? input.displayText
+            : input.placeholder
+        }
         disabled={input.disabled === true || heading.state.status === "saving"}
         saveStatus={
           heading.showStatus && heading.state.errorState === null ? heading.state.status : "idle"

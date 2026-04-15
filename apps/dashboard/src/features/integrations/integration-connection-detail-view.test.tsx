@@ -260,7 +260,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("starts title editing for the clicked connection", () => {
+  it("starts title editing when the connection title field receives focus", () => {
     let startedEditingConnectionId: string | null = null;
 
     render(
@@ -299,7 +299,7 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit connection name" }));
+    fireEvent.focus(screen.getByRole("textbox", { name: "Connection name" }));
     expect(startedEditingConnectionId).toBe("icn_github_archive");
     expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
   });
@@ -397,7 +397,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByRole("button", { name: "Expand repository resources" })).toBeTruthy();
   });
 
-  it("clears a stale connection save error when a new edit session starts", () => {
+  it("clears a stale connection save error when the title field receives focus again", () => {
     function ErrorHarness(): React.JSX.Element {
       const [errorMessageByConnectionId, setErrorMessageByConnectionId] = useState<
         Readonly<Record<string, string | undefined>>
@@ -443,7 +443,7 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.queryByText("Could not update connection.")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit connection name" }));
+    fireEvent.focus(screen.getByRole("textbox", { name: "Connection name" }));
 
     expect(screen.getByRole("textbox", { name: "Connection name" })).toBeTruthy();
     expect(screen.queryByText("Could not update connection.")).toBeNull();

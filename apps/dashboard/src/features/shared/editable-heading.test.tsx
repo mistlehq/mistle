@@ -57,14 +57,16 @@ describe("EditableHeading", () => {
     ).toBe("idle");
   });
 
-  it("renders the edit field with the default page-title chrome", () => {
+  it("renders the edit field with bottom-only page-title chrome", () => {
     renderEditableHeading({
       isEditing: true,
     });
 
     const input = screen.getByRole("textbox", { name: "Heading" });
 
-    expect(input.className).toContain("border-input");
+    expect(input.className).toContain("border-x-0");
+    expect(input.className).toContain("border-t-0");
+    expect(input.className).toContain("px-0");
     expect(input.className).toContain("text-xl");
   });
 
@@ -88,5 +90,19 @@ describe("EditableHeading", () => {
 
     expect(commitCount).toBe(1);
     expect(cancelCount).toBe(1);
+  });
+
+  it("renders an always-editable inline field with flush border treatment", () => {
+    renderEditableHeading({
+      alwaysEditing: true,
+    });
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+
+    expect(screen.queryByRole("button", { name: "Edit heading" })).toBeNull();
+    expect(input.className).toContain("border-x-0");
+    expect(input.className).toContain("border-t-0");
+    expect(input.className).toContain("px-0");
+    expect(input.className).toContain("hover:border-b-border");
   });
 });
