@@ -455,7 +455,7 @@ describe("IntegrationConnectionDetailView", () => {
             resources: [],
           },
         ]}
-        onEditApiKey={(connectionId) => {
+        onEditAuthentication={(connectionId) => {
           editedConnectionId = connectionId;
         }}
       />,
@@ -486,7 +486,7 @@ describe("IntegrationConnectionDetailView", () => {
             resources: [],
           },
         ]}
-        onEditConnection={(connectionId) => {
+        onEditAuthentication={(connectionId) => {
           editedConnectionId = connectionId;
         }}
       />,

@@ -17,7 +17,7 @@ const meta = {
   decorators: [withDashboardCenteredStory],
   args: {
     ...createDetailViewStoryProps(),
-    onEditApiKey: () => {},
+    onEditAuthentication: () => {},
     onRefreshResource: () => {},
   },
 } satisfies Meta<typeof IntegrationConnectionDetailView>;

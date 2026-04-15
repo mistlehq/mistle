@@ -24,16 +24,14 @@ function withoutStoryHandlers(
   React.ComponentProps<typeof IntegrationConnectionDetailView>,
   | "onCreateWebhookSource"
   | "onDeleteWebhookSource"
-  | "onEditConnection"
-  | "onEditApiKey"
+  | "onEditAuthentication"
   | "onRefreshResource"
   | "onStartGitHubAppInstallation"
 > {
   const {
     onCreateWebhookSource: _onCreateWebhookSource,
     onDeleteWebhookSource: _onDeleteWebhookSource,
-    onEditConnection: _onEditConnection,
-    onEditApiKey: _onEditApiKey,
+    onEditAuthentication: _onEditAuthentication,
     onRefreshResource: _onRefreshResource,
     onStartGitHubAppInstallation: _onStartGitHubAppInstallation,
     ...rest
@@ -49,8 +47,7 @@ const meta = {
   args: {
     onCreateWebhookSource: (_input: { connectionId: string }) => {},
     onDeleteWebhookSource: (_input: { connectionId: string; webhookSourceId: string }) => {},
-    onEditConnection: (_connectionId: string) => {},
-    onEditApiKey: (_connectionId: string) => {},
+    onEditAuthentication: (_connectionId: string) => {},
     onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
     onStartGitHubAppInstallation: async (_connectionId: string) => {},
     titleEditor: {

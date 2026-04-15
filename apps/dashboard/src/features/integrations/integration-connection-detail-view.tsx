@@ -88,8 +88,7 @@ export type IntegrationConnectionDetailViewProps = {
   onCreateWebhookSource?: (input: { connectionId: string }) => void;
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
-  onEditConnection?: (connectionId: string) => void;
-  onEditApiKey?: (connectionId: string) => void;
+  onEditAuthentication?: (connectionId: string) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<
@@ -208,10 +207,9 @@ export function IntegrationConnectionDetailView(
             {...(props.onDeleteWebhookSource === undefined
               ? {}
               : { onDeleteWebhookSource: props.onDeleteWebhookSource })}
-            {...(props.onEditApiKey === undefined ? {} : { onEditApiKey: props.onEditApiKey })}
-            {...(props.onEditConnection === undefined
+            {...(props.onEditAuthentication === undefined
               ? {}
-              : { onEditConnection: props.onEditConnection })}
+              : { onEditAuthentication: props.onEditAuthentication })}
             {...(props.onRefreshResource === undefined
               ? {}
               : { onRefreshResource: props.onRefreshResource })}
@@ -243,8 +241,7 @@ function ConnectionDetailPane(input: {
   onCreateWebhookSource?: (input: { connectionId: string }) => void;
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
-  onEditConnection?: (connectionId: string) => void;
-  onEditApiKey?: (connectionId: string) => void;
+  onEditAuthentication?: (connectionId: string) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
@@ -381,25 +378,13 @@ function ConnectionDetailPane(input: {
 
       <SectionBlock
         action={
-          input.connection.authMethodId === "api-key" && input.onEditApiKey !== undefined ? (
+          input.connection.authMethodId !== undefined &&
+          input.connection.authMethodId !== null &&
+          input.onEditAuthentication !== undefined ? (
             <Button
               aria-label="Edit"
               onClick={() => {
-                input.onEditApiKey?.(input.connection.id);
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Edit
-            </Button>
-          ) : input.connection.authMethodId !== undefined &&
-            input.connection.authMethodId !== null &&
-            input.onEditConnection !== undefined ? (
-            <Button
-              aria-label="Edit"
-              onClick={() => {
-                input.onEditConnection?.(input.connection.id);
+                input.onEditAuthentication?.(input.connection.id);
               }}
               size="sm"
               type="button"
@@ -734,7 +719,7 @@ function ResourceScopeRow(input: {
     errorMessage: input.resourceItems?.errorMessage ?? null,
     kindLabel: resourceLabel,
   });
-  const shouldReplaceMetadataWithPreviewError = input.resourceItems?.errorMessage !== null;
+  const shouldReplaceMetadataWithPreviewError = input.resourceItems?.errorMessage != null;
 
   return (
     <div className={rowClassName}>

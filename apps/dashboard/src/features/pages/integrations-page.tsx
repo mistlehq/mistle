@@ -86,10 +86,22 @@ export function IntegrationsPage() {
               }),
         })}
         onDeleteConnection={connectionEditors.onDeleteConnection}
-        onEditConnection={(connectionId) => {
+        onEditAuthentication={(connectionId) => {
+          const editingConnection =
+            directoryState.selectedDetailConnections.find(
+              (connection) => connection.id === connectionId,
+            ) ?? null;
+          if (editingConnection === null) {
+            throw new Error(`Integration connection '${connectionId}' was not found.`);
+          }
+
+          if (editingConnection.connectionMethodId === "api-key") {
+            connectionEditors.onEditApiKey(connectionId);
+            return;
+          }
+
           void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit`);
         }}
-        onEditApiKey={connectionEditors.onEditApiKey}
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
