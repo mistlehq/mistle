@@ -32,14 +32,31 @@ nix develop
 pnpm install
 ```
 
-3. Copy local environment files:
+3. Create `config/config.development.toml`:
+
+```bash
+pnpm config:init:dev
+```
+
+4. Copy local environment files:
 
 ```bash
 cp sample.env.dev .env.dev
 cp sample.env.test .env.test
 ```
 
-4. Create a named Cloudflare tunnel and DNS routes:
+## Cloudflare Tunnel Setup
+
+Local development expects a named Cloudflare tunnel with stable public hostnames for the control-plane API, data-plane gateway, and tokenizer proxy.
+
+Before continuing, make sure you have:
+
+- `cloudflared` installed locally
+- access to the Cloudflare account and zone you want to use
+- permission to create named tunnels and DNS routes
+- hostnames chosen for the control-plane API, data-plane gateway, and tokenizer proxy
+
+5. Create a named Cloudflare tunnel and DNS routes:
 
 ```bash
 cloudflared tunnel create <tunnel-name>
@@ -48,7 +65,7 @@ cloudflared tunnel route dns <tunnel-name> <data-plane-gateway-hostname>
 cloudflared tunnel route dns <tunnel-name> <tokenizer-proxy-hostname>
 ```
 
-5. Fill the required tunnel values in `.env.dev`:
+6. Fill the required tunnel values in `.env.dev`:
 
 ```bash
 cloudflared tunnel token <tunnel-name>
@@ -61,13 +78,33 @@ DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-gateway-hostname>
 TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
 ```
 
-6. Start the stack:
+7. Start the stack:
 
 ```bash
 pnpm dev
 ```
 
-`pnpm dev` brings up local infra, runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
+`pnpm dev` brings up local infra, runs control-plane and data-plane migrations, starts the public tunnels, and launches the workspace development processes.
+
+8. Sync integration targets into the control-plane database:
+
+```bash
+pnpm --filter @mistle/control-plane-api integration-targets:sync
+```
+
+`integration-targets:sync` syncs built-in integration targets from the integration registry and can also provision target records from a manifest when one is available.
+
+## First Successful Run
+
+After startup:
+
+- open the dashboard at `http://localhost:5173`
+- review the available integration targets
+- create or connect an integration
+- create a sandbox profile
+- start a session or configure an automation
+
+`pnpm dev` also prints public tunnel URLs along with local Mailpit and Grafana endpoints for supporting services.
 
 ## Daily Workflow
 

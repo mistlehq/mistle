@@ -8,7 +8,7 @@ Mistle is an open-source platform for building and running sandboxed coding agen
 
 - **Integrations** connect external systems and models such as GitHub, Slack, and OpenAI.
 - **Sandbox profiles** define the tools, permissions, and environment an agent starts with.
-- **Sessions** let people launch interactive agent work for tasks like investigating bugs or reviewing pull requests.
+- **Sessions** start interactive agent work such as debugging, code review, and repository changes.
 - **Automations** respond to external events, such as webhook deliveries from connected systems.
 
 ## Architecture
@@ -78,34 +78,20 @@ nix develop
 pnpm install
 ```
 
-3. Copy local environment files:
+3. Create `config/config.development.toml`:
+
+```bash
+pnpm config:init:dev
+```
+
+4. Copy local environment files:
 
 ```bash
 cp sample.env.dev .env.dev
 cp sample.env.test .env.test
 ```
 
-4. Create a named Cloudflare tunnel and DNS routes:
-
-```bash
-cloudflared tunnel create <tunnel-name>
-cloudflared tunnel route dns <tunnel-name> <control-plane-api-hostname>
-cloudflared tunnel route dns <tunnel-name> <data-plane-gateway-hostname>
-cloudflared tunnel route dns <tunnel-name> <tokenizer-proxy-hostname>
-```
-
-5. Fill the required tunnel values in `.env.dev`:
-
-```bash
-cloudflared tunnel token <tunnel-name>
-```
-
-```env
-CLOUDFLARE_TUNNEL_TOKEN=<token-from-command-above>
-CONTROL_PLANE_API_TUNNEL_HOSTNAME=<control-plane-api-hostname>
-DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-gateway-hostname>
-TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
-```
+5. Complete the Cloudflare tunnel setup described in [docs/local-development.md](docs/local-development.md).
 
 6. Start the stack:
 
@@ -113,7 +99,21 @@ TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
 pnpm dev
 ```
 
-`pnpm dev` brings up local infra, runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
+`pnpm dev` brings up local infra, runs control-plane and data-plane migrations, starts the public tunnels, and launches the workspace development processes.
+
+7. Sync integration targets into the control-plane database:
+
+```bash
+pnpm --filter @mistle/control-plane-api integration-targets:sync
+```
+
+After startup:
+
+- open the dashboard at `http://localhost:5173`
+- review the available integration targets
+- create or connect an integration
+- create a sandbox profile
+- start a session or configure an automation
 
 For the complete local setup and daily development workflow, see [docs/local-development.md](docs/local-development.md).
 
