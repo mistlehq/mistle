@@ -8,7 +8,7 @@ use crate::codex_proxy::CodexThreadStatus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RetainReason {
-    AutomationBackgroundExecution,
+    MistleAgentBackgroundExecution,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,7 +62,7 @@ pub struct CodexSessionManagerState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProxyClientKind {
     Unknown,
-    AutomationWorker,
+    MistleAgentClient,
     Other,
 }
 

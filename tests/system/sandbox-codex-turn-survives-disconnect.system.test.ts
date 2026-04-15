@@ -18,6 +18,10 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import {
+  CodexConversationProviderInitializeClientInfo,
+  CodexDashboardInitializeClientInfo,
+} from "../../packages/integrations-definitions/src/agent-runtimes/codex/initialize-client-info.js";
 import { ExecStreamClient } from "../../packages/sandbox-session-client/src/exec-stream-client.js";
 import { createNodeSandboxSessionRuntime } from "../../packages/sandbox-session-client/src/node.js";
 import { SandboxSessionTransport } from "../../packages/sandbox-session-client/src/transport.js";
@@ -26,8 +30,6 @@ import { it } from "./system-test-context.js";
 const OPENAI_TARGET_KEY = "openai-default";
 const OPENAI_CONNECTION_METHOD_ID = "api-key";
 const OPENAI_API_KEY_ENV_NAME = "MISTLE_TEST_OPENAI_API_KEY";
-const CODEX_INITIALIZE_CLIENT_NAME = "codex_cli_rs";
-const AUTOMATION_WORKER_CLIENT_TITLE = "Mistle Control Plane Worker";
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const SANDBOX_READY_TIMEOUT_MS = 3 * 60_000;
 const TURN_TERMINAL_TIMEOUT_MS = 2 * 60_000;
@@ -394,17 +396,18 @@ async function connectCodexSession(input: { connectionUrl: string }): Promise<{
   };
 }
 
-async function initializeAutomationWorkerSession(input: {
+async function initializeCodexSession(input: {
   rpcClient: CodexJsonRpcClient;
   sessionClient: AgentStreamClient;
+  clientInfo: {
+    name: string;
+    version: string;
+    title?: string;
+  };
 }): Promise<void> {
   input.sessionClient.markInitializing();
   await input.rpcClient.call("initialize", {
-    clientInfo: {
-      name: CODEX_INITIALIZE_CLIENT_NAME,
-      title: AUTOMATION_WORKER_CLIENT_TITLE,
-      version: "0.1.0",
-    },
+    clientInfo: input.clientInfo,
   });
   await input.rpcClient.notify("initialized", {});
   input.sessionClient.markReady();
@@ -484,13 +487,166 @@ async function runSandboxExecCommand(input: {
   }
 }
 
+async function runDisconnectSurvivalScenario(input: {
+  fixture: {
+    request: (path: string, init?: RequestInit) => Promise<Response>;
+    dataPlaneGatewayBaseUrl: string;
+  };
+  authenticatedSession: {
+    cookie: string;
+    organizationId: string;
+    userId: string;
+  };
+  sandboxInstanceId: string;
+  clientInfo: {
+    name: string;
+    version: string;
+    title?: string;
+  };
+  markerPrefix: string;
+}): Promise<void> {
+  const marker = `${input.markerPrefix}-${randomUUID()}`;
+  const markerDirectory = "/tmp/mistle-system-tests";
+  const markerFilePath = `${markerDirectory}/${marker}.txt`;
+  const shellCommand = [
+    "sh -lc",
+    shellQuote(
+      [
+        "sleep 8",
+        `mkdir -p ${shellQuote(markerDirectory)}`,
+        `printf %s ${shellQuote(marker)} > ${shellQuote(markerFilePath)}`,
+      ].join("; "),
+    ),
+  ].join(" ");
+
+  const firstConnectionUrl = await mintSandboxConnectionUrl({
+    request: input.fixture.request,
+    authenticatedSession: input.authenticatedSession,
+    dataPlaneGatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const firstAgentConnection = await connectCodexSession({
+    connectionUrl: firstConnectionUrl,
+  });
+
+  let firstRpcClient: CodexJsonRpcClient | null = firstAgentConnection.rpcClient;
+
+  try {
+    await initializeCodexSession({
+      rpcClient: firstRpcClient,
+      sessionClient: firstAgentConnection.sessionClient,
+      clientInfo: input.clientInfo,
+    });
+
+    const startedThread = await startCodexThread({
+      rpcClient: firstRpcClient,
+      model: "gpt-5.3-codex",
+    });
+    const startedTurn = await startCodexTurn({
+      rpcClient: firstRpcClient,
+      threadId: startedThread.threadId,
+      input: buildCodexTurnInputItems({
+        text: [
+          "Use the shell tool and run exactly this command:",
+          `\`${shellCommand}\``,
+          `After the command succeeds, reply with exactly ${marker}.`,
+          "Do not ask for confirmation and do not use any tool other than the shell tool.",
+        ].join(" "),
+        attachments: [],
+      }),
+    });
+
+    expect(startedTurn.status).toBe("inProgress");
+
+    firstRpcClient.dispose();
+    firstRpcClient = null;
+    await firstAgentConnection.close({
+      reason: "system test disconnect after turn/start",
+    });
+
+    const secondConnectionUrl = await mintSandboxConnectionUrl({
+      request: input.fixture.request,
+      authenticatedSession: input.authenticatedSession,
+      dataPlaneGatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const secondAgentConnection = await connectCodexSession({
+      connectionUrl: secondConnectionUrl,
+    });
+    const secondRpcClient = secondAgentConnection.rpcClient;
+
+    try {
+      await initializeCodexSession({
+        rpcClient: secondRpcClient,
+        sessionClient: secondAgentConnection.sessionClient,
+        clientInfo: input.clientInfo,
+      });
+      await resumeCodexThread({
+        rpcClient: secondRpcClient,
+        threadId: startedThread.threadId,
+      });
+
+      const completedTurn = await waitForTurnTerminalState({
+        rpcClient: secondRpcClient,
+        threadId: startedThread.threadId,
+        turnId: startedTurn.turnId,
+        timeoutMs: TURN_TERMINAL_TIMEOUT_MS,
+      });
+
+      expect(completedTurn.status).toBe("completed");
+      expect(completedTurn.items.length).toBeGreaterThan(0);
+
+      await waitForCondition({
+        description: `marker file '${markerFilePath}' to exist in sandbox`,
+        timeoutMs: MARKER_FILE_TIMEOUT_MS,
+        evaluate: async () => {
+          const execConnectionUrl = await mintSandboxConnectionUrl({
+            request: input.fixture.request,
+            authenticatedSession: input.authenticatedSession,
+            dataPlaneGatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+            sandboxInstanceId: input.sandboxInstanceId,
+          });
+          const result = await runSandboxExecCommand({
+            connectionUrl: execConnectionUrl,
+            command: "sh",
+            args: [
+              "-lc",
+              `test -f ${shellQuote(markerFilePath)} && cat ${shellQuote(markerFilePath)}`,
+            ],
+            cwd: "/root",
+            timeoutMs: 30_000,
+          });
+
+          if (result.exitCode !== 0) {
+            return null;
+          }
+
+          return result.stdout.trim() === marker ? result : null;
+        },
+      });
+    } finally {
+      secondRpcClient.dispose();
+      await secondAgentConnection.close({
+        reason: "system test cleanup",
+      });
+    }
+  } finally {
+    if (firstRpcClient !== null) {
+      firstRpcClient.dispose();
+      await firstAgentConnection.close({
+        reason: "system test cleanup",
+      });
+    }
+  }
+}
+
 describe("system sandbox codex turn survives disconnect", () => {
   it(
-    "keeps a codex turn running to completion after the only agent client disconnects",
+    "keeps a codex turn running to completion after the only dashboard client disconnects",
     async ({ fixture }) => {
       const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
       const authenticatedSession = await fixture.authSession({
-        email: "sandbox-codex-turn-survives-disconnect@example.com",
+        email: "sandbox-codex-dashboard-turn-survives-disconnect@example.com",
       });
 
       const openAiConnectionId = await createOpenAiConnection({
@@ -521,137 +677,60 @@ describe("system sandbox codex turn survives disconnect", () => {
         sandboxInstanceId,
       });
 
-      const marker = `disconnect-survives-${randomUUID()}`;
-      const markerDirectory = "/tmp/mistle-system-tests";
-      const markerFilePath = `${markerDirectory}/${marker}.txt`;
-      const shellCommand = [
-        "sh -lc",
-        shellQuote(
-          [
-            "sleep 8",
-            `mkdir -p ${shellQuote(markerDirectory)}`,
-            `printf %s ${shellQuote(marker)} > ${shellQuote(markerFilePath)}`,
-          ].join("; "),
-        ),
-      ].join(" ");
+      await runDisconnectSurvivalScenario({
+        fixture,
+        authenticatedSession,
+        sandboxInstanceId,
+        clientInfo: CodexDashboardInitializeClientInfo,
+        markerPrefix: "dashboard-disconnect-survives",
+      });
+    },
+    SYSTEM_TEST_TIMEOUT_MS,
+  );
 
-      const firstConnectionUrl = await mintSandboxConnectionUrl({
+  it(
+    "keeps a codex turn running to completion after the automation conversation client disconnects",
+    async ({ fixture }) => {
+      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+      const authenticatedSession = await fixture.authSession({
+        email: "sandbox-codex-worker-turn-survives-disconnect@example.com",
+      });
+
+      const openAiConnectionId = await createOpenAiConnection({
         request: fixture.request,
         authenticatedSession,
-        dataPlaneGatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
+        openAiApiKey,
+      });
+      const sandboxProfileId = await createSandboxProfile({
+        request: fixture.request,
+        authenticatedSession,
+      });
+      await updateSandboxBindings({
+        request: fixture.request,
+        authenticatedSession,
+        sandboxProfileId,
+        openAiConnectionId,
+      });
+
+      const sandboxInstanceId = await startSandboxInstance({
+        request: fixture.request,
+        authenticatedSession,
+        sandboxProfileId,
+      });
+      await waitForSandboxReady({
+        request: fixture.request,
+        authenticatedSession,
+        readSandboxRuntimeState: fixture.readSandboxRuntimeState,
         sandboxInstanceId,
       });
-      const firstAgentConnection = await connectCodexSession({
-        connectionUrl: firstConnectionUrl,
+
+      await runDisconnectSurvivalScenario({
+        fixture,
+        authenticatedSession,
+        sandboxInstanceId,
+        clientInfo: CodexConversationProviderInitializeClientInfo,
+        markerPrefix: "worker-disconnect-survives",
       });
-
-      let firstRpcClient: CodexJsonRpcClient | null = firstAgentConnection.rpcClient;
-
-      try {
-        await initializeAutomationWorkerSession({
-          rpcClient: firstRpcClient,
-          sessionClient: firstAgentConnection.sessionClient,
-        });
-
-        const startedThread = await startCodexThread({
-          rpcClient: firstRpcClient,
-          model: "gpt-5.3-codex",
-        });
-        const startedTurn = await startCodexTurn({
-          rpcClient: firstRpcClient,
-          threadId: startedThread.threadId,
-          input: buildCodexTurnInputItems({
-            text: [
-              "Use the shell tool and run exactly this command:",
-              `\`${shellCommand}\``,
-              `After the command succeeds, reply with exactly ${marker}.`,
-              "Do not ask for confirmation and do not use any tool other than the shell tool.",
-            ].join(" "),
-            attachments: [],
-          }),
-        });
-
-        expect(startedTurn.status).toBe("inProgress");
-
-        firstRpcClient.dispose();
-        firstRpcClient = null;
-        await firstAgentConnection.close({
-          reason: "system test disconnect after turn/start",
-        });
-
-        const secondConnectionUrl = await mintSandboxConnectionUrl({
-          request: fixture.request,
-          authenticatedSession,
-          dataPlaneGatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
-          sandboxInstanceId,
-        });
-        const secondAgentConnection = await connectCodexSession({
-          connectionUrl: secondConnectionUrl,
-        });
-        const secondRpcClient = secondAgentConnection.rpcClient;
-
-        try {
-          await initializeAutomationWorkerSession({
-            rpcClient: secondRpcClient,
-            sessionClient: secondAgentConnection.sessionClient,
-          });
-          await resumeCodexThread({
-            rpcClient: secondRpcClient,
-            threadId: startedThread.threadId,
-          });
-
-          const completedTurn = await waitForTurnTerminalState({
-            rpcClient: secondRpcClient,
-            threadId: startedThread.threadId,
-            turnId: startedTurn.turnId,
-            timeoutMs: TURN_TERMINAL_TIMEOUT_MS,
-          });
-
-          expect(completedTurn.status).toBe("completed");
-          expect(completedTurn.items.length).toBeGreaterThan(0);
-
-          await waitForCondition({
-            description: `marker file '${markerFilePath}' to exist in sandbox`,
-            timeoutMs: MARKER_FILE_TIMEOUT_MS,
-            evaluate: async () => {
-              const execConnectionUrl = await mintSandboxConnectionUrl({
-                request: fixture.request,
-                authenticatedSession,
-                dataPlaneGatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
-                sandboxInstanceId,
-              });
-              const result = await runSandboxExecCommand({
-                connectionUrl: execConnectionUrl,
-                command: "sh",
-                args: [
-                  "-lc",
-                  `test -f ${shellQuote(markerFilePath)} && cat ${shellQuote(markerFilePath)}`,
-                ],
-                cwd: "/root",
-                timeoutMs: 30_000,
-              });
-
-              if (result.exitCode !== 0) {
-                return null;
-              }
-
-              return result.stdout.trim() === marker ? result : null;
-            },
-          });
-        } finally {
-          secondRpcClient.dispose();
-          await secondAgentConnection.close({
-            reason: "system test cleanup",
-          });
-        }
-      } finally {
-        if (firstRpcClient !== null) {
-          firstRpcClient.dispose();
-          await firstAgentConnection.close({
-            reason: "system test cleanup",
-          });
-        }
-      }
     },
     SYSTEM_TEST_TIMEOUT_MS,
   );

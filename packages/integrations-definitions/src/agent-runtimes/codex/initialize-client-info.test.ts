@@ -4,6 +4,7 @@ import {
   CodexConversationProviderInitializeClientInfo,
   CodexDashboardInitializeClientInfo,
   CodexInitializeClientName,
+  MistleAgentClientTitle,
 } from "./initialize-client-info.js";
 
 describe("Codex initialize client info", () => {
@@ -11,5 +12,11 @@ describe("Codex initialize client info", () => {
     expect(CodexDashboardInitializeClientInfo.name).toBe(CodexInitializeClientName);
     expect(CodexConversationProviderInitializeClientInfo.name).toBe(CodexInitializeClientName);
     expect(CodexInitializeClientName).toBe("codex_cli_rs");
+  });
+
+  it("uses the shared Mistle agent client title for retained clients", () => {
+    expect(CodexDashboardInitializeClientInfo.title).toBe(MistleAgentClientTitle);
+    expect(CodexConversationProviderInitializeClientInfo.title).toBe(MistleAgentClientTitle);
+    expect(MistleAgentClientTitle).toBe("Mistle Agent Client");
   });
 });

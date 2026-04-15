@@ -440,6 +440,7 @@ describe("openai codex json-rpc client", () => {
       params: {
         clientInfo: {
           name: "codex_cli_rs",
+          title: "Mistle Agent Client",
           version: "0.1.0",
         },
       },

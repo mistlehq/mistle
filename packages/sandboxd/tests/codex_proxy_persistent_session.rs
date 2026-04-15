@@ -17,7 +17,7 @@ use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(5_000);
 
 #[test]
-fn automation_turn_survives_worker_disconnect_after_proxy_retention() {
+fn mistle_agent_turn_survives_client_disconnect_after_proxy_retention() {
     let raw_port = reserve_available_port();
     let raw_url = format!("ws://127.0.0.1:{raw_port}");
     let _app_server = start_codex_app_server(raw_port);
@@ -36,7 +36,7 @@ fn automation_turn_survives_worker_disconnect_after_proxy_retention() {
 
     let (mut worker_client, _) =
         connect_to_proxy_with_retry(proxy.listen_url(), &ThreadSleeper, Duration::from_secs(5));
-    initialize_client(&mut worker_client, "Mistle Control Plane Worker");
+    initialize_client(&mut worker_client, "Mistle Agent Client");
 
     let thread_start_response = call_json_rpc(&mut worker_client, "thread/start", json!({}));
     let thread_id = thread_start_response["thread"]["id"]
@@ -85,7 +85,7 @@ fn automation_turn_survives_worker_disconnect_after_proxy_retention() {
 
     assert_ne!(
         observed_turn_status, "interrupted",
-        "closing the automation worker after the proxy forwards turn/start should not interrupt the turn"
+        "closing the Mistle agent client after the proxy forwards turn/start should not interrupt the turn"
     );
 
     observer_client

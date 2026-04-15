@@ -12,11 +12,10 @@ use crate::codex_proxy::types::{
     BufferedSuccessResponse, PendingClientRequest, ProxyClientKind,
 };
 use crate::codex_proxy::{
-    CodexProxyError, CodexSessionManagerError, CodexSessionManagerHandle, RetainReason,
+    CodexProxyError, CodexSessionManagerError, CodexSessionManagerHandle,
+    MISTLE_AGENT_CLIENT_TITLE, RetainReason,
     is_connection_termination_error,
 };
-
-const AUTOMATION_WORKER_CLIENT_TITLE: &str = "Mistle Control Plane Worker";
 const TURN_START_METHOD: &str = "turn/start";
 const TURN_STEER_METHOD: &str = "turn/steer";
 const RETENTION_FAILURE_ERROR_CODE: i64 = -32000;
@@ -106,7 +105,7 @@ pub async fn relay_codex_proxy_connection(
                                 let result = session_manager_handle
                                     .retain_thread(
                                         thread_id,
-                                        RetainReason::AutomationBackgroundExecution,
+                                        RetainReason::MistleAgentBackgroundExecution,
                                     )
                                     .await;
                                 let _ = retention_result_sender.send(RetentionResult {
@@ -148,7 +147,7 @@ fn track_client_message(
 
     if method == "initialize" {
         *client_kind = match value["params"]["clientInfo"]["title"].as_str() {
-            Some(AUTOMATION_WORKER_CLIENT_TITLE) => ProxyClientKind::AutomationWorker,
+            Some(MISTLE_AGENT_CLIENT_TITLE) => ProxyClientKind::MistleAgentClient,
             _ => ProxyClientKind::Other,
         };
     }
@@ -194,7 +193,7 @@ fn matched_retention_target(
         return Ok(None);
     };
 
-    if *client_kind != ProxyClientKind::AutomationWorker {
+    if *client_kind != ProxyClientKind::MistleAgentClient {
         return Ok(None);
     }
     if value.get("error").is_some() {
@@ -360,7 +359,7 @@ mod tests {
     };
 
     #[test]
-    fn classifies_automation_worker_initialize_requests() {
+    fn classifies_mistle_agent_client_initialize_requests() {
         let mut client_kind = ProxyClientKind::Unknown;
         let mut pending_requests = std::collections::BTreeMap::new();
 
@@ -372,7 +371,7 @@ mod tests {
                     "params": {
                         "clientInfo": {
                             "name": "codex_cli_rs",
-                            "title": "Mistle Control Plane Worker",
+                            "title": "Mistle Agent Client",
                             "version": "0.1.0"
                         }
                     }
@@ -385,7 +384,7 @@ mod tests {
         )
         .expect("initialize request should parse");
 
-        assert_eq!(client_kind, ProxyClientKind::AutomationWorker);
+        assert_eq!(client_kind, ProxyClientKind::MistleAgentClient);
     }
 
     #[test]
@@ -409,7 +408,7 @@ mod tests {
                 .to_string()
                 .into(),
             ),
-            &ProxyClientKind::AutomationWorker,
+            &ProxyClientKind::MistleAgentClient,
             &mut pending_requests,
         )
         .expect("turn/steer response should parse");

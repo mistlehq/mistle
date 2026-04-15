@@ -8,6 +8,7 @@ import {
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
+import { CodexConversationProviderInitializeClientInfo } from "../../../packages/integrations-definitions/src/agent-runtimes/codex/initialize-client-info.js";
 import { ExecStreamClient } from "../../../packages/sandbox-session-client/src/exec-stream-client.js";
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
 import { PtyStreamClient } from "../../../packages/sandbox-session-client/src/pty-stream-client.js";
@@ -17,8 +18,6 @@ import type { AuthenticatedSession, SystemTestFixture } from "../system-test-con
 const OPENAI_TARGET_KEY = "openai-default";
 const OPENAI_CONNECTION_METHOD_ID = "api-key";
 const OPENAI_API_KEY = "sk-system-sandbox-restart";
-const CODEX_INITIALIZE_CLIENT_NAME = "codex_cli_rs";
-const AUTOMATION_WORKER_CLIENT_TITLE = "Mistle Control Plane Worker";
 const SANDBOX_READY_TIMEOUT_MS = 3 * 60_000;
 const POLL_INTERVAL_MS = 1_000;
 const RUNTIME_READY_POLL_INTERVAL_MS = 100;
@@ -206,11 +205,7 @@ export async function connectCodexAgentSession(input: {
   const rpcClient = new CodexJsonRpcClient(sessionClient);
   sessionClient.markInitializing();
   await rpcClient.call("initialize", {
-    clientInfo: {
-      name: CODEX_INITIALIZE_CLIENT_NAME,
-      title: AUTOMATION_WORKER_CLIENT_TITLE,
-      version: "0.1.0",
-    },
+    clientInfo: CodexConversationProviderInitializeClientInfo,
   });
   await rpcClient.notify("initialized", {});
   sessionClient.markReady();

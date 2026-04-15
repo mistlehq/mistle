@@ -63,6 +63,8 @@ pub const DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL: std::time::Duration =
     std::time::Duration::from_millis(100);
 /// The Codex client identity accepted by ChatGPT-backed OpenAI endpoints.
 pub const CODEX_INITIALIZE_CLIENT_NAME: &str = "codex_cli_rs";
+/// Shared title for Mistle-managed Codex clients whose turns must survive reconnects.
+pub const MISTLE_AGENT_CLIENT_TITLE: &str = "Mistle Agent Client";
 const CODEX_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const CODEX_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const CODEX_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];

@@ -600,7 +600,7 @@ async fn apply_one_thread_status_update(
         .expect("retained thread should still exist");
     retained_thread
         .retain_reasons
-        .remove(&RetainReason::AutomationBackgroundExecution);
+        .remove(&RetainReason::MistleAgentBackgroundExecution);
 
     if !retained_thread.retain_reasons.is_empty() {
         manager_state
@@ -972,7 +972,7 @@ mod tests {
         let (reply_sender, _reply_receiver) = oneshot::channel();
         let command = CodexSessionManagerCommand::RetainThread {
             thread_id: "thr_123".to_string(),
-            reason: RetainReason::AutomationBackgroundExecution,
+            reason: RetainReason::MistleAgentBackgroundExecution,
             reply: reply_sender,
         };
 
@@ -981,7 +981,7 @@ mod tests {
                 thread_id, reason, ..
             } => {
                 assert_eq!(thread_id, "thr_123");
-                assert_eq!(reason, RetainReason::AutomationBackgroundExecution);
+                assert_eq!(reason, RetainReason::MistleAgentBackgroundExecution);
             }
             _ => panic!("expected retain thread command"),
         }

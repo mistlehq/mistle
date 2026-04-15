@@ -239,14 +239,14 @@ fn session_manager_retain_and_release_manage_subscriptions() {
         handle
             .retain_thread(
                 "thr_123".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("retain command should succeed");
         handle
             .release_thread(
                 "thr_123".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("release command should succeed");
@@ -353,7 +353,7 @@ fn session_manager_auto_releases_when_resume_returns_non_active_status() {
         handle
             .retain_thread(
                 "thr_idle".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("retain command should succeed");
@@ -497,14 +497,14 @@ fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
         handle
             .retain_thread(
                 "thr_release_error".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("retain command should succeed");
         let error = handle
             .release_thread(
                 "thr_release_error".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect_err("release should fail when unsubscribe is rejected");
@@ -655,7 +655,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
         handle
             .retain_thread(
                 "thr_missing".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("initial retain should succeed");
@@ -667,7 +667,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
         handle
             .retain_thread(
                 "thr_missing".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("retain should succeed again after replay removed the stale entry");
@@ -791,7 +791,7 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
         handle
             .retain_thread(
                 "thr_456".to_string(),
-                RetainReason::AutomationBackgroundExecution,
+                RetainReason::MistleAgentBackgroundExecution,
             )
             .await
             .expect("retain command should succeed");
@@ -954,7 +954,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
     send_initialize_request(
         &mut proxy_client,
         REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
-        Some("Mistle Control Plane Worker"),
+        Some("Mistle Agent Client"),
     );
     let _ = read_json_text_message(&mut proxy_client);
 
@@ -1105,7 +1105,7 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
     send_initialize_request(
         &mut proxy_client,
         REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
-        Some("Mistle Control Plane Worker"),
+        Some("Mistle Agent Client"),
     );
     let _ = read_json_text_message(&mut proxy_client);
 
@@ -1281,7 +1281,7 @@ fn automation_turn_steer_buffers_success_until_retention_succeeds() {
     send_initialize_request(
         &mut proxy_client,
         REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed),
-        Some("Mistle Control Plane Worker"),
+        Some("Mistle Agent Client"),
     );
     let _ = read_json_text_message(&mut proxy_client);
 
