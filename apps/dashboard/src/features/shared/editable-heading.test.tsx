@@ -57,41 +57,8 @@ describe("EditableHeading", () => {
     ).toBe("idle");
   });
 
-  it("renders the edit field with inline input chrome", () => {
-    const { container } = renderEditableHeading({
-      editVariant: "inline",
-    });
-
-    const input = screen.getByRole("textbox", { name: "Heading" });
-
-    expect(screen.queryByRole("button", { name: "Edit heading" })).toBeNull();
-    expect(input.className).toContain("border-0");
-    expect(input.className).toContain("border-b");
-    expect(input.className).toContain("border-transparent");
-    expect(input.className).toContain("w-auto");
-    expect(input.className).toContain("pl-0");
-    expect(input.className).toContain("pr-2");
-    expect(input.className).toContain("text-xl");
-    expect(input.className).toContain("font-semibold");
-    expect(input.className).toContain("leading-none");
-    expect(input.getAttribute("size")).toBe("11");
-    expect(container.querySelector("svg")).not.toBeNull();
-  });
-
-  it("hides the pencil while the inline field is active", () => {
-    const { container } = renderEditableHeading({
-      editVariant: "inline",
-    });
-
-    const pencil = container.querySelector("svg");
-    expect(pencil).not.toBeNull();
-    expect(pencil?.parentElement?.className).toContain("group-focus-within:opacity-0");
-    expect(pencil?.parentElement?.className).toContain("group-hover:opacity-0");
-  });
-
   it("renders the edit field with the default page-title chrome", () => {
     renderEditableHeading({
-      editVariant: "default",
       isEditing: true,
     });
 

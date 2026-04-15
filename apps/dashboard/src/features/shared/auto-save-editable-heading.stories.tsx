@@ -19,8 +19,7 @@ type StoryHarnessProps = Pick<
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
-  const defaultExample = useAutoSaveStoryValue(input.value);
-  const inlineExample = useAutoSaveStoryValue(input.value);
+  const example = useAutoSaveStoryValue(input.value);
 
   return (
     <AutoSaveStoryFrame
@@ -39,60 +38,37 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
         </>
       }
     >
-      <div className="grid gap-8 lg:grid-cols-2">
-        <ComparisonPane
-          heading="Default input"
-          example={defaultExample}
-          {...input}
-          editVariant="default"
-        />
-        <ComparisonPane
-          heading="Inline input"
-          example={inlineExample}
-          {...input}
-          editVariant="inline"
-        />
-      </div>
+      <ComparisonPane example={example} {...input} />
     </AutoSaveStoryFrame>
   );
 }
 
 function ComparisonPane(
-  input: StoryHarnessProps & {
-    heading: string;
-    editVariant: "default" | "inline";
-    example: ReturnType<typeof useAutoSaveStoryValue>;
-  },
+  input: StoryHarnessProps & { example: ReturnType<typeof useAutoSaveStoryValue> },
 ): React.JSX.Element {
-  const { example, heading, editVariant, ...headingProps } = input;
+  const { example, ...headingProps } = input;
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        {heading}
-      </div>
-      <AutoSaveEditableHeading
-        ariaLabel="Display name"
-        editButtonLabel="Edit display name"
-        {...(headingProps.errorMessage === undefined
-          ? {}
-          : { errorMessage: headingProps.errorMessage })}
-        {...(headingProps.headingClassName === undefined
-          ? {}
-          : { headingClassName: headingProps.headingClassName })}
-        value={example.value}
-        {...(headingProps.inputClassName === undefined
-          ? {}
-          : { inputClassName: headingProps.inputClassName })}
-        {...(headingProps.maxWidthClassName === undefined
-          ? {}
-          : { maxWidthClassName: headingProps.maxWidthClassName })}
-        onSave={example.onSave}
-        placeholder={headingProps.placeholder ?? "Display name"}
-        validate={validateAutoSaveDisplayName}
-        editVariant={editVariant}
-      />
-    </div>
+    <AutoSaveEditableHeading
+      ariaLabel="Display name"
+      editButtonLabel="Edit display name"
+      {...(headingProps.errorMessage === undefined
+        ? {}
+        : { errorMessage: headingProps.errorMessage })}
+      {...(headingProps.headingClassName === undefined
+        ? {}
+        : { headingClassName: headingProps.headingClassName })}
+      value={example.value}
+      {...(headingProps.inputClassName === undefined
+        ? {}
+        : { inputClassName: headingProps.inputClassName })}
+      {...(headingProps.maxWidthClassName === undefined
+        ? {}
+        : { maxWidthClassName: headingProps.maxWidthClassName })}
+      onSave={example.onSave}
+      placeholder={headingProps.placeholder ?? "Display name"}
+      validate={validateAutoSaveDisplayName}
+    />
   );
 }
 

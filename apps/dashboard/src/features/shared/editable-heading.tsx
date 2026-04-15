@@ -1,7 +1,6 @@
-import { Button, Notice, cn } from "@mistle/ui";
+import { Button, Notice } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 
-import { AutoSaveInputSurface } from "./auto-save-input-surface.js";
 import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
 import { PageTitleField } from "./page-title-field.js";
 
@@ -20,7 +19,6 @@ export function EditableHeading(input: {
   headingTag?: "div" | "h1" | "h2";
   headingClassName?: string;
   inputClassName?: string;
-  editVariant?: "default" | "inline";
   onEditStart: () => void;
   onDraftValueChange: (nextValue: string) => void;
   onCommit: () => void;
@@ -30,55 +28,6 @@ export function EditableHeading(input: {
   const HeadingTag = input.headingTag ?? "h1";
   const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
   const headingToneClassName = input.errorMessage === undefined ? "" : " text-destructive";
-  const editVariant = input.editVariant ?? "default";
-
-  if (editVariant === "inline") {
-    const inlineSize = Math.max(
-      input.draftValue.trim().length,
-      input.placeholder?.trim().length ?? 0,
-      1,
-    );
-
-    return (
-      <div className={containerClassName}>
-        <AutoSaveInputSurface
-          ariaLabel={input.ariaLabel}
-          autoFocus={input.isEditing}
-          id="editable-heading-input"
-          onBlur={input.onCommit}
-          onChange={input.onDraftValueChange}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-              return;
-            }
-
-            if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
-              input.onCancel();
-            }
-          }}
-          saveStatus={input.saveStatus ?? "idle"}
-          size={inlineSize}
-          {...(input.isEditing
-            ? {}
-            : {
-                idleTrailingAdornment: (
-                  <PencilSimpleIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-                ),
-              })}
-          value={input.draftValue}
-          variant="inline"
-          {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
-          {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
-          inputClassName={cn(
-            "w-auto border-0 border-b border-transparent rounded-none pl-0 py-1 text-xl font-semibold leading-none hover:border-border hover:bg-transparent focus-visible:border-border focus-visible:bg-transparent",
-            input.inputClassName,
-          )}
-          {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
-        />
-      </div>
-    );
-  }
 
   if (input.isEditing) {
     return (
