@@ -8,7 +8,7 @@
 //! - one internal session-manager connection that rebuilds active thread state from
 //!   `thread/loaded/list` and `thread/read`
 //! - incremental keepalive updates driven only by `thread/status/changed`
-//! - runtime-readiness updates driven by the session manager's real protocol bootstrap
+//! - runtime-readiness projection derived from the shared supervision snapshot
 
 mod proxy_session;
 mod session_manager;
@@ -47,7 +47,9 @@ pub use crate::codex_proxy::types::{
     ProxyClientKind, RetainReason, RetainedThreadState, ThreadSubscriptionState,
 };
 use crate::keepalive::KeepaliveManager;
-use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::runtime::readiness::{
+    RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
+};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::SystemClock;
 pub type RawCodexSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -64,6 +66,7 @@ pub const CODEX_INITIALIZE_CLIENT_NAME: &str = "codex_cli_rs";
 const CODEX_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const CODEX_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const CODEX_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
+const CODEX_PROXY_READINESS_PROJECTION_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Describes why Codex proxy startup, relay, or monitor handling failed.
 #[derive(Debug)]
@@ -237,7 +240,14 @@ pub struct CodexProxy {
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), CodexProxyError>>>,
     control_handle: CodexProxyControlHandle,
+    local_runtime_readiness_projection: Option<LocalRuntimeReadinessProjection>,
     supervisor_handle: SandboxdSupervisorHandle,
+}
+
+struct LocalRuntimeReadinessProjection {
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    shutdown_requested: Arc<AtomicBool>,
+    thread: JoinHandle<()>,
 }
 
 #[derive(Clone, Debug)]
@@ -269,7 +279,6 @@ struct CodexProxySupervisorConfig {
     listen_url: String,
     raw_app_server_url: String,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
 }
 
 enum CodexProxySupervisorCommand {
@@ -317,6 +326,18 @@ impl CodexProxy {
         };
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::CodexProxy);
+        if let Some(local_runtime_readiness_projection) =
+            self.local_runtime_readiness_projection.take()
+        {
+            sync_codex_proxy_runtime_readiness_from_snapshot(
+                &self.supervisor_handle,
+                &local_runtime_readiness_projection.runtime_readiness_manager,
+            );
+            local_runtime_readiness_projection
+                .shutdown_requested
+                .store(true, Ordering::Relaxed);
+            let _ = local_runtime_readiness_projection.thread.join();
+        }
         close_result
     }
 }
@@ -389,7 +410,6 @@ pub fn start_codex_proxy_with_supervisor(
         listen_url: proxy_listen_url.to_string(),
         raw_app_server_url: raw_app_server_url.to_string(),
         keepalive_manager,
-        runtime_readiness_manager,
     };
     let mut active_runtime = spawn_active_codex_proxy_runtime(&config)?;
     if let Err(error) =
@@ -413,6 +433,27 @@ pub fn start_codex_proxy_with_supervisor(
         supervisor_handle: supervisor_handle.clone(),
         supervisor_command_sender: supervisor_command_sender.clone(),
     };
+    let local_runtime_readiness_projection = if !supervisor_handle
+        .tracks_component(SupervisedComponent::CodexAppServer)
+    {
+        sync_codex_proxy_runtime_readiness_from_snapshot(
+            &supervisor_handle,
+            &runtime_readiness_manager,
+        );
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let thread = spawn_codex_proxy_runtime_readiness_projection(
+            supervisor_handle.clone(),
+            runtime_readiness_manager.clone(),
+            shutdown_requested.clone(),
+        );
+        Some(LocalRuntimeReadinessProjection {
+            runtime_readiness_manager,
+            shutdown_requested,
+            thread,
+        })
+    } else {
+        None
+    };
     let shutdown_requested = Arc::new(AtomicBool::new(false));
     let supervisor_thread = thread::spawn({
         let shutdown_requested = shutdown_requested.clone();
@@ -433,7 +474,47 @@ pub fn start_codex_proxy_with_supervisor(
         shutdown_requested,
         supervisor_thread: Some(supervisor_thread),
         control_handle,
+        local_runtime_readiness_projection,
         supervisor_handle,
+    })
+}
+
+fn sync_codex_proxy_runtime_readiness_from_snapshot(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
+) {
+    let ready = derive_runtime_ready(
+        &supervisor_handle.snapshot(),
+        RuntimeReadinessMode::CodexProxyOnly,
+    );
+    runtime_readiness_manager
+        .lock()
+        .expect("runtime readiness manager lock should not be poisoned")
+        .set_ready(ready);
+}
+
+fn spawn_codex_proxy_runtime_readiness_projection(
+    supervisor_handle: SandboxdSupervisorHandle,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    shutdown_requested: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut last_projected_ready = None;
+
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            let projected_ready = derive_runtime_ready(
+                &supervisor_handle.snapshot(),
+                RuntimeReadinessMode::CodexProxyOnly,
+            );
+            if last_projected_ready != Some(projected_ready) {
+                runtime_readiness_manager
+                    .lock()
+                    .expect("runtime readiness manager lock should not be poisoned")
+                    .set_ready(projected_ready);
+                last_projected_ready = Some(projected_ready);
+            }
+            thread::sleep(CODEX_PROXY_READINESS_PROJECTION_INTERVAL);
+        }
     })
 }
 
@@ -511,7 +592,6 @@ fn spawn_active_codex_proxy_runtime(
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
     let raw_app_server_url = config.raw_app_server_url.clone();
     let keepalive_manager = config.keepalive_manager.clone();
-    let runtime_readiness_manager = config.runtime_readiness_manager.clone();
     let runtime_thread = thread::spawn(move || {
         let result = Builder::new_multi_thread()
             .worker_threads(2)
@@ -525,7 +605,6 @@ fn spawn_active_codex_proxy_runtime(
                         listen_url_template,
                         &raw_app_server_url,
                         keepalive_manager,
-                        runtime_readiness_manager,
                         shutdown_receiver,
                         startup_result_sender,
                     )
@@ -938,7 +1017,6 @@ async fn run_codex_proxy_runtime(
     listen_url_template: Url,
     raw_app_server_url: &str,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     mut shutdown_receiver: watch::Receiver<bool>,
     startup_result_sender: mpsc::Sender<Result<CodexProxyStartup, CodexProxyError>>,
 ) -> Result<(), CodexProxyError> {
@@ -961,7 +1039,6 @@ async fn run_codex_proxy_runtime(
         session_manager::spawn_codex_session_manager(
             raw_app_server_url.to_string(),
             keepalive_manager,
-            runtime_readiness_manager,
             shutdown_receiver.clone(),
         );
     let _ = startup_result_sender.send(Ok(CodexProxyStartup {

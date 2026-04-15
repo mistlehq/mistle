@@ -117,7 +117,6 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
     .expect("Codex proxy should start");
 
     wait_for_keepalive_state(&keepalive_manager, true);
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
 
     let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     let request_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -138,7 +137,6 @@ fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
     assert_eq!(proxied_response["result"]["data"], json!([]));
 
     wait_for_keepalive_state(&keepalive_manager, false);
-    wait_for_runtime_readiness(&runtime_readiness_manager, false);
 
     proxy_client
         .close(None)
@@ -227,20 +225,16 @@ fn session_manager_retain_and_release_manage_subscriptions() {
         .expect("raw server should report readiness");
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
         let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
-            runtime_readiness_manager.clone(),
             shutdown_receiver,
         );
         (shutdown_sender, handle, task)
     });
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
     runtime.block_on(async {
         handle
             .retain_thread(
@@ -345,20 +339,16 @@ fn session_manager_auto_releases_when_resume_returns_non_active_status() {
         .expect("raw server should report readiness");
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
         let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
-            runtime_readiness_manager.clone(),
             shutdown_receiver,
         );
         (shutdown_sender, handle, task)
     });
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
     runtime.block_on(async {
         handle
             .retain_thread(
@@ -493,20 +483,16 @@ fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
         .expect("raw server should report readiness");
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
         let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
-            runtime_readiness_manager.clone(),
             shutdown_receiver,
         );
         (shutdown_sender, handle, task)
     });
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
     runtime.block_on(async {
         handle
             .retain_thread(
@@ -655,20 +641,16 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
         .expect("raw server should report readiness");
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
         let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
-            runtime_readiness_manager.clone(),
             shutdown_receiver,
         );
         (shutdown_sender, handle, task)
     });
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
     runtime.block_on(async {
         handle
             .retain_thread(
@@ -795,20 +777,16 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
         .expect("raw server should report readiness");
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
         let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
-            runtime_readiness_manager.clone(),
             shutdown_receiver,
         );
         (shutdown_sender, handle, task)
     });
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
     runtime.block_on(async {
         handle
             .retain_thread(
@@ -972,8 +950,6 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
     )
     .expect("Codex proxy should start");
 
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
-
     let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     send_initialize_request(
         &mut proxy_client,
@@ -1124,8 +1100,6 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
         runtime_readiness_manager.clone(),
     )
     .expect("Codex proxy should start");
-
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
 
     let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     send_initialize_request(
@@ -1303,8 +1277,6 @@ fn automation_turn_steer_buffers_success_until_retention_succeeds() {
     )
     .expect("Codex proxy should start");
 
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
-
     let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     send_initialize_request(
         &mut proxy_client,
@@ -1447,8 +1419,6 @@ fn non_automation_turn_start_remains_passthrough() {
     )
     .expect("Codex proxy should start");
 
-    wait_for_runtime_readiness(&runtime_readiness_manager, true);
-
     let (mut proxy_client, _) = connect_to_proxy_with_retry(proxy.listen_url());
     send_initialize_request(
         &mut proxy_client,
@@ -1497,26 +1467,6 @@ fn build_runtime() -> Runtime {
         .enable_all()
         .build()
         .expect("test runtime should build")
-}
-
-fn wait_for_runtime_readiness(
-    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
-    expected_ready: bool,
-) {
-    for _ in 0..100 {
-        if runtime_readiness_manager
-            .lock()
-            .expect("runtime readiness manager lock should not be poisoned")
-            .ready()
-            == expected_ready
-        {
-            return;
-        }
-
-        ThreadSleeper.sleep(Duration::from_millis(10));
-    }
-
-    panic!("timed out waiting for runtime.ready == {expected_ready}");
 }
 
 fn wait_for_keepalive_state(

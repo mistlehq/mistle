@@ -21,7 +21,9 @@ use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
-use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::runtime::readiness::{
+    RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
+};
 use crate::supervision::{
     SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent,
 };
@@ -84,6 +86,8 @@ pub struct SandboxdState {
     codex_proxy_control_handle: Option<CodexProxyControlHandle>,
     codex_coordination_shutdown_requested: Arc<AtomicBool>,
     codex_coordination_thread: Option<JoinHandle<()>>,
+    runtime_readiness_shutdown_requested: Arc<AtomicBool>,
+    runtime_readiness_thread: Option<JoinHandle<()>>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
@@ -170,13 +174,7 @@ impl SandboxdState {
             .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
         let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
-            [] => {
-                runtime_readiness_manager
-                    .lock()
-                    .expect("runtime readiness manager lock should not be poisoned")
-                    .set_ready(true);
-                None
-            }
+            [] => None,
             [_adapter] => Some(
                 codex_proxy_control_handle
                     .as_ref()
@@ -195,6 +193,19 @@ impl SandboxdState {
                 ));
             }
         };
+        let runtime_readiness_mode = determine_runtime_readiness_mode(&supervisor_handle);
+        sync_runtime_readiness_from_snapshot(
+            &supervisor_handle,
+            &runtime_readiness_manager,
+            runtime_readiness_mode,
+        );
+        let runtime_readiness_shutdown_requested = Arc::new(AtomicBool::new(false));
+        let runtime_readiness_thread = Some(spawn_runtime_readiness_projection_thread(
+            supervisor_handle.clone(),
+            runtime_readiness_manager.clone(),
+            runtime_readiness_mode,
+            runtime_readiness_shutdown_requested.clone(),
+        ));
 
         let tunnel_session = Some(
             TunnelSession::start_with_supervisor(
@@ -234,6 +245,8 @@ impl SandboxdState {
             codex_proxy_control_handle,
             codex_coordination_shutdown_requested,
             codex_coordination_thread,
+            runtime_readiness_shutdown_requested,
+            runtime_readiness_thread,
             supervisor_handle,
             keepalive_manager,
             runtime_readiness_manager,
@@ -286,6 +299,11 @@ impl SandboxdState {
         if let Some(codex_coordination_thread) = self.codex_coordination_thread.take() {
             let _ = codex_coordination_thread.join();
         }
+        self.runtime_readiness_shutdown_requested
+            .store(true, Ordering::Relaxed);
+        if let Some(runtime_readiness_thread) = self.runtime_readiness_thread.take() {
+            let _ = runtime_readiness_thread.join();
+        }
         self.runtime_adapters
             .close()
             .map_err(|error| SandboxdStateError::StopRuntimeAdapters(error.to_string()))?;
@@ -326,6 +344,70 @@ impl SandboxdState {
 
 const CODEX_COORDINATION_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 const CODEX_PROXY_RECOVERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const RUNTIME_READINESS_PROJECTION_POLL_INTERVAL: std::time::Duration =
+    std::time::Duration::from_millis(100);
+
+fn determine_runtime_readiness_mode(
+    supervisor_handle: &SandboxdSupervisorHandle,
+) -> RuntimeReadinessMode {
+    if supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer) {
+        RuntimeReadinessMode::Codex
+    } else if supervisor_handle.tracks_component(SupervisedComponent::CodexProxy) {
+        RuntimeReadinessMode::CodexProxyOnly
+    } else {
+        RuntimeReadinessMode::NoAgentRuntime
+    }
+}
+
+fn sync_runtime_readiness_from_snapshot(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_mode: RuntimeReadinessMode,
+) {
+    let ready = derive_runtime_ready(&supervisor_handle.snapshot(), runtime_readiness_mode);
+    runtime_readiness_manager
+        .lock()
+        .expect("runtime readiness manager lock should not be poisoned")
+        .set_ready(ready);
+}
+
+fn spawn_runtime_readiness_projection_thread(
+    supervisor_handle: SandboxdSupervisorHandle,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_mode: RuntimeReadinessMode,
+    shutdown_requested: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    thread::spawn(move || {
+        run_runtime_readiness_projection_loop(
+            supervisor_handle,
+            runtime_readiness_manager,
+            runtime_readiness_mode,
+            shutdown_requested,
+        );
+    })
+}
+
+fn run_runtime_readiness_projection_loop(
+    supervisor_handle: SandboxdSupervisorHandle,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_mode: RuntimeReadinessMode,
+    shutdown_requested: Arc<AtomicBool>,
+) {
+    let mut last_projected_ready = None;
+
+    while !shutdown_requested.load(Ordering::Relaxed) {
+        let projected_ready =
+            derive_runtime_ready(&supervisor_handle.snapshot(), runtime_readiness_mode);
+        if last_projected_ready != Some(projected_ready) {
+            runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned")
+                .set_ready(projected_ready);
+            last_projected_ready = Some(projected_ready);
+        }
+        thread::sleep(RUNTIME_READINESS_PROJECTION_POLL_INTERVAL);
+    }
+}
 
 fn spawn_codex_coordination_thread(
     codex_app_server_control_handle: CodexAppServerControlHandle,
@@ -659,10 +741,10 @@ mod tests {
         RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile,
         RuntimeExecCommand,
     };
-    use crate::runtime::readiness::RuntimeReadinessManager;
+    use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
     use crate::sandboxd_state::{
         apply_runtime_startup_overrides, collect_runtime_environment,
-        spawn_codex_coordination_thread,
+        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::{SystemClock, ThreadSleeper};
@@ -1152,6 +1234,41 @@ supports_websockets = false
         let _ = std::fs::remove_file(marker_path);
     }
 
+    #[test]
+    fn runtime_readiness_projection_tracks_codex_component_health() {
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([
+                SupervisedComponent::CodexProxy,
+                SupervisedComponent::CodexAppServer,
+            ]),
+        );
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let projection_thread = spawn_runtime_readiness_projection_thread(
+            supervisor_handle.clone(),
+            runtime_readiness_manager.clone(),
+            RuntimeReadinessMode::Codex,
+            shutdown_requested.clone(),
+        );
+
+        wait_for_runtime_ready_value(&runtime_readiness_manager, false, Duration::from_secs(5));
+
+        supervisor_handle.mark_component_starting(SupervisedComponent::CodexProxy);
+        supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
+        supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
+        supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
+        wait_for_runtime_ready_value(&runtime_readiness_manager, true, Duration::from_secs(5));
+
+        supervisor_handle
+            .mark_component_restarting(SupervisedComponent::CodexProxy, "proxy restart");
+        wait_for_runtime_ready_value(&runtime_readiness_manager, false, Duration::from_secs(5));
+
+        shutdown_requested.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = projection_thread.join();
+    }
+
     fn reserve_test_port() -> u16 {
         let listener =
             TcpListener::bind(("127.0.0.1", 0)).expect("test listener should bind to loopback");
@@ -1211,6 +1328,28 @@ supports_websockets = false
             assert!(
                 Instant::now() < deadline,
                 "expected Codex proxy to reconnect cleanly, got {snapshot:?}"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
+    }
+
+    fn wait_for_runtime_ready_value(
+        runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
+        expected_ready: bool,
+        timeout: Duration,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let ready = runtime_readiness_manager
+                .lock()
+                .expect("runtime readiness manager lock should not be poisoned")
+                .ready();
+            if ready == expected_ready {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "expected runtime readiness to become {expected_ready}, got {ready}"
             );
             thread::sleep(Duration::from_millis(25));
         }

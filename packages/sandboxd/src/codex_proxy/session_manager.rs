@@ -18,7 +18,6 @@ use crate::codex_proxy::{
     wait_for_response,
 };
 use crate::keepalive::KeepaliveManager;
-use crate::runtime::readiness::RuntimeReadinessManager;
 
 const INITIALIZE_CLIENT_TITLE: &str = "Mistle sandboxd Codex session manager";
 const INITIALIZE_CLIENT_VERSION: &str = "0.0.0";
@@ -85,7 +84,6 @@ impl CodexSessionManagerHandle {
 pub fn spawn_codex_session_manager(
     raw_app_server_url: String,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     shutdown_receiver: watch::Receiver<bool>,
 ) -> (
     CodexSessionManagerHandle,
@@ -100,7 +98,6 @@ pub fn spawn_codex_session_manager(
         run_codex_session_manager_loop(
             &raw_app_server_url,
             &keepalive_manager,
-            &runtime_readiness_manager,
             shutdown_receiver,
             command_receiver,
             health_state_sender,
@@ -112,14 +109,12 @@ pub fn spawn_codex_session_manager(
 }
 
 struct SessionManagerStatusSinks<'a> {
-    runtime_readiness_manager: &'a Arc<Mutex<RuntimeReadinessManager>>,
     health_state_sender: &'a watch::Sender<CodexSessionManagerHealthState>,
 }
 
 async fn run_codex_session_manager_loop(
     raw_app_server_url: &str,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     mut shutdown_receiver: watch::Receiver<bool>,
     mut command_receiver: mpsc::Receiver<CodexSessionManagerCommand>,
     health_state_sender: watch::Sender<CodexSessionManagerHealthState>,
@@ -134,7 +129,6 @@ async fn run_codex_session_manager_loop(
 
         let _ = health_state_sender.send(CodexSessionManagerHealthState::Starting);
         let status_sinks = SessionManagerStatusSinks {
-            runtime_readiness_manager,
             health_state_sender: &health_state_sender,
         };
         let session_result = run_codex_session_manager_session(
@@ -150,9 +144,6 @@ async fn run_codex_session_manager_loop(
 
         if let Ok(mut keepalive_manager) = keepalive_manager.lock() {
             monitor.clear(&mut keepalive_manager);
-        }
-        if let Ok(mut runtime_readiness_manager) = runtime_readiness_manager.lock() {
-            runtime_readiness_manager.set_ready(false);
         }
         let _ = health_state_sender.send(CodexSessionManagerHealthState::Disconnected);
         manager_state.initialized = false;
@@ -224,11 +215,6 @@ async fn run_codex_session_manager_session(
     .await?;
 
     manager_state.initialized = true;
-    status_sinks
-        .runtime_readiness_manager
-        .lock()
-        .expect("Codex runtime readiness manager lock should not be poisoned")
-        .set_ready(true);
     let _ = status_sinks
         .health_state_sender
         .send(CodexSessionManagerHealthState::Connected);

@@ -8,6 +8,54 @@
 
 use serde::Serialize;
 
+use crate::supervision::{ComponentHealthState, SandboxdHealthSnapshot, SupervisedComponent};
+
+/// Explicit readiness derivation policy for the current initialized sandbox runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeReadinessMode {
+    NoAgentRuntime,
+    CodexProxyOnly,
+    Codex,
+}
+
+/// Derives the publishable runtime readiness bit from the supervision snapshot.
+pub fn derive_runtime_ready(
+    snapshot: &SandboxdHealthSnapshot,
+    mode: RuntimeReadinessMode,
+) -> bool {
+    match mode {
+        RuntimeReadinessMode::NoAgentRuntime => true,
+        RuntimeReadinessMode::CodexProxyOnly => codex_proxy_is_ready(snapshot),
+        RuntimeReadinessMode::Codex => {
+            codex_proxy_is_ready(snapshot)
+                && component_is_healthy(snapshot, SupervisedComponent::CodexAppServer)
+        }
+    }
+}
+
+fn component_is_healthy(
+    snapshot: &SandboxdHealthSnapshot,
+    component: SupervisedComponent,
+) -> bool {
+    snapshot
+        .components
+        .iter()
+        .find(|candidate| candidate.component == component)
+        .is_some_and(|candidate| candidate.state == ComponentHealthState::Healthy)
+}
+
+fn codex_proxy_is_ready(snapshot: &SandboxdHealthSnapshot) -> bool {
+    snapshot
+        .components
+        .iter()
+        .find(|candidate| candidate.component == SupervisedComponent::CodexProxy)
+        .is_some_and(|candidate| {
+            candidate.state == ComponentHealthState::Healthy
+                && candidate.details.get("sessionManagerState").is_some_and(|state| state == "Connected")
+                && candidate.details.get("rawConnectivityState").is_some_and(|state| state == "Connected")
+        })
+}
+
 /// Wire shape for one runtime-readiness control message sent to the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -70,7 +118,16 @@ impl RuntimeReadinessManager {
 
 #[cfg(test)]
 mod tests {
-    use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadyMessageType};
+    use std::collections::BTreeMap;
+    use std::time::SystemTime;
+
+    use crate::runtime::readiness::{
+        RuntimeReadinessManager, RuntimeReadinessMode, RuntimeReadyMessageType,
+        derive_runtime_ready,
+    };
+    use crate::supervision::{
+        ComponentHealthSnapshot, ComponentHealthState, SandboxdHealthSnapshot, SupervisedComponent,
+    };
 
     #[test]
     fn publishes_immediately_when_tunnel_connects() {
@@ -107,5 +164,114 @@ mod tests {
             manager.take_publishable_state().is_none(),
             "disconnected tunnels should not publish runtime readiness"
         );
+    }
+
+    #[test]
+    fn derives_no_agent_runtime_as_ready() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::NoAgentRuntime,
+        ));
+    }
+
+    #[test]
+    fn derives_codex_runtime_as_ready_only_when_proxy_and_app_server_are_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                codex_proxy_snapshot(ComponentHealthState::Healthy, "Connected"),
+                component_snapshot(
+                    SupervisedComponent::CodexAppServer,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(derive_runtime_ready(&snapshot, RuntimeReadinessMode::Codex));
+    }
+
+    #[test]
+    fn derives_codex_runtime_as_not_ready_when_a_required_component_is_not_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![
+                codex_proxy_snapshot(ComponentHealthState::Restarting, "Disconnected"),
+                component_snapshot(
+                    SupervisedComponent::CodexAppServer,
+                    ComponentHealthState::Healthy,
+                ),
+            ],
+        };
+
+        assert!(!derive_runtime_ready(&snapshot, RuntimeReadinessMode::Codex));
+    }
+
+    #[test]
+    fn derives_proxy_only_runtime_as_ready_when_codex_proxy_is_healthy() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![codex_proxy_snapshot(
+                ComponentHealthState::Healthy,
+                "Connected",
+            )],
+        };
+
+        assert!(derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::CodexProxyOnly,
+        ));
+    }
+
+    #[test]
+    fn derives_proxy_only_runtime_as_not_ready_when_proxy_connectivity_is_not_connected() {
+        let snapshot = SandboxdHealthSnapshot {
+            observed_at: SystemTime::UNIX_EPOCH,
+            components: vec![codex_proxy_snapshot(
+                ComponentHealthState::Healthy,
+                "Disconnected",
+            )],
+        };
+
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::CodexProxyOnly,
+        ));
+    }
+
+    fn component_snapshot(
+        component: SupervisedComponent,
+        state: ComponentHealthState,
+    ) -> ComponentHealthSnapshot {
+        ComponentHealthSnapshot {
+            component,
+            state,
+            restart_count: 0,
+            last_started_at: None,
+            last_failed_at: None,
+            last_healthcheck_at: None,
+            last_error: None,
+            details: BTreeMap::new(),
+        }
+    }
+
+    fn codex_proxy_snapshot(
+        state: ComponentHealthState,
+        connectivity_state: &str,
+    ) -> ComponentHealthSnapshot {
+        let mut snapshot = component_snapshot(SupervisedComponent::CodexProxy, state);
+        snapshot.details.insert(
+            "sessionManagerState".to_string(),
+            connectivity_state.to_string(),
+        );
+        snapshot.details.insert(
+            "rawConnectivityState".to_string(),
+            connectivity_state.to_string(),
+        );
+        snapshot
     }
 }
