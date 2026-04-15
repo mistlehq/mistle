@@ -10,9 +10,9 @@ import {
   type IntegrationConnection,
 } from "../integrations/integrations-service.js";
 import {
-  buildIntegrationConnectionResourceItemsByKey,
+  buildIntegrationConnectionResourceContentByKey,
   buildIntegrationConnectionResourceRequests,
-  createRefreshingResourceKey,
+  createIntegrationConnectionResourceKey,
   shouldPollIntegrationDetailResources,
 } from "./integrations-page-view-model.js";
 
@@ -57,15 +57,15 @@ function createRefreshingResourceKeys(pendingMutationVariables: readonly unknown
   return new Set<string>(
     pendingMutationVariables
       .filter(isRefreshResourceMutationVariables)
-      .map(createRefreshingResourceKey),
+      .map(createIntegrationConnectionResourceKey),
   );
 }
 
-function buildResourceItemsByKey(input: {
+function buildResourceContentByKey(input: {
   resourceRequests: ReturnType<typeof buildIntegrationConnectionResourceRequests>;
   resourceQueries: readonly IntegrationResourceQueryState[];
 }) {
-  return buildIntegrationConnectionResourceItemsByKey(
+  return buildIntegrationConnectionResourceContentByKey(
     input.resourceRequests.map((resource, index) => {
       const query = input.resourceQueries[index];
 
@@ -157,7 +157,7 @@ export function useIntegrationResourceState(input: {
     })),
   });
 
-  const resourceItemsByKey = buildResourceItemsByKey({
+  const resourceContentByKey = buildResourceContentByKey({
     resourceRequests,
     resourceQueries,
   });
@@ -165,6 +165,6 @@ export function useIntegrationResourceState(input: {
   return {
     onRefreshResource: refreshResourceMutation.mutate,
     refreshingResourceKeys,
-    resourceItemsByKey,
+    resourceContentByKey,
   };
 }

@@ -220,6 +220,29 @@ export function buildIntegrationConnectionDetailItems(input: {
   });
 }
 
+export type IntegrationConnectionDetailWebhookPolicy = {
+  canCreateWebhookSource: boolean;
+  canDeleteWebhookSource: boolean;
+  showWebhookSources: boolean;
+};
+
+export function resolveIntegrationConnectionDetailWebhookPolicy(input: {
+  webhookSource:
+    | {
+        lifecycle?: string;
+      }
+    | undefined;
+}): IntegrationConnectionDetailWebhookPolicy {
+  const lifecycle = input.webhookSource?.lifecycle;
+  const supportsManagedWebhookActions = lifecycle === "managed";
+
+  return {
+    canCreateWebhookSource: supportsManagedWebhookActions,
+    canDeleteWebhookSource: supportsManagedWebhookActions,
+    showWebhookSources: input.webhookSource !== undefined,
+  };
+}
+
 function resolveAuthFields(input: {
   connection: IntegrationConnection;
   currentMethod: IntegrationConnectionMethod | null;
@@ -377,19 +400,19 @@ export function buildIntegrationConnectionResourceRequests(
   );
 }
 
-export type IntegrationConnectionResourceItemsState = {
+export type IntegrationConnectionResourceContentState = {
   errorMessage: string | null;
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
 };
 
-export function buildIntegrationConnectionResourceItemsByKey(
+export function buildIntegrationConnectionResourceContentByKey(
   input: readonly {
     connectionId: string;
-    state: IntegrationConnectionResourceItemsState;
+    state: IntegrationConnectionResourceContentState;
   }[],
-): ReadonlyMap<string, IntegrationConnectionResourceItemsState> {
+): ReadonlyMap<string, IntegrationConnectionResourceContentState> {
   return new Map(
     input.map((entry) => [
       createIntegrationConnectionResourceKey({

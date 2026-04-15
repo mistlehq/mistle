@@ -6,6 +6,18 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
 
+const ManagedWebhookPolicy = {
+  canCreateWebhookSource: true,
+  canDeleteWebhookSource: true,
+  showWebhookSources: true,
+} as const;
+
+const ImplicitWebhookPolicy = {
+  canCreateWebhookSource: false,
+  canDeleteWebhookSource: false,
+  showWebhookSources: true,
+} as const;
+
 describe("IntegrationConnectionDetailView", () => {
   afterEach(() => {
     cleanup();
@@ -57,7 +69,7 @@ describe("IntegrationConnectionDetailView", () => {
         onStartGitHubAppInstallation={(connectionId) => {
           startedGitHubAppInstallationConnectionId = connectionId;
         }}
-        resourceItemsByKey={
+        resourceContentByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -193,7 +205,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(refreshButton).toHaveProperty("disabled", true);
   });
 
-  it("shows resource preview errors while the row is collapsed and keeps item chips hidden", () => {
+  it("shows resource load errors while the row is collapsed and keeps items hidden", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -214,7 +226,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceItemsByKey={
+        resourceContentByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -240,7 +252,7 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByLabelText("View repository preview error")).toBeTruthy();
+    expect(screen.getByLabelText("View repository load error")).toBeTruthy();
     expect(screen.queryByText("Could not load repositories.")).toBeNull();
     expect(screen.queryByText(/Last synced/)).toBeNull();
     expect(screen.queryByText("mistle/dashboard")).toBeNull();
@@ -331,7 +343,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceItemsByKey={
+        resourceContentByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -633,8 +645,7 @@ describe("IntegrationConnectionDetailView", () => {
         onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
           deletedWebhookSource = { connectionId, webhookSourceId };
         }}
-        showCreateWebhookSource={true}
-        showWebhookSources={true}
+        webhookPolicy={ManagedWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [
@@ -728,8 +739,7 @@ describe("IntegrationConnectionDetailView", () => {
             resources: [],
           },
         ]}
-        showCreateWebhookSource={true}
-        showWebhookSources={true}
+        webhookPolicy={ManagedWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [
@@ -793,8 +803,7 @@ describe("IntegrationConnectionDetailView", () => {
         ]}
         onStartGitHubAppInstallation={() => {}}
         onCreateWebhookSource={() => {}}
-        showCreateWebhookSource={true}
-        showWebhookSources={true}
+        webhookPolicy={ManagedWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [
@@ -845,8 +854,7 @@ describe("IntegrationConnectionDetailView", () => {
         onCreateWebhookSource={({ connectionId }) => {
           createdConnectionId = connectionId;
         }}
-        showCreateWebhookSource={true}
-        showWebhookSources={true}
+        webhookPolicy={ManagedWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [
@@ -900,7 +908,7 @@ describe("IntegrationConnectionDetailView", () => {
         onStartGitHubAppInstallation={(connectionId) => {
           startedGitHubAppInstallationConnectionId = connectionId;
         }}
-        showWebhookSources={true}
+        webhookPolicy={ImplicitWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [
@@ -965,6 +973,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete webhook" })).toBeNull();
 
     const postInstallationSetupLabel = screen.getByText("Post-installation setup URL");
     const webhookCallbackLabel = screen.getByText("Webhook callback URL");
@@ -995,8 +1004,7 @@ describe("IntegrationConnectionDetailView", () => {
         onCreateWebhookSource={() => {
           throw new Error("Create webhook should not be available for implicit sources.");
         }}
-        showCreateWebhookSource={false}
-        showWebhookSources={true}
+        webhookPolicy={ImplicitWebhookPolicy}
         webhookSourceStateByConnectionId={
           new Map([
             [

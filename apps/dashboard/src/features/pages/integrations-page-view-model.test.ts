@@ -10,7 +10,7 @@ import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
-  buildIntegrationConnectionResourceItemsByKey,
+  buildIntegrationConnectionResourceContentByKey,
   buildIntegrationConnectionResourceRequests,
   buildOpenCreateIntegrationConnectionInput,
   buildOpenUpdateIntegrationConnectionInput,
@@ -668,7 +668,7 @@ describe("integrations page view model", () => {
       },
     ]);
 
-    const itemsByKey = buildIntegrationConnectionResourceItemsByKey([
+    const itemsByKey = buildIntegrationConnectionResourceContentByKey([
       {
         connectionId: "icn_primary",
         state: {

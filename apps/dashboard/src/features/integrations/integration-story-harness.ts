@@ -3,8 +3,9 @@ import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitio
 
 import {
   buildIntegrationConnectionDetailItems,
-  buildIntegrationConnectionResourceItemsByKey,
+  buildIntegrationConnectionResourceContentByKey,
   createIntegrationConnectionResourceKey,
+  resolveIntegrationConnectionDetailWebhookPolicy,
 } from "../pages/integrations-page-view-model.js";
 import { resolveVisibleConnectionMethodConfigFields } from "../pages/use-integration-connection-editor-state-helpers.js";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
@@ -290,7 +291,7 @@ export function createDetailViewStoryProps(input?: {
       connections,
       refreshingResourceKeys,
     }),
-    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
+    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
       {
         connectionId: "icn_github_primary",
         state: {
@@ -403,7 +404,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
       },
     ],
     onRefreshResource: () => {},
-    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
+    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
       {
         connectionId,
         state: {
@@ -543,7 +544,9 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
         },
       },
     ]),
-    showWebhookSources: true,
+    webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
+      webhookSource: { lifecycle: "implicit" },
+    }),
     webhookSourceStateByConnectionId: new Map<string, IntegrationWebhookSourceSectionState>([
       [
         connectionId,
@@ -618,7 +621,9 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
         status: "active",
       },
     ],
-    showWebhookSources: true,
+    webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
+      webhookSource: { lifecycle: "implicit" },
+    }),
     webhookSourceStateByConnectionId: new Map([
       [
         connectionId,
@@ -702,12 +707,12 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
       },
     ],
     onRefreshResource: () => {},
-    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
+    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
       {
         connectionId,
         state: {
           errorMessage:
-            "GitHub returned a 403 while loading repository preview data. Check installation repository access.",
+            "GitHub returned a 403 while loading repository data. Check installation repository access.",
           isLoading: false,
           items: [
             {
@@ -774,18 +779,18 @@ type ScenarioDetailStorySpec = {
         postInstallationSetupUrl?: string;
       }
     | undefined;
-  showCreateWebhookSource?: boolean;
+  webhookLifecycle?: "implicit" | "managed";
   status?: "active" | "error" | "revoked";
   webhookSources?: readonly IntegrationWebhookSource[];
 };
 
-function createResourceItems(
+function createResourceContent(
   input: ScenarioDetailStorySpec,
-): IntegrationConnectionDetailViewProps["resourceItemsByKey"] {
+): IntegrationConnectionDetailViewProps["resourceContentByKey"] {
   const resources = input.resources ?? [];
   const familyId = input.familyId ?? "integration";
 
-  return buildIntegrationConnectionResourceItemsByKey(
+  return buildIntegrationConnectionResourceContentByKey(
     resources.map((resource) => ({
       connectionId: input.connectionId,
       state: {
@@ -832,6 +837,17 @@ function createWebhookSourceSectionState(
   ]);
 }
 
+function createWebhookPolicy(input: ScenarioDetailStorySpec) {
+  if (input.webhookSources === undefined) {
+    return undefined;
+  }
+
+  return resolveIntegrationConnectionDetailWebhookPolicy({
+    webhookSource:
+      input.webhookLifecycle === undefined ? {} : { lifecycle: input.webhookLifecycle },
+  });
+}
+
 function createScenarioDetailViewStoryProps(
   input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps {
@@ -845,7 +861,8 @@ function createScenarioDetailViewStoryProps(
             : { connectionConfig: input.connectionConfig }),
           connectionId: input.connectionId,
         });
-  const resourceItemsByKey = createResourceItems(input);
+  const resourceContentByKey = createResourceContent(input);
+  const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
 
   return {
@@ -876,12 +893,11 @@ function createScenarioDetailViewStoryProps(
     ],
     onEditAuthentication: () => {},
     onRefreshResource: () => {},
-    ...(resourceItemsByKey === undefined ? {} : { resourceItemsByKey }),
+    ...(resourceContentByKey === undefined ? {} : { resourceContentByKey }),
     ...(webhookSourceStateByConnectionId === undefined
       ? {}
       : {
-          showCreateWebhookSource: input.showCreateWebhookSource ?? false,
-          showWebhookSources: true,
+          ...(webhookPolicy === undefined ? {} : { webhookPolicy }),
           webhookSourceStateByConnectionId,
         }),
   };
@@ -960,7 +976,7 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
     },
     connectionId: "icn_jira_dense",
     displayName: "Jira Production",
-    showCreateWebhookSource: true,
+    webhookLifecycle: "managed",
     webhookSources: [
       {
         callbackUrl:
@@ -1002,7 +1018,7 @@ export function createJiraWebhookNotConfiguredDetailViewStoryProps(): Integratio
     },
     connectionId: "icn_jira_setup_incomplete",
     displayName: "Jira Production",
-    showCreateWebhookSource: true,
+    webhookLifecycle: "managed",
     webhookSources: [],
   });
 }
@@ -1086,7 +1102,9 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
   return {
     connections: storyProps.flatMap((story) => story.connections),
     onRefreshResource: () => {},
-    showWebhookSources: true,
+    webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
+      webhookSource: { lifecycle: "implicit" },
+    }),
     webhookSourceStateByConnectionId: new Map(
       storyProps.flatMap((story) =>
         Array.from(story.webhookSourceStateByConnectionId?.entries() ?? []),

@@ -5,7 +5,10 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
-import { buildIntegrationConnectionDetailItems } from "./integrations-page-view-model.js";
+import {
+  buildIntegrationConnectionDetailItems,
+  resolveIntegrationConnectionDetailWebhookPolicy,
+} from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionEditors } from "./use-integration-connection-editors.js";
 import { useIntegrationWebhookSourceState } from "./use-integration-webhook-source-state.js";
@@ -54,6 +57,13 @@ export function IntegrationsPage() {
   ) {
     throw new Error(`Integration target '${detailTargetKey}' was not found.`);
   }
+
+  const selectedWebhookPolicy =
+    directoryState.selectedDetailCard === null
+      ? undefined
+      : resolveIntegrationConnectionDetailWebhookPolicy({
+          webhookSource: directoryState.selectedDetailCard.target.webhookSource,
+        });
 
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
@@ -104,7 +114,7 @@ export function IntegrationsPage() {
         }}
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
-        resourceItemsByKey={directoryState.resourceItemsByKey}
+        resourceContentByKey={directoryState.resourceContentByKey}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
         onCreateWebhookSource={({ connectionId }) => {
           webhookSourceState.createWebhookSource({ connectionId });
@@ -115,10 +125,7 @@ export function IntegrationsPage() {
             webhookSourceId,
           });
         }}
-        showWebhookSources={directoryState.selectedDetailCard.target.webhookSource !== undefined}
-        showCreateWebhookSource={
-          directoryState.selectedDetailCard.target.webhookSource?.lifecycle === "managed"
-        }
+        webhookPolicy={selectedWebhookPolicy}
         titleEditor={connectionEditors.titleEditor}
       />
     );
