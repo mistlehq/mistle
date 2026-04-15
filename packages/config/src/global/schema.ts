@@ -3,6 +3,7 @@ import { z } from "zod";
 const SandboxProviders = ["docker", "e2b"] as const;
 
 export const SandboxStorageBackends = {
+  NONE: "none",
   ARCHIL: "archil",
 } as const;
 
@@ -108,13 +109,13 @@ export const PartialGlobalSandboxPublishConfigSchema = z
 
 export const GlobalSandboxStorageConfigSchema = z
   .object({
-    backend: z.enum([SandboxStorageBackends.ARCHIL]),
+    backend: z.enum([SandboxStorageBackends.NONE, SandboxStorageBackends.ARCHIL]),
   })
   .strict();
 
 export const PartialGlobalSandboxStorageConfigSchema = z
   .object({
-    backend: z.enum([SandboxStorageBackends.ARCHIL]).optional(),
+    backend: z.enum([SandboxStorageBackends.NONE, SandboxStorageBackends.ARCHIL]).optional(),
   })
   .strict();
 

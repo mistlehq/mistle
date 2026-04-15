@@ -928,6 +928,30 @@ describe("loadConfig integrations", () => {
     );
   });
 
+  it("loads data-plane-worker config when sandbox storage backend is none and Archil worker config is omitted", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      env: createIntegrationEnv({
+        MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
+        MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
+      }),
+    });
+
+    if (config.global === undefined) {
+      throw new Error("Expected global config to be present.");
+    }
+
+    expect(config.global.sandbox.storage).toEqual({
+      backend: "none",
+    });
+    expect(config.app.controlPlaneApi).toBeUndefined();
+    expect(config.app.sandboxStorage).toBeUndefined();
+  });
+
   it("returns only data-plane-worker app config when includeGlobal is false", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,

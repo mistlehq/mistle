@@ -38,4 +38,18 @@ describe("loadGlobalFromEnv", () => {
       },
     });
   });
+
+  it("loads disabled sandbox storage backend config from env", () => {
+    const loaded = loadGlobalFromEnv({
+      MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
+    });
+
+    expect(loaded).toEqual({
+      sandbox: {
+        storage: {
+          backend: "none",
+        },
+      },
+    });
+  });
 });
