@@ -80,9 +80,25 @@ export type SystemTestFixture = {
     sandboxInstanceId: string,
     connectable: boolean,
   ) => Promise<SystemSandboxInstanceStatus>;
+  waitForSandboxRuntimeAttachment: (
+    sandboxInstanceId: string,
+    attached: boolean,
+  ) => Promise<z.infer<typeof SandboxRuntimeStateSnapshotSchema>>;
+  waitForSandboxRuntimeReady: (
+    sandboxInstanceId: string,
+    ready: boolean,
+  ) => Promise<z.infer<typeof SandboxRuntimeStateSnapshotSchema>>;
   readSandboxRuntimeState: (
     sandboxInstanceId: string,
   ) => Promise<z.infer<typeof SandboxRuntimeStateSnapshotSchema>>;
+  stopSandboxInstance: (input: {
+    sandboxInstanceId: string;
+    idempotencyKey?: string;
+  }) => Promise<{ sandboxInstanceId: string; workflowRunId: string }>;
+  resumeSandboxInstance: (input: {
+    sandboxInstanceId: string;
+    idempotencyKey?: string;
+  }) => Promise<{ sandboxInstanceId: string; workflowRunId: string }>;
 };
 
 const AUTH_OTP_LENGTH = 6;
@@ -136,6 +152,22 @@ const SandboxInstanceConnectionTokenResponseSchema = z.object({
   token: z.string().min(1),
   expiresAt: z.string().min(1),
 });
+
+const StopSandboxInstanceAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
+const ResumeSandboxInstanceAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
 
 type SystemSandboxInstanceStatus = z.infer<typeof SandboxInstanceStatusResponseSchema>;
 
@@ -1216,14 +1248,8 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
         try {
           await waitForSandboxStatus(startedInstance.sandboxInstanceId, "running");
           await waitForSandboxConnectable(startedInstance.sandboxInstanceId, true);
-          await waitForCondition({
-            description: `sandbox '${startedInstance.sandboxInstanceId}' runtime attachment readiness`,
-            timeoutMs: SandboxReadyTimeoutMs,
-            evaluate: async () => {
-              const snapshot = await readSandboxRuntimeState(startedInstance.sandboxInstanceId);
-              return snapshot.attachment !== null && snapshot.runtime.ready ? snapshot : null;
-            },
-          });
+          await waitForSandboxRuntimeAttachment(startedInstance.sandboxInstanceId, true);
+          await waitForSandboxRuntimeReady(startedInstance.sandboxInstanceId, true);
         } catch (error) {
           const runtimeState = await readSandboxRuntimeState(
             startedInstance.sandboxInstanceId,
@@ -1276,6 +1302,122 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
 
         return SandboxRuntimeStateSnapshotSchema.parse(payload);
       };
+      const waitForSandboxRuntimeAttachment = async (
+        sandboxInstanceId: string,
+        attached: boolean,
+      ): Promise<z.infer<typeof SandboxRuntimeStateSnapshotSchema>> => {
+        return waitForCondition({
+          description: `sandbox '${sandboxInstanceId}' runtime attachment attached=${String(attached)}`,
+          timeoutMs: SandboxReadyTimeoutMs,
+          evaluate: async () => {
+            let snapshot: z.infer<typeof SandboxRuntimeStateSnapshotSchema>;
+            try {
+              snapshot = await readSandboxRuntimeState(sandboxInstanceId);
+            } catch (error) {
+              throw new RetryableWaitError(
+                `sandbox runtime-state read failed while waiting for attachment=${String(attached)}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+            return (snapshot.attachment !== null) === attached ? snapshot : null;
+          },
+        });
+      };
+      const waitForSandboxRuntimeReady = async (
+        sandboxInstanceId: string,
+        ready: boolean,
+      ): Promise<z.infer<typeof SandboxRuntimeStateSnapshotSchema>> => {
+        return waitForCondition({
+          description: `sandbox '${sandboxInstanceId}' runtime.ready=${String(ready)}`,
+          timeoutMs: SandboxReadyTimeoutMs,
+          evaluate: async () => {
+            let snapshot: z.infer<typeof SandboxRuntimeStateSnapshotSchema>;
+            try {
+              snapshot = await readSandboxRuntimeState(sandboxInstanceId);
+            } catch (error) {
+              throw new RetryableWaitError(
+                `sandbox runtime-state read failed while waiting for runtime.ready=${String(ready)}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
+            return snapshot.runtime.ready === ready ? snapshot : null;
+          },
+        });
+      };
+      const stopSandboxInstance = async (input: {
+        sandboxInstanceId: string;
+        idempotencyKey?: string;
+      }): Promise<{ sandboxInstanceId: string; workflowRunId: string }> => {
+        const runtimeState = await readSandboxRuntimeState(input.sandboxInstanceId);
+        const ownerLeaseId = runtimeState.attachment?.ownerLeaseId;
+        if (ownerLeaseId === undefined) {
+          throw new Error(
+            `Sandbox '${input.sandboxInstanceId}' has no attachment owner lease id; stop requires an attached runtime owner.`,
+          );
+        }
+
+        const response = await fetch(
+          `${systemTestContext.dataPlaneApiBaseUrl}/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/stop`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              [InternalAuthServiceTokenHeader]: systemTestContext.internalAuthServiceToken,
+            },
+            body: JSON.stringify({
+              stopReason: "idle",
+              expectedOwnerLeaseId: ownerLeaseId,
+              idempotencyKey: input.idempotencyKey ?? `system-stop-${randomUUID()}`,
+            }),
+          },
+        );
+        const payload = await response.json().catch(() => null);
+        if (response.status !== 200) {
+          throw new Error(
+            `Expected internal sandbox stop status 200, got ${String(response.status)}. Response body: ${JSON.stringify(payload)}`,
+          );
+        }
+
+        const accepted = StopSandboxInstanceAcceptedResponseSchema.parse(payload);
+        return {
+          sandboxInstanceId: accepted.sandboxInstanceId,
+          workflowRunId: accepted.workflowRunId,
+        };
+      };
+      const resumeSandboxInstance = async (input: {
+        sandboxInstanceId: string;
+        idempotencyKey?: string;
+      }): Promise<{ sandboxInstanceId: string; workflowRunId: string }> => {
+        const sandboxContext = await ensureSandboxControlContext();
+        const response = await fetch(
+          `${systemTestContext.dataPlaneApiBaseUrl}/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/resume`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              [InternalAuthServiceTokenHeader]: systemTestContext.internalAuthServiceToken,
+            },
+            body: JSON.stringify({
+              organizationId: sandboxContext.session.organizationId,
+              idempotencyKey: input.idempotencyKey ?? `system-resume-${randomUUID()}`,
+            }),
+          },
+        );
+        const payload = await response.json().catch(() => null);
+        if (response.status !== 200) {
+          throw new Error(
+            `Expected internal sandbox resume status 200, got ${String(response.status)}. Response body: ${JSON.stringify(payload)}`,
+          );
+        }
+
+        const accepted = ResumeSandboxInstanceAcceptedResponseSchema.parse(payload);
+        return {
+          sandboxInstanceId: accepted.sandboxInstanceId,
+          workflowRunId: accepted.workflowRunId,
+        };
+      };
       const runSandboxPtyCommand = async (input: {
         sandboxInstanceId: string;
         command: string;
@@ -1286,23 +1428,16 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
         const commandTimeoutMs = input.timeoutMs ?? PtyCommandDefaultTimeoutMs;
 
         try {
-          await waitForCondition({
-            description: `sandbox '${input.sandboxInstanceId}' runtime attachment readiness before PTY command`,
-            timeoutMs: SandboxReadyTimeoutMs,
-            evaluate: async () => {
-              let snapshot: z.infer<typeof SandboxRuntimeStateSnapshotSchema>;
-              try {
-                snapshot = await readSandboxRuntimeState(input.sandboxInstanceId);
-              } catch (error) {
-                throw new RetryableWaitError(
-                  `sandbox runtime-state read failed before PTY command: ${
-                    error instanceof Error ? error.message : String(error)
-                  }`,
-                );
-              }
-              return snapshot.attachment !== null && snapshot.runtime.ready ? snapshot : null;
-            },
-          });
+          try {
+            await waitForSandboxRuntimeAttachment(input.sandboxInstanceId, true);
+            await waitForSandboxRuntimeReady(input.sandboxInstanceId, true);
+          } catch (error) {
+            throw new RetryableWaitError(
+              `sandbox runtime attachment/readiness wait failed before PTY command: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
 
           return await waitForCondition({
             description: `sandbox '${input.sandboxInstanceId}' PTY command '${input.command}'`,
@@ -1493,7 +1628,11 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           },
           waitForSandboxStatus,
           waitForSandboxConnectable,
+          waitForSandboxRuntimeAttachment,
+          waitForSandboxRuntimeReady,
           readSandboxRuntimeState,
+          stopSandboxInstance,
+          resumeSandboxInstance,
         });
       } finally {
         await removeSandboxContainersOnNetwork({
