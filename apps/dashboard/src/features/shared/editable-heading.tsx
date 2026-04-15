@@ -78,7 +78,7 @@ function InlineEditableHeadingField(
           aria-label={input.ariaLabel}
           autoFocus={input.autoFocus}
           className={cn(
-            "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!font-normal placeholder:!text-muted-foreground",
+            "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70",
             "hover:border-b-border focus-visible:border-b-border",
             input.inputClassName,
           )}
