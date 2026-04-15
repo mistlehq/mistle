@@ -32,9 +32,11 @@ const MISSING_THREAD_MESSAGES: [&str; 4] = [
     "references missing provider conversation",
     "invalid thread id",
 ];
-// Codex can acknowledge turn/start before a second subscriber can resume the new thread.
+// Codex can acknowledge turn/start before a second subscriber can resume the new
+// thread, and the live rollout can take several seconds to become resumable to a
+// second connection.
 const LIVE_RETAIN_RETRY_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
-const LIVE_RETAIN_MAX_ATTEMPTS: usize = 50;
+const LIVE_RETAIN_MAX_ATTEMPTS: usize = 200;
 
 #[derive(Clone)]
 pub struct CodexSessionManagerHandle {

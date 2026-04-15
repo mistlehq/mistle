@@ -18,7 +18,7 @@ use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(100);
-const LIVE_RETAIN_FAILURE_ATTEMPTS: usize = 50;
+const LIVE_RETAIN_FAILURE_ATTEMPTS: usize = 200;
 
 #[test]
 fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
