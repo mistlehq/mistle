@@ -80,7 +80,7 @@ pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
-    #[cfg(test)]
+    #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     ca_certificate_path: PathBuf,
     supervisor_handle: SandboxdSupervisorHandle,
@@ -115,7 +115,7 @@ struct EgressProxySupervisorConfig {
     state: EgressProxyState,
 }
 
-#[cfg(test)]
+#[cfg(any(test, debug_assertions))]
 enum EgressProxySupervisorCommand {
     ForceCurrentServerShutdown,
 }
@@ -187,9 +187,9 @@ impl EgressProxy {
             .map(|route| build_proxy_route(route, startup_input))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let proxy_directory = ca_certificate_path
-            .parent()
-            .ok_or_else(|| EgressProxyError::new("egress proxy CA path must include a parent directory"))?;
+        let proxy_directory = ca_certificate_path.parent().ok_or_else(|| {
+            EgressProxyError::new("egress proxy CA path must include a parent directory")
+        })?;
         prepare_proxy_directory(proxy_directory)?;
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
             .map_err(|error| EgressProxyError::new(error.to_string()))?;
@@ -204,7 +204,8 @@ impl EgressProxy {
             ))
         })?;
 
-        let std_listener = bind_egress_proxy_listener(listener_address).map_err(EgressProxyError::new)?;
+        let std_listener =
+            bind_egress_proxy_listener(listener_address).map_err(EgressProxyError::new)?;
         let listener_address = std_listener.local_addr().map_err(|error| {
             EgressProxyError::new(format!(
                 "failed to inspect local egress proxy address: {error}"
@@ -262,7 +263,7 @@ impl EgressProxy {
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
-        #[cfg(test)]
+        #[cfg(any(test, debug_assertions))]
         let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
         let supervisor_thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
@@ -277,7 +278,7 @@ impl EgressProxy {
                     active_server,
                     shutdown_requested,
                     supervisor_handle,
-                    #[cfg(test)]
+                    #[cfg(any(test, debug_assertions))]
                     supervisor_command_receiver,
                 )
             }
@@ -287,7 +288,7 @@ impl EgressProxy {
             runtime_env,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
-            #[cfg(test)]
+            #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: Some(supervisor_command_sender),
             ca_certificate_path: ca_certificate_path.to_path_buf(),
             supervisor_handle,
@@ -302,12 +303,20 @@ impl EgressProxy {
         &MANAGED_PROXY_ENV_KEYS
     }
 
-    #[cfg(test)]
-    fn force_current_server_shutdown_for_test(&self) {
-        if let Some(supervisor_command_sender) = &self.supervisor_command_sender {
-            let _ = supervisor_command_sender
-                .send(EgressProxySupervisorCommand::ForceCurrentServerShutdown);
-        }
+    #[cfg(any(test, debug_assertions))]
+    pub(crate) fn force_current_server_shutdown_for_test(&self) -> Result<(), EgressProxyError> {
+        let supervisor_command_sender = self.supervisor_command_sender.as_ref().ok_or_else(|| {
+            EgressProxyError::new(
+                "egress proxy fault injection is unavailable in this build or runtime mode",
+            )
+        })?;
+        supervisor_command_sender
+            .send(EgressProxySupervisorCommand::ForceCurrentServerShutdown)
+            .map_err(|_| {
+                EgressProxyError::new(
+                    "egress proxy supervisor command channel is unavailable",
+                )
+            })
     }
 
     pub fn close(mut self) -> Result<(), EgressProxyError> {
@@ -317,7 +326,11 @@ impl EgressProxy {
             match supervisor_thread.join() {
                 Ok(Ok(())) => {}
                 Ok(Err(error)) => return Err(error),
-                Err(_) => return Err(EgressProxyError::new("egress proxy supervisor thread panicked")),
+                Err(_) => {
+                    return Err(EgressProxyError::new(
+                        "egress proxy supervisor thread panicked",
+                    ));
+                }
             }
         }
 
@@ -390,13 +403,15 @@ impl ActiveEgressProxyServer {
         self.shutdown_tx = None;
         match self.server_thread.take() {
             Some(server_thread) => match server_thread.join() {
-                Ok(Ok(())) => {
-                    EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly")
-                }
+                Ok(Ok(())) => EgressProxyError::new(
+                    "local egress proxy exit channel disconnected unexpectedly",
+                ),
                 Ok(Err(error)) => error,
                 Err(_) => EgressProxyError::new("local egress proxy thread panicked"),
             },
-            None => EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly"),
+            None => {
+                EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly")
+            }
         }
     }
 }
@@ -406,7 +421,9 @@ fn run_egress_proxy_supervisor(
     mut active_server: ActiveEgressProxyServer,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_handle: SandboxdSupervisorHandle,
-    #[cfg(test)] supervisor_command_receiver: mpsc::Receiver<EgressProxySupervisorCommand>,
+    #[cfg(any(test, debug_assertions))] supervisor_command_receiver: mpsc::Receiver<
+        EgressProxySupervisorCommand,
+    >,
 ) -> Result<(), EgressProxyError> {
     let mut restart_attempt_index = 0_usize;
 
@@ -416,7 +433,7 @@ fn run_egress_proxy_supervisor(
             return active_server.join();
         }
 
-        #[cfg(test)]
+        #[cfg(any(test, debug_assertions))]
         match supervisor_command_receiver.try_recv() {
             Ok(EgressProxySupervisorCommand::ForceCurrentServerShutdown) => {
                 active_server.request_shutdown();
@@ -509,7 +526,8 @@ fn restart_egress_proxy_after_backoff(
                 continue;
             }
         };
-        let mut active_server = spawn_active_egress_proxy_server(std_listener, config.state.clone());
+        let mut active_server =
+            spawn_active_egress_proxy_server(std_listener, config.state.clone());
         match wait_for_egress_proxy_health(
             config.listener_address,
             &mut active_server,
@@ -582,10 +600,8 @@ fn record_egress_proxy_healthcheck_failure(
     supervisor_handle: &SandboxdSupervisorHandle,
     error: &EgressProxyError,
 ) {
-    supervisor_handle.mark_component_restarting(
-        SupervisedComponent::EgressProxy,
-        error.to_string(),
-    );
+    supervisor_handle
+        .mark_component_restarting(SupervisedComponent::EgressProxy, error.to_string());
     supervisor_handle.emit_component_healthcheck_failed(
         SupervisedComponent::EgressProxy,
         "loopback_tcp_failed",
@@ -601,29 +617,22 @@ fn record_egress_proxy_exit_for_restart(
 ) {
     let error_text = error.to_string();
     if error_text.contains("panicked") {
-        supervisor_handle.mark_component_restarting(
-            SupervisedComponent::EgressProxy,
-            error_text.clone(),
-        );
+        supervisor_handle
+            .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
         supervisor_handle.emit_component_exited(
             SupervisedComponent::EgressProxy,
             "panic",
             Some(&error_text),
             &[
                 ("exitKind", Value::String("panic".to_string())),
-                (
-                    "panicBoundary",
-                    Value::String("proxy_thread".to_string()),
-                ),
+                ("panicBoundary", Value::String("proxy_thread".to_string())),
             ],
         );
         return;
     }
 
-    supervisor_handle.mark_component_restarting(
-        SupervisedComponent::EgressProxy,
-        error_text.clone(),
-    );
+    supervisor_handle
+        .mark_component_restarting(SupervisedComponent::EgressProxy, error_text.clone());
     supervisor_handle.emit_component_exited(
         SupervisedComponent::EgressProxy,
         "thread_returned",
@@ -1233,9 +1242,7 @@ mod tests {
         CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
         CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimePlan,
     };
-    use crate::supervision::{
-        ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent,
-    };
+    use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
 
     #[test]
@@ -1389,7 +1396,9 @@ mod tests {
             .cloned()
             .expect("proxy env should include HTTPS_PROXY");
         assert_eq!(proxy_one_address, format!("http://{listener_address}"));
-        proxy_one.close().expect("first egress proxy close should succeed");
+        proxy_one
+            .close()
+            .expect("first egress proxy close should succeed");
 
         let proxy_two = EgressProxy::start_with_options(
             &runtime_plan,
@@ -1419,7 +1428,9 @@ mod tests {
             snapshot.details.get("stablePort"),
             Some(&listener_address.port().to_string())
         );
-        proxy_two.close().expect("second egress proxy close should succeed");
+        proxy_two
+            .close()
+            .expect("second egress proxy close should succeed");
         let _ = std::fs::remove_dir_all(
             ca_certificate_path
                 .parent()
@@ -1456,7 +1467,9 @@ mod tests {
             .cloned()
             .expect("proxy env should include HTTPS_PROXY");
 
-        proxy.force_current_server_shutdown_for_test();
+        proxy
+            .force_current_server_shutdown_for_test()
+            .expect("forced shutdown command should reach the supervisor");
         wait_for_egress_snapshot(
             &supervisor_handle,
             ComponentHealthState::Healthy,
@@ -1559,7 +1572,8 @@ mod tests {
             let snapshot = supervisor_handle
                 .component_snapshot(SupervisedComponent::EgressProxy)
                 .expect("egress proxy should be tracked");
-            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count {
+            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count
+            {
                 return;
             }
             assert!(

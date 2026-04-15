@@ -13,20 +13,18 @@ use std::thread::{self, JoinHandle};
 
 use url::Url;
 
+use crate::codex_proxy::CodexProxyControlHandle;
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
-use crate::codex_proxy::CodexProxyControlHandle;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
 };
-use crate::supervision::{
-    SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent,
-};
+use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
 use crate::tunnel::session::{TunnelSession, derive_sandbox_instance_id};
 
@@ -225,14 +223,14 @@ impl SandboxdState {
             codex_app_server_control_handle.clone(),
             codex_proxy_control_handle.clone(),
         ) {
-            (Some(codex_app_server_control_handle), Some(codex_proxy_control_handle)) => Some(
-                spawn_codex_coordination_thread(
+            (Some(codex_app_server_control_handle), Some(codex_proxy_control_handle)) => {
+                Some(spawn_codex_coordination_thread(
                     codex_app_server_control_handle,
                     codex_proxy_control_handle,
                     supervisor_handle.clone(),
                     codex_coordination_shutdown_requested.clone(),
-                ),
-            ),
+                ))
+            }
             _ => None,
         };
 
@@ -264,13 +262,12 @@ impl SandboxdState {
             tunnel_session.close();
         }
 
-        let agent_endpoint_url = if let Some(codex_proxy_control_handle) =
-            &self.codex_proxy_control_handle
-        {
-            Some(codex_proxy_control_handle.listen_url().to_string())
-        } else {
-            self.agent_endpoint_url.clone()
-        };
+        let agent_endpoint_url =
+            if let Some(codex_proxy_control_handle) = &self.codex_proxy_control_handle {
+                Some(codex_proxy_control_handle.listen_url().to_string())
+            } else {
+                self.agent_endpoint_url.clone()
+            };
 
         self.tunnel_session = Some(
             TunnelSession::start_with_supervisor(
@@ -339,6 +336,17 @@ impl SandboxdState {
 
     pub fn codex_app_server_control_handle(&self) -> Option<&CodexAppServerControlHandle> {
         self.codex_app_server_control_handle.as_ref()
+    }
+
+    #[cfg(any(test, debug_assertions))]
+    pub fn force_egress_proxy_shutdown_for_test(&self) -> Result<(), String> {
+        let egress_proxy = self
+            .egress_proxy
+            .as_ref()
+            .ok_or_else(|| "egress proxy is not running for this sandbox".to_string())?;
+        egress_proxy
+            .force_current_server_shutdown_for_test()
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -432,8 +440,8 @@ fn run_codex_coordination_loop(
     shutdown_requested: Arc<AtomicBool>,
 ) {
     while !shutdown_requested.load(Ordering::Relaxed) {
-        let codex_app_server_snapshot = supervisor_handle
-            .component_snapshot(SupervisedComponent::CodexAppServer);
+        let codex_app_server_snapshot =
+            supervisor_handle.component_snapshot(SupervisedComponent::CodexAppServer);
         let Some(codex_app_server_snapshot) = codex_app_server_snapshot else {
             break;
         };
@@ -735,13 +743,13 @@ mod tests {
     use crate::keepalive::KeepaliveManager;
     use crate::process::start_runtime_client_process_manager_with_supervisor;
     use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
     use crate::runtime::{
         CompiledRuntimePlan, RuntimeClient, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
         RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
         RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile,
         RuntimeExecCommand,
     };
-    use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
     use crate::sandboxd_state::{
         apply_runtime_startup_overrides, collect_runtime_environment,
         spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
@@ -1219,7 +1227,10 @@ supports_websockets = false
         let codex_app_server_snapshot = supervisor_handle
             .component_snapshot(SupervisedComponent::CodexAppServer)
             .expect("Codex app-server should be tracked");
-        assert_eq!(codex_app_server_snapshot.state, ComponentHealthState::Healthy);
+        assert_eq!(
+            codex_app_server_snapshot.state,
+            ComponentHealthState::Healthy
+        );
         assert_eq!(
             codex_app_server_snapshot.details.get("livenessState"),
             Some(&"Alive".to_string())
@@ -1227,7 +1238,9 @@ supports_websockets = false
 
         shutdown_requested.store(true, std::sync::atomic::Ordering::Relaxed);
         let _ = coordination_thread.join();
-        codex_proxy.close().expect("Codex proxy close should succeed");
+        codex_proxy
+            .close()
+            .expect("Codex proxy close should succeed");
         process_manager
             .stop(&SystemClock, &ThreadSleeper)
             .expect("process manager stop should succeed");
@@ -1291,7 +1304,8 @@ supports_websockets = false
             let snapshot = supervisor_handle
                 .component_snapshot(component)
                 .expect("component should be tracked");
-            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count {
+            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count
+            {
                 return;
             }
             assert!(

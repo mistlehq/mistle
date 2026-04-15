@@ -36,6 +36,10 @@ pub const DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis
 pub const DEFAULT_HEALTH_ENDPOINT_ADDR: &str = "127.0.0.1:3901";
 /// Fixed path served by the daemon-local health endpoint.
 pub const DEFAULT_HEALTH_ENDPOINT_PATH: &str = "/__healthz";
+#[cfg(any(test, debug_assertions))]
+const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
+#[cfg(any(test, debug_assertions))]
+const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
 
 /// Tracks whether this daemon has already accepted startup input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -572,19 +576,28 @@ fn handle_health_connection(
     let request_head = read_http_request_head(stream)?;
     let mut request_lines = request_head.lines();
     let request_line = request_lines.next().unwrap_or_default();
-    let response = if request_line.starts_with("GET /__healthz ") {
-        build_http_json_response(
+    let response = match parse_http_request_line(request_line) {
+        Some(("GET", DEFAULT_HEALTH_ENDPOINT_PATH)) => build_http_json_response(
             200,
             &serialize_health_response(&build_health_response(state)?)
                 .map_err(ControlError::SerializeResponse)?,
-        )
-    } else {
-        build_http_json_response(404, br#"{"error":"not_found"}"#)
+        ),
+        #[cfg(any(test, debug_assertions))]
+        Some(("POST", EGRESS_PROXY_FAULT_KILL_PATH)) => build_fault_injection_response(state)?,
+        _ => build_http_json_response(404, br#"{"error":"not_found"}"#),
     };
 
     stream
         .write_all(&response)
         .map_err(ControlError::WriteHealthResponse)
+}
+
+fn parse_http_request_line(request_line: &str) -> Option<(&str, &str)> {
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next()?;
+    let path = parts.next()?;
+    let _http_version = parts.next()?;
+    Some((method, path))
 }
 
 fn read_http_request_head(stream: &mut TcpStream) -> Result<String, ControlError> {
@@ -613,7 +626,9 @@ fn read_http_request_head(stream: &mut TcpStream) -> Result<String, ControlError
 fn build_http_json_response(status_code: u16, body: &[u8]) -> Vec<u8> {
     let status_text = match status_code {
         200 => "OK",
+        403 => "Forbidden",
         404 => "Not Found",
+        409 => "Conflict",
         _ => "OK",
     };
     let mut response = Vec::new();
@@ -623,6 +638,66 @@ fn build_http_json_response(status_code: u16, body: &[u8]) -> Vec<u8> {
     response.extend_from_slice(b"connection: close\r\n\r\n");
     response.extend_from_slice(body);
     response
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Serialize)]
+struct FaultInjectionAcceptedResponse {
+    status: &'static str,
+    component: &'static str,
+    action: &'static str,
+}
+
+#[cfg(any(test, debug_assertions))]
+#[derive(Serialize)]
+struct FaultInjectionErrorResponse<'a> {
+    error: &'a str,
+}
+
+#[cfg(any(test, debug_assertions))]
+fn build_fault_injection_response(
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<Vec<u8>, ControlError> {
+    if !test_fault_injection_enabled() {
+        let body = serde_json::to_vec(&FaultInjectionErrorResponse {
+            error: "test_fault_injection_disabled",
+        })
+        .map_err(ControlError::SerializeResponse)?;
+        return Ok(build_http_json_response(403, &body));
+    }
+
+    let fault_result = state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .sandboxd_state
+        .as_ref()
+        .ok_or_else(|| "sandboxd is not initialized".to_string())
+        .and_then(SandboxdState::force_egress_proxy_shutdown_for_test);
+
+    match fault_result {
+        Ok(()) => {
+            let body = serde_json::to_vec(&FaultInjectionAcceptedResponse {
+                status: "accepted",
+                component: "egress_proxy",
+                action: "kill",
+            })
+            .map_err(ControlError::SerializeResponse)?;
+            Ok(build_http_json_response(200, &body))
+        }
+        Err(error) => {
+            let body = serde_json::to_vec(&FaultInjectionErrorResponse { error: &error })
+                .map_err(ControlError::SerializeResponse)?;
+            Ok(build_http_json_response(409, &body))
+        }
+    }
+}
+
+#[cfg(any(test, debug_assertions))]
+fn test_fault_injection_enabled() -> bool {
+    matches!(
+        std::env::var(TEST_FAULTS_ENABLED_ENV),
+        Ok(value) if value == "1" || value.eq_ignore_ascii_case("true")
+    )
 }
 
 fn handle_connection(
@@ -977,8 +1052,9 @@ mod tests {
     use tungstenite::{Message, accept};
 
     use crate::control::{
-        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, InitPhase, start_control_server_with_health_endpoint,
-        submit_init, submit_resume,
+        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
+        EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
+        start_control_server_with_health_endpoint, submit_init, submit_resume,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::test_support::TestEnvVarGuard;
@@ -1218,6 +1294,46 @@ mod tests {
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
+    #[test]
+    fn rejects_fault_injection_requests_when_runtime_opt_in_is_missing() {
+        let _fault_guard = TestEnvVarGuard::unset(TEST_FAULTS_ENABLED_ENV);
+        let test_dir = create_temp_test_dir("control_fault_injection_disabled");
+        let socket_path = test_dir.join("control.sock");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        let (status_code, body) = fetch_http_json_response(
+            server.health_endpoint_addr(),
+            "POST",
+            EGRESS_PROXY_FAULT_KILL_PATH,
+        );
+
+        assert_eq!(status_code, 403);
+        assert_eq!(body["error"], "test_fault_injection_disabled");
+
+        server.close().expect("control server should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn rejects_fault_injection_requests_when_the_target_component_is_unavailable() {
+        let _fault_guard = TestEnvVarGuard::set(TEST_FAULTS_ENABLED_ENV, "1");
+        let test_dir = create_temp_test_dir("control_fault_injection_unavailable");
+        let socket_path = test_dir.join("control.sock");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        let (status_code, body) = fetch_http_json_response(
+            server.health_endpoint_addr(),
+            "POST",
+            EGRESS_PROXY_FAULT_KILL_PATH,
+        );
+
+        assert_eq!(status_code, 409);
+        assert_eq!(body["error"], "sandboxd is not initialized");
+
+        server.close().expect("control server should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
     fn start_test_control_server<S: Sleeper + 'static>(
         socket_path: &std::path::Path,
         sleeper: S,
@@ -1251,10 +1367,21 @@ mod tests {
     }
 
     fn fetch_health_response(health_endpoint_addr: SocketAddr) -> (u16, serde_json::Value) {
+        fetch_http_json_response(health_endpoint_addr, "GET", DEFAULT_HEALTH_ENDPOINT_PATH)
+    }
+
+    fn fetch_http_json_response(
+        health_endpoint_addr: SocketAddr,
+        method: &str,
+        path: &str,
+    ) -> (u16, serde_json::Value) {
         let mut stream =
             TcpStream::connect(health_endpoint_addr).expect("health endpoint should accept TCP");
         stream
-            .write_all(b"GET /__healthz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .write_all(
+                format!("{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
             .expect("health endpoint request should write");
         let mut raw_response = String::new();
         stream
@@ -1277,8 +1404,21 @@ mod tests {
 
     fn wait_for_init_phase(server: &crate::control::ControlServer, expected: InitPhase) {
         for _ in 0..100 {
-            if server.init_phase() == expected {
-                return;
+            match server.init_phase() {
+                phase if phase == expected => return,
+                InitPhase::Failed(error) => {
+                    panic!(
+                        "sandboxd init failed while waiting for {:?}: {error}",
+                        expected
+                    )
+                }
+                InitPhase::Initialized => {
+                    panic!(
+                        "sandboxd reached initialized while waiting for different phase {:?}",
+                        expected
+                    )
+                }
+                InitPhase::Initializing | InitPhase::Uninitialized => {}
             }
 
             ThreadSleeper.sleep(Duration::from_millis(10));
