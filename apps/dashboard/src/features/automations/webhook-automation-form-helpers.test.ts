@@ -18,6 +18,8 @@ import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 const GitHubConnectionId = "conn_github";
+const SlackConnectionId = "conn_slack";
+const SlackWebhookSourceId = "iws_slack";
 const StripeWebhookSourceId = "iws_stripe";
 const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   webhookSourceId: GitHubWebhookSourceId,
@@ -26,6 +28,10 @@ const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
 const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
+});
+const SlackAppMentionTriggerId = createWebhookAutomationTriggerId({
+  webhookSourceId: SlackWebhookSourceId,
+  eventType: "slack:app_mention",
 });
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
@@ -89,6 +95,34 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     ],
   }),
 ];
+
+const SlackAppMentionEventOption: WebhookAutomationEventOption = {
+  id: SlackAppMentionTriggerId,
+  eventType: "slack:app_mention",
+  integrationWebhookSourceId: SlackWebhookSourceId,
+  connectionId: SlackConnectionId,
+  connectionLabel: "Slack Engineering",
+  label: "App mention",
+  logoKey: "slack",
+  conversationKeyOptions: [
+    {
+      id: "channel",
+      label: "Channel",
+      description: "Events from the same Slack channel go to the same conversation.",
+      template: "slack:channel:{{payload.event.channel}}",
+    },
+  ],
+  parameters: [
+    {
+      id: "channel",
+      label: "channel",
+      kind: "resource-select",
+      resourceKind: "channel",
+      payloadPath: ["event", "channel"],
+      prefix: "in",
+    },
+  ],
+};
 
 const SampleAutomation: WebhookAutomation = {
   id: "aut_123",
@@ -210,6 +244,33 @@ describe("toWebhookAutomationFormValues", () => {
         },
         [IssueCommentCreatedTriggerId]: {
           target: "exists",
+        },
+      },
+    });
+  });
+
+  it("hydrates Slack app mention channel parameters out of payload filters", () => {
+    expect(
+      toWebhookAutomationFormValues(
+        {
+          ...SampleAutomation,
+          integrationWebhookSourceId: SlackWebhookSourceId,
+          eventTypes: ["slack:app_mention"],
+          payloadFilter: {
+            "slack:app_mention": {
+              op: "eq",
+              path: ["event", "channel"],
+              value: "C12345678",
+            },
+          },
+        },
+        [SlackAppMentionEventOption],
+      ),
+    ).toMatchObject({
+      triggerIds: [SlackAppMentionTriggerId],
+      triggerParameterValues: {
+        [SlackAppMentionTriggerId]: {
+          channel: "C12345678",
         },
       },
     });
@@ -460,6 +521,42 @@ describe("automation payload transforms", () => {
               value: "octocat",
             },
           ],
+        },
+      },
+      target: {
+        sandboxProfileId: "sbp_repo",
+      },
+    });
+  });
+
+  it("builds Slack app mention channel parameters into the payload filter", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+          triggerIds: [SlackAppMentionTriggerId],
+          triggerParameterValues: {
+            [SlackAppMentionTriggerId]: {
+              channel: "C12345678",
+            },
+          },
+        },
+        [SlackAppMentionEventOption],
+      ),
+    ).toEqual({
+      name: "Pull request routing",
+      enabled: true,
+      integrationWebhookSourceId: SlackWebhookSourceId,
+      inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
+      conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
+      idempotencyKeyTemplate: null,
+      eventTypes: ["slack:app_mention"],
+      payloadFilter: {
+        "slack:app_mention": {
+          op: "eq",
+          path: ["event", "channel"],
+          value: "C12345678",
         },
       },
       target: {

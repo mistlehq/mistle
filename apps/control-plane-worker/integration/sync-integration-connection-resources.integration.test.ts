@@ -1,3 +1,6 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   createControlPlaneDatabase,
   integrationConnectionResources,
@@ -40,6 +43,44 @@ async function createTestDatabase(input: { databaseUrl: string }) {
     db,
     stop: async () => {
       await pool.end();
+    },
+  };
+}
+
+async function startHttpServer(input: {
+  handler: (request: IncomingMessage, response: ServerResponse) => void;
+}): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const server = createServer(input.handler);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected HTTP server address.");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(address.port)}`,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error === undefined) {
+            resolve();
+            return;
+          }
+
+          reject(error);
+        });
+      });
     },
   };
 }
@@ -163,6 +204,178 @@ describe("syncIntegrationConnectionResources integration", () => {
         defaultBranch: "main",
       });
     } finally {
+      await database.stop();
+    }
+  });
+
+  it("syncs Slack public channel resources through the worker workflow", async ({ fixture }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    const slackApiServer = await startHttpServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        if (requestUrl.pathname !== "/api/conversations.list") {
+          response.writeHead(404);
+          response.end("Not found.");
+          return;
+        }
+
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            ok: true,
+            channels: [
+              {
+                id: "C12345678",
+                name: "alerts",
+                is_channel: true,
+                is_private: false,
+                is_archived: false,
+                is_im: false,
+                is_mpim: false,
+                is_shared: false,
+                is_ext_shared: false,
+              },
+              {
+                id: "C23456789",
+                name: "old-alerts",
+                is_channel: true,
+                is_private: false,
+                is_archived: true,
+                is_im: false,
+                is_mpim: false,
+              },
+            ],
+            response_metadata: {
+              next_cursor: "",
+            },
+          }),
+        );
+      },
+    });
+
+    const internalApiServer = await startHttpServer({
+      handler(request, response) {
+        if (request.url !== "/internal/integration-credentials/resolve") {
+          response.writeHead(404);
+          response.end("Not found.");
+          return;
+        }
+
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            kind: "value",
+            value: "xoxb-test-token",
+          }),
+        );
+      },
+    });
+
+    try {
+      const organizationId = "org_sync_resources_slack_channel";
+      const targetKey = "slack-default-sync-resources-channel";
+      const connectionId = "icn_sync_resources_slack_channel";
+
+      await database.db.insert(organizations).values({
+        id: organizationId,
+        name: "Sync Resources Slack Channel",
+        slug: "sync-resources-slack-channel",
+      });
+      await database.db.insert(integrationTargets).values({
+        targetKey,
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: `${slackApiServer.baseUrl}/api`,
+        },
+      });
+      await database.db.insert(integrationConnections).values({
+        id: connectionId,
+        organizationId,
+        targetKey,
+        displayName: "Slack Sync Resources Channel",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: "slack-bot-token",
+        },
+      });
+
+      await expect(
+        syncIntegrationConnectionResources(
+          {
+            db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
+            controlPlaneInternalClient: new ControlPlaneInternalClient({
+              baseUrl: internalApiServer.baseUrl,
+              internalAuthServiceToken: fixture.internalAuthServiceToken,
+            }),
+          },
+          {
+            organizationId,
+            connectionId,
+            kind: "channel",
+          },
+        ),
+      ).resolves.toEqual({
+        organizationId,
+        connectionId,
+        kind: "channel",
+      });
+
+      const persistedState = await database.db.query.integrationConnectionResourceStates.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, connectionId), eq(table.kind, "channel")),
+      });
+      expect(persistedState).toBeDefined();
+      if (persistedState === undefined) {
+        throw new Error("Expected persisted Slack resource sync state.");
+      }
+
+      expect(persistedState.syncState).toBe(IntegrationConnectionResourceSyncStates.READY);
+      expect(persistedState.totalCount).toBe(1);
+      expect(persistedState.lastSyncedAt).toBeTruthy();
+      expect(persistedState.lastErrorCode).toBeNull();
+      expect(persistedState.lastErrorMessage).toBeNull();
+
+      const persistedResources = await database.db.query.integrationConnectionResources.findMany({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, connectionId), eq(table.kind, "channel")),
+      });
+      expect(persistedResources).toHaveLength(1);
+
+      const persistedResource = persistedResources[0];
+      if (persistedResource === undefined) {
+        throw new Error("Expected persisted Slack channel resource.");
+      }
+
+      expect(persistedResource.externalId).toBe("C12345678");
+      expect(persistedResource.handle).toBe("C12345678");
+      expect(persistedResource.displayName).toBe("#alerts");
+      expect(persistedResource.status).toBe(IntegrationConnectionResourceStatuses.ACCESSIBLE);
+      expect(persistedResource.removedAt).toBeNull();
+      expect(persistedResource.metadata).toEqual({
+        name: "alerts",
+        isPrivate: false,
+        isArchived: false,
+        isShared: false,
+        isExtShared: false,
+        isIm: false,
+        isMpim: false,
+        isChannel: true,
+      });
+    } finally {
+      await internalApiServer.stop();
+      await slackApiServer.stop();
       await database.stop();
     }
   });

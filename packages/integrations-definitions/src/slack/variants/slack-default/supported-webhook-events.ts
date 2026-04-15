@@ -1,5 +1,6 @@
 import type {
   IntegrationWebhookEventDefinition,
+  IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 
@@ -82,6 +83,15 @@ const SlackReactedMessageConversationKeyOption = {
   template: "slack:message:{{payload.event.item.channel}}:{{payload.event.item.ts}}",
 };
 
+const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
+  id: "channel",
+  label: "channel",
+  kind: "resource-select",
+  resourceKind: "channel",
+  payloadPath: ["event", "channel"],
+  prefix: "in",
+};
+
 function createSlackWebhookEventDefinition(input: {
   eventType: string;
   providerEventType: string;
@@ -94,6 +104,7 @@ function createSlackWebhookEventDefinition(input: {
     description: string;
     template: string;
   }[];
+  parameters?: readonly IntegrationWebhookEventParameterDefinition[];
 }): IntegrationWebhookEventDefinition {
   return {
     eventType: input.eventType,
@@ -102,6 +113,7 @@ function createSlackWebhookEventDefinition(input: {
     category: input.category,
     payloadReferences: input.payloadReferences,
     conversationKeyOptions: input.conversationKeyOptions,
+    ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
   };
 }
 
@@ -121,6 +133,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     category: "Messages",
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
+    parameters: [SlackChannelParameter],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_added",

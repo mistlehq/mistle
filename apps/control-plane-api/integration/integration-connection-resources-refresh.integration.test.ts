@@ -242,4 +242,55 @@ describe("integration connection resources refresh integration", () => {
     expect(persistedState.syncState).toBe(IntegrationConnectionResourceSyncStates.SYNCING);
     expect(persistedState.lastSyncStartedAt).toBeTruthy();
   });
+
+  it("accepts refresh requests for Slack channel resources", async ({ fixture }) => {
+    const session = await fixture.authSession({
+      email: "integration-connection-resources-refresh-slack@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "slack_default",
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoNothing();
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_refresh_slack_channel",
+      organizationId: session.organizationId,
+      targetKey: "slack_default",
+      displayName: "Slack Refresh",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      createdAt: "2026-03-09T00:00:00.000Z",
+      updatedAt: "2026-03-09T00:00:00.000Z",
+      config: {
+        connection_method: "slack-bot-token",
+      },
+    });
+
+    const response = await fixture.request(
+      "/v1/integration/connections/icn_refresh_slack_channel/resources/channel/refresh",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(202);
+    const body = RefreshIntegrationConnectionResourcesResponseSchema.parse(await response.json());
+    expect(body).toEqual({
+      connectionId: "icn_refresh_slack_channel",
+      familyId: "slack",
+      kind: "channel",
+      syncState: IntegrationConnectionResourceSyncStates.SYNCING,
+    });
+  });
 });

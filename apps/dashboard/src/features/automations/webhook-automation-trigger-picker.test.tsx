@@ -21,6 +21,13 @@ import {
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
+const SlackConnectionId = "icn_slack";
+const SlackWebhookSourceId = "iws_slack";
+const SlackAppMentionTriggerId = createWebhookAutomationTriggerId({
+  webhookSourceId: SlackWebhookSourceId,
+  eventType: "slack:app_mention",
+});
+
 const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   createGithubIssueCommentCreatedEventOption({
     connectionLabel: GitHubGroupedConnectionLabel,
@@ -29,6 +36,26 @@ const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     connectionLabel: GitHubGroupedConnectionLabel,
   }),
 ];
+
+const SlackAppMentionEventOption: WebhookAutomationEventOption = {
+  id: SlackAppMentionTriggerId,
+  eventType: "slack:app_mention",
+  integrationWebhookSourceId: SlackWebhookSourceId,
+  connectionId: SlackConnectionId,
+  connectionLabel: "Slack - Slack Engineering",
+  label: "App mention",
+  logoKey: "slack",
+  parameters: [
+    {
+      id: "channel",
+      label: "channel",
+      kind: "resource-select",
+      resourceKind: "channel",
+      payloadPath: ["event", "channel"],
+      prefix: "in",
+    },
+  ],
+};
 
 function renderTriggerPicker(input: {
   error?: string;
@@ -345,6 +372,85 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     expect(screen.getAllByDisplayValue("octocat").length).toBeGreaterThan(0);
     expect(screen.queryByPlaceholderText("Any author")).toBeNull();
+  });
+
+  it("renders Slack channel selector-backed trigger parameters", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(["automation-trigger-parameters", SlackConnectionId, "channel"], {
+      connectionId: SlackConnectionId,
+      familyId: "slack",
+      kind: "channel",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_slack_channel_1",
+          familyId: "slack",
+          kind: "channel",
+          externalId: "C12345678",
+          handle: "C12345678",
+          displayName: "#alerts",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 1,
+        nextCursor: null,
+        previousCursor: null,
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WebhookAutomationTriggerPicker
+          error={undefined}
+          eventOptions={[SlackAppMentionEventOption]}
+          hasConnectedIntegrations={true}
+          onTriggerParameterValueChange={() => {}}
+          onValueChange={() => {}}
+          selectedConnectionId={SlackConnectionId}
+          selectedTriggerIds={[SlackAppMentionTriggerId]}
+          triggerParameterValues={{
+            [SlackAppMentionTriggerId]: {
+              channel: "C12345678",
+            },
+          }}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByDisplayValue("#alerts").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("preserves missing selected resource values as unavailable historical selections", () => {
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [
+        createWebhookAutomationTriggerId({
+          webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.pull_request.opened",
+        }),
+      ],
+      triggerParameterValues: {
+        [createWebhookAutomationTriggerId({
+          webhookSourceId: GitHubWebhookSourceId,
+          eventType: "github.pull_request.opened",
+        })]: {
+          author: "retired-user",
+        },
+      },
+    });
+
+    expect(screen.getAllByDisplayValue("retired-user (Unavailable)").length).toBeGreaterThan(0);
   });
 
   it("renders enum-backed trigger parameters", () => {

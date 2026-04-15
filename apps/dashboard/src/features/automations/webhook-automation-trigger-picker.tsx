@@ -536,23 +536,37 @@ function TriggerParameterField(input: {
     left.displayName.localeCompare(right.displayName),
   );
   const selectedResourceOption = resourceOptions.find((option) => option.handle === input.value);
+  const normalizedResourceOptions =
+    input.value.trim().length > 0 && selectedResourceOption === undefined
+      ? [
+          ...resourceOptions,
+          {
+            id: `missing:${input.value}`,
+            handle: input.value,
+            displayName: `${input.value} (Unavailable)`,
+          },
+        ]
+      : resourceOptions;
+  const resolvedSelectedResourceOption =
+    selectedResourceOption ??
+    normalizedResourceOptions.find((option) => option.handle === input.value);
   const placeholder =
     input.connectionId.trim().length === 0
       ? `Select ${input.parameter.label}`
       : resourceQuery.isPending
         ? "Loading..."
-        : resourceOptions.length === 0
+        : normalizedResourceOptions.length === 0
           ? `No ${input.parameter.label}s available`
           : `Select ${input.parameter.label}`;
   return (
     <ResourceSelectParameterField
-      key={`${input.connectionId}:${input.value}:${selectedResourceOption?.displayName ?? ""}`}
+      key={`${input.connectionId}:${input.value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
       eventType={input.eventType}
       onValueChange={input.onValueChange}
       parameter={input.parameter}
       placeholder={placeholder}
-      resourceOptions={resourceOptions}
-      selectedDisplayName={selectedResourceOption?.displayName ?? ""}
+      resourceOptions={normalizedResourceOptions}
+      selectedDisplayName={resolvedSelectedResourceOption?.displayName ?? ""}
       value={input.value}
     />
   );

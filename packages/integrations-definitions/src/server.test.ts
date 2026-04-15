@@ -92,6 +92,13 @@ describe("integrations-definitions server", () => {
     expect(slackDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
     });
+    expect(slackDefinition?.resourceDefinitions).toEqual([
+      expect.objectContaining({
+        kind: "channel",
+        bindingField: "channels",
+      }),
+    ]);
+    expect(typeof slackDefinition?.listConnectionResources).toBe("function");
   });
 
   it("lists registered server definitions", () => {

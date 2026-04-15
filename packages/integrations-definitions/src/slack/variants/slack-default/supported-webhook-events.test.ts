@@ -4,6 +4,23 @@ import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 describe("SlackSupportedWebhookEvents", () => {
+  it("exposes a resource-backed channel parameter for app mention events", () => {
+    const appMentionEvent = SlackSupportedWebhookEvents.find(
+      (eventDefinition) => eventDefinition.eventType === "slack:app_mention",
+    );
+
+    expect(appMentionEvent?.parameters).toEqual([
+      {
+        id: "channel",
+        label: "channel",
+        kind: "resource-select",
+        resourceKind: "channel",
+        payloadPath: ["event", "channel"],
+        prefix: "in",
+      },
+    ]);
+  });
+
   it("exposes thread-aware payload references and conversation groupings for reaction events", () => {
     const reactionAddedEvent = SlackSupportedWebhookEvents.find(
       (eventDefinition) => eventDefinition.eventType === "slack:reaction_added",
