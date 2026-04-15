@@ -86,6 +86,40 @@ describe("route breadcrumb metadata", () => {
     ]);
   });
 
+  it("resolves breadcrumb icons when provided by the route handle", () => {
+    const breadcrumbs = resolveAppBreadcrumbsFromMatches([
+      {
+        handle: {
+          breadcrumb: "Integrations",
+        },
+        params: {},
+        pathname: "/integrations",
+      },
+      {
+        handle: {
+          breadcrumb: "GitHub Cloud",
+          breadcrumbIcon: () => "GitHub icon",
+        },
+        params: {},
+        pathname: "/integrations/github-cloud",
+      },
+    ]);
+
+    expect(breadcrumbs).toEqual([
+      {
+        isCurrent: false,
+        label: "Integrations",
+        to: "/integrations",
+      },
+      {
+        icon: "GitHub icon",
+        isCurrent: true,
+        label: "GitHub Cloud",
+        to: null,
+      },
+    ]);
+  });
+
   it("throws when breadcrumb resolver throws", () => {
     expect(() =>
       resolveAppBreadcrumbsFromMatches([

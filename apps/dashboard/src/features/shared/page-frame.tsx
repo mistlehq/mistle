@@ -6,6 +6,7 @@ export type PageFrameProps = {
   description?: React.ReactNode;
   headerActions?: React.ReactNode;
   headerIcon?: React.ReactNode;
+  maxWidthClassName?: string;
   title: React.ReactNode;
 };
 
@@ -39,18 +40,22 @@ function shouldRenderPageFrameHeader(input: Omit<PageFrameProps, "children">): b
 
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
+  const contentClassName =
+    input.maxWidthClassName === undefined ? undefined : `mx-auto w-full ${input.maxWidthClassName}`;
 
   return (
     <div className="flex min-h-full flex-col gap-4 px-4 py-6">
       {shouldRenderHeader ? (
-        <FormPageHeader
-          actions={input.headerActions}
-          description={input.description}
-          icon={input.headerIcon}
-          title={input.title}
-        />
+        <div className={contentClassName}>
+          <FormPageHeader
+            actions={input.headerActions}
+            description={input.description}
+            icon={input.headerIcon}
+            title={input.title}
+          />
+        </div>
       ) : null}
-      {input.children}
+      <div className={contentClassName}>{input.children}</div>
     </div>
   );
 }

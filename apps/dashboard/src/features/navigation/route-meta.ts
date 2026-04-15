@@ -16,6 +16,7 @@ export type AppRouteHeaderHandle = {
 export type AppRouteHandle = {
   appShellInsetOwner?: "app-shell" | "child";
   appShellViewportMode?: "document" | "workspace";
+  breadcrumbIcon?: RouteNodeValue;
   breadcrumb?: RouteTextValue;
   breadcrumbTo?: RouteHrefValue;
   breadcrumbClickable?: boolean;
@@ -26,6 +27,7 @@ export type AppRouteHandle = {
 };
 
 export type AppBreadcrumb = {
+  icon?: React.ReactNode;
   label: string;
   to: string | null;
   isCurrent: boolean;
@@ -140,6 +142,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const appShellInsetOwner = handle["appShellInsetOwner"];
   const appShellViewportMode = handle["appShellViewportMode"];
   const breadcrumb = handle["breadcrumb"];
+  const breadcrumbIcon = handle["breadcrumbIcon"];
   const breadcrumbTo = handle["breadcrumbTo"];
   const breadcrumbClickable = handle["breadcrumbClickable"];
   const title = handle["title"];
@@ -157,6 +160,10 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
 
   if (isRouteTextValue(breadcrumb)) {
     parsedHandle.breadcrumb = breadcrumb;
+  }
+
+  if (isRouteNodeValue(breadcrumbIcon)) {
+    parsedHandle.breadcrumbIcon = breadcrumbIcon;
   }
 
   if (isRouteHrefValue(breadcrumbTo)) {
@@ -187,6 +194,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   if (
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
+    parsedHandle.breadcrumbIcon === undefined &&
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&
     parsedHandle.breadcrumbClickable === undefined &&
@@ -274,8 +282,10 @@ export function resolveAppBreadcrumbsFromMatches(matches: unknown[]): AppBreadcr
     });
     const canClick = handle.breadcrumbClickable !== false;
     const to = canClick ? (explicitTo ?? match.pathname) : null;
+    const icon = handle.breadcrumbIcon?.({ params, data: match.data });
 
     breadcrumbs.push({
+      ...(icon === undefined ? {} : { icon }),
       label,
       to,
       isCurrent: false,

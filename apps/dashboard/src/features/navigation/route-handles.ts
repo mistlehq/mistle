@@ -43,6 +43,11 @@ function resolveIntegrationDetailBreadcrumb(input: RouteTextResolverInput): stri
     return "Connection";
   }
 
+  const metadata = resolveIntegrationDefinitionMetadata(targetKey);
+  if (metadata !== null) {
+    return metadata.displayName;
+  }
+
   return normalizeIntegrationBreadcrumbLabel(targetKey);
 }
 
@@ -86,6 +91,24 @@ function resolveIntegrationDetailSubtitle(input: RouteTextResolverInput): string
   }
 
   return targetKey;
+}
+
+function resolveIntegrationBreadcrumbIcon(input: RouteTextResolverInput): React.ReactNode | null {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
+    return null;
+  }
+
+  const metadata = resolveIntegrationDefinitionMetadata(targetKey);
+  if (metadata === null) {
+    return null;
+  }
+
+  return createElement("img", {
+    alt: "",
+    className: "h-5 w-5 rounded-sm",
+    src: resolveIntegrationLogoPath({ logoKey: metadata.logoKey }),
+  });
 }
 
 function resolveIntegrationCreateTitle(input: RouteTextResolverInput): string {
@@ -161,6 +184,7 @@ export const ROUTE_HANDLES = {
   integrationDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveIntegrationDetailBreadcrumb,
+    breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {

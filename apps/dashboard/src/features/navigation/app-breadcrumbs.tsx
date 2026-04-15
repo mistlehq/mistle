@@ -39,31 +39,55 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
             <Fragment key={`${breadcrumb.label}-${breadcrumb.to ?? "current"}-${index}`}>
               <BreadcrumbItem className={itemClassName}>
                 {breadcrumb.isCurrent ? (
-                  <BreadcrumbPage>
-                    <span
-                      className="inline-block max-w-40 truncate align-bottom"
-                      title={breadcrumb.label}
-                    >
-                      {breadcrumb.label}
+                  <BreadcrumbPage className="inline-flex items-center">
+                    <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                      {breadcrumb.icon === undefined ? null : (
+                        <span aria-hidden className="shrink-0">
+                          {breadcrumb.icon}
+                        </span>
+                      )}
+                      <span
+                        className="inline-block max-w-40 truncate leading-none"
+                        title={breadcrumb.label}
+                      >
+                        {breadcrumb.label}
+                      </span>
                     </span>
                   </BreadcrumbPage>
                 ) : breadcrumb.to !== null ? (
-                  <BreadcrumbLink render={<NavLink to={breadcrumb.to} />}>
+                  <BreadcrumbLink
+                    className="inline-flex items-center"
+                    render={<NavLink to={breadcrumb.to} />}
+                  >
+                    <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                      {breadcrumb.icon === undefined ? null : (
+                        <span aria-hidden className="shrink-0">
+                          {breadcrumb.icon}
+                        </span>
+                      )}
+                      <span
+                        className="inline-block max-w-40 truncate leading-none"
+                        title={breadcrumb.label}
+                      >
+                        {breadcrumb.label}
+                      </span>
+                    </span>
+                  </BreadcrumbLink>
+                ) : (
+                  <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                    {breadcrumb.icon === undefined ? null : (
+                      <span aria-hidden className="shrink-0">
+                        {breadcrumb.icon}
+                      </span>
+                    )}
                     <span
-                      className="inline-block max-w-40 truncate align-bottom"
+                      aria-disabled="true"
+                      aria-label={`${breadcrumb.label} (not navigable)`}
+                      className="text-muted-foreground inline-block max-w-40 truncate leading-none"
                       title={breadcrumb.label}
                     >
                       {breadcrumb.label}
                     </span>
-                  </BreadcrumbLink>
-                ) : (
-                  <span
-                    aria-disabled="true"
-                    aria-label={`${breadcrumb.label} (not navigable)`}
-                    className="text-muted-foreground inline-block max-w-40 truncate"
-                    title={breadcrumb.label}
-                  >
-                    {breadcrumb.label}
                   </span>
                 )}
               </BreadcrumbItem>

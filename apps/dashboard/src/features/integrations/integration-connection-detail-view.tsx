@@ -149,7 +149,7 @@ export function IntegrationConnectionDetailView(
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-col gap-6 md:grid md:grid-cols-[16rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[18rem_1px_minmax(0,1fr)]">
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]">
         <nav aria-label="Connections" className="hidden flex-col md:flex">
           {props.connections.map((connection) => {
             const isSelected = connection.id === selectedConnection.id;

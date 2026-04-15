@@ -50,4 +50,20 @@ describe("PageFrame", () => {
     expect(container.firstElementChild?.className).not.toContain("bg-muted/30");
     expect(container.querySelector('[data-slot="page-header"]')).toBeDefined();
   });
+
+  it("supports constraining the generic page frame header and content", () => {
+    const { container } = render(
+      <PageFrame maxWidthClassName="max-w-5xl" title="Generic page">
+        <div>Contained content</div>
+      </PageFrame>,
+    );
+
+    const constrainedContainers = container.querySelectorAll(".max-w-5xl");
+
+    expect(constrainedContainers).toHaveLength(2);
+    for (const constrainedContainer of constrainedContainers) {
+      expect(constrainedContainer.className).toContain("mx-auto");
+      expect(constrainedContainer.className).toContain("w-full");
+    }
+  });
 });

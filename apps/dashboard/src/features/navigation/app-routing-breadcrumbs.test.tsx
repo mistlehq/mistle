@@ -182,7 +182,8 @@ describe("app routing breadcrumb integration", () => {
     markup = renderRoutingMarkup(router);
 
     expectMarkupToContainHref(markup, "/integrations");
-    expectMarkupToContainCurrentPageLabel(markup, "Github");
+    expectMarkupToContainCurrentPageLabel(markup, "GitHub");
+    expect(markup).toContain("/integration-logos/github.svg");
     expectMarkupToContainMetaTitle(markup, "GitHub");
     expectMarkupToContainMetaDescription(markup, "github");
 

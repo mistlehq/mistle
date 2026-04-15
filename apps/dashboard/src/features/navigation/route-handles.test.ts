@@ -82,7 +82,7 @@ describe("route handles", () => {
     }
   });
 
-  it("normalizes integration detail breadcrumb labels for known and unknown target keys", () => {
+  it("resolves integration detail breadcrumb labels from metadata for known targets and normalizes unknown ones", () => {
     const detailBreadcrumb = ROUTE_HANDLES.integrationDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
@@ -90,7 +90,7 @@ describe("route handles", () => {
       throw new Error("integrationDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { targetKey: "github" } })).toBe("Github");
+    expect(detailBreadcrumb({ params: { targetKey: "github-cloud" } })).toBe("GitHub");
     expect(detailBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Custom Integration V2",
     );
