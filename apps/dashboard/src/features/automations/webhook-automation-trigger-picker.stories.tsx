@@ -14,6 +14,8 @@ import type {
 
 const GitHubConnectionId = "conn_github_prod";
 const GitHubWebhookSourceId = "iws_github_prod";
+const SlackConnectionId = "conn_slack_prod";
+const SlackWebhookSourceId = "iws_slack_prod";
 const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.issue_comment.created",
@@ -33,6 +35,10 @@ const PullRequestReviewSubmittedTriggerId = createWebhookAutomationTriggerId({
 const PushDeletedTriggerId = createWebhookAutomationTriggerId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.push.deleted",
+});
+const SlackAppMentionTriggerId = createWebhookAutomationTriggerId({
+  webhookSourceId: SlackWebhookSourceId,
+  eventType: "slack:app_mention",
 });
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
@@ -338,6 +344,59 @@ const StoryGithubUserResources: IntegrationConnectionResources = {
   ],
 };
 
+const StorySlackChannelResources: IntegrationConnectionResources = {
+  connectionId: SlackConnectionId,
+  familyId: "slack",
+  kind: "channel",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_slack_channel_1",
+      familyId: "slack",
+      kind: "channel",
+      externalId: "C_ALERTS_001",
+      handle: "C_ALERTS_001",
+      displayName: "#alerts",
+      status: "accessible",
+      metadata: {},
+    },
+    {
+      id: "icr_slack_channel_2",
+      familyId: "slack",
+      kind: "channel",
+      externalId: "C_ENG_001",
+      handle: "C_ENG_001",
+      displayName: "#engineering",
+      status: "accessible",
+      metadata: {},
+    },
+  ],
+};
+
+const SlackEventOptions: readonly WebhookAutomationEventOption[] = [
+  {
+    id: SlackAppMentionTriggerId,
+    eventType: "slack:app_mention",
+    integrationWebhookSourceId: SlackWebhookSourceId,
+    connectionId: SlackConnectionId,
+    connectionLabel: "Slack Engineering",
+    label: "App mention",
+    category: "Slack Engineering / Messages",
+    logoKey: "slack",
+    parameters: [
+      {
+        id: "channel",
+        label: "channel",
+        kind: "resource-select",
+        resourceKind: "channel",
+        payloadPath: ["event", "channel"],
+        prefix: "in",
+      },
+    ],
+  },
+];
+
 function createWebhookAutomationTriggerPickerStoryQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -359,6 +418,10 @@ function createWebhookAutomationTriggerPickerStoryQueryClient(): QueryClient {
   queryClient.setQueryData(
     ["automation-trigger-parameters", GitHubConnectionId, "user"],
     StoryGithubUserResources,
+  );
+  queryClient.setQueryData(
+    ["automation-trigger-parameters", SlackConnectionId, "channel"],
+    StorySlackChannelResources,
   );
 
   return queryClient;
@@ -499,6 +562,34 @@ export const WrongProfileSavedTrigger: Story = {
         description: "Trigger is unavailable for the selected sandbox profile.",
       },
     ],
+  },
+};
+
+export const SlackAppMentionChannelOnly: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: SlackConnectionId,
+    selectedTriggerIds: [SlackAppMentionTriggerId],
+    triggerParameterValues: {
+      [SlackAppMentionTriggerId]: {
+        channel: "C_ALERTS_001",
+      },
+    },
+    eventOptions: SlackEventOptions,
+  },
+};
+
+export const SlackUnavailableArchivedChannelSelection: Story = {
+  args: {
+    hasConnectedIntegrations: true,
+    selectedConnectionId: SlackConnectionId,
+    selectedTriggerIds: [SlackAppMentionTriggerId],
+    triggerParameterValues: {
+      [SlackAppMentionTriggerId]: {
+        channel: "C_ARCHIVED_001",
+      },
+    },
+    eventOptions: SlackEventOptions,
   },
 };
 
