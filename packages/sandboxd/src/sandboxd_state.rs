@@ -1269,6 +1269,19 @@ supports_websockets = false
         wait_for_runtime_ready_value(&runtime_readiness_manager, false, Duration::from_secs(5));
 
         supervisor_handle.mark_component_starting(SupervisedComponent::CodexProxy);
+        supervisor_handle.replace_component_details(
+            SupervisedComponent::CodexProxy,
+            BTreeMap::from([
+                (
+                    "sessionManagerState".to_string(),
+                    "Connected".to_string(),
+                ),
+                (
+                    "rawConnectivityState".to_string(),
+                    "Connected".to_string(),
+                ),
+            ]),
+        );
         supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
         supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
         supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
