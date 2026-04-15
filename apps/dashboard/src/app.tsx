@@ -17,6 +17,7 @@ import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
+import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
@@ -90,16 +91,19 @@ export const APP_ROUTES = createRoutesFromElements(
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
           <Route element={<OrganizationIntegrationsSettingsPage />} index />
-          <Route
-            element={<IntegrationConnectionCreatePage />}
-            handle={ROUTE_HANDLES.integrationCreate}
-            path=":targetKey/add"
-          />
-          <Route
-            element={<OrganizationIntegrationsSettingsPage />}
-            handle={ROUTE_HANDLES.integrationDetail}
-            path=":targetKey"
-          />
+          <Route handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
+            <Route element={<OrganizationIntegrationsSettingsPage />} index />
+            <Route
+              element={<IntegrationConnectionCreatePage />}
+              handle={ROUTE_HANDLES.integrationCreate}
+              path="add"
+            />
+            <Route
+              element={<IntegrationConnectionEditPage />}
+              handle={ROUTE_HANDLES.integrationEdit}
+              path=":connectionId/edit"
+            />
+          </Route>
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
           <Route element={<SessionsPage />} index />

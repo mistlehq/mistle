@@ -43,6 +43,11 @@ export type IntegrationConnectionEditorDraft = {
   secrets: Record<string, string>;
 };
 
+export type ConnectionMethodVisibleConfigField = {
+  label: string;
+  value: string;
+};
+
 function resolveRecord(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) {
     return {};
@@ -206,6 +211,85 @@ export function resolveConnectionMethodFormUiModel(input: {
       uiSchema,
     }),
   };
+}
+
+function resolveSchemaPropertyLabel(input: { propertyKey: string; schema: RJSFSchema }): string {
+  const properties = resolveRecord(input.schema.properties);
+  const propertySchema = resolveRecord(properties[input.propertyKey]);
+  const title = propertySchema["title"];
+
+  return typeof title === "string" && title.trim().length > 0 ? title : input.propertyKey;
+}
+
+function resolveMetadataFieldValue(value: unknown): string | null {
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    return trimmedValue.length === 0 ? null : trimmedValue;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const renderedItems = value
+      .map((item) => (typeof item === "string" || typeof item === "number" ? String(item) : null))
+      .filter((item) => item !== null);
+
+    return renderedItems.length === 0 ? null : renderedItems.join(", ");
+  }
+
+  return null;
+}
+
+export function resolveVisibleConnectionMethodConfigFields(input: {
+  connectionId: string;
+  connectionMethod: IntegrationConnectionMethod;
+  connectionConfig: Record<string, unknown>;
+  targetConfig: Record<string, unknown>;
+  targetFamilyId: string;
+  targetKey: string;
+  targetVariantId: string;
+}): readonly ConnectionMethodVisibleConfigField[] {
+  const formUiModel = resolveConnectionMethodFormUiModel({
+    editor: {
+      connectionId: input.connectionId,
+      currentConnectionConfig: input.connectionConfig,
+      currentMethod: input.connectionMethod,
+      mode: "update",
+      targetConfig: input.targetConfig,
+      targetDisplayName: input.targetKey,
+      targetFamilyId: input.targetFamilyId,
+      targetKey: input.targetKey,
+      targetVariantId: input.targetVariantId,
+      connectionConfig: input.connectionConfig,
+    },
+    methodId: input.connectionMethod.id,
+    currentValue: input.connectionConfig,
+  });
+
+  if (formUiModel.mode !== "form") {
+    return [];
+  }
+
+  return formUiModel.visiblePropertyKeys.reduce<ConnectionMethodVisibleConfigField[]>(
+    (fields, propertyKey) => {
+      const value = resolveMetadataFieldValue(formUiModel.value[propertyKey]);
+      if (value === null) {
+        return fields;
+      }
+
+      fields.push({
+        label: resolveSchemaPropertyLabel({
+          propertyKey,
+          schema: formUiModel.schema,
+        }),
+        value,
+      });
+      return fields;
+    },
+    [],
+  );
 }
 
 function resolveInitialConfigValue(input: {

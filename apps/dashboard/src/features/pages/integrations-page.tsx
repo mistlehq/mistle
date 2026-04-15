@@ -1,4 +1,4 @@
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -15,6 +15,7 @@ import {
 } from "./use-integrations-directory-state.js";
 
 export function IntegrationsPage() {
+  const navigate = useNavigate();
   const params = useParams();
   const detailTargetKey = params["targetKey"] ?? null;
   const dashboardConfig = getDashboardConfig();
@@ -62,8 +63,32 @@ export function IntegrationsPage() {
           controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
           githubAppInstallationStateByConnectionId,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
+          ...(directoryState.selectedDetailCard === null
+            ? {}
+            : {
+                targetConfig: Object.fromEntries(
+                  Object.entries(
+                    typeof directoryState.selectedDetailCard.target.config === "object" &&
+                      directoryState.selectedDetailCard.target.config !== null &&
+                      !Array.isArray(directoryState.selectedDetailCard.target.config)
+                      ? directoryState.selectedDetailCard.target.config
+                      : {},
+                  ),
+                ),
+                ...(directoryState.selectedDetailCard.target.connectionMethods === undefined
+                  ? {}
+                  : {
+                      targetConnectionMethods:
+                        directoryState.selectedDetailCard.target.connectionMethods,
+                    }),
+                targetFamilyId: directoryState.selectedDetailCard.target.familyId,
+                targetVariantId: directoryState.selectedDetailCard.target.variantId,
+              }),
         })}
         onDeleteConnection={connectionEditors.onDeleteConnection}
+        onEditConnection={(connectionId) => {
+          void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit`);
+        }}
         onEditApiKey={connectionEditors.onEditApiKey}
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}

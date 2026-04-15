@@ -193,6 +193,61 @@ describe("IntegrationConnectionDetailView", () => {
     expect(refreshButton).toHaveProperty("disabled", true);
   });
 
+  it("shows resource preview errors while the row is collapsed and keeps item chips hidden", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 41,
+                syncState: "ready",
+                lastSyncedAt: "2026-03-11T04:25:00.000Z",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: "Could not load repositories.",
+                isLoading: false,
+                items: [
+                  {
+                    id: "repo_1",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/dashboard",
+                    displayName: "mistle/dashboard",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                ],
+                kind: "repositories",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByLabelText("View repository preview error")).toBeTruthy();
+    expect(screen.queryByText("Could not load repositories.")).toBeNull();
+    expect(screen.queryByText(/Last synced/)).toBeNull();
+    expect(screen.queryByText("mistle/dashboard")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("mistle/dashboard")).toBeTruthy();
+  });
+
   it("starts title editing for the clicked connection", () => {
     let startedEditingConnectionId: string | null = null;
 
@@ -392,6 +447,7 @@ describe("IntegrationConnectionDetailView", () => {
             id: "icn_openai_primary",
             bindingCount: 0,
             canDelete: true,
+            authSecretLabels: ["API key"],
             displayName: "OpenAI Production",
             authMethodId: "api-key",
             authMethodLabel: "API key",
@@ -407,14 +463,82 @@ describe("IntegrationConnectionDetailView", () => {
 
     const authSection = screen.getByLabelText("Connection authentication");
     expect(authSection.getAttribute("data-auth-method-id")).toBe("api-key");
-    expect(screen.getByLabelText("Masked API key value").getAttribute("data-api-key-state")).toBe(
-      "masked",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Edit API key" }));
+    expect(within(authSection).getAllByText("API key")).toHaveLength(2);
+    expect(within(authSection).getAllByText("**********")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(editedConnectionId).toBe("icn_openai_primary");
   });
 
-  it("renders masked Slack bot token credentials for Slack connections", () => {
+  it("renders a generic edit action for non-api-key connections", () => {
+    let editedConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Production",
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onEditConnection={(connectionId) => {
+          editedConnectionId = connectionId;
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(editedConnectionId).toBe("icn_jira_primary");
+  });
+
+  it("renders visible non-secret auth fields under authentication", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Production",
+            authFields: [
+              {
+                label: "Method",
+                value: "Personal API token",
+              },
+              {
+                label: "Site URL",
+                value: "https://mistle.atlassian.net",
+              },
+              {
+                label: "Email",
+                value: "dev@mistle.so",
+              },
+            ],
+            authSecretLabels: ["Personal API token"],
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Site URL")).toBeTruthy();
+    expect(screen.getByText("https://mistle.atlassian.net")).toBeTruthy();
+    expect(screen.getByText("Email")).toBeTruthy();
+    expect(screen.getByText("dev@mistle.so")).toBeTruthy();
+    const authSection = screen.getByLabelText("Connection authentication");
+    expect(within(authSection).getAllByText("Personal API token")).toHaveLength(2);
+    expect(within(authSection).getAllByText("**********")).toHaveLength(1);
+  });
+
+  it("renders masked secret fields for Slack connections", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -422,6 +546,7 @@ describe("IntegrationConnectionDetailView", () => {
             id: "icn_slack_primary",
             bindingCount: 0,
             canDelete: true,
+            authSecretLabels: ["Bot token", "Signing secret"],
             displayName: "Slack Engineering",
             authMethodId: "slack-bot-token",
             authMethodLabel: "Bot token",
@@ -434,7 +559,6 @@ describe("IntegrationConnectionDetailView", () => {
 
     const authSection = screen.getByLabelText("Connection authentication");
     expect(authSection.getAttribute("data-auth-method-id")).toBe("slack-bot-token");
-    expect(screen.getByLabelText("Masked Slack credential values")).toBeTruthy();
     expect(within(authSection).getAllByText("Bot token")).toHaveLength(2);
     expect(within(authSection).getByText("Signing secret")).toBeTruthy();
     expect(within(authSection).getAllByText("**********")).toHaveLength(2);
@@ -553,14 +677,16 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByText("Details")).toBeTruthy();
+    expect(screen.getByText("Webhook")).toBeTruthy();
     expect(
       screen.queryByText("Copy the callback URL into your provider's webhook configuration."),
     ).toBeNull();
-    expect(screen.getByText("Primary Jira webhook")).toBeTruthy();
+    expect(screen.queryByText("Primary Jira webhook")).toBeNull();
     expect(screen.queryByText("Webhook source ID: iws_jira_123")).toBeNull();
     expect(screen.queryByText("Target")).toBeNull();
     expect(screen.queryByText("jira-default")).toBeNull();
+    expect(screen.getByText("Status")).toBeTruthy();
+    expect(screen.getByText("Active")).toBeTruthy();
     expect(screen.getByText("Provider registration")).toBeTruthy();
     expect(screen.getByText("10001")).toBeTruthy();
     expect(screen.getByText("Registered events")).toBeTruthy();
@@ -568,12 +694,9 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Issue updated")).toBeTruthy();
     expect(screen.getByText("Comment created")).toBeTruthy();
     expect(screen.getByText("Comment updated")).toBeTruthy();
-    expect(screen.getByText("Callback URL")).toBeTruthy();
+    expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
     expect(screen.queryByText("Endpoint key")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
-    expect(createdConnectionId).toBe("icn_webhook_primary");
 
     fireEvent.click(
       screen.getByRole("button", { name: "Delete webhook source Primary Jira webhook" }),
@@ -582,6 +705,70 @@ describe("IntegrationConnectionDetailView", () => {
       connectionId: "icn_webhook_primary",
       webhookSourceId: "iws_jira_123",
     });
+    expect(createdConnectionId).toBeNull();
+  });
+
+  it.each([
+    ["active", "Active"],
+    ["disabled", "Disabled"],
+    ["error", "Error"],
+  ] as const)("renders Jira webhook status %s in webhook section", (status, expectedLabel) => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_status",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Connection",
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        showCreateWebhookSource={true}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_jira_status",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_jira_status",
+                    targetKey: "jira-default",
+                    integrationConnectionId: "icn_jira_status",
+                    displayName: "Primary Jira webhook",
+                    endpointKey: "ep_jira_status",
+                    callbackUrl:
+                      "https://control-plane.example.com/p/integration/webhooks/jira-default/ep_jira_status",
+                    remoteRegistrationId: "10001",
+                    status,
+                    providerMetadata: {},
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.queryByText("Primary Jira webhook")).toBeNull();
+    expect(screen.getByText("Status")).toBeTruthy();
+    expect(screen.getByText(expectedLabel)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Webhook URL" })).toBeTruthy();
   });
 
   it("renders generic setup guidance without setup URLs", () => {
@@ -627,9 +814,59 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.getByText("Setup")).toBeTruthy();
     expect(screen.getByText("Create a Jira admin webhook to complete setup.")).toBeTruthy();
-    expect(screen.queryByText("Details")).toBeNull();
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create webhook" })).toBeTruthy();
-    expect(screen.queryByText("Callback URL")).toBeNull();
+    expect(screen.queryByText("Webhook URL")).toBeNull();
+  });
+
+  it("renders Jira webhook empty state without requiring a setup section", () => {
+    let createdConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_jira_empty",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Jira Production",
+            authMethodId: "jira-personal-api-token",
+            authMethodLabel: "Personal API token",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onCreateWebhookSource={({ connectionId }) => {
+          createdConnectionId = connectionId;
+        }}
+        showCreateWebhookSource={true}
+        showWebhookSources={true}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_jira_empty",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
+    expect(createdConnectionId).toBe("icn_jira_empty");
   });
 
   it("does not show delete for implicit webhook sources", () => {
@@ -717,6 +954,11 @@ describe("IntegrationConnectionDetailView", () => {
         "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
       ),
     ).toHaveLength(2);
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.queryByText("GitHub App webhook")).toBeNull();
+    expect(screen.getByText("Status")).toBeTruthy();
+    expect(screen.getByText("Active")).toBeTruthy();
+    expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
@@ -787,6 +1029,6 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Copy Callback URL" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Webhook URL" })).toBeTruthy();
   });
 });

@@ -115,6 +115,10 @@ function resolveIntegrationCreateTitle(input: RouteTextResolverInput): string {
   return `Add ${resolveIntegrationDetailTitle(input)} Connection`;
 }
 
+function resolveIntegrationEditTitle(input: RouteTextResolverInput): string {
+  return `Edit ${resolveIntegrationDetailTitle(input)} Connection`;
+}
+
 function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): React.ReactNode | null {
   const targetKey = input.params["targetKey"];
   if (targetKey === undefined || targetKey.trim().length === 0) {
@@ -195,6 +199,15 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Add",
     title: resolveIntegrationCreateTitle,
+    description: resolveIntegrationDetailSubtitle,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
+  },
+  integrationEdit: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Edit",
+    title: resolveIntegrationEditTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,

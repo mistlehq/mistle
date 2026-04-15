@@ -40,14 +40,14 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
               <BreadcrumbItem className={itemClassName}>
                 {breadcrumb.isCurrent ? (
                   <BreadcrumbPage className="inline-flex items-center">
-                    <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                    <span className="inline-flex max-w-full items-center gap-2 leading-tight">
                       {breadcrumb.icon === undefined ? null : (
                         <span aria-hidden className="shrink-0">
                           {breadcrumb.icon}
                         </span>
                       )}
                       <span
-                        className="inline-block max-w-40 truncate leading-none"
+                        className="inline-block max-w-40 truncate leading-tight"
                         title={breadcrumb.label}
                       >
                         {breadcrumb.label}
@@ -59,14 +59,14 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
                     className="inline-flex items-center"
                     render={<NavLink to={breadcrumb.to} />}
                   >
-                    <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                    <span className="inline-flex max-w-full items-center gap-2 leading-tight">
                       {breadcrumb.icon === undefined ? null : (
                         <span aria-hidden className="shrink-0">
                           {breadcrumb.icon}
                         </span>
                       )}
                       <span
-                        className="inline-block max-w-40 truncate leading-none"
+                        className="inline-block max-w-40 truncate leading-tight"
                         title={breadcrumb.label}
                       >
                         {breadcrumb.label}
@@ -74,7 +74,7 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
                     </span>
                   </BreadcrumbLink>
                 ) : (
-                  <span className="inline-flex max-w-full items-center gap-2 leading-none">
+                  <span className="inline-flex max-w-full items-center gap-2 leading-tight">
                     {breadcrumb.icon === undefined ? null : (
                       <span aria-hidden className="shrink-0">
                         {breadcrumb.icon}
@@ -83,7 +83,7 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
                     <span
                       aria-disabled="true"
                       aria-label={`${breadcrumb.label} (not navigable)`}
-                      className="text-muted-foreground inline-block max-w-40 truncate leading-none"
+                      className="text-muted-foreground inline-block max-w-40 truncate leading-tight"
                       title={breadcrumb.label}
                     >
                       {breadcrumb.label}

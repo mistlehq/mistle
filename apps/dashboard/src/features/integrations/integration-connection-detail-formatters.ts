@@ -10,6 +10,16 @@ export function formatConnectionStatusLabel(status: "active" | "error" | "revoke
   return "Revoked";
 }
 
+export function formatWebhookSourceStatusLabel(status: "active" | "error" | "disabled"): string {
+  if (status === "active") {
+    return "Active";
+  }
+  if (status === "error") {
+    return "Error";
+  }
+  return "Disabled";
+}
+
 export function formatSyncStateLabel(
   syncState: "never-synced" | "syncing" | "ready" | "error",
 ): string {

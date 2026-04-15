@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { JiraConnectionMethodIds } from "./auth.js";
 import {
   buildJiraWebhookCallbackUrl,
+  JiraWebhookSourceCapability,
   resolveJiraAdminWebhookIdFromSelf,
   resolveJiraAdminWebhookRegistrationOrThrow,
 } from "./webhook-source.server.js";
@@ -49,6 +50,35 @@ describe("jira webhook source helpers", () => {
         },
       }),
     ).toThrow("only supports personal API token connections");
+  });
+
+  it("only supports webhook sources for personal Jira connections", () => {
+    expect(
+      JiraWebhookSourceCapability.supportsConnection?.({
+        connection: {
+          id: "icn_jira_personal",
+          status: "active",
+          config: {
+            connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+            site_url: "https://mistle-test.atlassian.net",
+            email: "jira@example.com",
+          },
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      JiraWebhookSourceCapability.supportsConnection?.({
+        connection: {
+          id: "icn_jira_service_account",
+          status: "active",
+          config: {
+            connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
+            cloud_id: "cloud-123",
+          },
+        },
+      }),
+    ).toBe(false);
   });
 
   it("extracts the remote webhook id from the Jira self URL", () => {

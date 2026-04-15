@@ -132,6 +132,9 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
   JiraConnectionConfig
 > = {
   lifecycle: IntegrationWebhookSourceLifecycles.MANAGED,
+  supportsConnection(input) {
+    return JiraPersonalApiTokenConnectionConfigSchema.safeParse(input.connection.config).success;
+  },
   async describeSource(input) {
     const endpointKey = input.source.endpointKey;
     if (endpointKey === undefined) {
@@ -139,7 +142,7 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
     }
 
     return {
-      displayName: input.source.displayName ?? "Jira admin webhook",
+      displayName: input.source.displayName ?? "Webhook",
       callbackUrl: buildJiraWebhookCallbackUrl({
         controlPlaneBaseUrl: input.controlPlaneBaseUrl,
         targetKey: input.targetKey,

@@ -93,16 +93,15 @@ describe("app routing breadcrumb integration", () => {
     <Route element={<Outlet />} path="/">
       <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
         <Route element={<PageHarness />} index />
-        <Route
-          element={<PageHarness />}
-          handle={ROUTE_HANDLES.integrationCreate}
-          path=":targetKey/add"
-        />
-        <Route
-          element={<PageHarness />}
-          handle={ROUTE_HANDLES.integrationDetail}
-          path=":targetKey"
-        />
+        <Route handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
+          <Route element={<PageHarness />} index />
+          <Route element={<PageHarness />} handle={ROUTE_HANDLES.integrationCreate} path="add" />
+          <Route
+            element={<PageHarness />}
+            handle={ROUTE_HANDLES.integrationEdit}
+            path=":connectionId/edit"
+          />
+        </Route>
       </Route>
     </Route>,
   );
@@ -191,8 +190,18 @@ describe("app routing breadcrumb integration", () => {
     markup = renderRoutingMarkup(router);
 
     expectMarkupToContainHref(markup, "/integrations");
+    expectMarkupToContainHref(markup, "/integrations/github");
     expectMarkupToContainCurrentPageLabel(markup, "Add");
     expectMarkupToContainMetaTitle(markup, "Add GitHub Connection");
+    expectMarkupToContainMetaDescription(markup, "github");
+
+    await router.navigate("/integrations/github/icn_123/edit");
+    markup = renderRoutingMarkup(router);
+
+    expectMarkupToContainHref(markup, "/integrations");
+    expectMarkupToContainHref(markup, "/integrations/github");
+    expectMarkupToContainCurrentPageLabel(markup, "Edit");
+    expectMarkupToContainMetaTitle(markup, "Edit GitHub Connection");
     expectMarkupToContainMetaDescription(markup, "github");
   });
 
@@ -218,6 +227,7 @@ describe("app routing breadcrumb integration", () => {
       "/integrations",
       "/integrations/github",
       "/integrations/github/add",
+      "/integrations/github/icn_123/edit",
     ];
 
     for (const destination of integrationDestinations) {

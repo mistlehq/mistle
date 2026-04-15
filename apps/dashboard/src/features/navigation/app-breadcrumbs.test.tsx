@@ -96,5 +96,6 @@ describe("app-breadcrumbs", () => {
 
     const markup = renderBreadcrumbMarkup(router);
     expect(markup).toContain('href="/integrations"');
+    expect(markup).not.toContain("leading-none");
   });
 });

@@ -13,6 +13,7 @@ import {
   buildIntegrationConnectionResourceItemsByKey,
   buildIntegrationConnectionResourceRequests,
   buildOpenCreateIntegrationConnectionInput,
+  buildOpenUpdateIntegrationConnectionInput,
   createIntegrationConnectionResourceKey,
   createRefreshingResourceKey,
   getIntegrationConnectionResourceSummaries,
@@ -180,6 +181,83 @@ describe("integrations page view model", () => {
     });
   });
 
+  it("builds update inputs from integration cards and connections", () => {
+    const card = createCard({
+      description: "Bring Jira into Mistle.",
+      displayName: "Jira",
+      targetKey: "jira-default",
+      familyId: "jira",
+      variantId: "jira-default",
+      connectionMethods: [
+        {
+          id: "jira-personal-api-token",
+          label: "Personal API token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      connections: [
+        createConnection({
+          id: "icn_jira",
+          status: "active",
+          targetKey: "jira-default",
+          displayName: "Jira Production",
+          connectionMethodId: "jira-personal-api-token",
+          connectionMethodLabel: "Personal API token",
+          config: {
+            connection_method: "jira-personal-api-token",
+            site_url: "https://mistle.atlassian.net",
+            email: "dev@mistle.so",
+          },
+        }),
+      ],
+    });
+    const connection = card.connections[0];
+
+    if (connection === undefined) {
+      throw new Error("Expected connection test fixture.");
+    }
+
+    expect(
+      buildOpenUpdateIntegrationConnectionInput({
+        card,
+        connection,
+      }),
+    ).toEqual({
+      mode: "update",
+      connectionConfig: {
+        connection_method: "jira-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "dev@mistle.so",
+      },
+      connectionDisplayName: "Jira Production",
+      connectionId: "icn_jira",
+      currentMethod: {
+        id: "jira-personal-api-token",
+        label: "Personal API token",
+        kind: "form",
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "Personal API token",
+            inputType: "password",
+          },
+        ],
+      },
+      targetConfig: {},
+      targetDisplayName: "Jira",
+      targetFamilyId: "jira",
+      targetKey: "jira-default",
+      targetVariantId: "jira-default",
+    });
+  });
+
   it("builds detail items with auth labels and refreshing resource state", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
@@ -261,11 +339,34 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
+      targetConfig: {},
+      targetConnectionMethods: [
+        {
+          id: "slack-bot-token",
+          label: "Bot token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "botToken",
+              label: "Bot token",
+              inputType: "password",
+            },
+            {
+              name: "signingSecret",
+              label: "Signing secret",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetFamilyId: "slack",
+      targetVariantId: "slack-default",
       refreshingResourceKeys: new Set<string>(),
     });
 
     expect(item?.authMethodId).toBe("slack-bot-token");
     expect(item?.authMethodLabel).toBe("Bot token");
+    expect(item?.authSecretLabels).toEqual(["Bot token", "Signing secret"]);
   });
 
   it("builds detail items for AWS assume-role connections", () => {
@@ -357,11 +458,84 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
+      targetConfig: {},
+      targetConnectionMethods: [
+        {
+          id: "jira-service-account-api-token",
+          label: "Service account API token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Service account API token",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetFamilyId: "jira",
+      targetVariantId: "jira-default",
       refreshingResourceKeys: new Set<string>(),
     });
 
     expect(item?.authMethodId).toBe("jira-service-account-api-token");
     expect(item?.authMethodLabel).toBe("Service account API token");
+  });
+
+  it("includes visible Jira auth config fields in detail items", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_jira_123",
+          targetKey: "jira-default",
+          displayName: "Jira Engineering",
+          status: "active",
+          config: {
+            connection_method: "jira-personal-api-token",
+            site_url: "https://mistle.atlassian.net",
+            email: "dev@mistle.so",
+          },
+          connectionMethodId: "jira-personal-api-token",
+          connectionMethodLabel: "Personal API token",
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      targetConfig: {},
+      targetConnectionMethods: [
+        {
+          id: "jira-personal-api-token",
+          label: "Personal API token",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetFamilyId: "jira",
+      targetVariantId: "jira-default",
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.authFields).toEqual([
+      {
+        label: "Method",
+        value: "Personal API token",
+      },
+      {
+        label: "Site URL",
+        value: "https://mistle.atlassian.net",
+      },
+      {
+        label: "Email",
+        value: "dev@mistle.so",
+      },
+    ]);
+    expect(item?.authSecretLabels).toEqual(["Personal API token"]);
   });
 
   it("includes GitHub App installation mutation state in detail items", () => {
@@ -618,16 +792,25 @@ function createCard(input: {
   connections?: readonly IntegrationConnection[];
   connectionStatuses?: readonly IntegrationConnection["status"][];
   connectionMethods?: readonly IntegrationConnectionMethod[];
+  displayName?: string;
+  familyId?: string;
+  targetKey?: string;
+  variantId?: string;
 }): IntegrationCardViewModel {
+  const targetKey = input.targetKey ?? "github";
+  const familyId = input.familyId ?? targetKey;
+  const variantId = input.variantId ?? "github-cloud";
+  const displayName = input.displayName ?? "GitHub";
+
   if (input.connections !== undefined) {
     return {
       target: {
-        targetKey: "github",
-        familyId: "github",
-        variantId: "github-cloud",
+        targetKey,
+        familyId,
+        variantId,
         enabled: true,
         config: {},
-        displayName: "GitHub",
+        displayName,
         description: input.description,
         ...(input.connectionMethods === undefined
           ? {}
@@ -636,7 +819,7 @@ function createCard(input: {
           configStatus: "valid",
         },
       },
-      displayName: "GitHub",
+      displayName,
       description: input.description,
       status: "Connected",
       configStatus: "valid",
@@ -651,8 +834,8 @@ function createCard(input: {
     );
   const connections: IntegrationConnection[] = connectionStatuses.map((status, index) => ({
     id: `icn_${index}`,
-    targetKey: "github",
-    displayName: `GitHub ${index}`,
+    targetKey,
+    displayName: `${displayName} ${index}`,
     status,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",
@@ -660,12 +843,12 @@ function createCard(input: {
 
   return {
     target: {
-      targetKey: "github",
-      familyId: "github",
-      variantId: "github-cloud",
+      targetKey,
+      familyId,
+      variantId,
       enabled: true,
       config: {},
-      displayName: "GitHub",
+      displayName,
       description: input.description,
       ...(input.connectionMethods === undefined
         ? {}
@@ -674,7 +857,7 @@ function createCard(input: {
         configStatus: "valid",
       },
     },
-    displayName: "GitHub",
+    displayName,
     description: input.description,
     status: "Connected",
     configStatus: "valid",
@@ -696,6 +879,12 @@ function createConnection(
     updatedAt: "2026-03-11T04:30:00.000Z",
     ...(input.resources === undefined ? {} : { resources: input.resources }),
     ...(input.config === undefined ? {} : { config: input.config }),
+    ...(input.connectionMethodId === undefined
+      ? {}
+      : { connectionMethodId: input.connectionMethodId }),
+    ...(input.connectionMethodLabel === undefined
+      ? {}
+      : { connectionMethodLabel: input.connectionMethodLabel }),
     ...(input.externalSubjectId === undefined
       ? {}
       : { externalSubjectId: input.externalSubjectId }),
