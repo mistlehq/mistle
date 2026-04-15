@@ -868,7 +868,7 @@ function createScenarioDetailViewStoryProps(
         status: input.status ?? "active",
       },
     ],
-    onEditApiKey: () => {},
+    onEditAuthentication: () => {},
     onRefreshResource: () => {},
     ...(resourceItemsByKey === undefined ? {} : { resourceItemsByKey }),
     ...(webhookSourceStateByConnectionId === undefined
