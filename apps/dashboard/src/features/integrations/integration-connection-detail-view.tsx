@@ -2,6 +2,8 @@ import { JiraSupportedWebhookEvents } from "@mistle/integrations-definitions";
 import {
   Badge,
   Button,
+  BadgeListField,
+  DefinitionList,
   Notice,
   Select,
   SelectContent,
@@ -542,11 +544,13 @@ function ConnectionDetailPane(input: {
       input.connection.contextItems.length === 0 ? null : (
         <SectionBlock title="Details">
           <div className="flex flex-col gap-4">
-            <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-              {input.connection.contextItems.map((item) => (
-                <MetadataField key={item.label} label={item.label} value={item.value} />
-              ))}
-            </div>
+            <DefinitionList
+              items={input.connection.contextItems.map((item) => ({
+                id: item.label,
+                label: item.label,
+                value: item.value,
+              }))}
+            />
           </div>
         </SectionBlock>
       )}
@@ -629,45 +633,20 @@ function ConnectionAuthSection(input: {
       className="gap-3 flex flex-col"
       {...(input.authMethodId === undefined ? {} : { "data-auth-method-id": input.authMethodId })}
     >
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        {authFields.map((field) => (
-          <MetadataField key={field.label} label={field.label} value={field.value} />
-        ))}
-        {authSecretLabels.map((label) => (
-          <MetadataField key={label} label={label} value="**********" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MetadataField(input: { label: string; value: string }): React.JSX.Element {
-  return (
-    <div className="gap-1.5 flex flex-col">
-      <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
-      <p className="break-all text-sm">{input.value}</p>
-    </div>
-  );
-}
-
-function MetadataBadgeListField(input: {
-  items: readonly string[];
-  label: string;
-}): React.JSX.Element | null {
-  if (input.items.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="gap-1.5 flex flex-col">
-      <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
-      <div className="flex flex-wrap gap-2">
-        {input.items.map((item) => (
-          <span className="rounded-full border px-2.5 py-1 text-xs" key={item}>
-            {item}
-          </span>
-        ))}
-      </div>
+      <DefinitionList
+        items={[
+          ...authFields.map((field) => ({
+            id: field.label,
+            label: field.label,
+            value: field.value,
+          })),
+          ...authSecretLabels.map((label) => ({
+            id: label,
+            label,
+            value: "**********",
+          })),
+        ]}
+      />
     </div>
   );
 }
@@ -986,14 +965,31 @@ function WebhookSourceCard(input: {
         </div>
       ) : null}
       <div className="gap-3 flex flex-col">
-        <div className="gap-1.5 flex flex-col">
-          <p className="text-muted-foreground text-xs uppercase tracking-wide">Status</p>
-          <p className="text-sm">{formatWebhookSourceStatusLabel(input.source.status)}</p>
-        </div>
-        {input.source.remoteRegistrationId === undefined ? null : (
-          <MetadataField label="Provider registration" value={input.source.remoteRegistrationId} />
-        )}
-        <MetadataBadgeListField items={registeredEventLabels} label="Registered events" />
+        <DefinitionList
+          items={[
+            {
+              id: "status",
+              label: "Status",
+              value: formatWebhookSourceStatusLabel(input.source.status),
+            },
+            ...(input.source.remoteRegistrationId === undefined
+              ? []
+              : [
+                  {
+                    id: "provider-registration",
+                    label: "Provider registration",
+                    value: input.source.remoteRegistrationId,
+                  },
+                ]),
+          ]}
+        />
+        <BadgeListField
+          items={registeredEventLabels.map((label) => ({
+            id: label,
+            label,
+          }))}
+          label="Registered events"
+        />
         {input.source.callbackUrl === undefined ? null : (
           <CopyableValue label="Webhook URL" value={input.source.callbackUrl} />
         )}
