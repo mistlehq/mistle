@@ -2,8 +2,6 @@
 
 Mistle is an open-source platform for building and running sandboxed coding agents.
 
-[Architecture](docs/architecture.md) | [Local development](docs/local-development.md) | [Deployment](docs/deployment.md) | [Release process](docs/release-process.md)
-
 ## How Mistle Works
 
 - **Integrations** connect external systems and models such as GitHub, Slack, and OpenAI.
@@ -36,7 +34,7 @@ Mistle is split into control-plane and data-plane services.
                               v
 +--------------------------------------------------------------+
 |                Sandbox / Runtime Environment                 |
-|           agent runtime | filesystem | tools                |
+|               agent runtime | filesystem | tools             |
 +--------------------------------------------------------------+
                 |                                |
                 | runtime connectivity           | outbound requests
@@ -50,8 +48,6 @@ Mistle is split into control-plane and data-plane services.
                               GitHub / Slack / Jira / SigNoz / OpenAI
 ```
 
-More detail lives in [docs/architecture.md](docs/architecture.md).
-
 ## Security Model
 
 Mistle is built around isolated agent execution and explicit configuration.
@@ -64,9 +60,7 @@ Mistle is built around isolated agent execution and explicit configuration.
 
 ## Quick Start
 
-For local development:
-
-1. Enter the Nix development shell:
+1. Enter the development shell:
 
 ```bash
 nix develop
@@ -91,15 +85,13 @@ cp sample.env.dev .env.dev
 cp sample.env.test .env.test
 ```
 
-5. Complete the Cloudflare tunnel setup described in [docs/local-development.md](docs/local-development.md).
+5. Complete the Cloudflare tunnel setup in [Local Development](#local-development).
 
 6. Start the stack:
 
 ```bash
 pnpm dev
 ```
-
-`pnpm dev` brings up local infra, runs control-plane and data-plane migrations, starts the public tunnels, and launches the workspace development processes.
 
 7. Sync integration targets into the control-plane database:
 
@@ -115,7 +107,196 @@ After startup:
 - create a sandbox profile
 - start a session or configure an automation
 
-For the complete local setup and daily development workflow, see [docs/local-development.md](docs/local-development.md).
+## Local Development
+
+### Overview
+
+Local development for Mistle is Nix-first and assumes a multi-service environment with Docker-backed dependencies.
+
+Repo runtime expectation:
+
+- Node v25
+- pnpm 10.30.2
+- Rust stable with `cargo`, `rustfmt`, and `clippy`
+
+### Prerequisites
+
+- Nix with flakes enabled
+- Docker (Desktop or Engine) with `docker compose`
+- `cloudflared`
+- access to the Cloudflare account and zone you want to use
+- permission to create named tunnels and DNS routes
+- optional: `direnv` + `nix-direnv` for automatic shell activation
+
+If you are not using the Nix shell, install Node v25, pnpm 10.30.2, a Rust toolchain with `cargo`, `rustfmt`, and `clippy`, and `typos-cli` locally.
+
+### First-Time Setup
+
+1. Enter the development shell:
+
+```bash
+nix develop
+```
+
+2. Install dependencies:
+
+```bash
+pnpm install
+```
+
+3. Create `config/config.development.toml`:
+
+```bash
+pnpm config:init:dev
+```
+
+4. Copy local environment files:
+
+```bash
+cp sample.env.dev .env.dev
+cp sample.env.test .env.test
+```
+
+### Cloudflare Tunnel Setup
+
+Local development expects a named Cloudflare tunnel with stable public hostnames for the control-plane API, data-plane gateway, and tokenizer proxy.
+
+Choose hostnames for the control-plane API, data-plane gateway, and tokenizer proxy, then create the tunnel and DNS routes:
+
+```bash
+cloudflared tunnel create <tunnel-name>
+cloudflared tunnel route dns <tunnel-name> <control-plane-api-hostname>
+cloudflared tunnel route dns <tunnel-name> <data-plane-gateway-hostname>
+cloudflared tunnel route dns <tunnel-name> <tokenizer-proxy-hostname>
+```
+
+Fetch the tunnel token and place the required values in `.env.dev`:
+
+```bash
+cloudflared tunnel token <tunnel-name>
+```
+
+```env
+CLOUDFLARE_TUNNEL_TOKEN=<token-from-command-above>
+CONTROL_PLANE_API_TUNNEL_HOSTNAME=<control-plane-api-hostname>
+DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-gateway-hostname>
+TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
+```
+
+Example naming:
+
+- `<tunnel-name>`: `mistle-<your-suffix>`
+- `<control-plane-api-hostname>`: `control-plane-api-<your-suffix>.<your-zone>`
+- `<data-plane-gateway-hostname>`: `data-plane-gateway-<your-suffix>.<your-zone>`
+- `<tokenizer-proxy-hostname>`: `tokenizer-proxy-<your-suffix>.<your-zone>`
+
+### Start the Stack
+
+Start the stack:
+
+```bash
+pnpm dev
+```
+
+`pnpm dev` brings up local infra, runs control-plane and data-plane migrations, starts the public tunnels, and launches the workspace development processes.
+
+Sync integration targets into the control-plane database:
+
+```bash
+pnpm --filter @mistle/control-plane-api integration-targets:sync
+```
+
+`integration-targets:sync` syncs built-in integration targets from the integration registry and can also provision target records from a manifest when one is available.
+
+### First Successful Run
+
+After startup:
+
+- open the dashboard at `http://localhost:5173`
+- review the available integration targets
+- create or connect an integration
+- create a sandbox profile
+- start a session or configure an automation
+
+`pnpm dev` also prints public tunnel URLs along with local Mailpit and Grafana endpoints for supporting services.
+
+### Daily Workflow
+
+```bash
+nix develop
+pnpm dev
+```
+
+Dev command summary:
+
+| Command               | What it does                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`            | Starts local infra and app dev processes. On stop, runs compose `down --remove-orphans` and keeps volumes and images so Postgres and registry state persist. |
+| `pnpm dev:down`       | Stops and removes containers and network. Keeps volumes and images.                                                                                          |
+| `pnpm dev:reset`      | Same as `dev:down`, then removes compose volumes and wipes Postgres and local registry state.                                                                |
+| `pnpm dev:reset:hard` | Same as `dev:reset`, then removes local compose images.                                                                                                      |
+
+### Environment Files
+
+`.env.dev` is for local tooling and developer-only values needed by `pnpm dev` such as tunnel tokens and public tunnel hostnames. Application runtime configuration should be set in `config/*.toml` and loaded via `MISTLE_CONFIG_PATH`, not stored in `.env.dev`.
+
+`.env.test` is only for manual test inputs such as `MISTLE_TEST_OPENAI_API_KEY`, `MISTLE_TEST_GITHUB_TOKEN`, `MISTLE_TEST_GITHUB_TEST_REPOSITORY`, `MISTLE_TEST_GITHUB_INSTALLATION_ID`, and sandbox integration toggles like `MISTLE_TEST_SANDBOX_INTEGRATION`. Generated integration and system test runtime context is written under `.local/test-context/*.json` during suite setup and should not be added to `.env.test`.
+
+### Install Nix
+
+Nix installation docs:
+
+- https://nixos.org/download/
+- https://nix.dev/manual/nix/stable/installation/
+
+macOS multi-user install:
+
+```bash
+sh <(curl -L https://nixos.org/nix/install) --daemon
+```
+
+Enable flakes:
+
+```bash
+echo "experimental-features = nix-command flakes" | sudo tee -a /etc/nix/nix.conf
+```
+
+Verify:
+
+```bash
+nix --version
+nix config check
+```
+
+### Optional Direnv
+
+Install `direnv`:
+
+- macOS (Homebrew): `brew install direnv`
+- Nix: `nix profile add nixpkgs#direnv`
+
+Install `nix-direnv`:
+
+```bash
+nix profile add nixpkgs#nix-direnv
+mkdir -p ~/.config/direnv
+echo 'source $HOME/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
+```
+
+Enable direnv in zsh:
+
+```bash
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+exec zsh
+```
+
+Allow this repo once:
+
+```bash
+direnv allow
+```
+
+This repo includes `.envrc` to auto-enter the flake shell and load `.env.dev`.
 
 ### Validation
 
@@ -127,12 +308,53 @@ pnpm typecheck
 pnpm test
 ```
 
-Additional testing guidance lives in [docs/testing/no-mocking.md](docs/testing/no-mocking.md) and [docs/testing/property-based-testing.md](docs/testing/property-based-testing.md).
+Testing guidance:
+
+- [No Mocking](docs/testing/no-mocking.md)
+- [Property-Based Testing](docs/testing/property-based-testing.md)
 
 ## Deployment
 
-Deployment guidance lives in [docs/deployment.md](docs/deployment.md). Kubernetes packaging for Mistle lives under `deploy/helm/mistle/`.
+Mistle is deployed as a multi-service system. The repository includes Kubernetes packaging, but deployment still requires environment-specific decisions about infrastructure, networking, secrets, and exposure.
+
+At a minimum, operators should expect to reason about:
+
+- dashboard access
+- control-plane APIs and workers
+- data-plane APIs and workers
+- gateway connectivity for runtime and session traffic
+- supporting infrastructure such as databases, secrets, and environment configuration
+
+Mistle should be treated as an integrated platform deployment rather than a single application process.
+
+### Kubernetes Packaging
+
+Kubernetes application packaging for Mistle lives under:
+
+- `deploy/helm/mistle/`
+
+Use this chart as the starting point for Kubernetes-based deployment.
+
+For repo-local Helm smoke testing against OrbStack and the compose-backed development dependencies, start from:
+
+- `deploy/helm/mistle/values-local.yaml`
+
+### Operator Responsibilities
+
+This repository provides application code and packaging, but operators still need to supply:
+
+- environment-specific configuration
+- secret management
+- network and ingress decisions
+- external hostname and connectivity strategy
+- infrastructure lifecycle and observability
+
+The right production setup depends on the environment where Mistle will run and the systems it must connect to.
+
+### Development Versus Deployment
+
+Local development uses Docker-backed dependencies and a Cloudflare tunnel for stable hostnames. That is a development convenience and not a substitute for a production deployment plan.
 
 ## Releases
 
-Release process documentation lives in [docs/release-process.md](docs/release-process.md).
+- [Release process](docs/release-process.md)
