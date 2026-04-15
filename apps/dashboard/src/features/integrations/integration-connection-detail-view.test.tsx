@@ -696,6 +696,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Comment updated")).toBeTruthy();
     expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
     expect(screen.queryByText("Endpoint key")).toBeNull();
 
     fireEvent.click(
