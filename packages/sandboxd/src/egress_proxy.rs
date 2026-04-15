@@ -461,7 +461,7 @@ fn run_egress_proxy_supervisor(
                 &mut restart_attempt_index,
             ) {
                 Ok(active_server) => active_server,
-                Err(error) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
+                Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
                 Err(error) => return Err(error),
             };
             continue;
@@ -478,7 +478,7 @@ fn run_egress_proxy_supervisor(
                 &mut restart_attempt_index,
             ) {
                 Ok(active_server) => active_server,
-                Err(error) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
+                Err(_) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
                 Err(error) => return Err(error),
             };
             continue;

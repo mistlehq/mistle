@@ -1407,16 +1407,10 @@ mod tests {
             match server.init_phase() {
                 phase if phase == expected => return,
                 InitPhase::Failed(error) => {
-                    panic!(
-                        "sandboxd init failed while waiting for {:?}: {error}",
-                        expected
-                    )
+                    panic!("sandboxd init failed while waiting for {expected:?}: {error}")
                 }
                 InitPhase::Initialized => {
-                    panic!(
-                        "sandboxd reached initialized while waiting for different phase {:?}",
-                        expected
-                    )
+                    panic!("sandboxd reached initialized while waiting for different phase {expected:?}")
                 }
                 InitPhase::Initializing | InitPhase::Uninitialized => {}
             }
