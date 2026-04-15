@@ -46,6 +46,7 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
     ctx.set("config", config);
     ctx.set("internalAuthServiceToken", internalAuthServiceToken);
     ctx.set("resources", resources);
+    ctx.set("controlPlaneInternalClient", resources.controlPlaneInternalClient);
     ctx.set("sandboxProvider", sandboxProvider);
     await next();
   });

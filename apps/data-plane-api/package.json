@@ -21,6 +21,7 @@
     "@hono/node-server": "^1.19.13",
     "@hono/zod-openapi": "^1.2.4",
     "@mistle/config": "workspace:*",
+    "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",

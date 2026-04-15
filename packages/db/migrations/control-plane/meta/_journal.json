@@ -71,6 +71,13 @@
       "when": 1776246304382,
       "tag": "0009_add-webhook-automation-instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1776265866111,
+      "tag": "0010_add-organization-sandbox-storage-settings",
+      "breakpoints": true
     }
   ]
 }

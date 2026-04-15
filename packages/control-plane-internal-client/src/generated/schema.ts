@@ -621,6 +621,400 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox-storage/encrypt-credential": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            credentialKind: "disk_token";
+            organizationId: string;
+            plaintext: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Encrypt sandbox storage credential for trusted internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              ciphertext: string;
+              /** @enum {string} */
+              credentialKind: "disk_token";
+              nonce: string;
+              organizationCredentialKeyVersion: number;
+            };
+          };
+        };
+        /** @description Invalid encrypt credential request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox-storage/resolve-configuration": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve effective sandbox storage configuration for an organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  organizationStorageConfig: null;
+                  /** @enum {boolean} */
+                  persistentSandboxesEnabled: false;
+                  storageBackend: null;
+                  /** @enum {string} */
+                  storageConfigSource: "managed";
+                }
+              | {
+                  organizationStorageConfig: {
+                    apiKey: string;
+                    /** @enum {string} */
+                    backend: "archil";
+                    mounts?:
+                      | []
+                      | [
+                          {
+                            accessKeyId: string;
+                            bucket: string;
+                            endpoint: string;
+                            secretAccessKey: string;
+                            /** @enum {string} */
+                            type: "s3-compatible";
+                          },
+                        ];
+                    namePrefix?: string;
+                    region: string;
+                  };
+                  /** @enum {boolean} */
+                  persistentSandboxesEnabled: false;
+                  /** @enum {string} */
+                  storageBackend: "archil";
+                  /** @enum {string} */
+                  storageConfigSource: "organization";
+                }
+              | {
+                  organizationStorageConfig: null;
+                  /** @enum {boolean} */
+                  persistentSandboxesEnabled: true;
+                  storageBackend: null;
+                  /** @enum {string} */
+                  storageConfigSource: "managed";
+                }
+              | {
+                  organizationStorageConfig: {
+                    apiKey: string;
+                    /** @enum {string} */
+                    backend: "archil";
+                    mounts?:
+                      | []
+                      | [
+                          {
+                            accessKeyId: string;
+                            bucket: string;
+                            endpoint: string;
+                            secretAccessKey: string;
+                            /** @enum {string} */
+                            type: "s3-compatible";
+                          },
+                        ];
+                    namePrefix?: string;
+                    region: string;
+                  };
+                  /** @enum {boolean} */
+                  persistentSandboxesEnabled: true;
+                  /** @enum {string} */
+                  storageBackend: "archil";
+                  /** @enum {string} */
+                  storageConfigSource: "organization";
+                };
+          };
+        };
+        /** @description Invalid resolve configuration request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox-storage/resolve-credential": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            ciphertext: string;
+            /** @enum {string} */
+            credentialKind: "disk_token";
+            nonce: string;
+            organizationCredentialKeyVersion: number;
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve sandbox storage credential for trusted internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              credentialKind: "disk_token";
+              plaintext: string;
+            };
+          };
+        };
+        /** @description Invalid resolve credential request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox-storage/resolve-persistence-mode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve sandbox storage persistence mode for an organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              persistentSandboxesEnabled: boolean;
+            };
+          };
+        };
+        /** @description Invalid resolve persistence mode request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {

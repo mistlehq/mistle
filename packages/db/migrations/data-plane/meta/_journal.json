@@ -29,6 +29,13 @@
       "when": 1776099813857,
       "tag": "0003_add-sandbox-instance-deadlines",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1776265866045,
+      "tag": "0004_add-sandbox-storage-foundation",
+      "breakpoints": true
     }
   ]
 }

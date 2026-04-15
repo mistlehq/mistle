@@ -1,7 +1,12 @@
 import { z } from "@hono/zod-openapi";
+import { SandboxStorageBackends, SandboxStorageConfigSources } from "@mistle/db/control-plane";
 
 import { ORGANIZATION_ROLES } from "../auth/services/organization-policy.js";
 import { singletonImageMetadataResponseSchema } from "../lib/singleton-image-metadata.js";
+import {
+  OrganizationSandboxStorageConfigSummarySchema,
+  OrganizationSandboxStorageConfigV1Schema,
+} from "../sandbox-storage/storage-config.js";
 
 export const OrganizationRoleSchema = z.enum(ORGANIZATION_ROLES);
 
@@ -85,3 +90,39 @@ export const InvitationsPageResponseSchema = z
     total: z.number().int().min(0),
   })
   .strict();
+
+export const GetOrganizationSandboxStorageSettingsResponseSchema = z
+  .object({
+    persistentSandboxesEnabled: z.boolean(),
+    storageConfigSource: z.enum([
+      SandboxStorageConfigSources.MANAGED,
+      SandboxStorageConfigSources.ORGANIZATION,
+    ]),
+    storageBackend: z.enum([SandboxStorageBackends.ARCHIL]).nullable(),
+    storageConfigVersion: z.number().int().nullable(),
+    organizationStorageConfigSummary: OrganizationSandboxStorageConfigSummarySchema.nullable(),
+  })
+  .strict();
+
+export const PutOrganizationSandboxStorageSettingsRequestSchema = z.discriminatedUnion(
+  "storageConfigSource",
+  [
+    z
+      .object({
+        persistentSandboxesEnabled: z.boolean(),
+        storageConfigSource: z.literal(SandboxStorageConfigSources.MANAGED),
+        organizationStorageConfig: z.null(),
+      })
+      .strict(),
+    z
+      .object({
+        persistentSandboxesEnabled: z.boolean(),
+        storageConfigSource: z.literal(SandboxStorageConfigSources.ORGANIZATION),
+        organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema,
+      })
+      .strict(),
+  ],
+);
+
+export const PutOrganizationSandboxStorageSettingsResponseSchema =
+  GetOrganizationSandboxStorageSettingsResponseSchema;

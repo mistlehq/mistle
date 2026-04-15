@@ -28,6 +28,7 @@ export type AppContextVariables = {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
   resources: AppRuntimeResources;
+  controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
 };
 

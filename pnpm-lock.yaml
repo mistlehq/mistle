@@ -398,6 +398,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -547,6 +550,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db

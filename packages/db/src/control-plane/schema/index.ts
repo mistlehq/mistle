@@ -142,6 +142,15 @@ export {
   type InsertOrganizationCredentialKey,
   type OrganizationCredentialKey,
 } from "./organization-credential-keys.js";
+export {
+  organizationSandboxStorageSettings,
+  SandboxStorageBackends,
+  SandboxStorageConfigSources,
+  type InsertOrganizationSandboxStorageSettings,
+  type OrganizationSandboxStorageSettings,
+  type SandboxStorageBackend,
+  type SandboxStorageConfigSource,
+} from "./organization-sandbox-storage-settings.js";
 export { organizations } from "./organizations.js";
 export { sandboxProfiles, SandboxProfileStatuses } from "./sandbox-profiles.js";
 export type {

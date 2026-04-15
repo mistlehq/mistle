@@ -2,6 +2,7 @@ export { DATA_PLANE_SCHEMA_NAME } from "./namespace.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,
+  SandboxInstancePersistenceModes,
   SandboxStopReasons,
   SandboxInstanceSources,
   SandboxInstanceStarterKinds,
@@ -11,11 +12,25 @@ export type {
   InsertSandboxInstance,
   SandboxInstance,
   SandboxInstanceProvider,
+  SandboxInstancePersistenceMode,
   SandboxStopReason,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,
 } from "./sandbox-instances.js";
+export {
+  sandboxInstanceStorages,
+  SandboxStorageCredentialKinds,
+  SandboxStorageProviders,
+  SandboxStorageStatuses,
+} from "./sandbox-instance-storages.js";
+export type {
+  InsertSandboxInstanceStorage,
+  SandboxInstanceStorage,
+  SandboxStorageCredentialKind,
+  SandboxStorageProvider,
+  SandboxStorageStatus,
+} from "./sandbox-instance-storages.js";
 export { sandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
 export type {
   InsertSandboxInstanceRuntimePlan,

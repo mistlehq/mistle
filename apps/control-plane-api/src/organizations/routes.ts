@@ -7,9 +7,11 @@ import * as deleteLogo from "./delete-logo/index.js";
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
+import * as getOrganizationSandboxStorageSettings from "./get-organization-sandbox-storage-settings/index.js";
 import * as listInvitations from "./list-invitations/index.js";
 import * as listMembers from "./list-members/index.js";
 import * as putLogo from "./put-logo/index.js";
+import * as putOrganizationSandboxStorageSettings from "./put-organization-sandbox-storage-settings/index.js";
 
 export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>({
@@ -21,8 +23,16 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(putLogo.route, putLogo.handler);
   routes.openapi(deleteLogo.route, deleteLogo.handler);
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
+  routes.openapi(
+    getOrganizationSandboxStorageSettings.route,
+    getOrganizationSandboxStorageSettings.handler,
+  );
   routes.openapi(listMembers.route, listMembers.handler);
   routes.openapi(listInvitations.route, listInvitations.handler);
+  routes.openapi(
+    putOrganizationSandboxStorageSettings.route,
+    putOrganizationSandboxStorageSettings.handler,
+  );
 
   return {
     basePath: ORGANIZATION_ROUTE_BASE_PATH,

@@ -1,3 +1,4 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { MistleLogger } from "@mistle/logging";
 import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
@@ -22,6 +23,7 @@ export type WorkflowContext = {
   sandboxAdapter: SandboxAdapter;
   sandboxRuntimeControl: SandboxRuntimeControl;
   runtimeStateReader: SandboxRuntimeStateReader;
+  controlPlaneInternalClient: ControlPlaneInternalClient | null;
   tunnelReadinessPolicy: {
     timeoutMs: number;
     pollIntervalMs: number;
@@ -63,6 +65,13 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
 
   try {
     sandboxRuntimeControl = createSandboxRuntimeControl(config);
+    const controlPlaneInternalClient =
+      workerConfig.controlPlaneApi === undefined
+        ? null
+        : new ControlPlaneInternalClient({
+            baseUrl: workerConfig.controlPlaneApi.baseUrl,
+            internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+          });
 
     return {
       config,
@@ -75,6 +84,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
         gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
         serviceToken: globalConfig.internalAuth.serviceToken,
       }),
+      controlPlaneInternalClient,
       tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(config),
       clock: systemClock,
       sleeper: systemSleeper,

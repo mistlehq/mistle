@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@mistle/config": "workspace:*",
+    "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/integrations-core": "workspace:*",

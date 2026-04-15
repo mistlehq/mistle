@@ -48,6 +48,14 @@ export const SandboxStopReasons = {
 
 export type SandboxStopReason = (typeof SandboxStopReasons)[keyof typeof SandboxStopReasons];
 
+export const SandboxInstancePersistenceModes = {
+  EPHEMERAL: "ephemeral",
+  PERSISTENT: "persistent",
+} as const;
+
+export type SandboxInstancePersistenceMode =
+  (typeof SandboxInstancePersistenceModes)[keyof typeof SandboxInstancePersistenceModes];
+
 export const sandboxInstances = dataPlaneSchema.table(
   "sandbox_instances",
   {
@@ -67,6 +75,10 @@ export const sandboxInstances = dataPlaneSchema.table(
     startedById: text("started_by_id").notNull(),
     source: text("source").notNull().$type<SandboxInstanceSource>(),
     title: text("title"),
+    persistenceMode: text("persistence_mode")
+      .notNull()
+      .$type<SandboxInstancePersistenceMode>()
+      .default(SandboxInstancePersistenceModes.EPHEMERAL),
     startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
     stoppedAt: timestamp("stopped_at", { withTimezone: true, mode: "string" }),
     stopReason: text("stop_reason").$type<SandboxStopReason>(),

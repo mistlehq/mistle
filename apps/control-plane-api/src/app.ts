@@ -15,6 +15,7 @@ import { createIntegrationWebhooksRoutes } from "./integration-webhooks/index.js
 import { createInternalIntegrationConnectionsRoutes } from "./internal/integration-connections/index.js";
 import { createInternalIntegrationCredentialsRoutes } from "./internal/integration-credentials/index.js";
 import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/index.js";
+import { createInternalSandboxStorageRoutes } from "./internal/sandbox-storage/index.js";
 import { createMeRoutes } from "./me/index.js";
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
@@ -143,6 +144,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
 export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
   const internalIntegrationConnectionsRoutes = createInternalIntegrationConnectionsRoutes();
   const internalIntegrationCredentialsRoutes = createInternalIntegrationCredentialsRoutes();
+  const internalSandboxStorageRoutes = createInternalSandboxStorageRoutes();
   const internalSandboxRuntimeRoutes = createInternalSandboxRuntimeRoutes();
 
   app.route(
@@ -153,5 +155,6 @@ export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
     internalIntegrationCredentialsRoutes.basePath,
     internalIntegrationCredentialsRoutes.routes,
   );
+  app.route(internalSandboxStorageRoutes.basePath, internalSandboxStorageRoutes.routes);
   app.route(internalSandboxRuntimeRoutes.basePath, internalSandboxRuntimeRoutes.routes);
 }
