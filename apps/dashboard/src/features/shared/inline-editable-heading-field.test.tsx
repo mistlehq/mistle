@@ -3,48 +3,38 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EditableHeading } from "./editable-heading.js";
+import { InlineEditableHeadingField } from "./inline-editable-heading-field.js";
 
-describe("EditableHeading", () => {
+describe("InlineEditableHeadingField", () => {
   afterEach(() => {
     cleanup();
   });
 
-  function renderEditableHeading(
-    overrides: Partial<Parameters<typeof EditableHeading>[0]> = {},
+  function renderInlineEditableHeadingField(
+    overrides: Partial<Parameters<typeof InlineEditableHeadingField>[0]> = {},
   ): ReturnType<typeof render> {
     return render(
-      <EditableHeading
+      <InlineEditableHeadingField
         ariaLabel="Heading"
         cancelOnEscape={true}
+        disabled={false}
         draftValue="Draft value"
-        editButtonLabel="Edit heading"
         errorMessage={undefined}
-        isEditing={false}
+        inputClassName={undefined}
         maxWidthClassName={undefined}
         onCancel={() => {}}
         onCommit={() => {}}
         onDraftValueChange={() => {}}
-        onEditStart={() => {}}
+        onFocus={() => {}}
         placeholder="Heading"
-        disabled={false}
-        value="Saved value"
+        saveStatus="idle"
         {...overrides}
       />,
     );
   }
 
-  it("disables the edit button when saves are disabled", () => {
-    renderEditableHeading({
-      disabled: true,
-    });
-
-    expect(screen.getByRole("button", { name: "Edit heading" })).toHaveProperty("disabled", true);
-  });
-
   it("disables the textbox while editing when saves are disabled", () => {
-    renderEditableHeading({
-      isEditing: true,
+    renderInlineEditableHeadingField({
       disabled: true,
     });
 
@@ -58,9 +48,7 @@ describe("EditableHeading", () => {
   });
 
   it("renders the edit field with bottom-only page-title chrome", () => {
-    renderEditableHeading({
-      isEditing: true,
-    });
+    renderInlineEditableHeadingField();
 
     const input = screen.getByRole("textbox", { name: "Heading" });
 
@@ -74,8 +62,7 @@ describe("EditableHeading", () => {
     let commitCount = 0;
     let cancelCount = 0;
 
-    renderEditableHeading({
-      isEditing: true,
+    renderInlineEditableHeadingField({
       onCancel: () => {
         cancelCount += 1;
       },
@@ -92,17 +79,34 @@ describe("EditableHeading", () => {
     expect(cancelCount).toBe(1);
   });
 
-  it("renders an always-editable inline field with flush border treatment", () => {
-    renderEditableHeading({
-      alwaysEditing: true,
-    });
+  it("renders an inline field with flush border treatment", () => {
+    renderInlineEditableHeadingField();
 
     const input = screen.getByRole("textbox", { name: "Heading" });
 
-    expect(screen.queryByRole("button", { name: "Edit heading" })).toBeNull();
     expect(input.className).toContain("border-x-0");
     expect(input.className).toContain("border-t-0");
     expect(input.className).toContain("px-0");
     expect(input.className).toContain("hover:border-b-border");
+  });
+
+  it("focuses the input when the pencil affordance is clicked", () => {
+    let focusCount = 0;
+    const { container } = renderInlineEditableHeadingField({
+      onFocus: () => {
+        focusCount += 1;
+      },
+    });
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+    const iconTrigger = container.querySelector(".cursor-text");
+    if (!(iconTrigger instanceof HTMLElement)) {
+      throw new Error("Expected the pencil affordance to render.");
+    }
+
+    fireEvent.mouseDown(iconTrigger);
+
+    expect(document.activeElement).toBe(input);
+    expect(focusCount).toBe(1);
   });
 });

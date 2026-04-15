@@ -5,9 +5,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AutoSaveEditableHeading, AutoSaveTitleHeading } from "./auto-save-editable-heading.js";
+import { AutoSaveInlineHeading, AutoSaveTitleHeading } from "./auto-save-inline-heading.js";
 
-describe("AutoSaveEditableHeading", () => {
+describe("AutoSaveInlineHeading", () => {
   afterEach(() => {
     cleanup();
   });
@@ -23,9 +23,8 @@ describe("AutoSaveEditableHeading", () => {
 
   it("shows a validation error and keeps the inline field visible when the value is invalid", async () => {
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
-        editButtonLabel="Edit heading"
         value="Repo Maintainer"
         onSave={async () => {}}
         successFadeDurationMs={20}
@@ -49,9 +48,8 @@ describe("AutoSaveEditableHeading", () => {
       const [value, setValue] = useState("Repo Maintainer");
 
       return (
-        <AutoSaveEditableHeading
+        <AutoSaveInlineHeading
           ariaLabel="Heading"
-          editButtonLabel="Edit heading"
           onSave={async (nextValue) => {
             setValue(nextValue);
           }}
@@ -78,10 +76,9 @@ describe("AutoSaveEditableHeading", () => {
 
   it("keeps the inline field disabled when saves are disabled", () => {
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
         disabled={true}
-        editButtonLabel="Edit heading"
         value="Repo Maintainer"
         onSave={async () => {}}
         validate={() => null}
@@ -93,10 +90,9 @@ describe("AutoSaveEditableHeading", () => {
 
   it("uses the display fallback as placeholder text without seeding the input value", () => {
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
         displayText="profile_123"
-        editButtonLabel="Edit heading"
         value=""
         onSave={async () => {}}
         validate={() => null}
@@ -111,9 +107,8 @@ describe("AutoSaveEditableHeading", () => {
   it("disables the input while saving", async () => {
     let resolveSave: (() => void) | undefined;
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
-        editButtonLabel="Edit heading"
         value="Repo Maintainer"
         onSave={() =>
           new Promise<void>((resolve) => {
@@ -159,9 +154,8 @@ describe("AutoSaveEditableHeading", () => {
           >
             Rerender
           </button>
-          <AutoSaveEditableHeading
+          <AutoSaveInlineHeading
             ariaLabel="Heading"
-            editButtonLabel="Edit heading"
             errorMessage={errorMessage}
             value="Repo Maintainer"
             onSave={async () => {}}
@@ -183,9 +177,8 @@ describe("AutoSaveEditableHeading", () => {
 
   it("keeps an external save error visible on blur when the user has not changed the value", () => {
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
-        editButtonLabel="Edit heading"
         errorMessage="Could not update heading."
         value="Repo Maintainer"
         onSave={async () => {}}
@@ -202,9 +195,8 @@ describe("AutoSaveEditableHeading", () => {
 
   it("restores the persisted value when escape cancels a changed draft after a parent-owned save error", () => {
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
-        editButtonLabel="Edit heading"
         errorMessage="Could not update heading."
         value="Repo Maintainer"
         onSave={async () => {}}
@@ -234,9 +226,8 @@ describe("AutoSaveEditableHeading", () => {
       });
 
       return (
-        <AutoSaveEditableHeading
+        <AutoSaveInlineHeading
           ariaLabel="Heading"
-          editButtonLabel="Edit heading"
           value={value}
           onSave={async (nextValue) => {
             setErrorState(null);
@@ -280,9 +271,8 @@ describe("AutoSaveEditableHeading", () => {
           >
             Reset
           </button>
-          <AutoSaveEditableHeading
+          <AutoSaveInlineHeading
             ariaLabel="Heading"
-            editButtonLabel="Edit heading"
             value={value}
             onSave={() =>
               new Promise<void>((resolve) => {
@@ -321,9 +311,8 @@ describe("AutoSaveEditableHeading", () => {
     const scheduler = createManualScheduler(clock);
 
     render(
-      <AutoSaveEditableHeading
+      <AutoSaveInlineHeading
         ariaLabel="Heading"
-        editButtonLabel="Edit heading"
         value="Repo Maintainer"
         onSave={async () => {}}
         scheduler={scheduler}
@@ -363,9 +352,8 @@ describe("AutoSaveEditableHeading", () => {
       const [value, setValue] = useState("Repo Maintainer");
 
       return (
-        <AutoSaveEditableHeading
+        <AutoSaveInlineHeading
           ariaLabel="Heading"
-          editButtonLabel="Edit heading"
           onSave={async (nextValue) => {
             setValue(nextValue);
           }}
@@ -400,7 +388,6 @@ describe("AutoSaveTitleHeading", () => {
     render(
       <AutoSaveTitleHeading
         ariaLabel="Session title"
-        editButtonLabel="Edit session title"
         emptyDisplayText="Untitled"
         onSave={async () => {}}
         requiredLabel="Session title"
@@ -417,7 +404,6 @@ describe("AutoSaveTitleHeading", () => {
     render(
       <AutoSaveTitleHeading
         ariaLabel="Session title"
-        editButtonLabel="Edit session title"
         emptyDisplayText="Untitled"
         onSave={async () => {}}
         requiredLabel="Session title"
@@ -434,7 +420,6 @@ describe("AutoSaveTitleHeading", () => {
     render(
       <AutoSaveTitleHeading
         ariaLabel="Session title"
-        editButtonLabel="Edit session title"
         emptyDisplayText="Untitled"
         onSave={async () => {}}
         requiredLabel="Session title"

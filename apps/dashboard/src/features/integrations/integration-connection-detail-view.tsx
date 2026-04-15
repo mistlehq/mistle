@@ -25,7 +25,7 @@ import {
 import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
-import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { CopyableValue } from "../shared/copyable-value.js";
 import {
   formatConnectionStatusLabel,
@@ -583,8 +583,6 @@ function EditableConnectionTitle(input: {
       ariaLabel="Connection name"
       disabled={input.titleEditor.disabled}
       emptyDisplayText={input.connection.displayName}
-      editButtonLabel="Edit connection name"
-      headingClassName="text-base font-semibold leading-tight"
       maxWidthClassName="max-w-3xl"
       onEditStart={() => {
         input.titleEditor.onStartEditing(input.connection.id);

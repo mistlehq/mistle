@@ -1,74 +1,38 @@
-import { Button, Input, Notice, Spinner, cn } from "@mistle/ui";
+import { Input, Spinner, cn } from "@mistle/ui";
 import { CheckCircleIcon, PencilSimpleIcon } from "@phosphor-icons/react";
+import { useRef, useState } from "react";
 
 import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
 
-export function EditableHeading(input: {
-  value: string;
-  draftValue: string;
-  isEditing: boolean;
-  alwaysEditing?: boolean;
+export type InlineEditableHeadingFieldProps = {
   ariaLabel: string;
-  editButtonLabel: string;
-  placeholder: string | undefined;
-  errorMessage: string | undefined;
+  draftValue: string;
+  placeholder?: string | undefined;
+  errorMessage?: string | undefined;
   disabled: boolean;
-  saveStatus?: AutoSaveInputVisualStatus;
-  cancelOnEscape?: boolean;
-  maxWidthClassName: string | undefined;
-  headingTag?: "div" | "h1" | "h2";
-  headingClassName?: string;
-  inputClassName?: string;
-  onEditStart: () => void;
+  saveStatus?: AutoSaveInputVisualStatus | undefined;
+  cancelOnEscape?: boolean | undefined;
+  maxWidthClassName?: string | undefined;
+  inputClassName?: string | undefined;
+  autoFocus?: boolean | undefined;
+  onFocus?: (() => void) | undefined;
   onDraftValueChange: (nextValue: string) => void;
   onCommit: () => void;
   onCancel: () => void;
-}): React.JSX.Element {
-  const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
-  const HeadingTag = input.headingTag ?? "h1";
-  const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
-  const headingToneClassName = input.errorMessage === undefined ? "" : " text-destructive";
+};
 
-  if (input.alwaysEditing === true) {
-    return <InlineEditableHeadingField {...input} />;
-  }
-
-  if (input.isEditing) {
-    return <InlineEditableHeadingField autoFocus={true} {...input} />;
-  }
-
-  return (
-    <div className={containerClassName}>
-      <div className="flex max-w-full items-center gap-1">
-        <HeadingTag className={`min-w-0 ${headingClassName}${headingToneClassName}`}>
-          {input.value}
-        </HeadingTag>
-        <Button
-          aria-label={input.editButtonLabel}
-          disabled={input.disabled}
-          onClick={input.onEditStart}
-          size="icon-sm"
-          type="button"
-          variant="ghost"
-        >
-          <PencilSimpleIcon aria-hidden className="size-4" />
-        </Button>
-      </div>
-      {input.errorMessage === undefined ? null : (
-        <Notice variant="alert">{input.errorMessage}</Notice>
-      )}
-    </div>
-  );
-}
-
-function InlineEditableHeadingField(
-  input: Parameters<typeof EditableHeading>[0] & {
-    autoFocus?: boolean;
-  },
+export function InlineEditableHeadingField(
+  input: InlineEditableHeadingFieldProps,
 ): React.JSX.Element {
   const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
   const saveStatus = input.saveStatus ?? "idle";
   const saveState = input.errorMessage === undefined ? saveStatus : "error";
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [isIndicatorHovered, setIsIndicatorHovered] = useState(false);
+
+  function focusInput(): void {
+    inputRef.current?.focus();
+  }
 
   return (
     <div className={containerClassName} data-save-state={saveState}>
@@ -80,18 +44,16 @@ function InlineEditableHeadingField(
           className={cn(
             "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70",
             "hover:border-b-border focus-visible:border-b-border",
+            isIndicatorHovered ? "border-b-border text-muted-foreground" : null,
             input.inputClassName,
           )}
           disabled={input.disabled}
-          onBlur={() => {
-            input.onCommit();
-          }}
+          ref={inputRef}
+          onBlur={input.onCommit}
           onChange={(event) => {
             input.onDraftValueChange(event.currentTarget.value);
           }}
-          onFocus={() => {
-            input.onEditStart();
-          }}
+          onFocus={input.onFocus}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.currentTarget.blur();
@@ -106,12 +68,28 @@ function InlineEditableHeadingField(
           value={input.draftValue}
           variant="inline"
         />
-        <div className="pointer-events-none absolute top-1/2 left-full flex -translate-y-1/2 items-center gap-1.5 pl-2 text-muted-foreground">
+        <div className="absolute top-1/2 left-full flex -translate-y-1/2 items-center gap-1.5 pl-2 text-muted-foreground">
           {input.errorMessage === undefined && saveStatus === "idle" ? (
-            <PencilSimpleIcon
+            <div
               aria-hidden
-              className="size-4 shrink-0 transition-opacity group-hover/editable-heading:opacity-0 group-focus-within/editable-heading:opacity-0"
-            />
+              className="flex cursor-text items-center"
+              onClick={focusInput}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                focusInput();
+              }}
+              onMouseEnter={() => {
+                setIsIndicatorHovered(true);
+              }}
+              onMouseLeave={() => {
+                setIsIndicatorHovered(false);
+              }}
+            >
+              <PencilSimpleIcon
+                aria-hidden
+                className="size-4 shrink-0 transition-opacity group-hover/editable-heading:opacity-0 group-focus-within/editable-heading:opacity-0"
+              />
+            </div>
           ) : null}
           <InlineEditableHeadingStatus errorMessage={input.errorMessage} status={saveStatus} />
         </div>

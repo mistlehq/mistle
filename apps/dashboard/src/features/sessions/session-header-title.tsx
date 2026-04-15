@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import {
   applyPatchedSessionTitleToCache,
   resolveCachedSessionStatus,
@@ -49,10 +49,7 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
     <AutoSaveTitleHeading
       ariaLabel="Session title"
       emptyDisplayText="Untitled"
-      editButtonLabel="Edit session title"
-      headingClassName="truncate text-sm font-medium"
-      headingTag="div"
-      inputClassName="text-sm font-medium"
+      inputClassName="truncate text-sm font-medium"
       maxWidthClassName="max-w-[28rem] flex-1"
       onSave={async (title) => {
         await patchTitleMutation.mutateAsync(title);

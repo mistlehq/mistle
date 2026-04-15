@@ -8,7 +8,7 @@ import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.
 afterEach(cleanup);
 
 describe("WebhookAutomationTitleEditor", () => {
-  it("disables edit entry while saves are disabled", () => {
+  it("keeps the inline title field disabled while saves are disabled", () => {
     render(
       <WebhookAutomationTitleEditor
         disabled={true}
@@ -18,13 +18,13 @@ describe("WebhookAutomationTitleEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Edit automation name" })).toHaveProperty(
+    expect(screen.getByRole("textbox", { name: "Automation name" })).toHaveProperty(
       "disabled",
       true,
     );
   });
 
-  it("resets edit state from a keyed remount when the title changes", () => {
+  it("resets the inline draft from a keyed remount when the title changes", () => {
     const { rerender } = render(
       <WebhookAutomationTitleEditor
         disabled={false}
@@ -34,7 +34,6 @@ describe("WebhookAutomationTitleEditor", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit automation name" }));
     fireEvent.change(screen.getByLabelText("Automation name"), {
       target: { value: "Unsaved title" },
     });
@@ -49,8 +48,6 @@ describe("WebhookAutomationTitleEditor", () => {
     );
 
     expect(screen.queryByDisplayValue("Unsaved title")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Edit automation name" }));
 
     expect(screen.getByDisplayValue("New automation name")).toBeDefined();
   });

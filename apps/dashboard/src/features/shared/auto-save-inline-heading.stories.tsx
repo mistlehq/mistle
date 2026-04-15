@@ -7,13 +7,13 @@ import {
 } from "../../storybook/auto-save-story-support.js";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
-  AutoSaveEditableHeading,
-  type AutoSaveEditableHeadingProps,
-} from "./auto-save-editable-heading.js";
+  AutoSaveInlineHeading,
+  type AutoSaveInlineHeadingProps,
+} from "./auto-save-inline-heading.js";
 
 type StoryHarnessProps = Pick<
-  AutoSaveEditableHeadingProps,
-  "value" | "placeholder" | "maxWidthClassName" | "headingClassName" | "inputClassName"
+  AutoSaveInlineHeadingProps,
+  "value" | "placeholder" | "maxWidthClassName" | "inputClassName"
 > & {
   errorMessage?: string;
 };
@@ -25,13 +25,11 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
     <AutoSaveStoryFrame
       instructions={
         <>
-          <span className="block">
-            Validation error: click the pencil, clear the value, and blur.
-          </span>
+          <span className="block">Validation error: clear the value, then blur the field.</span>
           <span className="block">
             Save error: pass{" "}
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">errorMessage</code>
-            or click the pencil, type
+            or type
             <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">explode</code>
             and blur.
           </span>
@@ -49,15 +47,11 @@ function ComparisonPane(
   const { example, ...headingProps } = input;
 
   return (
-    <AutoSaveEditableHeading
+    <AutoSaveInlineHeading
       ariaLabel="Display name"
-      editButtonLabel="Edit display name"
       {...(headingProps.errorMessage === undefined
         ? {}
         : { errorMessage: headingProps.errorMessage })}
-      {...(headingProps.headingClassName === undefined
-        ? {}
-        : { headingClassName: headingProps.headingClassName })}
       value={example.value}
       {...(headingProps.inputClassName === undefined
         ? {}
@@ -73,7 +67,7 @@ function ComparisonPane(
 }
 
 const meta = {
-  title: "Dashboard/Forms/AutoSaveEditableHeading",
+  title: "Dashboard/Forms/AutoSaveInlineHeading",
   component: StoryHarness,
   decorators: [withDashboardCenteredStory],
   parameters: {

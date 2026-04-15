@@ -23,7 +23,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { AutoSaveTitleHeading } from "../shared/auto-save-editable-heading.js";
+import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createDefaultBindingConfig,
@@ -578,7 +578,6 @@ function LoadedSandboxProfileMetaSection(input: {
           ariaLabel="Profile name"
           disabled={metaState.isUpdating}
           emptyDisplayText={metaState.pageTitle}
-          editButtonLabel="Edit profile name"
           onSave={metaState.onProfileNameSave}
           requiredLabel="Profile name"
           value={metaState.formState.displayName}
