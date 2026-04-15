@@ -824,9 +824,12 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByText("Setup")).toBeTruthy();
+    const setupSection = screen.getByText("Setup").closest("section");
+    expect(setupSection).toBeTruthy();
     expect(
-      screen.getByText("Set these URLs in your GitHub App settings, then install the app."),
+      within(setupSection as HTMLElement).getByText(
+        "Set these URLs in your GitHub App settings, then install the app.",
+      ),
     ).toBeTruthy();
     expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
@@ -943,8 +946,12 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
+    const setupSection = screen.getByText("Setup").closest("section");
+    expect(setupSection).toBeTruthy();
     expect(
-      screen.getByText("Set these URLs in your GitHub App settings, then install the app."),
+      within(setupSection as HTMLElement).getByText(
+        "Set these URLs in your GitHub App settings, then install the app.",
+      ),
     ).toBeTruthy();
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
     expect(screen.getByText("Post-installation setup URL")).toBeTruthy();

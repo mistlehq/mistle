@@ -1,4 +1,4 @@
-import { SectionHeader } from "@mistle/ui";
+import { SectionBlock } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 type IntegrationSectionProps<Card> = {
@@ -9,22 +9,26 @@ type IntegrationSectionProps<Card> = {
   title: string;
 };
 
-export function IntegrationSection<Card>(props: IntegrationSectionProps<Card>) {
+export function IntegrationSection<Card>(
+  props: IntegrationSectionProps<Card>,
+): React.JSX.Element | null {
+  if (props.cards.length === 0) {
+    if (props.emptyStateMessage !== undefined) {
+      return <SectionBlock emptyState={props.emptyStateMessage} title={props.title} />;
+    }
+
+    return null;
+  }
+
   return (
-    <div className="gap-2 flex flex-col">
-      <SectionHeader title={props.title} />
+    <SectionBlock title={props.title}>
       <div className="w-full max-w-6xl">
-        {props.cards.length === 0 && props.emptyStateMessage ? (
-          <p className="text-muted-foreground text-sm">{props.emptyStateMessage}</p>
-        ) : null}
-        {props.cards.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {props.cards.map((card) => (
-              <div key={props.getCardKey(card)}>{props.renderTile(card)}</div>
-            ))}
-          </div>
-        ) : null}
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {props.cards.map((card) => (
+            <div key={props.getCardKey(card)}>{props.renderTile(card)}</div>
+          ))}
+        </div>
       </div>
-    </div>
+    </SectionBlock>
   );
 }

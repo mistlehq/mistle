@@ -6,7 +6,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SectionHeader,
+  SectionBlock,
   SelectTrigger,
   SelectValue,
   Tooltip,
@@ -400,6 +400,9 @@ function ConnectionDetailPane(input: {
               </Button>
             ) : null
           }
+          {...(viewState.setup?.description === undefined
+            ? {}
+            : { description: viewState.setup.description })}
           title="Setup"
         >
           <div className="flex flex-col gap-4">
@@ -409,9 +412,6 @@ function ConnectionDetailPane(input: {
               viewState.setup.callbackUrl === undefined
                 ? {}
                 : { callbackUrl: viewState.setup.callbackUrl })}
-              {...(viewState.setup?.description === undefined
-                ? {}
-                : { description: viewState.setup.description })}
               {...(viewState.setup?.postInstallationSetupUrl === undefined
                 ? {}
                 : { postInstallationSetupUrl: viewState.setup.postInstallationSetupUrl })}
@@ -554,25 +554,6 @@ function ConnectionDetailPane(input: {
   );
 }
 
-function SectionBlock(input: {
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  description?: string;
-  title: string;
-}): React.JSX.Element {
-  return (
-    <section className="flex flex-col gap-0">
-      <div className="flex flex-col gap-0">
-        <SectionHeader action={input.action} title={input.title} />
-        {input.description === undefined ? null : (
-          <p className="text-muted-foreground text-xs">{input.description}</p>
-        )}
-      </div>
-      {input.children}
-    </section>
-  );
-}
-
 function resolveDeleteConnectionMessage(
   connection: Pick<IntegrationConnectionDetailItem, "bindingCount" | "canDelete">,
 ): string | null {
@@ -693,14 +674,9 @@ function MetadataBadgeListField(input: {
 
 function SetupSection(input: {
   callbackUrl?: string;
-  description?: string;
   postInstallationSetupUrl?: string;
 }): React.JSX.Element | null {
-  if (
-    input.description === undefined &&
-    input.callbackUrl === undefined &&
-    input.postInstallationSetupUrl === undefined
-  ) {
+  if (input.callbackUrl === undefined && input.postInstallationSetupUrl === undefined) {
     return null;
   }
 
@@ -713,9 +689,6 @@ function SetupSection(input: {
 
   return (
     <div className="gap-3 flex flex-col">
-      {input.description === undefined ? null : (
-        <p className="text-muted-foreground text-xs">{input.description}</p>
-      )}
       {resolvedPostInstallationSetupUrl === undefined && input.callbackUrl === undefined ? null : (
         <div className="flex flex-col gap-3">
           {resolvedPostInstallationSetupUrl === undefined ? null : (
@@ -752,7 +725,6 @@ function resolveGitHubPostInstallationSetupUrl(input: {
 }
 
 function ResourceScopeRow(input: {
-  className?: string;
   connectionId: string;
   onRefreshResource: ((input: { connectionId: string; kind: string }) => void) | undefined;
   resource: IntegrationConnectionDetailResourceSummary;
@@ -765,7 +737,6 @@ function ResourceScopeRow(input: {
 }): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false);
   const resourceLabel = formatResourceLabel(input.resource.kind);
-  const rowClassName = [input.className].filter(Boolean).join(" ");
   const resourceCount = input.resource.count;
   const resourceStateIndicator = resolveResourceStateIndicator({
     errorMessage: input.resourceItems?.errorMessage ?? null,
@@ -774,81 +745,77 @@ function ResourceScopeRow(input: {
   const shouldReplaceMetadataWithPreviewError = input.resourceItems?.errorMessage != null;
 
   return (
-    <div className={rowClassName}>
-      <div className={`flex flex-col gap-2 pt-1 ${isExpanded ? "pb-4" : "pb-1"}`}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0 flex items-center gap-2">
-            <Button
-              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${resourceLabel.toLowerCase()} resources`}
-              className="-ml-2 h-auto justify-start rounded-sm px-1 py-0 text-left text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground"
-              onClick={() => {
-                setIsExpanded((current) => !current);
-              }}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              {isExpanded ? (
-                <CaretDownIcon aria-hidden className="size-4" />
-              ) : (
-                <CaretRightIcon aria-hidden className="size-4" />
-              )}
-              <span className="text-sm font-medium leading-tight">
-                {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
-              </span>
-            </Button>
-            {shouldShowResourceSyncStateBadge(input.resource.syncState) ? (
-              <Badge variant="secondary">{formatSyncStateLabel(input.resource.syncState)}</Badge>
-            ) : null}
-          </div>
-          <div className="flex items-center gap-2 sm:shrink-0">
-            {shouldReplaceMetadataWithPreviewError ? (
-              <div className="flex items-center">{resourceStateIndicator}</div>
+    <div className={`flex flex-col gap-2 ${isExpanded ? "pb-4" : ""}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex items-center gap-2">
+          <Button
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${resourceLabel.toLowerCase()} resources`}
+            className="-ml-2 h-auto justify-start rounded-sm px-1 py-0 text-left text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground"
+            onClick={() => {
+              setIsExpanded((current) => !current);
+            }}
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            {isExpanded ? (
+              <CaretDownIcon aria-hidden className="size-4" />
             ) : (
-              <div className="text-muted-foreground text-xs">
-                <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
-                {formatResourceInlineMetadata(input.resource)}
-              </div>
+              <CaretRightIcon aria-hidden className="size-4" />
             )}
-            {input.onRefreshResource ? (
-              <Button
-                aria-label={`Refresh ${input.resource.kind}`}
-                disabled={input.resource.isRefreshing === true}
-                onClick={() => {
-                  input.onRefreshResource?.({
-                    connectionId: input.connectionId,
-                    kind: input.resource.kind,
-                  });
-                }}
-                size="icon-sm"
-                title="Sync resource"
-                type="button"
-                variant="outline"
-              >
-                <ArrowClockwiseIcon
-                  aria-hidden
-                  className={
-                    input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"
-                  }
-                />
-              </Button>
-            ) : null}
-          </div>
+            <span className="text-sm font-medium leading-tight">
+              {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
+            </span>
+          </Button>
+          {shouldShowResourceSyncStateBadge(input.resource.syncState) ? (
+            <Badge variant="secondary">{formatSyncStateLabel(input.resource.syncState)}</Badge>
+          ) : null}
         </div>
-        {input.resource.lastErrorMessage ? (
-          <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
-        ) : null}
-        {input.resourceItems?.errorMessage === null ? resourceStateIndicator : null}
-        {isExpanded && input.resourceItems !== null && input.resourceItems.items.length > 0 ? (
-          <div className="gap-2 flex flex-wrap pl-5">
-            {input.resourceItems.items.map((item) => (
-              <span className="rounded-full border px-2.5 py-1 text-xs" key={item.id}>
-                {item.displayName}
-              </span>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2 sm:shrink-0">
+          {shouldReplaceMetadataWithPreviewError ? (
+            <div className="flex items-center">{resourceStateIndicator}</div>
+          ) : (
+            <div className="text-muted-foreground text-xs">
+              <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
+              {formatResourceInlineMetadata(input.resource)}
+            </div>
+          )}
+          {input.onRefreshResource ? (
+            <Button
+              aria-label={`Refresh ${input.resource.kind}`}
+              disabled={input.resource.isRefreshing === true}
+              onClick={() => {
+                input.onRefreshResource?.({
+                  connectionId: input.connectionId,
+                  kind: input.resource.kind,
+                });
+              }}
+              size="icon-sm"
+              title="Sync resource"
+              type="button"
+              variant="outline"
+            >
+              <ArrowClockwiseIcon
+                aria-hidden
+                className={input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"}
+              />
+            </Button>
+          ) : null}
+        </div>
       </div>
+      {input.resource.lastErrorMessage ? (
+        <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
+      ) : null}
+      {input.resourceItems?.errorMessage === null ? resourceStateIndicator : null}
+      {isExpanded && input.resourceItems !== null && input.resourceItems.items.length > 0 ? (
+        <div className="gap-2 flex flex-wrap pl-5">
+          {input.resourceItems.items.map((item) => (
+            <span className="rounded-full border px-2.5 py-1 text-xs" key={item.id}>
+              {item.displayName}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -861,7 +828,7 @@ function ResourcesSection(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
-      {input.resources.map((resource, index) => (
+      {input.resources.map((resource) => (
         <ResourceScopeRow
           connectionId={input.connectionId}
           key={`${input.connectionId}:${resource.kind}`}
@@ -870,7 +837,6 @@ function ResourcesSection(input: {
           resourceItems={
             input.resourceContentByKey?.get(`${input.connectionId}:${resource.kind}`) ?? null
           }
-          {...(index === 0 ? {} : { className: "" })}
         />
       ))}
     </div>

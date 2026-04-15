@@ -17,6 +17,13 @@ export const WithValue = {
   },
 };
 
+export const Inline = {
+  args: {
+    variant: "inline",
+    placeholder: "Search sessions",
+  },
+};
+
 export const Invalid = {
   args: {
     "aria-invalid": true,

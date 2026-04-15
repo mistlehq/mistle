@@ -8,15 +8,38 @@ import { Button } from "./button.js";
 import { Input } from "./input.js";
 import { Textarea } from "./textarea.js";
 
-function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
+const inputGroupVariants = cva(
+  "group/input-group relative flex w-full min-w-0 items-center outline-none",
+  {
+    variants: {
+      variant: {
+        default:
+          "border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 h-9 rounded-md border shadow-xs transition-[color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot][aria-invalid=true]]:ring-[3px] has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 [[data-slot=combobox-content]_&]:focus-within:border-inherit [[data-slot=combobox-content]_&]:focus-within:ring-0",
+        inline:
+          "border border-transparent h-8 rounded-md px-2 text-foreground transition-colors hover:border-border hover:bg-white hover:text-muted-foreground focus-within:text-muted-foreground [&_[data-slot=input-group-addon]]:pl-0 [&_[data-slot=input-group-addon]]:pr-2 [&_[data-slot=input-group-addon]]:text-inherit [&_[data-slot=input-group-control]::placeholder]:text-current data-[active=true]:border-border data-[active=true]:bg-white data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&_[data-slot=input-group-addon]]:text-muted-foreground data-[active=true]:[&_[data-slot=input-group-control]::placeholder]:text-muted-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+);
+
+function InputGroup({
+  className,
+  variant = "default",
+  active,
+  ...props
+}: React.ComponentProps<"div"> &
+  VariantProps<typeof inputGroupVariants> & {
+    active?: boolean;
+  }) {
   return (
     <div
       data-slot="input-group"
+      data-active={active ? "true" : undefined}
       role="group"
-      className={cn(
-        "border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 h-9 rounded-md border shadow-xs transition-[color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot][aria-invalid=true]]:ring-[3px] has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 [[data-slot=combobox-content]_&]:focus-within:border-inherit [[data-slot=combobox-content]_&]:focus-within:ring-0 group/input-group relative flex w-full min-w-0 items-center outline-none has-[>textarea]:h-auto",
-        className,
-      )}
+      className={cn(inputGroupVariants({ variant }), className)}
       {...props}
     />
   );

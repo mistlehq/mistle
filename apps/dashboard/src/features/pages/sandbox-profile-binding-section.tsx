@@ -1,4 +1,4 @@
-import { Button, SectionHeader, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
+import { Button, SectionBlock, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -56,9 +56,9 @@ export function SandboxProfileBindingSection(input: {
     </Button>
   );
 
-  return (
-    <div className="gap-3 flex flex-col">
-      <SectionHeader
+  if (input.rows.length === 0) {
+    return (
+      <SectionBlock
         action={
           addConstraintMessage === null ? (
             addButton
@@ -69,16 +69,25 @@ export function SandboxProfileBindingSection(input: {
             </Tooltip>
           )
         }
+        emptyState={formatBindingSectionEmptyState(input.kind)}
         title={formatBindingSectionTitle(input.kind)}
       />
+    );
+  }
 
-      {input.rows.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {formatBindingSectionEmptyState(input.kind)}
-        </p>
-      ) : null}
-
-      {input.rows.map((row) => (
+  return (
+    <SectionBlock
+      action={
+        addConstraintMessage === null ? (
+          addButton
+        ) : (
+          <Tooltip delay={0}>
+            <TooltipTrigger render={<span className="inline-flex" />}>{addButton}</TooltipTrigger>
+            <TooltipContent side="top">{addConstraintMessage}</TooltipContent>
+          </Tooltip>
+        )
+      }
+      children={input.rows.map((row) => (
         <SandboxProfileBindingCard
           availableConnections={input.availableConnections}
           availableTargets={input.availableTargets}
@@ -93,6 +102,7 @@ export function SandboxProfileBindingSection(input: {
           row={row}
         />
       ))}
-    </div>
+      title={formatBindingSectionTitle(input.kind)}
+    />
   );
 }

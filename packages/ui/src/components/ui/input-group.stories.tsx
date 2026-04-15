@@ -73,3 +73,24 @@ export const WithTextarea = {
     );
   },
 };
+
+export const Inline = {
+  render: function Render() {
+    return (
+      <div className="space-y-4 w-80">
+        <InputGroup active={false} variant="inline">
+          <InputGroupAddon>
+            <MagnifyingGlassIcon />
+          </InputGroupAddon>
+          <InputGroupInput placeholder="Search sessions" defaultValue="" />
+        </InputGroup>
+        <InputGroup active variant="inline">
+          <InputGroupAddon>
+            <MagnifyingGlassIcon />
+          </InputGroupAddon>
+          <InputGroupInput defaultValue="Review migration draft" placeholder="Search sessions" />
+        </InputGroup>
+      </div>
+    );
+  },
+};

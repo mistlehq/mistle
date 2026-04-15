@@ -43,7 +43,7 @@ export * from "./components/ui/resizable.js";
 export * from "./components/ui/scroll-area.js";
 export * from "./components/ui/select.js";
 export * from "./components/ui/separator.js";
-export * from "./components/ui/section-header.js";
+export * from "./components/ui/section-block.js";
 export * from "./components/ui/sheet.js";
 export * from "./components/ui/sidebar.js";
 export * from "./components/ui/skeleton.js";
