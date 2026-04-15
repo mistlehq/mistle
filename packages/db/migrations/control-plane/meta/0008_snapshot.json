@@ -1312,7 +1312,7 @@
           "primaryKey": false,
           "notNull": true
         },
-        "slotKey": {
+        "slot_key": {
           "name": "slot_key",
           "type": "text",
           "primaryKey": false,
@@ -2637,29 +2637,23 @@
           "primaryKey": true,
           "notNull": true
         },
-        "owner_scope": {
-          "name": "owner_scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "organization_id": {
           "name": "organization_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "integration_connection_id": {
           "name": "integration_connection_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "target_key": {
           "name": "target_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "display_name": {
           "name": "display_name",
@@ -2667,17 +2661,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "routing_strategy": {
-          "name": "routing_strategy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "endpoint_key": {
           "name": "endpoint_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "webhook_secret_credential_id": {
           "name": "webhook_secret_credential_id",
@@ -2771,21 +2759,6 @@
           "columns": [
             {
               "expression": "target_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "integration_webhook_sources_owner_scope_idx": {
-          "name": "integration_webhook_sources_owner_scope_idx",
-          "columns": [
-            {
-              "expression": "owner_scope",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4263,25 +4236,25 @@
           "primaryKey": true,
           "notNull": true
         },
-        "organizationId": {
+        "organization_id": {
           "name": "organization_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "targetKey": {
+        "target_key": {
           "name": "target_key",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "connectionMethodId": {
+        "connection_method_id": {
           "name": "connection_method_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "displayName": {
+        "display_name": {
           "name": "display_name",
           "type": "text",
           "primaryKey": false,
@@ -4294,74 +4267,74 @@
           "notNull": true,
           "default": "'pending'"
         },
-        "providerStateEncrypted": {
+        "provider_state_encrypted": {
           "name": "provider_state_encrypted",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "verificationUrl": {
+        "verification_url": {
           "name": "verification_url",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "userCode": {
+        "user_code": {
           "name": "user_code",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "expiresAt": {
+        "expires_at": {
           "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "pollAfterAt": {
+        "poll_after_at": {
           "name": "poll_after_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "connectionId": {
+        "connection_id": {
           "name": "connection_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "errorCode": {
+        "error_code": {
           "name": "error_code",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "errorMessage": {
+        "error_message": {
           "name": "error_message",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "completedAt": {
+        "completed_at": {
           "name": "completed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "cancelledAt": {
+        "cancelled_at": {
           "name": "cancelled_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
-        "createdAt": {
+        "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updatedAt": {
+        "updated_at": {
           "name": "updated_at",
           "type": "timestamp with time zone",
           "primaryKey": false,

@@ -1312,7 +1312,7 @@
           "primaryKey": false,
           "notNull": true
         },
-        "slotKey": {
+        "slot_key": {
           "name": "slot_key",
           "type": "text",
           "primaryKey": false,

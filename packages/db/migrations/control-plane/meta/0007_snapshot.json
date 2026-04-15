@@ -1312,7 +1312,7 @@
           "primaryKey": false,
           "notNull": true
         },
-        "slotKey": {
+        "slot_key": {
           "name": "slot_key",
           "type": "text",
           "primaryKey": false,
@@ -2631,29 +2631,23 @@
           "primaryKey": true,
           "notNull": true
         },
-        "owner_scope": {
-          "name": "owner_scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "organization_id": {
           "name": "organization_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "integration_connection_id": {
           "name": "integration_connection_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "target_key": {
           "name": "target_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "display_name": {
           "name": "display_name",
@@ -2661,17 +2655,11 @@
           "primaryKey": false,
           "notNull": false
         },
-        "routing_strategy": {
-          "name": "routing_strategy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "endpoint_key": {
           "name": "endpoint_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "webhook_secret_credential_id": {
           "name": "webhook_secret_credential_id",
@@ -2765,21 +2753,6 @@
           "columns": [
             {
               "expression": "target_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "integration_webhook_sources_owner_scope_idx": {
-          "name": "integration_webhook_sources_owner_scope_idx",
-          "columns": [
-            {
-              "expression": "owner_scope",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
