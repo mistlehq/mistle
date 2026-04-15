@@ -14,32 +14,28 @@ import type { SlackTargetSecrets } from "../variants/slack-default/target-secret
 
 const SlackChannelKind = "channel";
 
-const SlackConversationSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1).optional(),
-    is_channel: z.boolean().optional(),
-    is_private: z.boolean().optional(),
-    is_archived: z.boolean().optional(),
-    is_shared: z.boolean().optional(),
-    is_ext_shared: z.boolean().optional(),
-    is_im: z.boolean().optional(),
-    is_mpim: z.boolean().optional(),
-  })
-  .strict();
+const SlackConversationSchema = z.looseObject({
+  id: z.string().min(1),
+  name: z.string().min(1).optional(),
+  is_channel: z.boolean().optional(),
+  is_private: z.boolean().optional(),
+  is_archived: z.boolean().optional(),
+  is_shared: z.boolean().optional(),
+  is_ext_shared: z.boolean().optional(),
+  is_im: z.boolean().optional(),
+  is_mpim: z.boolean().optional(),
+});
 
-const SlackConversationsListResponseSchema = z
-  .object({
-    ok: z.boolean(),
-    channels: z.array(SlackConversationSchema).optional(),
-    error: z.string().min(1).optional(),
-    response_metadata: z
-      .object({
-        next_cursor: z.string().optional(),
-      })
-      .optional(),
-  })
-  .strict();
+const SlackConversationsListResponseSchema = z.looseObject({
+  ok: z.boolean(),
+  channels: z.array(SlackConversationSchema).optional(),
+  error: z.string().min(1).optional(),
+  response_metadata: z
+    .looseObject({
+      next_cursor: z.string().optional(),
+    })
+    .optional(),
+});
 
 type SlackListConnectionResourcesInput = ListConnectionResourcesInput<
   SlackTargetConfig,
@@ -52,7 +48,7 @@ type SlackConversation = z.output<typeof SlackConversationSchema>;
 function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: string }): URL {
   const apiUrl = new URL(input.apiBaseUrl);
   apiUrl.pathname = `${apiUrl.pathname === "/" ? "" : apiUrl.pathname}/conversations.list`;
-  apiUrl.searchParams.set("types", "public_channel");
+  apiUrl.searchParams.set("types", "public_channel,private_channel");
   apiUrl.searchParams.set("exclude_archived", "true");
   if (input.cursor !== undefined && input.cursor.length > 0) {
     apiUrl.searchParams.set("cursor", input.cursor);
@@ -60,10 +56,9 @@ function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: st
   return apiUrl;
 }
 
-function isSelectablePublicChannel(conversation: SlackConversation): boolean {
+function isSelectableChannel(conversation: SlackConversation): boolean {
   return (
     conversation.is_channel === true &&
-    conversation.is_private !== true &&
     conversation.is_archived !== true &&
     conversation.is_im !== true &&
     conversation.is_mpim !== true
@@ -128,7 +123,7 @@ async function listSlackChannels(input: {
     }
 
     for (const conversation of parsedPayload.channels ?? []) {
-      if (!isSelectablePublicChannel(conversation)) {
+      if (!isSelectableChannel(conversation)) {
         continue;
       }
 
