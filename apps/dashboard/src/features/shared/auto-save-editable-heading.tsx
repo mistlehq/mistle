@@ -192,6 +192,7 @@ export type AutoSaveEditableHeadingProps = {
   headingTag?: "div" | "h1" | "h2";
   headingClassName?: string;
   inputClassName?: string;
+  editVariant?: "default" | "inline";
   cancelOnEscape?: boolean;
   validate: (nextValue: string) => string | null;
   onSave: (nextValue: string) => Promise<void> | void;
@@ -458,6 +459,7 @@ export function AutoSaveEditableHeading(input: AutoSaveEditableHeadingProps): Re
         {...(input.headingClassName === undefined
           ? {}
           : { headingClassName: input.headingClassName })}
+        {...(input.editVariant === undefined ? {} : { editVariant: input.editVariant })}
         {...(input.headingTag === undefined ? {} : { headingTag: input.headingTag })}
         {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
       />

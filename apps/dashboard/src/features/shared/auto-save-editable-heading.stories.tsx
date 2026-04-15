@@ -19,7 +19,8 @@ type StoryHarnessProps = Pick<
 };
 
 function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
-  const { onSave, value } = useAutoSaveStoryValue(input.value);
+  const defaultExample = useAutoSaveStoryValue(input.value);
+  const inlineExample = useAutoSaveStoryValue(input.value);
 
   return (
     <AutoSaveStoryFrame
@@ -38,23 +39,60 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
         </>
       }
     >
+      <div className="grid gap-8 lg:grid-cols-2">
+        <ComparisonPane
+          heading="Default input"
+          example={defaultExample}
+          {...input}
+          editVariant="default"
+        />
+        <ComparisonPane
+          heading="Inline input"
+          example={inlineExample}
+          {...input}
+          editVariant="inline"
+        />
+      </div>
+    </AutoSaveStoryFrame>
+  );
+}
+
+function ComparisonPane(
+  input: StoryHarnessProps & {
+    heading: string;
+    editVariant: "default" | "inline";
+    example: ReturnType<typeof useAutoSaveStoryValue>;
+  },
+): React.JSX.Element {
+  const { example, heading, editVariant, ...headingProps } = input;
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        {heading}
+      </div>
       <AutoSaveEditableHeading
         ariaLabel="Display name"
         editButtonLabel="Edit display name"
-        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
-        {...(input.headingClassName === undefined
+        {...(headingProps.errorMessage === undefined
           ? {}
-          : { headingClassName: input.headingClassName })}
-        value={value}
-        {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
-        {...(input.maxWidthClassName === undefined
+          : { errorMessage: headingProps.errorMessage })}
+        {...(headingProps.headingClassName === undefined
           ? {}
-          : { maxWidthClassName: input.maxWidthClassName })}
-        onSave={onSave}
-        placeholder={input.placeholder ?? "Display name"}
+          : { headingClassName: headingProps.headingClassName })}
+        value={example.value}
+        {...(headingProps.inputClassName === undefined
+          ? {}
+          : { inputClassName: headingProps.inputClassName })}
+        {...(headingProps.maxWidthClassName === undefined
+          ? {}
+          : { maxWidthClassName: headingProps.maxWidthClassName })}
+        onSave={example.onSave}
+        placeholder={headingProps.placeholder ?? "Display name"}
         validate={validateAutoSaveDisplayName}
+        editVariant={editVariant}
       />
-    </AutoSaveStoryFrame>
+    </div>
   );
 }
 

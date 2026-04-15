@@ -10,40 +10,57 @@ export function AutoSaveInputSurface(input: {
   placeholder?: string;
   disabled?: boolean;
   autoFocus?: boolean;
+  size?: number;
   inputClassName?: string;
+  variant?: "default" | "inline";
   errorMessage?: string;
   saveStatus?: AutoSaveInputVisualStatus;
+  idleTrailingAdornment?: React.ReactNode;
+  trailingAdornment?: React.ReactNode;
   onBlur?: () => void;
   onChange: (nextValue: string) => void;
   onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }): React.JSX.Element {
   const saveStatus = input.saveStatus ?? "idle";
   const showIndicator = saveStatus !== "idle" && input.errorMessage === undefined;
+  const showIdleAdornment = saveStatus === "idle" && input.errorMessage === undefined;
   const saveState = input.errorMessage === undefined ? saveStatus : "error";
+  const showTrailingAdornment = showIndicator || input.idleTrailingAdornment !== undefined;
 
   return (
-    <div className="space-y-2" data-save-state={saveState}>
-      <div className="relative">
-        <Input
-          aria-invalid={input.errorMessage === undefined ? undefined : true}
-          aria-label={input.ariaLabel}
-          autoFocus={input.autoFocus}
-          className={cn(showIndicator ? "pr-9" : null, input.inputClassName)}
-          disabled={input.disabled}
-          id={input.id}
-          onBlur={input.onBlur}
-          onChange={(event) => {
-            input.onChange(event.currentTarget.value);
-          }}
-          onKeyDown={input.onKeyDown}
-          placeholder={input.placeholder}
-          value={input.value}
-        />
-        {showIndicator ? (
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-            <AutoSaveInputIndicator status={saveStatus} />
-          </div>
-        ) : null}
+    <div className="group space-y-2" data-save-state={saveState}>
+      <div
+        className={cn("relative", showTrailingAdornment ? "flex items-center gap-2" : undefined)}
+      >
+        <div className={cn("relative", showTrailingAdornment ? "inline-flex min-w-0" : undefined)}>
+          <Input
+            aria-invalid={input.errorMessage === undefined ? undefined : true}
+            aria-label={input.ariaLabel}
+            autoFocus={input.autoFocus}
+            className={cn(showTrailingAdornment ? "pr-2" : null, input.inputClassName)}
+            disabled={input.disabled}
+            id={input.id}
+            onBlur={input.onBlur}
+            onChange={(event) => {
+              input.onChange(event.currentTarget.value);
+            }}
+            onKeyDown={input.onKeyDown}
+            placeholder={input.placeholder}
+            size={input.size}
+            variant={input.variant}
+            value={input.value}
+          />
+          {showIndicator ? (
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex w-2 items-center justify-center">
+              <AutoSaveInputIndicator status={saveStatus} />
+            </div>
+          ) : showIdleAdornment ? (
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex w-2 items-center justify-center transition-opacity group-hover:opacity-0 group-focus-within:opacity-0">
+              {input.idleTrailingAdornment}
+            </div>
+          ) : null}
+        </div>
+        {input.trailingAdornment === undefined ? null : input.trailingAdornment}
       </div>
       {input.errorMessage === undefined ? null : (
         <div aria-live="polite" role="status">

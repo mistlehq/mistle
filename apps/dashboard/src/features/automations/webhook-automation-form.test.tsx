@@ -212,7 +212,9 @@ describe("WebhookAutomationForm", () => {
     const currentForm = within(container);
 
     expect(currentForm.getByRole("textbox", { name: "Message Template" })).toBeDefined();
-    expect(currentForm.getByRole("textbox", { name: "Automation Instructions" })).toBeDefined();
+    expect(
+      currentForm.getByRole("textbox", { name: "Agent Instructions for Automation" }),
+    ).toBeDefined();
     const editors = container.querySelectorAll('[data-slot="agent-instructions-editor"]');
     const messageTemplateEditor = editors[0];
 
@@ -224,13 +226,16 @@ describe("WebhookAutomationForm", () => {
     expect(currentForm.queryByRole("heading", { name: "Message Template" })).toBeNull();
   });
 
-  it("renders triggers before the message template editor", () => {
+  it("renders triggers before the automation instructions editor and message template editor", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
 
     const currentForm = within(container);
     const [triggersHeading] = currentForm.getAllByRole("heading", { name: "Triggers" });
+    const automationInstructionsField = currentForm.getByRole("textbox", {
+      name: "Agent Instructions for Automation",
+    });
     const inputTemplateField = currentForm.getByRole("textbox", { name: "Message Template" });
 
     if (triggersHeading === undefined) {
@@ -239,11 +244,21 @@ describe("WebhookAutomationForm", () => {
 
     expect(
       Boolean(
-        triggersHeading.compareDocumentPosition(inputTemplateField) &
+        triggersHeading.compareDocumentPosition(automationInstructionsField) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
+    expect(
+      Boolean(
+        automationInstructionsField.compareDocumentPosition(inputTemplateField) &
         Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("Triggers")).toBeLessThan(
+      container.textContent?.indexOf("Agent Instructions for Automation") ??
+        Number.POSITIVE_INFINITY,
+    );
+    expect(container.textContent?.indexOf("Agent Instructions for Automation")).toBeLessThan(
       container.textContent?.indexOf("Message Template") ?? Number.POSITIVE_INFINITY,
     );
   });

@@ -396,6 +396,33 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <Field>
             <FieldHeader>
               <div className="space-y-1">
+                <FieldLabel id={instructionsLabelId}>Agent Instructions for Automation</FieldLabel>
+                <FieldDescription>
+                  Appended to the developer message when the automation is triggered.
+                </FieldDescription>
+              </div>
+            </FieldHeader>
+            <FieldContent>
+              <AgentInstructionsEditor
+                ariaLabelledBy={instructionsLabelId}
+                disabled={input.isDeleting || input.isSaving}
+                invalid={false}
+                onChange={(nextValue) => {
+                  input.onValueChange("instructions", nextValue);
+                }}
+                tokens={[]}
+                value={input.values.instructions}
+              />
+            </FieldContent>
+          </Field>
+        </div>
+      </FormPageSection>
+
+      <FormPageSection>
+        <div className="p-4">
+          <Field>
+            <FieldHeader>
+              <div className="space-y-1">
                 <FieldLabel id={inputTemplateLabelId}>Message Template</FieldLabel>
                 {hasSelectedTrigger ? (
                   <FieldDescription>
@@ -440,33 +467,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                     : undefined
                 }
                 className="text-right text-xs"
-              />
-            </FieldContent>
-          </Field>
-        </div>
-
-        <div className="border-t p-4">
-          <Field>
-            <FieldHeader>
-              <div className="space-y-1">
-                <FieldLabel id={instructionsLabelId}>Automation Instructions</FieldLabel>
-                <FieldDescription>
-                  Optional. These instructions apply only to this automation. Sandbox profile
-                  binding instructions still apply separately.
-                </FieldDescription>
-              </div>
-            </FieldHeader>
-            <FieldContent>
-              <AgentInstructionsEditor
-                ariaLabelledBy={instructionsLabelId}
-                disabled={input.isDeleting || input.isSaving}
-                invalid={false}
-                onChange={(nextValue) => {
-                  input.onValueChange("instructions", nextValue);
-                }}
-                placeholderText="Optional automation-specific instructions."
-                tokens={[]}
-                value={input.values.instructions}
               />
             </FieldContent>
           </Field>
