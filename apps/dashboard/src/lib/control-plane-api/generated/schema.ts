@@ -446,6 +446,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate: string;
+            instructions?: string | null;
             integrationWebhookSourceId: string;
             name: string;
             payloadFilter?: {
@@ -473,6 +474,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
+              instructions: string | null;
               integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
@@ -578,6 +580,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
+              instructions: string | null;
               integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
@@ -745,6 +748,7 @@ export interface paths {
             eventTypes?: string[] | null;
             idempotencyKeyTemplate?: string | null;
             inputTemplate?: string;
+            instructions?: string | null;
             integrationWebhookSourceId?: string;
             name?: string;
             payloadFilter?: {
@@ -772,6 +776,7 @@ export interface paths {
               id: string;
               idempotencyKeyTemplate: string | null;
               inputTemplate: string;
+              instructions: string | null;
               integrationWebhookSourceId: string;
               /** @enum {string} */
               kind: "webhook";
