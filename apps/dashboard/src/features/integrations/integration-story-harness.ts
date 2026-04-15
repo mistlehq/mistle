@@ -24,6 +24,14 @@ type StoryAuthMethodSpec = {
   variantId: string;
 };
 
+type StoryResolvedAuthMethod = {
+  authMethodId: string;
+  authMethodLabel: string;
+  definition: AnyIntegrationDefinition;
+  normalizedMethod: IntegrationConnectionMethod;
+  secretLabels: readonly string[];
+};
+
 function getDefinitionOrThrow(input: {
   familyId: string;
   variantId: string;
@@ -44,7 +52,7 @@ function getDefinitionOrThrow(input: {
   return definition;
 }
 
-function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec) {
+function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuthMethod {
   const definition = getDefinitionOrThrow({
     familyId: input.familyId,
     variantId: input.variantId,
@@ -63,7 +71,8 @@ function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec) {
     authMethodId: method.id,
     authMethodLabel: method.label,
     definition,
-    method,
+    normalizedMethod: normalizeStoryConnectionMethod(method),
+    secretLabels: method.kind === "form" ? method.secretFields.map((field) => field.label) : [],
   };
 }
 
@@ -77,6 +86,7 @@ function resolveStoryAuthFields(input: {
         label: string;
         value: string;
       }[];
+      authSecretLabels?: readonly string[];
       authMethodId: string;
       authMethodLabel: string;
     }
@@ -92,11 +102,9 @@ function resolveStoryAuthFields(input: {
   if (input.connectionConfig === undefined) {
     return {
       authFields: baseFields,
-      ...(resolvedAuthMethod.method.kind === "form"
-        ? {
-            authSecretLabels: resolvedAuthMethod.method.secretFields.map((field) => field.label),
-          }
-        : {}),
+      ...(resolvedAuthMethod.secretLabels.length === 0
+        ? {}
+        : { authSecretLabels: resolvedAuthMethod.secretLabels }),
       authMethodId: resolvedAuthMethod.authMethodId,
       authMethodLabel: resolvedAuthMethod.authMethodLabel,
     };
@@ -107,7 +115,7 @@ function resolveStoryAuthFields(input: {
       ...baseFields,
       ...resolveVisibleConnectionMethodConfigFields({
         connectionId: input.connectionId,
-        connectionMethod: normalizeStoryConnectionMethod(resolvedAuthMethod.method),
+        connectionMethod: resolvedAuthMethod.normalizedMethod,
         connectionConfig: input.connectionConfig,
         targetConfig: {},
         targetFamilyId: resolvedAuthMethod.definition.familyId,
@@ -115,11 +123,9 @@ function resolveStoryAuthFields(input: {
         targetVariantId: resolvedAuthMethod.definition.variantId,
       }),
     ],
-    ...(resolvedAuthMethod.method.kind === "form"
-      ? {
-          authSecretLabels: resolvedAuthMethod.method.secretFields.map((field) => field.label),
-        }
-      : {}),
+    ...(resolvedAuthMethod.secretLabels.length === 0
+      ? {}
+      : { authSecretLabels: resolvedAuthMethod.secretLabels }),
     authMethodId: resolvedAuthMethod.authMethodId,
     authMethodLabel: resolvedAuthMethod.authMethodLabel,
   };
