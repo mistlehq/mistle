@@ -88,7 +88,8 @@ describe("listSlackConnectionResources", () => {
                 {
                   id: "G_PRIVATE_1",
                   name: "secret-plans",
-                  is_channel: true,
+                  is_channel: false,
+                  is_group: true,
                   is_private: true,
                   is_archived: false,
                   is_im: false,
@@ -185,6 +186,7 @@ describe("listSlackConnectionResources", () => {
               isIm: false,
               isMpim: false,
               isChannel: true,
+              isGroup: false,
             },
           },
           {
@@ -200,6 +202,7 @@ describe("listSlackConnectionResources", () => {
               isIm: false,
               isMpim: false,
               isChannel: true,
+              isGroup: false,
             },
           },
           {
@@ -214,7 +217,8 @@ describe("listSlackConnectionResources", () => {
               isExtShared: false,
               isIm: false,
               isMpim: false,
-              isChannel: true,
+              isChannel: false,
+              isGroup: true,
             },
           },
         ],

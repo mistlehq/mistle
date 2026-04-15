@@ -18,6 +18,7 @@ const SlackConversationSchema = z.looseObject({
   id: z.string().min(1),
   name: z.string().min(1).optional(),
   is_channel: z.boolean().optional(),
+  is_group: z.boolean().optional(),
   is_private: z.boolean().optional(),
   is_archived: z.boolean().optional(),
   is_shared: z.boolean().optional(),
@@ -58,7 +59,7 @@ function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: st
 
 function isSelectableChannel(conversation: SlackConversation): boolean {
   return (
-    conversation.is_channel === true &&
+    (conversation.is_channel === true || conversation.is_group === true) &&
     conversation.is_archived !== true &&
     conversation.is_im !== true &&
     conversation.is_mpim !== true
@@ -83,6 +84,7 @@ function toDiscoveredChannelResource(
       isIm: conversation.is_im ?? false,
       isMpim: conversation.is_mpim ?? false,
       isChannel: conversation.is_channel ?? false,
+      isGroup: conversation.is_group ?? false,
     },
   };
 }
