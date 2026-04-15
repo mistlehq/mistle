@@ -58,8 +58,4 @@ export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTri
     eventType: "slack:group_rename",
     resourceKinds: ["channel"],
   },
-  {
-    eventType: "slack:group_name",
-    resourceKinds: ["channel"],
-  },
 ];
