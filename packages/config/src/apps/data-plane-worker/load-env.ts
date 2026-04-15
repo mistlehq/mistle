@@ -97,6 +97,12 @@ const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfi
     key: "tokenizerProxyEgressBaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
   },
+  {
+    key: "sandboxdTestFaultsEnabled",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED",
+    parse: (value) =>
+      parseBooleanEnv(value, "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED"),
+  },
 ]);
 
 export function loadDataPlaneWorkerFromEnv(

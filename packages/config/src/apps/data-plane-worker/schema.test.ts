@@ -28,6 +28,7 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
   it("parses E2B sandbox settings", () => {
     const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      sandboxdTestFaultsEnabled: true,
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.example.com",
@@ -38,12 +39,25 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
 
     expect(parsed).toEqual({
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      sandboxdTestFaultsEnabled: true,
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.example.com",
         cpuCount: 4,
         memoryMb: 16384,
       },
+    });
+  });
+
+  it("accepts the optional sandboxd test faults toggle", () => {
+    const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      sandboxdTestFaultsEnabled: true,
+    });
+
+    expect(parsed).toEqual({
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      sandboxdTestFaultsEnabled: true,
     });
   });
 });

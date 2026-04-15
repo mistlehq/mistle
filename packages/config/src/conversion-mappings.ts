@@ -466,6 +466,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_worker", "sandbox", "sandboxdTestFaultsEnabled"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "sandboxd_test_faults_enabled"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED",
+  },
+  {
     configPath: ["apps", "data_plane_worker", "sandbox", "docker", "socketPath"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "docker", "socket_path"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",

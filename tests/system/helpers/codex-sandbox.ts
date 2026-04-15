@@ -65,6 +65,14 @@ const ResumeSandboxInstanceAcceptedResponseSchema = z
   })
   .strict();
 
+const SandboxdFaultInjectionAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    component: z.literal("egress_proxy"),
+    action: z.literal("kill"),
+  })
+  .strict();
+
 const SandboxInstanceConnectionTokenResponseSchema = z
   .object({
     instanceId: z.string().min(1),
@@ -102,6 +110,13 @@ export type ConnectedCodexAgentSession = {
   close: () => Promise<void>;
   rpcClient: CodexJsonRpcClient;
   sessionClient: AgentStreamClient;
+};
+
+export type SandboxExecResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  truncated: boolean;
 };
 
 const InternalAuthServiceTokenHeader = "x-mistle-service-token";
@@ -234,6 +249,61 @@ export async function killRawCodexAppServer(input: {
       `raw Codex app-server kill failed with exit code ${String(result.exitCode)}. stdout=${result.stdout} stderr=${result.stderr}`,
     );
   }
+}
+
+export async function runSandboxExecCommandInSandbox(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+  command: string;
+  args?: string[];
+  cwd?: string;
+  timeoutMs?: number;
+}): Promise<SandboxExecResult> {
+  const connectionUrl = await mintSandboxConnectionUrl({
+    fixture: input.fixture,
+    authenticatedSession: input.authenticatedSession,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+
+  return runSandboxExecCommand({
+    connectionUrl,
+    command: input.command,
+    ...(input.args === undefined ? {} : { args: input.args }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+  });
+}
+
+export async function triggerSandboxdEgressProxyKill(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<z.infer<typeof SandboxdFaultInjectionAcceptedResponseSchema>> {
+  const result = await runSandboxExecCommandInSandbox({
+    fixture: input.fixture,
+    authenticatedSession: input.authenticatedSession,
+    sandboxInstanceId: input.sandboxInstanceId,
+    command: "curl",
+    args: ["-fsS", "-X", "POST", "http://127.0.0.1:3901/__faults/components/egress-proxy/kill"],
+    timeoutMs: 30_000,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `sandboxd egress proxy kill failed with exit code ${String(result.exitCode)}. stdout=${result.stdout} stderr=${result.stderr}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(
+      `sandboxd egress proxy kill returned invalid JSON: ${error instanceof Error ? error.message : String(error)}. stdout=${result.stdout}`,
+    );
+  }
+
+  return SandboxdFaultInjectionAcceptedResponseSchema.parse(parsed);
 }
 
 export async function readSandboxHealthz(input: {
@@ -635,12 +705,7 @@ async function runSandboxExecCommand(input: {
   args?: string[];
   cwd?: string;
   timeoutMs?: number;
-}): Promise<{
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-  truncated: boolean;
-}> {
+}): Promise<SandboxExecResult> {
   const transport = new SandboxSessionTransport({
     runtime: createNodeSandboxSessionRuntime(),
   });

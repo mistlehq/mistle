@@ -6,6 +6,7 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
   "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
+const SandboxdTestFaultsEnabledEnv = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
 
 export function createSandboxRuntimeEnv(input: {
   config: DataPlaneWorkerRuntimeConfig;
@@ -15,6 +16,11 @@ export function createSandboxRuntimeEnv(input: {
     [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
       input.config.app.sandbox.tokenizerProxyEgressBaseUrl,
     [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
+    ...(input.config.app.sandbox.sandboxdTestFaultsEnabled === true
+      ? {
+          [SandboxdTestFaultsEnabledEnv]: "1",
+        }
+      : {}),
   };
 }
 

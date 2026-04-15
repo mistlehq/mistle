@@ -70,6 +70,7 @@ const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) 
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
+    sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
   })
@@ -78,6 +79,7 @@ export const DataPlaneWorkerSandboxConfigSchema = z
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
+    sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.partial().optional(),
   })

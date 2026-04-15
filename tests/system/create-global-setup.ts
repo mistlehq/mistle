@@ -20,6 +20,8 @@ const AUTH_ORIGIN = "http://localhost:5100";
 const INTERNAL_AUTH_SERVICE_TOKEN = "system-internal-service-token";
 const DATA_PLANE_GATEWAY_IDLE_TIMEOUT_MS = 20_000;
 const DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS = 8_000;
+const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
+  "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED";
 const TestContextId = "system";
 
 function createTelemetryEnvironmentOverrides(input: {
@@ -83,7 +85,6 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       controlPlaneApiEnvironment: telemetryEnvironmentOverrides,
       controlPlaneWorkerEnvironment: telemetryEnvironmentOverrides,
       dataPlaneApiEnvironment: telemetryEnvironmentOverrides,
-      dataPlaneWorkerEnvironment: telemetryEnvironmentOverrides,
       dataPlaneGatewayEnvironment: {
         ...telemetryEnvironmentOverrides,
         MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: String(
@@ -92,6 +93,10 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
         MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: String(
           DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS,
         ),
+      },
+      dataPlaneWorkerEnvironment: {
+        ...telemetryEnvironmentOverrides,
+        [SANDBOXD_TEST_FAULTS_ENABLED_ENV]: "true",
       },
       tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
     });

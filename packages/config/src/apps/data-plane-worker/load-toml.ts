@@ -20,6 +20,7 @@ export function loadDataPlaneWorkerFromToml(
 
   const sandboxConfig: Record<string, unknown> = {
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
+    sandboxdTestFaultsEnabled: sandbox.sandboxd_test_faults_enabled,
   };
 
   if (hasEntries(sandboxDocker)) {
