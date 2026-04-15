@@ -133,6 +133,10 @@ export function IntegrationConnectionDetailView(
     throw new Error("Expected at least one integration connection.");
   }
 
+  const selectedWebhookSourceState = props.webhookSourceStateByConnectionId?.get(
+    selectedConnection.id,
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="md:hidden">
@@ -195,20 +199,38 @@ export function IntegrationConnectionDetailView(
         <div className="min-w-0 md:pl-8">
           <ConnectionDetailPane
             connection={selectedConnection}
-            onCreateWebhookSource={props.onCreateWebhookSource}
-            onDeleteConnection={props.onDeleteConnection}
-            onDeleteWebhookSource={props.onDeleteWebhookSource}
-            onEditApiKey={props.onEditApiKey}
-            onEditConnection={props.onEditConnection}
-            onRefreshResource={props.onRefreshResource}
-            onStartGitHubAppInstallation={props.onStartGitHubAppInstallation}
-            resourceItemsByKey={props.resourceItemsByKey}
-            showCreateWebhookSource={props.showCreateWebhookSource}
-            showWebhookSources={props.showWebhookSources}
-            titleEditor={props.titleEditor}
-            webhookSourceState={
-              props.webhookSourceStateByConnectionId?.get(selectedConnection.id) ?? undefined
-            }
+            {...(props.onCreateWebhookSource === undefined
+              ? {}
+              : { onCreateWebhookSource: props.onCreateWebhookSource })}
+            {...(props.onDeleteConnection === undefined
+              ? {}
+              : { onDeleteConnection: props.onDeleteConnection })}
+            {...(props.onDeleteWebhookSource === undefined
+              ? {}
+              : { onDeleteWebhookSource: props.onDeleteWebhookSource })}
+            {...(props.onEditApiKey === undefined ? {} : { onEditApiKey: props.onEditApiKey })}
+            {...(props.onEditConnection === undefined
+              ? {}
+              : { onEditConnection: props.onEditConnection })}
+            {...(props.onRefreshResource === undefined
+              ? {}
+              : { onRefreshResource: props.onRefreshResource })}
+            {...(props.onStartGitHubAppInstallation === undefined
+              ? {}
+              : { onStartGitHubAppInstallation: props.onStartGitHubAppInstallation })}
+            {...(props.resourceItemsByKey === undefined
+              ? {}
+              : { resourceItemsByKey: props.resourceItemsByKey })}
+            {...(props.showCreateWebhookSource === undefined
+              ? {}
+              : { showCreateWebhookSource: props.showCreateWebhookSource })}
+            {...(props.showWebhookSources === undefined
+              ? {}
+              : { showWebhookSources: props.showWebhookSources })}
+            {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
+            {...(selectedWebhookSourceState === undefined
+              ? {}
+              : { webhookSourceState: selectedWebhookSourceState })}
           />
         </div>
       </div>

@@ -3365,6 +3365,10 @@
                   "displayName": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "config": {
+                    "type": "object",
+                    "additionalProperties": {}
                   }
                 },
                 "required": ["displayName"],
@@ -3485,19 +3489,42 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_UPDATE_CONNECTION_INPUT",
+                            "FORM_CONNECTION_REQUIRED",
+                            "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -3555,7 +3582,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",

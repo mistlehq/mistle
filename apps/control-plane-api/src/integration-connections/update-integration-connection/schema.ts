@@ -4,7 +4,10 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionsNotFoundCodes } from "../constants.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
 
 export const UpdateIntegrationConnectionParamsSchema = z
   .object({
@@ -15,11 +18,24 @@ export const UpdateIntegrationConnectionParamsSchema = z
 export const UpdateIntegrationConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
+    config: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 
-export const UpdateIntegrationConnectionBadRequestResponseSchema = ValidationErrorResponseSchema;
+export const UpdateIntegrationConnectionBadRequestResponseSchema = z.union([
+  createCodeMessageErrorSchema(
+    z.enum([
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_REQUIRED,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+    ]),
+  ),
+  ValidationErrorResponseSchema,
+]);
 
 export const UpdateIntegrationConnectionNotFoundResponseSchema = createCodeMessageErrorSchema(
-  z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND),
+  z.enum([
+    IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
+    IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+  ]),
 );

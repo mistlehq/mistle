@@ -1077,6 +1077,9 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            config?: {
+              [key: string]: unknown;
+            };
             displayName: string;
           };
         };
@@ -1126,11 +1129,20 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "FORM_CONNECTION_REQUIRED"
+                    | "FORM_CONNECTION_METHOD_NOT_SUPPORTED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
           };
         };
         /** @description Authentication is required. */
@@ -1167,7 +1179,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "CONNECTION_NOT_FOUND";
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
               message: string;
             };
           };

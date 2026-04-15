@@ -114,9 +114,12 @@ export function useIntegrationConnectionEditorState(
       cancelDeviceAuthorizationAttempt(mutationInput),
   });
 
-  const updateConnectionMetadataMutation = useMutation({
-    mutationFn: async (mutationInput: { connectionId: string; displayName: string }) =>
-      updateIntegrationConnection(mutationInput),
+  const updateConnectionMutation = useMutation({
+    mutationFn: async (mutationInput: {
+      connectionId: string;
+      displayName: string;
+      config?: Record<string, unknown>;
+    }) => updateIntegrationConnection(mutationInput),
   });
 
   const updateFormMutation = useMutation({
@@ -138,7 +141,7 @@ export function useIntegrationConnectionEditorState(
     createFormMutation.isPending ||
     startDeviceAuthorizationMutation.isPending ||
     startRedirectMutation.isPending ||
-    updateConnectionMetadataMutation.isPending ||
+    updateConnectionMutation.isPending ||
     updateFormMutation.isPending;
   const closePending = submitPending || cancelDeviceAuthorizationMutation.isPending;
 
@@ -333,9 +336,10 @@ export function useIntegrationConnectionEditorState(
     }
 
     if (editor.mode === "update") {
-      await updateConnectionMetadataMutation.mutateAsync({
+      await updateConnectionMutation.mutateAsync({
         connectionId: editor.connectionId,
         displayName: normalizedConnectionDisplayName,
+        ...(configForm.mode === "form" ? { config: draft.configValue } : {}),
       });
 
       await queryClient.invalidateQueries({

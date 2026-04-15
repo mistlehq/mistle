@@ -1,5 +1,10 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
-import { IntegrationCredentialSecretKinds, integrationTargets } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionStatuses,
+  IntegrationCredentialSecretKinds,
+  integrationConnections,
+  integrationTargets,
+} from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   IntegrationRegistry,
@@ -12,8 +17,10 @@ import { z } from "zod";
 import { createApp } from "../src/app.js";
 import { createControlPlaneAuth } from "../src/auth/index.js";
 import { CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/complete-oauth2-authorization-code-connection/schema.js";
+import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
+import { UpdateIntegrationConnectionBodySchema } from "../src/integration-connections/update-integration-connection/schema.js";
 import {
   decryptCredentialUtf8,
   decryptRedirectSessionSecretUtf8,
@@ -205,6 +212,99 @@ function decryptStoredCredential(input: {
 }
 
 describe("integration connections OAuth 2.0 authorization-code integration", () => {
+  it("updates redirect connection config without touching the connection method", async ({
+    fixture,
+  }) => {
+    const targetKey = "oauth2-update-default";
+    const registry = createOAuth2AuthorizationCodeTestRegistry({
+      startAuthorization: async () => ({
+        authorizationUrl: "https://provider.example.test/authorize",
+        providerState: {},
+      }),
+      completeAuthorizationCodeGrant: async () => ({
+        externalSubjectId: "oauth-subject-001",
+        connectionConfig: {
+          region: "us",
+        },
+        accessToken: "oauth-access-token",
+        refreshToken: "oauth-refresh-token",
+        expiresAt: "2026-04-15T00:30:00.000Z",
+      }),
+      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
+    });
+    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
+      fixture,
+      registry,
+    });
+
+    try {
+      await fixture.db.insert(integrationTargets).values({
+        targetKey,
+        familyId: OAuth2AuthorizationCodeTestFamilyId,
+        variantId: OAuth2AuthorizationCodeTestVariantId,
+        enabled: true,
+        config: {},
+      });
+
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-connections-update-redirect@example.com",
+      });
+
+      await fixture.db.insert(integrationConnections).values({
+        id: "icn_oauth_update_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey,
+        displayName: "SigNoz Hosted",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        externalSubjectId: "oauth-subject-001",
+        config: {
+          connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          region: "us",
+        },
+        createdAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:00:00.000Z",
+      });
+
+      const response = await app.request("/v1/integration/connections/icn_oauth_update_001", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify(
+          UpdateIntegrationConnectionBodySchema.parse({
+            displayName: "SigNoz EU",
+            config: {
+              region: "eu",
+            },
+          }),
+        ),
+      });
+
+      expect(response.status).toBe(200);
+      const updatedConnection = IntegrationConnectionSchema.parse(await response.json());
+      expect(updatedConnection.displayName).toBe("SigNoz EU");
+      expect(updatedConnection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        region: "eu",
+      });
+
+      const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.id, "icn_oauth_update_001"),
+            eq(table.organizationId, authenticatedSession.organizationId),
+          ),
+      });
+      expect(persistedConnection?.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        region: "eu",
+      });
+    } finally {
+      await stopAppResources(resources);
+    }
+  });
+
   it("returns 400 when a target does not support OAuth 2.0 (Authorization Code) start", async ({
     fixture,
   }) => {

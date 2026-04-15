@@ -134,6 +134,63 @@ function openAiCreateEditorInput() {
   };
 }
 
+function signozRedirectUpdateEditorInput() {
+  return {
+    mode: "update" as const,
+    connectionId: "icn_signoz_001",
+    connectionDisplayName: "SigNoz Hosted",
+    connectionConfig: {
+      connection_method: "oauth2-authorization-code",
+      region: "us",
+    },
+    currentMethod: {
+      id: "oauth2-authorization-code",
+      label: "SigNoz OAuth",
+      kind: "redirect" as const,
+      ui: {
+        create: {
+          submitLabel: "Connect SigNoz",
+          helperText: "Authorize SigNoz hosted MCP access.",
+        },
+      },
+    },
+    targetConfig: {},
+    targetDisplayName: "SigNoz",
+    targetFamilyId: "signoz",
+    targetKey: "signoz-mcp",
+    targetVariantId: "signoz-mcp",
+  };
+}
+
+function openAiFormUpdateEditorInput() {
+  return {
+    mode: "update" as const,
+    connectionId: "icn_openai_001",
+    connectionDisplayName: "OpenAI Primary",
+    connectionConfig: {
+      connection_method: "api-key",
+    },
+    currentMethod: {
+      id: "api-key",
+      label: "API key",
+      kind: "form" as const,
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password" as const,
+          slotKey: "openai.openai-default.api-key.api-key",
+        },
+      ],
+    },
+    targetConfig: {},
+    targetDisplayName: "OpenAI",
+    targetFamilyId: "openai",
+    targetKey: "openai-default",
+    targetVariantId: "openai-default",
+  };
+}
+
 afterEach(async () => {
   await cleanupTestQueryClients();
   resetDashboardConfigForTest();
@@ -400,6 +457,146 @@ describe("useIntegrationConnectionEditorState", () => {
         pathname:
           "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel",
         body: null,
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("persists redirect config changes during update", async () => {
+    const server = await startControlPlaneTestServer({
+      handler: (request) => {
+        if (
+          request.method === "PUT" &&
+          request.pathname === "/v1/integration/connections/icn_signoz_001"
+        ) {
+          return {
+            status: 200,
+            body: {
+              id: "icn_signoz_001",
+              targetKey: "signoz-mcp",
+              displayName: "SigNoz EU",
+              status: "active",
+              config: {
+                connection_method: "oauth2-authorization-code",
+                region: "eu",
+              },
+              createdAt: "2026-04-15T00:00:00.000Z",
+              updatedAt: "2026-04-15T00:01:00.000Z",
+            },
+          };
+        }
+
+        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+      },
+    });
+
+    try {
+      setControlPlaneOrigin(server.origin);
+      const queryClient = createTestQueryClient();
+      const { result } = renderHook(
+        () =>
+          useIntegrationConnectionEditorState({
+            initialEditorInput: signozRedirectUpdateEditorInput(),
+            queryKey: ["integrations"],
+          }),
+        {
+          wrapper: createWrapper(queryClient),
+        },
+      );
+
+      act(() => {
+        result.current.onConnectionDisplayNameChange("SigNoz EU");
+      });
+      act(() => {
+        result.current.onConfigChange({
+          connection_method: "oauth2-authorization-code",
+          region: "eu",
+        });
+      });
+      act(() => {
+        result.current.submitEditor();
+      });
+
+      await waitFor(() => {
+        expect(server.requests).toEqual([
+          {
+            method: "PUT",
+            pathname: "/v1/integration/connections/icn_signoz_001",
+            body: {
+              displayName: "SigNoz EU",
+              config: {
+                connection_method: "oauth2-authorization-code",
+                region: "eu",
+              },
+            },
+          },
+        ]);
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("does not send form secrets during update when the user leaves them blank", async () => {
+    const server = await startControlPlaneTestServer({
+      handler: (request) => {
+        if (
+          request.method === "PUT" &&
+          request.pathname === "/v1/integration/connections/icn_openai_001/form"
+        ) {
+          return {
+            status: 200,
+            body: {
+              id: "icn_openai_001",
+              targetKey: "openai-default",
+              displayName: "OpenAI Renamed",
+              status: "active",
+              config: {
+                connection_method: "api-key",
+              },
+              createdAt: "2026-04-15T00:00:00.000Z",
+              updatedAt: "2026-04-15T00:01:00.000Z",
+            },
+          };
+        }
+
+        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+      },
+    });
+
+    try {
+      setControlPlaneOrigin(server.origin);
+      const queryClient = createTestQueryClient();
+      const { result } = renderHook(
+        () =>
+          useIntegrationConnectionEditorState({
+            initialEditorInput: openAiFormUpdateEditorInput(),
+            queryKey: ["integrations"],
+          }),
+        {
+          wrapper: createWrapper(queryClient),
+        },
+      );
+
+      act(() => {
+        result.current.onConnectionDisplayNameChange("OpenAI Renamed");
+      });
+      act(() => {
+        result.current.submitEditor();
+      });
+
+      await waitFor(() => {
+        expect(server.requests).toEqual([
+          {
+            method: "PUT",
+            pathname: "/v1/integration/connections/icn_openai_001/form",
+            body: {
+              displayName: "OpenAI Renamed",
+              config: {},
+            },
+          },
+        ]);
       });
     } finally {
       await server.close();

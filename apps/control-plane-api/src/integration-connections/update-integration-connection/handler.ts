@@ -11,17 +11,20 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
   const { connectionId } = ctx.req.valid("param");
-  const { displayName } = ctx.req.valid("json");
+  const { displayName, config } = ctx.req.valid("json");
 
   const updatedConnection = await updateIntegrationConnection(
     {
       db,
+      integrationRegistry,
     },
     {
       organizationId: session.activeOrganizationId,
       connectionId,
       displayName,
+      ...(config === undefined ? {} : { config }),
     },
   );
 

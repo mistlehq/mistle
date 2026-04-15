@@ -73,6 +73,7 @@ export async function createApiKeyIntegrationConnection(input: {
 export async function updateIntegrationConnection(input: {
   connectionId: string;
   displayName: string;
+  config?: Record<string, unknown>;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
@@ -81,6 +82,7 @@ export async function updateIntegrationConnection(input: {
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}`,
       body: {
         displayName: input.displayName,
+        ...(input.config === undefined ? {} : { config: input.config }),
       },
       fallbackMessage: "Could not update integration connection.",
     });
