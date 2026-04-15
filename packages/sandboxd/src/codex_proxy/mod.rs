@@ -14,7 +14,7 @@ mod proxy_session;
 mod session_manager;
 mod types;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::ErrorKind;
 use std::sync::{Arc, Mutex, mpsc};
@@ -246,8 +246,44 @@ impl CodexProxy {
             .take()
             .expect("Codex proxy runtime thread should exist");
         let close_result = match runtime_thread.join() {
-            Ok(result) => result,
-            Err(_) => Err(CodexProxyError::RuntimePanicked),
+            Ok(result) => {
+                if let Err(error) = &result {
+                    let error_text = error.to_string();
+                    self.supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::CodexProxy,
+                        error_text.clone(),
+                    );
+                    self.supervisor_handle.emit_component_exited(
+                        SupervisedComponent::CodexProxy,
+                        "runtime_thread_returned",
+                        Some(&error_text),
+                        &[(
+                            "exitKind",
+                            Value::String("runtime_thread_returned".to_string()),
+                        )],
+                    );
+                }
+                result
+            }
+            Err(_) => {
+                self.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::CodexProxy,
+                    "Codex proxy runtime thread panicked",
+                );
+                self.supervisor_handle.emit_component_exited(
+                    SupervisedComponent::CodexProxy,
+                    "panic",
+                    Some("Codex proxy runtime thread panicked"),
+                    &[
+                        ("exitKind", Value::String("panic".to_string())),
+                        (
+                            "panicBoundary",
+                            Value::String("runtime_thread".to_string()),
+                        ),
+                    ],
+                );
+                Err(CodexProxyError::RuntimePanicked)
+            }
         };
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::CodexProxy);
@@ -285,7 +321,6 @@ pub fn start_codex_proxy_with_supervisor(
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<CodexProxy, CodexProxyError> {
-    supervisor_handle.mark_component_starting(SupervisedComponent::CodexProxy);
     let listen_url = Url::parse(proxy_listen_url)
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
     if listen_url.scheme() != "ws" {
@@ -312,6 +347,14 @@ pub fn start_codex_proxy_with_supervisor(
             url: raw_app_server_url.to_string(),
         });
     }
+    supervisor_handle.replace_component_details(
+        SupervisedComponent::CodexProxy,
+        BTreeMap::from([
+            ("listenAddr".to_string(), proxy_listen_url.to_string()),
+            ("rawTarget".to_string(), raw_app_server_url.to_string()),
+        ]),
+    );
+    supervisor_handle.mark_component_starting(SupervisedComponent::CodexProxy);
 
     let listener_address = format!("{listen_host}:{listen_port}");
     let (shutdown_sender, shutdown_receiver) = watch::channel(false);
@@ -341,13 +384,76 @@ pub fn start_codex_proxy_with_supervisor(
     let listen_url = match startup_result_receiver.recv() {
         Ok(Ok(listen_url)) => listen_url,
         Ok(Err(error)) => {
+            let error_text = error.to_string();
+            supervisor_handle.mark_component_restarting(
+                SupervisedComponent::CodexProxy,
+                error_text.clone(),
+            );
+            supervisor_handle.emit_component_exited(
+                SupervisedComponent::CodexProxy,
+                "runtime_thread_returned",
+                Some(&error_text),
+                &[(
+                    "exitKind",
+                    Value::String("runtime_thread_returned".to_string()),
+                )],
+            );
             let _ = runtime_thread.join();
             return Err(error);
         }
         Err(_) => match runtime_thread.join() {
-            Ok(Err(error)) => return Err(error),
-            Ok(Ok(())) => return Err(CodexProxyError::SessionPanicked),
-            Err(_) => return Err(CodexProxyError::RuntimePanicked),
+            Ok(Err(error)) => {
+                let error_text = error.to_string();
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::CodexProxy,
+                    error_text.clone(),
+                );
+                supervisor_handle.emit_component_exited(
+                    SupervisedComponent::CodexProxy,
+                    "runtime_thread_returned",
+                    Some(&error_text),
+                    &[(
+                        "exitKind",
+                        Value::String("runtime_thread_returned".to_string()),
+                    )],
+                );
+                return Err(error);
+            }
+            Ok(Ok(())) => {
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::CodexProxy,
+                    "Codex proxy runtime exited before startup completed",
+                );
+                supervisor_handle.emit_component_exited(
+                    SupervisedComponent::CodexProxy,
+                    "runtime_thread_returned",
+                    Some("Codex proxy runtime exited before startup completed"),
+                    &[(
+                        "exitKind",
+                        Value::String("runtime_thread_returned".to_string()),
+                    )],
+                );
+                return Err(CodexProxyError::SessionPanicked);
+            }
+            Err(_) => {
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::CodexProxy,
+                    "Codex proxy runtime thread panicked",
+                );
+                supervisor_handle.emit_component_exited(
+                    SupervisedComponent::CodexProxy,
+                    "panic",
+                    Some("Codex proxy runtime thread panicked"),
+                    &[
+                        ("exitKind", Value::String("panic".to_string())),
+                        (
+                            "panicBoundary",
+                            Value::String("runtime_thread".to_string()),
+                        ),
+                    ],
+                );
+                return Err(CodexProxyError::RuntimePanicked);
+            }
         },
     };
     supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);

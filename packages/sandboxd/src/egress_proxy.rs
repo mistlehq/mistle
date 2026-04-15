@@ -30,6 +30,7 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use serde_json::Value;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
@@ -137,8 +138,6 @@ impl EgressProxy {
             return Ok(None);
         }
 
-        supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-
         let routes = runtime_plan
             .egress_routes
             .iter()
@@ -171,6 +170,16 @@ impl EgressProxy {
                 "failed to inspect local egress proxy address: {error}"
             ))
         })?;
+        supervisor_handle.replace_component_details(
+            SupervisedComponent::EgressProxy,
+            BTreeMap::from([
+                ("listenAddr".to_string(), listener_address.to_string()),
+                (
+                    "stablePort".to_string(),
+                    listener_address.port().to_string(),
+                ),
+            ]),
+        );
 
         let mut http_connector = HttpConnector::new();
         http_connector.enforce_http(false);
@@ -193,15 +202,16 @@ impl EgressProxy {
             clock,
         };
 
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let server_thread =
-            thread::spawn(move || run_proxy_server(std_listener, shutdown_rx, state));
-
         let runtime_env = build_managed_proxy_env(
             listener_address,
             Path::new(RUNTIME_PROXY_CA_CERT_PATH),
             tokenizer_proxy_egress_base_url,
         )?;
+
+        supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let server_thread =
+            thread::spawn(move || run_proxy_server(std_listener, shutdown_rx, state));
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
         Ok(Some(Self {
@@ -229,8 +239,39 @@ impl EgressProxy {
         if let Some(server_thread) = self.server_thread.take() {
             match server_thread.join() {
                 Ok(Ok(())) => {}
-                Ok(Err(error)) => return Err(error),
-                Err(_) => return Err(EgressProxyError::new("local egress proxy thread panicked")),
+                Ok(Err(error)) => {
+                    let error_text = error.to_string();
+                    self.supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::EgressProxy,
+                        error_text.clone(),
+                    );
+                    self.supervisor_handle.emit_component_exited(
+                        SupervisedComponent::EgressProxy,
+                        "thread_returned",
+                        Some(&error_text),
+                        &[("exitKind", Value::String("thread_returned".to_string()))],
+                    );
+                    return Err(error);
+                }
+                Err(_) => {
+                    self.supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::EgressProxy,
+                        "local egress proxy thread panicked",
+                    );
+                    self.supervisor_handle.emit_component_exited(
+                        SupervisedComponent::EgressProxy,
+                        "panic",
+                        Some("local egress proxy thread panicked"),
+                        &[
+                            ("exitKind", Value::String("panic".to_string())),
+                            (
+                                "panicBoundary",
+                                Value::String("proxy_thread".to_string()),
+                            ),
+                        ],
+                    );
+                    return Err(EgressProxyError::new("local egress proxy thread panicked"));
+                }
             }
         }
 

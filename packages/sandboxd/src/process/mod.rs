@@ -160,6 +160,10 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         if is_codex_app_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
         {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::CodexAppServer,
+                codex_app_server_details(process_spec, None),
+            );
             supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
         }
         let mut process = start_runtime_client_process(process_spec).map_err(|error| {
@@ -184,6 +188,10 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         if is_codex_app_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
         {
+            supervisor_handle.replace_component_details(
+                SupervisedComponent::CodexAppServer,
+                codex_app_server_details(process_spec, Some(process.child.id())),
+            );
             supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
         }
 
@@ -218,6 +226,20 @@ impl RuntimeClientProcessManager {
 
 fn is_codex_app_server_process(process_spec: &RuntimeClientProcessSpec) -> bool {
     process_spec.process_key == "codex-app-server"
+}
+
+fn codex_app_server_details(
+    process_spec: &RuntimeClientProcessSpec,
+    pid: Option<u32>,
+) -> BTreeMap<String, String> {
+    let mut details = BTreeMap::from([("processKey".to_string(), process_spec.process_key.clone())]);
+    if let RuntimeClientProcessReadiness::Ws { url, .. } = &process_spec.readiness {
+        details.insert("readinessUrl".to_string(), url.clone());
+    }
+    if let Some(pid) = pid {
+        details.insert("pid".to_string(), pid.to_string());
+    }
+    details
 }
 
 /// Merges client-wide environment variables with any process-local overrides.

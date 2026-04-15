@@ -51,7 +51,9 @@ use crate::pty::{
     PtySpawnRequest, start_scoped_pty_session,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
-use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+use crate::supervision::{
+    SandboxdSupervisorHandle, SupervisedComponent, encode_forwarded_lifecycle_event_log_line,
+};
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -340,6 +342,13 @@ impl TunnelSession {
     ) -> Result<Self, TunnelSessionError> {
         let sandbox_instance_id =
             derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        supervisor_handle.replace_component_details(
+            SupervisedComponent::TunnelSession,
+            BTreeMap::from([(
+                "gatewayWsUrl".to_string(),
+                startup_input.tunnel_gateway_ws_url.clone(),
+            )]),
+        );
         supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
         let attachment_root = PathBuf::from(DEFAULT_ATTACHMENT_ROOT);
         fs::create_dir_all(&attachment_root)
@@ -349,6 +358,7 @@ impl TunnelSession {
         let (startup_result_sender, startup_result_receiver) = std::sync::mpsc::channel();
         let thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
+            let thread_supervisor_handle = supervisor_handle.clone();
             let cgroup_root = PathBuf::from(DEFAULT_CGROUP_ROOT);
             let runtime = TunnelSessionRuntime {
                 keepalive_manager,
@@ -358,11 +368,14 @@ impl TunnelSession {
                 cgroup_root,
                 attachment_root,
                 sandbox_instance_id,
+                gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
                 shutdown_requested,
                 clock,
                 sleeper,
+                supervisor_handle: supervisor_handle.clone(),
             };
             let connected_url = startup_input.tunnel_gateway_ws_url.clone();
+            let panic_connected_url = connected_url.clone();
             let bootstrap_token = startup_input.bootstrap_token.clone();
             let tunnel_exchange_token = startup_input.tunnel_exchange_token.clone();
             move || match panic::catch_unwind(AssertUnwindSafe(move || {
@@ -376,25 +389,41 @@ impl TunnelSession {
 
                 let startup_result_sender = startup_result_sender;
                 runtime_builder.block_on(async move {
-                    let result = run_tunnel_supervisor(
+                    run_tunnel_supervisor(
                         runtime,
                         &connected_url,
                         &bootstrap_token,
                         &tunnel_exchange_token,
                         startup_result_sender,
                     )
-                    .await;
-                    if let Err(error) = &result {
-                        eprintln!("sandboxd bootstrap tunnel session exited: {error}");
-                    }
-                    result
+                    .await
                 })
             })) {
                 Ok(result) => result,
                 Err(payload) => {
-                    eprintln!(
-                        "sandboxd bootstrap tunnel session panicked: {}",
-                        format_panic_payload(payload.as_ref())
+                    let panic_text = format_panic_payload(payload.as_ref());
+                    thread_supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::TunnelSession,
+                        panic_text.clone(),
+                    );
+                    update_tunnel_supervision_details(
+                        &thread_supervisor_handle,
+                        &panic_connected_url,
+                        Some("tunnel_thread_panic"),
+                        None,
+                        None,
+                    );
+                    thread_supervisor_handle.emit_component_exited(
+                        SupervisedComponent::TunnelSession,
+                        "panic",
+                        Some(&panic_text),
+                        &[
+                            ("exitKind", Value::String("panic".to_string())),
+                            (
+                                "panicBoundary",
+                                Value::String("tunnel_thread".to_string()),
+                            ),
+                        ],
                     );
                     Err(TunnelSessionError::SessionPanicked)
                 }
@@ -412,7 +441,6 @@ impl TunnelSession {
                 return Err(TunnelSessionError::SessionPanicked);
             }
         }
-        supervisor_handle.mark_component_healthy(SupervisedComponent::TunnelSession);
 
         Ok(Self {
             shutdown_requested,
@@ -432,11 +460,34 @@ impl TunnelSession {
         match thread.join() {
             Ok(Ok(())) => {}
             Ok(Err(error)) => {
-                eprintln!("sandboxd bootstrap tunnel close observed session error: {error}");
+                let error_text = error.to_string();
+                self.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    error_text.clone(),
+                );
+                self.supervisor_handle.emit_component_exited(
+                    SupervisedComponent::TunnelSession,
+                    "thread_returned",
+                    Some(&error_text),
+                    &[("exitKind", Value::String("thread_returned".to_string()))],
+                );
             }
             Err(_) => {
-                eprintln!(
-                    "sandboxd bootstrap tunnel close observed a panicked session thread"
+                self.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    "tunnel session thread panicked",
+                );
+                self.supervisor_handle.emit_component_exited(
+                    SupervisedComponent::TunnelSession,
+                    "panic",
+                    Some("tunnel session thread panicked"),
+                    &[
+                        ("exitKind", Value::String("panic".to_string())),
+                        (
+                            "panicBoundary",
+                            Value::String("tunnel_thread".to_string()),
+                        ),
+                    ],
                 );
             }
         }
@@ -471,9 +522,11 @@ struct TunnelSessionRuntime {
     cgroup_root: PathBuf,
     attachment_root: PathBuf,
     sandbox_instance_id: String,
+    gateway_ws_url: String,
     shutdown_requested: Arc<AtomicBool>,
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 struct TunnelSessionLoopContext<'a> {
     agent_endpoint_url: Option<&'a str>,
@@ -481,8 +534,10 @@ struct TunnelSessionLoopContext<'a> {
     cgroup_root: &'a Path,
     runtime_env: &'a BTreeMap<String, String>,
     sandbox_instance_id: &'a str,
+    gateway_ws_url: &'a str,
     clock: &'a dyn Clock,
     sleeper: &'a dyn Sleeper,
+    supervisor_handle: &'a SandboxdSupervisorHandle,
 }
 
 struct TunnelSessionMutableState {
@@ -525,9 +580,27 @@ async fn run_tunnel_supervisor(
     {
         Ok(value) => value,
         Err(startup_error) => {
-            eprintln!("sandboxd initial tunnel connect failed: {startup_error}");
+            let startup_error_text = startup_error.to_string();
+            update_tunnel_supervision_details(
+                &runtime.supervisor_handle,
+                gateway_ws_url,
+                Some("bootstrap_connect_failed"),
+                Some(1),
+                None,
+            );
+            runtime.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                startup_error_text.clone(),
+            );
+            runtime.supervisor_handle.emit_component_healthcheck_failed(
+                SupervisedComponent::TunnelSession,
+                "bootstrap_connect_failed",
+                startup_error_text.clone(),
+                "bootstrap_connection",
+                &[],
+            );
             let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
-                startup_error.to_string(),
+                startup_error_text,
             )));
             return Err(startup_error);
         }
@@ -549,12 +622,9 @@ async fn run_tunnel_supervisor(
     loop {
         match session_result.outcome {
             ConnectedTunnelSessionOutcome::ShutdownRequested => {
-                eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
                 return Ok(());
             }
-            ConnectedTunnelSessionOutcome::RestartRequired => {
-                eprintln!("sandboxd bootstrap connected session requested restart");
-            }
+            ConnectedTunnelSessionOutcome::RestartRequired => {}
         }
 
         let Some(reconnected_socket) = reconnect_bootstrap_tunnel(
@@ -591,9 +661,29 @@ async fn run_connected_tunnel_session_catching_panics(
     {
         Ok(result) => result,
         Err(payload) => {
-            eprintln!(
-                "sandboxd bootstrap connected session panicked and will restart: {}",
-                format_panic_payload(payload.as_ref())
+            let panic_text = format_panic_payload(payload.as_ref());
+            update_tunnel_supervision_details(
+                &runtime.supervisor_handle,
+                &runtime.gateway_ws_url,
+                Some("connected_session_panic"),
+                None,
+                None,
+            );
+            runtime.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                panic_text.clone(),
+            );
+            runtime.supervisor_handle.emit_component_exited(
+                SupervisedComponent::TunnelSession,
+                "panic",
+                Some(&panic_text),
+                &[
+                    ("exitKind", Value::String("panic".to_string())),
+                    (
+                        "panicBoundary",
+                        Value::String("connected_session".to_string()),
+                    ),
+                ],
             );
             let startup_completed = startup_completed.load(Ordering::Relaxed);
             if let Some(startup_result_sender) = startup_result_sender
@@ -645,7 +735,24 @@ async fn run_connected_tunnel_session(
         Ok(frames) => frames,
         Err(error) => {
             let error = TunnelSessionError::AttachTelemetry(error.to_string());
-            eprintln!("sandboxd bootstrap connected session failed before entering the event loop: {error}");
+            let error_text = error.to_string();
+            update_tunnel_supervision_details(
+                &runtime.supervisor_handle,
+                &runtime.gateway_ws_url,
+                Some("telemetry_attach_failed"),
+                None,
+                None,
+            );
+            runtime.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                error.to_string(),
+            );
+            runtime.supervisor_handle.emit_component_exited(
+                SupervisedComponent::TunnelSession,
+                "thread_returned",
+                Some(&error_text),
+                &[("exitKind", Value::String("thread_returned".to_string()))],
+            );
             mark_tunnel_disconnected(runtime);
             if let Some(startup_result_sender) = startup_result_sender {
                 let _ = startup_result_sender.send(Err(error));
@@ -659,13 +766,35 @@ async fn run_connected_tunnel_session(
     match send_telemetry_frames(&tunnel_writer_sender, telemetry_frames) {
         Ok(()) => {
             mark_tunnel_connected(runtime);
+            forward_supervisor_lifecycle_events(
+                &runtime.supervisor_handle,
+                &mut session_state.telemetry_relay,
+                &tunnel_writer_sender,
+            );
             if let Some(startup_result_sender) = startup_result_sender {
                 let _ = startup_result_sender.send(Ok(()));
             }
             startup_completed.store(true, Ordering::Relaxed);
         }
         Err(error) => {
-            eprintln!("sandboxd bootstrap connected session failed before entering the event loop: {error}");
+            let error_text = error.to_string();
+            update_tunnel_supervision_details(
+                &runtime.supervisor_handle,
+                &runtime.gateway_ws_url,
+                Some("telemetry_open_failed"),
+                None,
+                None,
+            );
+            runtime.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                error.to_string(),
+            );
+            runtime.supervisor_handle.emit_component_exited(
+                SupervisedComponent::TunnelSession,
+                "thread_returned",
+                Some(&error_text),
+                &[("exitKind", Value::String("thread_returned".to_string()))],
+            );
             mark_tunnel_disconnected(runtime);
             if let Some(startup_result_sender) = startup_result_sender {
                 let _ = startup_result_sender.send(Err(error));
@@ -684,8 +813,10 @@ async fn run_connected_tunnel_session(
         cgroup_root: &runtime.cgroup_root,
         runtime_env: &runtime.runtime_env,
         sandbox_instance_id: &runtime.sandbox_instance_id,
+        gateway_ws_url: &runtime.gateway_ws_url,
         clock: runtime.clock.as_ref(),
         sleeper: runtime.sleeper.as_ref(),
+        supervisor_handle: &runtime.supervisor_handle,
     };
 
     loop {
@@ -694,8 +825,23 @@ async fn run_connected_tunnel_session(
             loop_context.cgroup_root,
             loop_context.sandbox_instance_id,
         ) {
-            eprintln!(
-                "sandboxd bootstrap connected session will restart after error: {error}"
+            let error_text = error.to_string();
+            update_tunnel_supervision_details(
+                loop_context.supervisor_handle,
+                loop_context.gateway_ws_url,
+                Some("pty_keepalive_sync_failed"),
+                None,
+                None,
+            );
+            loop_context.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                error_text.clone(),
+            );
+            loop_context.supervisor_handle.emit_component_exited(
+                SupervisedComponent::TunnelSession,
+                "thread_returned",
+                Some(&error_text),
+                &[("exitKind", Value::String("thread_returned".to_string()))],
             );
             mark_tunnel_disconnected(runtime);
             return ConnectedTunnelSessionResult {
@@ -713,9 +859,24 @@ async fn run_connected_tunnel_session(
                 let payload = match serde_json::to_string(&state) {
                     Ok(payload) => payload,
                     Err(error) => {
-                        eprintln!(
-                            "sandboxd bootstrap connected session will restart after error: {}",
-                            TunnelSessionError::PublishKeepalive(error)
+                        let publish_error = TunnelSessionError::PublishKeepalive(error);
+                        let publish_error_text = publish_error.to_string();
+                        update_tunnel_supervision_details(
+                            loop_context.supervisor_handle,
+                            loop_context.gateway_ws_url,
+                            Some("keepalive_publish_failed"),
+                            None,
+                            None,
+                        );
+                        loop_context.supervisor_handle.mark_component_restarting(
+                            SupervisedComponent::TunnelSession,
+                            publish_error_text.clone(),
+                        );
+                        loop_context.supervisor_handle.emit_component_exited(
+                            SupervisedComponent::TunnelSession,
+                            "thread_returned",
+                            Some(&publish_error_text),
+                            &[("exitKind", Value::String("thread_returned".to_string()))],
                         );
                         mark_tunnel_disconnected(runtime);
                         return ConnectedTunnelSessionResult {
@@ -725,8 +886,23 @@ async fn run_connected_tunnel_session(
                     }
                 };
                 if let Err(error) = write_tunnel_text(&tunnel_writer_sender, payload) {
-                    eprintln!(
-                        "sandboxd bootstrap connected session will restart after error: {error}"
+                    let error_text = error.to_string();
+                    update_tunnel_supervision_details(
+                        loop_context.supervisor_handle,
+                        loop_context.gateway_ws_url,
+                        Some("keepalive_publish_failed"),
+                        None,
+                        None,
+                    );
+                    loop_context.supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::TunnelSession,
+                        error_text.clone(),
+                    );
+                    loop_context.supervisor_handle.emit_component_exited(
+                        SupervisedComponent::TunnelSession,
+                        "thread_returned",
+                        Some(&error_text),
+                        &[("exitKind", Value::String("thread_returned".to_string()))],
                     );
                     mark_tunnel_disconnected(runtime);
                     return ConnectedTunnelSessionResult {
@@ -746,9 +922,24 @@ async fn run_connected_tunnel_session(
                 let payload = match serde_json::to_string(&state) {
                     Ok(payload) => payload,
                     Err(error) => {
-                        eprintln!(
-                            "sandboxd bootstrap connected session will restart after error: {}",
-                            TunnelSessionError::PublishRuntimeReady(error)
+                        let publish_error = TunnelSessionError::PublishRuntimeReady(error);
+                        let publish_error_text = publish_error.to_string();
+                        update_tunnel_supervision_details(
+                            loop_context.supervisor_handle,
+                            loop_context.gateway_ws_url,
+                            Some("runtime_readiness_publish_failed"),
+                            None,
+                            None,
+                        );
+                        loop_context.supervisor_handle.mark_component_restarting(
+                            SupervisedComponent::TunnelSession,
+                            publish_error_text.clone(),
+                        );
+                        loop_context.supervisor_handle.emit_component_exited(
+                            SupervisedComponent::TunnelSession,
+                            "thread_returned",
+                            Some(&publish_error_text),
+                            &[("exitKind", Value::String("thread_returned".to_string()))],
                         );
                         mark_tunnel_disconnected(runtime);
                         return ConnectedTunnelSessionResult {
@@ -758,8 +949,23 @@ async fn run_connected_tunnel_session(
                     }
                 };
                 if let Err(error) = write_tunnel_text(&tunnel_writer_sender, payload) {
-                    eprintln!(
-                        "sandboxd bootstrap connected session will restart after error: {error}"
+                    let error_text = error.to_string();
+                    update_tunnel_supervision_details(
+                        loop_context.supervisor_handle,
+                        loop_context.gateway_ws_url,
+                        Some("runtime_readiness_publish_failed"),
+                        None,
+                        None,
+                    );
+                    loop_context.supervisor_handle.mark_component_restarting(
+                        SupervisedComponent::TunnelSession,
+                        error_text.clone(),
+                    );
+                    loop_context.supervisor_handle.emit_component_exited(
+                        SupervisedComponent::TunnelSession,
+                        "thread_returned",
+                        Some(&error_text),
+                        &[("exitKind", Value::String("thread_returned".to_string()))],
                     );
                     mark_tunnel_disconnected(runtime);
                     return ConnectedTunnelSessionResult {
@@ -818,7 +1024,13 @@ async fn run_connected_tunnel_session(
         )
         .await
         {
-            Ok(TunnelSessionControlFlow::Continue) => {}
+            Ok(TunnelSessionControlFlow::Continue) => {
+                forward_supervisor_lifecycle_events(
+                    loop_context.supervisor_handle,
+                    &mut session_state.telemetry_relay,
+                    &tunnel_writer_sender,
+                );
+            }
             Ok(TunnelSessionControlFlow::RestartRequired) => {
                 mark_tunnel_disconnected(runtime);
                 return ConnectedTunnelSessionResult {
@@ -827,8 +1039,23 @@ async fn run_connected_tunnel_session(
                 };
             }
             Err(error) => {
-                eprintln!(
-                    "sandboxd bootstrap connected session will restart after error: {error}"
+                let error_text = error.to_string();
+                update_tunnel_supervision_details(
+                    loop_context.supervisor_handle,
+                    loop_context.gateway_ws_url,
+                    Some("connected_session_event_loop_failed"),
+                    None,
+                    None,
+                );
+                loop_context.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    error_text.clone(),
+                );
+                loop_context.supervisor_handle.emit_component_exited(
+                    SupervisedComponent::TunnelSession,
+                    "thread_returned",
+                    Some(&error_text),
+                    &[("exitKind", Value::String("thread_returned".to_string()))],
                 );
                 mark_tunnel_disconnected(runtime);
                 return ConnectedTunnelSessionResult {
@@ -839,6 +1066,23 @@ async fn run_connected_tunnel_session(
         }
     }
 
+    update_tunnel_supervision_details(
+        &runtime.supervisor_handle,
+        &runtime.gateway_ws_url,
+        Some("event_channel_closed"),
+        None,
+        None,
+    );
+    runtime.supervisor_handle.mark_component_restarting(
+        SupervisedComponent::TunnelSession,
+        "bootstrap event channel closed".to_string(),
+    );
+    runtime.supervisor_handle.emit_component_exited(
+        SupervisedComponent::TunnelSession,
+        "thread_returned",
+        Some("bootstrap event channel closed"),
+        &[("exitKind", Value::String("thread_returned".to_string()))],
+    );
     mark_tunnel_disconnected(runtime);
     ConnectedTunnelSessionResult {
         outcome: ConnectedTunnelSessionOutcome::RestartRequired,
@@ -867,6 +1111,16 @@ fn mark_tunnel_connected(runtime: &TunnelSessionRuntime) {
             poisoned_manager.into_inner().on_tunnel_connected();
         }
     }
+    update_tunnel_supervision_details(
+        &runtime.supervisor_handle,
+        &runtime.gateway_ws_url,
+        None,
+        None,
+        None,
+    );
+    runtime
+        .supervisor_handle
+        .mark_component_healthy(SupervisedComponent::TunnelSession);
 }
 
 fn mark_tunnel_disconnected(runtime: &TunnelSessionRuntime) {
@@ -913,12 +1167,20 @@ async fn reconnect_bootstrap_tunnel(
 
     loop {
         if runtime.shutdown_requested.load(Ordering::Relaxed) {
-            eprintln!("sandboxd bootstrap tunnel supervisor exiting due to shutdown request");
             return Ok(None);
         }
 
         let attempt_number = attempt_index + 1;
-        eprintln!("sandboxd bootstrap reconnect attempt started: attempt={attempt_number}");
+        update_tunnel_supervision_details(
+            &runtime.supervisor_handle,
+            &runtime.gateway_ws_url,
+            Some("restart_attempt"),
+            Some(attempt_number),
+            None,
+        );
+        runtime
+            .supervisor_handle
+            .mark_component_starting(SupervisedComponent::TunnelSession);
         match exchange_tunnel_token(
             tunnel_exchange_client,
             token_exchange_url,
@@ -932,30 +1194,92 @@ async fn reconnect_bootstrap_tunnel(
                     resolve_bootstrap_tunnel_url(gateway_ws_url, exchange.bootstrap_token.as_str())?;
                 match connect_bootstrap_websocket(connected_url.as_str()).await {
                     Ok((bootstrap_socket, _)) => {
-                        eprintln!("sandboxd bootstrap reconnect succeeded");
                         return Ok(Some(bootstrap_socket));
                     }
                     Err(error) => {
-                        eprintln!(
-                            "sandboxd bootstrap reconnect websocket connect failed and will retry: {error}"
+                        update_tunnel_supervision_details(
+                            &runtime.supervisor_handle,
+                            &runtime.gateway_ws_url,
+                            Some("bootstrap_connect_failed"),
+                            Some(attempt_number),
+                            None,
+                        );
+                        runtime.supervisor_handle.mark_component_restarting(
+                            SupervisedComponent::TunnelSession,
+                            error.to_string(),
+                        );
+                        runtime.supervisor_handle.emit_component_healthcheck_failed(
+                            SupervisedComponent::TunnelSession,
+                            "bootstrap_connect_failed",
+                            error.to_string(),
+                            "bootstrap_connection",
+                            &[],
                         );
                     }
                 }
             }
             TunnelExchangeOutcome::Retryable(error) => {
-                eprintln!("sandboxd bootstrap token exchange failed and will retry: {error}");
+                update_tunnel_supervision_details(
+                    &runtime.supervisor_handle,
+                    &runtime.gateway_ws_url,
+                    Some("token_exchange_failed"),
+                    Some(attempt_number),
+                    None,
+                );
+                runtime.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    error.clone(),
+                );
+                runtime.supervisor_handle.emit_component_healthcheck_failed(
+                    SupervisedComponent::TunnelSession,
+                    "token_exchange_failed",
+                    error,
+                    "bootstrap_connection",
+                    &[],
+                );
             }
             TunnelExchangeOutcome::Terminal(error) => {
-                eprintln!("sandboxd bootstrap token exchange failed terminally: {error}");
+                update_tunnel_supervision_details(
+                    &runtime.supervisor_handle,
+                    &runtime.gateway_ws_url,
+                    Some("token_exchange_terminal"),
+                    Some(attempt_number),
+                    None,
+                );
+                runtime.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    error.clone(),
+                );
+                runtime.supervisor_handle.emit_component_healthcheck_failed(
+                    SupervisedComponent::TunnelSession,
+                    "token_exchange_terminal",
+                    error,
+                    "bootstrap_connection",
+                    &[],
+                );
                 mark_tunnel_disconnected(runtime);
                 return Ok(None);
             }
         }
 
         mark_tunnel_disconnected(runtime);
+        let backoff_ms = reconnect_backoff_ms(attempt_index);
+        update_tunnel_supervision_details(
+            &runtime.supervisor_handle,
+            &runtime.gateway_ws_url,
+            Some("retry_after_failure"),
+            Some(attempt_number),
+            Some(backoff_ms),
+        );
+        runtime.supervisor_handle.emit_component_restart_scheduled(
+            SupervisedComponent::TunnelSession,
+            "retry_after_failure",
+            backoff_ms,
+            &[],
+        );
         runtime
             .sleeper
-            .sleep(Duration::from_millis(reconnect_backoff_ms(attempt_index)));
+            .sleep(Duration::from_millis(backoff_ms));
         attempt_index = attempt_index.saturating_add(1);
     }
 }
@@ -964,6 +1288,61 @@ fn reconnect_backoff_ms(attempt_index: usize) -> u64 {
     *TUNNEL_RECONNECT_BACKOFF_MS
         .get(attempt_index)
         .unwrap_or_else(|| TUNNEL_RECONNECT_BACKOFF_MS.last().expect("backoff list should not be empty"))
+}
+
+fn forward_supervisor_lifecycle_events(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    telemetry_relay: &mut TelemetryRelay,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+) {
+    for line in supervisor_handle.drain_forwarded_lifecycle_event_lines() {
+        let forwarded_line = match encode_forwarded_lifecycle_event_log_line(&line) {
+            Ok(forwarded_line) => forwarded_line,
+            Err(error) => {
+                eprintln!("sandboxd failed to encode forwarded lifecycle telemetry: {error}");
+                continue;
+            }
+        };
+        let frames = match telemetry_relay.enqueue_log_line(&forwarded_line) {
+            Ok(frames) => frames,
+            Err(error) => {
+                eprintln!("sandboxd failed to queue supervisor lifecycle telemetry: {error}");
+                continue;
+            }
+        };
+        if let Err(error) = send_telemetry_frames(tunnel_writer_sender, frames) {
+            eprintln!("sandboxd failed to publish supervisor lifecycle telemetry: {error}");
+        }
+    }
+}
+
+fn update_tunnel_supervision_details(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    gateway_ws_url: &str,
+    last_reconnect_reason: Option<&str>,
+    reconnect_attempt: Option<usize>,
+    reconnect_backoff_ms: Option<u64>,
+) {
+    let mut details = BTreeMap::from([("gatewayWsUrl".to_string(), gateway_ws_url.to_string())]);
+    if let Some(last_reconnect_reason) = last_reconnect_reason {
+        details.insert(
+            "lastReconnectReason".to_string(),
+            last_reconnect_reason.to_string(),
+        );
+    }
+    if let Some(reconnect_attempt) = reconnect_attempt {
+        details.insert(
+            "reconnectAttempt".to_string(),
+            reconnect_attempt.to_string(),
+        );
+    }
+    if let Some(reconnect_backoff_ms) = reconnect_backoff_ms {
+        details.insert(
+            "reconnectBackoffMs".to_string(),
+            reconnect_backoff_ms.to_string(),
+        );
+    }
+    supervisor_handle.replace_component_details(SupervisedComponent::TunnelSession, details);
 }
 
 async fn exchange_tunnel_token(
@@ -1871,7 +2250,24 @@ async fn handle_tunnel_session_event(
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
-            eprintln!("sandboxd bootstrap tunnel closed: {reason_text}");
+            update_tunnel_supervision_details(
+                context.supervisor_handle,
+                context.gateway_ws_url,
+                Some("bootstrap_closed"),
+                None,
+                None,
+            );
+            context.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                reason_text.clone(),
+            );
+            context.supervisor_handle.emit_component_healthcheck_failed(
+                SupervisedComponent::TunnelSession,
+                "bootstrap_closed",
+                reason_text,
+                "bootstrap_connection",
+                &[],
+            );
             Ok(TunnelSessionControlFlow::RestartRequired)
         }
         TunnelSessionEvent::Wake => {
@@ -3473,7 +3869,7 @@ mod tests {
         run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
     };
 
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
     use std::io::{Read, Write};
     use std::net::{TcpListener, TcpStream};
@@ -3498,6 +3894,7 @@ mod tests {
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
+    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
@@ -3518,6 +3915,17 @@ mod tests {
         fn request_panic(&self) {
             self.panic_requested.store(true, Ordering::Relaxed);
         }
+    }
+
+    fn test_tunnel_supervisor_handle(
+        sandbox_instance_id: &str,
+        clock: Arc<dyn Clock>,
+    ) -> SandboxdSupervisorHandle {
+        SandboxdSupervisorHandle::new(
+            sandbox_instance_id,
+            clock,
+            BTreeSet::from([SupervisedComponent::TunnelSession]),
+        )
     }
 
     impl Clock for PanicClock {
@@ -3557,14 +3965,17 @@ mod tests {
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
         let context = TunnelSessionLoopContext {
             agent_endpoint_url: None,
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
             sleeper: &sleeper,
+            supervisor_handle: &supervisor_handle,
         };
 
         handle_tunnel_session_event(
@@ -4471,7 +4882,8 @@ mod tests {
                     .into(),
                 ))
                 .expect("gateway should send an unsupported bootstrap control message");
-            let dropped_control_message = read_telemetry_log_line(&mut websocket);
+            let dropped_control_message =
+                read_telemetry_log_line_with_event(&mut websocket, "bootstrap_control_message_dropped");
             assert_eq!(
                 dropped_control_message["event"],
                 "bootstrap_control_message_dropped"
@@ -4488,7 +4900,8 @@ mod tests {
             websocket
                 .send(Message::Binary(vec![0x01, 0x02, 0x03].into()))
                 .expect("gateway should send an invalid bootstrap data frame");
-            let dropped_data_frame = read_telemetry_log_line(&mut websocket);
+            let dropped_data_frame =
+                read_telemetry_log_line_with_event(&mut websocket, "bootstrap_data_frame_dropped");
             assert_eq!(dropped_data_frame["event"], "bootstrap_data_frame_dropped");
             assert_eq!(dropped_data_frame["level"], "warn");
             assert_eq!(
@@ -4854,6 +5267,8 @@ mod tests {
                             .expect("shutdown control payload should be valid json");
                         assert_eq!(message["type"], "telemetry.close");
                     }
+                    Ok(Message::Binary(payload))
+                        if decode_telemetry_data_frame(payload.as_ref()).is_ok() => {}
                     Ok(Message::Close(_))
                     | Err(WebSocketError::ConnectionClosed)
                     | Err(WebSocketError::Protocol(_)) => break,
@@ -4957,6 +5372,8 @@ mod tests {
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let panic_clock = Arc::new(PanicClock::default());
         let shutdown_requested = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let supervisor_handle =
+            test_tunnel_supervisor_handle("sbi_tunnel_session", panic_clock.clone());
         let runtime = TunnelSessionRuntime {
             keepalive_manager,
             runtime_readiness_manager,
@@ -4965,9 +5382,11 @@ mod tests {
             cgroup_root: PathBuf::from(crate::cgroups::DEFAULT_CGROUP_ROOT),
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_tunnel_session".to_string(),
+            gateway_ws_url: bootstrap_url.clone(),
             shutdown_requested,
             clock: panic_clock.clone(),
             sleeper: Arc::new(ThreadSleeper),
+            supervisor_handle,
         };
         let connected_url = resolve_bootstrap_tunnel_url(&bootstrap_url, "bootstrap-token-initial")
             .expect("bootstrap websocket URL should be derivable");
@@ -5094,6 +5513,8 @@ mod tests {
                             .expect("shutdown control payload should be valid json");
                         assert_eq!(message["type"], "telemetry.close");
                     }
+                    Ok(Message::Binary(payload))
+                        if decode_telemetry_data_frame(payload.as_ref()).is_ok() => {}
                     Ok(Message::Close(_))
                     | Err(WebSocketError::ConnectionClosed)
                     | Err(WebSocketError::Protocol(_)) => break,
@@ -7192,14 +7613,23 @@ mod tests {
     where
         S: std::io::Read + std::io::Write,
     {
-        let Message::Text(payload) = socket
-            .read()
-            .expect("websocket should receive one text message")
-        else {
-            panic!("expected websocket text message");
-        };
-
-        serde_json::from_str(payload.as_str()).expect("text payload should be valid json")
+        loop {
+            match socket
+                .read()
+                .expect("websocket should receive one text message")
+            {
+                Message::Text(payload) => {
+                    return serde_json::from_str(payload.as_str())
+                        .expect("text payload should be valid json");
+                }
+                Message::Binary(payload)
+                    if decode_telemetry_data_frame(payload.as_ref()).is_ok() =>
+                {
+                    continue;
+                }
+                _ => panic!("expected websocket text message"),
+            }
+        }
     }
 
     fn read_stream_text_message<S>(socket: &mut WebSocket<S>) -> Value
@@ -7446,6 +7876,18 @@ mod tests {
                         .expect("telemetry frame should contain one json log line");
                 }
                 _ => panic!("expected websocket binary telemetry frame"),
+            }
+        }
+    }
+
+    fn read_telemetry_log_line_with_event<S>(socket: &mut WebSocket<S>, expected_event: &str) -> Value
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            let message = read_telemetry_log_line(socket);
+            if message["event"] == Value::String(expected_event.to_string()) {
+                return message;
             }
         }
     }
