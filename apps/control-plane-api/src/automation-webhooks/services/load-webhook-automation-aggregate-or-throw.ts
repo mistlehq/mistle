@@ -15,6 +15,7 @@ export type AutomationWebhookAggregate = {
   eventTypes: string[] | null;
   payloadFilter: Record<string, unknown> | null;
   inputTemplate: string;
+  instructions: string | null;
   conversationKeyTemplate: string;
   idempotencyKeyTemplate: string | null;
   target: {
@@ -77,6 +78,7 @@ export async function loadWebhookAutomationAggregateOrThrow(
     eventTypes: webhookAutomation.eventTypes,
     payloadFilter: webhookAutomation.payloadFilter,
     inputTemplate: webhookAutomation.inputTemplate,
+    instructions: webhookAutomation.instructions,
     conversationKeyTemplate: webhookAutomation.conversationKeyTemplate,
     idempotencyKeyTemplate: webhookAutomation.idempotencyKeyTemplate,
     target: {

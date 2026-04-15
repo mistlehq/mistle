@@ -14,6 +14,7 @@ export const CreateAutomationWebhookBodySchema = z
     eventTypes: z.array(z.string().min(1)).min(1).nullable().optional(),
     payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
     inputTemplate: z.string().min(1),
+    instructions: z.string().min(1).nullable().optional(),
     conversationKeyTemplate: z.string().min(1),
     idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
     target: z

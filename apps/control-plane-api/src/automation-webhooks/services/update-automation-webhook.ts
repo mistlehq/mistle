@@ -26,6 +26,7 @@ export type UpdateWebhookAutomationInput = {
   eventTypes?: string[] | null | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
   inputTemplate?: string | undefined;
+  instructions?: string | null | undefined;
   conversationKeyTemplate?: string | undefined;
   idempotencyKeyTemplate?: string | null | undefined;
   target?:
@@ -163,6 +164,10 @@ async function updateWebhookConfigRow(
 
   if (input.inputTemplate !== undefined) {
     nextValues.inputTemplate = input.inputTemplate;
+  }
+
+  if (input.instructions !== undefined) {
+    nextValues.instructions = input.instructions;
   }
 
   if (input.conversationKeyTemplate !== undefined) {

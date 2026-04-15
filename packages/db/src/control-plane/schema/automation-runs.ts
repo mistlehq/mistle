@@ -43,6 +43,7 @@ export const automationRuns = controlPlaneSchema.table(
     renderedInput: text("rendered_input"),
     renderedConversationKey: text("rendered_conversation_key"),
     renderedIdempotencyKey: text("rendered_idempotency_key"),
+    instructions: text("instructions"),
     status: text("status")
       .notNull()
       .$type<AutomationRunStatus>()

@@ -16,6 +16,7 @@ export const webhookAutomations = controlPlaneSchema.table(
     eventTypes: jsonb("event_types").$type<string[]>(),
     payloadFilter: jsonb("payload_filter").$type<Record<string, unknown>>(),
     inputTemplate: text("input_template").notNull(),
+    instructions: text("instructions"),
     conversationKeyTemplate: text("conversation_key_template").notNull(),
     idempotencyKeyTemplate: text("idempotency_key_template"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

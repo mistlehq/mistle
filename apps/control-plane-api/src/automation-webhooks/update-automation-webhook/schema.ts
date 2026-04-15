@@ -14,6 +14,7 @@ export const UpdateAutomationWebhookBodySchema = z
     eventTypes: z.array(z.string().min(1)).min(1).nullable().optional(),
     payloadFilter: z.record(z.string(), z.unknown()).nullable().optional(),
     inputTemplate: z.string().min(1).optional(),
+    instructions: z.string().min(1).nullable().optional(),
     conversationKeyTemplate: z.string().min(1).optional(),
     idempotencyKeyTemplate: z.string().min(1).nullable().optional(),
     target: z
@@ -40,6 +41,7 @@ export const UpdateAutomationWebhookBodySchema = z
       value.eventTypes !== undefined ||
       value.payloadFilter !== undefined ||
       value.inputTemplate !== undefined ||
+      value.instructions !== undefined ||
       value.conversationKeyTemplate !== undefined ||
       value.idempotencyKeyTemplate !== undefined ||
       value.target !== undefined,

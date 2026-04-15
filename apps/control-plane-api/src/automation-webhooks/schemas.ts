@@ -50,6 +50,7 @@ export const AutomationWebhookSchema = z
     eventTypes: z.array(z.string().min(1)).nullable(),
     payloadFilter: z.record(z.string(), z.unknown()).nullable(),
     inputTemplate: z.string().min(1),
+    instructions: z.string().min(1).nullable(),
     conversationKeyTemplate: z.string().min(1),
     idempotencyKeyTemplate: z.string().min(1).nullable(),
     target: AutomationWebhookTargetSchema,

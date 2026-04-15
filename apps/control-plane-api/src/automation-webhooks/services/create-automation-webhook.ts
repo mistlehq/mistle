@@ -25,6 +25,7 @@ export type CreateWebhookAutomationInput = {
   eventTypes?: string[] | null | undefined;
   payloadFilter?: Record<string, unknown> | null | undefined;
   inputTemplate: string;
+  instructions?: string | null | undefined;
   conversationKeyTemplate: string;
   idempotencyKeyTemplate?: string | null | undefined;
   target: {
@@ -123,6 +124,7 @@ async function createAutomationAggregate(
     eventTypes: input.eventTypes ?? null,
     payloadFilter: input.payloadFilter ?? null,
     inputTemplate: input.inputTemplate,
+    instructions: input.instructions ?? null,
     conversationKeyTemplate: input.conversationKeyTemplate,
     idempotencyKeyTemplate: input.idempotencyKeyTemplate ?? null,
   });

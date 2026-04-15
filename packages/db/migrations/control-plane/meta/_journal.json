@@ -64,6 +64,13 @@
       "when": 1775808000000,
       "tag": "0008_add-integration-connection-device-authorization-attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776246304382,
+      "tag": "0009_add-webhook-automation-instructions",
+      "breakpoints": true
     }
   ]
 }

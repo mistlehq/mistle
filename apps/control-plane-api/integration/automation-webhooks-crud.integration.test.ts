@@ -90,6 +90,7 @@ describe("automation webhooks CRUD integration", () => {
         },
       },
       inputTemplate: "Handle {{payload.comment.body}}",
+      instructions: "Prefer concise triage summaries.",
       conversationKeyTemplate: "{{payload.issue.node_id}}",
       idempotencyKeyTemplate: "{{payload.comment.node_id}}",
       target: {
@@ -121,6 +122,7 @@ describe("automation webhooks CRUD integration", () => {
         value: "created",
       },
     });
+    expect(body.instructions).toBe("Prefer concise triage summaries.");
     expect(body.target.sandboxProfileId).toBe("sbp_webhook_create_001");
     expect(body.target.sandboxProfileVersion).toBe(3);
 
@@ -151,6 +153,7 @@ describe("automation webhooks CRUD integration", () => {
         value: "created",
       },
     });
+    expect(persistedWebhook.instructions).toBe("Prefer concise triage summaries.");
 
     const persistedTargets = await fixture.db.query.automationTargets.findMany({
       where: (table, { eq }) => eq(table.automationId, body.id),
@@ -223,6 +226,7 @@ describe("automation webhooks CRUD integration", () => {
 
     expect(response.status).toBe(201);
     const body = AutomationWebhookSchema.parse(await response.json());
+    expect(body.instructions).toBeNull();
     expect(body.target.sandboxProfileVersion).toBe(5);
 
     const persistedTarget = await fixture.db.query.automationTargets.findFirst({
@@ -833,6 +837,7 @@ describe("automation webhooks CRUD integration", () => {
     const getBody = AutomationWebhookSchema.parse(await getResponse.json());
     expect(getBody.name).toBe("Before");
     expect(getBody.integrationWebhookSourceId).toBe("iws_webhook_update_001");
+    expect(getBody.instructions).toBe("Prefer deterministic reproduction steps.");
     expect(getBody.target.sandboxProfileVersion).toBe(7);
 
     const patchResponse = await fixture.request("/v1/automations/webhooks/atm_webhook_update_001", {
@@ -848,6 +853,7 @@ describe("automation webhooks CRUD integration", () => {
         target: {
           sandboxProfileId: "sbp_webhook_update_001",
         },
+        instructions: null,
         idempotencyKeyTemplate: null,
       }),
     });
@@ -856,6 +862,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(patchBody.name).toBe("After");
     expect(patchBody.enabled).toBe(false);
     expect(patchBody.integrationWebhookSourceId).toBe("iws_webhook_update_002");
+    expect(patchBody.instructions).toBeNull();
     expect(patchBody.idempotencyKeyTemplate).toBeNull();
     expect(patchBody.target.sandboxProfileVersion).toBe(7);
     expect(patchBody.updatedAt).not.toBe("2026-02-05T00:00:00.000Z");
@@ -867,6 +874,7 @@ describe("automation webhooks CRUD integration", () => {
       throw new Error("Expected updated webhook config row.");
     }
     expect(persistedWebhook.inputTemplate).toBe("Handle payload");
+    expect(persistedWebhook.instructions).toBeNull();
     expect(persistedWebhook.conversationKeyTemplate).toBe("{{payload.issue.node_id}}");
     expect(persistedWebhook.idempotencyKeyTemplate).toBeNull();
 
@@ -1155,6 +1163,7 @@ describe("automation webhooks CRUD integration", () => {
       eventTypes: ["issue_comment.created"],
       payloadFilter: null,
       inputTemplate: "Handle payload",
+      instructions: null,
       conversationKeyTemplate: "{{payload.issue.node_id}}",
       idempotencyKeyTemplate: null,
     });
@@ -1404,6 +1413,7 @@ function createPersistedWebhookAutomationConfig(
       },
     },
     inputTemplate: "Handle payload",
+    instructions: "Prefer deterministic reproduction steps.",
     conversationKeyTemplate: "{{payload.issue.node_id}}",
     idempotencyKeyTemplate: "{{payload.comment.node_id}}",
     createdAt: "2026-02-01T00:00:00.000Z",
