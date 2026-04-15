@@ -747,7 +747,7 @@ function ResourceScopeRow(input: {
 
   return (
     <div className={rowClassName}>
-      <div className="flex flex-col gap-2 py-2">
+      <div className={`flex flex-col gap-2 pt-2 ${isExpanded ? "pb-4" : "pb-2"}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex items-center gap-2">
             <Button
@@ -826,7 +826,7 @@ function ResourcesSection(input: {
   resources: readonly IntegrationConnectionDetailResourceSummary[];
 }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-1">
       {input.resources.map((resource, index) => (
         <ResourceScopeRow
           connectionId={input.connectionId}
