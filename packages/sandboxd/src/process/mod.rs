@@ -8,8 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::os::unix::process::ExitStatusExt;
 use std::process::{Child, Command, Stdio};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 use nix::errno::Errno;
@@ -28,6 +31,8 @@ use crate::time::{Clock, Sleeper};
 pub const DEFAULT_PROCESS_READINESS_POLL_INTERVAL: Duration = Duration::from_millis(100);
 /// Poll interval for exit checks while waiting for a process to stop.
 pub const DEFAULT_PROCESS_EXIT_POLL_INTERVAL: Duration = Duration::from_millis(25);
+/// Poll interval for post-readiness child monitoring.
+pub const DEFAULT_PROCESS_MONITOR_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Captures one runtime client process after client-level environment merging.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +47,9 @@ pub struct RuntimeClientProcessSpec {
 #[derive(Debug)]
 pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,
+    codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
+    monitor_shutdown_requested: Arc<AtomicBool>,
+    monitor_thread: Option<JoinHandle<()>>,
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
@@ -49,7 +57,30 @@ pub struct RuntimeClientProcessManager {
 #[derive(Debug)]
 struct RunningRuntimeClientProcess {
     spec: RuntimeClientProcessSpec,
-    child: Child,
+    child: Arc<Mutex<Child>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodexAppServerObservation {
+    pub process_key: String,
+    pub pid: Option<u32>,
+    pub readiness_url: Option<String>,
+    pub is_alive: bool,
+    pub last_exit_status: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CodexAppServerObservationHandle {
+    state: Arc<Mutex<CodexAppServerObservation>>,
+}
+
+impl CodexAppServerObservationHandle {
+    pub fn snapshot(&self) -> CodexAppServerObservation {
+        self.state
+            .lock()
+            .expect("Codex app-server observation lock should not be poisoned")
+            .clone()
+    }
 }
 
 /// Describes why runtime client process startup, readiness, or shutdown failed.
@@ -155,6 +186,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<RuntimeClientProcessManager, ProcessManagerError> {
     let mut started_processes = Vec::new();
+    let mut codex_app_server_observation_handle = None;
 
     for (process_index, process_spec) in process_specs.iter().enumerate() {
         if is_codex_app_server_process(process_spec)
@@ -162,9 +194,25 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         {
             supervisor_handle.replace_component_details(
                 SupervisedComponent::CodexAppServer,
-                codex_app_server_details(process_spec, None),
+                codex_app_server_details_with_status(
+                    process_spec,
+                    None,
+                    None,
+                    "Starting",
+                    "Starting",
+                ),
             );
             supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
+            codex_app_server_observation_handle =
+                Some(CodexAppServerObservationHandle {
+                    state: Arc::new(Mutex::new(CodexAppServerObservation {
+                        process_key: process_spec.process_key.clone(),
+                        pid: None,
+                        readiness_url: codex_app_server_readiness_url(process_spec),
+                        is_alive: false,
+                        last_exit_status: None,
+                    })),
+                });
         }
         let mut process = start_runtime_client_process(process_spec).map_err(|error| {
             ProcessManagerError::StartProcess {
@@ -188,9 +236,24 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         if is_codex_app_server_process(process_spec)
             && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
         {
+            if let Some(observation_handle) = &codex_app_server_observation_handle {
+                update_codex_app_server_observation(
+                    observation_handle,
+                    process_spec,
+                    Some(process.pid()),
+                    true,
+                    None,
+                );
+            }
             supervisor_handle.replace_component_details(
                 SupervisedComponent::CodexAppServer,
-                codex_app_server_details(process_spec, Some(process.child.id())),
+                codex_app_server_details_with_status(
+                    process_spec,
+                    Some(process.pid()),
+                    None,
+                    "Alive",
+                    "Ready",
+                ),
             );
             supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
         }
@@ -198,19 +261,40 @@ pub fn start_runtime_client_process_manager_with_supervisor(
         started_processes.push(process);
     }
 
+    let monitor_shutdown_requested = Arc::new(AtomicBool::new(false));
+    let monitor_thread = codex_app_server_observation_handle.clone().map(|observation_handle| {
+        spawn_codex_app_server_monitor(
+            &started_processes,
+            observation_handle,
+            supervisor_handle.clone(),
+            monitor_shutdown_requested.clone(),
+        )
+    });
+
     Ok(RuntimeClientProcessManager {
         processes: started_processes,
+        codex_app_server_observation_handle,
+        monitor_shutdown_requested,
+        monitor_thread,
         supervisor_handle,
     })
 }
 
 impl RuntimeClientProcessManager {
+    pub fn codex_app_server_observation_handle(&self) -> Option<&CodexAppServerObservationHandle> {
+        self.codex_app_server_observation_handle.as_ref()
+    }
+
     /// Stops all managed processes in reverse start order using their stop policies.
     pub fn stop(
         mut self,
         clock: &dyn Clock,
         sleeper: &dyn Sleeper,
     ) -> Result<(), ProcessManagerError> {
+        self.monitor_shutdown_requested.store(true, Ordering::Relaxed);
+        if let Some(monitor_thread) = self.monitor_thread.take() {
+            let _ = monitor_thread.join();
+        }
         stop_started_processes(&mut self.processes, clock, sleeper)
             .map_err(ProcessManagerError::StopProcesses)?;
         if self
@@ -228,6 +312,15 @@ fn is_codex_app_server_process(process_spec: &RuntimeClientProcessSpec) -> bool 
     process_spec.process_key == "codex-app-server"
 }
 
+impl RunningRuntimeClientProcess {
+    fn pid(&self) -> u32 {
+        self.child
+            .lock()
+            .expect("runtime client child lock should not be poisoned")
+            .id()
+    }
+}
+
 fn codex_app_server_details(
     process_spec: &RuntimeClientProcessSpec,
     pid: Option<u32>,
@@ -240,6 +333,232 @@ fn codex_app_server_details(
         details.insert("pid".to_string(), pid.to_string());
     }
     details
+}
+
+fn codex_app_server_readiness_url(process_spec: &RuntimeClientProcessSpec) -> Option<String> {
+    match &process_spec.readiness {
+        RuntimeClientProcessReadiness::Ws { url, .. } => Some(url.clone()),
+        _ => None,
+    }
+}
+
+fn update_codex_app_server_observation(
+    observation_handle: &CodexAppServerObservationHandle,
+    process_spec: &RuntimeClientProcessSpec,
+    pid: Option<u32>,
+    is_alive: bool,
+    last_exit_status: Option<String>,
+) {
+    let mut observation = observation_handle
+        .state
+        .lock()
+        .expect("Codex app-server observation lock should not be poisoned");
+    observation.process_key = process_spec.process_key.clone();
+    observation.pid = pid;
+    observation.readiness_url = codex_app_server_readiness_url(process_spec);
+    observation.is_alive = is_alive;
+    observation.last_exit_status = last_exit_status;
+}
+
+fn spawn_codex_app_server_monitor(
+    processes: &[RunningRuntimeClientProcess],
+    observation_handle: CodexAppServerObservationHandle,
+    supervisor_handle: SandboxdSupervisorHandle,
+    shutdown_requested: Arc<AtomicBool>,
+) -> JoinHandle<()> {
+    let monitored_processes = processes
+        .iter()
+        .filter(|process| is_codex_app_server_process(&process.spec))
+        .map(|process| MonitoredCodexAppServer {
+            spec: process.spec.clone(),
+            child: process.child.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    thread::spawn(move || {
+        run_codex_app_server_monitor(
+            monitored_processes,
+            observation_handle,
+            supervisor_handle,
+            shutdown_requested,
+        );
+    })
+}
+
+#[derive(Clone)]
+struct MonitoredCodexAppServer {
+    spec: RuntimeClientProcessSpec,
+    child: Arc<Mutex<Child>>,
+}
+
+fn run_codex_app_server_monitor(
+    monitored_processes: Vec<MonitoredCodexAppServer>,
+    observation_handle: CodexAppServerObservationHandle,
+    supervisor_handle: SandboxdSupervisorHandle,
+    shutdown_requested: Arc<AtomicBool>,
+) {
+    for monitored_process in monitored_processes {
+        let mut last_readiness_ok = true;
+
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            let exit_status = {
+                let mut child = monitored_process
+                    .child
+                    .lock()
+                    .expect("runtime client child lock should not be poisoned");
+                child.try_wait().ok().flatten()
+            };
+
+            if let Some(exit_status) = exit_status {
+                let exit_description = describe_process_exit(exit_status);
+                let (exit_reason, exit_fields) = codex_app_server_exit_event_fields(exit_status);
+                update_codex_app_server_observation(
+                    &observation_handle,
+                    &monitored_process.spec,
+                    Some(pid_from_child_handle(&monitored_process.child)),
+                    false,
+                    Some(exit_description.clone()),
+                );
+                supervisor_handle.replace_component_details(
+                    SupervisedComponent::CodexAppServer,
+                    codex_app_server_details_with_status(
+                        &monitored_process.spec,
+                        Some(pid_from_child_handle(&monitored_process.child)),
+                        Some(exit_description.clone()),
+                        "Exited",
+                        if last_readiness_ok { "Ready" } else { "Unreachable" },
+                    ),
+                );
+                supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::CodexAppServer,
+                    exit_description.clone(),
+                );
+                supervisor_handle.emit_component_exited(
+                    SupervisedComponent::CodexAppServer,
+                    exit_reason,
+                    Some(&exit_description),
+                    &exit_fields,
+                );
+                break;
+            }
+
+            match check_runtime_client_process_readiness_from_spec(&monitored_process.spec) {
+                Ok(()) => {
+                    update_codex_app_server_observation(
+                        &observation_handle,
+                        &monitored_process.spec,
+                        Some(pid_from_child_handle(&monitored_process.child)),
+                        true,
+                        None,
+                    );
+                    supervisor_handle.replace_component_details(
+                        SupervisedComponent::CodexAppServer,
+                        codex_app_server_details_with_status(
+                            &monitored_process.spec,
+                            Some(pid_from_child_handle(&monitored_process.child)),
+                            None,
+                            "Alive",
+                            "Ready",
+                        ),
+                    );
+                    if !last_readiness_ok {
+                        supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
+                    }
+                    supervisor_handle.record_component_healthcheck(SupervisedComponent::CodexAppServer);
+                    last_readiness_ok = true;
+                }
+                Err(error) => {
+                    update_codex_app_server_observation(
+                        &observation_handle,
+                        &monitored_process.spec,
+                        Some(pid_from_child_handle(&monitored_process.child)),
+                        true,
+                        None,
+                    );
+                    supervisor_handle.replace_component_details(
+                        SupervisedComponent::CodexAppServer,
+                        codex_app_server_details_with_status(
+                            &monitored_process.spec,
+                            Some(pid_from_child_handle(&monitored_process.child)),
+                            None,
+                            "Alive",
+                            "Unreachable",
+                        ),
+                    );
+                    if last_readiness_ok {
+                        supervisor_handle.mark_component_restarting(
+                            SupervisedComponent::CodexAppServer,
+                            error.clone(),
+                        );
+                        supervisor_handle.emit_component_healthcheck_failed(
+                            SupervisedComponent::CodexAppServer,
+                            "readiness_probe_failed",
+                            error,
+                            "readiness_ws",
+                            &[],
+                        );
+                    }
+                    last_readiness_ok = false;
+                }
+            }
+
+            thread::sleep(DEFAULT_PROCESS_MONITOR_POLL_INTERVAL);
+        }
+    }
+}
+
+fn pid_from_child_handle(child: &Arc<Mutex<Child>>) -> u32 {
+    child
+        .lock()
+        .expect("runtime client child lock should not be poisoned")
+        .id()
+}
+
+fn codex_app_server_details_with_status(
+    process_spec: &RuntimeClientProcessSpec,
+    pid: Option<u32>,
+    last_exit_status: Option<String>,
+    liveness_state: &str,
+    readiness_state: &str,
+) -> BTreeMap<String, String> {
+    let mut details = codex_app_server_details(process_spec, pid);
+    details.insert("livenessState".to_string(), liveness_state.to_string());
+    details.insert("readinessState".to_string(), readiness_state.to_string());
+    if let Some(last_exit_status) = last_exit_status {
+        details.insert("lastExitStatus".to_string(), last_exit_status);
+    }
+    details
+}
+
+fn codex_app_server_exit_event_fields(
+    exit_status: std::process::ExitStatus,
+) -> (&'static str, Vec<(&'static str, serde_json::Value)>) {
+    if let Some(signal) = exit_status.signal() {
+        return (
+            "process_signaled",
+            vec![
+                (
+                    "exitKind",
+                    serde_json::Value::String("process_signaled".to_string()),
+                ),
+                ("signal", serde_json::Value::from(signal)),
+            ],
+        );
+    }
+
+    (
+        "process_exited",
+        vec![
+            (
+                "exitKind",
+                serde_json::Value::String("process_exited".to_string()),
+            ),
+            (
+                "exitCode",
+                serde_json::Value::from(exit_status.code().unwrap_or_default()),
+            ),
+        ],
+    )
 }
 
 /// Merges client-wide environment variables with any process-local overrides.
@@ -297,7 +616,7 @@ fn start_runtime_client_process(
 
     Ok(RunningRuntimeClientProcess {
         spec: process_spec.clone(),
-        child,
+        child: Arc::new(Mutex::new(child)),
     })
 }
 
@@ -318,6 +637,8 @@ fn wait_for_runtime_client_process_readiness(
     loop {
         if let Some(status) = process
             .child
+            .lock()
+            .expect("runtime client child lock should not be poisoned")
             .try_wait()
             .map_err(|error| format!("failed to poll process exit: {error}"))?
         {
@@ -342,7 +663,13 @@ fn wait_for_runtime_client_process_readiness(
 fn check_runtime_client_process_readiness(
     process: &mut RunningRuntimeClientProcess,
 ) -> Result<(), String> {
-    match &process.spec.readiness {
+    check_runtime_client_process_readiness_from_spec(&process.spec)
+}
+
+fn check_runtime_client_process_readiness_from_spec(
+    process_spec: &RuntimeClientProcessSpec,
+) -> Result<(), String> {
+    match &process_spec.readiness {
         RuntimeClientProcessReadiness::None => Ok(()),
         RuntimeClientProcessReadiness::Tcp { host, port, .. } => check_tcp_readiness(host, *port),
         RuntimeClientProcessReadiness::Http {
@@ -412,6 +739,8 @@ fn stop_runtime_client_process(
 fn process_has_exited(process: &mut RunningRuntimeClientProcess) -> Result<bool, String> {
     process
         .child
+        .lock()
+        .expect("runtime client child lock should not be poisoned")
         .try_wait()
         .map(|status| status.is_some())
         .map_err(|error| format!("failed to poll process exit: {error}"))
@@ -428,6 +757,8 @@ fn wait_for_runtime_client_process_exit(
     loop {
         match process
             .child
+            .lock()
+            .expect("runtime client child lock should not be poisoned")
             .try_wait()
             .map_err(|error| format!("failed to poll process exit: {error}"))?
         {
@@ -445,7 +776,7 @@ fn signal_runtime_client_process(
     process: &mut RunningRuntimeClientProcess,
     signal: RuntimeClientProcessStopSignal,
 ) -> Result<(), String> {
-    let pid = i32::try_from(process.child.id())
+    let pid = i32::try_from(process.pid())
         .map_err(|_| "process pid exceeded i32 range".to_string())?;
     let unix_signal = match signal {
         RuntimeClientProcessStopSignal::Sigterm => Signal::SIGTERM,

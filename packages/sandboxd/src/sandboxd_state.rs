@@ -14,6 +14,7 @@ use url::Url;
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
+use crate::process::CodexAppServerObservationHandle;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::codex_proxy::CodexProxyControlHandle;
@@ -76,6 +77,7 @@ pub struct SandboxdState {
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
+    codex_app_server_observation_handle: Option<CodexAppServerObservationHandle>,
     codex_proxy_control_handle: Option<CodexProxyControlHandle>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
@@ -142,6 +144,10 @@ impl SandboxdState {
                 .map_err(|error| SandboxdStateError::StartRuntimeProcesses(error.to_string()))?,
             )
         };
+        let codex_app_server_observation_handle = process_manager
+            .as_ref()
+            .and_then(process::RuntimeClientProcessManager::codex_app_server_observation_handle)
+            .cloned();
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
@@ -199,6 +205,7 @@ impl SandboxdState {
             egress_proxy,
             process_manager,
             runtime_adapters,
+            codex_app_server_observation_handle,
             codex_proxy_control_handle,
             supervisor_handle,
             keepalive_manager,
@@ -274,6 +281,10 @@ impl SandboxdState {
     /// Returns a cloneable handle to the shared supervision state.
     pub fn supervisor_handle(&self) -> SandboxdSupervisorHandle {
         self.supervisor_handle.clone()
+    }
+
+    pub fn codex_app_server_observation_handle(&self) -> Option<&CodexAppServerObservationHandle> {
+        self.codex_app_server_observation_handle.as_ref()
     }
 }
 
