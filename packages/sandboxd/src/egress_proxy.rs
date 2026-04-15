@@ -44,9 +44,8 @@ use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::Clock;
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
-const RUNTIME_PROXY_DIRECTORY: &str = "/run/mistle/sandboxd";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
-const LOOPBACK_PROXY_HOST: &str = "127.0.0.1";
+const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 const RUNTIME_NO_PROXY_DEFAULTS: [&str; 2] = ["127.0.0.1", "localhost"];
 
 const MANAGED_PROXY_ENV_KEYS: [&str; 15] = [
@@ -134,6 +133,26 @@ impl EgressProxy {
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
+        Self::start_with_options(
+            runtime_plan,
+            startup_input,
+            tokenizer_proxy_egress_base_url,
+            default_loopback_proxy_listener_address(),
+            Path::new(RUNTIME_PROXY_CA_CERT_PATH),
+            clock,
+            supervisor_handle,
+        )
+    }
+
+    fn start_with_options(
+        runtime_plan: &CompiledRuntimePlan,
+        startup_input: &StartupInput,
+        tokenizer_proxy_egress_base_url: &str,
+        listener_address: SocketAddr,
+        ca_certificate_path: &Path,
+        clock: Arc<dyn Clock>,
+        supervisor_handle: SandboxdSupervisorHandle,
+    ) -> Result<Option<Self>, EgressProxyError> {
         if runtime_plan.egress_routes.is_empty() {
             return Ok(None);
         }
@@ -144,20 +163,24 @@ impl EgressProxy {
             .map(|route| build_proxy_route(route, startup_input))
             .collect::<Result<Vec<_>, _>>()?;
 
-        prepare_proxy_directory(Path::new(RUNTIME_PROXY_DIRECTORY))?;
+        let proxy_directory = ca_certificate_path
+            .parent()
+            .ok_or_else(|| EgressProxyError::new("egress proxy CA path must include a parent directory"))?;
+        prepare_proxy_directory(proxy_directory)?;
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
             .map_err(|error| EgressProxyError::new(error.to_string()))?;
         fs::write(
-            RUNTIME_PROXY_CA_CERT_PATH,
+            ca_certificate_path,
             generated_proxy_ca.certificate_pem.as_bytes(),
         )
         .map_err(|error| {
             EgressProxyError::new(format!(
-                "failed to write local egress proxy certificate '{RUNTIME_PROXY_CA_CERT_PATH}': {error}"
+                "failed to write local egress proxy certificate '{}': {error}",
+                ca_certificate_path.display()
             ))
         })?;
 
-        let std_listener = StdTcpListener::bind((LOOPBACK_PROXY_HOST, 0)).map_err(|error| {
+        let std_listener = StdTcpListener::bind(listener_address).map_err(|error| {
             EgressProxyError::new(format!(
                 "failed to bind local egress proxy listener: {error}"
             ))
@@ -204,7 +227,7 @@ impl EgressProxy {
 
         let runtime_env = build_managed_proxy_env(
             listener_address,
-            Path::new(RUNTIME_PROXY_CA_CERT_PATH),
+            ca_certificate_path,
             tokenizer_proxy_egress_base_url,
         )?;
 
@@ -218,7 +241,7 @@ impl EgressProxy {
             runtime_env,
             shutdown_tx: Some(shutdown_tx),
             server_thread: Some(server_thread),
-            ca_certificate_path: PathBuf::from(RUNTIME_PROXY_CA_CERT_PATH),
+            ca_certificate_path: ca_certificate_path.to_path_buf(),
             supervisor_handle,
         }))
     }
@@ -291,6 +314,10 @@ impl EgressProxy {
 
         Ok(())
     }
+}
+
+fn default_loopback_proxy_listener_address() -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
 }
 
 fn build_proxy_route(
@@ -858,10 +885,24 @@ fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Hyp
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::net::{SocketAddr, TcpListener as StdTcpListener};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use crate::egress_proxy::{
         EgressProxy, EgressProxyRoute, build_direct_forward_uri, build_managed_proxy_env,
         join_url_path, match_route,
     };
+    use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::runtime::{
+        CompiledEgressRoute, CompiledEgressRouteAuthInjection,
+        CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
+        CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimePlan,
+    };
+    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::time::SystemClock;
 
     #[test]
     fn joins_proxy_forward_paths_without_duplicate_slashes() {
@@ -983,5 +1024,145 @@ mod tests {
         );
         assert!(EgressProxy::managed_env_keys().contains(&"HTTPS_PROXY"));
         assert!(EgressProxy::managed_env_keys().contains(&"NODE_EXTRA_CA_CERTS"));
+    }
+
+    #[test]
+    fn keeps_a_stable_proxy_address_across_close_and_restart() {
+        let listener_address = reserve_test_listener_address();
+        let ca_certificate_path = test_ca_certificate_path();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy_one = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            &ca_certificate_path,
+            Arc::new(SystemClock),
+            supervisor_handle.clone(),
+        )
+        .expect("first egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+        let proxy_one_address = proxy_one
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+        assert_eq!(proxy_one_address, format!("http://{listener_address}"));
+        proxy_one.close().expect("first egress proxy close should succeed");
+
+        let proxy_two = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            &ca_certificate_path,
+            Arc::new(SystemClock),
+            supervisor_handle.clone(),
+        )
+        .expect("second egress proxy start should succeed")
+        .expect("egress proxy should still be configured");
+        let proxy_two_address = proxy_two
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+        assert_eq!(proxy_two_address, proxy_one_address);
+        let snapshot = supervisor_handle
+            .component_snapshot(SupervisedComponent::EgressProxy)
+            .expect("egress proxy should be tracked");
+        assert_eq!(
+            snapshot.details.get("listenAddr"),
+            Some(&listener_address.to_string())
+        );
+        assert_eq!(
+            snapshot.details.get("stablePort"),
+            Some(&listener_address.port().to_string())
+        );
+        proxy_two.close().expect("second egress proxy close should succeed");
+        let _ = std::fs::remove_dir_all(
+            ca_certificate_path
+                .parent()
+                .expect("test CA path should have a parent directory"),
+        );
+    }
+
+    fn reserve_test_listener_address() -> SocketAddr {
+        let listener = StdTcpListener::bind(("127.0.0.1", 0))
+            .expect("test listener should bind to an ephemeral loopback port");
+        let listener_address = listener
+            .local_addr()
+            .expect("test listener should expose its bound address");
+        drop(listener);
+        listener_address
+    }
+
+    fn sample_runtime_plan() -> CompiledRuntimePlan {
+        CompiledRuntimePlan {
+            egress_routes: vec![CompiledEgressRoute {
+                egress_rule_id: "egress-rule-1".to_string(),
+                binding_id: "binding-1".to_string(),
+                family_id: "family-1".to_string(),
+                variant_id: "variant-1".to_string(),
+                r#match: CompiledEgressRouteMatch {
+                    hosts: vec!["api.openai.com".to_string()],
+                    path_prefixes: Some(vec!["/v1".to_string()]),
+                    methods: Some(vec!["POST".to_string()]),
+                },
+                upstream: CompiledEgressRouteUpstream {
+                    base_url: "https://api.openai.com".to_string(),
+                },
+                auth_injection: CompiledEgressRouteAuthInjection {
+                    r#type: CompiledEgressRouteAuthInjectionType::Bearer,
+                    target: None,
+                    username: None,
+                    service: None,
+                    region: None,
+                },
+                additional_headers: None,
+                additional_credential_headers: None,
+                credential_resolver: CompiledEgressRouteCredentialResolver {
+                    connection_id: "connection-1".to_string(),
+                    secret_type: "token".to_string(),
+                    slot_key: None,
+                    resolver_key: None,
+                },
+                request_middleware: None,
+            }],
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        }
+    }
+
+    fn sample_startup_input() -> StartupInput {
+        StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token".to_string(),
+            tunnel_exchange_token: "exchange-token".to_string(),
+            tunnel_gateway_ws_url: "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123".to_string(),
+            runtime_plan: serde_json::json!({}),
+            egress_grant_by_rule_id: BTreeMap::from([(
+                "egress-rule-1".to_string(),
+                "grant-1".to_string(),
+            )]),
+        }
+    }
+
+    fn test_ca_certificate_path() -> PathBuf {
+        let unique_id = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir()
+            .join(format!("mistle-egress-proxy-test-{unique_id}"))
+            .join("egress-proxy-ca.pem")
     }
 }
