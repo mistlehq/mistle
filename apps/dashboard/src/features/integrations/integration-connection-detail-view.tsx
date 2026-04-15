@@ -951,7 +951,6 @@ function WebhookSourceCard(input: {
     input.onDeleteWebhookSource !== undefined &&
     input.source.remoteRegistrationId !== undefined;
   const registeredEventLabels = resolveWebhookRegisteredEventLabels(input.source.providerMetadata);
-  const callbackLabel = resolveWebhookCallbackLabel(input.source);
   const shouldShowHeaderText = !input.hideDeleteAction && input.source.displayName !== "";
   const shouldShowHeaderRow = shouldShowHeaderText || isDeleteSupported;
 
@@ -995,15 +994,11 @@ function WebhookSourceCard(input: {
         )}
         <MetadataBadgeListField items={registeredEventLabels} label="Registered events" />
         {input.source.callbackUrl === undefined ? null : (
-          <CopyableValue label={callbackLabel} value={input.source.callbackUrl} />
+          <CopyableValue label="Webhook URL" value={input.source.callbackUrl} />
         )}
       </div>
     </div>
   );
-}
-
-function resolveWebhookCallbackLabel(_source: IntegrationWebhookSource): string {
-  return "Webhook URL";
 }
 
 function isStringArray(input: unknown): input is string[] {

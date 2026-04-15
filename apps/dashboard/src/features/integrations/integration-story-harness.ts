@@ -4,7 +4,7 @@ import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitio
 import {
   buildIntegrationConnectionDetailItems,
   buildIntegrationConnectionResourceItemsByKey,
-  createRefreshingResourceKey,
+  createIntegrationConnectionResourceKey,
 } from "../pages/integrations-page-view-model.js";
 import { resolveVisibleConnectionMethodConfigFields } from "../pages/use-integration-connection-editor-state-helpers.js";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
@@ -338,7 +338,7 @@ export function createRefreshingDetailViewStoryProps() {
   return createDetailViewStoryProps({
     connections: [primaryConnection],
     refreshingResourceKeys: new Set<string>([
-      createRefreshingResourceKey({
+      createIntegrationConnectionResourceKey({
         connectionId: primaryConnection.id,
         kind: "repositories",
       }),

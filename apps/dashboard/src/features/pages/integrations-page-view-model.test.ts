@@ -15,7 +15,6 @@ import {
   buildOpenCreateIntegrationConnectionInput,
   buildOpenUpdateIntegrationConnectionInput,
   createIntegrationConnectionResourceKey,
-  createRefreshingResourceKey,
   getIntegrationConnectionResourceSummaries,
   shouldPollIntegrationDetailResources,
   toConnectionMethods,
@@ -290,7 +289,7 @@ describe("integrations page view model", () => {
       ],
       controlPlaneApiOrigin: "https://control-plane.example.com",
       refreshingResourceKeys: new Set([
-        createRefreshingResourceKey({
+        createIntegrationConnectionResourceKey({
           connectionId: "icn_123",
           kind: "repositories",
         }),

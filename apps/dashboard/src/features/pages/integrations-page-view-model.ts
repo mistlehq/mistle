@@ -355,10 +355,6 @@ export function createIntegrationConnectionResourceKey(input: {
   return `${input.connectionId}:${input.kind}`;
 }
 
-export function createRefreshingResourceKey(input: { connectionId: string; kind: string }): string {
-  return createIntegrationConnectionResourceKey(input);
-}
-
 export function getIntegrationConnectionResourceSummaries(
   connection: Pick<IntegrationConnection, "resources"> | null,
 ): readonly NonNullable<IntegrationConnection["resources"]>[number][] {
