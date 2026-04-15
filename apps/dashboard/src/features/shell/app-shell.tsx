@@ -68,10 +68,27 @@ export function AppShell(): React.JSX.Element {
   }, [showSessionsSidebar]);
 
   useEffect(() => {
-    if (showSessionsSidebar && !routeState.inSessions) {
+    const currentLocationHref = resolveLocationHref({
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    });
+
+    if (
+      showSessionsSidebar &&
+      !routeState.inSessions &&
+      previousSessionsSidebarToggleUrlRef.current !== null &&
+      previousSessionsSidebarToggleUrlRef.current !== currentLocationHref
+    ) {
       previousSessionsSidebarToggleUrlRef.current = null;
     }
-  }, [routeState.inSessions, showSessionsSidebar]);
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    routeState.inSessions,
+    showSessionsSidebar,
+  ]);
 
   const organizationOptionsQuery = useQuery({
     queryKey: ORGANIZATION_SWITCHER_QUERY_KEY,
