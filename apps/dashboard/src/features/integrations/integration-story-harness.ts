@@ -1079,7 +1079,7 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
           count: 0,
           items: [],
           kind: "channel",
-          lastErrorMessage: "Slack returned rate_limited while listing public channels.",
+          lastErrorMessage: "Slack returned rate_limited while listing channels.",
           syncState: "error" as const,
         },
       ],
