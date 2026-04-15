@@ -80,7 +80,6 @@ export type IntegrationConnectionDetailItem = {
       }
     | undefined;
   status: "active" | "error" | "revoked";
-  webhookInstructions?: string;
 };
 
 export type IntegrationConnectionDetailViewProps = {
@@ -194,56 +193,26 @@ export function IntegrationConnectionDetailView(
         </nav>
         <div aria-hidden className="bg-border hidden md:block" />
         <div className="min-w-0 md:pl-8">
-          <ConnectionDetailPaneWithOptionalProps connection={selectedConnection} props={props} />
+          <ConnectionDetailPane
+            connection={selectedConnection}
+            onCreateWebhookSource={props.onCreateWebhookSource}
+            onDeleteConnection={props.onDeleteConnection}
+            onDeleteWebhookSource={props.onDeleteWebhookSource}
+            onEditApiKey={props.onEditApiKey}
+            onEditConnection={props.onEditConnection}
+            onRefreshResource={props.onRefreshResource}
+            onStartGitHubAppInstallation={props.onStartGitHubAppInstallation}
+            resourceItemsByKey={props.resourceItemsByKey}
+            showCreateWebhookSource={props.showCreateWebhookSource}
+            showWebhookSources={props.showWebhookSources}
+            titleEditor={props.titleEditor}
+            webhookSourceState={
+              props.webhookSourceStateByConnectionId?.get(selectedConnection.id) ?? undefined
+            }
+          />
         </div>
       </div>
     </div>
-  );
-}
-
-function ConnectionDetailPaneWithOptionalProps(input: {
-  connection: IntegrationConnectionDetailItem;
-  props: IntegrationConnectionDetailViewProps;
-}): React.JSX.Element {
-  const webhookSourceState =
-    input.props.webhookSourceStateByConnectionId?.get(input.connection.id) ?? undefined;
-
-  return (
-    <ConnectionDetailPane
-      connection={input.connection}
-      {...(input.props.onDeleteConnection === undefined
-        ? {}
-        : { onDeleteConnection: input.props.onDeleteConnection })}
-      {...(input.props.onEditApiKey === undefined
-        ? {}
-        : { onEditApiKey: input.props.onEditApiKey })}
-      {...(input.props.onStartGitHubAppInstallation === undefined
-        ? {}
-        : { onStartGitHubAppInstallation: input.props.onStartGitHubAppInstallation })}
-      {...(input.props.onRefreshResource === undefined
-        ? {}
-        : { onRefreshResource: input.props.onRefreshResource })}
-      {...(input.props.resourceItemsByKey === undefined
-        ? {}
-        : { resourceItemsByKey: input.props.resourceItemsByKey })}
-      {...(webhookSourceState === undefined ? {} : { webhookSourceState })}
-      {...(input.props.onCreateWebhookSource === undefined
-        ? {}
-        : { onCreateWebhookSource: input.props.onCreateWebhookSource })}
-      {...(input.props.onDeleteWebhookSource === undefined
-        ? {}
-        : { onDeleteWebhookSource: input.props.onDeleteWebhookSource })}
-      {...(input.props.onEditConnection === undefined
-        ? {}
-        : { onEditConnection: input.props.onEditConnection })}
-      {...(input.props.showWebhookSources === undefined
-        ? {}
-        : { showWebhookSources: input.props.showWebhookSources })}
-      {...(input.props.showCreateWebhookSource === undefined
-        ? {}
-        : { showCreateWebhookSource: input.props.showCreateWebhookSource })}
-      {...(input.props.titleEditor === undefined ? {} : { titleEditor: input.props.titleEditor })}
-    />
   );
 }
 

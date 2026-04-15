@@ -394,8 +394,6 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           },
         ],
         status: "active",
-        webhookInstructions:
-          "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
       },
     ],
     onRefreshResource: () => {},
@@ -612,8 +610,6 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
             "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
         },
         status: "active",
-        webhookInstructions:
-          "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
       },
     ],
     showWebhookSources: true,
@@ -774,7 +770,6 @@ type ScenarioDetailStorySpec = {
     | undefined;
   showCreateWebhookSource?: boolean;
   status?: "active" | "error" | "revoked";
-  webhookInstructions?: string;
   webhookSources?: readonly IntegrationWebhookSource[];
 };
 
@@ -871,9 +866,6 @@ function createScenarioDetailViewStoryProps(
         })),
         ...(input.setup === undefined ? {} : { setup: input.setup }),
         status: input.status ?? "active",
-        ...(input.webhookInstructions === undefined
-          ? {}
-          : { webhookInstructions: input.webhookInstructions }),
       },
     ],
     onEditApiKey: () => {},
@@ -929,8 +921,6 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
         syncState: "ready",
       },
     ],
-    webhookInstructions:
-      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
     webhookSources: [
       {
         callbackUrl:

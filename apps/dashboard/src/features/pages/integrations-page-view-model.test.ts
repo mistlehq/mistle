@@ -315,9 +315,6 @@ describe("integrations page view model", () => {
     ]);
     expect(item?.setup).toBeUndefined();
     expect(item?.installActionLabel).toBe("Manage installation");
-    expect(item?.webhookInstructions).toBe(
-      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
-    );
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });

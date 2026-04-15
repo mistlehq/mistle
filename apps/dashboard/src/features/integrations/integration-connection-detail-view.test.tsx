@@ -776,26 +776,28 @@ describe("IntegrationConnectionDetailView", () => {
       <IntegrationConnectionDetailView
         connections={[
           {
-            id: "icn_jira_setup",
+            id: "icn_github_setup",
             bindingCount: 0,
             canDelete: true,
-            displayName: "Jira Production",
-            authMethodId: "jira-personal-api-token",
-            authMethodLabel: "Personal API token",
+            displayName: "GitHub App Setup",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            installActionLabel: "Install GitHub App",
             status: "active",
             resources: [],
             setup: {
-              description: "Create a Jira admin webhook to complete setup.",
+              description: "Set these URLs in your GitHub App settings, then install the app.",
             },
           },
         ]}
+        onStartGitHubAppInstallation={() => {}}
         onCreateWebhookSource={() => {}}
         showCreateWebhookSource={true}
         showWebhookSources={true}
         webhookSourceStateByConnectionId={
           new Map([
             [
-              "icn_jira_setup",
+              "icn_github_setup",
               {
                 createErrorMessage: null,
                 deleteErrorMessage: null,
@@ -813,7 +815,9 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.getByText("Setup")).toBeTruthy();
-    expect(screen.getByText("Create a Jira admin webhook to complete setup.")).toBeTruthy();
+    expect(
+      screen.getByText("Set these URLs in your GitHub App settings, then install the app."),
+    ).toBeTruthy();
     expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create webhook" })).toBeTruthy();
@@ -890,8 +894,6 @@ describe("IntegrationConnectionDetailView", () => {
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/github-app-installation",
             },
-            webhookInstructions:
-              "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
           },
         ]}
         onStartGitHubAppInstallation={(connectionId) => {

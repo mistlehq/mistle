@@ -198,7 +198,6 @@ export function buildIntegrationConnectionDetailItems(input: {
                       : { isPending: githubAppInstallationState.isPending }),
                   },
                 }),
-            webhookInstructions: githubAppConnectionContext.webhookInstructions,
           }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
@@ -283,7 +282,6 @@ function resolveGitHubAppConnectionContext(
             postInstallationSetupUrl?: string;
           }
         | undefined;
-      webhookInstructions: string;
     }
   | undefined {
   const config = connection.config;
@@ -347,8 +345,6 @@ function resolveGitHubAppConnectionContext(
           },
         }
       : {}),
-    webhookInstructions:
-      "Copy the callback URL into your GitHub App webhook settings, then install the app to finish setup.",
   };
 }
 
