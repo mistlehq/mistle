@@ -1042,6 +1042,15 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       connectionId: "icn_slack_engineering",
       displayName: "Slack Engineering",
       endpointKey: "ep_slack_engineering",
+      resources: [
+        {
+          count: 3,
+          items: ["#alerts", "#engineering", "#platform-help"],
+          kind: "channel",
+          lastSyncedAt: DenseStoryLastSyncedAt,
+          syncState: "ready" as const,
+        },
+      ],
       webhookSourceId: "iws_slack_engineering",
     },
     {
@@ -1049,6 +1058,15 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       connectionId: "icn_slack_support",
       displayName: "Slack Support",
       endpointKey: "ep_slack_support",
+      resources: [
+        {
+          count: 2,
+          items: ["#support-escalations", "#customer-incidents"],
+          kind: "channel",
+          lastSyncedAt: DenseStoryLastSyncedAt,
+          syncState: "ready" as const,
+        },
+      ],
       webhookSourceId: "iws_slack_support",
     },
     {
@@ -1056,6 +1074,15 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       connectionId: "icn_slack_growth",
       displayName: "Slack Growth",
       endpointKey: "ep_slack_growth",
+      resources: [
+        {
+          count: 0,
+          items: [],
+          kind: "channel",
+          lastErrorMessage: "Slack returned rate_limited while listing channels.",
+          syncState: "error" as const,
+        },
+      ],
       webhookSourceId: "iws_slack_growth",
     },
     {
@@ -1063,6 +1090,14 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       connectionId: "icn_slack_ops",
       displayName: "Slack Ops",
       endpointKey: "ep_slack_ops",
+      resources: [
+        {
+          count: 0,
+          items: [],
+          kind: "channel",
+          syncState: "never-synced" as const,
+        },
+      ],
       webhookSourceId: "iws_slack_ops",
     },
     {
@@ -1070,6 +1105,14 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       connectionId: "icn_slack_design",
       displayName: "Slack Design",
       endpointKey: "ep_slack_design",
+      resources: [
+        {
+          count: 1,
+          items: ["#design-crit"],
+          kind: "channel",
+          syncState: "syncing" as const,
+        },
+      ],
       webhookSourceId: "iws_slack_design",
     },
   ].map((connection) =>
@@ -1082,6 +1125,8 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
       bindingCount: connection.bindingCount,
       connectionId: connection.connectionId,
       displayName: connection.displayName,
+      familyId: "slack",
+      resources: connection.resources,
       webhookSources: [
         {
           callbackUrl: `https://control-plane.example.com/p/integration/webhooks/slack-default/${connection.endpointKey}`,
@@ -1102,6 +1147,14 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
   return {
     connections: storyProps.flatMap((story) => story.connections),
     onRefreshResource: () => {},
+    resourceContentByKey: buildIntegrationConnectionResourceContentByKey(
+      storyProps.flatMap((story) =>
+        Array.from(story.resourceContentByKey?.entries() ?? []).map(([key, state]) => ({
+          connectionId: key.slice(0, key.lastIndexOf(":")),
+          state,
+        })),
+      ),
+    ),
     webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
       webhookSource: { lifecycle: "implicit" },
     }),

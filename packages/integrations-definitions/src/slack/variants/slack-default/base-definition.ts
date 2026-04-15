@@ -27,8 +27,7 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
   variantId: "slack-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Slack",
-  description:
-    "Access Slack Web API endpoints with a bot token and receive Slack Events API callbacks.",
+  description: "Enable access to Slack Web API endpoints and Slack Events API callbacks.",
   logoKey: "slack",
   targetConfigSchema: SlackTargetConfigSchema,
   targetSecretSchema: SlackTargetSecretSchema,

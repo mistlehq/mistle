@@ -6,18 +6,43 @@ icon: data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTQiIGhlaWdodD0iNTQiIHZpZXdCb3g9
 
 ## Overview
 
-Connect to Slack by providing a bot token and signing secret. This also supports Slack Events API callbacks through the connection's Webhooks section.
+Set up a Slack app, configure the required bot scopes and event subscriptions, install it to your workspace, then connect it to Mistle with the bot token and signing secret.
 
 ## Create The Slack App
 
 Create a Slack app for the workspace you want Mistle to access.
 
-Collect:
+## Configure Bot Scopes
 
-1. The bot user OAuth token (`xoxb-...`)
+Add these bot scopes before installing the app:
+
+| Scope               | Enables                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| `app_mentions:read` | Receive `app_mention` events for Slack-triggered automations |
+| `channels:read`     | Sync public channels as selectable automation resources      |
+| `groups:read`       | Sync private channels as selectable automation resources     |
+
+## Configure Event Subscriptions
+
+Enable the Slack Events API and subscribe the bot to these events:
+
+| Event               | Enables                                       |
+| ------------------- | --------------------------------------------- |
+| `app_mention`       | Slack automation trigger                      |
+| `channel_created`   | Refresh synced public channels when created   |
+| `channel_archive`   | Refresh synced public channels when archived  |
+| `channel_unarchive` | Refresh synced public channels when restored  |
+| `channel_rename`    | Refresh synced public channels when renamed   |
+| `group_archive`     | Refresh synced private channels when archived |
+| `group_unarchive`   | Refresh synced private channels when restored |
+| `group_rename`      | Refresh synced private channels when renamed  |
+
+## Install The App And Collect Credentials
+
+Install the Slack app to the workspace, then collect:
+
+1. The bot token (`xoxb-...`)
 2. The signing secret from the app's Basic Information page
-
-Grant the bot scopes your Mistle workflows need before installing the app to the workspace.
 
 ## Connect In Mistle
 
@@ -32,11 +57,64 @@ Enter:
 
 ## Webhooks
 
-If you use Slack-triggered automations, open the connection's **Webhooks** section in Mistle and copy the displayed callback URL into your Slack app's Events API configuration.
+If you use Slack-triggered automations:
+
+1. Open the connection's **Webhooks** section in Mistle.
+2. Copy the displayed callback URL.
+3. Paste it into the Slack app's **Events API Request URL** field.
+4. Save and verify the request URL in Slack.
+
+## Private Channels
+
+If you want Mistle to sync or trigger from private channels, invite the app to those channels in Slack. Private-channel sync and `app_mention` behavior only work where the app is actually a member.
+
+## Slack App Manifest
+
+Use this manifest as a starting point for the setup above:
+
+```yaml
+display_information:
+  name: Mistle Slack App
+  description: Slack integration for Mistle automations and channel sync
+  background_color: "#611f69"
+
+features:
+  bot_user:
+    display_name: Mistle
+    always_online: false
+
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:read
+      - groups:read
+
+settings:
+  event_subscriptions:
+    request_url: https://YOUR-MISTLE-CALLBACK-URL
+    bot_events:
+      - app_mention
+      - channel_created
+      - channel_archive
+      - channel_unarchive
+      - channel_rename
+      - group_archive
+      - group_unarchive
+      - group_rename
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
+```
+
+Replace `request_url` with the webhook callback URL shown in the Slack connection's **Webhooks** section in Mistle. If you do not have that URL yet, create the app first and update the Events API request URL after creating the connection.
 
 ## Official References
 
+- [Slack app manifest](https://docs.slack.dev/reference/app-manifest/)
 - [Creating an app from app settings](https://docs.slack.dev/app-management/quickstart-app-settings)
-- [Installing with OAuth](https://docs.slack.dev/authentication/installing-with-oauth/)
-- [Slack tokens](https://docs.slack.dev/authentication/tokens/)
 - [Using HTTP Request URLs](https://docs.slack.dev/apis/events-api/using-http-request-urls/)
+- [app_mention event](https://docs.slack.dev/reference/events/app_mention/)
+- [conversations.list](https://docs.slack.dev/reference/methods/conversations.list/)
