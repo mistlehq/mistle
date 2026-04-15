@@ -49,6 +49,22 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureMessage: z.string().nullable(),
 });
 
+const StopSandboxInstanceAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
+const ResumeSandboxInstanceAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
 const SandboxInstanceConnectionTokenResponseSchema = z
   .object({
     instanceId: z.string().min(1),
@@ -87,6 +103,8 @@ export type ConnectedCodexAgentSession = {
   rpcClient: CodexJsonRpcClient;
   sessionClient: AgentStreamClient;
 };
+
+const InternalAuthServiceTokenHeader = "x-mistle-service-token";
 
 export async function prepareCodexSandbox(input: {
   fixture: SystemTestFixture;
@@ -272,6 +290,144 @@ export async function waitForRuntimeReadyValue(input: {
 
     await systemSleeper.sleep(Math.min(RUNTIME_READY_POLL_INTERVAL_MS, remainingMs));
   }
+}
+
+export async function waitForSandboxStatus(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+  expectedStatus: z.infer<typeof SandboxInstanceStatusResponseSchema>["status"];
+}): Promise<z.infer<typeof SandboxInstanceStatusResponseSchema>> {
+  return waitForCondition({
+    description: `sandbox '${input.sandboxInstanceId}' status=${input.expectedStatus}`,
+    timeoutMs: SANDBOX_READY_TIMEOUT_MS,
+    evaluate: async () => {
+      const response = await input.fixture.request(
+        `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
+        {
+          headers: {
+            cookie: input.authenticatedSession.cookie,
+          },
+        },
+      );
+      const bodyText = await response.text().catch(() => "");
+      if (response.status !== 200) {
+        throw new Error(
+          `sandbox status lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
+        );
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(bodyText);
+      } catch (error) {
+        throw new Error(
+          `sandbox status lookup returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      const sandboxStatus = SandboxInstanceStatusResponseSchema.parse(parsed);
+      return sandboxStatus.status === input.expectedStatus ? sandboxStatus : null;
+    },
+  });
+}
+
+export async function waitForSandboxConnectable(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+  expectedConnectable: boolean;
+}): Promise<z.infer<typeof SandboxInstanceStatusResponseSchema>> {
+  return waitForCondition({
+    description: `sandbox '${input.sandboxInstanceId}' connectable=${String(input.expectedConnectable)}`,
+    timeoutMs: SANDBOX_READY_TIMEOUT_MS,
+    evaluate: async () => {
+      const response = await input.fixture.request(
+        `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
+        {
+          headers: {
+            cookie: input.authenticatedSession.cookie,
+          },
+        },
+      );
+      const bodyText = await response.text().catch(() => "");
+      if (response.status !== 200) {
+        throw new Error(
+          `sandbox connectable lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
+        );
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(bodyText);
+      } catch (error) {
+        throw new Error(
+          `sandbox connectable lookup returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      const sandboxStatus = SandboxInstanceStatusResponseSchema.parse(parsed);
+      return sandboxStatus.connectable === input.expectedConnectable ? sandboxStatus : null;
+    },
+  });
+}
+
+export async function stopSandboxInstance(input: {
+  fixture: SystemTestFixture;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  const runtimeState = await input.fixture.readSandboxRuntimeState(input.sandboxInstanceId);
+  const ownerLeaseId = runtimeState.attachment?.ownerLeaseId;
+  if (ownerLeaseId === undefined) {
+    throw new Error(
+      `Sandbox '${input.sandboxInstanceId}' has no attachment owner lease id; stop requires an attached runtime owner.`,
+    );
+  }
+
+  await requestJsonOrThrow({
+    request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
+    path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/stop`,
+    expectedStatus: 200,
+    description: "internal sandbox stop",
+    schema: StopSandboxInstanceAcceptedResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+      },
+      body: JSON.stringify({
+        stopReason: "idle",
+        expectedOwnerLeaseId: ownerLeaseId,
+        idempotencyKey: `system-stop-${randomUUID()}`,
+      }),
+    },
+  });
+}
+
+export async function resumeSandboxInstance(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await requestJsonOrThrow({
+    request: async (path, init) => fetch(`${input.fixture.dataPlaneApiBaseUrl}${path}`, init),
+    path: `/internal/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/resume`,
+    expectedStatus: 200,
+    description: "internal sandbox resume",
+    schema: ResumeSandboxInstanceAcceptedResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+      },
+      body: JSON.stringify({
+        organizationId: input.authenticatedSession.organizationId,
+        idempotencyKey: `system-resume-${randomUUID()}`,
+      }),
+    },
+  });
 }
 
 export async function waitForCondition<T>(input: {
