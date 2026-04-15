@@ -8,8 +8,8 @@ use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
 
 use crate::codex_proxy::types::{
-    CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerState, RetainReason,
-    ThreadSubscriptionState,
+    CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerHealthState,
+    CodexSessionManagerState, RetainReason, ThreadSubscriptionState,
 };
 use crate::codex_proxy::{
     CODEX_INITIALIZE_CLIENT_NAME, CodexMonitor, CodexProxyError, CodexThreadStatus,
@@ -90,8 +90,11 @@ pub fn spawn_codex_session_manager(
 ) -> (
     CodexSessionManagerHandle,
     JoinHandle<Result<(), CodexProxyError>>,
+    watch::Receiver<CodexSessionManagerHealthState>,
 ) {
     let (command_sender, command_receiver) = mpsc::channel(32);
+    let (health_state_sender, health_state_receiver) =
+        watch::channel(CodexSessionManagerHealthState::Starting);
     let handle = CodexSessionManagerHandle { command_sender };
     let task = tokio::spawn(async move {
         run_codex_session_manager_loop(
@@ -100,11 +103,17 @@ pub fn spawn_codex_session_manager(
             &runtime_readiness_manager,
             shutdown_receiver,
             command_receiver,
+            health_state_sender,
         )
         .await
     });
 
-    (handle, task)
+    (handle, task, health_state_receiver)
+}
+
+struct SessionManagerStatusSinks<'a> {
+    runtime_readiness_manager: &'a Arc<Mutex<RuntimeReadinessManager>>,
+    health_state_sender: &'a watch::Sender<CodexSessionManagerHealthState>,
 }
 
 async fn run_codex_session_manager_loop(
@@ -113,6 +122,7 @@ async fn run_codex_session_manager_loop(
     runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     mut shutdown_receiver: watch::Receiver<bool>,
     mut command_receiver: mpsc::Receiver<CodexSessionManagerCommand>,
+    health_state_sender: watch::Sender<CodexSessionManagerHealthState>,
 ) -> Result<(), CodexProxyError> {
     let mut monitor = CodexMonitor::default();
     let mut manager_state = CodexSessionManagerState::default();
@@ -122,12 +132,17 @@ async fn run_codex_session_manager_loop(
             return Ok(());
         }
 
+        let _ = health_state_sender.send(CodexSessionManagerHealthState::Starting);
+        let status_sinks = SessionManagerStatusSinks {
+            runtime_readiness_manager,
+            health_state_sender: &health_state_sender,
+        };
         let session_result = run_codex_session_manager_session(
             raw_app_server_url,
             &mut monitor,
             &mut manager_state,
             keepalive_manager,
-            runtime_readiness_manager,
+            &status_sinks,
             &mut shutdown_receiver,
             &mut command_receiver,
         )
@@ -139,6 +154,7 @@ async fn run_codex_session_manager_loop(
         if let Ok(mut runtime_readiness_manager) = runtime_readiness_manager.lock() {
             runtime_readiness_manager.set_ready(false);
         }
+        let _ = health_state_sender.send(CodexSessionManagerHealthState::Disconnected);
         manager_state.initialized = false;
         manager_state.retention_replay_in_progress = false;
         mark_all_retained_threads_requested(&mut manager_state);
@@ -163,7 +179,7 @@ async fn run_codex_session_manager_session(
     monitor: &mut CodexMonitor,
     manager_state: &mut CodexSessionManagerState,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
-    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
+    status_sinks: &SessionManagerStatusSinks<'_>,
     shutdown_receiver: &mut watch::Receiver<bool>,
     command_receiver: &mut mpsc::Receiver<CodexSessionManagerCommand>,
 ) -> Result<(), CodexProxyError> {
@@ -208,10 +224,14 @@ async fn run_codex_session_manager_session(
     .await?;
 
     manager_state.initialized = true;
-    runtime_readiness_manager
+    status_sinks
+        .runtime_readiness_manager
         .lock()
         .expect("Codex runtime readiness manager lock should not be poisoned")
         .set_ready(true);
+    let _ = status_sinks
+        .health_state_sender
+        .send(CodexSessionManagerHealthState::Connected);
 
     replay_retained_threads(
         &mut socket,

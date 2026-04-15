@@ -16,6 +16,7 @@ use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
+use crate::codex_proxy::CodexProxyControlHandle;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{
@@ -75,6 +76,7 @@ pub struct SandboxdState {
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
+    codex_proxy_control_handle: Option<CodexProxyControlHandle>,
     supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
@@ -151,6 +153,7 @@ impl SandboxdState {
                 supervisor_handle.clone(),
             )
             .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
+        let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
             [] => {
                 runtime_readiness_manager
@@ -159,7 +162,18 @@ impl SandboxdState {
                     .set_ready(true);
                 None
             }
-            [adapter] => Some(adapter.listen_url().to_string()),
+            [_adapter] => Some(
+                codex_proxy_control_handle
+                    .as_ref()
+                    .ok_or_else(|| {
+                        SandboxdStateError::StartRuntimeAdapters(
+                            "sandboxd is missing the typed Codex proxy control handle for the running runtime adapter"
+                                .to_string(),
+                        )
+                    })?
+                    .listen_url()
+                    .to_string(),
+            ),
             _ => {
                 return Err(SandboxdStateError::StartTunnelSession(
                     "sandboxd currently supports exactly one runtime adapter endpoint".to_string(),
@@ -185,6 +199,7 @@ impl SandboxdState {
             egress_proxy,
             process_manager,
             runtime_adapters,
+            codex_proxy_control_handle,
             supervisor_handle,
             keepalive_manager,
             runtime_readiness_manager,
@@ -202,12 +217,20 @@ impl SandboxdState {
             tunnel_session.close();
         }
 
+        let agent_endpoint_url = if let Some(codex_proxy_control_handle) =
+            &self.codex_proxy_control_handle
+        {
+            Some(codex_proxy_control_handle.listen_url().to_string())
+        } else {
+            self.agent_endpoint_url.clone()
+        };
+
         self.tunnel_session = Some(
             TunnelSession::start_with_supervisor(
                 startup_input,
                 self.keepalive_manager.clone(),
                 self.runtime_readiness_manager.clone(),
-                self.agent_endpoint_url.clone(),
+                agent_endpoint_url,
                 self.runtime_env.clone(),
                 self.clock.clone(),
                 self.sleeper.clone(),

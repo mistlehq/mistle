@@ -231,7 +231,7 @@ fn session_manager_retain_and_release_manage_subscriptions() {
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
-        let (handle, task) = spawn_codex_session_manager(
+        let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
             runtime_readiness_manager.clone(),
@@ -349,7 +349,7 @@ fn session_manager_auto_releases_when_resume_returns_non_active_status() {
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
-        let (handle, task) = spawn_codex_session_manager(
+        let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
             runtime_readiness_manager.clone(),
@@ -497,7 +497,7 @@ fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
-        let (handle, task) = spawn_codex_session_manager(
+        let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
             runtime_readiness_manager.clone(),
@@ -659,7 +659,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
-        let (handle, task) = spawn_codex_session_manager(
+        let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
             runtime_readiness_manager.clone(),
@@ -799,7 +799,7 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
     let runtime = build_runtime();
     let (shutdown_sender, handle, task) = runtime.block_on(async {
         let (shutdown_sender, shutdown_receiver) = watch::channel(false);
-        let (handle, task) = spawn_codex_session_manager(
+        let (handle, task, _health_state_receiver) = spawn_codex_session_manager(
             raw_url,
             keepalive_manager,
             runtime_readiness_manager.clone(),

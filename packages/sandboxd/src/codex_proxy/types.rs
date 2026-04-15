@@ -11,6 +11,23 @@ pub enum RetainReason {
     AutomationBackgroundExecution,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodexSessionManagerHealthState {
+    Starting,
+    Connected,
+    Disconnected,
+}
+
+impl CodexSessionManagerHealthState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Starting => "Starting",
+            Self::Connected => "Connected",
+            Self::Disconnected => "Disconnected",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThreadSubscriptionState {
     Requested,
