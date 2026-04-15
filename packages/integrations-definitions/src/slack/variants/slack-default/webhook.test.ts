@@ -359,22 +359,10 @@ describe("slack webhook handler", () => {
         payload: {
           ...createSlackMessagePayload(),
           event: {
-            type: "group_name",
-            channel: "G123",
-            name: "secret-plans-renamed",
-          },
-          event_id: "Ev132",
-        },
-        expectedEventType: "slack:group_name",
-      },
-      {
-        payload: {
-          ...createSlackMessagePayload(),
-          event: {
             type: "group_unarchive",
             channel: "G123",
           },
-          event_id: "Ev133",
+          event_id: "Ev132",
         },
         expectedEventType: "slack:group_unarchive",
       },
@@ -386,7 +374,7 @@ describe("slack webhook handler", () => {
             channel: "G123",
             name: "secret-plans-renamed",
           },
-          event_id: "Ev134",
+          event_id: "Ev133",
         },
         expectedEventType: "slack:group_rename",
       },

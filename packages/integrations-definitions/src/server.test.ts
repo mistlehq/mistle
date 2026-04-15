@@ -127,10 +127,6 @@ describe("integrations-definitions server", () => {
         eventType: "slack:group_rename",
         resourceKinds: ["channel"],
       },
-      {
-        eventType: "slack:group_name",
-        resourceKinds: ["channel"],
-      },
     ]);
     expect(typeof slackDefinition?.listConnectionResources).toBe("function");
   });

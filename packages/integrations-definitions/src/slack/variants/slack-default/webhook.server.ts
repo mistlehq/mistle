@@ -138,7 +138,6 @@ function resolveSlackEventClassification(input: {
     providerEventType === "channel_unarchive" ||
     providerEventType === "channel_rename" ||
     providerEventType === "group_archive" ||
-    providerEventType === "group_name" ||
     providerEventType === "group_unarchive" ||
     providerEventType === "group_rename"
   ) {
