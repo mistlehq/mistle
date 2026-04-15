@@ -203,6 +203,7 @@ domain = "e2b.app"
 
 [apps.data_plane_worker.sandbox_storage.archil]
 api_key = "replace-with-archil-api-key"
+# Region availability: https://docs.archil.com/reference/regions
 region = "gcp-us-central1"
 name_prefix = "mistle-"
 
