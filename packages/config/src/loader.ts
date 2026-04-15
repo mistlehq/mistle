@@ -6,10 +6,7 @@ import type { z } from "zod";
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
-import {
-  getDataPlaneApiPersistentSandboxValidationIssue,
-  getDataPlaneApiSandboxProviderValidationIssue,
-} from "./apps/data-plane-api/schema.js";
+import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import {
@@ -181,18 +178,7 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
     if (issue !== null) {
       throw new Error(issue.message);
     }
-
-    const persistentIssue = getDataPlaneApiPersistentSandboxValidationIssue({
-      globalSandboxStorageBackend: globalConfig.sandbox.storage?.backend,
-      appConfig: parseModuleValue(dataPlaneApiConfigModule, validatedRoot),
-    });
-
-    if (persistentIssue !== null) {
-      throw new Error(persistentIssue.message);
-    }
-  }
-
-  if (options.app === AppIds.DATA_PLANE_WORKER) {
+  } else if (options.app === AppIds.DATA_PLANE_WORKER) {
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
       globalSandboxProvider: globalConfig.sandbox.provider,
       appSandbox: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot).sandbox,

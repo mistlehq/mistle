@@ -633,6 +633,17 @@ describe("loadConfig integrations", () => {
     });
   });
 
+  it("rejects data-plane-api config when control-plane API config is missing", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_API,
+        env: createIntegrationEnv({
+          MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
+        }),
+      }),
+    ).toThrow(/controlPlaneApi/i);
+  });
+
   it("loads data-plane-api from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
@@ -899,7 +910,7 @@ describe("loadConfig integrations", () => {
     );
   });
 
-  it("rejects data-plane-worker config when Archil storage is enabled but worker control-plane API config is missing", () => {
+  it("rejects data-plane-worker config when control-plane API config is missing", () => {
     expect(() =>
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
@@ -907,9 +918,7 @@ describe("loadConfig integrations", () => {
           MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
         }),
       }),
-    ).toThrow(
-      /apps\.data_plane_worker\.control_plane_api\.base_url is required when global\.sandbox\.storage\.backend is 'archil'/,
-    );
+    ).toThrow(/controlPlaneApi/i);
   });
 
   it("rejects data-plane-worker config when Archil storage is enabled but worker Archil config is missing", () => {
@@ -933,7 +942,6 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
-        MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
@@ -948,7 +956,9 @@ describe("loadConfig integrations", () => {
     expect(config.global.sandbox.storage).toEqual({
       backend: "none",
     });
-    expect(config.app.controlPlaneApi).toBeUndefined();
+    expect(config.app.controlPlaneApi).toEqual({
+      baseUrl: "http://127.0.0.1:5100",
+    });
     expect(config.app.sandboxStorage).toBeUndefined();
   });
 

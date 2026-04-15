@@ -23,7 +23,7 @@ export type WorkflowContext = {
   sandboxAdapter: SandboxAdapter;
   sandboxRuntimeControl: SandboxRuntimeControl;
   runtimeStateReader: SandboxRuntimeStateReader;
-  controlPlaneInternalClient: ControlPlaneInternalClient | null;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
   tunnelReadinessPolicy: {
     timeoutMs: number;
     pollIntervalMs: number;
@@ -65,13 +65,10 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
 
   try {
     sandboxRuntimeControl = createSandboxRuntimeControl(config);
-    const controlPlaneInternalClient =
-      workerConfig.controlPlaneApi === undefined
-        ? null
-        : new ControlPlaneInternalClient({
-            baseUrl: workerConfig.controlPlaneApi.baseUrl,
-            internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
-          });
+    const controlPlaneInternalClient = new ControlPlaneInternalClient({
+      baseUrl: workerConfig.controlPlaneApi.baseUrl,
+      internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+    });
 
     return {
       config,

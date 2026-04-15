@@ -153,7 +153,7 @@ export const DataPlaneWorkerConfigSchema = z
     tunnel: DataPlaneWorkerTunnelConfigSchema,
     runtimeState: DataPlaneWorkerRuntimeStateConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
-    controlPlaneApi: DataPlaneWorkerControlPlaneApiConfigSchema.optional(),
+    controlPlaneApi: DataPlaneWorkerControlPlaneApiConfigSchema,
     sandboxStorage: DataPlaneWorkerSandboxStorageConfigSchema.optional(),
   })
   .strict();
@@ -177,8 +177,6 @@ const DataPlaneWorkerProviderRequirementMessages = {
 } as const;
 
 const DataPlaneWorkerPersistentSandboxRequirementMessages = {
-  CONTROL_PLANE_API:
-    "apps.data_plane_worker.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
   ARCHIL:
     "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
 } as const;
@@ -211,18 +209,11 @@ export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
   globalSandboxStorageBackend: SandboxStorageBackend | undefined;
   appConfig: DataPlaneWorkerConfig;
 }): {
-  path: readonly ["controlPlaneApi"] | readonly ["sandboxStorage", "archil"];
+  path: readonly ["sandboxStorage", "archil"];
   message: string;
 } | null {
   if (input.globalSandboxStorageBackend !== SandboxStorageBackends.ARCHIL) {
     return null;
-  }
-
-  if (input.appConfig.controlPlaneApi === undefined) {
-    return {
-      path: ["controlPlaneApi"],
-      message: DataPlaneWorkerPersistentSandboxRequirementMessages.CONTROL_PLANE_API,
-    };
   }
 
   if (input.appConfig.sandboxStorage?.archil === undefined) {

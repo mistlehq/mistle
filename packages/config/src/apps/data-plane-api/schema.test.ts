@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   DataPlaneApiConfigSchema,
   DataPlaneApiSandboxConfigSchema,
-  getDataPlaneApiPersistentSandboxValidationIssue,
   getDataPlaneApiSandboxProviderValidationIssue,
 } from "./schema.js";
 
@@ -54,28 +53,10 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
       baseUrl: "http://127.0.0.1:5100",
     });
   });
-});
 
-describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
-  it("requires docker settings when the global provider is docker", () => {
-    const issue = getDataPlaneApiSandboxProviderValidationIssue({
-      globalSandboxProvider: "docker",
-      appSandbox: {},
-    });
-
-    expect(issue).toEqual({
-      path: ["sandbox", "docker"],
-      message:
-        "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
-    });
-  });
-});
-
-describe("getDataPlaneApiPersistentSandboxValidationIssue", () => {
-  it("requires control-plane API config when Archil storage is enabled", () => {
-    const issue = getDataPlaneApiPersistentSandboxValidationIssue({
-      globalSandboxStorageBackend: "archil",
-      appConfig: {
+  it("requires control-plane API config", () => {
+    expect(() =>
+      DataPlaneApiConfigSchema.parse({
         server: {
           host: "127.0.0.1",
           port: 5200,
@@ -92,13 +73,22 @@ describe("getDataPlaneApiPersistentSandboxValidationIssue", () => {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
         sandbox: {},
-      },
+      }),
+    ).toThrow(/controlPlaneApi/);
+  });
+});
+
+describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
+  it("requires docker settings when the global provider is docker", () => {
+    const issue = getDataPlaneApiSandboxProviderValidationIssue({
+      globalSandboxProvider: "docker",
+      appSandbox: {},
     });
 
     expect(issue).toEqual({
-      path: ["controlPlaneApi"],
+      path: ["sandbox", "docker"],
       message:
-        "apps.data_plane_api.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
+        "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
     });
   });
 });

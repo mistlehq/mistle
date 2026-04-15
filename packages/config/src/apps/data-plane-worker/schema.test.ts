@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DataPlaneWorkerConfigSchema,
   DataPlaneWorkerSandboxConfigSchema,
   DataPlaneWorkerSandboxStorageArchilConfigSchema,
   getDataPlaneWorkerPersistentSandboxValidationIssue,
@@ -61,6 +62,32 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
     });
+  });
+
+  it("requires control-plane API config on the full worker config", () => {
+    expect(() =>
+      DataPlaneWorkerConfigSchema.parse({
+        database: {
+          url: "postgresql://127.0.0.1/mistle",
+        },
+        workflow: {
+          databaseUrl: "postgresql://127.0.0.1/mistle",
+          namespaceId: "development",
+          runMigrations: true,
+          concurrency: 1,
+        },
+        tunnel: {
+          bootstrapTokenTtlSeconds: 120,
+          exchangeTokenTtlSeconds: 3600,
+        },
+        runtimeState: {
+          gatewayBaseUrl: "http://127.0.0.1:5202",
+        },
+        sandbox: {
+          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+        },
+      }),
+    ).toThrow(/controlPlaneApi/);
   });
 });
 
@@ -141,7 +168,7 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
 });
 
 describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
-  it("requires control-plane API config when Archil storage is enabled", () => {
+  it("requires Archil worker config when Archil storage is enabled", () => {
     const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
       globalSandboxStorageBackend: "archil",
       appConfig: {
@@ -161,6 +188,9 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
+        controlPlaneApi: {
+          baseUrl: "http://127.0.0.1:5100",
+        },
         sandbox: {
           tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
         },
@@ -168,9 +198,9 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
     });
 
     expect(issue).toEqual({
-      path: ["controlPlaneApi"],
+      path: ["sandboxStorage", "archil"],
       message:
-        "apps.data_plane_worker.control_plane_api.base_url is required when global.sandbox.storage.backend is 'archil'.",
+        "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
     });
   });
 });

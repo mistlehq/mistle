@@ -17,7 +17,7 @@ export type AppRuntimeResources = {
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   runtimeStateReader: SandboxRuntimeStateReader;
   sandboxAdapter: SandboxAdapter;
-  controlPlaneInternalClient: ControlPlaneInternalClient | null;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
 };
 
 export async function createAppResources(
@@ -34,13 +34,10 @@ export async function createAppResources(
     baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
     serviceToken: runtimeConfig.internalAuthServiceToken,
   });
-  const controlPlaneInternalClient =
-    runtimeConfig.app.controlPlaneApi === undefined
-      ? null
-      : new ControlPlaneInternalClient({
-          baseUrl: runtimeConfig.app.controlPlaneApi.baseUrl,
-          internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
-        });
+  const controlPlaneInternalClient = new ControlPlaneInternalClient({
+    baseUrl: runtimeConfig.app.controlPlaneApi.baseUrl,
+    internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+  });
   const sandboxAdapter = createSandboxRuntimeAdapter(runtimeConfig);
 
   let workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;

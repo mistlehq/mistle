@@ -23,6 +23,9 @@ describe("createSandboxRuntimeEnv", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
             sandboxdTestFaultsEnabled: true,
@@ -105,6 +108,9 @@ describe("createSandboxRuntimeEnv", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",

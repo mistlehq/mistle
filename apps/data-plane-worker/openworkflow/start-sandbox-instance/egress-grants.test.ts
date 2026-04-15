@@ -33,6 +33,9 @@ describe("createEgressGrantByRuleId", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5003",
           },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
@@ -209,6 +212,9 @@ describe("createEgressGrantByRuleId", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5003",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",

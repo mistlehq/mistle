@@ -140,6 +140,9 @@ describe("parseConfigRecord", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
           sandbox: {
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -162,6 +165,9 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
@@ -343,6 +349,9 @@ describe("parseConfigRecord", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
           sandbox: {
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -365,6 +374,9 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
@@ -546,6 +558,9 @@ describe("parseConfigRecord", () => {
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
           },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
           sandbox: {
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -568,6 +583,9 @@ describe("parseConfigRecord", () => {
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
@@ -610,7 +628,7 @@ describe("parseConfigRecord", () => {
     );
   });
 
-  it("rejects a config record when Archil storage is enabled but the data-plane API control-plane URL is missing", () => {
+  it("rejects a config record when the data-plane API control-plane URL is missing", () => {
     expect(() =>
       parseConfigRecord({
         global: {
@@ -627,9 +645,6 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             provider: "docker",
-            storage: {
-              backend: "archil",
-            },
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
             internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -810,9 +825,7 @@ describe("parseConfigRecord", () => {
           },
         },
       }),
-    ).toThrow(
-      /apps\.data_plane_api\.control_plane_api\.base_url is required when global\.sandbox\.storage\.backend is 'archil'/,
-    );
+    ).toThrow(/controlPlaneApi/);
   });
 });
 
