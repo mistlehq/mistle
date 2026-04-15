@@ -1,3 +1,4 @@
+import { getValueAtPath } from "../../../../packages/config/src/core/record.js";
 import type { ConfigRecord } from "../development/types.ts";
 
 export const IntegrationSandboxProvider = {
@@ -18,6 +19,21 @@ type RequiredConfigValue = {
   envVar: string;
 };
 
+const ArchilIntegrationRequiredConfigValues = [
+  {
+    path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+  },
+  {
+    path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "region"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
+  },
+  {
+    path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+  },
+] as const satisfies readonly RequiredConfigValue[];
+
 export type IntegrationProviderPreset = {
   defaults: ConfigRecord;
   prunePaths: readonly (readonly string[])[];
@@ -32,7 +48,7 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
       sandbox: {
         provider: IntegrationSandboxProvider.DOCKER,
         storage: {
-          backend: "archil",
+          backend: "none",
         },
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway:5202/tunnel/sandbox",
@@ -66,16 +82,7 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
     ["apps", "data_plane_api", "sandbox", "e2b"],
     ["apps", "data_plane_worker", "sandbox", "e2b"],
   ],
-  requiredConfigValues: [
-    {
-      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
-    },
-    {
-      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    },
-  ],
+  requiredConfigValues: [],
   outputFileName: IntegrationConfigFileNames.DOCKER,
 };
 
@@ -86,7 +93,7 @@ const E2B_PRESET: IntegrationProviderPreset = {
       sandbox: {
         provider: IntegrationSandboxProvider.E2B,
         storage: {
-          backend: "archil",
+          backend: "none",
         },
         gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
         internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
@@ -129,17 +136,28 @@ const E2B_PRESET: IntegrationProviderPreset = {
       path: ["apps", "data_plane_worker", "sandbox", "e2b", "api_key"],
       envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
     },
-    {
-      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "api_key"],
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
-    },
-    {
-      path: ["apps", "data_plane_worker", "sandbox_storage", "archil", "mounts"],
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    },
   ],
   outputFileName: IntegrationConfigFileNames.E2B,
 };
+
+export function getRequiredIntegrationConfigValues(input: {
+  provider: IntegrationSandboxProvider;
+  configRoot: Record<string, unknown>;
+}): readonly RequiredConfigValue[] {
+  const preset = getIntegrationProviderPreset(input.provider);
+  const storageBackend = getValueAtPath(input.configRoot, [
+    "global",
+    "sandbox",
+    "storage",
+    "backend",
+  ]);
+
+  if (storageBackend === "archil") {
+    return [...preset.requiredConfigValues, ...ArchilIntegrationRequiredConfigValues];
+  }
+
+  return preset.requiredConfigValues;
+}
 
 export function parseIntegrationSandboxProviders(
   rawProviders: string | undefined,

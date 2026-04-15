@@ -17,6 +17,7 @@ import { AppIds } from "../../packages/config/src/modules.ts";
 import { developmentPresetModules } from "./presets/development/index.ts";
 import type { ConfigRecord, DevelopmentPresetModule } from "./presets/development/types.ts";
 import {
+  getRequiredIntegrationConfigValues,
   getIntegrationProviderPreset,
   parseIntegrationSandboxProviders,
   type IntegrationSandboxProvider,
@@ -116,9 +117,7 @@ function assertRequiredConfigValues(input: {
   provider: IntegrationSandboxProvider;
   configRoot: Record<string, unknown>;
 }): void {
-  const preset = getIntegrationProviderPreset(input.provider);
-
-  for (const requiredValue of preset.requiredConfigValues) {
+  for (const requiredValue of getRequiredIntegrationConfigValues(input)) {
     const value = getValueAtPath(input.configRoot, requiredValue.path);
     if (isMissingRequiredConfigValue(value)) {
       throw new Error(

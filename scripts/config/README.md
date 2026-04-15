@@ -49,10 +49,10 @@ Notes:
 - Conversion currently covers `@mistle/config` managed runtime modules (global plus control/data plane apps).
 - Unknown keys are ignored.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
-- Persistent-sandbox integration config is stricter than the base runtime schema:
-  when Archil storage is enabled for generated integration configs, provider
-  presets require a fully populated managed Archil mount definition rather than
-  an omitted or empty `mounts` array.
+- Generated integration configs default to `global.sandbox.storage.backend = "none"`.
+- If integration config generation explicitly enables Archil storage, provider
+  presets require a fully populated managed Archil profile with `api_key`,
+  `region`, and a non-empty `mounts` array.
 
 ## Preset Modules
 
