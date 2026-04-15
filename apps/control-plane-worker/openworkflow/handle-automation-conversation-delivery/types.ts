@@ -1,3 +1,5 @@
+import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
+
 export type ActiveAutomationConversationDeliveryTaskStatus = "claimed" | "delivering";
 
 export type ActiveAutomationConversationDeliveryTask = {
@@ -33,6 +35,7 @@ export type ExecuteConversationProviderDeliveryInput = {
   runtimeId: string;
   connectionUrl: string;
   inputText: string;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   providerConversationId: string | null;
   providerExecutionId: string | null;
 };

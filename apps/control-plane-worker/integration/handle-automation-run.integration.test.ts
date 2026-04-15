@@ -479,6 +479,7 @@ describe("handleAutomationRun integration", () => {
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
+          instructions: "Always include a reproducible next step.",
           conversationKeyTemplate: "issue-{{payload.issue.number}}",
           idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
         });
@@ -551,6 +552,11 @@ describe("handleAutomationRun integration", () => {
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
+          instructions: "Always include a reproducible next step.",
+          collaborationModeSettings: {
+            model: "gpt-5.2",
+            reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+          },
         });
         expect(preparedRun.webhookPayload).toEqual({
           issue: {
@@ -566,6 +572,7 @@ describe("handleAutomationRun integration", () => {
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
+          instructions: "Always include a reproducible next step.",
         });
         expect(persistedAutomationConversation).toMatchObject({
           id: preparedRun.conversationId,
@@ -951,6 +958,7 @@ describe("handleAutomationRun integration", () => {
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
           inputTemplate: "Handle {{payload.comment.body}}",
+          instructions: "Mention the automation marker `AUTOMATION_ONLY` exactly once.",
           conversationKeyTemplate: "issue-{{payload.issue.number}}",
           idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
         });
@@ -1003,6 +1011,7 @@ describe("handleAutomationRun integration", () => {
           .update(webhookAutomations)
           .set({
             inputTemplate: "Changed {{payload.comment.body}}",
+            instructions: "Changed automation instructions should not replay.",
             conversationKeyTemplate: "changed-issue-{{payload.issue.number}}",
             idempotencyKeyTemplate: "changed-{{webhookEvent.externalDeliveryId}}",
           })
@@ -1026,6 +1035,11 @@ describe("handleAutomationRun integration", () => {
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",
+          instructions: "Mention the automation marker `AUTOMATION_ONLY` exactly once.",
+          collaborationModeSettings: {
+            model: "gpt-5.2",
+            reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+          },
         });
         expect(replayPreparedRun).toEqual(firstPreparedRun);
         expect(persistedRun).toMatchObject({
@@ -1034,6 +1048,7 @@ describe("handleAutomationRun integration", () => {
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",
+          instructions: "Mention the automation marker `AUTOMATION_ONLY` exactly once.",
         });
       } finally {
         await database.stop();

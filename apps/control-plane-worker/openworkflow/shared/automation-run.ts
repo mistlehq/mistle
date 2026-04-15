@@ -9,6 +9,7 @@ import {
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
+import { OpenAiApiKeyBindingConfigSchema } from "@mistle/integrations-definitions/openai";
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
@@ -49,6 +50,7 @@ export const AutomationRunFailureCodes = {
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
   AGENT_BINDING_RUNTIME_INVALID: "agent_binding_runtime_invalid",
+  AGENT_BINDING_CONFIG_INVALID: "agent_binding_config_invalid",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
@@ -196,6 +198,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     renderedInput: string | null;
     renderedConversationKey: string | null;
     renderedIdempotencyKey: string | null;
+    instructions: string | null;
   };
   automationTarget: {
     id: string;
@@ -254,6 +257,31 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     renderedInput: input.automationRun.renderedInput,
     renderedConversationKey: input.automationRun.renderedConversationKey,
     renderedIdempotencyKey: input.automationRun.renderedIdempotencyKey,
+    instructions: input.automationRun.instructions,
+    collaborationModeSettings: null,
+  };
+}
+
+function readCodexCollaborationModeSettings(input: {
+  automationRunId: string;
+  bindingId: string;
+  bindingConfig: Record<string, unknown>;
+}): {
+  model: string;
+  reasoningEffort: string | null;
+} {
+  const parsedBindingConfig = OpenAiApiKeyBindingConfigSchema.safeParse(input.bindingConfig);
+  if (!parsedBindingConfig.success) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_CONFIG_INVALID,
+      message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid Codex binding config.`,
+      cause: parsedBindingConfig.error,
+    });
+  }
+
+  return {
+    model: parsedBindingConfig.data.model.defaultModel,
+    reasoningEffort: parsedBindingConfig.data.model.options.reasoningEffort,
   };
 }
 
@@ -284,6 +312,10 @@ async function resolveAutomationConversationBindingContext(
 ): Promise<{
   integrationFamilyId: string;
   runtimeId: string;
+  collaborationModeSettings: {
+    model: string;
+    reasoningEffort: string | null;
+  } | null;
 }> {
   const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     where: (table, { and: whereAnd, eq: whereEq }) =>
@@ -333,13 +365,23 @@ async function resolveAutomationConversationBindingContext(
     });
   }
 
+  const runtimeId = readAgentBindingRuntimeId({
+    automationRunId: input.automationRunId,
+    bindingId: agentBinding.id,
+    bindingConfig: agentBinding.config,
+  });
+
   return {
     integrationFamilyId: agentTarget.familyId,
-    runtimeId: readAgentBindingRuntimeId({
-      automationRunId: input.automationRunId,
-      bindingId: agentBinding.id,
-      bindingConfig: agentBinding.config,
-    }),
+    runtimeId,
+    collaborationModeSettings:
+      runtimeId === "codex"
+        ? readCodexCollaborationModeSettings({
+            automationRunId: input.automationRunId,
+            bindingId: agentBinding.id,
+            bindingConfig: agentBinding.config,
+          })
+        : null,
   };
 }
 
@@ -432,6 +474,7 @@ export async function prepareAutomationRun(
       renderedInput: automationRun.renderedInput,
       renderedConversationKey: automationRun.renderedConversationKey,
       renderedIdempotencyKey: automationRun.renderedIdempotencyKey,
+      instructions: automationRun.instructions,
     },
     automationTarget: {
       id: automationTarget.id,
@@ -452,6 +495,15 @@ export async function prepareAutomationRun(
     },
   });
   if (persistedSnapshot !== null) {
+    const bindingContext =
+      persistedSnapshot.instructions === null
+        ? null
+        : await resolveAutomationConversationBindingContext(ctx.db, {
+            automationRunId: automationRun.id,
+            organizationId: automation.organizationId,
+            sandboxProfileId: automationTarget.sandboxProfileId,
+            sandboxProfileVersion,
+          });
     if (persistedSnapshot.webhookSourceOrderKey.length === 0) {
       throw new AutomationRunExecutionError({
         code: AutomationRunFailureCodes.WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING,
@@ -459,7 +511,10 @@ export async function prepareAutomationRun(
       });
     }
 
-    return persistedSnapshot;
+    return {
+      ...persistedSnapshot,
+      collaborationModeSettings: bindingContext?.collaborationModeSettings ?? null,
+    };
   }
 
   const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
@@ -501,14 +556,14 @@ export async function prepareAutomationRun(
     });
   }
 
-  const claimedConversationId = await ctx.db.transaction(async (tx) => {
-    const bindingContext = await resolveAutomationConversationBindingContext(tx, {
-      automationRunId: automationRun.id,
-      organizationId: automation.organizationId,
-      sandboxProfileId: automationTarget.sandboxProfileId,
-      sandboxProfileVersion,
-    });
+  const bindingContext = await resolveAutomationConversationBindingContext(ctx.db, {
+    automationRunId: automationRun.id,
+    organizationId: automation.organizationId,
+    sandboxProfileId: automationTarget.sandboxProfileId,
+    sandboxProfileVersion,
+  });
 
+  const claimedConversationId = await ctx.db.transaction(async (tx) => {
     const claimedAutomationConversation = await claimAutomationConversation(
       {
         db: tx,
@@ -533,6 +588,7 @@ export async function prepareAutomationRun(
         renderedInput: compiledTemplates.renderedInput,
         renderedConversationKey: compiledTemplates.renderedConversationKey,
         renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+        instructions: webhookAutomation.instructions,
         updatedAt: sql`now()`,
       })
       .where(eq(automationRuns.id, automationRun.id));
@@ -559,6 +615,9 @@ export async function prepareAutomationRun(
     renderedInput: compiledTemplates.renderedInput,
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+    instructions: webhookAutomation.instructions,
+    collaborationModeSettings:
+      webhookAutomation.instructions === null ? null : bindingContext.collaborationModeSettings,
   };
 }
 

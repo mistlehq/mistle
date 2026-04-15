@@ -45,10 +45,17 @@ export type AgentConversationReadMetadataResult = {
   preview: string | null;
 };
 
+export type AgentConversationCollaborationModeSettings = {
+  model: string;
+  reasoningEffort: string | null;
+  developerInstructions: string | null;
+};
+
 export type AgentConversationStartExecutionInput = {
   connection: AgentConversationConnection;
   providerConversationId: string;
   inputText: string;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
 };
 
 export type AgentConversationStartExecutionResult = {

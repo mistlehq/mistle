@@ -127,6 +127,16 @@ export async function deliverConversationAutomationPayload(
     runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
     connectionUrl: input.acquiredAutomationConnection.url,
     inputText: input.preparedAutomationRun.renderedInput,
+    ...(input.preparedAutomationRun.instructions === null ||
+    input.preparedAutomationRun.collaborationModeSettings === null
+      ? {}
+      : {
+          collaborationModeSettings: {
+            model: input.preparedAutomationRun.collaborationModeSettings.model,
+            reasoningEffort: input.preparedAutomationRun.collaborationModeSettings.reasoningEffort,
+            developerInstructions: input.preparedAutomationRun.instructions,
+          },
+        }),
     providerConversationId: route.providerConversationId,
     providerExecutionId: route.providerExecutionId,
   });

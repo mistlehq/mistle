@@ -1,4 +1,5 @@
 import type {
+  AgentConversationCollaborationModeSettings,
   AgentConversationConnectInput,
   AgentConversationConnection,
   AgentConversationInspectResult,
@@ -405,6 +406,42 @@ function toCodexTextInputItems(inputText: string): CodexStartExecutionInputItem[
   ];
 }
 
+export function resolveCodexTurnStartParams(input: {
+  providerConversationId: string;
+  inputText: string;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+}): {
+  threadId: string;
+  input: CodexStartExecutionInputItem[];
+  collaborationMode?:
+    | {
+        mode: "default";
+        settings: {
+          model: string;
+          reasoning_effort: string | null;
+          developer_instructions: string | null;
+        };
+      }
+    | undefined;
+} {
+  return {
+    threadId: input.providerConversationId,
+    input: toCodexTextInputItems(input.inputText),
+    ...(input.collaborationModeSettings === undefined
+      ? {}
+      : {
+          collaborationMode: {
+            mode: "default" as const,
+            settings: {
+              model: input.collaborationModeSettings.model,
+              reasoning_effort: input.collaborationModeSettings.reasoningEffort,
+              developer_instructions: input.collaborationModeSettings.developerInstructions,
+            },
+          },
+        }),
+  };
+}
+
 function resolveCodexStartThreadParams(options: Readonly<Record<string, unknown>> | undefined): {
   model?: string;
 } {
@@ -641,10 +678,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       try {
         startResult = await input.connection.request({
           method: CodexMethodNames.TURN_START,
-          params: {
-            threadId: input.providerConversationId,
-            input: toCodexTextInputItems(input.inputText),
-          },
+          params: resolveCodexTurnStartParams(input),
         });
       } catch (error) {
         if (isProviderConversationMissingError(error)) {

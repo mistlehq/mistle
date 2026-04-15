@@ -48,6 +48,7 @@ async function recoverLateSteerExecution(input: {
   providerConversationId: string;
   providerExecutionId: string;
   inputText: string;
+  collaborationModeSettings?: ExecuteConversationProviderDeliveryInput["collaborationModeSettings"];
 }) {
   if (input.adapter.recoverLateSteer !== undefined) {
     return await input.adapter.recoverLateSteer({
@@ -72,6 +73,7 @@ async function recoverLateSteerExecution(input: {
         connection: input.connection,
         providerConversationId: input.providerConversationId,
         inputText: input.inputText,
+        collaborationModeSettings: input.collaborationModeSettings,
       });
     case AutomationConversationSteerRecoveryActions.FAIL_MISSING_CONVERSATION:
       throw new ConversationDeliveryExecutionError(
@@ -124,6 +126,7 @@ export async function executeConversationProviderDelivery(
           connection,
           providerConversationId,
           inputText: input.inputText,
+          collaborationModeSettings: input.collaborationModeSettings,
         });
         break;
       case AutomationConversationExecutionActions.STEER:
@@ -155,6 +158,7 @@ export async function executeConversationProviderDelivery(
             providerConversationId,
             providerExecutionId: input.providerExecutionId,
             inputText: input.inputText,
+            collaborationModeSettings: input.collaborationModeSettings,
           });
         }
         break;

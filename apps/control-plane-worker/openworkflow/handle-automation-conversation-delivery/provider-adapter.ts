@@ -1,4 +1,7 @@
-import type { AgentConversationProvider } from "@mistle/integrations-core";
+import type {
+  AgentConversationCollaborationModeSettings,
+  AgentConversationProvider,
+} from "@mistle/integrations-core";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
 export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
@@ -63,6 +66,7 @@ export type ProviderStartExecutionInput = {
   connection: ProviderConnection;
   providerConversationId: string;
   inputText: string;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
 };
 
 export type ProviderSteerExecutionInput = {

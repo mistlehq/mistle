@@ -286,6 +286,8 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadInpu
       renderedInput: "Handle @mistlebot run this",
       renderedConversationKey: "issue-42",
       renderedIdempotencyKey: "delivery_test_001",
+      instructions: null,
+      collaborationModeSettings: null,
     },
     ensuredAutomationSandbox: {
       sandboxInstanceId: "sbi_test_001",

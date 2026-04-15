@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeCodexThreadStatus } from "./conversation-provider.server.js";
+import {
+  normalizeCodexThreadStatus,
+  resolveCodexTurnStartParams,
+} from "./conversation-provider.server.js";
 
 describe("normalizeCodexThreadStatus", () => {
   it("keeps active threads active", () => {
@@ -20,5 +23,54 @@ describe("normalizeCodexThreadStatus", () => {
     expect(() => normalizeCodexThreadStatus({ type: "unknown" })).toThrow(
       "Codex inspect returned unsupported thread status type 'unknown'.",
     );
+  });
+});
+
+describe("resolveCodexTurnStartParams", () => {
+  it("includes collaboration mode settings when provided", () => {
+    expect(
+      resolveCodexTurnStartParams({
+        providerConversationId: "thread_123",
+        inputText: "Handle the webhook payload.",
+        collaborationModeSettings: {
+          model: "gpt-5.2",
+          reasoningEffort: "medium",
+          developerInstructions: "Always include the automation marker.",
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      input: [
+        {
+          type: "text",
+          text: "Handle the webhook payload.",
+        },
+      ],
+      collaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.2",
+          reasoning_effort: "medium",
+          developer_instructions: "Always include the automation marker.",
+        },
+      },
+    });
+  });
+
+  it("omits collaboration mode settings when none are provided", () => {
+    expect(
+      resolveCodexTurnStartParams({
+        providerConversationId: "thread_123",
+        inputText: "Handle the webhook payload.",
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      input: [
+        {
+          type: "text",
+          text: "Handle the webhook payload.",
+        },
+      ],
+    });
   });
 });

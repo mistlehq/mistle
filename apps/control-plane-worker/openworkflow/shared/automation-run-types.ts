@@ -19,6 +19,11 @@ export type PreparedAutomationRun = {
   renderedInput: string;
   renderedConversationKey: string;
   renderedIdempotencyKey: string | null;
+  instructions: string | null;
+  collaborationModeSettings: {
+    model: string;
+    reasoningEffort: string | null;
+  } | null;
 };
 
 export type EnsuredAutomationSandbox = {
