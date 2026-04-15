@@ -1,6 +1,6 @@
 import { Input, Spinner, cn } from "@mistle/ui";
 import { CheckCircleIcon, PencilSimpleIcon } from "@phosphor-icons/react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 import type { AutoSaveInputVisualStatus } from "./auto-save-input-surface.js";
 
@@ -28,7 +28,6 @@ export function InlineEditableHeadingField(
   const saveStatus = input.saveStatus ?? "idle";
   const saveState = input.errorMessage === undefined ? saveStatus : "error";
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [isIndicatorHovered, setIsIndicatorHovered] = useState(false);
 
   function focusInput(): void {
     inputRef.current?.focus();
@@ -36,7 +35,7 @@ export function InlineEditableHeadingField(
 
   return (
     <div className={containerClassName} data-save-state={saveState}>
-      <div className="group/editable-heading relative max-w-full w-fit">
+      <div className="group/editable-heading relative max-w-full w-fit [&:has(.heading-affordance:hover)_[data-slot=input]]:border-b-border [&:has(.heading-affordance:hover)_[data-slot=input]]:text-muted-foreground">
         <Input
           aria-invalid={input.errorMessage === undefined ? undefined : true}
           aria-label={input.ariaLabel}
@@ -44,7 +43,6 @@ export function InlineEditableHeadingField(
           className={cn(
             "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70",
             "hover:border-b-border focus-visible:border-b-border",
-            isIndicatorHovered ? "border-b-border text-muted-foreground" : null,
             input.inputClassName,
           )}
           disabled={input.disabled}
@@ -72,17 +70,11 @@ export function InlineEditableHeadingField(
           {input.errorMessage === undefined && saveStatus === "idle" ? (
             <div
               aria-hidden
-              className="flex cursor-text items-center"
+              className="heading-affordance flex cursor-text items-center"
               onClick={focusInput}
               onMouseDown={(event) => {
                 event.preventDefault();
                 focusInput();
-              }}
-              onMouseEnter={() => {
-                setIsIndicatorHovered(true);
-              }}
-              onMouseLeave={() => {
-                setIsIndicatorHovered(false);
               }}
             >
               <PencilSimpleIcon
