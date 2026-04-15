@@ -15,7 +15,10 @@ use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, TryRecvError};
 use std::thread::{self, JoinHandle};
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
@@ -46,6 +49,9 @@ use crate::time::Clock;
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
+const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
+const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
+const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const RUNTIME_NO_PROXY_DEFAULTS: [&str; 2] = ["127.0.0.1", "localhost"];
 
 const MANAGED_PROXY_ENV_KEYS: [&str; 15] = [
@@ -72,8 +78,10 @@ type EgressConnector = HttpsConnector<HttpConnector>;
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
-    shutdown_tx: Option<oneshot::Sender<()>>,
-    server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
+    shutdown_requested: Arc<AtomicBool>,
+    supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
+    #[cfg(test)]
+    supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     ca_certificate_path: PathBuf,
     supervisor_handle: SandboxdSupervisorHandle,
 }
@@ -100,6 +108,22 @@ struct EgressProxyState {
     proxy_ca_certificate_pem: Arc<String>,
     proxy_ca_private_key_pem: Arc<String>,
     clock: Arc<dyn Clock>,
+}
+
+struct EgressProxySupervisorConfig {
+    listener_address: SocketAddr,
+    state: EgressProxyState,
+}
+
+#[cfg(test)]
+enum EgressProxySupervisorCommand {
+    ForceCurrentServerShutdown,
+}
+
+struct ActiveEgressProxyServer {
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
+    exit_receiver: mpsc::Receiver<Result<(), EgressProxyError>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -180,14 +204,7 @@ impl EgressProxy {
             ))
         })?;
 
-        let std_listener = StdTcpListener::bind(listener_address).map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to bind local egress proxy listener: {error}"
-            ))
-        })?;
-        std_listener.set_nonblocking(true).map_err(|error| {
-            EgressProxyError::new(format!("failed to configure proxy listener: {error}"))
-        })?;
+        let std_listener = bind_egress_proxy_listener(listener_address).map_err(EgressProxyError::new)?;
         let listener_address = std_listener.local_addr().map_err(|error| {
             EgressProxyError::new(format!(
                 "failed to inspect local egress proxy address: {error}"
@@ -232,15 +249,46 @@ impl EgressProxy {
         )?;
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let server_thread =
-            thread::spawn(move || run_proxy_server(std_listener, shutdown_rx, state));
+        let mut active_server = spawn_active_egress_proxy_server(std_listener, state.clone());
+        if let Err(error) = wait_for_egress_proxy_health(
+            listener_address,
+            &mut active_server,
+            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+        ) {
+            active_server.request_shutdown();
+            let _ = active_server.join();
+            return Err(error);
+        }
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
+
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        #[cfg(test)]
+        let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
+        let supervisor_thread = thread::spawn({
+            let shutdown_requested = shutdown_requested.clone();
+            let supervisor_handle = supervisor_handle.clone();
+            let config = EgressProxySupervisorConfig {
+                listener_address,
+                state,
+            };
+            move || {
+                run_egress_proxy_supervisor(
+                    config,
+                    active_server,
+                    shutdown_requested,
+                    supervisor_handle,
+                    #[cfg(test)]
+                    supervisor_command_receiver,
+                )
+            }
+        });
 
         Ok(Some(Self {
             runtime_env,
-            shutdown_tx: Some(shutdown_tx),
-            server_thread: Some(server_thread),
+            shutdown_requested,
+            supervisor_thread: Some(supervisor_thread),
+            #[cfg(test)]
+            supervisor_command_sender: Some(supervisor_command_sender),
             ca_certificate_path: ca_certificate_path.to_path_buf(),
             supervisor_handle,
         }))
@@ -254,47 +302,22 @@ impl EgressProxy {
         &MANAGED_PROXY_ENV_KEYS
     }
 
-    pub fn close(mut self) -> Result<(), EgressProxyError> {
-        if let Some(shutdown_tx) = self.shutdown_tx.take() {
-            let _ = shutdown_tx.send(());
+    #[cfg(test)]
+    fn force_current_server_shutdown_for_test(&self) {
+        if let Some(supervisor_command_sender) = &self.supervisor_command_sender {
+            let _ = supervisor_command_sender
+                .send(EgressProxySupervisorCommand::ForceCurrentServerShutdown);
         }
+    }
 
-        if let Some(server_thread) = self.server_thread.take() {
-            match server_thread.join() {
+    pub fn close(mut self) -> Result<(), EgressProxyError> {
+        self.shutdown_requested.store(true, Ordering::Relaxed);
+
+        if let Some(supervisor_thread) = self.supervisor_thread.take() {
+            match supervisor_thread.join() {
                 Ok(Ok(())) => {}
-                Ok(Err(error)) => {
-                    let error_text = error.to_string();
-                    self.supervisor_handle.mark_component_restarting(
-                        SupervisedComponent::EgressProxy,
-                        error_text.clone(),
-                    );
-                    self.supervisor_handle.emit_component_exited(
-                        SupervisedComponent::EgressProxy,
-                        "thread_returned",
-                        Some(&error_text),
-                        &[("exitKind", Value::String("thread_returned".to_string()))],
-                    );
-                    return Err(error);
-                }
-                Err(_) => {
-                    self.supervisor_handle.mark_component_restarting(
-                        SupervisedComponent::EgressProxy,
-                        "local egress proxy thread panicked",
-                    );
-                    self.supervisor_handle.emit_component_exited(
-                        SupervisedComponent::EgressProxy,
-                        "panic",
-                        Some("local egress proxy thread panicked"),
-                        &[
-                            ("exitKind", Value::String("panic".to_string())),
-                            (
-                                "panicBoundary",
-                                Value::String("proxy_thread".to_string()),
-                            ),
-                        ],
-                    );
-                    return Err(EgressProxyError::new("local egress proxy thread panicked"));
-                }
+                Ok(Err(error)) => return Err(error),
+                Err(_) => return Err(EgressProxyError::new("egress proxy supervisor thread panicked")),
             }
         }
 
@@ -318,6 +341,314 @@ impl EgressProxy {
 
 fn default_loopback_proxy_listener_address() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
+}
+
+fn spawn_active_egress_proxy_server(
+    std_listener: StdTcpListener,
+    state: EgressProxyState,
+) -> ActiveEgressProxyServer {
+    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let (exit_sender, exit_receiver) = mpsc::channel();
+    let server_thread = thread::spawn(move || {
+        let result = run_proxy_server(std_listener, shutdown_rx, state);
+        let _ = exit_sender.send(result.clone());
+        result
+    });
+    ActiveEgressProxyServer {
+        shutdown_tx: Some(shutdown_tx),
+        server_thread: Some(server_thread),
+        exit_receiver,
+    }
+}
+
+impl ActiveEgressProxyServer {
+    fn request_shutdown(&mut self) {
+        if let Some(shutdown_tx) = self.shutdown_tx.take() {
+            let _ = shutdown_tx.send(());
+        }
+    }
+
+    fn try_recv_exit(&self) -> Result<Option<Result<(), EgressProxyError>>, TryRecvError> {
+        match self.exit_receiver.try_recv() {
+            Ok(result) => Ok(Some(result)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(TryRecvError::Disconnected),
+        }
+    }
+
+    fn join(mut self) -> Result<(), EgressProxyError> {
+        if let Some(server_thread) = self.server_thread.take() {
+            return match server_thread.join() {
+                Ok(result) => result,
+                Err(_) => Err(EgressProxyError::new("local egress proxy thread panicked")),
+            };
+        }
+        Ok(())
+    }
+
+    fn join_after_disconnected_exit_channel(&mut self) -> EgressProxyError {
+        self.shutdown_tx = None;
+        match self.server_thread.take() {
+            Some(server_thread) => match server_thread.join() {
+                Ok(Ok(())) => {
+                    EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly")
+                }
+                Ok(Err(error)) => error,
+                Err(_) => EgressProxyError::new("local egress proxy thread panicked"),
+            },
+            None => EgressProxyError::new("local egress proxy exit channel disconnected unexpectedly"),
+        }
+    }
+}
+
+fn run_egress_proxy_supervisor(
+    config: EgressProxySupervisorConfig,
+    mut active_server: ActiveEgressProxyServer,
+    shutdown_requested: Arc<AtomicBool>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    #[cfg(test)] supervisor_command_receiver: mpsc::Receiver<EgressProxySupervisorCommand>,
+) -> Result<(), EgressProxyError> {
+    let mut restart_attempt_index = 0_usize;
+
+    loop {
+        if shutdown_requested.load(Ordering::Relaxed) {
+            active_server.request_shutdown();
+            return active_server.join();
+        }
+
+        #[cfg(test)]
+        match supervisor_command_receiver.try_recv() {
+            Ok(EgressProxySupervisorCommand::ForceCurrentServerShutdown) => {
+                active_server.request_shutdown();
+            }
+            Err(TryRecvError::Empty) => {}
+            Err(TryRecvError::Disconnected) => {}
+        }
+
+        let exit_result = match active_server.try_recv_exit() {
+            Ok(Some(exit_result)) => Some(exit_result),
+            Ok(None) => None,
+            Err(TryRecvError::Empty) => None,
+            Err(TryRecvError::Disconnected) => {
+                Some(Err(active_server.join_after_disconnected_exit_channel()))
+            }
+        };
+
+        if let Some(exit_result) = exit_result {
+            let exit_error = normalize_egress_proxy_exit_result(exit_result);
+            record_egress_proxy_exit_for_restart(&supervisor_handle, &exit_error);
+            active_server = match restart_egress_proxy_after_backoff(
+                &config,
+                shutdown_requested.as_ref(),
+                &supervisor_handle,
+                &mut restart_attempt_index,
+            ) {
+                Ok(active_server) => active_server,
+                Err(error) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
+                Err(error) => return Err(error),
+            };
+            continue;
+        }
+
+        if let Err(error) = check_egress_proxy_health(config.listener_address) {
+            record_egress_proxy_healthcheck_failure(&supervisor_handle, &error);
+            active_server.request_shutdown();
+            let _ = active_server.join();
+            active_server = match restart_egress_proxy_after_backoff(
+                &config,
+                shutdown_requested.as_ref(),
+                &supervisor_handle,
+                &mut restart_attempt_index,
+            ) {
+                Ok(active_server) => active_server,
+                Err(error) if shutdown_requested.load(Ordering::Relaxed) => return Ok(()),
+                Err(error) => return Err(error),
+            };
+            continue;
+        }
+
+        supervisor_handle.record_component_healthcheck(SupervisedComponent::EgressProxy);
+        thread::sleep(EGRESS_PROXY_HEALTHCHECK_INTERVAL);
+    }
+}
+
+fn restart_egress_proxy_after_backoff(
+    config: &EgressProxySupervisorConfig,
+    shutdown_requested: &AtomicBool,
+    supervisor_handle: &SandboxdSupervisorHandle,
+    restart_attempt_index: &mut usize,
+) -> Result<ActiveEgressProxyServer, EgressProxyError> {
+    loop {
+        if shutdown_requested.load(Ordering::Relaxed) {
+            return Err(EgressProxyError::new(
+                "egress proxy supervisor shutdown requested",
+            ));
+        }
+
+        let backoff_ms = egress_proxy_restart_backoff_ms(*restart_attempt_index);
+        supervisor_handle.emit_component_restart_scheduled(
+            SupervisedComponent::EgressProxy,
+            "restart_after_failure",
+            backoff_ms,
+            &[],
+        );
+        thread::sleep(Duration::from_millis(backoff_ms));
+        if shutdown_requested.load(Ordering::Relaxed) {
+            return Err(EgressProxyError::new(
+                "egress proxy supervisor shutdown requested",
+            ));
+        }
+
+        supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
+        let std_listener = match bind_egress_proxy_listener(config.listener_address) {
+            Ok(std_listener) => std_listener,
+            Err(error_message) => {
+                let error = EgressProxyError::new(error_message);
+                record_egress_proxy_healthcheck_failure(supervisor_handle, &error);
+                *restart_attempt_index = restart_attempt_index.saturating_add(1);
+                continue;
+            }
+        };
+        let mut active_server = spawn_active_egress_proxy_server(std_listener, config.state.clone());
+        match wait_for_egress_proxy_health(
+            config.listener_address,
+            &mut active_server,
+            EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+        ) {
+            Ok(()) => {
+                supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
+                *restart_attempt_index = restart_attempt_index.saturating_add(1);
+                return Ok(active_server);
+            }
+            Err(error) => {
+                record_egress_proxy_healthcheck_failure(supervisor_handle, &error);
+                active_server.request_shutdown();
+                let _ = active_server.join();
+                *restart_attempt_index = restart_attempt_index.saturating_add(1);
+            }
+        }
+    }
+}
+
+fn normalize_egress_proxy_exit_result(
+    exit_result: Result<(), EgressProxyError>,
+) -> EgressProxyError {
+    match exit_result {
+        Ok(()) => EgressProxyError::new("local egress proxy thread returned unexpectedly"),
+        Err(error) => error,
+    }
+}
+
+fn wait_for_egress_proxy_health(
+    listener_address: SocketAddr,
+    active_server: &mut ActiveEgressProxyServer,
+    timeout: Duration,
+) -> Result<(), EgressProxyError> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Some(exit_result) = active_server
+            .try_recv_exit()
+            .map_err(|_| EgressProxyError::new("egress proxy exit channel disconnected"))?
+        {
+            return match exit_result {
+                Ok(()) => Err(EgressProxyError::new(
+                    "local egress proxy thread returned before becoming healthy",
+                )),
+                Err(error) => Err(error),
+            };
+        }
+
+        if check_egress_proxy_health(listener_address).is_ok() {
+            return Ok(());
+        }
+
+        if Instant::now() >= deadline {
+            return Err(EgressProxyError::new(format!(
+                "egress proxy healthcheck timed out for {listener_address}"
+            )));
+        }
+
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn check_egress_proxy_health(listener_address: SocketAddr) -> Result<(), EgressProxyError> {
+    std::net::TcpStream::connect_timeout(&listener_address, Duration::from_millis(200))
+        .map(|_| ())
+        .map_err(|error| EgressProxyError::new(format!("loopback tcp healthcheck failed: {error}")))
+}
+
+fn record_egress_proxy_healthcheck_failure(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    error: &EgressProxyError,
+) {
+    supervisor_handle.mark_component_restarting(
+        SupervisedComponent::EgressProxy,
+        error.to_string(),
+    );
+    supervisor_handle.emit_component_healthcheck_failed(
+        SupervisedComponent::EgressProxy,
+        "loopback_tcp_failed",
+        error.to_string(),
+        "loopback_tcp",
+        &[],
+    );
+}
+
+fn record_egress_proxy_exit_for_restart(
+    supervisor_handle: &SandboxdSupervisorHandle,
+    error: &EgressProxyError,
+) {
+    let error_text = error.to_string();
+    if error_text.contains("panicked") {
+        supervisor_handle.mark_component_restarting(
+            SupervisedComponent::EgressProxy,
+            error_text.clone(),
+        );
+        supervisor_handle.emit_component_exited(
+            SupervisedComponent::EgressProxy,
+            "panic",
+            Some(&error_text),
+            &[
+                ("exitKind", Value::String("panic".to_string())),
+                (
+                    "panicBoundary",
+                    Value::String("proxy_thread".to_string()),
+                ),
+            ],
+        );
+        return;
+    }
+
+    supervisor_handle.mark_component_restarting(
+        SupervisedComponent::EgressProxy,
+        error_text.clone(),
+    );
+    supervisor_handle.emit_component_exited(
+        SupervisedComponent::EgressProxy,
+        "thread_returned",
+        Some(&error_text),
+        &[("exitKind", Value::String("thread_returned".to_string()))],
+    );
+}
+
+fn egress_proxy_restart_backoff_ms(attempt_index: usize) -> u64 {
+    *EGRESS_PROXY_RESTART_BACKOFF_MS
+        .get(attempt_index)
+        .unwrap_or_else(|| {
+            EGRESS_PROXY_RESTART_BACKOFF_MS
+                .last()
+                .expect("egress proxy backoff list should not be empty")
+        })
+}
+
+fn bind_egress_proxy_listener(listener_address: SocketAddr) -> Result<StdTcpListener, String> {
+    let std_listener = StdTcpListener::bind(listener_address)
+        .map_err(|error| format!("failed to bind local egress proxy listener: {error}"))?;
+    std_listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("failed to configure proxy listener: {error}"))?;
+    Ok(std_listener)
 }
 
 fn build_proxy_route(
@@ -889,7 +1220,8 @@ mod tests {
     use std::net::{SocketAddr, TcpListener as StdTcpListener};
     use std::path::PathBuf;
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::thread;
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use crate::egress_proxy::{
         EgressProxy, EgressProxyRoute, build_direct_forward_uri, build_managed_proxy_env,
@@ -901,7 +1233,9 @@ mod tests {
         CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
         CompiledEgressRouteMatch, CompiledEgressRouteUpstream, CompiledRuntimePlan,
     };
-    use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::supervision::{
+        ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent,
+    };
     use crate::time::SystemClock;
 
     #[test]
@@ -1093,6 +1427,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn restarts_the_proxy_after_the_live_server_exits() {
+        let listener_address = reserve_test_listener_address();
+        let ca_certificate_path = test_ca_certificate_path();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            &ca_certificate_path,
+            Arc::new(SystemClock),
+            supervisor_handle.clone(),
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+        let stable_proxy_url = proxy
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+
+        proxy.force_current_server_shutdown_for_test();
+        wait_for_egress_snapshot(
+            &supervisor_handle,
+            ComponentHealthState::Healthy,
+            1,
+            Duration::from_secs(5),
+        );
+        assert_eq!(
+            proxy.runtime_env().get("HTTPS_PROXY"),
+            Some(&stable_proxy_url)
+        );
+        proxy.close().expect("egress proxy close should succeed");
+        let _ = std::fs::remove_dir_all(
+            ca_certificate_path
+                .parent()
+                .expect("test CA path should have a parent directory"),
+        );
+    }
+
     fn reserve_test_listener_address() -> SocketAddr {
         let listener = StdTcpListener::bind(("127.0.0.1", 0))
             .expect("test listener should bind to an ephemeral loopback port");
@@ -1164,5 +1546,27 @@ mod tests {
         std::env::temp_dir()
             .join(format!("mistle-egress-proxy-test-{unique_id}"))
             .join("egress-proxy-ca.pem")
+    }
+
+    fn wait_for_egress_snapshot(
+        supervisor_handle: &SandboxdSupervisorHandle,
+        expected_state: ComponentHealthState,
+        expected_restart_count: u64,
+        timeout: Duration,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let snapshot = supervisor_handle
+                .component_snapshot(SupervisedComponent::EgressProxy)
+                .expect("egress proxy should be tracked");
+            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "expected egress proxy snapshot to reach state {expected_state:?} with restart_count >= {expected_restart_count}, got {snapshot:?}"
+            );
+            thread::sleep(Duration::from_millis(25));
+        }
     }
 }
