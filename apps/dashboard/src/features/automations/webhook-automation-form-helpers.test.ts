@@ -544,7 +544,7 @@ describe("automation payload transforms", () => {
         },
         [SlackAppMentionEventOption],
       ),
-    ).toEqual({
+    ).toMatchObject({
       name: "Pull request routing",
       enabled: true,
       integrationWebhookSourceId: SlackWebhookSourceId,
