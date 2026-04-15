@@ -44,6 +44,8 @@ pub use crate::codex_proxy::types::{
 };
 use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+use crate::time::SystemClock;
 pub type RawCodexSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /// Default public listener URL for the Codex proxy endpoint.
@@ -227,6 +229,7 @@ pub struct CodexProxy {
     listen_url: String,
     shutdown_sender: watch::Sender<bool>,
     runtime_thread: Option<JoinHandle<Result<(), CodexProxyError>>>,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 impl CodexProxy {
@@ -242,10 +245,13 @@ impl CodexProxy {
             .runtime_thread
             .take()
             .expect("Codex proxy runtime thread should exist");
-        match runtime_thread.join() {
+        let close_result = match runtime_thread.join() {
             Ok(result) => result,
             Err(_) => Err(CodexProxyError::RuntimePanicked),
-        }
+        };
+        self.supervisor_handle
+            .mark_component_stopped(SupervisedComponent::CodexProxy);
+        close_result
     }
 }
 
@@ -256,6 +262,30 @@ pub fn start_codex_proxy(
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
 ) -> Result<CodexProxy, CodexProxyError> {
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandboxd-codex-proxy",
+        Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::CodexProxy]),
+    );
+
+    start_codex_proxy_with_supervisor(
+        proxy_listen_url,
+        raw_app_server_url,
+        keepalive_manager,
+        runtime_readiness_manager,
+        supervisor_handle,
+    )
+}
+
+/// Starts the Codex websocket proxy using the shared supervisor boundary.
+pub fn start_codex_proxy_with_supervisor(
+    proxy_listen_url: &str,
+    raw_app_server_url: &str,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<CodexProxy, CodexProxyError> {
+    supervisor_handle.mark_component_starting(SupervisedComponent::CodexProxy);
     let listen_url = Url::parse(proxy_listen_url)
         .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?;
     if listen_url.scheme() != "ws" {
@@ -320,11 +350,13 @@ pub fn start_codex_proxy(
             Err(_) => return Err(CodexProxyError::RuntimePanicked),
         },
     };
+    supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);
 
     Ok(CodexProxy {
         listen_url,
         shutdown_sender,
         runtime_thread: Some(runtime_thread),
+        supervisor_handle,
     })
 }
 

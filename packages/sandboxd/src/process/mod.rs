@@ -4,11 +4,12 @@
 //! processes, waits for their declared readiness checks, and applies the stop
 //! policies used during daemon shutdown.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
 use std::time::Duration;
 
 use nix::errno::Errno;
@@ -19,6 +20,8 @@ use crate::runtime::{
     RuntimeClient, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
     RuntimeClientProcessStopSignal, RuntimeExecCommand,
 };
+use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+use crate::time::SystemClock;
 use crate::time::{Clock, Sleeper};
 
 /// Poll interval for readiness retries while a child process is still starting.
@@ -39,6 +42,7 @@ pub struct RuntimeClientProcessSpec {
 #[derive(Debug)]
 pub struct RuntimeClientProcessManager {
     processes: Vec<RunningRuntimeClientProcess>,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 /// Tracks one live child process together with the spec that produced it.
@@ -129,9 +133,35 @@ pub fn start_runtime_client_process_manager(
     clock: &dyn Clock,
     sleeper: &dyn Sleeper,
 ) -> Result<RuntimeClientProcessManager, ProcessManagerError> {
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandboxd-process-manager",
+        Arc::new(SystemClock),
+        BTreeSet::new(),
+    );
+
+    start_runtime_client_process_manager_with_supervisor(
+        process_specs,
+        clock,
+        sleeper,
+        supervisor_handle,
+    )
+}
+
+/// Starts every runtime client process using the shared supervisor boundary.
+pub fn start_runtime_client_process_manager_with_supervisor(
+    process_specs: &[RuntimeClientProcessSpec],
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<RuntimeClientProcessManager, ProcessManagerError> {
     let mut started_processes = Vec::new();
 
     for (process_index, process_spec) in process_specs.iter().enumerate() {
+        if is_codex_app_server_process(process_spec)
+            && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
+        {
+            supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
+        }
         let mut process = start_runtime_client_process(process_spec).map_err(|error| {
             ProcessManagerError::StartProcess {
                 process_index,
@@ -151,11 +181,18 @@ pub fn start_runtime_client_process_manager(
             });
         }
 
+        if is_codex_app_server_process(process_spec)
+            && supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer)
+        {
+            supervisor_handle.mark_component_healthy(SupervisedComponent::CodexAppServer);
+        }
+
         started_processes.push(process);
     }
 
     Ok(RuntimeClientProcessManager {
         processes: started_processes,
+        supervisor_handle,
     })
 }
 
@@ -167,8 +204,20 @@ impl RuntimeClientProcessManager {
         sleeper: &dyn Sleeper,
     ) -> Result<(), ProcessManagerError> {
         stop_started_processes(&mut self.processes, clock, sleeper)
-            .map_err(ProcessManagerError::StopProcesses)
+            .map_err(ProcessManagerError::StopProcesses)?;
+        if self
+            .supervisor_handle
+            .tracks_component(SupervisedComponent::CodexAppServer)
+        {
+            self.supervisor_handle
+                .mark_component_stopped(SupervisedComponent::CodexAppServer);
+        }
+        Ok(())
     }
+}
+
+fn is_codex_app_server_process(process_spec: &RuntimeClientProcessSpec) -> bool {
+    process_spec.process_key == "codex-app-server"
 }
 
 /// Merges client-wide environment variables with any process-local overrides.

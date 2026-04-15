@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::codex_proxy::{CodexProxy, CodexProxyError, start_codex_proxy};
+use crate::codex_proxy::{CodexProxy, CodexProxyError, start_codex_proxy_with_supervisor};
 use crate::keepalive::KeepaliveManager;
 use crate::protocol::startup::StartupInput;
 use crate::runtime::plan::{
@@ -18,6 +18,9 @@ use crate::runtime::plan::{
     RuntimeClientEndpointTransport, RuntimeClientProcessReadiness,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
+use crate::time::SystemClock;
+use crate::tunnel::session::derive_sandbox_instance_id;
 /// Starts the runtime-specific platform-activity adapters declared by one startup input.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RuntimeAdapterRegistry;
@@ -182,6 +185,34 @@ impl RuntimeAdapterRegistry {
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
         runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
+        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+            .map_err(|error| {
+                RuntimeAdapterRegistryError::StartCodexProxy(CodexProxyError::ConfigureRuntime(
+                    error.to_string(),
+                ))
+            })?;
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            sandbox_instance_id,
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::CodexProxy]),
+        );
+
+        self.start_with_supervisor(
+            startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            supervisor_handle,
+        )
+    }
+
+    /// Starts all runtime-specific adapters using the shared supervisor boundary.
+    pub fn start_with_supervisor(
+        &self,
+        startup_input: &StartupInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        supervisor_handle: SandboxdSupervisorHandle,
+    ) -> Result<RuntimeAdapters, RuntimeAdapterRegistryError> {
         let runtime_plan: CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone())
                 .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
@@ -201,6 +232,7 @@ impl RuntimeAdapterRegistry {
                     &runtime_plan,
                     keepalive_manager.clone(),
                     runtime_readiness_manager.clone(),
+                    supervisor_handle.clone(),
                 )?),
                 _ => {
                     return Err(RuntimeAdapterRegistryError::UnsupportedRuntimeId {
@@ -221,6 +253,7 @@ fn start_codex_runtime_adapter(
     runtime_plan: &CompiledRuntimePlan,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
     let runtime_client = runtime_plan
         .runtime_clients
@@ -271,11 +304,12 @@ fn start_codex_runtime_adapter(
         );
     };
 
-    let proxy = start_codex_proxy(
+    let proxy = start_codex_proxy_with_supervisor(
         listen_url,
         raw_app_server_url,
         keepalive_manager,
         runtime_readiness_manager,
+        supervisor_handle,
     )
     .map_err(RuntimeAdapterRegistryError::StartCodexProxy)?;
 

@@ -39,6 +39,7 @@ use tokio_rustls::rustls::ServerConfig;
 use crate::protocol::startup::StartupInput;
 use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
+use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::Clock;
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
@@ -74,6 +75,7 @@ pub struct EgressProxy {
     shutdown_tx: Option<oneshot::Sender<()>>,
     server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     ca_certificate_path: PathBuf,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,10 +131,13 @@ impl EgressProxy {
         startup_input: &StartupInput,
         tokenizer_proxy_egress_base_url: &str,
         clock: Arc<dyn Clock>,
+        supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
         if runtime_plan.egress_routes.is_empty() {
             return Ok(None);
         }
+
+        supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
 
         let routes = runtime_plan
             .egress_routes
@@ -197,12 +202,14 @@ impl EgressProxy {
             Path::new(RUNTIME_PROXY_CA_CERT_PATH),
             tokenizer_proxy_egress_base_url,
         )?;
+        supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
         Ok(Some(Self {
             runtime_env,
             shutdown_tx: Some(shutdown_tx),
             server_thread: Some(server_thread),
             ca_certificate_path: PathBuf::from(RUNTIME_PROXY_CA_CERT_PATH),
+            supervisor_handle,
         }))
     }
 
@@ -237,6 +244,9 @@ impl EgressProxy {
                 )));
             }
         }
+
+        self.supervisor_handle
+            .mark_component_stopped(SupervisedComponent::EgressProxy);
 
         Ok(())
     }

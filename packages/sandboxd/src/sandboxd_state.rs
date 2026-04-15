@@ -5,7 +5,7 @@
 //! client processes, runtime-specific adapters, and the live bootstrap tunnel
 //! session that publishes keepalive and serves tunnel streams.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
@@ -18,8 +18,11 @@ use crate::protocol::startup::StartupInput;
 use crate::runtime;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::supervision::{
+    SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent,
+};
 use crate::time::{Clock, Sleeper};
-use crate::tunnel::session::TunnelSession;
+use crate::tunnel::session::{TunnelSession, derive_sandbox_instance_id};
 
 /// Describes why the initialized daemon runtime failed to start or stop.
 #[derive(Debug)]
@@ -72,6 +75,7 @@ pub struct SandboxdState {
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
+    supervisor_handle: SandboxdSupervisorHandle,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     agent_endpoint_url: Option<String>,
@@ -97,6 +101,13 @@ impl SandboxdState {
             startup_input,
             &tokenizer_proxy_egress_base_url,
         )?;
+        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+            .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            sandbox_instance_id,
+            clock.clone(),
+            collect_tracked_components(&runtime_plan),
+        );
         runtime::apply_compiled_runtime_plan(&runtime_plan)
             .map_err(|error| SandboxdStateError::ApplyRuntimePlan(error.to_string()))?;
         let egress_proxy = EgressProxy::start(
@@ -104,6 +115,7 @@ impl SandboxdState {
             startup_input,
             &tokenizer_proxy_egress_base_url,
             clock.clone(),
+            supervisor_handle.clone(),
         )
         .map_err(|error| SandboxdStateError::StartEgressProxy(error.to_string()))?;
         let runtime_env = collect_runtime_environment(&runtime_plan)
@@ -119,10 +131,11 @@ impl SandboxdState {
             None
         } else {
             Some(
-                process::start_runtime_client_process_manager(
+                process::start_runtime_client_process_manager_with_supervisor(
                     &process_specs,
                     clock.as_ref(),
                     sleeper.as_ref(),
+                    supervisor_handle.clone(),
                 )
                 .map_err(|error| SandboxdStateError::StartRuntimeProcesses(error.to_string()))?,
             )
@@ -131,10 +144,11 @@ impl SandboxdState {
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(
+            .start_with_supervisor(
                 startup_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
+                supervisor_handle.clone(),
             )
             .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
         let agent_endpoint_url = match runtime_adapters.adapters() {
@@ -154,7 +168,7 @@ impl SandboxdState {
         };
 
         let tunnel_session = Some(
-            TunnelSession::start(
+            TunnelSession::start_with_supervisor(
                 startup_input,
                 keepalive_manager.clone(),
                 runtime_readiness_manager.clone(),
@@ -162,6 +176,7 @@ impl SandboxdState {
                 runtime_env.clone(),
                 clock.clone(),
                 sleeper.clone(),
+                supervisor_handle.clone(),
             )
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
         );
@@ -170,6 +185,7 @@ impl SandboxdState {
             egress_proxy,
             process_manager,
             runtime_adapters,
+            supervisor_handle,
             keepalive_manager,
             runtime_readiness_manager,
             agent_endpoint_url,
@@ -187,7 +203,7 @@ impl SandboxdState {
         }
 
         self.tunnel_session = Some(
-            TunnelSession::start(
+            TunnelSession::start_with_supervisor(
                 startup_input,
                 self.keepalive_manager.clone(),
                 self.runtime_readiness_manager.clone(),
@@ -195,6 +211,7 @@ impl SandboxdState {
                 self.runtime_env.clone(),
                 self.clock.clone(),
                 self.sleeper.clone(),
+                self.supervisor_handle.clone(),
             )
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
         );
@@ -225,6 +242,37 @@ impl SandboxdState {
 
         Ok(())
     }
+
+    /// Returns the current in-memory health snapshot for this initialized daemon.
+    pub fn health_snapshot(&self) -> SandboxdHealthSnapshot {
+        self.supervisor_handle.snapshot()
+    }
+
+    /// Returns a cloneable handle to the shared supervision state.
+    pub fn supervisor_handle(&self) -> SandboxdSupervisorHandle {
+        self.supervisor_handle.clone()
+    }
+}
+
+fn collect_tracked_components(
+    runtime_plan: &runtime::CompiledRuntimePlan,
+) -> BTreeSet<SupervisedComponent> {
+    let mut tracked_components = BTreeSet::from([SupervisedComponent::TunnelSession]);
+
+    if !runtime_plan.egress_routes.is_empty() {
+        tracked_components.insert(SupervisedComponent::EgressProxy);
+    }
+
+    if runtime_plan
+        .agent_runtimes
+        .iter()
+        .any(|agent_runtime| agent_runtime.runtime_id == "codex")
+    {
+        tracked_components.insert(SupervisedComponent::CodexProxy);
+        tracked_components.insert(SupervisedComponent::CodexAppServer);
+    }
+
+    tracked_components
 }
 
 fn resolve_tokenizer_proxy_egress_base_url() -> Result<String, SandboxdStateError> {

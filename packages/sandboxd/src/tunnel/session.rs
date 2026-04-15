@@ -51,6 +51,7 @@ use crate::pty::{
     PtySpawnRequest, start_scoped_pty_session,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
+use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -199,6 +200,7 @@ impl std::error::Error for TunnelSessionError {}
 pub struct TunnelSession {
     shutdown_requested: Arc<AtomicBool>,
     thread: Option<JoinHandle<Result<(), TunnelSessionError>>>,
+    supervisor_handle: SandboxdSupervisorHandle,
 }
 
 enum TunnelSessionControlFlow {
@@ -304,7 +306,41 @@ impl TunnelSession {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<Self, TunnelSessionError> {
-        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let sandbox_instance_id =
+            derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            sandbox_instance_id,
+            clock.clone(),
+            BTreeSet::from([SupervisedComponent::TunnelSession]),
+        );
+
+        Self::start_with_supervisor(
+            startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            agent_endpoint_url,
+            runtime_env,
+            clock,
+            sleeper,
+            supervisor_handle,
+        )
+    }
+
+    /// Starts one live bootstrap tunnel session thread using the shared supervisor boundary.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_with_supervisor(
+        startup_input: &StartupInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        agent_endpoint_url: Option<String>,
+        runtime_env: BTreeMap<String, String>,
+        clock: Arc<dyn Clock>,
+        sleeper: Arc<dyn Sleeper>,
+        supervisor_handle: SandboxdSupervisorHandle,
+    ) -> Result<Self, TunnelSessionError> {
+        let sandbox_instance_id =
+            derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
         let attachment_root = PathBuf::from(DEFAULT_ATTACHMENT_ROOT);
         fs::create_dir_all(&attachment_root)
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
@@ -376,10 +412,12 @@ impl TunnelSession {
                 return Err(TunnelSessionError::SessionPanicked);
             }
         }
+        supervisor_handle.mark_component_healthy(SupervisedComponent::TunnelSession);
 
         Ok(Self {
             shutdown_requested,
             thread: Some(thread),
+            supervisor_handle,
         })
     }
 
@@ -402,6 +440,8 @@ impl TunnelSession {
                 );
             }
         }
+        self.supervisor_handle
+            .mark_component_stopped(SupervisedComponent::TunnelSession);
     }
 }
 
@@ -3165,7 +3205,7 @@ fn finalize_file_upload(
     Ok(())
 }
 
-fn derive_sandbox_instance_id(gateway_ws_url: &str) -> Result<String, TunnelSessionError> {
+pub(crate) fn derive_sandbox_instance_id(gateway_ws_url: &str) -> Result<String, TunnelSessionError> {
     let parsed_url = Url::parse(gateway_ws_url)
         .map_err(|error| TunnelSessionError::InvalidGatewayUrl(error.to_string()))?;
     let Some(segment) = parsed_url

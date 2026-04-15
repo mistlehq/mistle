@@ -25,6 +25,7 @@ pub mod resume;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
+pub mod supervision;
 #[doc(hidden)]
 pub mod test_support;
 pub mod time;
