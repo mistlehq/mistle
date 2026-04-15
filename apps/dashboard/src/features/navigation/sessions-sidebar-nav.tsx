@@ -163,7 +163,7 @@ function SessionsSidebarSearch(input: {
         </InputGroupAddon>
         <InputGroupInput
           aria-label="Search sessions"
-          className="h-full px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+          variant="inline"
           onChange={(event) => input.onQueryChange(event.target.value)}
           placeholder="Search"
           value={input.query}

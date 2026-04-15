@@ -15,6 +15,7 @@ it("renders the inline input appearance", () => {
 
   const input = screen.getByRole("textbox", { name: "Search sessions" });
   expect(input.className).toContain("border-transparent");
-  expect(input.className).toContain("h-8");
+  expect(input.className).toContain("h-9");
+  expect(input.className).toContain("text-sm");
   expect(input.className).toContain("hover:border-border");
 });
