@@ -17,7 +17,7 @@
   "devDependencies": {
     "@storybook/addon-a11y": "^10.3.4",
     "@storybook/addon-docs": "^10.3.5",
-    "@storybook/addon-links": "^10.3.4",
+    "@storybook/addon-links": "^10.3.5",
     "@storybook/addon-vitest": "^10.3.4",
     "@storybook/react-vite": "^10.3.4",
     "@tailwindcss/vite": "^4.1.14",

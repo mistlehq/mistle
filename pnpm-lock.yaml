@@ -34,7 +34,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@typescript/native-preview':
         specifier: latest
-        version: 7.0.0-dev.20260410.1
+        version: 7.0.0-dev.20260412.1
       jscpd:
         specifier: ^4.0.8
         version: 4.0.8
@@ -936,8 +936,8 @@ importers:
         specifier: ^10.3.5
         version: 10.3.5(@types/react@19.2.14)(esbuild@0.27.4)(rollup@4.59.0)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.1)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
       '@storybook/addon-links':
-        specifier: ^10.3.4
-        version: 10.3.4(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
+        specifier: ^10.3.5
+        version: 10.3.5(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))
       '@storybook/addon-vitest':
         specifier: ^10.3.4
         version: 10.3.4(@vitest/runner@4.1.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(vitest@4.1.2(@opentelemetry/api@1.9.1)(@types/node@25.5.1)(jsdom@29.0.1(@noble/hashes@2.0.1))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.5.1)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)))
@@ -5989,11 +5989,11 @@ packages:
     peerDependencies:
       storybook: ^10.3.5
 
-  '@storybook/addon-links@10.3.4':
-    resolution: {integrity: sha512-4Kcdv0U5WEyteN08Mv4oAUXTigF8OHMLA7Bpf1VEQrtJfQsxoUjXzItOHhCyBvphufkZzbU0n6wCC8upEb7X7w==}
+  '@storybook/addon-links@10.3.5':
+    resolution: {integrity: sha512-Xe2wCGZ+hpZ0cDqAIBHk+kPc8nODNbu585ghd5bLrlYJMDVXoNM/fIlkrLgjIDVbfpgeJLUEg7vldJrn+FyOLw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-      storybook: ^10.3.4
+      storybook: ^10.3.5
     peerDependenciesMeta:
       react:
         optional: true
@@ -6546,43 +6546,43 @@ packages:
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-bpLYm6woXd8BECzV9AQvPqISVeohpekK1qwpRopvNIxydhRQ4fEjZsS7EtDYpqHAW4/u1uEv07P9/iS6TAL1fQ==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-sSkFG+hjtRWffg6FddF3dEkk7N3TRMEqfiUpixwcWhXgyocMdPw8wutTvQRBxQdgxeL9y01M2SO8A8YPPiEgVg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-V8bW8g5hgu+bAwGvTqF1kilkkoDgxhxi5egrdMUeWQkR+MIisoBQeaAupqMpLoSkqZsc/kKucM0zwBNC/KRU3Q==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-m2BTeaLkrHEEDg0D9snigddy01qTY+wgx+W+GpXAfx36PPvW4xWuGXNVWfSaB8bqAC9C8NeLnT/C9/G/rJ5v2w==}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-MOluRRAhv46s9ScFmePa0InMHmpZ/z0Evc11RrTKsg+bN8BR7sWoAtFq6IujEDK9WVP7YmEYtBRgEfMLuqVojw==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-JAdsG6MlVV1hoAUKPy8zxAL7xLeNxz8JgCbLCJVqW8EyH29R9FD4cFTqr7CSIRTNUEDzDTrgnXUyoRtDe1gr+w==}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-NO6Ci65ADadOCr2ycTxOyCgC5kyk+Ryjl8k5c78mz9sKDxYqwEtryFFjLqitAG+rejtJbnUq897WRICjAOwslA==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-wDLekbfsfmKMWORg7CTnEnpKj8oXpU/6AEBrtVN9CEUCiQAe6yH878nZHhJNzWQXHtrtFf3lY49Yplqmdxja3w==}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-IofIUrMGjXmZKDEMaRgshzOne0EQZtx9vE/6URHfgmDnWLDKWzz9eQ2qWmvsFD2vOBbgc6GwVWEq6XTHMEfx2A==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-gYgppiQIqid3jZ7D8THh4k3Q+4bwidrQH6SL9Xgbk1qfP6/jwv8twuPqDOfZ+cK2OD55lQHp15fOh2lMNAC40Q==}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-TXmE+wovQqRo+qAhaewB0MPB9esgayvSHr6vFlCpHykHqbDl3FUucuC4F8yU6zVOA3UqXTk4/GHeLsAvU7YEgQ==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-TOh7rH5H3jisHJqRXJSjmUGMzcbNBocS/hufhXPQIv+g3pdG5IKZoSnv3SV62I5d12FFDSS5KQon5MQPnOKAHg==}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-dMFT4tdHBe2vVA2WPQMjorT+fzCURRtillevQzz8/bwCEz2uXSnpu4oLRLS5045ppGE0wCFELE+Hq5z2oRddDw==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-u+70wL89wspN1wKoX6FVNUATRGCG3BpleByP3H/UqOZvlwuMm8N7Gy8hEbM0U8bDyAuyP/daUfTBVkqXjjv9mA==}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260410.1':
-    resolution: {integrity: sha512-K3TIwBw4XGQM33wW8KUqRU7r6ZY1IqB8chk1u1kT+CDj4iu+eQ6jCXgU7EDxmpJ++gbNcIf8iBYgWgYNssrhZQ==}
+  '@typescript/native-preview@7.0.0-dev.20260412.1':
+    resolution: {integrity: sha512-tDw3XZt2BkjAlt/MJmnFGmbe9lgKmc5wezmrMoBIEvJcqz+/KVpVBVvjbkZoaiABnJmuG3G3b6IUFrEveTw6UQ==}
     hasBin: true
 
   '@typescript/vfs@1.6.4':
@@ -18419,7 +18419,7 @@ snapshots:
       - vite
       - webpack
 
-  '@storybook/addon-links@10.3.4(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
+  '@storybook/addon-links@10.3.5(react@19.2.4)(storybook@10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))':
     dependencies:
       '@storybook/global': 5.0.0
       storybook: 10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -19005,36 +19005,36 @@ snapshots:
       '@types/node': 25.5.1
     optional: true
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260410.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260412.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260410.1':
+  '@typescript/native-preview@7.0.0-dev.20260412.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260410.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260410.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260412.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260412.1
 
   '@typescript/vfs@1.6.4(typescript@5.9.3)':
     dependencies:
