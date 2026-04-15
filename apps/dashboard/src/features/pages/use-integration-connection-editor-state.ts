@@ -53,6 +53,22 @@ function isDeviceAuthorizationMethod(
   return method?.kind === "device-authorization";
 }
 
+function resolveEditableConfigValue(input: {
+  configValue: Record<string, unknown>;
+  configForm: ReturnType<typeof resolveConnectionMethodFormUiModel>;
+}): Record<string, unknown> | undefined {
+  if (input.configForm.mode !== "form") {
+    return undefined;
+  }
+
+  const entries = input.configForm.visiblePropertyKeys.flatMap((propertyKey) => {
+    const value = input.configValue[propertyKey];
+    return value === undefined ? [] : [[propertyKey, value] as const];
+  });
+
+  return Object.fromEntries(entries);
+}
+
 function resolveSelectedMethod(input: {
   editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
@@ -336,10 +352,14 @@ export function useIntegrationConnectionEditorState(
     }
 
     if (editor.mode === "update") {
+      const editableConfigValue = resolveEditableConfigValue({
+        configValue: draft.configValue,
+        configForm,
+      });
       await updateConnectionMutation.mutateAsync({
         connectionId: editor.connectionId,
         displayName: normalizedConnectionDisplayName,
-        ...(configForm.mode === "form" ? { config: draft.configValue } : {}),
+        ...(editableConfigValue === undefined ? {} : { config: editableConfigValue }),
       });
 
       await queryClient.invalidateQueries({

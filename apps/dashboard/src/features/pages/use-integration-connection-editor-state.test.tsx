@@ -526,7 +526,6 @@ describe("useIntegrationConnectionEditorState", () => {
             body: {
               displayName: "SigNoz EU",
               config: {
-                connection_method: "oauth2-authorization-code",
                 region: "eu",
               },
             },

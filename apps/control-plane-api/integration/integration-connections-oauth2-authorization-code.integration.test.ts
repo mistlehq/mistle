@@ -259,6 +259,7 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
         externalSubjectId: "oauth-subject-001",
         config: {
           connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          client_id: "signoz-client-id",
           region: "us",
         },
         createdAt: "2026-04-15T00:00:00.000Z",
@@ -286,6 +287,7 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
       expect(updatedConnection.displayName).toBe("SigNoz EU");
       expect(updatedConnection.config).toEqual({
         connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        client_id: "signoz-client-id",
         region: "eu",
       });
 
@@ -298,6 +300,7 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
       });
       expect(persistedConnection?.config).toEqual({
         connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        client_id: "signoz-client-id",
         region: "eu",
       });
     } finally {

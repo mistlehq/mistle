@@ -157,6 +157,7 @@ export async function updateIntegrationConnection(
     });
 
     nextConfig = {
+      ...(existingConnection.config ?? {}),
       ...parsedConfig,
       connection_method: existingConnectionMethodId,
     };
