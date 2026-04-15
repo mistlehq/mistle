@@ -43,7 +43,7 @@ async function startTestServer(input: {
 }
 
 describe("listSlackConnectionResources", () => {
-  it("lists public channels, excludes archived and non-channel conversations, and paginates", async () => {
+  it("lists public and private channels, excludes archived and non-channel conversations, and paginates", async () => {
     const seenUrls: string[] = [];
     const server = await startTestServer({
       handler(request, response) {
@@ -62,6 +62,7 @@ describe("listSlackConnectionResources", () => {
           response.end(
             JSON.stringify({
               ok: true,
+              cache_ts: 1_710_000_000,
               channels: [
                 {
                   id: "C_PUBLIC_1",
@@ -73,6 +74,7 @@ describe("listSlackConnectionResources", () => {
                   is_mpim: false,
                   is_shared: false,
                   is_ext_shared: false,
+                  num_members: 42,
                 },
                 {
                   id: "C_ARCHIVED",
@@ -83,9 +85,21 @@ describe("listSlackConnectionResources", () => {
                   is_im: false,
                   is_mpim: false,
                 },
+                {
+                  id: "G_PRIVATE_1",
+                  name: "secret-plans",
+                  is_channel: true,
+                  is_private: true,
+                  is_archived: false,
+                  is_im: false,
+                  is_mpim: false,
+                  is_shared: false,
+                  is_ext_shared: false,
+                },
               ],
               response_metadata: {
                 next_cursor: "cursor-2",
+                warnings: ["partial_results"],
               },
             }),
           );
@@ -118,6 +132,7 @@ describe("listSlackConnectionResources", () => {
             ],
             response_metadata: {
               next_cursor: "",
+              warnings: [],
             },
           }),
         );
@@ -152,8 +167,8 @@ describe("listSlackConnectionResources", () => {
       });
 
       expect(seenUrls).toEqual([
-        "http://127.0.0.1/api/conversations.list?types=public_channel&exclude_archived=true",
-        "http://127.0.0.1/api/conversations.list?types=public_channel&exclude_archived=true&cursor=cursor-2",
+        "http://127.0.0.1/api/conversations.list?types=public_channel%2Cprivate_channel&exclude_archived=true",
+        "http://127.0.0.1/api/conversations.list?types=public_channel%2Cprivate_channel&exclude_archived=true&cursor=cursor-2",
       ]);
       expect(result).toEqual({
         resources: [
@@ -181,6 +196,21 @@ describe("listSlackConnectionResources", () => {
               isPrivate: false,
               isArchived: false,
               isShared: true,
+              isExtShared: false,
+              isIm: false,
+              isMpim: false,
+              isChannel: true,
+            },
+          },
+          {
+            externalId: "G_PRIVATE_1",
+            handle: "G_PRIVATE_1",
+            displayName: "#secret-plans",
+            metadata: {
+              name: "secret-plans",
+              isPrivate: true,
+              isArchived: false,
+              isShared: false,
               isExtShared: false,
               isIm: false,
               isMpim: false,

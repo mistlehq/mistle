@@ -132,6 +132,22 @@ function resolveSlackEventClassification(input: {
     };
   }
 
+  if (
+    providerEventType === "channel_created" ||
+    providerEventType === "channel_archive" ||
+    providerEventType === "channel_unarchive" ||
+    providerEventType === "channel_rename" ||
+    providerEventType === "group_archive" ||
+    providerEventType === "group_name" ||
+    providerEventType === "group_unarchive" ||
+    providerEventType === "group_rename"
+  ) {
+    return {
+      providerEventType,
+      eventType: `slack:${providerEventType}`,
+    };
+  }
+
   throw new Error(`Slack event type '${providerEventType}' is not supported.`);
 }
 

@@ -290,12 +290,143 @@ describe("slack webhook handler", () => {
     });
   });
 
+  it("normalizes Slack channel lifecycle events for resource sync triggers", () => {
+    const lifecyclePayloads = [
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "channel_created",
+            channel: {
+              id: "C123",
+              name: "alerts",
+              created: 1_710_000_000,
+            },
+          },
+          event_id: "Ev127",
+        },
+        expectedEventType: "slack:channel_created",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "channel_archive",
+            channel: "C123",
+          },
+          event_id: "Ev128",
+        },
+        expectedEventType: "slack:channel_archive",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "channel_unarchive",
+            channel: "C123",
+          },
+          event_id: "Ev129",
+        },
+        expectedEventType: "slack:channel_unarchive",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "channel_rename",
+            channel: {
+              id: "C123",
+              name: "alerts-renamed",
+              created: 1_710_000_000,
+            },
+          },
+          event_id: "Ev130",
+        },
+        expectedEventType: "slack:channel_rename",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "group_archive",
+            channel: "G123",
+          },
+          event_id: "Ev131",
+        },
+        expectedEventType: "slack:group_archive",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "group_name",
+            channel: "G123",
+            name: "secret-plans-renamed",
+          },
+          event_id: "Ev132",
+        },
+        expectedEventType: "slack:group_name",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "group_unarchive",
+            channel: "G123",
+          },
+          event_id: "Ev133",
+        },
+        expectedEventType: "slack:group_unarchive",
+      },
+      {
+        payload: {
+          ...createSlackMessagePayload(),
+          event: {
+            type: "group_rename",
+            channel: "G123",
+            name: "secret-plans-renamed",
+          },
+          event_id: "Ev134",
+        },
+        expectedEventType: "slack:group_rename",
+      },
+    ] as const;
+
+    for (const lifecyclePayload of lifecyclePayloads) {
+      expect(
+        SlackWebhookHandler.resolveWebhookRequest({
+          targetKey: "slack-default",
+          target: {
+            familyId: "slack",
+            variantId: "slack-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://slack.com/api",
+            },
+            secrets: {},
+          },
+          headers: {},
+          rawBody: new TextEncoder().encode(JSON.stringify(lifecyclePayload.payload)),
+        }),
+      ).toEqual({
+        kind: "event",
+        event: {
+          externalEventId: lifecyclePayload.payload.event_id,
+          providerEventType: lifecyclePayload.payload.event.type,
+          eventType: lifecyclePayload.expectedEventType,
+          payload: lifecyclePayload.payload,
+          occurredAt: "2024-03-09T16:00:00.000Z",
+        },
+      });
+    }
+  });
+
   it("rejects unsupported Slack event types", () => {
     const rawBody = new TextEncoder().encode(
       JSON.stringify({
         ...createSlackMessagePayload(),
         event: {
-          type: "channel_created",
+          type: "team_join",
         },
       }),
     );
@@ -315,7 +446,7 @@ describe("slack webhook handler", () => {
         headers: {},
         rawBody,
       }),
-    ).toThrow("Slack event type 'channel_created' is not supported.");
+    ).toThrow("Slack event type 'team_join' is not supported.");
   });
 
   it("verifies valid Slack webhook signatures", () => {

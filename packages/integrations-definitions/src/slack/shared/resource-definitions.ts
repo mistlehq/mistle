@@ -1,5 +1,6 @@
 import {
   IntegrationResourceSelectionModes,
+  type IntegrationResourceSyncTrigger,
   type IntegrationResourceCredentialRef,
   type IntegrationResourceDefinition,
 } from "@mistle/integrations-core";
@@ -22,8 +23,43 @@ export function createSlackResourceDefinitions(): ReadonlyArray<IntegrationResou
       bindingField: "channels",
       displayNameSingular: "channel",
       displayNamePlural: "channels",
-      description: "Public Slack channels accessible to this connection.",
+      description: "Slack channels accessible to this connection, including private channels.",
       credential: SlackBotTokenResourceCredential,
     },
   ];
 }
+
+export const SlackResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [
+  {
+    eventType: "slack:channel_created",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:channel_archive",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:channel_unarchive",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:channel_rename",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:group_archive",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:group_unarchive",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:group_rename",
+    resourceKinds: ["channel"],
+  },
+  {
+    eventType: "slack:group_name",
+    resourceKinds: ["channel"],
+  },
+];
