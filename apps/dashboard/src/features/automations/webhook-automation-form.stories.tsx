@@ -506,7 +506,7 @@ const ExistingSlackAutomationValues: WebhookAutomationFormValues = {
     "Payload:",
     "{{payload}}",
   ].join("\n"),
-  instructions: "",
+  instructions: "Reply with the root cause and the next recommended action.",
   conversationKeyTemplate: "slack:channel:{{payload.event.channel}}",
   triggerIds: [SlackAppMentionTriggerId],
   triggerParameterValues: {
