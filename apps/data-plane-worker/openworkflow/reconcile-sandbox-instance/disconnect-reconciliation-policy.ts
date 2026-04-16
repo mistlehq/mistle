@@ -1,4 +1,4 @@
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import type { SandboxInspectDisposition } from "@mistle/sandbox";
 
 export type DisconnectReconciliationAction =
@@ -23,6 +23,7 @@ export type DisconnectReconciliationAction =
  * shared `SandboxInspectDisposition`.
  */
 export function determineDisconnectReconciliationAction(input: {
+  persistenceMode: string;
   sandboxStatus: string;
   providerState: SandboxInspectDisposition | "missing";
 }): DisconnectReconciliationAction {
@@ -30,6 +31,11 @@ export function determineDisconnectReconciliationAction(input: {
     case SandboxInstanceStatuses.STARTING: {
       switch (input.providerState) {
         case "missing":
+          if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+            return {
+              kind: "mark_stopped",
+            };
+          }
           return {
             kind: "fail",
             failureCode: "provider_runtime_missing",
@@ -41,6 +47,11 @@ export function determineDisconnectReconciliationAction(input: {
             kind: "mark_stopped",
           };
         case "terminal_stopped":
+          if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+            return {
+              kind: "mark_stopped",
+            };
+          }
           return {
             kind: "fail",
             failureCode: "provider_runtime_terminal",
@@ -59,6 +70,11 @@ export function determineDisconnectReconciliationAction(input: {
     case SandboxInstanceStatuses.RUNNING: {
       switch (input.providerState) {
         case "missing":
+          if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+            return {
+              kind: "mark_stopped",
+            };
+          }
           return {
             kind: "fail",
             failureCode: "provider_runtime_missing",
@@ -70,6 +86,11 @@ export function determineDisconnectReconciliationAction(input: {
             kind: "mark_stopped",
           };
         case "terminal_stopped":
+          if (input.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+            return {
+              kind: "mark_stopped",
+            };
+          }
           return {
             kind: "fail",
             failureCode: "provider_runtime_terminal",

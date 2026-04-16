@@ -170,15 +170,25 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
       throw error;
     }
 
-    await markSandboxInstanceFailed({
+    if (ctx.sandboxInstance.persistenceMode !== "persistent") {
+      await markSandboxInstanceFailed({
+        db: ctx.db,
+        sandboxInstanceId: ctx.sandboxInstance.id,
+        currentStatus: ctx.sandboxInstance.status,
+        failureCode: "provider_runtime_missing",
+        failureMessage:
+          "Sandbox runtime was not found at the provider during disconnect reconciliation.",
+      });
+      return "failed";
+    }
+
+    await markSandboxInstanceStopped({
       db: ctx.db,
       sandboxInstanceId: ctx.sandboxInstance.id,
       currentStatus: ctx.sandboxInstance.status,
-      failureCode: "provider_runtime_missing",
-      failureMessage:
-        "Sandbox runtime was not found at the provider during disconnect reconciliation.",
+      clearProviderSandboxId: true,
     });
-    return "failed";
+    return "stopped";
   }
 
   await markSandboxInstanceStopped({
@@ -239,6 +249,7 @@ export async function reconcileSandboxInstance(
     providerSandboxId: sandboxInstance.providerSandboxId,
   });
   const action = determineDisconnectReconciliationAction({
+    persistenceMode: sandboxInstance.persistenceMode,
     sandboxStatus: sandboxInstance.status,
     providerState,
   });
@@ -258,6 +269,7 @@ export async function reconcileSandboxInstance(
         db: ctx.db,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
+        clearProviderSandboxId: sandboxInstance.persistenceMode === "persistent",
       });
       return true;
     case "stop_then_mark_stopped":

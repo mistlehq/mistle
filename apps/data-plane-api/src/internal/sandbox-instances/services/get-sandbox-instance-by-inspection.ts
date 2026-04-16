@@ -1,4 +1,5 @@
 import {
+  SandboxInstancePersistenceModes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
   sandboxInstances,
@@ -57,12 +58,14 @@ async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
   input: {
     sandboxInstanceId: string;
+    clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
       status: SandboxInstanceStatuses.STOPPED,
+      ...(input.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
       stoppedAt: sql`now()`,
       stopReason: SandboxStopReasons.SYSTEM,
       updatedAt: sql`now()`,
@@ -82,6 +85,35 @@ async function markRunningSandboxInstanceStopped(
   }
 
   throw new Error("Failed to transition sandbox instance status from running to stopped.");
+}
+
+async function clearStoppedSandboxInstanceProviderSandboxId(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      providerSandboxId: null,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+      ),
+    )
+    .returning({
+      id: sandboxInstances.id,
+    });
+
+  if (updatedRows[0] !== undefined) {
+    return;
+  }
+
+  throw new Error("Failed to clear provider sandbox id while sandbox instance remained stopped.");
 }
 
 const InspectionFailureCodes = {
@@ -121,6 +153,42 @@ async function markStartingSandboxInstanceFailed(
   }
 
   throw new Error("Failed to transition sandbox instance status from starting to failed.");
+}
+
+async function markStartingSandboxInstanceStopped(
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  input: {
+    sandboxInstanceId: string;
+    clearProviderSandboxId?: boolean;
+  },
+): Promise<void> {
+  const updatedRows = await ctx.db
+    .update(sandboxInstances)
+    .set({
+      status: SandboxInstanceStatuses.STOPPED,
+      ...(input.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
+      stoppedAt: sql`now()`,
+      stopReason: SandboxStopReasons.SYSTEM,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+      ),
+    )
+    .returning({
+      status: sandboxInstances.status,
+    });
+
+  if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
+    return;
+  }
+
+  throw new Error("Failed to transition sandbox instance status from starting to stopped.");
 }
 
 async function markRunningSandboxInstanceFailed(
@@ -198,12 +266,32 @@ async function inspectStartingSandboxInstance(
   sandboxInstance: {
     id: string;
     title: string | null;
+    persistenceMode: string;
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
     runtimePlan: PersistedRuntimePlan;
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (
+    sandboxInstance.providerSandboxId === null &&
+    sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
+  ) {
+    await markStartingSandboxInstanceStopped(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+      clearProviderSandboxId: true,
+    });
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
+      failureCode: null,
+      failureMessage: null,
+      runtimePlan: sandboxInstance.runtimePlan,
+    };
+  }
+
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected starting sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -213,6 +301,22 @@ async function inspectStartingSandboxInstance(
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
 
   if (inspection === null) {
+    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+      await markStartingSandboxInstanceStopped(ctx, {
+        sandboxInstanceId: sandboxInstance.id,
+        clearProviderSandboxId: true,
+      });
+      return {
+        id: sandboxInstance.id,
+        title: sandboxInstance.title,
+        status: SandboxInstanceStatuses.STOPPED,
+        connectable: false,
+        failureCode: null,
+        failureMessage: null,
+        runtimePlan: sandboxInstance.runtimePlan,
+      };
+    }
+
     await markStartingSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -251,6 +355,22 @@ async function inspectStartingSandboxInstance(
       connectable: status === "running",
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: sandboxInstance.runtimePlan,
+    };
+  }
+
+  if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+    await markStartingSandboxInstanceStopped(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+      clearProviderSandboxId: true,
+    });
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
+      failureCode: null,
+      failureMessage: null,
       runtimePlan: sandboxInstance.runtimePlan,
     };
   }
@@ -295,12 +415,28 @@ async function inspectStoppedSandboxInstance(
   sandboxInstance: {
     id: string;
     title: string | null;
+    persistenceMode: string;
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
     runtimePlan: PersistedRuntimePlan;
   },
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (
+    sandboxInstance.providerSandboxId === null &&
+    sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
+  ) {
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: sandboxInstance.runtimePlan,
+    };
+  }
+
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected stopped sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -309,6 +445,21 @@ async function inspectStoppedSandboxInstance(
 
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
   if (inspection === null) {
+    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+      await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
+        sandboxInstanceId: sandboxInstance.id,
+      });
+      return {
+        id: sandboxInstance.id,
+        title: sandboxInstance.title,
+        status: SandboxInstanceStatuses.STOPPED,
+        connectable: false,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+        runtimePlan: sandboxInstance.runtimePlan,
+      };
+    }
+
     await markStoppedSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -329,6 +480,21 @@ async function inspectStoppedSandboxInstance(
     inspection.disposition === SandboxInspectDispositions.RESUMABLE_STOPPED ||
     inspection.disposition === SandboxInspectDispositions.ACTIVE
   ) {
+    return {
+      id: sandboxInstance.id,
+      title: sandboxInstance.title,
+      status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: sandboxInstance.runtimePlan,
+    };
+  }
+
+  if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+    await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
+      sandboxInstanceId: sandboxInstance.id,
+    });
     return {
       id: sandboxInstance.id,
       title: sandboxInstance.title,
@@ -361,6 +527,7 @@ async function inspectRunningSandboxInstance(
   sandboxInstance: {
     id: string;
     title: string | null;
+    persistenceMode: string;
     providerSandboxId: string | null;
     failureCode: string | null;
     failureMessage: string | null;
@@ -375,6 +542,22 @@ async function inspectRunningSandboxInstance(
 
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
   if (inspection === null) {
+    if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
+      await markRunningSandboxInstanceStopped(ctx, {
+        sandboxInstanceId: sandboxInstance.id,
+        clearProviderSandboxId: true,
+      });
+      return {
+        id: sandboxInstance.id,
+        title: sandboxInstance.title,
+        status: SandboxInstanceStatuses.STOPPED,
+        connectable: false,
+        failureCode: sandboxInstance.failureCode,
+        failureMessage: sandboxInstance.failureMessage,
+        runtimePlan: sandboxInstance.runtimePlan,
+      };
+    }
+
     await markRunningSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -453,6 +636,7 @@ export async function getSandboxInstanceByInspection(
     columns: {
       id: true,
       title: true,
+      persistenceMode: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,

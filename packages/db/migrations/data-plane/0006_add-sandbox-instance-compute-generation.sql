@@ -1,0 +1,1 @@
+ALTER TABLE "data_plane"."sandbox_instances" ADD COLUMN "compute_generation" bigint DEFAULT 1 NOT NULL;

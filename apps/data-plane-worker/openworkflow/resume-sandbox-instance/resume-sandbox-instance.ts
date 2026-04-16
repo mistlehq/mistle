@@ -14,6 +14,7 @@ import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandb
 import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-runtime.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
+import { replacePersistentSandboxCompute } from "./replace-persistent-sandbox-compute.js";
 import { resolveResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
 import { resumeSandbox } from "./resume-sandbox.js";
 
@@ -135,27 +136,133 @@ export async function resumeSandboxInstance(
     runtimeProvider: SandboxProvider;
     providerSandboxId: string;
   };
-  try {
-    resumedRuntime = await resumeSandbox(
-      {
+  let storageAttachLifecycle: "start" | "resume";
+  if (resumableSandboxInstance.providerSandboxId !== null) {
+    try {
+      resumedRuntime = await resumeSandbox(
+        {
+          config: ctx.config,
+          sandboxAdapter: ctx.sandboxAdapter,
+        },
+        {
+          sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
+          providerSandboxId: resumableSandboxInstance.providerSandboxId,
+        },
+      );
+      storageAttachLifecycle = "resume";
+    } catch (error) {
+      if (persistenceMode !== "persistent" || !isSandboxResourceNotFoundError(error)) {
+        await handleFailedResume({
+          sandboxInstanceId: input.sandboxInstanceId,
+          failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Failed to resume sandbox runtime.",
+            error,
+          }),
+        });
+        throw error;
+      }
+
+      resumedRuntime = await replacePersistentSandboxCompute({
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
-      },
-      {
-        sandboxInstanceId: resumableSandboxInstance.sandboxInstanceId,
-        providerSandboxId: resumableSandboxInstance.providerSandboxId,
-      },
-    );
-  } catch (error) {
-    await handleFailedResume({
-      sandboxInstanceId: input.sandboxInstanceId,
-      failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
-      failureMessage: formatPersistedFailureMessage({
-        summary: "Failed to resume sandbox runtime.",
-        error,
-      }),
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        resumableSandboxInstance,
+      });
+      storageAttachLifecycle = "start";
+    }
+  } else {
+    if (persistenceMode !== "persistent") {
+      const error = new Error(
+        `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
+      );
+      await handleFailedResume({
+        sandboxInstanceId: input.sandboxInstanceId,
+        failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Failed to resume sandbox runtime.",
+          error,
+        }),
+      });
+      throw error;
+    }
+
+    resumedRuntime = await replacePersistentSandboxCompute({
+      db: ctx.db,
+      controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+      config: ctx.config,
+      sandboxAdapter: ctx.sandboxAdapter,
+      sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+      resumableSandboxInstance,
     });
-    throw error;
+    storageAttachLifecycle = "start";
+  }
+
+  if (storageAttachLifecycle === "start") {
+    let replacementSandboxRuntimeReady: boolean;
+    try {
+      replacementSandboxRuntimeReady = await waitForSandboxRuntimeReadiness(
+        {
+          runtimeStateReader: ctx.runtimeStateReader,
+          policy: ctx.tunnelReadinessPolicy,
+          clock: ctx.clock,
+          sleeper: ctx.sleeper,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      );
+    } catch (error) {
+      await handleFailedResume({
+        sandboxInstanceId: input.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Failed while waiting for replacement sandbox runtime readiness.",
+          error,
+        }),
+      });
+      throw error;
+    }
+
+    if (!replacementSandboxRuntimeReady) {
+      await handleFailedResume({
+        sandboxInstanceId: input.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        failureCode: ResumeSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
+        failureMessage: "Timed out waiting for replacement sandbox runtime readiness.",
+      });
+      throw new Error("Timed out waiting for replacement sandbox runtime readiness.");
+    }
+
+    try {
+      await markSandboxInstanceRunning(
+        {
+          db: ctx.db,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      );
+    } catch (error) {
+      await handleFailedResume({
+        sandboxInstanceId: input.sandboxInstanceId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        failureCode: ResumeSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Failed to mark replacement sandbox instance as running.",
+          error,
+        }),
+      });
+      throw error;
+    }
+
+    return;
   }
 
   try {
@@ -174,7 +281,7 @@ export async function resumeSandboxInstance(
         persistenceMode,
         runtimeProvider: resumedRuntime.runtimeProvider,
         providerSandboxId: resumedRuntime.providerSandboxId,
-        lifecycle: "resume",
+        lifecycle: storageAttachLifecycle,
       },
     );
   } catch (error) {

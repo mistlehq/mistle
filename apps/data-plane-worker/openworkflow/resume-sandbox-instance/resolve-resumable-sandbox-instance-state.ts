@@ -14,7 +14,8 @@ export type ResumableSandboxInstanceState = {
   organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxProvider;
-  providerSandboxId: string;
+  providerSandboxId: string | null;
+  computeGeneration: number;
   runtimePlan: CompiledRuntimePlan;
 };
 
@@ -30,6 +31,7 @@ export async function resolveResumableSandboxInstanceState(input: {
       persistenceMode: sandboxInstances.persistenceMode,
       runtimeProvider: sandboxInstances.runtimeProvider,
       providerSandboxId: sandboxInstances.providerSandboxId,
+      computeGeneration: sandboxInstances.computeGeneration,
       status: sandboxInstances.status,
       compiledRuntimePlan: sandboxInstanceRuntimePlans.compiledRuntimePlan,
     })
@@ -64,7 +66,10 @@ export async function resolveResumableSandboxInstanceState(input: {
     );
   }
 
-  if (sandboxInstance.providerSandboxId === null) {
+  if (
+    sandboxInstance.providerSandboxId === null &&
+    sandboxInstance.persistenceMode !== "persistent"
+  ) {
     throw new Error(
       `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have a provider sandbox id.`,
     );
@@ -82,6 +87,7 @@ export async function resolveResumableSandboxInstanceState(input: {
     persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,
+    computeGeneration: sandboxInstance.computeGeneration,
     runtimePlan: CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),
   };
 }
