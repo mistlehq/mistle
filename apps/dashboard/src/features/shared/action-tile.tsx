@@ -44,7 +44,7 @@ export function ActionTile({
       <div className={cn("min-w-0", contentClassName)}>
         <div
           className={cn(
-            "flex items-start gap-2",
+            "flex items-start gap-1",
             isDetachedLeading ? "" : "min-w-0 flex-col gap-1",
           )}
         >
