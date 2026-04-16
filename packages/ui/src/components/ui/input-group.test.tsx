@@ -1,7 +1,7 @@
 import { MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { render, screen } from "@testing-library/react";
 
-import { InputGroup, InputGroupAddon, InputGroupInput } from "./input-group.js";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "./input-group.js";
 
 function renderSearchGroup(active: boolean): HTMLElement {
   const { container } = render(
@@ -49,4 +49,42 @@ it("renders the search appearance in the active state", () => {
   expect(group.className).toContain("h-9");
   expect(input.className).toContain("h-full");
   expect(input.className).toContain("border-0");
+});
+
+it("keeps the default input variant stripped inside the group chrome", () => {
+  render(
+    <InputGroup>
+      <InputGroupAddon>@</InputGroupAddon>
+      <InputGroupInput aria-label="Workspace handle" defaultValue="platform-team" />
+      <InputGroupAddon align="inline-end">.mistle.dev</InputGroupAddon>
+    </InputGroup>,
+  );
+
+  const input = screen.getByRole("textbox", { name: "Workspace handle" });
+
+  expect(input.className).toContain("border-0");
+  expect(input.className).toContain("rounded-none");
+  expect(input.className).toContain("px-0");
+  expect(input.className).toContain("shadow-none");
+});
+
+it("lets the default group wrapper expand for textareas", () => {
+  const { container } = render(
+    <InputGroup>
+      <InputGroupAddon align="block-start">Review notes</InputGroupAddon>
+      <InputGroupTextarea
+        aria-label="Review notes body"
+        rows={4}
+        defaultValue="Flag the auth flow."
+      />
+      <InputGroupAddon align="block-end">Saved</InputGroupAddon>
+    </InputGroup>,
+  );
+
+  const group = container.querySelector('[data-slot="input-group"]');
+  if (!(group instanceof HTMLElement)) {
+    throw new Error("Expected the input group wrapper to render.");
+  }
+
+  expect(group.className).toContain("has-[>textarea]:h-auto");
 });

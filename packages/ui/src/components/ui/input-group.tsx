@@ -15,7 +15,7 @@ const inputGroupVariants = cva(
     variants: {
       variant: {
         default:
-          "border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 h-9 rounded-md border shadow-xs transition-[color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot][aria-invalid=true]]:ring-[3px] has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 [[data-slot=combobox-content]_&]:focus-within:border-inherit [[data-slot=combobox-content]_&]:focus-within:ring-0",
+          "border-input dark:bg-input/30 has-[[data-slot=input-group-control]:focus-visible]:border-ring has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50 has-[[data-slot][aria-invalid=true]]:ring-destructive/20 has-[[data-slot][aria-invalid=true]]:border-destructive dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40 h-9 rounded-md border shadow-xs transition-[color,box-shadow] has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot][aria-invalid=true]]:ring-[3px] has-[>textarea]:h-auto has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>[data-align=block-end]]:[&>input]:pt-3 has-[>[data-align=block-start]]:[&>input]:pb-3 has-[>[data-align=inline-end]]:[&>input]:pr-1.5 has-[>[data-align=inline-start]]:[&>input]:pl-1.5 [[data-slot=combobox-content]_&]:focus-within:border-inherit [[data-slot=combobox-content]_&]:focus-within:ring-0",
         inline: cn(
           "h-9 rounded-md px-1.5 text-foreground focus-within:text-muted-foreground",
           inlineFieldChromeClasses,
@@ -32,7 +32,8 @@ const inputGroupVariants = cva(
 const inputGroupInputVariants = cva("w-full min-w-0 outline-none", {
   variants: {
     variant: {
-      default: "",
+      default:
+        "flex-1 h-full rounded-none border-0 bg-transparent px-0 shadow-none ring-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:bg-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
       inline:
         "flex-1 h-full rounded-none border-0 bg-transparent px-0 shadow-none ring-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:bg-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
     },
