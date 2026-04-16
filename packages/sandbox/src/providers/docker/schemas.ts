@@ -60,9 +60,6 @@ export type DockerStartSandboxRequest = z.output<typeof DockerStartSandboxReques
 
 export const DockerPrepareVolumeForStartRequestSchema = z
   .object({
-    imageRef: z.string().trim().min(1, {
-      message: "Docker request field `imageRef` is required.",
-    }),
     storagePreparation: DockerVolumeStoragePreparationSchema,
   })
   .strict();

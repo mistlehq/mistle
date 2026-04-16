@@ -37,6 +37,8 @@ type DockerHostConfig = Docker.HostConfig & {
   CgroupnsMode?: "host" | "private";
 };
 
+const DockerVolumeInitImageRef = "alpine:3.20";
+
 export type DockerStartSandboxResponse = {
   runtimeId: string;
 };
@@ -203,7 +205,7 @@ export class DockerApiClient implements DockerClient {
 
   async prepareVolumeForStart(request: DockerPrepareVolumeForStartRequest): Promise<void> {
     const parsedRequest = DockerPrepareVolumeForStartRequestSchema.parse(request);
-    await this.#pullImage(parsedRequest.imageRef);
+    await this.#pullImage(DockerVolumeInitImageRef);
 
     const hostConfig: DockerHostConfig = {
       Mounts: createDockerVolumeInitMounts({
@@ -215,7 +217,7 @@ export class DockerApiClient implements DockerClient {
       DockerClientOperationIds.CREATE_CONTAINER,
       () =>
         this.#docker.createContainer({
-          Image: parsedRequest.imageRef,
+          Image: DockerVolumeInitImageRef,
           Entrypoint: ["sh", "-lc"],
           Cmd: [createDockerVolumeInitCommand({ storage: parsedRequest.storagePreparation })],
           ...(Object.keys(hostConfig).length === 0 ? {} : { HostConfig: hostConfig }),

@@ -62,7 +62,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     };
 
     await this.#client.prepareVolumeForStart({
-      imageRef: request.image.imageId,
       storagePreparation: {
         backend: storagePreparation.backend,
         handle: storagePreparation.handle,

@@ -469,7 +469,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     }
   }, 300_000);
 
-  it("prepares Docker volumes for start using the real sandbox base image entrypoint override", async ({
+  it("prepares Docker volumes for start with a lightweight helper image even when the sandbox image is the real base image", async ({
     fixture,
   }) => {
     if (!dockerAdapterIntegrationSettings.enabled) {
