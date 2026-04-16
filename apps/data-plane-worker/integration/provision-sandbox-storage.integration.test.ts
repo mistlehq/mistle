@@ -36,8 +36,8 @@ import { z } from "zod";
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import {
+  createArchilDiskName,
   createArchilDiskRequest,
-  createArchilDiskTokenNickname,
   provisionSandboxStorage,
 } from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
 
@@ -518,6 +518,86 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
   );
 
   it(
+    "compensates the created Archil disk when credential encryption fails",
+    async () => {
+      if (dbPool === undefined || controlPlaneApi === undefined) {
+        throw new Error("Expected integration infrastructure to be initialized.");
+      }
+
+      const controlPlaneDb = createControlPlaneDatabase(dbPool);
+      const dataPlaneDb = createDataPlaneDataPlaneDatabase(dbPool);
+      const controlPlaneInternalClient = new ControlPlaneInternalClient({
+        baseUrl: controlPlaneApi.baseUrl,
+        internalAuthServiceToken: InternalAuthServiceToken,
+      });
+      const organizationId = `org_pr4_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const sandboxInstanceId = createSandboxInstanceId(
+        randomUUID().replaceAll("-", "").slice(0, 12),
+      );
+      const workerConfig = createWorkerConfig(archilEnvironment);
+      const archilConfig = workerConfig.sandboxStorage?.archil;
+
+      if (archilConfig === undefined) {
+        throw new Error("Expected managed Archil worker config to be defined.");
+      }
+
+      await controlPlaneDb.insert(organizations).values({
+        id: organizationId,
+        slug: `org-pr4-${randomUUID().replaceAll("-", "").slice(0, 12)}`,
+        name: "PR4 integration organization",
+      });
+      await controlPlaneDb.insert(organizationSandboxStorageSettings).values({
+        organizationId,
+        persistentSandboxesEnabled: true,
+        storageConfigSource: SandboxStorageConfigSources.MANAGED,
+      });
+
+      await ensureSandboxInstance(
+        {
+          db: dataPlaneDb,
+          runtimeProvider: "docker",
+        },
+        {
+          sandboxInstanceId,
+          organizationId,
+          sandboxProfileId: "sbp_pr4_integration",
+          sandboxProfileVersion: 1,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          startedBy: {
+            kind: "system",
+            id: "worker_pr4_integration",
+          },
+          source: "dashboard",
+        },
+      );
+
+      await expect(
+        provisionSandboxStorage({
+          db: dataPlaneDb,
+          controlPlaneInternalClient,
+          workerConfig,
+          organizationId,
+          sandboxInstanceId,
+        }),
+      ).rejects.toThrow();
+
+      const provisionedDiskName = createArchilDiskName({
+        sandboxInstanceId,
+        ...(archilConfig.namePrefix === undefined ? {} : { namePrefix: archilConfig.namePrefix }),
+      });
+      const disks = await archil.disks.list();
+
+      expect(disks.some((disk) => disk.name === provisionedDiskName)).toBe(false);
+      await expect(
+        dataPlaneDb.query.sandboxInstanceStorages.findFirst({
+          where: (table, { eq }) => eq(table.sandboxInstanceId, sandboxInstanceId),
+        }),
+      ).resolves.toBeUndefined();
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "falls back to disk.createToken when createDisk does not return a token",
     async () => {
       if (dbPool === undefined || controlPlaneApi === undefined) {
@@ -630,11 +710,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       );
 
       expect(tokenUsers).toHaveLength(1);
-      expect(tokenUsers?.[0]?.nickname).toBe(
-        createArchilDiskTokenNickname({
-          sandboxInstanceId,
-        }),
-      );
+      expect(tokenUsers?.[0]?.nickname).toBe(sandboxInstanceId);
     },
     IntegrationTestTimeoutMs,
   );
@@ -720,11 +796,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       );
       createdDiskIds.add(precreatedDisk.disk.id);
 
-      await precreatedDisk.disk.createToken(
-        createArchilDiskTokenNickname({
-          sandboxInstanceId,
-        }),
-      );
+      await precreatedDisk.disk.createToken(sandboxInstanceId);
 
       const provisionedStorage = await provisionSandboxStorage({
         db: dataPlaneDb,

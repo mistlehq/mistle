@@ -47,17 +47,9 @@ type ArchilMountInput = {
   secretAccessKey: string;
 };
 
-function createArchilProvisioningMountEntry(input: {
-  mount: ArchilMountInput;
-}): ArchilProvisioningMount {
-  return {
-    type: input.mount.type,
-    bucket: input.mount.bucket,
-    endpoint: input.mount.endpoint,
-    accessKeyId: input.mount.accessKeyId,
-    secretAccessKey: input.mount.secretAccessKey,
-  };
-}
+type CompensationAction = {
+  run: () => Promise<void>;
+};
 
 function resolveArchilProvisioningMounts(input: {
   mounts: readonly ArchilMountInput[] | undefined;
@@ -77,9 +69,13 @@ function resolveArchilProvisioningMounts(input: {
 
   return {
     mounts: [
-      createArchilProvisioningMountEntry({
-        mount: firstMount,
-      }),
+      {
+        type: firstMount.type,
+        bucket: firstMount.bucket,
+        endpoint: firstMount.endpoint,
+        accessKeyId: firstMount.accessKeyId,
+        secretAccessKey: firstMount.secretAccessKey,
+      },
     ] satisfies [ArchilProvisioningMount],
   };
 }
@@ -89,10 +85,6 @@ export function createArchilDiskName(input: {
   namePrefix?: string;
 }): string {
   return `${input.namePrefix ?? ""}${input.sandboxInstanceId}`;
-}
-
-export function createArchilDiskTokenNickname(input: { sandboxInstanceId: string }): string {
-  return input.sandboxInstanceId;
 }
 
 export function resolveArchilProvisioningProfile(input: {
@@ -264,23 +256,42 @@ async function resolveArchilDiskToken(input: {
     await currentDisk.removeTokenUser(tokenUser.identifier);
   }
 
-  const createdToken = await currentDisk.createToken(
-    createArchilDiskTokenNickname({
-      sandboxInstanceId: input.sandboxInstanceId,
-    }),
-  );
+  const createdToken = await currentDisk.createToken(input.sandboxInstanceId);
 
   return createdToken.token;
 }
 
-async function deleteArchilDiskBestEffort(input: {
-  archil: Archil;
-  diskId: string;
-}): Promise<void> {
+async function tryDeleteArchilDisk(input: { archil: Archil; diskId: string }): Promise<void> {
   try {
     const disk = await input.archil.disks.get(input.diskId);
     await disk.delete();
   } catch {}
+}
+
+async function tryDeleteSandboxInstanceStorage(input: {
+  db: DataPlaneDatabase;
+  sandboxInstanceStorageId: string;
+}): Promise<void> {
+  try {
+    await input.db
+      .delete(sandboxInstanceStorages)
+      .where(eq(sandboxInstanceStorages.id, input.sandboxInstanceStorageId));
+  } catch {}
+}
+
+function registerCompensationAction(input: {
+  compensationActions: CompensationAction[];
+  action: CompensationAction;
+}): void {
+  input.compensationActions.push(input.action);
+}
+
+async function runCompensationActions(input: {
+  compensationActions: readonly CompensationAction[];
+}): Promise<void> {
+  for (const action of [...input.compensationActions].reverse()) {
+    await action.run();
+  }
 }
 
 export async function provisionSandboxStorage(input: {
@@ -290,67 +301,81 @@ export async function provisionSandboxStorage(input: {
   organizationId: string;
   sandboxInstanceId: string;
 }): Promise<SandboxInstanceStorage> {
-  return input.db.transaction(async (tx) => {
-    const [lockedSandboxInstance] = await tx
-      .select({
-        id: sandboxInstances.id,
-      })
-      .from(sandboxInstances)
-      .where(eq(sandboxInstances.id, input.sandboxInstanceId))
-      .limit(1)
-      .for("update");
+  const compensationActions: CompensationAction[] = [];
 
-    if (lockedSandboxInstance === undefined) {
-      throw new Error(
-        `Sandbox instance '${input.sandboxInstanceId}' was not found before storage provisioning.`,
-      );
-    }
+  try {
+    const provisionedStorage = await input.db.transaction(async (tx) => {
+      const [lockedSandboxInstance] = await tx
+        .select({
+          id: sandboxInstances.id,
+        })
+        .from(sandboxInstances)
+        .where(eq(sandboxInstances.id, input.sandboxInstanceId))
+        .limit(1)
+        .for("update");
 
-    const existingStorage = await getSandboxInstanceStorageBySandboxInstanceId(
-      {
-        db: tx,
-      },
-      {
-        sandboxInstanceId: input.sandboxInstanceId,
-      },
-    );
-
-    if (existingStorage !== undefined) {
-      if (
-        existingStorage.provider === SandboxStorageProviders.ARCHIL &&
-        existingStorage.status === SandboxStorageStatuses.READY
-      ) {
-        return existingStorage;
+      if (lockedSandboxInstance === undefined) {
+        throw new Error(
+          `Sandbox instance '${input.sandboxInstanceId}' was not found before storage provisioning.`,
+        );
       }
 
-      throw new Error(
-        `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists in unsupported state '${existingStorage.status}'.`,
+      const existingStorage = await getSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db: tx,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
       );
-    }
 
-    const resolvedStorageConfiguration =
-      await input.controlPlaneInternalClient.resolveStorageConfiguration({
-        organizationId: input.organizationId,
+      if (existingStorage !== undefined) {
+        if (
+          existingStorage.provider === SandboxStorageProviders.ARCHIL &&
+          existingStorage.status === SandboxStorageStatuses.READY
+        ) {
+          return existingStorage;
+        }
+
+        throw new Error(
+          `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists in unsupported state '${existingStorage.status}'.`,
+        );
+      }
+
+      const resolvedStorageConfiguration =
+        await input.controlPlaneInternalClient.resolveStorageConfiguration({
+          organizationId: input.organizationId,
+        });
+
+      const archilProfile = resolveArchilProvisioningProfile({
+        managedArchilConfig: input.workerConfig.sandboxStorage?.archil,
+        resolvedStorageConfiguration,
       });
 
-    const archilProfile = resolveArchilProvisioningProfile({
-      managedArchilConfig: input.workerConfig.sandboxStorage?.archil,
-      resolvedStorageConfiguration,
-    });
+      const archil = new Archil({
+        apiKey: archilProfile.apiKey,
+        region: archilProfile.region,
+      });
 
-    const archil = new Archil({
-      apiKey: archilProfile.apiKey,
-      region: archilProfile.region,
-    });
+      const createdDisk = await archil.disks.create(
+        createArchilDiskRequest({
+          sandboxInstanceId: input.sandboxInstanceId,
+          profile: archilProfile,
+        }),
+      );
 
-    const createdDisk = await archil.disks.create(
-      createArchilDiskRequest({
-        sandboxInstanceId: input.sandboxInstanceId,
-        profile: archilProfile,
-      }),
-    );
+      registerCompensationAction({
+        compensationActions,
+        action: {
+          run: async () => {
+            await tryDeleteArchilDisk({
+              archil,
+              diskId: createdDisk.disk.id,
+            });
+          },
+        },
+      });
 
-    try {
       const plaintextToken = await resolveArchilDiskToken({
         archil,
         createdDisk,
@@ -363,7 +388,7 @@ export async function provisionSandboxStorage(input: {
         plaintext: plaintextToken,
       });
 
-      return insertSandboxInstanceStorage(
+      const insertedStorage = await insertSandboxInstanceStorage(
         {
           db: tx,
         },
@@ -379,12 +404,28 @@ export async function provisionSandboxStorage(input: {
           organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
         },
       );
-    } catch (error) {
-      await deleteArchilDiskBestEffort({
-        archil,
-        diskId: createdDisk.disk.id,
+
+      registerCompensationAction({
+        compensationActions,
+        action: {
+          run: async () => {
+            await tryDeleteSandboxInstanceStorage({
+              db: input.db,
+              sandboxInstanceStorageId: insertedStorage.id,
+            });
+          },
+        },
       });
-      throw error;
-    }
-  });
+
+      return insertedStorage;
+    });
+
+    compensationActions.length = 0;
+    return provisionedStorage;
+  } catch (error) {
+    await runCompensationActions({
+      compensationActions,
+    });
+    throw error;
+  }
 }

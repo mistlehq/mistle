@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   createArchilDiskName,
   createArchilDiskRequest,
-  createArchilDiskTokenNickname,
   resolveArchilProvisioningProfile,
 } from "./provision-sandbox-storage.js";
 
@@ -23,14 +22,6 @@ describe("provisionSandboxStorage helpers", () => {
         namePrefix: "stg-mistle-",
       }),
     ).toBe("stg-mistle-sbi_01knvnbakhfevv29xs862a8txe");
-  });
-
-  it("uses the sandbox instance id as the token nickname", () => {
-    expect(
-      createArchilDiskTokenNickname({
-        sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
-      }),
-    ).toBe("sbi_01knvnbakhfevv29xs862a8txe");
   });
 
   it("maps a managed Archil profile to the provisioning profile", () => {
