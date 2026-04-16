@@ -1,11 +1,9 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   sandboxInstances,
-  sandboxInstanceStorages,
   SandboxStorageProviders,
   SandboxStorageStatuses,
   type DataPlaneDatabase,
-  type InsertSandboxInstanceStorage,
   type SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
 import {
@@ -18,14 +16,19 @@ import { eq } from "drizzle-orm";
 
 import type { DataPlaneWorkerConfig } from "../../core/config.js";
 import type { SandboxStorageBackendAdapter, SandboxStorageBackendRecord } from "./backend.js";
+import {
+  deleteSandboxInstanceStorageBySandboxInstanceId,
+  getSandboxInstanceStorageBySandboxInstanceId,
+  insertSandboxInstanceStorage,
+  registerCompensationAction,
+  runCompensationActions,
+  tryDeleteSandboxInstanceStorageById,
+  type CompensationAction,
+} from "./storage-persistence.js";
 
 type ManagedDockerVolumeConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["dockerVolume"]
 >;
-
-type CompensationAction = {
-  run: () => Promise<void>;
-};
 
 type DockerVolumeReadySandboxInstanceStorage = SandboxInstanceStorage & {
   provider: typeof SandboxStorageProviders.DOCKER_VOLUME;
@@ -67,65 +70,6 @@ function resolveDockerVolumeName(input: {
           namePrefix: input.managedDockerVolumeConfig.namePrefix,
         }),
   });
-}
-
-async function getSandboxInstanceStorageBySandboxInstanceId(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<SandboxInstanceStorage | undefined> {
-  return ctx.db.query.sandboxInstanceStorages.findFirst({
-    where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
-  });
-}
-
-async function insertSandboxInstanceStorage(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: InsertSandboxInstanceStorage,
-): Promise<SandboxInstanceStorage> {
-  const insertedRows = await ctx.db
-    .insert(sandboxInstanceStorages)
-    .values(input)
-    .onConflictDoNothing({
-      target: [sandboxInstanceStorages.sandboxInstanceId],
-    })
-    .returning();
-
-  const insertedRow = insertedRows[0];
-  if (insertedRow === undefined) {
-    throw new Error(
-      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists.`,
-    );
-  }
-
-  return insertedRow;
-}
-
-async function deleteSandboxInstanceStorageBySandboxInstanceId(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<void> {
-  const deletedRows = await ctx.db
-    .delete(sandboxInstanceStorages)
-    .where(eq(sandboxInstanceStorages.sandboxInstanceId, input.sandboxInstanceId))
-    .returning({
-      id: sandboxInstanceStorages.id,
-    });
-
-  if (deletedRows[0] === undefined) {
-    throw new Error(
-      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not found.`,
-    );
-  }
 }
 
 function requireReadyDockerVolumeSandboxStorage(input: {
@@ -174,32 +118,6 @@ async function tryDeleteDockerVolume(input: {
       volumeName: input.volumeName,
     });
   } catch {}
-}
-
-async function tryDeleteSandboxInstanceStorage(input: {
-  db: DataPlaneDatabase;
-  sandboxInstanceStorageId: string;
-}): Promise<void> {
-  try {
-    await input.db
-      .delete(sandboxInstanceStorages)
-      .where(eq(sandboxInstanceStorages.id, input.sandboxInstanceStorageId));
-  } catch {}
-}
-
-function registerCompensationAction(input: {
-  compensationActions: CompensationAction[];
-  action: CompensationAction;
-}): void {
-  input.compensationActions.push(input.action);
-}
-
-async function runCompensationActions(input: {
-  compensationActions: readonly CompensationAction[];
-}): Promise<void> {
-  for (const action of [...input.compensationActions].reverse()) {
-    await action.run();
-  }
 }
 
 type DockerVolumeSandboxStorageBackendAdapterContext = {
@@ -315,7 +233,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
           compensationActions,
           action: {
             run: async () => {
-              await tryDeleteSandboxInstanceStorage({
+              await tryDeleteSandboxInstanceStorageById({
                 db: this.#db,
                 sandboxInstanceStorageId: insertedStorage.id,
               });

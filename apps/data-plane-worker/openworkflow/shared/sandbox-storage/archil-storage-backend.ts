@@ -9,11 +9,9 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxStorageCredentialKinds,
   sandboxInstances,
-  sandboxInstanceStorages,
   SandboxStorageProviders,
   SandboxStorageStatuses,
   type DataPlaneDatabase,
-  type InsertSandboxInstanceStorage,
   type SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
 import {
@@ -22,10 +20,20 @@ import {
   type SandboxArchilStorageAttachment,
   type SandboxArchilStorageCleanup,
 } from "@mistle/sandbox";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import type { DataPlaneWorkerConfig } from "../../core/config.js";
 import type { SandboxStorageBackendAdapter, SandboxStorageBackendRecord } from "./backend.js";
+import {
+  deleteSandboxInstanceStorageBySandboxInstanceId,
+  getSandboxInstanceStorageBySandboxInstanceId,
+  insertSandboxInstanceStorage,
+  registerCompensationAction,
+  runCompensationActions,
+  tryDeleteSandboxInstanceStorageById,
+  updateSandboxInstanceStorageCredential,
+  type CompensationAction,
+} from "./storage-persistence.js";
 
 type ManagedArchilConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["archil"]
@@ -52,10 +60,6 @@ type ArchilMountInput = {
   endpoint: string;
   accessKeyId: string;
   secretAccessKey: string;
-};
-
-type CompensationAction = {
-  run: () => Promise<void>;
 };
 
 type SandboxInstanceStorageValidationCandidate = Omit<
@@ -198,19 +202,6 @@ export function createArchilDiskRequest(input: {
   };
 }
 
-export async function getSandboxInstanceStorageBySandboxInstanceId(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<SandboxInstanceStorage | undefined> {
-  return ctx.db.query.sandboxInstanceStorages.findFirst({
-    where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
-  });
-}
-
 export function requireReadyArchilSandboxStorage(input: {
   sandboxInstanceId: string;
   storage: SandboxInstanceStorageValidationCandidate | undefined;
@@ -258,87 +249,6 @@ export async function resolveSandboxStorageDiskToken(input: {
   return resolvedCredential.plaintext;
 }
 
-export async function insertSandboxInstanceStorage(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: InsertSandboxInstanceStorage,
-): Promise<SandboxInstanceStorage> {
-  const insertedRows = await ctx.db
-    .insert(sandboxInstanceStorages)
-    .values(input)
-    .onConflictDoNothing({
-      target: [sandboxInstanceStorages.sandboxInstanceId],
-    })
-    .returning();
-
-  const insertedRow = insertedRows[0];
-  if (insertedRow === undefined) {
-    throw new Error(
-      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists.`,
-    );
-  }
-
-  return insertedRow;
-}
-
-export async function updateSandboxInstanceStorageCredential(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: {
-    sandboxInstanceId: string;
-    status: SandboxInstanceStorage["status"];
-    credentialCiphertext: string;
-    credentialNonce: string;
-    organizationCredentialKeyVersion: number;
-    credentialKind: SandboxInstanceStorage["credentialKind"];
-  },
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(sandboxInstanceStorages)
-    .set({
-      status: input.status,
-      credentialCiphertext: input.credentialCiphertext,
-      credentialNonce: input.credentialNonce,
-      organizationCredentialKeyVersion: input.organizationCredentialKeyVersion,
-      credentialKind: input.credentialKind,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(sandboxInstanceStorages.sandboxInstanceId, input.sandboxInstanceId))
-    .returning({
-      id: sandboxInstanceStorages.id,
-    });
-
-  if (updatedRows[0] === undefined) {
-    throw new Error(
-      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not found.`,
-    );
-  }
-}
-
-export async function deleteSandboxInstanceStorageBySandboxInstanceId(
-  ctx: {
-    db: DataPlaneDatabase;
-  },
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<void> {
-  const deletedRows = await ctx.db
-    .delete(sandboxInstanceStorages)
-    .where(eq(sandboxInstanceStorages.sandboxInstanceId, input.sandboxInstanceId))
-    .returning({
-      id: sandboxInstanceStorages.id,
-    });
-
-  if (deletedRows[0] === undefined) {
-    throw new Error(
-      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not found.`,
-    );
-  }
-}
-
 async function resolveArchilDiskToken(input: {
   archil: Archil;
   createdDisk: CreateDiskResult;
@@ -371,32 +281,6 @@ async function tryDeleteArchilDisk(input: { archil: Archil; diskId: string }): P
     const disk = await input.archil.disks.get(input.diskId);
     await disk.delete();
   } catch {}
-}
-
-async function tryDeleteSandboxInstanceStorage(input: {
-  db: DataPlaneDatabase;
-  sandboxInstanceStorageId: string;
-}): Promise<void> {
-  try {
-    await input.db
-      .delete(sandboxInstanceStorages)
-      .where(eq(sandboxInstanceStorages.id, input.sandboxInstanceStorageId));
-  } catch {}
-}
-
-function registerCompensationAction(input: {
-  compensationActions: CompensationAction[];
-  action: CompensationAction;
-}): void {
-  input.compensationActions.push(input.action);
-}
-
-async function runCompensationActions(input: {
-  compensationActions: readonly CompensationAction[];
-}): Promise<void> {
-  for (const action of [...input.compensationActions].reverse()) {
-    await action.run();
-  }
 }
 
 type ArchilSandboxStorageBackendAdapterContext = {
@@ -532,7 +416,7 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
           compensationActions,
           action: {
             run: async () => {
-              await tryDeleteSandboxInstanceStorage({
+              await tryDeleteSandboxInstanceStorageById({
                 db: this.#db,
                 sandboxInstanceStorageId: insertedStorage.id,
               });
@@ -703,3 +587,11 @@ export function createArchilSandboxStorageBackendAdapter(
 ): SandboxStorageBackendAdapter {
   return new ArchilSandboxStorageBackendAdapterImpl(input);
 }
+
+export {
+  deleteSandboxInstanceStorageBySandboxInstanceId,
+  getSandboxInstanceStorageBySandboxInstanceId,
+  insertSandboxInstanceStorage,
+  tryDeleteSandboxInstanceStorageById as tryDeleteSandboxInstanceStorage,
+  updateSandboxInstanceStorageCredential,
+};
