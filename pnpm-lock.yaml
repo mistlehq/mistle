@@ -547,6 +547,9 @@ importers:
 
   apps/data-plane-worker:
     dependencies:
+      '@archildata/client':
+        specifier: 0.8.7
+        version: 0.8.7
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -1216,6 +1219,10 @@ packages:
 
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
+
+  '@archildata/client@0.8.7':
+    resolution: {integrity: sha512-53RkbKQ2g+Ziy3+LQiSTafLl+kKCzoVRo0ZcGBogZL0jwE/HwGQB0l4VeO8QJRhbnWuLjheUMCLWwx/fRnJbaw==}
+    engines: {node: '>= 18'}
 
   '@ark/schema@0.55.0':
     resolution: {integrity: sha512-IlSIc0FmLKTDGr4I/FzNHauMn0MADA6bCjT1wauu4k6MyxhC1R9gz0olNpIRvK7lGGDwtc/VO0RUDNvVQW5WFg==}
@@ -10438,6 +10445,9 @@ packages:
     resolution: {integrity: sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ==}
     engines: {node: '>=12'}
 
+  openapi-fetch@0.13.8:
+    resolution: {integrity: sha512-yJ4QKRyNxE44baQ9mY5+r/kAzZ8yXMemtNAOFwOzRXJscdjSxxzWSNlyBAr+o5JjkUw9Lc3W7OIoca0cY3PYnQ==}
+
   openapi-fetch@0.14.1:
     resolution: {integrity: sha512-l7RarRHxlEZYjMLd/PR0slfMVse2/vvIAGm75/F7J6MlQ8/b9uUQmUF2kCPrQhJqMXSxmYWObVgeYXbFYzZR+A==}
 
@@ -12763,6 +12773,10 @@ snapshots:
     dependencies:
       package-manager-detector: 1.6.0
       tinyexec: 1.0.4
+
+  '@archildata/client@0.8.7':
+    dependencies:
+      openapi-fetch: 0.13.8
 
   '@ark/schema@0.55.0':
     dependencies:
@@ -23613,6 +23627,10 @@ snapshots:
       define-lazy-prop: 2.0.0
       is-docker: 2.2.1
       is-wsl: 2.2.0
+
+  openapi-fetch@0.13.8:
+    dependencies:
+      openapi-typescript-helpers: 0.0.15
 
   openapi-fetch@0.14.1:
     dependencies:

@@ -13,11 +13,13 @@ import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
+import { provisionSandboxStorage } from "./provision-sandbox-storage.js";
 import { SandboxStartupModes } from "./sandbox-startup-input.js";
 import { startSandbox } from "./start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
 const StartSandboxFailureCodes = {
+  SANDBOX_STORAGE_PROVISION_FAILED: "sandbox_storage_provision_failed",
   SANDBOX_START_FAILED: "sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
   SANDBOX_INIT_FAILED: "sandbox_init_failed",
@@ -176,6 +178,33 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       logger.info("Ensured sandbox instance exists.");
       return persisted;
     });
+
+    if (workflowInput.persistenceMode === "persistent") {
+      try {
+        await step.run({ name: "provision-sandbox-storage" }, async () => {
+          logger.info("Provisioning persistent sandbox storage.");
+          await provisionSandboxStorage({
+            db: ctx.db,
+            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+            workerConfig: ctx.config.app,
+            organizationId: workflowInput.organizationId,
+            sandboxInstanceId: workflowInput.sandboxInstanceId,
+          });
+        });
+        logger.info("Provisioned persistent sandbox storage.");
+      } catch (error) {
+        logger.error({ err: error }, "Persistent sandbox storage provisioning failed.");
+        await markSandboxInstanceFailedStep({
+          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+          failureCode: StartSandboxFailureCodes.SANDBOX_STORAGE_PROVISION_FAILED,
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Persistent sandbox storage provisioning failed before sandbox startup.",
+            error,
+          }),
+        });
+        throw error;
+      }
+    }
 
     let startedSandbox: {
       sandboxInstanceId: string;

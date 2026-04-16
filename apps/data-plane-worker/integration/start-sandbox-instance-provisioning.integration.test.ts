@@ -2,8 +2,12 @@ import {
   createDataPlaneDatabase,
   SandboxInstancePersistenceModes,
   sandboxInstanceRuntimePlans,
+  sandboxInstanceStorages,
   sandboxInstances,
   SandboxInstanceStatuses,
+  SandboxStorageCredentialKinds,
+  SandboxStorageProviders,
+  SandboxStorageStatuses,
 } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -17,6 +21,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
+import {
+  getSandboxInstanceStorageBySandboxInstanceId,
+  insertSandboxInstanceStorage,
+  updateSandboxInstanceStorageCredential,
+} from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -79,6 +88,7 @@ describe("start sandbox instance provisioning integration", () => {
 
   beforeEach(async () => {
     await createDatabase().delete(sandboxInstanceRuntimePlans);
+    await createDatabase().delete(sandboxInstanceStorages);
     await createDatabase().delete(sandboxInstances);
   });
 
@@ -168,6 +178,107 @@ describe("start sandbox instance provisioning integration", () => {
           compiledFromProfileVersion: 3,
         },
       ]);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "persists and updates sandbox storage metadata",
+    async () => {
+      const db = createDatabase();
+      const sandboxInstanceId = "sbi_start_storage_provisioning_integration";
+
+      await ensureSandboxInstance(
+        {
+          db,
+          runtimeProvider: "docker",
+        },
+        {
+          sandboxInstanceId,
+          organizationId: "org_start_storage_provisioning_integration",
+          sandboxProfileId: "sbp_start_storage_provisioning_integration",
+          sandboxProfileVersion: 1,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          startedBy: {
+            kind: "system",
+            id: "worker_start_storage_provisioning_integration",
+          },
+          source: "dashboard",
+        },
+      );
+
+      await insertSandboxInstanceStorage(
+        {
+          db,
+        },
+        {
+          sandboxInstanceId,
+          provider: SandboxStorageProviders.ARCHIL,
+          handle: "dsk-0123456789abcdef",
+          region: "aws-us-east-1",
+          status: SandboxStorageStatuses.READY,
+          credentialCiphertext: "ciphertext-v1",
+          credentialNonce: "nonce-v1",
+          credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+          organizationCredentialKeyVersion: 1,
+        },
+      );
+
+      const insertedStorage = await getSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db,
+        },
+        {
+          sandboxInstanceId,
+        },
+      );
+
+      expect(insertedStorage).toMatchObject({
+        sandboxInstanceId,
+        provider: SandboxStorageProviders.ARCHIL,
+        handle: "dsk-0123456789abcdef",
+        region: "aws-us-east-1",
+        status: SandboxStorageStatuses.READY,
+        credentialCiphertext: "ciphertext-v1",
+        credentialNonce: "nonce-v1",
+        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+        organizationCredentialKeyVersion: 1,
+      });
+
+      await updateSandboxInstanceStorageCredential(
+        {
+          db,
+        },
+        {
+          sandboxInstanceId,
+          status: SandboxStorageStatuses.FAILED,
+          credentialCiphertext: "ciphertext-v2",
+          credentialNonce: "nonce-v2",
+          credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+          organizationCredentialKeyVersion: 2,
+        },
+      );
+
+      const updatedStorage = await getSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db,
+        },
+        {
+          sandboxInstanceId,
+        },
+      );
+
+      expect(updatedStorage).toMatchObject({
+        sandboxInstanceId,
+        provider: SandboxStorageProviders.ARCHIL,
+        handle: "dsk-0123456789abcdef",
+        region: "aws-us-east-1",
+        status: SandboxStorageStatuses.FAILED,
+        credentialCiphertext: "ciphertext-v2",
+        credentialNonce: "nonce-v2",
+        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+        organizationCredentialKeyVersion: 2,
+      });
     },
     IntegrationTestTimeoutMs,
   );
