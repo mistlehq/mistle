@@ -58,12 +58,6 @@ export type OrganizationSandboxStorageConfigSummary = z.infer<
   typeof OrganizationSandboxStorageConfigSummarySchema
 >;
 
-export function parseOrganizationSandboxStorageConfigV1(
-  input: string,
-): OrganizationSandboxStorageConfigV1 {
-  return OrganizationSandboxStorageConfigV1Schema.parse(JSON.parse(input));
-}
-
 export function summarizeOrganizationSandboxStorageConfig(
   input: OrganizationSandboxStorageConfigV1,
 ): OrganizationSandboxStorageConfigSummary {

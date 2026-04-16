@@ -35,20 +35,6 @@ async function getOrganizationCredentialKeyByVersion(input: {
   });
 }
 
-function unwrapOrganizationCredentialKeyMaterial(input: {
-  ciphertext: string;
-  masterKeyVersion: number;
-  masterEncryptionKeys: Record<string, string>;
-}): Buffer {
-  return unwrapOrganizationCredentialKey({
-    wrappedCiphertext: input.ciphertext,
-    masterEncryptionKeyMaterial: resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: input.masterKeyVersion,
-      masterEncryptionKeys: input.masterEncryptionKeys,
-    }),
-  });
-}
-
 export async function encryptOrganizationBackedValue(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
@@ -69,10 +55,13 @@ export async function encryptOrganizationBackedValue(input: {
     );
   }
 
-  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKeyMaterial({
-    ciphertext: organizationCredentialKey.ciphertext,
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
     masterKeyVersion: organizationCredentialKey.masterKeyVersion,
     masterEncryptionKeys: input.encryptionConfig.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
   });
 
   try {
@@ -109,10 +98,13 @@ export async function decryptOrganizationBackedValue(input: {
     );
   }
 
-  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKeyMaterial({
-    ciphertext: organizationCredentialKey.ciphertext,
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
     masterKeyVersion: organizationCredentialKey.masterKeyVersion,
     masterEncryptionKeys: input.encryptionConfig.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
   });
 
   try {

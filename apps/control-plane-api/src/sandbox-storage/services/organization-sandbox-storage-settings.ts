@@ -10,7 +10,7 @@ import { sql } from "drizzle-orm";
 
 import {
   OrganizationSandboxStorageConfigVersion,
-  parseOrganizationSandboxStorageConfigV1,
+  OrganizationSandboxStorageConfigV1Schema,
   summarizeOrganizationSandboxStorageConfig,
   type OrganizationSandboxStorageConfigSummary,
   type OrganizationSandboxStorageConfigV1,
@@ -109,7 +109,9 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
     storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
     storageBackend: SandboxStorageBackends.ARCHIL,
     storageConfigVersion: OrganizationSandboxStorageConfigVersion,
-    organizationStorageConfig: parseOrganizationSandboxStorageConfigV1(plaintext),
+    organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema.parse(
+      JSON.parse(plaintext),
+    ),
   };
 }
 

@@ -32,7 +32,7 @@ export const sandboxInstanceStorages = dataPlaneSchema.table(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => typeid("sst").toString()),
+      .$defaultFn(() => typeid("sto").toString()),
     sandboxInstanceId: text("sandbox_instance_id")
       .notNull()
       .references(() => sandboxInstances.id, { onDelete: "cascade" }),
