@@ -51,6 +51,31 @@ type CompensationAction = {
   run: () => Promise<void>;
 };
 
+type SandboxInstanceStorageValidationCandidate = Omit<
+  SandboxInstanceStorage,
+  "provider" | "status" | "credentialKind"
+> & {
+  provider: string;
+  status: string;
+  credentialKind: string;
+};
+
+type ArchilReadySandboxInstanceStorage = SandboxInstanceStorage & {
+  provider: typeof SandboxStorageProviders.ARCHIL;
+  status: typeof SandboxStorageStatuses.READY;
+  credentialKind: typeof SandboxStorageCredentialKinds.DISK_TOKEN;
+};
+
+function isArchilReadySandboxInstanceStorage(
+  storage: SandboxInstanceStorageValidationCandidate,
+): storage is ArchilReadySandboxInstanceStorage {
+  return (
+    storage.provider === SandboxStorageProviders.ARCHIL &&
+    storage.status === SandboxStorageStatuses.READY &&
+    storage.credentialKind === SandboxStorageCredentialKinds.DISK_TOKEN
+  );
+}
+
 function resolveArchilProvisioningMounts(input: {
   mounts: readonly ArchilMountInput[] | undefined;
 }): Pick<ArchilProvisioningProfile, "mounts"> | object {
@@ -173,6 +198,86 @@ export async function getSandboxInstanceStorageBySandboxInstanceId(
   return ctx.db.query.sandboxInstanceStorages.findFirst({
     where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
   });
+}
+
+export function requireReadyArchilSandboxStorage(input: {
+  sandboxInstanceId: string;
+  storage: SandboxInstanceStorageValidationCandidate | undefined;
+}): ArchilReadySandboxInstanceStorage {
+  if (input.storage === undefined) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not found.`,
+    );
+  }
+
+  if (input.storage.provider !== SandboxStorageProviders.ARCHIL) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' must use provider '${SandboxStorageProviders.ARCHIL}'.`,
+    );
+  }
+
+  if (input.storage.credentialKind !== SandboxStorageCredentialKinds.DISK_TOKEN) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' must use credential kind '${SandboxStorageCredentialKinds.DISK_TOKEN}'.`,
+    );
+  }
+
+  if (!isArchilReadySandboxInstanceStorage(input.storage)) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' is not ready; found status '${input.storage.status}'.`,
+    );
+  }
+
+  return input.storage;
+}
+
+export async function resolveSandboxStorageDiskToken(input: {
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  organizationId: string;
+  storage: ArchilReadySandboxInstanceStorage;
+}): Promise<string> {
+  const resolvedCredential = await input.controlPlaneInternalClient.resolveStorageCredential({
+    organizationId: input.organizationId,
+    credentialKind: input.storage.credentialKind,
+    ciphertext: input.storage.credentialCiphertext,
+    nonce: input.storage.credentialNonce,
+    organizationCredentialKeyVersion: input.storage.organizationCredentialKeyVersion,
+  });
+
+  return resolvedCredential.plaintext;
+}
+
+export async function resolveReadyArchilSandboxStorage(input: {
+  db: DataPlaneDatabase;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  organizationId: string;
+  sandboxInstanceId: string;
+}): Promise<{
+  storage: ArchilReadySandboxInstanceStorage;
+  diskToken: string;
+}> {
+  const storage = requireReadyArchilSandboxStorage({
+    sandboxInstanceId: input.sandboxInstanceId,
+    storage: await getSandboxInstanceStorageBySandboxInstanceId(
+      {
+        db: input.db,
+      },
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+    ),
+  });
+
+  const diskToken = await resolveSandboxStorageDiskToken({
+    controlPlaneInternalClient: input.controlPlaneInternalClient,
+    organizationId: input.organizationId,
+    storage,
+  });
+
+  return {
+    storage,
+    diskToken,
+  };
 }
 
 export async function insertSandboxInstanceStorage(

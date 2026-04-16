@@ -1,10 +1,44 @@
+import {
+  SandboxStorageCredentialKinds,
+  SandboxStorageProviders,
+  SandboxStorageStatuses,
+  type SandboxInstanceStorage,
+} from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
 import {
   createArchilDiskName,
   createArchilDiskRequest,
+  requireReadyArchilSandboxStorage,
   resolveArchilProvisioningProfile,
 } from "./provision-sandbox-storage.js";
+
+function createSandboxInstanceStorage(
+  input: Partial<{
+    provider: string;
+    status: string;
+    credentialKind: string;
+  }> = {},
+): Omit<SandboxInstanceStorage, "provider" | "status" | "credentialKind"> & {
+  provider: string;
+  status: string;
+  credentialKind: string;
+} {
+  return {
+    id: "sto_01knvnbakhfevv29xs862a8txe",
+    sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
+    provider: input.provider ?? SandboxStorageProviders.ARCHIL,
+    handle: "dsk-0123456789abcdef",
+    region: "aws-us-east-1",
+    status: input.status ?? SandboxStorageStatuses.READY,
+    credentialCiphertext: "ciphertext",
+    credentialNonce: "nonce",
+    credentialKind: input.credentialKind ?? SandboxStorageCredentialKinds.DISK_TOKEN,
+    organizationCredentialKeyVersion: 1,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
 
 describe("provisionSandboxStorage helpers", () => {
   it("builds the Archil disk name from the sandbox instance id when no prefix is set", () => {
@@ -197,5 +231,31 @@ describe("provisionSandboxStorage helpers", () => {
         },
       ],
     });
+  });
+
+  it("fails when the storage row uses an unsupported provider", () => {
+    expect(() =>
+      requireReadyArchilSandboxStorage({
+        sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
+        storage: createSandboxInstanceStorage({
+          provider: "other-provider",
+        }),
+      }),
+    ).toThrow(
+      "Sandbox storage row for sandbox instance 'sbi_01knvnbakhfevv29xs862a8txe' must use provider 'archil'.",
+    );
+  });
+
+  it("fails when the storage row uses an unsupported credential kind", () => {
+    expect(() =>
+      requireReadyArchilSandboxStorage({
+        sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
+        storage: createSandboxInstanceStorage({
+          credentialKind: "other-credential",
+        }),
+      }),
+    ).toThrow(
+      "Sandbox storage row for sandbox instance 'sbi_01knvnbakhfevv29xs862a8txe' must use credential kind 'disk_token'.",
+    );
   });
 });
