@@ -9,10 +9,14 @@ type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.D
 
 export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
 export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult["global"]>;
+export type DataPlaneApiSandboxStorageBackend =
+  | NonNullable<DataPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"]
+  | undefined;
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
   internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
   sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 export type AppContextBindings = {
@@ -30,6 +34,7 @@ export type AppContextVariables = {
   resources: AppRuntimeResources;
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 export type AppContext = Context<AppContextBindings>;

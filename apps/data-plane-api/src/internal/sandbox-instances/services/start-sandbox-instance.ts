@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  SandboxInstancePersistenceModes,
+  type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
@@ -11,7 +13,11 @@ import { z } from "zod";
 
 import { DataPlaneOpenWorkflowSchema } from "../../../openworkflow/index.js";
 import type { AppRuntimeResources } from "../../../resources.js";
-import type { DataPlaneApiConfig, DataPlaneApiGlobalConfig } from "../../../types.js";
+import type {
+  DataPlaneApiConfig,
+  DataPlaneApiGlobalConfig,
+  DataPlaneApiSandboxStorageBackend,
+} from "../../../types.js";
 import type {
   StartSandboxInstanceAcceptedResponse,
   StartSandboxInstanceInput,
@@ -27,8 +33,10 @@ type StartSandboxInstanceContext = {
   db: DataPlaneDatabase;
   openWorkflow: AppRuntimeResources["openWorkflow"];
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
+  controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   workflowNamespaceId: DataPlaneApiConfig["workflow"]["namespaceId"];
   sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): string {
@@ -46,6 +54,24 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
 
 function createSandboxInstanceId(): string {
   return typeid("sbi").toString();
+}
+
+export function resolveSandboxInstancePersistenceMode(input: {
+  organizationId: string;
+  persistentSandboxesEnabled: boolean;
+  configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
+}): SandboxInstancePersistenceMode {
+  if (!input.persistentSandboxesEnabled) {
+    return SandboxInstancePersistenceModes.EPHEMERAL;
+  }
+
+  if (input.configuredStorageBackend === "archil") {
+    return SandboxInstancePersistenceModes.PERSISTENT;
+  }
+
+  throw new Error(
+    `Persistent sandboxes are enabled for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
+  );
 }
 
 async function resolveWorkflowSandboxInstanceId(input: {
@@ -82,11 +108,23 @@ export async function startSandboxInstance(
   ctx: StartSandboxInstanceContext,
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
+  const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
+    {
+      organizationId: input.organizationId,
+    },
+  );
+  const persistenceMode = resolveSandboxInstancePersistenceMode({
+    organizationId: input.organizationId,
+    persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
+    configuredStorageBackend: ctx.sandboxStorageBackend,
+  });
+
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
     StartSandboxInstanceWorkflowSpec,
     {
       ...input,
       sandboxInstanceId: createSandboxInstanceId(),
+      persistenceMode,
     },
     {
       idempotencyKey: createStartSandboxIdempotencyKey(input),
@@ -112,6 +150,7 @@ export async function startSandboxInstance(
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,
+      persistenceMode,
     })
     .onConflictDoNothing({
       target: [sandboxInstances.id],

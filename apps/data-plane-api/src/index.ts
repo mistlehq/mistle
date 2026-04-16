@@ -9,6 +9,7 @@ async function startDataPlaneApi(): Promise<void> {
     app: appConfig,
     internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
     sandboxProvider: globalConfig.sandbox.provider,
+    sandboxStorageBackend: globalConfig.sandbox.storage?.backend,
   });
 
   await runtime.start();

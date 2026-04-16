@@ -16,6 +16,7 @@ export async function ensureSandboxInstance(
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
+    persistenceMode: StartSandboxInstanceWorkflowInput["persistenceMode"];
     startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
     source: StartSandboxInstanceWorkflowInput["source"];
   },
@@ -35,6 +36,7 @@ export async function ensureSandboxInstance(
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,
+      persistenceMode: input.persistenceMode,
     })
     .onConflictDoNothing({
       target: [sandboxInstances.id],

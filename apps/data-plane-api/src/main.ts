@@ -20,6 +20,7 @@ export async function createDataPlaneApiRuntime(
       internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       resources,
       sandboxProvider: runtimeConfig.sandboxProvider,
+      sandboxStorageBackend: runtimeConfig.sandboxStorageBackend,
     });
   } catch (error) {
     await stopAppResources(resources);

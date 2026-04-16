@@ -8,8 +8,10 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
   const db = ctx.get("resources").db;
   const openWorkflow = ctx.get("resources").openWorkflow;
   const workflowDbPool = ctx.get("resources").workflowDbPool;
+  const controlPlaneInternalClient = ctx.get("controlPlaneInternalClient");
   const workflowNamespaceId = ctx.get("config").workflow.namespaceId;
   const sandboxProvider = ctx.get("sandboxProvider");
+  const sandboxStorageBackend = ctx.get("sandboxStorageBackend");
   const body = ctx.req.valid("json");
 
   const response = await startSandboxInstance(
@@ -17,8 +19,10 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
       db,
       openWorkflow,
       workflowDbPool,
+      controlPlaneInternalClient,
       workflowNamespaceId,
       sandboxProvider,
+      sandboxStorageBackend,
     },
     body,
   );
