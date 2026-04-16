@@ -38,14 +38,12 @@ export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleK
     includeGlobal?: boolean;
   };
 
-export type LoadConfigSectionOptions<
-  TApp extends AppConfigModuleKey = AppConfigModuleKey,
-  TSchema extends z.ZodType = z.ZodType,
-> = LoadConfigSourceOptions & {
-  app: TApp;
-  path: readonly string[];
-  schema: TSchema;
-};
+export type LoadConfigSectionOptions<TSchema extends z.ZodType = z.ZodType> =
+  LoadConfigSourceOptions & {
+    schema: TSchema;
+    loadEnv: (env: NodeJS.ProcessEnv) => Record<string, unknown>;
+    loadToml: (tomlRoot: Record<string, unknown>) => Record<string, unknown>;
+  };
 
 export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
   app: AppConfigModuleValue<TApp>;
@@ -96,20 +94,6 @@ function loadValidatedRoot(
   const envLoadedRoot = loadFromEnv(modules, env);
   const mergedRoot = mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
   return validateModules(modules, mergedRoot);
-}
-
-function loadMergedRoot(
-  modules: readonly ConfigModule[],
-  options: LoadConfigSourceOptions,
-): Record<string, unknown> {
-  const { configPath, env } = resolveLoadInputs(options);
-
-  const parsedTomlRoot =
-    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
-
-  const tomlLoadedRoot = loadFromToml(modules, parsedTomlRoot);
-  const envLoadedRoot = loadFromEnv(modules, env);
-  return mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
 }
 
 export function parseConfigRecord(record: unknown): AppConfig {
@@ -227,12 +211,15 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
   };
 }
 
-export function loadConfigSection<TApp extends AppConfigModuleKey, TSchema extends z.ZodType>(
-  options: LoadConfigSectionOptions<TApp, TSchema>,
+export function loadConfigSection<TSchema extends z.ZodType>(
+  options: LoadConfigSectionOptions<TSchema>,
 ): z.output<TSchema> {
-  const appModule = appConfigModules[options.app];
-  const mergedRoot = loadMergedRoot([appModule], options);
-  const sectionPath = [...appModule.namespace, ...options.path];
+  const { configPath, env } = resolveLoadInputs(options);
+  const parsedTomlRoot =
+    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
 
-  return options.schema.parse(getValueAtPath(mergedRoot, sectionPath));
+  const tomlValue = asObjectRecord(options.loadToml(parsedTomlRoot));
+  const envValue = asObjectRecord(options.loadEnv(env));
+
+  return options.schema.parse(mergeConfigRoots(tomlValue, envValue));
 }

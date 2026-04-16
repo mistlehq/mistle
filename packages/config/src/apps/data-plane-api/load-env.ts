@@ -116,3 +116,11 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
 
   return PartialDataPlaneApiConfigSchema.parse(partialConfig);
 }
+
+export function loadDataPlaneApiDatabaseFromEnv(env: NodeJS.ProcessEnv): Record<string, unknown> {
+  return loadDatabaseEnv(env);
+}
+
+export function loadDataPlaneApiWorkflowFromEnv(env: NodeJS.ProcessEnv): Record<string, unknown> {
+  return loadWorkflowEnv(env);
+}
