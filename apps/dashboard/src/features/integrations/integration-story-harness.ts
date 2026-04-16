@@ -380,7 +380,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             value: "116007157",
           },
         ],
-        displayName: "GH",
+        displayName: "GitHub App (Ready)",
         installActionLabel: "Manage installation",
         resources: [
           {
@@ -393,13 +393,12 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             count: 45,
             kind: "branch",
             lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            syncState: "error",
           },
           {
-            count: 5,
+            count: 0,
             kind: "user",
-            lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            syncState: "never-synced",
           },
         ],
         status: "active",
@@ -451,12 +450,14 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "repository",
+          previewState: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage: null,
+          errorMessage:
+            "GitHub returned a 403 while loading branch data. Check installation repository access.",
           isLoading: false,
           items: [
             {
@@ -506,6 +507,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "branch",
+          previewState: "error",
         },
       },
       {
@@ -513,36 +515,9 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
         state: {
           errorMessage: null,
           isLoading: false,
-          items: [
-            {
-              id: "user_dense_1",
-              familyId: "github",
-              kind: "user",
-              handle: "blacksmith-sh[bot]",
-              displayName: "blacksmith-sh[bot]",
-              status: "accessible",
-              metadata: {},
-            },
-            {
-              id: "user_dense_2",
-              familyId: "github",
-              kind: "user",
-              handle: "dependabot[bot]",
-              displayName: "dependabot[bot]",
-              status: "accessible",
-              metadata: {},
-            },
-            {
-              id: "user_dense_3",
-              familyId: "github",
-              kind: "user",
-              handle: "jlowhy",
-              displayName: "jlowhy",
-              status: "accessible",
-              metadata: {},
-            },
-          ],
+          items: [],
           kind: "user",
+          previewState: "not-synced",
         },
       },
     ]),
@@ -612,7 +587,7 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
             value: "Pending",
           },
         ],
-        displayName: "GitHub App Setup",
+        displayName: "GitHub App (Setup Incomplete)",
         installActionLabel: "Install GitHub App",
         resources: [],
         setup: {
@@ -1069,7 +1044,7 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
       site_url: "https://mistle.atlassian.net",
     },
     connectionId: "icn_jira_dense",
-    displayName: "Jira Production",
+    displayName: "Jira (Webhook Configured)",
     webhookLifecycle: "managed",
     webhookSources: [
       {
@@ -1111,7 +1086,7 @@ export function createJiraWebhookNotConfiguredDetailViewStoryProps(): Integratio
       site_url: "https://mistle.atlassian.net",
     },
     connectionId: "icn_jira_setup_incomplete",
-    displayName: "Jira Production",
+    displayName: "Jira (Webhook Not Configured)",
     webhookLifecycle: "managed",
     webhookSources: [],
   });
