@@ -111,21 +111,9 @@ export function IntegrationResourceListItem(
       {input.resource.lastErrorMessage ? (
         <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
       ) : null}
-      {isExpanded && input.resourceItems !== null ? (
-        input.resourceItems.items.length > 0 ? (
-          <div className="mt-1">
-            <BadgeListField
-              badgeClassName="px-2 py-0.5 text-[11px] sm:px-2.5 sm:py-1 sm:text-xs"
-              items={input.resourceItems.items.map((item) => ({
-                id: item.id,
-                label: item.displayName,
-              }))}
-            />
-          </div>
-        ) : (
-          <p className="mt-1 text-muted-foreground text-xs">No items available.</p>
-        )
-      ) : null}
+      {isExpanded && input.resourceItems !== null
+        ? renderExpandedResourceItems(input.resourceItems)
+        : null}
       {shouldRenderFooter ? (
         <div className="mt-1 pt-1 sm:hidden">
           <div className="flex min-w-0 items-center gap-1.5 pr-2 text-muted-foreground text-xs sm:pl-5">
@@ -153,4 +141,32 @@ function resolveResourceSecondaryStatusText(input: {
   }
 
   return formatResourceInlineMetadata(input.resource);
+}
+
+function renderExpandedResourceItems(
+  resourceItems: IntegrationResourceListItemPreviewState,
+): React.JSX.Element {
+  if (resourceItems.items.length > 0) {
+    return (
+      <div className="mt-1">
+        <BadgeListField
+          badgeClassName="px-2 py-0.5 text-[11px] sm:px-2.5 sm:py-1 sm:text-xs"
+          items={resourceItems.items.map((item) => ({
+            id: item.id,
+            label: item.displayName,
+          }))}
+        />
+      </div>
+    );
+  }
+
+  if (resourceItems.isLoading) {
+    return <p className="mt-1 text-muted-foreground text-xs">Loading items...</p>;
+  }
+
+  if (resourceItems.previewState === "not-synced") {
+    return <p className="mt-1 text-muted-foreground text-xs">Not synced yet.</p>;
+  }
+
+  return <p className="mt-1 text-muted-foreground text-xs">No items available.</p>;
 }

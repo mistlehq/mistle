@@ -25,7 +25,13 @@ export function ChatPlanEntry({ block }: ChatPlanEntryProps): React.JSX.Element 
   const structuredSteps = block.steps ?? [];
 
   return (
-    <div className="space-y-1">
+    <div
+      className="flex flex-col"
+      data-chat-plan-entry
+      style={{
+        gap: "var(--chat-plan-entry-gap, 0.25rem)",
+      }}
+    >
       <div className="flex items-center justify-between gap-3">
         <p className="font-medium text-sm">{hasStructuredSteps ? "Updated Plan" : "Plan"}</p>
       </div>
@@ -33,7 +39,14 @@ export function ChatPlanEntry({ block }: ChatPlanEntryProps): React.JSX.Element 
         <p className="text-muted-foreground text-sm leading-6 italic">{block.explanation}</p>
       )}
       {hasStructuredSteps ? (
-        <ul className="border-border/70 space-y-0.5 border-l pl-4">
+        <ul
+          className="border-border/70 flex flex-col border-l"
+          data-chat-plan-steps
+          style={{
+            gap: "var(--chat-plan-step-gap, 0.125rem)",
+            paddingLeft: "var(--chat-plan-entry-indent, 1rem)",
+          }}
+        >
           {structuredSteps.map((step) => (
             <li
               className="flex items-center gap-2.5 text-sm leading-6"
@@ -66,7 +79,13 @@ export function ChatPlanEntry({ block }: ChatPlanEntryProps): React.JSX.Element 
           ))}
         </ul>
       ) : block.text === null ? null : (
-        <div className="border-border/70 border-l pl-4">
+        <div
+          className="border-border/70 border-l"
+          data-chat-plan-text
+          style={{
+            paddingLeft: "var(--chat-plan-entry-indent, 1rem)",
+          }}
+        >
           <p className="text-sm leading-6 whitespace-pre-wrap">{block.text}</p>
         </div>
       )}

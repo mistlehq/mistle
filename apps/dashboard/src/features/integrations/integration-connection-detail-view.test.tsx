@@ -302,6 +302,51 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("Not synced")).toBeNull();
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View repository load error")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("Not synced yet.")).toBeTruthy();
+    expect(screen.queryByText("No items available.")).toBeNull();
+  });
+
+  it("shows a loading state instead of an empty state while resource preview items are loading", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "ready",
+              },
+            ],
+          },
+        ]}
+        resourceContentByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: null,
+                isLoading: true,
+                items: [],
+                kind: "repositories",
+                previewState: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("Loading items...")).toBeTruthy();
+    expect(screen.queryByText("No items available.")).toBeNull();
   });
 
   it("shows an expanded empty state when a resource has no items", () => {

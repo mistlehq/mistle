@@ -4,6 +4,7 @@ import {
   CodexFixtureChatThreadEntries,
   CodexFixtureChatThreadEntriesWithExploringGroup,
   CodexFixtureChatThreadEntriesWithGenericItem,
+  CodexFixtureChatThreadEntriesWithSequentialActionGroups,
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../../session-agents/codex/fixtures/chat-fixtures.js";
@@ -46,6 +47,13 @@ export const WithExploringGroup: Story = {
 export const WithThinkingGroup: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithThinkingGroup,
+    ...BaseArgs,
+  },
+};
+
+export const WithSequentialActionGroups: Story = {
+  args: {
+    entries: CodexFixtureChatThreadEntriesWithSequentialActionGroups,
     ...BaseArgs,
   },
 };

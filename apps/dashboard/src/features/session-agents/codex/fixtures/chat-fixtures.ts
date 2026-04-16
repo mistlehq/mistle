@@ -595,3 +595,31 @@ export const CodexFixtureRunningCommandsLongOutputGroupEntry: ChatSemanticGroupE
     },
   ],
 };
+
+export const CodexFixtureChatThreadEntriesWithSequentialActionGroups: readonly ChatEntry[] = [
+  {
+    id: "user-sequential-actions-1",
+    turnId: "turn-sequential-actions",
+    kind: "user-message",
+    status: "completed",
+    text: "Show me how grouped session activity looks when multiple action sections appear back to back.",
+  },
+  {
+    ...CodexFixtureRunningCommandsGroupEntry,
+    id: "running-commands-group-sequential-1",
+    turnId: "turn-sequential-actions",
+  },
+  {
+    ...CodexFixtureExploringGroupEntry,
+    id: "exploring-group-sequential-1",
+    turnId: "turn-sequential-actions",
+  },
+  {
+    id: "assistant-sequential-actions-1",
+    turnId: "turn-sequential-actions",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "The conversation pane now shows consecutive activity groups so spacing between adjacent action sections is visible in Storybook.",
+  },
+];
