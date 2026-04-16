@@ -200,6 +200,7 @@ export async function resumeSandboxInstance(
       {
         sandboxInstanceId: resumedRuntime.sandboxInstanceId,
         providerSandboxId: resumedRuntime.providerSandboxId,
+        runtimeProvider: resumedRuntime.runtimeProvider,
         runtimePlan: resumableSandboxInstance.runtimePlan,
       },
     );

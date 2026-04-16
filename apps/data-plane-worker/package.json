@@ -37,6 +37,8 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.20.0"
   }
 }
