@@ -255,7 +255,7 @@ describe("app routing breadcrumb integration", () => {
     markup = renderRoutingMarkup(router);
 
     expectMarkupToContainHref(markup, "/sandbox-profiles");
-    expectMarkupToContainCurrentPageLabel(markup, "Edit profile");
+    expectMarkupToContainCurrentPageLabel(markup, "Edit");
     expect(markup).not.toContain("sbp_abc");
     expectMarkupToContainMetaTitle(markup, "Edit profile");
     expectMarkupToContainMetaDescription(markup, "Edit sandbox profile configuration.");
@@ -388,7 +388,7 @@ describe("app routing breadcrumb integration", () => {
     markup = renderRoutingMarkup(router);
 
     expectMarkupToContainHref(markup, "/automations");
-    expectMarkupToContainCurrentPageLabel(markup, "Edit automation");
+    expectMarkupToContainCurrentPageLabel(markup, "Edit");
     expect(markup).not.toContain("aut_123");
     expectMarkupToContainEmptyMetaTitle(markup);
     expectMarkupToContainEmptyMetaDescription(markup);

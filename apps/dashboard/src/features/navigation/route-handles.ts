@@ -1,6 +1,5 @@
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { createElement } from "react";
-import { z } from "zod";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
@@ -11,10 +10,6 @@ type SettingsPageRouteHandle = AppRouteHandle & {
   title: RouteTextValue;
   description: RouteTextValue;
 };
-
-const SandboxProfileRouteDataSchema = z.object({
-  displayName: z.string().trim().min(1),
-});
 
 function toTitleCaseWord(value: string): string {
   const [head = "", ...tail] = value;
@@ -155,22 +150,12 @@ function resolveSessionDetailHeaderLeading(input: RouteTextResolverInput): React
   });
 }
 
-function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const parsedData = SandboxProfileRouteDataSchema.safeParse(input.data);
-  if (parsedData.success) {
-    return parsedData.data.displayName;
-  }
-
-  const profileId = input.params["profileId"];
-  if (profileId === undefined || profileId.trim().length === 0) {
-    return "Edit profile";
-  }
-
-  return "Edit profile";
+function resolveSandboxProfileDetailBreadcrumb(_input: RouteTextResolverInput): string {
+  return "Edit";
 }
 
 function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
-  return "Edit automation";
+  return "Edit";
 }
 
 export const ROUTE_HANDLES = {

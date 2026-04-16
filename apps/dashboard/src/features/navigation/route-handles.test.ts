@@ -144,8 +144,8 @@ describe("route handles", () => {
       throw new Error("sandboxProfilesDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("Edit profile");
-    expect(detailBreadcrumb({ params: {} })).toBe("Edit profile");
+    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("Edit");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit");
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {
@@ -161,7 +161,7 @@ describe("route handles", () => {
       throw new Error("automationsDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("Edit automation");
-    expect(detailBreadcrumb({ params: {} })).toBe("Edit automation");
+    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("Edit");
+    expect(detailBreadcrumb({ params: {} })).toBe("Edit");
   });
 });
