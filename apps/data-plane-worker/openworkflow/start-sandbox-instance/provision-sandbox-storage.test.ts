@@ -17,12 +17,12 @@ function createSandboxInstanceStorage(
   input: Partial<{
     provider: string;
     status: string;
-    credentialKind: string;
+    credentialKind: string | null;
   }> = {},
 ): Omit<SandboxInstanceStorage, "provider" | "status" | "credentialKind"> & {
   provider: string;
   status: string;
-  credentialKind: string;
+  credentialKind: string | null;
 } {
   return {
     id: "sto_01knvnbakhfevv29xs862a8txe",

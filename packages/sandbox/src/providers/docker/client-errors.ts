@@ -23,6 +23,12 @@ export const DockerClientOperationIds = {
    */
   START_CONTAINER: "start_container",
   /**
+   * `docker.createVolume(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L1063-L1097
+   */
+  CREATE_VOLUME: "create_volume",
+  /**
    * `container.stop(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L422-L452
@@ -47,6 +53,12 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L815-L847
    */
   REMOVE_CONTAINER: "remove_container",
+  /**
+   * `volume.remove(...)`.
+   * Sources:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/volume.js#L31-L54
+   */
+  REMOVE_VOLUME: "remove_volume",
 } as const;
 export type DockerClientOperation =
   (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];

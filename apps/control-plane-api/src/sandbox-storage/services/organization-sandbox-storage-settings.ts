@@ -35,7 +35,7 @@ export type ResolvedOrganizationSandboxStorageSettings = {
 export type PublicOrganizationSandboxStorageSettingsResponse = {
   persistentSandboxesEnabled: boolean;
   storageConfigSource: SandboxStorageConfigSource;
-  storageBackend: SandboxStorageBackend | null;
+  storageBackend: typeof SandboxStorageBackendValues.ARCHIL | null;
   storageConfigVersion: number | null;
   organizationStorageConfigSummary: OrganizationSandboxStorageConfigSummary | null;
 };
@@ -118,10 +118,15 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
 export function createPublicOrganizationSandboxStorageSettingsResponse(
   input: ResolvedOrganizationSandboxStorageSettings,
 ): PublicOrganizationSandboxStorageSettingsResponse {
+  const storageBackend =
+    input.storageBackend === SandboxStorageBackendValues.ARCHIL
+      ? SandboxStorageBackendValues.ARCHIL
+      : null;
+
   return {
     persistentSandboxesEnabled: input.persistentSandboxesEnabled,
     storageConfigSource: input.storageConfigSource,
-    storageBackend: input.storageBackend,
+    storageBackend,
     storageConfigVersion: input.storageConfigVersion,
     organizationStorageConfigSummary:
       input.organizationStorageConfig === null

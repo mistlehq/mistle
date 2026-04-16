@@ -64,13 +64,17 @@ type SandboxInstanceStorageValidationCandidate = Omit<
 > & {
   provider: string;
   status: string;
-  credentialKind: string;
+  credentialKind: string | null;
 };
 
 type ArchilReadySandboxInstanceStorage = SandboxInstanceStorage & {
   provider: typeof SandboxStorageProviders.ARCHIL;
   status: typeof SandboxStorageStatuses.READY;
   credentialKind: typeof SandboxStorageCredentialKinds.DISK_TOKEN;
+  credentialCiphertext: string;
+  credentialNonce: string;
+  organizationCredentialKeyVersion: number;
+  region: string;
 };
 
 function isArchilReadySandboxInstanceStorage(

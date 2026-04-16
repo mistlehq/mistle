@@ -6,6 +6,7 @@ import { sandboxInstances } from "./sandbox-instances.js";
 
 export const SandboxStorageProviders = {
   ARCHIL: "archil",
+  DOCKER_VOLUME: "docker_volume",
 } as const;
 
 export const SandboxStorageStatuses = {
@@ -38,20 +39,17 @@ export const sandboxInstanceStorages = dataPlaneSchema.table(
       .references(() => sandboxInstances.id, { onDelete: "cascade" }),
     provider: text("provider").$type<SandboxStorageProvider>().notNull(),
     handle: text("handle").notNull(),
-    region: text("region").notNull(),
+    region: text("region"),
     status: text("status")
       .notNull()
       .$type<SandboxStorageStatus>()
       .default(SandboxStorageStatuses.PENDING),
-    credentialCiphertext: text("credential_ciphertext").notNull(),
-    credentialNonce: text("credential_nonce").notNull(),
-    credentialKind: text("credential_kind")
-      .notNull()
-      .$type<SandboxStorageCredentialKind>()
-      .default(SandboxStorageCredentialKinds.DISK_TOKEN),
+    credentialCiphertext: text("credential_ciphertext"),
+    credentialNonce: text("credential_nonce"),
+    credentialKind: text("credential_kind").$type<SandboxStorageCredentialKind>(),
     organizationCredentialKeyVersion: bigint("organization_credential_key_version", {
       mode: "number",
-    }).notNull(),
+    }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),

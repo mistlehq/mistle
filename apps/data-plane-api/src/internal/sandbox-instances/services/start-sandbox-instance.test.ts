@@ -26,6 +26,17 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     ).toBe(SandboxInstancePersistenceModes.PERSISTENT);
   });
 
+  it("returns persistent when persistent sandboxes are enabled and docker_volume is configured", () => {
+    expect(
+      resolveSandboxInstancePersistenceMode({
+        organizationId: "org_test",
+        persistentSandboxesEnabled: true,
+        sandboxProvider: "docker",
+        configuredStorageBackend: "docker_volume",
+      }),
+    ).toBe(SandboxInstancePersistenceModes.PERSISTENT);
+  });
+
   it("throws when persistent sandboxes are enabled without a supported backend", () => {
     expect(() =>
       resolveSandboxInstancePersistenceMode({

@@ -36,6 +36,13 @@
       "when": 1776265866045,
       "tag": "0004_add-sandbox-storage-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776351533518,
+      "tag": "0005_add-docker-volume-sandbox-storage",
+      "breakpoints": true
     }
   ]
 }

@@ -4,6 +4,7 @@ import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
 import {
+  createDockerClient,
   SandboxProvider,
   SandboxResourceNotFoundError,
   SandboxRuntimeEnv,
@@ -125,6 +126,32 @@ async function readSandboxFile(input: {
 }
 
 describeDockerAdapterIntegration("docker adapter integration", () => {
+  it("creates and deletes a named Docker volume", async ({ fixture }) => {
+    if (!dockerAdapterIntegrationSettings.enabled) {
+      throw new Error("Docker integration settings are required for the volume lifecycle test.");
+    }
+
+    const volumeName = `mistle-pr12-${randomUUID()}`;
+    const dockerClient = createDockerClient({
+      socketPath: dockerAdapterIntegrationSettings.socketPath,
+    });
+
+    await dockerClient.createVolume({
+      volumeName,
+    });
+
+    const inspectBeforeDelete = await fixture.dockerClient.getVolume(volumeName).inspect();
+    expect(inspectBeforeDelete.Name).toBe(volumeName);
+
+    await dockerClient.deleteVolume({
+      volumeName,
+    });
+
+    await expect(fixture.dockerClient.getVolume(volumeName).inspect()).rejects.toBeInstanceOf(
+      Error,
+    );
+  }, 300_000);
+
   it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
     const startMarker = `mistle-docker-start-${randomUUID()}`;
     let id: string | undefined;

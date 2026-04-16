@@ -6798,7 +6798,7 @@
                     },
                     "storageBackend": {
                       "type": ["string", "null"],
-                      "enum": ["archil", "docker_volume", null]
+                      "enum": ["archil", null]
                     },
                     "storageConfigVersion": {
                       "type": ["integer", "null"]
@@ -7100,7 +7100,7 @@
                     },
                     "storageBackend": {
                       "type": ["string", "null"],
-                      "enum": ["archil", "docker_volume", null]
+                      "enum": ["archil", null]
                     },
                     "storageConfigVersion": {
                       "type": ["integer", "null"]

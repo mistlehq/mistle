@@ -8,11 +8,15 @@ import {
   type DockerClientOperation,
 } from "./client-errors.js";
 import {
+  DockerCreateVolumeRequestSchema,
+  DockerDeleteVolumeRequestSchema,
   DockerDestroySandboxRequestSchema,
   DockerInspectSandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
+  type DockerCreateVolumeRequest,
+  type DockerDeleteVolumeRequest,
   type DockerDestroySandboxRequest,
   type DockerInspectSandboxRequest,
   type DockerResumeSandboxRequest,
@@ -30,11 +34,17 @@ export type DockerStartSandboxResponse = {
   runtimeId: string;
 };
 
+export type DockerCreateVolumeResponse = {
+  volumeName: string;
+};
+
 export interface DockerClient {
+  createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
+  deleteVolume(request: DockerDeleteVolumeRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
 }
 
@@ -169,6 +179,20 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
+  async createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse> {
+    const parsedRequest = DockerCreateVolumeRequestSchema.parse(request);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.CREATE_VOLUME, () =>
+      this.#docker.createVolume({
+        Name: parsedRequest.volumeName,
+      }),
+    );
+
+    return {
+      volumeName: parsedRequest.volumeName,
+    };
+  }
+
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
@@ -266,6 +290,15 @@ export class DockerApiClient implements DockerClient {
       container.remove({
         force: true,
       }),
+    );
+  }
+
+  async deleteVolume(request: DockerDeleteVolumeRequest): Promise<void> {
+    const parsedRequest = DockerDeleteVolumeRequestSchema.parse(request);
+    const volume = this.#docker.getVolume(parsedRequest.volumeName);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_VOLUME, () =>
+      volume.remove(),
     );
   }
 

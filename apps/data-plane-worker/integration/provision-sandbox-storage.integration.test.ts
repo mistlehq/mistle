@@ -527,6 +527,17 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       expect(persistedStorage.provider).toBe(SandboxStorageProviders.ARCHIL);
       expect(persistedStorage.region).toBe(TestArchilRegion);
+      expect(persistedStorage.credentialCiphertext).not.toBeNull();
+      expect(persistedStorage.credentialNonce).not.toBeNull();
+      expect(persistedStorage.organizationCredentialKeyVersion).not.toBeNull();
+
+      if (
+        persistedStorage.credentialCiphertext === null ||
+        persistedStorage.credentialNonce === null ||
+        persistedStorage.organizationCredentialKeyVersion === null
+      ) {
+        throw new Error("Expected persisted Archil credential fields.");
+      }
 
       const decryptedCredential = await controlPlaneInternalClient.resolveStorageCredential({
         organizationId,
@@ -748,6 +759,17 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
         db: dataPlaneDb,
         sandboxInstanceId,
       });
+      expect(persistedStorage.credentialCiphertext).not.toBeNull();
+      expect(persistedStorage.credentialNonce).not.toBeNull();
+      expect(persistedStorage.organizationCredentialKeyVersion).not.toBeNull();
+
+      if (
+        persistedStorage.credentialCiphertext === null ||
+        persistedStorage.credentialNonce === null ||
+        persistedStorage.organizationCredentialKeyVersion === null
+      ) {
+        throw new Error("Expected persisted Archil credential fields.");
+      }
 
       const decryptedCredential = await controlPlaneInternalClient.resolveStorageCredential({
         organizationId,

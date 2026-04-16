@@ -5,6 +5,7 @@ import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
 import type { DataPlaneWorkerConfig } from "../../core/config.js";
 import { createArchilSandboxStorageBackendAdapter } from "./archil-storage-backend.js";
 import type { SandboxStorageBackendAdapter } from "./backend.js";
+import { createDockerVolumeSandboxStorageBackendAdapter } from "./docker-volume-storage-backend.js";
 
 export function createSandboxStorageBackendAdapter(input: {
   db: DataPlaneDatabase;
@@ -28,6 +29,18 @@ export function createSandboxStorageBackendAdapter(input: {
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       workerConfig: input.workerConfig,
       runtimeProvider: SandboxProvider.E2B,
+    });
+  }
+
+  if (
+    input.runtimeProvider === SandboxProvider.DOCKER &&
+    input.storageBackend === SandboxStorageBackend.DOCKER_VOLUME
+  ) {
+    return createDockerVolumeSandboxStorageBackendAdapter({
+      db: input.db,
+      controlPlaneInternalClient: input.controlPlaneInternalClient,
+      workerConfig: input.workerConfig,
+      runtimeProvider: SandboxProvider.DOCKER,
     });
   }
 

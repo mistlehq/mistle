@@ -37,6 +37,24 @@ export const DockerResumeSandboxRequestSchema = z
   .strict();
 export type DockerResumeSandboxRequest = z.output<typeof DockerResumeSandboxRequestSchema>;
 
+export const DockerCreateVolumeRequestSchema = z
+  .object({
+    volumeName: z.string().trim().min(1, {
+      message: "Docker request field `volumeName` is required.",
+    }),
+  })
+  .strict();
+export type DockerCreateVolumeRequest = z.output<typeof DockerCreateVolumeRequestSchema>;
+
+export const DockerDeleteVolumeRequestSchema = z
+  .object({
+    volumeName: z.string().trim().min(1, {
+      message: "Docker request field `volumeName` is required.",
+    }),
+  })
+  .strict();
+export type DockerDeleteVolumeRequest = z.output<typeof DockerDeleteVolumeRequestSchema>;
+
 export const DockerInspectSandboxRequestSchema = z
   .object({
     runtimeId: z.string().trim().min(1, {

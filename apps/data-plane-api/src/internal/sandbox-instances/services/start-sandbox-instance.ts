@@ -74,6 +74,13 @@ export function resolveSandboxInstancePersistenceMode(input: {
     return SandboxInstancePersistenceModes.PERSISTENT;
   }
 
+  if (
+    input.sandboxProvider === SandboxProvider.DOCKER &&
+    input.configuredStorageBackend === "docker_volume"
+  ) {
+    return SandboxInstancePersistenceModes.PERSISTENT;
+  }
+
   throw new Error(
     `Persistent sandboxes are enabled for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
   );

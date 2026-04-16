@@ -98,9 +98,7 @@ export const GetOrganizationSandboxStorageSettingsResponseSchema = z
       SandboxStorageConfigSources.MANAGED,
       SandboxStorageConfigSources.ORGANIZATION,
     ]),
-    storageBackend: z
-      .enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME])
-      .nullable(),
+    storageBackend: z.enum([SandboxStorageBackend.ARCHIL]).nullable(),
     storageConfigVersion: z.number().int().nullable(),
     organizationStorageConfigSummary: OrganizationSandboxStorageConfigSummarySchema.nullable(),
   })
