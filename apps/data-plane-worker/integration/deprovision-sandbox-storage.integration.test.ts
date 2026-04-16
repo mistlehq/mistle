@@ -29,8 +29,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
-import { getSandboxInstanceStorageBySandboxInstanceId } from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { getSandboxInstanceStorageBySandboxInstanceId } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import { startControlPlaneApiProcess } from "./helpers/control-plane-api.js";
 import { insertInitialOrganizationCredentialKey } from "./helpers/organization-credential-keys.js";

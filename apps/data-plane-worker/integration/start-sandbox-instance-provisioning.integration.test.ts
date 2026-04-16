@@ -23,7 +23,7 @@ import {
   getSandboxInstanceStorageBySandboxInstanceId,
   insertSandboxInstanceStorage,
   updateSandboxInstanceStorageCredential,
-} from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
+} from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
 

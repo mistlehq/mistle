@@ -31,7 +31,6 @@ import {
   registerCompensationAction,
   runCompensationActions,
   tryDeleteSandboxInstanceStorageById,
-  updateSandboxInstanceStorageCredential,
   type CompensationAction,
 } from "./storage-persistence.js";
 
@@ -587,11 +586,3 @@ export function createArchilSandboxStorageBackendAdapter(
 ): SandboxStorageBackendAdapter {
   return new ArchilSandboxStorageBackendAdapterImpl(input);
 }
-
-export {
-  deleteSandboxInstanceStorageBySandboxInstanceId,
-  getSandboxInstanceStorageBySandboxInstanceId,
-  insertSandboxInstanceStorage,
-  tryDeleteSandboxInstanceStorageById as tryDeleteSandboxInstanceStorage,
-  updateSandboxInstanceStorageCredential,
-};
