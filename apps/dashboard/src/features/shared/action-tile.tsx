@@ -11,6 +11,7 @@ type ActionTileProps = {
   descriptionClassName?: string;
   leading?: ReactNode;
   leadingPlacement?: "detached" | "inline";
+  padding?: "comfortable" | "default";
   title: ReactNode;
   titleClassName?: string;
 };
@@ -25,6 +26,7 @@ export function ActionTile({
   descriptionClassName,
   leading,
   leadingPlacement = "inline",
+  padding = "default",
   title,
   titleClassName,
 }: ActionTileProps): React.JSX.Element {
@@ -33,7 +35,9 @@ export function ActionTile({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:justify-between",
+        "flex flex-col gap-3 rounded-md border py-3 sm:flex-row sm:items-center sm:justify-between",
+        padding === "default" && "px-3",
+        padding === "comfortable" && "px-4",
         className,
       )}
     >
@@ -73,7 +77,9 @@ export function ActionTile({
         </div>
       </div>
       {action === undefined ? null : (
-        <div className={cn("flex justify-end sm:justify-start", actionContainerClassName)}>
+        <div
+          className={cn("flex items-center justify-end sm:justify-start", actionContainerClassName)}
+        >
           {action}
         </div>
       )}

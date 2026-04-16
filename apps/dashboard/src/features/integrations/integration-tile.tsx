@@ -42,7 +42,6 @@ export function IntegrationTile(props: IntegrationTileProps) {
           </span>
         )
       }
-      className="rounded-md px-3 py-3 sm:items-center"
       description={props.description}
       descriptionClassName="text-xs"
       leading={

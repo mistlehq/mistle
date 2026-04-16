@@ -56,7 +56,6 @@ function SetupStepRow(input: {
           </Button>
         )
       }
-      actionContainerClassName="sm:items-start"
       className={cn(
         input.step.status === "current" && "border-primary/40 bg-primary/5",
         input.step.status === "complete" && "border-border/60 bg-muted/15",
@@ -65,6 +64,7 @@ function SetupStepRow(input: {
       description={input.step.description}
       leading={<StepStatusMark status={input.step.status} />}
       leadingPlacement="detached"
+      padding="comfortable"
       title={input.step.title}
       titleClassName={cn(
         input.step.status === "complete" && "text-foreground/80",
