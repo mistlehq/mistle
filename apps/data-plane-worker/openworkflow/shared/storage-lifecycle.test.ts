@@ -17,11 +17,20 @@ describe("sandbox storage lifecycle helpers", () => {
     await expect(
       prepareSandboxStorageForStart(
         {
+          db: undefined as never,
+          controlPlaneInternalClient: undefined as never,
+          workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
+          storageBackend: undefined,
         },
         {
+          organizationId: "org_12345678901234567890123456",
           sandboxInstanceId: "sbi_12345678901234567890123456",
+          image: {
+            imageId: "image-ref",
+            createdAt: "2026-04-17T00:00:00.000Z",
+          },
           persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
           runtimeProvider: SandboxProvider.E2B,
         },
@@ -61,11 +70,20 @@ describe("sandbox storage lifecycle helpers", () => {
     await expect(
       prepareSandboxStorageForStart(
         {
+          db: undefined as never,
+          controlPlaneInternalClient: undefined as never,
+          workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
+          storageBackend: undefined,
         },
         {
+          organizationId: "org_12345678901234567890123456",
           sandboxInstanceId: "sbi_12345678901234567890123456",
+          image: {
+            imageId: "image-ref",
+            createdAt: "2026-04-17T00:00:00.000Z",
+          },
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.E2B,
         },
@@ -109,11 +127,20 @@ describe("sandbox storage lifecycle helpers", () => {
     await expect(
       prepareSandboxStorageForStart(
         {
+          db: undefined as never,
+          controlPlaneInternalClient: undefined as never,
+          workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.E2B,
           sandboxAdapter: adapter,
+          storageBackend: undefined,
         },
         {
+          organizationId: "org_12345678901234567890123456",
           sandboxInstanceId: "sbi_12345678901234567890123456",
+          image: {
+            imageId: "image-ref",
+            createdAt: "2026-04-17T00:00:00.000Z",
+          },
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.E2B,
         },

@@ -4,6 +4,7 @@ import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { cleanupSandboxStorage } from "./cleanup-sandbox-storage.js";
+import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import {
   combineSandboxStorageCleanupErrors,
   throwSandboxTeardownOutcome,
@@ -18,9 +19,11 @@ export async function destroySandbox(
   },
   input: {
     sandboxInstanceId: string;
+    organizationId: string;
     persistenceMode: SandboxInstancePersistenceMode;
     runtimeProvider: SandboxProvider;
     providerSandboxId: string;
+    skipPersistentStorageDeprovision?: boolean;
   },
 ): Promise<void> {
   if (input.runtimeProvider !== ctx.config.sandbox.provider) {
@@ -86,13 +89,49 @@ export async function destroySandbox(
     afterComputeStorageCleanupError = error;
   }
 
+  let deprovisionSandboxStorageError: unknown;
+  if (
+    input.persistenceMode === "persistent" &&
+    input.skipPersistentStorageDeprovision !== true &&
+    destroyError === undefined
+  ) {
+    try {
+      const storageBackendAdapter = createSandboxStorageBackendAdapter({
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.config.app,
+        runtimeProvider: input.runtimeProvider,
+        storageBackend: ctx.config.sandbox.storage?.backend,
+      });
+
+      await storageBackendAdapter.deprovision({
+        organizationId: input.organizationId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    } catch (error) {
+      deprovisionSandboxStorageError = error;
+    }
+  }
+
+  const baseStorageCleanupError = combineSandboxStorageCleanupErrors({
+    lifecycle: "destroy",
+    beforeComputeTeardownError: beforeComputeStorageCleanupError,
+    afterComputeTeardownError: afterComputeStorageCleanupError,
+  });
+
+  const combinedStorageCleanupError =
+    baseStorageCleanupError !== undefined && deprovisionSandboxStorageError !== undefined
+      ? new Error("Failed to clean up and deprovision sandbox storage during destroy.", {
+          cause: {
+            storageCleanupError: baseStorageCleanupError,
+            deprovisionSandboxStorageError,
+          },
+        })
+      : (baseStorageCleanupError ?? deprovisionSandboxStorageError);
+
   throwSandboxTeardownOutcome({
     lifecycle: "destroy",
     computeTeardownError: destroyError,
-    storageCleanupError: combineSandboxStorageCleanupErrors({
-      lifecycle: "destroy",
-      beforeComputeTeardownError: beforeComputeStorageCleanupError,
-      afterComputeTeardownError: afterComputeStorageCleanupError,
-    }),
+    storageCleanupError: combinedStorageCleanupError,
   });
 }

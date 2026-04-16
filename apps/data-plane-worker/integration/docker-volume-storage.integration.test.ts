@@ -16,12 +16,23 @@ import {
   MigrationTracking,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
-import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  SandboxPersistentStorageLayout,
+  SandboxProvider,
+  SandboxStorageBackend,
+} from "@mistle/sandbox";
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
+import {
+  createDataPlaneWorkerRuntimeConfig,
+  loadDataPlaneWorkerConfig,
+  requireDataPlaneWorkerGlobalConfig,
+  type DataPlaneWorkerConfig,
+} from "../openworkflow/core/config.js";
+import { destroySandbox } from "../openworkflow/shared/destroy-sandbox.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 
@@ -100,6 +111,54 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       },
     },
   };
+}
+
+function createWorkerRuntimeConfig() {
+  const loadedConfig = loadDataPlaneWorkerConfig({
+    NODE_ENV: "development",
+    MISTLE_GLOBAL_TELEMETRY_ENABLED: "false",
+    MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
+    MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: "integration-service-token",
+    MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "mistle/sandbox-base:test",
+    MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
+    MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
+    MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "integration-connect-secret",
+    MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "integration-control-plane-api",
+    MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "integration-data-plane-gateway",
+    MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "integration-bootstrap-secret",
+    MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "integration-data-plane-worker",
+    MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "integration-data-plane-gateway",
+    MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "integration-egress-secret",
+    MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "integration-data-plane-worker",
+    MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "integration-tokenizer-proxy",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "integration-publish-secret",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "integration-control-plane-api",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "integration-data-plane-gateway",
+    MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET:
+      "integration-publish-cookie-secret",
+    MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "docker_volume",
+    MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://unused",
+    MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: "postgresql://unused",
+    MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "integration",
+    MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+    MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "1",
+    MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
+    MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
+    MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+    MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
+    MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
+      "http://tokenizer-proxy/tokenizer-proxy/egress",
+    MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+    MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-pr12-",
+  });
+  requireDataPlaneWorkerGlobalConfig(loadedConfig, "docker volume sandbox storage integration");
+
+  return createDataPlaneWorkerRuntimeConfig({
+    app: loadedConfig.app,
+    global: loadedConfig.global,
+  });
 }
 
 function createDockerVolumeStorageBackendAdapter(input: {
@@ -284,6 +343,102 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
         organizationId,
         sandboxInstanceId,
       });
+
+      expect(volumeExists(provisionedStorage.handle)).toBe(false);
+      createdVolumeNames.delete(provisionedStorage.handle);
+      await expect(
+        createDataPlaneDb().query.sandboxInstanceStorages.findFirst({
+          where: (table, { eq }) => eq(table.sandboxInstanceId, sandboxInstanceId),
+        }),
+      ).resolves.toBeUndefined();
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "destroys persistent Docker sandboxes by tearing down compute, deleting the volume, and removing the storage row",
+    async () => {
+      const organizationId = `org_pr13_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const sandboxInstanceId = `sbi_pr13_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+
+      await ensureSandboxInstance(
+        {
+          db: createDataPlaneDb(),
+          runtimeProvider: SandboxProvider.DOCKER,
+        },
+        {
+          sandboxInstanceId,
+          organizationId,
+          sandboxProfileId: "sbp_pr13_integration",
+          sandboxProfileVersion: 1,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          startedBy: {
+            kind: "system",
+            id: "worker_pr13_integration",
+          },
+          source: "dashboard",
+        },
+      );
+
+      const storageBackendAdapter = createDockerVolumeStorageBackendAdapter({
+        db: createDataPlaneDb(),
+      });
+      const sandboxAdapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: DockerSocketPath,
+        },
+      });
+
+      const provisionedStorage = await storageBackendAdapter.provision({
+        organizationId,
+        sandboxInstanceId,
+      });
+      createdVolumeNames.add(provisionedStorage.handle);
+
+      const storageAttachment = await storageBackendAdapter.resolveAttachment({
+        organizationId,
+        sandboxInstanceId,
+      });
+      const storagePreparation = await sandboxAdapter.prepareStorageForStart({
+        sandboxInstanceId,
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: new Date().toISOString(),
+        },
+        storage: {
+          ...storageAttachment,
+          layout: SandboxPersistentStorageLayout,
+        },
+      });
+      const sandbox = await sandboxAdapter.start({
+        image: {
+          provider: SandboxProvider.DOCKER,
+          imageId: "registry:3",
+          createdAt: new Date().toISOString(),
+        },
+        storagePreparation,
+      });
+
+      await destroySandbox(
+        {
+          db: createDataPlaneDb(),
+          controlPlaneInternalClient: new ControlPlaneInternalClient({
+            baseUrl: "http://127.0.0.1:1",
+            internalAuthServiceToken: "unused",
+          }),
+          config: createWorkerRuntimeConfig(),
+          sandboxAdapter,
+        },
+        {
+          sandboxInstanceId,
+          organizationId,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          runtimeProvider: SandboxProvider.DOCKER,
+          providerSandboxId: sandbox.id,
+        },
+      );
 
       expect(volumeExists(provisionedStorage.handle)).toBe(false);
       createdVolumeNames.delete(provisionedStorage.handle);

@@ -98,9 +98,11 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: workflowInput.organizationId,
                 persistenceMode: input.persistenceMode,
                 runtimeProvider,
                 providerSandboxId,
+                skipPersistentStorageDeprovision: true,
               },
             );
           });
@@ -312,11 +314,17 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           logger.info("Preparing sandbox storage before provider start.");
           return prepareSandboxStorageForStart(
             {
+              db: ctx.db,
+              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+              workerConfig: ctx.config.app,
               configuredSandboxProvider: ctx.config.sandbox.provider,
               sandboxAdapter: ctx.sandboxAdapter,
+              storageBackend: ctx.config.sandbox.storage?.backend,
             },
             {
+              organizationId: workflowInput.organizationId,
               sandboxInstanceId: workflowInput.sandboxInstanceId,
+              image: workflowInput.image,
               persistenceMode: workflowInput.persistenceMode,
               runtimeProvider: ctx.config.sandbox.provider,
             },

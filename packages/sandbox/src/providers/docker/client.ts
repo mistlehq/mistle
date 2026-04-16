@@ -10,6 +10,7 @@ import {
 import {
   DockerCreateVolumeRequestSchema,
   DockerDeleteVolumeRequestSchema,
+  DockerPrepareVolumeForStartRequestSchema,
   DockerDestroySandboxRequestSchema,
   DockerInspectSandboxRequestSchema,
   DockerResumeSandboxRequestSchema,
@@ -17,6 +18,7 @@ import {
   DockerStopSandboxRequestSchema,
   type DockerCreateVolumeRequest,
   type DockerDeleteVolumeRequest,
+  type DockerPrepareVolumeForStartRequest,
   type DockerDestroySandboxRequest,
   type DockerInspectSandboxRequest,
   type DockerResumeSandboxRequest,
@@ -24,6 +26,11 @@ import {
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
 } from "./schemas.js";
+import {
+  createDockerVolumeInitCommand,
+  createDockerVolumeInitMounts,
+  createDockerVolumeSubpathMounts,
+} from "./storage.js";
 import type { DockerSandboxInspectResult } from "./types.js";
 
 type DockerHostConfig = Docker.HostConfig & {
@@ -40,6 +47,7 @@ export type DockerCreateVolumeResponse = {
 
 export interface DockerClient {
   createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
+  prepareVolumeForStart(request: DockerPrepareVolumeForStartRequest): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
@@ -193,6 +201,68 @@ export class DockerApiClient implements DockerClient {
     };
   }
 
+  async prepareVolumeForStart(request: DockerPrepareVolumeForStartRequest): Promise<void> {
+    const parsedRequest = DockerPrepareVolumeForStartRequestSchema.parse(request);
+    await this.#pullImage(parsedRequest.imageRef);
+
+    const hostConfig: DockerHostConfig = {
+      Mounts: createDockerVolumeInitMounts({
+        storage: parsedRequest.storagePreparation,
+      }),
+    };
+
+    const container = await this.#runDockerClientOperation(
+      DockerClientOperationIds.CREATE_CONTAINER,
+      () =>
+        this.#docker.createContainer({
+          Image: parsedRequest.imageRef,
+          Entrypoint: ["sh", "-lc"],
+          Cmd: [createDockerVolumeInitCommand({ storage: parsedRequest.storagePreparation })],
+          ...(Object.keys(hostConfig).length === 0 ? {} : { HostConfig: hostConfig }),
+          Labels: {
+            "mistle.sandbox.provider": "docker",
+            "mistle.sandbox.storage_init": "true",
+          },
+        }),
+    );
+
+    try {
+      await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
+        container.start(),
+      );
+    } catch (error) {
+      await this.#tryRemoveContainer(container);
+      throw error;
+    }
+
+    try {
+      const waitResult = await this.#runDockerClientOperation(
+        DockerClientOperationIds.WAIT_CONTAINER,
+        () => container.wait(),
+      );
+      const statusCode =
+        typeof waitResult.StatusCode === "number" ? waitResult.StatusCode : undefined;
+
+      if (statusCode === 0) {
+        return;
+      }
+
+      const logs = await this.#runDockerClientOperation(
+        DockerClientOperationIds.CONTAINER_LOGS,
+        () =>
+          container.logs({
+            stdout: true,
+            stderr: true,
+          }),
+      );
+      throw new Error(
+        `Docker volume initialization container exited with status '${statusCode ?? "unknown"}': ${chunkToUtf8String(logs).trim()}`,
+      );
+    } finally {
+      await this.#tryRemoveContainer(container);
+    }
+  }
+
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
@@ -208,6 +278,11 @@ export class DockerApiClient implements DockerClient {
     // sandbox-owned scopes.
     hostConfig.Binds = ["/sys/fs/cgroup:/sys/fs/cgroup:rw"];
     hostConfig.CgroupnsMode = "host";
+    if (parsedRequest.storagePreparation !== undefined) {
+      hostConfig.Mounts = createDockerVolumeSubpathMounts({
+        storage: parsedRequest.storagePreparation,
+      });
+    }
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
@@ -319,6 +394,16 @@ export class DockerApiClient implements DockerClient {
     );
 
     await this.#consumeProgressStream(DockerClientOperationIds.PULL_IMAGE, pullStream);
+  }
+
+  async #tryRemoveContainer(container: Docker.Container): Promise<void> {
+    try {
+      await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
+        container.remove({
+          force: true,
+        }),
+      );
+    } catch {}
   }
 
   async #consumeProgressStream(

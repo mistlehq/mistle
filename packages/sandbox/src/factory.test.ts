@@ -68,12 +68,6 @@ describe("provider storage lifecycle no-op hooks", () => {
     });
 
     await expect(
-      adapter.prepareStorageForStart({
-        sandboxInstanceId: "sbi_12345678901234567890123456",
-      }),
-    ).resolves.toEqual({});
-
-    await expect(
       adapter.attachStorage({
         sandboxInstanceId: "sbi_12345678901234567890123456",
         sandbox: {
@@ -121,6 +115,11 @@ describe("provider storage lifecycle no-op hooks", () => {
     await expect(
       adapter.prepareStorageForStart({
         sandboxInstanceId: "sbi_12345678901234567890123456",
+        image: {
+          provider: SandboxProvider.E2B,
+          imageId: "template-id",
+          createdAt: "2026-04-17T00:00:00.000Z",
+        },
       }),
     ).resolves.toEqual({});
   });

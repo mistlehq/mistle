@@ -23,6 +23,18 @@ export const DockerClientOperationIds = {
    */
   START_CONTAINER: "start_container",
   /**
+   * `container.wait(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L569-L601
+   */
+  WAIT_CONTAINER: "wait_container",
+  /**
+   * `container.logs(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L771-L814
+   */
+  CONTAINER_LOGS: "container_logs",
+  /**
    * `docker.createVolume(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L1063-L1097

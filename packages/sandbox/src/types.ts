@@ -17,12 +17,6 @@ export interface SandboxHandle {
   readonly id: string;
 }
 
-export interface SandboxStartStoragePreparation {}
-
-export interface SandboxPrepareStorageForStartRequest {
-  readonly sandboxInstanceId: string;
-}
-
 export const SandboxStorageBackend = {
   ARCHIL: "archil",
   DOCKER_VOLUME: "docker_volume",
@@ -73,6 +67,12 @@ export interface SandboxDockerVolumeStorageAttachment {
   readonly layout: SandboxStorageAttachmentLayout;
 }
 
+export interface SandboxDockerVolumeStartStoragePreparation extends SandboxDockerVolumeStorageAttachment {}
+
+export type SandboxStartStoragePreparation =
+  | Record<never, never>
+  | SandboxDockerVolumeStartStoragePreparation;
+
 export type SandboxStorageAttachment =
   | SandboxArchilStorageAttachment
   | SandboxDockerVolumeStorageAttachment;
@@ -117,6 +117,12 @@ export interface SandboxCleanupStorageRequest {
   readonly storage: SandboxStorageCleanup;
   readonly lifecycle: SandboxStorageCleanupLifecycle;
   readonly timing: SandboxStorageCleanupTiming;
+}
+
+export interface SandboxPrepareStorageForStartRequest {
+  readonly sandboxInstanceId: string;
+  readonly image: SandboxImageHandle;
+  readonly storage?: SandboxStorageAttachment;
 }
 
 export const SandboxInspectStates = {
