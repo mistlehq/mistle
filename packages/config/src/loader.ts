@@ -38,13 +38,6 @@ export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleK
     includeGlobal?: boolean;
   };
 
-export type LoadConfigSectionOptions<TSchema extends z.ZodType = z.ZodType> =
-  LoadConfigSourceOptions & {
-    schema: TSchema;
-    loadEnv: (env: NodeJS.ProcessEnv) => Record<string, unknown>;
-    loadToml: (tomlRoot: Record<string, unknown>) => Record<string, unknown>;
-  };
-
 export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
   app: AppConfigModuleValue<TApp>;
   global?: AppConfig["global"];
@@ -209,17 +202,4 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
     global: globalConfig,
     app: appConfig,
   };
-}
-
-export function loadConfigSection<TSchema extends z.ZodType>(
-  options: LoadConfigSectionOptions<TSchema>,
-): z.output<TSchema> {
-  const { configPath, env } = resolveLoadInputs(options);
-  const parsedTomlRoot =
-    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
-
-  const tomlValue = asObjectRecord(options.loadToml(parsedTomlRoot));
-  const envValue = asObjectRecord(options.loadEnv(env));
-
-  return options.schema.parse(mergeConfigRoots(tomlValue, envValue));
 }

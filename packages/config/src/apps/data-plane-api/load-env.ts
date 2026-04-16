@@ -23,31 +23,27 @@ const loadServerEnv = createEnvLoader<typeof DataPlaneApiServerConfigSchema>([
   },
 ]);
 
-export const loadDataPlaneApiDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>(
-  [
-    {
-      key: "url",
-      envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
-    },
-    {
-      key: "migrationUrl",
-      envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
-    },
-  ],
-);
+const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>([
+  {
+    key: "url",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
+  },
+  {
+    key: "migrationUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
+  },
+]);
 
-export const loadDataPlaneApiWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>(
-  [
-    {
-      key: "databaseUrl",
-      envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
-    },
-    {
-      key: "namespaceId",
-      envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
-    },
-  ],
-);
+const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>([
+  {
+    key: "databaseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
+  },
+  {
+    key: "namespaceId",
+    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
+  },
+]);
 
 const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>([
   {
@@ -89,12 +85,12 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
     partialConfig.server = server;
   }
 
-  const database = loadDataPlaneApiDatabaseEnv(env);
+  const database = loadDatabaseEnv(env);
   if (hasEntries(database)) {
     partialConfig.database = database;
   }
 
-  const workflow = loadDataPlaneApiWorkflowEnv(env);
+  const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
   }

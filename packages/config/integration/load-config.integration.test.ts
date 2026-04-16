@@ -2,15 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  DataPlaneApiDatabaseConfigSchema,
-  DataPlaneApiWorkflowConfigSchema,
-  loadDataPlaneApiDatabaseEnv,
-  loadDataPlaneApiDatabaseToml,
-  loadDataPlaneApiWorkflowEnv,
-  loadDataPlaneApiWorkflowToml,
-} from "../src/apps/data-plane-api/index.js";
-import { loadConfig, loadConfigSection } from "../src/loader.js";
+import { loadConfig } from "../src/loader.js";
 import { AppIds } from "../src/modules.js";
 import { createIntegrationEnv } from "./fixtures/env.js";
 
@@ -980,45 +972,6 @@ describe("loadConfig integrations", () => {
     expect(config).toEqual({
       app: dataPlaneWorkerFixtureConfig,
     });
-  });
-
-  it("loads the data-plane-api database section without requiring unrelated app config", () => {
-    const config = loadConfigSection({
-      env: createIntegrationEnv({
-        MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
-      }),
-      loadEnv: loadDataPlaneApiDatabaseEnv,
-      loadToml: loadDataPlaneApiDatabaseToml,
-      schema: DataPlaneApiDatabaseConfigSchema,
-    });
-
-    expect(config).toEqual(dataPlaneApiEnvConfig.database);
-  });
-
-  it("loads the data-plane-api database section when unrelated env vars are malformed", () => {
-    const config = loadConfigSection({
-      env: createIntegrationEnv({
-        MISTLE_APPS_DATA_PLANE_API_PORT: "abc",
-      }),
-      loadEnv: loadDataPlaneApiDatabaseEnv,
-      loadToml: loadDataPlaneApiDatabaseToml,
-      schema: DataPlaneApiDatabaseConfigSchema,
-    });
-
-    expect(config).toEqual(dataPlaneApiEnvConfig.database);
-  });
-
-  it("loads the data-plane-api workflow section without requiring unrelated app config", () => {
-    const config = loadConfigSection({
-      env: createIntegrationEnv({
-        MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
-      }),
-      loadEnv: loadDataPlaneApiWorkflowEnv,
-      loadToml: loadDataPlaneApiWorkflowToml,
-      schema: DataPlaneApiWorkflowConfigSchema,
-    });
-
-    expect(config).toEqual(dataPlaneApiEnvConfig.workflow);
   });
 
   it("loads tokenizer-proxy purely from a config file fixture", () => {

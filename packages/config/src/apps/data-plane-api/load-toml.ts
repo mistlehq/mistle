@@ -57,29 +57,3 @@ export function loadDataPlaneApiFromToml(
     sandbox: sandboxConfig,
   });
 }
-
-export function loadDataPlaneApiDatabaseToml(
-  tomlRoot: Record<string, unknown>,
-): Record<string, unknown> {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const dataPlaneApi = asObjectRecord(apps.data_plane_api);
-  const database = asObjectRecord(dataPlaneApi.database);
-
-  return {
-    url: database.url,
-    migrationUrl: database.migration_url,
-  };
-}
-
-export function loadDataPlaneApiWorkflowToml(
-  tomlRoot: Record<string, unknown>,
-): Record<string, unknown> {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const dataPlaneApi = asObjectRecord(apps.data_plane_api);
-  const workflow = asObjectRecord(dataPlaneApi.workflow);
-
-  return {
-    databaseUrl: workflow.database_url,
-    namespaceId: workflow.namespace_id,
-  };
-}
