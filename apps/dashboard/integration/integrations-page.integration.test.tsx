@@ -348,16 +348,100 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     });
 
     try {
-      expect(await screen.findByText("Bound GitHub")).toBeTruthy();
-      expect(await screen.findByText("Free GitHub")).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Delete connection Bound GitHub" })).toBeNull();
+      expect((await screen.findAllByText("Bound GitHub")).length).toBeGreaterThanOrEqual(1);
+      expect((await screen.findAllByText("Free GitHub")).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole("button", { name: "Delete connection Bound GitHub" })).toHaveProperty(
+        "disabled",
+        true,
+      );
 
+      fireEvent.click(screen.getByRole("button", { name: "Select connection Free GitHub" }));
       fireEvent.click(screen.getByRole("button", { name: "Delete connection Free GitHub" }));
       expect(await screen.findByText("Delete integration connection")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Delete connection" }));
 
       await waitFor(() => {
         expect(screen.queryByText("Delete integration connection")).toBeNull();
+      });
+    } finally {
+      await renderedPage.close();
+    }
+  });
+
+  it("keeps the GitHub App install action in its pending state after the redirect URL is returned", async () => {
+    const renderedPage = await renderDashboardPageIntegration({
+      handler: (request, response) => {
+        const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/integration/targets") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [createGitHubTarget()],
+              nextPage: null,
+              previousPage: null,
+              totalResults: 1,
+            }),
+          );
+          return;
+        }
+
+        if (request.method === "GET" && requestUrl.pathname === "/v1/integration/connections") {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              items: [
+                {
+                  id: "icn_install",
+                  targetKey: "github",
+                  displayName: "Install GitHub",
+                  status: "active",
+                  bindingCount: 0,
+                  config: {
+                    connection_method: "github-app-installation",
+                    app_id: "123",
+                    app_slug: "mistle-github-app",
+                  },
+                  createdAt: "2026-03-03T00:00:00.000Z",
+                  updatedAt: "2026-03-11T04:30:00.000Z",
+                },
+              ],
+              nextPage: null,
+              previousPage: null,
+              totalResults: 1,
+            }),
+          );
+          return;
+        }
+
+        if (
+          request.method === "POST" &&
+          requestUrl.pathname ===
+            "/v1/integration/connections/icn_install/github-app-installation/start"
+        ) {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(
+            JSON.stringify({
+              authorizationUrl: "#install-github-app",
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404, { "content-type": "application/json" });
+        response.end(JSON.stringify({ message: "Not found" }));
+      },
+      ui: <RouterProvider router={createIntegrationsRouter()} />,
+    });
+
+    try {
+      expect((await screen.findAllByText("Install GitHub")).length).toBeGreaterThanOrEqual(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "Install GitHub App" }));
+
+      await waitFor(() => {
+        const installButton = screen.getByRole("button", { name: "Starting install..." });
+        expect(installButton).toHaveProperty("disabled", true);
       });
     } finally {
       await renderedPage.close();
