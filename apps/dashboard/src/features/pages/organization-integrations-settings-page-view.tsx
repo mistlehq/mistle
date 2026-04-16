@@ -71,7 +71,7 @@ export function OrganizationIntegrationsSettingsPageView(
     <div className="w-full gap-4 flex flex-col">
       <IntegrationSection
         cards={props.connectedCards}
-        emptyStateMessage="No integration connections yet. Add one from the integrations list below."
+        emptyStateMessage="No integration connections yet. Add an integration from the list below."
         getCardKey={(card) => card.targetKey}
         renderTile={(card) => renderIntegrationSettingsTile(card, { actionVariant: "outline" })}
         title="Connected"
