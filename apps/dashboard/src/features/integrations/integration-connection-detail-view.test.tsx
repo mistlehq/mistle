@@ -124,6 +124,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                previewState: null,
               },
             ],
           ])
@@ -245,6 +246,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                previewState: "error",
               },
             ],
           ])
@@ -258,6 +260,48 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("mistle/dashboard")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
+  });
+
+  it("shows a neutral not-synced badge when no preview snapshot exists yet", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "never-synced",
+              },
+            ],
+          },
+        ]}
+        resourceContentByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: null,
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                previewState: "not-synced",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.queryByText("Not synced")).toBeNull();
+    expect(screen.getByText("Not synced yet")).toBeTruthy();
+    expect(screen.queryByLabelText("View repository load error")).toBeNull();
   });
 
   it("starts title editing when the connection title field receives focus", () => {
@@ -362,6 +406,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                previewState: null,
               },
             ],
             [
@@ -381,6 +426,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                previewState: null,
               },
             ],
           ])

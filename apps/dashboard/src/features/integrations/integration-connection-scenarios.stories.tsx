@@ -7,6 +7,7 @@ import {
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
   createGitHubAppDetailViewStoryProps,
+  createGitHubNotSyncedDetailViewStoryProps,
   createGitHubPreviewErrorDetailViewStoryProps,
   createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
@@ -81,6 +82,13 @@ export const GitHubPreviewError: Story = {
   name: "GitHub Preview Error",
   args: {
     ...withoutStoryHandlers(createGitHubPreviewErrorDetailViewStoryProps()),
+  },
+};
+
+export const GitHubNotSynced: Story = {
+  name: "GitHub Not Synced",
+  args: {
+    ...withoutStoryHandlers(createGitHubNotSyncedDetailViewStoryProps()),
   },
 };
 

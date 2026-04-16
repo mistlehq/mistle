@@ -318,6 +318,7 @@ export function createDetailViewStoryProps(input?: {
             },
           ],
           kind: "repositories",
+          previewState: null,
         },
       },
       {
@@ -327,6 +328,7 @@ export function createDetailViewStoryProps(input?: {
           isLoading: false,
           items: [],
           kind: "repositories",
+          previewState: null,
         },
       },
     ]),
@@ -726,6 +728,7 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "repositories",
+          previewState: "error",
         },
       },
       {
@@ -745,6 +748,96 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "organizations",
+          previewState: null,
+        },
+      },
+    ]),
+  };
+}
+
+export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_github_not_synced";
+
+  return {
+    connections: [
+      {
+        id: connectionId,
+        ...resolveStoryAuthFields({
+          authMethod: {
+            familyId: "github",
+            methodId: "github-app-installation",
+            variantId: "github-cloud",
+          },
+          connectionId,
+        }),
+        bindingCount: 0,
+        canDelete: true,
+        contextItems: [
+          {
+            label: "App ID",
+            value: "3079908",
+          },
+          {
+            label: "App slug",
+            value: "mistle-github-app",
+          },
+          {
+            label: "Installation",
+            value: "116007157",
+          },
+        ],
+        displayName: "New GitHub Connection",
+        installActionLabel: "Manage installation",
+        resources: [
+          {
+            count: 0,
+            kind: "repositories",
+            syncState: "never-synced",
+          },
+          {
+            count: 0,
+            kind: "branches",
+            syncState: "never-synced",
+          },
+          {
+            count: 0,
+            kind: "users",
+            syncState: "never-synced",
+          },
+        ],
+        status: "active",
+      },
+    ],
+    onRefreshResource: () => {},
+    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+      {
+        connectionId,
+        state: {
+          errorMessage: null,
+          isLoading: false,
+          items: [],
+          kind: "repositories",
+          previewState: "not-synced",
+        },
+      },
+      {
+        connectionId,
+        state: {
+          errorMessage: null,
+          isLoading: false,
+          items: [],
+          kind: "branches",
+          previewState: "not-synced",
+        },
+      },
+      {
+        connectionId,
+        state: {
+          errorMessage: null,
+          isLoading: false,
+          items: [],
+          kind: "users",
+          previewState: "not-synced",
         },
       },
     ]),
@@ -808,6 +901,7 @@ function createResourceContent(
           }),
         ),
         kind: resource.kind,
+        previewState: null,
       },
     })),
   );

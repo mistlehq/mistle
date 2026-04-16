@@ -405,6 +405,7 @@ export type IntegrationConnectionResourceContentState = {
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
+  previewState: "error" | "not-synced" | null;
 };
 
 export function buildIntegrationConnectionResourceContentByKey(

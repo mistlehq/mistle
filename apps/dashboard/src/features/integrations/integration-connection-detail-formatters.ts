@@ -24,7 +24,7 @@ export function formatSyncStateLabel(
   syncState: "never-synced" | "syncing" | "ready" | "error",
 ): string {
   if (syncState === "never-synced") {
-    return "Never synced";
+    return "Not synced";
   }
   if (syncState === "syncing") {
     return "Syncing";
@@ -49,20 +49,20 @@ export function formatResourceMetadata(input: {
 
   if (input.syncState === "syncing") {
     if (input.lastSyncedAt !== undefined) {
-      return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
+      return `Synced ${formatDateTime(input.lastSyncedAt)}`;
     }
-    return "Resources have not been synced yet.";
+    return "Not synced yet";
   }
 
   if (input.syncState === "never-synced") {
-    return "Resources have not been synced yet.";
+    return "Not synced yet";
   }
 
   if (input.lastSyncedAt === undefined) {
     return "Resources are ready.";
   }
 
-  return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
+  return `Synced ${formatDateTime(input.lastSyncedAt)}`;
 }
 
 export function formatResourceHeading(input: { count: number; kind: string }): string {

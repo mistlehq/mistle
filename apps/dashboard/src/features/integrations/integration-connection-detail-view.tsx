@@ -100,6 +100,7 @@ export type IntegrationConnectionDetailViewProps = {
       isLoading: boolean;
       items: readonly IntegrationConnectionResource[];
       kind: string;
+      previewState: "error" | "not-synced" | null;
     }
   >;
   titleEditor?:
@@ -601,7 +602,7 @@ function EditableConnectionTitle(input: {
 function shouldShowResourceSyncStateBadge(
   syncState: IntegrationConnectionDetailResourceSummary["syncState"],
 ): boolean {
-  return syncState !== "ready" && syncState !== "syncing";
+  return syncState !== "ready" && syncState !== "syncing" && syncState !== "never-synced";
 }
 
 function ConnectionAuthSection(input: {
@@ -710,6 +711,7 @@ function ResourceScopeRow(input: {
     isLoading: boolean;
     items: readonly IntegrationConnectionResource[];
     kind: string;
+    previewState: "error" | "not-synced" | null;
   } | null;
 }): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -718,8 +720,9 @@ function ResourceScopeRow(input: {
   const resourceStateIndicator = resolveResourceStateIndicator({
     errorMessage: input.resourceItems?.errorMessage ?? null,
     kindLabel: resourceLabel,
+    previewState: input.resourceItems?.previewState ?? null,
   });
-  const shouldReplaceMetadataWithPreviewError = input.resourceItems?.errorMessage != null;
+  const shouldReplaceMetadataWithPreviewError = input.resourceItems?.previewState === "error";
 
   return (
     <div className={`flex flex-col gap-2 ${isExpanded ? "pb-4" : ""}`}>
@@ -783,7 +786,6 @@ function ResourceScopeRow(input: {
       {input.resource.lastErrorMessage ? (
         <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
       ) : null}
-      {input.resourceItems?.errorMessage === null ? resourceStateIndicator : null}
       {isExpanded && input.resourceItems !== null && input.resourceItems.items.length > 0 ? (
         <div className="gap-2 flex flex-wrap pl-5">
           {input.resourceItems.items.map((item) => (
@@ -823,8 +825,9 @@ function ResourcesSection(input: {
 function resolveResourceStateIndicator(input: {
   errorMessage: string | null;
   kindLabel: string;
+  previewState: "error" | "not-synced" | null;
 }): React.JSX.Element | null {
-  if (input.errorMessage !== null) {
+  if (input.previewState === "error" && input.errorMessage !== null) {
     return (
       <Tooltip delay={0}>
         <TooltipTrigger

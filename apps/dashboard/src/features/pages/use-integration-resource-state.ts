@@ -2,6 +2,7 @@ import { useMutation, useMutationState, useQueries, useQueryClient } from "@tans
 import { useMemo } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { readHttpErrorCode } from "../api/http-api-error.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationConnectionResources,
@@ -32,6 +33,7 @@ const RefreshIntegrationConnectionResourcesMutationKey = [
   "integrations",
   "refresh-resource",
 ] as const;
+const ResourceSyncRequiredCode = "RESOURCE_SYNC_REQUIRED";
 
 export const SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX: readonly [
   "settings",
@@ -68,12 +70,14 @@ function buildResourceContentByKey(input: {
   return buildIntegrationConnectionResourceContentByKey(
     input.resourceRequests.map((resource, index) => {
       const query = input.resourceQueries[index];
+      const isResourceSyncRequiredError =
+        query?.isError === true && readHttpErrorCode(query.error) === ResourceSyncRequiredCode;
 
       return {
         connectionId: resource.connectionId,
         state: {
           errorMessage:
-            query?.isError === true
+            query?.isError === true && !isResourceSyncRequiredError
               ? resolveApiErrorMessage({
                   error: query.error,
                   fallbackMessage: `Could not load ${resource.kind}.`,
@@ -82,6 +86,11 @@ function buildResourceContentByKey(input: {
           isLoading: query?.isPending ?? false,
           items: query?.data?.items ?? [],
           kind: resource.kind,
+          previewState: isResourceSyncRequiredError
+            ? "not-synced"
+            : query?.isError
+              ? "error"
+              : null,
         },
       };
     }),

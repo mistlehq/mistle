@@ -14,31 +14,27 @@ describe("integration connection detail formatters", () => {
   });
 
   it("formats sync state labels", () => {
-    expect(formatSyncStateLabel("never-synced")).toBe("Never synced");
+    expect(formatSyncStateLabel("never-synced")).toBe("Not synced");
     expect(formatSyncStateLabel("syncing")).toBe("Syncing");
     expect(formatSyncStateLabel("ready")).toBe("Ready");
     expect(formatSyncStateLabel("error")).toBe("Sync failed");
   });
 
   it("formats resource metadata across readiness states", () => {
-    expect(formatResourceMetadata({ syncState: "never-synced" })).toBe(
-      "Resources have not been synced yet.",
-    );
+    expect(formatResourceMetadata({ syncState: "never-synced" })).toBe("Not synced yet");
     expect(
       formatResourceMetadata({
         syncState: "syncing",
         lastSyncedAt: "2026-03-11T04:25:00.000Z",
       }),
-    ).toContain("Last synced");
-    expect(formatResourceMetadata({ syncState: "syncing" })).toBe(
-      "Resources have not been synced yet.",
-    );
+    ).toContain("Synced");
+    expect(formatResourceMetadata({ syncState: "syncing" })).toBe("Not synced yet");
     expect(
       formatResourceMetadata({
         syncState: "ready",
         lastSyncedAt: "2026-03-11T04:25:00.000Z",
       }),
-    ).toContain("Last synced");
+    ).toContain("Synced");
     expect(
       formatResourceMetadata({
         syncState: "error",
