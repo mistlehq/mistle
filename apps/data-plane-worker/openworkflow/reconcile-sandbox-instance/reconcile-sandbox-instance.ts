@@ -1,6 +1,7 @@
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import {
@@ -23,6 +24,7 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type ActiveSandboxInstance = {
   id: string;
+  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   providerSandboxId: string;
   status: "starting" | "running";
@@ -72,6 +74,7 @@ async function resolveActiveSandboxInstance(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
+      persistenceMode: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,
@@ -101,6 +104,7 @@ async function resolveActiveSandboxInstance(input: {
 
       return {
         id: sandboxInstance.id,
+        persistenceMode: sandboxInstance.persistenceMode,
         runtimeProvider: sandboxInstance.runtimeProvider,
         providerSandboxId: sandboxInstance.providerSandboxId,
         status: sandboxInstance.status,
@@ -151,6 +155,8 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
         sandboxAdapter: ctx.sandboxAdapter,
       },
       {
+        sandboxInstanceId: ctx.sandboxInstance.id,
+        persistenceMode: ctx.sandboxInstance.persistenceMode,
         runtimeProvider: ctx.sandboxInstance.runtimeProvider,
         providerSandboxId: ctx.sandboxInstance.providerSandboxId,
       },

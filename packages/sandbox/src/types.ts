@@ -17,6 +17,46 @@ export interface SandboxHandle {
   readonly id: string;
 }
 
+export interface SandboxStartStoragePreparation {}
+
+export interface SandboxPrepareStorageForStartRequest {
+  readonly sandboxInstanceId: string;
+}
+
+export const SandboxStorageAttachLifecycles = {
+  START: "start",
+  RESUME: "resume",
+} as const;
+export type SandboxStorageAttachLifecycle =
+  (typeof SandboxStorageAttachLifecycles)[keyof typeof SandboxStorageAttachLifecycles];
+
+export const SandboxStorageCleanupLifecycles = {
+  STOP: "stop",
+  DESTROY: "destroy",
+} as const;
+export type SandboxStorageCleanupLifecycle =
+  (typeof SandboxStorageCleanupLifecycles)[keyof typeof SandboxStorageCleanupLifecycles];
+
+export const SandboxStorageCleanupTimings = {
+  BEFORE_COMPUTE_TEARDOWN: "before_compute_teardown",
+  AFTER_COMPUTE_TEARDOWN: "after_compute_teardown",
+} as const;
+export type SandboxStorageCleanupTiming =
+  (typeof SandboxStorageCleanupTimings)[keyof typeof SandboxStorageCleanupTimings];
+
+export interface SandboxAttachStorageRequest {
+  readonly sandboxInstanceId: string;
+  readonly sandbox: SandboxHandle;
+  readonly lifecycle: SandboxStorageAttachLifecycle;
+}
+
+export interface SandboxCleanupStorageRequest {
+  readonly sandboxInstanceId: string;
+  readonly sandbox: SandboxHandle;
+  readonly lifecycle: SandboxStorageCleanupLifecycle;
+  readonly timing: SandboxStorageCleanupTiming;
+}
+
 export const SandboxInspectStates = {
   RUNNING: "running",
   STOPPED: "stopped",
@@ -76,6 +116,7 @@ export interface SandboxRuntimeControl {
 export interface SandboxStartRequest {
   readonly image: SandboxImageHandle;
   readonly env?: Readonly<Record<string, string>>;
+  readonly storagePreparation?: SandboxStartStoragePreparation;
 }
 
 export interface SandboxResumeRequestV1 {
@@ -92,9 +133,14 @@ export interface SandboxDestroyRequest {
 }
 
 export interface SandboxAdapter {
+  prepareStorageForStart(
+    request: SandboxPrepareStorageForStartRequest,
+  ): Promise<SandboxStartStoragePreparation>;
   start(request: SandboxStartRequest): Promise<SandboxHandle>;
   inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult>;
   resume(request: SandboxResumeRequestV1): Promise<SandboxHandle>;
+  attachStorage(request: SandboxAttachStorageRequest): Promise<void>;
+  cleanupStorage(request: SandboxCleanupStorageRequest): Promise<void>;
   stop(request: SandboxStopRequest): Promise<void>;
   destroy(request: SandboxDestroyRequest): Promise<void>;
 }

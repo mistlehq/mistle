@@ -7,10 +7,14 @@ import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import {
   SandboxProvider,
   type SandboxAdapter,
+  type SandboxAttachStorageRequest,
+  type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
   type SandboxInspectRequest,
+  type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
+  type SandboxStartStoragePreparation,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
@@ -38,6 +42,12 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
   constructor(client: DockerClient) {
     this.#client = client;
+  }
+
+  async prepareStorageForStart(
+    _request: SandboxPrepareStorageForStartRequest,
+  ): Promise<SandboxStartStoragePreparation> {
+    return {};
   }
 
   async start(request: SandboxStartRequest): Promise<SandboxHandle> {
@@ -88,6 +98,14 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
       throw error;
     }
+  }
+
+  async attachStorage(_request: SandboxAttachStorageRequest): Promise<void> {
+    return;
+  }
+
+  async cleanupStorage(_request: SandboxCleanupStorageRequest): Promise<void> {
+    return;
   }
 
   async stop(request: SandboxStopRequest): Promise<void> {

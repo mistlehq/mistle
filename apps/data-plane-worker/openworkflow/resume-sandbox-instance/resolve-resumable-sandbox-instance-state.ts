@@ -2,6 +2,7 @@ import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
+  type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
@@ -10,6 +11,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 export type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
+  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxProvider;
   providerSandboxId: string;
   runtimePlan: CompiledRuntimePlan;
@@ -23,6 +25,7 @@ export async function resolveResumableSandboxInstanceState(input: {
   // plan. Fetch them together so we validate resume preconditions against one DB snapshot.
   const [sandboxInstance] = await input.db
     .select({
+      persistenceMode: sandboxInstances.persistenceMode,
       runtimeProvider: sandboxInstances.runtimeProvider,
       providerSandboxId: sandboxInstances.providerSandboxId,
       status: sandboxInstances.status,
@@ -73,6 +76,7 @@ export async function resolveResumableSandboxInstanceState(input: {
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
+    persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,
     runtimePlan: CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),

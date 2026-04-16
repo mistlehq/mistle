@@ -13,9 +13,12 @@ describe("createSandboxAdapter", () => {
       },
     });
 
+    expect(typeof adapter.prepareStorageForStart).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.inspect).toBe("function");
     expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.attachStorage).toBe("function");
+    expect(typeof adapter.cleanupStorage).toBe("function");
     expect(typeof adapter.stop).toBe("function");
     expect(typeof adapter.destroy).toBe("function");
   });
@@ -36,9 +39,12 @@ describe("createSandboxAdapter", () => {
       },
     });
 
+    expect(typeof adapter.prepareStorageForStart).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.inspect).toBe("function");
     expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.attachStorage).toBe("function");
+    expect(typeof adapter.cleanupStorage).toBe("function");
     expect(typeof adapter.stop).toBe("function");
     expect(typeof adapter.destroy).toBe("function");
   });
@@ -49,6 +55,84 @@ describe("createSandboxAdapter", () => {
         provider: SandboxProvider.E2B,
       }),
     ).toThrow(SandboxConfigurationError);
+  });
+});
+
+describe("provider storage lifecycle no-op hooks", () => {
+  it("keeps docker storage attach and cleanup as no-ops in this phase", async () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: "/var/run/docker.sock",
+      },
+    });
+
+    await expect(
+      adapter.prepareStorageForStart({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+      }),
+    ).resolves.toEqual({});
+
+    await expect(
+      adapter.attachStorage({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+        sandbox: {
+          provider: SandboxProvider.DOCKER,
+          id: "docker-runtime-id",
+        },
+        lifecycle: "start",
+      }),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      adapter.cleanupStorage({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+        sandbox: {
+          provider: SandboxProvider.DOCKER,
+          id: "docker-runtime-id",
+        },
+        lifecycle: "stop",
+        timing: "before_compute_teardown",
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("keeps e2b storage attach and cleanup as no-ops in this phase", async () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.E2B,
+      e2b: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    await expect(
+      adapter.prepareStorageForStart({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+      }),
+    ).resolves.toEqual({});
+
+    await expect(
+      adapter.attachStorage({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+        sandbox: {
+          provider: SandboxProvider.E2B,
+          id: "e2b-sandbox-id",
+        },
+        lifecycle: "resume",
+      }),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      adapter.cleanupStorage({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+        sandbox: {
+          provider: SandboxProvider.E2B,
+          id: "e2b-sandbox-id",
+        },
+        lifecycle: "destroy",
+        timing: "after_compute_teardown",
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

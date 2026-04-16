@@ -5,6 +5,7 @@ import type { Clock, Sleeper } from "@mistle/time";
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -48,6 +49,7 @@ export async function resumeSandboxInstance(
   if (resumableSandboxInstance === null) {
     return;
   }
+  const persistenceMode = resumableSandboxInstance.persistenceMode;
 
   await markSandboxInstanceStarting({
     db: ctx.db,
@@ -70,6 +72,8 @@ export async function resumeSandboxInstance(
             sandboxAdapter: ctx.sandboxAdapter,
           },
           {
+            sandboxInstanceId: input.sandboxInstanceId,
+            persistenceMode,
             runtimeProvider: input.runtimeProvider,
             providerSandboxId: input.providerSandboxId,
           },
@@ -144,6 +148,34 @@ export async function resumeSandboxInstance(
       failureCode: ResumeSandboxFailureCodes.RESUME_SANDBOX_FAILED,
       failureMessage: formatPersistedFailureMessage({
         summary: "Failed to resume sandbox runtime.",
+        error,
+      }),
+    });
+    throw error;
+  }
+
+  try {
+    await attachSandboxStorage(
+      {
+        configuredSandboxProvider: ctx.config.sandbox.provider,
+        sandboxAdapter: ctx.sandboxAdapter,
+      },
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        persistenceMode,
+        runtimeProvider: resumedRuntime.runtimeProvider,
+        providerSandboxId: resumedRuntime.providerSandboxId,
+        lifecycle: "resume",
+      },
+    );
+  } catch (error) {
+    await handleFailedResume({
+      sandboxInstanceId: input.sandboxInstanceId,
+      runtimeProvider: resumedRuntime.runtimeProvider,
+      providerSandboxId: resumedRuntime.providerSandboxId,
+      failureCode: ResumeSandboxFailureCodes.SANDBOX_INIT_FAILED,
+      failureMessage: formatPersistedFailureMessage({
+        summary: "Failed to attach sandbox storage before resume runtime initialization.",
         error,
       }),
     });
