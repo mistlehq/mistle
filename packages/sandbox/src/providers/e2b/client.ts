@@ -33,9 +33,9 @@ import {
 import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
 import type { E2BSandboxInspectResult } from "./types.js";
 
-const InitCommand = "/usr/local/bin/sandboxd init";
-const ResumeCommand = "/usr/local/bin/sandboxd resume";
-const StartDaemonCommand = "/usr/bin/tini -s -- /usr/local/bin/sandboxd";
+const InitCommand = "/opt/mistle/bin/sandboxd init";
+const ResumeCommand = "/opt/mistle/bin/sandboxd resume";
+const StartDaemonCommand = "/usr/bin/tini -s -- /opt/mistle/bin/sandboxd";
 const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
 const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;

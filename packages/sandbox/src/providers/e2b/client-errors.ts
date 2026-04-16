@@ -49,7 +49,7 @@ export const E2BClientOperationIds = {
    */
   KILL_SANDBOX: "kill_sandbox",
   /**
-   * `sandbox.commands.run(...)` and `CommandHandle.wait()` for `/usr/bin/tini -- /usr/local/bin/sandboxd`,
+   * `sandbox.commands.run(...)` and `CommandHandle.wait()` for `/usr/bin/tini -- /opt/mistle/bin/sandboxd`,
    * plus readiness probes executed through `sandbox.commands.run(...)`.
    * Sources:
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469
@@ -58,7 +58,7 @@ export const E2BClientOperationIds = {
   ENSURE_DAEMON_READY: "ensure_daemon_ready",
   /**
    * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`
-   * for `/usr/local/bin/sandboxd init`.
+   * for `/opt/mistle/bin/sandboxd init`.
    * Sources:
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L187-L210
@@ -68,7 +68,7 @@ export const E2BClientOperationIds = {
   INIT: "init",
   /**
    * `sandbox.commands.run(...)`, `sendStdin(...)`, `closeStdin(...)`, and `handle.wait()`
-   * for `/usr/local/bin/sandboxd resume`.
+   * for `/opt/mistle/bin/sandboxd resume`.
    */
   RESUME: "resume",
 } as const;
