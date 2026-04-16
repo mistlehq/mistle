@@ -1,18 +1,19 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { AppIds, DataPlaneApiWorkflowConfigSchema, loadConfigSection } from "@mistle/config";
 
 import { logger } from "../logger.js";
 import { createDataPlaneBackend } from "../openworkflow/index.js";
 
 async function main(): Promise<void> {
-  const loadedConfig = loadConfig({
+  const workflowConfig = loadConfigSection({
     app: AppIds.DATA_PLANE_API,
     env: process.env,
-    includeGlobal: false,
+    path: ["workflow"],
+    schema: DataPlaneApiWorkflowConfigSchema,
   });
 
   const workflowBackend = await createDataPlaneBackend({
-    url: loadedConfig.app.workflow.databaseUrl,
-    namespaceId: loadedConfig.app.workflow.namespaceId,
+    url: workflowConfig.databaseUrl,
+    namespaceId: workflowConfig.namespaceId,
     runMigrations: true,
   });
 

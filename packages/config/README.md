@@ -14,6 +14,7 @@ Then the merged result is validated by module schemas.
 The package exports these public APIs from [`src/index.ts`](./src/index.ts):
 
 - `loadConfig(options)`
+- `loadConfigSection(options)`
 - `AppIds`
 - `convertEnvToTomlRecord(env)`
 - `convertTomlToEnvRecord(tomlRoot)`
@@ -55,6 +56,8 @@ Return shape:
 - with `includeGlobal: false`: `{ app }`
 
 `app` is type-safe and inferred from `options.app` (for example, `AppIds.CONTROL_PLANE_API` returns the control-plane-api app config shape).
+
+`loadConfigSection` loads and validates only a specific app subsection. This is intended for scripts that need a narrow config surface, such as migration entrypoints that only require `database` or `workflow` settings.
 
 ## Conversion Helpers
 

@@ -1,4 +1,4 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { AppIds, DataPlaneApiDatabaseConfigSchema, loadConfigSection } from "@mistle/config";
 import { DATA_PLANE_SCHEMA_NAME } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -9,14 +9,15 @@ import {
 import { logger } from "../logger.js";
 
 async function main(): Promise<void> {
-  const loadedConfig = loadConfig({
+  const databaseConfig = loadConfigSection({
     app: AppIds.DATA_PLANE_API,
     env: process.env,
-    includeGlobal: false,
+    path: ["database"],
+    schema: DataPlaneApiDatabaseConfigSchema,
   });
 
   await runDataPlaneMigrations({
-    connectionString: loadedConfig.app.database.migrationUrl,
+    connectionString: databaseConfig.migrationUrl,
     schemaName: DATA_PLANE_SCHEMA_NAME,
     migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
     migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,

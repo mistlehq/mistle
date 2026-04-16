@@ -38,6 +38,15 @@ export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleK
     includeGlobal?: boolean;
   };
 
+export type LoadConfigSectionOptions<
+  TApp extends AppConfigModuleKey = AppConfigModuleKey,
+  TSchema extends z.ZodType = z.ZodType,
+> = LoadConfigSourceOptions & {
+  app: TApp;
+  path: readonly string[];
+  schema: TSchema;
+};
+
 export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
   app: AppConfigModuleValue<TApp>;
   global?: AppConfig["global"];
@@ -87,6 +96,20 @@ function loadValidatedRoot(
   const envLoadedRoot = loadFromEnv(modules, env);
   const mergedRoot = mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
   return validateModules(modules, mergedRoot);
+}
+
+function loadMergedRoot(
+  modules: readonly ConfigModule[],
+  options: LoadConfigSourceOptions,
+): Record<string, unknown> {
+  const { configPath, env } = resolveLoadInputs(options);
+
+  const parsedTomlRoot =
+    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
+
+  const tomlLoadedRoot = loadFromToml(modules, parsedTomlRoot);
+  const envLoadedRoot = loadFromEnv(modules, env);
+  return mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
 }
 
 export function parseConfigRecord(record: unknown): AppConfig {
@@ -202,4 +225,14 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
     global: globalConfig,
     app: appConfig,
   };
+}
+
+export function loadConfigSection<TApp extends AppConfigModuleKey, TSchema extends z.ZodType>(
+  options: LoadConfigSectionOptions<TApp, TSchema>,
+): z.output<TSchema> {
+  const appModule = appConfigModules[options.app];
+  const mergedRoot = loadMergedRoot([appModule], options);
+  const sectionPath = [...appModule.namespace, ...options.path];
+
+  return options.schema.parse(getValueAtPath(mergedRoot, sectionPath));
 }
