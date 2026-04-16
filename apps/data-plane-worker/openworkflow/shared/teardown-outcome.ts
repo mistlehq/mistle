@@ -23,3 +23,26 @@ export function throwSandboxTeardownOutcome(input: {
     throw input.storageCleanupError;
   }
 }
+
+export function combineSandboxStorageCleanupErrors(input: {
+  lifecycle: "stop" | "destroy";
+  beforeComputeTeardownError?: unknown;
+  afterComputeTeardownError?: unknown;
+}): unknown {
+  if (
+    input.beforeComputeTeardownError !== undefined &&
+    input.afterComputeTeardownError !== undefined
+  ) {
+    return new Error(
+      `Failed to clean up sandbox storage before and after sandbox ${input.lifecycle} compute teardown.`,
+      {
+        cause: {
+          beforeComputeTeardownError: input.beforeComputeTeardownError,
+          afterComputeTeardownError: input.afterComputeTeardownError,
+        },
+      },
+    );
+  }
+
+  return input.beforeComputeTeardownError ?? input.afterComputeTeardownError;
+}

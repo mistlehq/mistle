@@ -71,6 +71,14 @@ export const E2BClientOperationIds = {
    * for `/opt/mistle/bin/sandboxd resume`.
    */
   RESUME: "resume",
+  /**
+   * `sandbox.commands.run(...)` for in-guest Archil mount and bind-mount orchestration.
+   */
+  ATTACH_STORAGE: "attach_storage",
+  /**
+   * `sandbox.commands.run(...)` for in-guest bind-mount and Archil unmount cleanup.
+   */
+  CLEANUP_STORAGE: "cleanup_storage",
 } as const;
 export type E2BClientOperation = (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
 

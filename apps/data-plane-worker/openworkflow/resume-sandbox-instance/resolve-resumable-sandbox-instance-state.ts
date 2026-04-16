@@ -11,6 +11,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 export type ResumableSandboxInstanceState = {
   sandboxInstanceId: string;
+  organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxProvider;
   providerSandboxId: string;
@@ -25,6 +26,7 @@ export async function resolveResumableSandboxInstanceState(input: {
   // plan. Fetch them together so we validate resume preconditions against one DB snapshot.
   const [sandboxInstance] = await input.db
     .select({
+      organizationId: sandboxInstances.organizationId,
       persistenceMode: sandboxInstances.persistenceMode,
       runtimeProvider: sandboxInstances.runtimeProvider,
       providerSandboxId: sandboxInstances.providerSandboxId,
@@ -76,6 +78,7 @@ export async function resolveResumableSandboxInstanceState(input: {
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
+    organizationId: sandboxInstance.organizationId,
     persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,

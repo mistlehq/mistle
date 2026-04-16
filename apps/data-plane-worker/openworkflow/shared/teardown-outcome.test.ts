@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { throwSandboxTeardownOutcome } from "./teardown-outcome.js";
+import {
+  combineSandboxStorageCleanupErrors,
+  throwSandboxTeardownOutcome,
+} from "./teardown-outcome.js";
 
 describe("throwSandboxTeardownOutcome", () => {
   it("does nothing when compute teardown and storage cleanup both succeed", () => {
@@ -62,5 +65,65 @@ describe("throwSandboxTeardownOutcome", () => {
         storageCleanupError,
       });
     }
+  });
+});
+
+describe("combineSandboxStorageCleanupErrors", () => {
+  it("returns undefined when neither cleanup phase fails", () => {
+    expect(
+      combineSandboxStorageCleanupErrors({
+        lifecycle: "stop",
+        beforeComputeTeardownError: undefined,
+        afterComputeTeardownError: undefined,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("returns the before-teardown cleanup error when only that phase fails", () => {
+    const beforeComputeTeardownError = new Error("before cleanup failed");
+
+    expect(
+      combineSandboxStorageCleanupErrors({
+        lifecycle: "destroy",
+        beforeComputeTeardownError,
+        afterComputeTeardownError: undefined,
+      }),
+    ).toBe(beforeComputeTeardownError);
+  });
+
+  it("returns the after-teardown cleanup error when only that phase fails", () => {
+    const afterComputeTeardownError = new Error("after cleanup failed");
+
+    expect(
+      combineSandboxStorageCleanupErrors({
+        lifecycle: "stop",
+        beforeComputeTeardownError: undefined,
+        afterComputeTeardownError,
+      }),
+    ).toBe(afterComputeTeardownError);
+  });
+
+  it("combines before and after cleanup failures when both phases fail", () => {
+    const beforeComputeTeardownError = new Error("before cleanup failed");
+    const afterComputeTeardownError = new Error("after cleanup failed");
+
+    const combinedError = combineSandboxStorageCleanupErrors({
+      lifecycle: "destroy",
+      beforeComputeTeardownError,
+      afterComputeTeardownError,
+    });
+
+    expect(combinedError).toBeInstanceOf(Error);
+    if (!(combinedError instanceof Error)) {
+      throw new Error("Expected a combined cleanup error.");
+    }
+
+    expect(combinedError.message).toBe(
+      "Failed to clean up sandbox storage before and after sandbox destroy compute teardown.",
+    );
+    expect(combinedError.cause).toEqual({
+      beforeComputeTeardownError,
+      afterComputeTeardownError,
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
@@ -28,6 +29,7 @@ export async function resumeSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     sandboxRuntimeControl: SandboxRuntimeControl;
     runtimeStateReader: SandboxRuntimeStateReader;
@@ -157,10 +159,13 @@ export async function resumeSandboxInstance(
   try {
     await attachSandboxStorage(
       {
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
       },
       {
+        organizationId: resumableSandboxInstance.organizationId,
         sandboxInstanceId: input.sandboxInstanceId,
         persistenceMode,
         runtimeProvider: resumedRuntime.runtimeProvider,

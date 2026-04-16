@@ -873,6 +873,9 @@ importers:
 
   packages/sandbox:
     dependencies:
+      '@archildata/client':
+        specifier: ^0.8.7
+        version: 0.8.7
       '@mistle/time':
         specifier: workspace:*
         version: link:../time

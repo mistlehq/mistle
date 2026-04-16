@@ -17,6 +17,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           config: ctx.config,
           db: ctx.db,
+          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxAdapter: ctx.sandboxAdapter,
           sandboxRuntimeControl: ctx.sandboxRuntimeControl,
           runtimeStateReader: ctx.runtimeStateReader,

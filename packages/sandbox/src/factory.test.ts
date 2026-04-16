@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "./errors.js";
 import { createSandboxAdapter, createSandboxRuntimeControl } from "./factory.js";
-import { SandboxProvider } from "./types.js";
+import { SandboxAttachedStorageBackends, SandboxProvider } from "./types.js";
 
 describe("createSandboxAdapter", () => {
   it("creates a docker adapter when docker config is provided", () => {
@@ -80,6 +80,12 @@ describe("provider storage lifecycle no-op hooks", () => {
           provider: SandboxProvider.DOCKER,
           id: "docker-runtime-id",
         },
+        storage: {
+          backend: SandboxAttachedStorageBackends.ARCHIL,
+          handle: "dsk-0123456789abcdef",
+          region: "aws-us-east-1",
+          credential: "token",
+        },
         lifecycle: "start",
       }),
     ).resolves.toBeUndefined();
@@ -97,7 +103,7 @@ describe("provider storage lifecycle no-op hooks", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("keeps e2b storage attach and cleanup as no-ops in this phase", async () => {
+  it("keeps e2b storage preparation as a no-op in this phase", async () => {
     const adapter = createSandboxAdapter({
       provider: SandboxProvider.E2B,
       e2b: {
@@ -110,29 +116,6 @@ describe("provider storage lifecycle no-op hooks", () => {
         sandboxInstanceId: "sbi_12345678901234567890123456",
       }),
     ).resolves.toEqual({});
-
-    await expect(
-      adapter.attachStorage({
-        sandboxInstanceId: "sbi_12345678901234567890123456",
-        sandbox: {
-          provider: SandboxProvider.E2B,
-          id: "e2b-sandbox-id",
-        },
-        lifecycle: "resume",
-      }),
-    ).resolves.toBeUndefined();
-
-    await expect(
-      adapter.cleanupStorage({
-        sandboxInstanceId: "sbi_12345678901234567890123456",
-        sandbox: {
-          provider: SandboxProvider.E2B,
-          id: "e2b-sandbox-id",
-        },
-        lifecycle: "destroy",
-        timing: "after_compute_teardown",
-      }),
-    ).resolves.toBeUndefined();
   });
 });
 

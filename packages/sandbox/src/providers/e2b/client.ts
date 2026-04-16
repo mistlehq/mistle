@@ -54,6 +54,15 @@ export interface E2BClient {
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
   init(request: E2BInitRequest): Promise<void>;
   resume(request: E2BInitRequest): Promise<void>;
+  runCommand(request: {
+    sandboxId: string;
+    command: string;
+    operation: (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
+    commandDescription: string;
+    env?: Record<string, string>;
+    user?: string;
+    timeoutMs?: number;
+  }): Promise<{ stdout: string; stderr: string }>;
 }
 
 function createE2BConnectionOptions(config: ValidatedE2BSandboxConfig): ConnectionOpts {
@@ -279,6 +288,40 @@ export class E2BApiClient implements E2BClient {
       }
 
       throw mapE2BClientError(E2BClientOperationIds.RESUME, error);
+    }
+  }
+
+  async runCommand(request: {
+    sandboxId: string;
+    command: string;
+    operation: (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];
+    commandDescription: string;
+    env?: Record<string, string>;
+    user?: string;
+    timeoutMs?: number;
+  }): Promise<{ stdout: string; stderr: string }> {
+    try {
+      const sandbox = await Sandbox.connect(request.sandboxId, this.#connectionOptions);
+      const result = await sandbox.commands.run(request.command, {
+        user: request.user ?? "root",
+        ...(request.env === undefined ? {} : { envs: request.env }),
+        ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+      });
+
+      return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+      };
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        throw createCommandExitError({
+          operation: request.operation,
+          error,
+          commandDescription: request.commandDescription,
+        });
+      }
+
+      throw mapE2BClientError(request.operation, error);
     }
   }
 

@@ -339,6 +339,28 @@ export async function updateSandboxInstanceStorageCredential(
   }
 }
 
+export async function deleteSandboxInstanceStorageBySandboxInstanceId(
+  ctx: {
+    db: DataPlaneDatabase;
+  },
+  input: {
+    sandboxInstanceId: string;
+  },
+): Promise<void> {
+  const deletedRows = await ctx.db
+    .delete(sandboxInstanceStorages)
+    .where(eq(sandboxInstanceStorages.sandboxInstanceId, input.sandboxInstanceId))
+    .returning({
+      id: sandboxInstanceStorages.id,
+    });
+
+  if (deletedRows[0] === undefined) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not found.`,
+    );
+  }
+}
+
 async function resolveArchilDiskToken(input: {
   archil: Archil;
   createdDisk: CreateDiskResult;

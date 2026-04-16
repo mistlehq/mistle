@@ -10,6 +10,7 @@ import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
+import { deprovisionSandboxStorage } from "./deprovision-sandbox-storage.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -116,6 +117,36 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         }
       }
 
+      let deprovisionSandboxStorageError: unknown;
+      if (input.persistenceMode === "persistent") {
+        logger.warn(
+          {
+            failureCode: input.failureCode,
+          },
+          "Deprovisioning persistent sandbox storage after start failure.",
+        );
+        try {
+          await step.run({ name: "deprovision-sandbox-storage-after-start-failure" }, async () => {
+            await deprovisionSandboxStorage({
+              db: ctx.db,
+              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+              workerConfig: ctx.config.app,
+              organizationId: workflowInput.organizationId,
+              sandboxInstanceId: input.sandboxInstanceId,
+            });
+          });
+        } catch (error) {
+          logger.error(
+            {
+              err: error,
+              failureCode: input.failureCode,
+            },
+            "Failed to deprovision sandbox storage during start failure cleanup.",
+          );
+          deprovisionSandboxStorageError = error;
+        }
+      }
+
       let updateFailedStatusError: unknown;
       try {
         await markSandboxInstanceFailedStep({
@@ -134,6 +165,23 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         updateFailedStatusError = error;
       }
 
+      if (
+        destroySandboxError !== undefined &&
+        deprovisionSandboxStorageError !== undefined &&
+        updateFailedStatusError !== undefined
+      ) {
+        throw new Error(
+          "Failed to destroy sandbox, failed to deprovision sandbox storage, and failed to mark sandbox instance as failed after startup failure.",
+          {
+            cause: {
+              destroySandboxError,
+              deprovisionSandboxStorageError,
+              updateFailedStatusError,
+            },
+          },
+        );
+      }
+
       if (destroySandboxError !== undefined && updateFailedStatusError !== undefined) {
         throw new Error(
           "Failed to destroy sandbox and failed to mark sandbox instance as failed after startup failure.",
@@ -146,9 +194,39 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
       }
 
+      if (deprovisionSandboxStorageError !== undefined && updateFailedStatusError !== undefined) {
+        throw new Error(
+          "Failed to deprovision sandbox storage and failed to mark sandbox instance as failed after startup failure.",
+          {
+            cause: {
+              deprovisionSandboxStorageError,
+              updateFailedStatusError,
+            },
+          },
+        );
+      }
+
+      if (destroySandboxError !== undefined && deprovisionSandboxStorageError !== undefined) {
+        throw new Error(
+          "Failed to destroy sandbox and failed to deprovision sandbox storage after startup failure.",
+          {
+            cause: {
+              destroySandboxError,
+              deprovisionSandboxStorageError,
+            },
+          },
+        );
+      }
+
       if (destroySandboxError !== undefined) {
         throw new Error("Failed to destroy sandbox after startup failure.", {
           cause: destroySandboxError,
+        });
+      }
+
+      if (deprovisionSandboxStorageError !== undefined) {
+        throw new Error("Failed to deprovision sandbox storage after startup failure.", {
+          cause: deprovisionSandboxStorageError,
         });
       }
 
@@ -239,8 +317,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       logger.info("Prepared sandbox storage before provider start.");
     } catch (error) {
       logger.error({ err: error }, "Sandbox storage preparation failed before provider start.");
-      await markSandboxInstanceFailedStep({
+      await handleFailedStartup({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        persistenceMode: workflowInput.persistenceMode,
         failureCode: StartSandboxFailureCodes.SANDBOX_STORAGE_PREPARE_FAILED,
         failureMessage: formatPersistedFailureMessage({
           summary: "Sandbox storage preparation failed before provider start.",
@@ -280,8 +359,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     } catch (error) {
       logger.error({ err: error }, "Sandbox provider start failed.");
-      await markSandboxInstanceFailedStep({
+      await handleFailedStartup({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        persistenceMode: workflowInput.persistenceMode,
         failureCode: StartSandboxFailureCodes.SANDBOX_START_FAILED,
         failureMessage: formatPersistedFailureMessage({
           summary: "Sandbox provider start failed before runtime provisioning completed.",
@@ -300,10 +380,13 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         logger.info("Attaching sandbox storage before runtime initialization.");
         await attachSandboxStorage(
           {
+            db: ctx.db,
+            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             configuredSandboxProvider: ctx.config.sandbox.provider,
             sandboxAdapter: ctx.sandboxAdapter,
           },
           {
+            organizationId: workflowInput.organizationId,
             sandboxInstanceId: workflowInput.sandboxInstanceId,
             persistenceMode: workflowInput.persistenceMode,
             runtimeProvider: startedSandbox.runtimeProvider,
