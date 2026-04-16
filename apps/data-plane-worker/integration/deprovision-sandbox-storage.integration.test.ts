@@ -47,6 +47,10 @@ const TestArchilRegion = "gcp-us-central1";
 const ArchilIntegrationEnvironmentSchema = z
   .object({
     MISTLE_TEST_ARCHIL_API_KEY: z.string().min(1),
+    MISTLE_TEST_ARCHIL_S3_BUCKET: z.string().min(1),
+    MISTLE_TEST_ARCHIL_S3_ENDPOINT: z.url(),
+    MISTLE_TEST_ARCHIL_S3_ACCESS_KEY_ID: z.string().min(1),
+    MISTLE_TEST_ARCHIL_S3_SECRET_ACCESS_KEY: z.string().min(1),
   })
   .strict();
 
@@ -60,6 +64,10 @@ type ArchilIntegrationEnvironment = z.infer<typeof ArchilIntegrationEnvironmentS
 function readArchilIntegrationEnvironment(): ArchilIntegrationEnvironment | null {
   const parsed = ArchilIntegrationEnvironmentSchema.safeParse({
     MISTLE_TEST_ARCHIL_API_KEY: process.env.MISTLE_TEST_ARCHIL_API_KEY,
+    MISTLE_TEST_ARCHIL_S3_BUCKET: process.env.MISTLE_TEST_ARCHIL_S3_BUCKET,
+    MISTLE_TEST_ARCHIL_S3_ENDPOINT: process.env.MISTLE_TEST_ARCHIL_S3_ENDPOINT,
+    MISTLE_TEST_ARCHIL_S3_ACCESS_KEY_ID: process.env.MISTLE_TEST_ARCHIL_S3_ACCESS_KEY_ID,
+    MISTLE_TEST_ARCHIL_S3_SECRET_ACCESS_KEY: process.env.MISTLE_TEST_ARCHIL_S3_SECRET_ACCESS_KEY,
   });
 
   if (!parsed.success) {
@@ -102,6 +110,15 @@ function createWorkerConfig(input: ArchilIntegrationEnvironment): DataPlaneWorke
         apiKey: input.MISTLE_TEST_ARCHIL_API_KEY,
         region: TestArchilRegion,
         namePrefix: "it-pr9-",
+        mounts: [
+          {
+            type: "s3-compatible" as const,
+            bucket: input.MISTLE_TEST_ARCHIL_S3_BUCKET,
+            endpoint: input.MISTLE_TEST_ARCHIL_S3_ENDPOINT,
+            accessKeyId: input.MISTLE_TEST_ARCHIL_S3_ACCESS_KEY_ID,
+            secretAccessKey: input.MISTLE_TEST_ARCHIL_S3_SECRET_ACCESS_KEY,
+          },
+        ],
       },
     },
   };
@@ -185,6 +202,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       dataPlaneApiBaseUrl: "http://127.0.0.1:5201",
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
+      sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
     });
   }, IntegrationTestTimeoutMs);
 

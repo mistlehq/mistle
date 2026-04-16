@@ -141,6 +141,7 @@ function createControlPlaneApiEnvironment(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -154,6 +155,7 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: input.dataPlaneApiBaseUrl,
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
   };
 }
 
@@ -164,6 +166,7 @@ function startControlPlaneApiChildProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -212,6 +215,7 @@ async function startControlPlaneApiProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): Promise<StartedControlPlaneApiProcess> {
   const childProcess = startControlPlaneApiChildProcess(input);
   const stdoutChunks: string[] = [];
@@ -415,6 +419,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       dataPlaneApiBaseUrl: "http://127.0.0.1:5201",
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
+      sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
     });
   }, IntegrationTestTimeoutMs);
 

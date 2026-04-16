@@ -162,6 +162,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
       dataPlaneApiBaseUrl: "http://127.0.0.1:5201",
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
+      sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
     });
   }, IntegrationTestTimeoutMs);
 
