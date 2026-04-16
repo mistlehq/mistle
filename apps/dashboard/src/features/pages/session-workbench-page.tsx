@@ -282,6 +282,7 @@ function SessionWorkbenchPageContent(input: {
             activeTurnId={null}
             isTurnInProgress={false}
             pendingTurnId={null}
+            scrollBehavior="follow-streaming-at-bottom"
             chatEntries={[]}
             isRespondingToServerRequest={false}
             onRespondToServerRequest={function onRespondToServerRequest() {}}
@@ -331,6 +332,7 @@ function SessionWorkbenchPageContent(input: {
           activeTurnId: conversationPane.chatState.activeTurnId,
           isTurnInProgress: conversationPane.chatState.status === "inProgress",
           pendingTurnId: conversationPane.chatState.pendingTurnId,
+          scrollBehavior: "follow-streaming-at-bottom",
           chatEntries: conversationPane.chatState.entries,
           isRespondingToServerRequest:
             conversationPane.serverRequestsState.isRespondingToServerRequest,
@@ -387,6 +389,7 @@ type PrimaryPanelConversationContent = Pick<
   | "activeTurnId"
   | "isTurnInProgress"
   | "pendingTurnId"
+  | "scrollBehavior"
   | "chatEntries"
   | "isRespondingToServerRequest"
   | "onRespondToServerRequest"

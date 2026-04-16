@@ -20,6 +20,7 @@ type SessionConversationMainContentProps = {
   activeTurnId: string | null;
   isTurnInProgress: boolean;
   pendingTurnId: string | null;
+  scrollBehavior?: "pin-active-turn-to-top" | "follow-streaming-at-bottom" | "none";
   chatEntries: readonly ChatEntry[];
   serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
@@ -46,6 +47,7 @@ type SessionConversationBottomPanelControllerProps = SessionConversationSharedPa
 };
 
 const PinnedTurnTopInsetPx = 12;
+const ScrollFollowBottomThresholdPx = 24;
 
 function findPinnedTurnElement(input: {
   pinnedTurnId: string | null;
@@ -93,16 +95,42 @@ function measurePinnedTurnSpacerHeight(input: {
   );
 }
 
-export function SessionConversationMainContent({
-  activeTurnId,
-  isTurnInProgress,
-  pendingTurnId,
-  chatEntries,
-  serverRequestPanelEntries,
-  isRespondingToServerRequest,
-  onRespondToServerRequest,
-  scrollContainerRef,
-}: SessionConversationMainContentProps): React.JSX.Element {
+function hasStreamingChatEntries(chatEntries: readonly ChatEntry[]): boolean {
+  return chatEntries.some((entry) => entry.status === "streaming");
+}
+
+function isScrollContainerNearBottom(scrollContainerElement: HTMLDivElement): boolean {
+  const remainingScrollDistance =
+    scrollContainerElement.scrollHeight -
+    scrollContainerElement.clientHeight -
+    scrollContainerElement.scrollTop;
+  return remainingScrollDistance <= ScrollFollowBottomThresholdPx;
+}
+
+function scrollContainerToBottom(scrollContainerElement: HTMLDivElement): void {
+  const targetScrollTop = Math.max(
+    0,
+    scrollContainerElement.scrollHeight - scrollContainerElement.clientHeight,
+  );
+  if (Math.abs(scrollContainerElement.scrollTop - targetScrollTop) < 1) {
+    return;
+  }
+
+  scrollContainerElement.scrollTop = targetScrollTop;
+}
+
+function usePinnedTurnToTopScrollBehavior(input: {
+  activeTurnId: string | null;
+  isTurnInProgress: boolean;
+  pendingTurnId: string | null;
+  chatEntries: readonly ChatEntry[];
+  enabled: boolean;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null> | undefined;
+}): {
+  pinnedTurnId: string | null;
+  reservedSpacerHeight: number;
+  threadRootRef: React.RefObject<HTMLDivElement | null>;
+} {
   const threadRootRef = useRef<HTMLDivElement | null>(null);
   const reservedSpacerHeightRef = useRef(0);
   const spacerAlignedTurnIdRef = useRef<string | null>(null);
@@ -110,34 +138,60 @@ export function SessionConversationMainContent({
   const [reservedSpacerHeight, setReservedSpacerHeight] = useState(0);
 
   useEffect(() => {
-    if (pendingTurnId !== null && pinnedTurnId !== pendingTurnId) {
-      setPinnedTurnId(pendingTurnId);
+    if (!input.enabled) {
+      return;
     }
-  }, [pendingTurnId, pinnedTurnId]);
+
+    if (input.pendingTurnId !== null && pinnedTurnId !== input.pendingTurnId) {
+      setPinnedTurnId(input.pendingTurnId);
+    }
+  }, [input.enabled, input.pendingTurnId, pinnedTurnId]);
 
   useEffect(() => {
+    if (!input.enabled) {
+      return;
+    }
+
     const hasActiveTurn =
-      activeTurnId !== null && chatEntries.some((entry) => entry.turnId === activeTurnId);
-    if (isTurnInProgress && hasActiveTurn && pinnedTurnId !== activeTurnId) {
-      setPinnedTurnId(activeTurnId);
+      input.activeTurnId !== null &&
+      input.chatEntries.some((entry) => entry.turnId === input.activeTurnId);
+    if (input.isTurnInProgress && hasActiveTurn && pinnedTurnId !== input.activeTurnId) {
+      setPinnedTurnId(input.activeTurnId);
     }
-  }, [activeTurnId, chatEntries, isTurnInProgress, pinnedTurnId]);
+  }, [input.activeTurnId, input.chatEntries, input.enabled, input.isTurnInProgress, pinnedTurnId]);
 
   useEffect(() => {
+    if (!input.enabled) {
+      if (
+        pinnedTurnId !== null ||
+        reservedSpacerHeightRef.current !== 0 ||
+        reservedSpacerHeight !== 0
+      ) {
+        setPinnedTurnId(null);
+        reservedSpacerHeightRef.current = 0;
+        setReservedSpacerHeight(0);
+      }
+      return;
+    }
+
     if (pinnedTurnId === null) {
       return;
     }
 
-    const hasPinnedTurn = chatEntries.some((entry) => entry.turnId === pinnedTurnId);
+    const hasPinnedTurn = input.chatEntries.some((entry) => entry.turnId === pinnedTurnId);
     if (!hasPinnedTurn) {
       setPinnedTurnId(null);
       reservedSpacerHeightRef.current = 0;
       setReservedSpacerHeight(0);
     }
-  }, [chatEntries, pinnedTurnId]);
+  }, [input.chatEntries, input.enabled, pinnedTurnId, reservedSpacerHeight]);
 
   useLayoutEffect(() => {
-    const scrollContainerElement = scrollContainerRef?.current ?? null;
+    if (!input.enabled) {
+      return;
+    }
+
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
     const threadRootElement = threadRootRef.current;
     if (scrollContainerElement === null || threadRootElement === null) {
       return;
@@ -188,15 +242,20 @@ export function SessionConversationMainContent({
       cancelAnimationFrame(nestedAnimationFrameId);
       resizeObserver.disconnect();
     };
-  }, [chatEntries, pinnedTurnId, scrollContainerRef]);
+  }, [input.chatEntries, input.enabled, pinnedTurnId, input.scrollContainerRef]);
 
   useLayoutEffect(() => {
+    if (!input.enabled) {
+      spacerAlignedTurnIdRef.current = null;
+      return;
+    }
+
     if (pinnedTurnId === null) {
       spacerAlignedTurnIdRef.current = null;
       return;
     }
 
-    const scrollContainerElement = scrollContainerRef?.current ?? null;
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
     const threadRootElement = threadRootRef.current;
     if (scrollContainerElement === null || threadRootElement === null) {
       return;
@@ -232,9 +291,13 @@ export function SessionConversationMainContent({
       cancelAnimationFrame(animationFrameId);
       cancelAnimationFrame(nestedAnimationFrameId);
     };
-  }, [pinnedTurnId, scrollContainerRef]);
+  }, [input.enabled, pinnedTurnId, input.scrollContainerRef]);
 
   useLayoutEffect(() => {
+    if (!input.enabled) {
+      return;
+    }
+
     if (pinnedTurnId === null || reservedSpacerHeight === 0) {
       return;
     }
@@ -243,7 +306,7 @@ export function SessionConversationMainContent({
       return;
     }
 
-    const scrollContainerElement = scrollContainerRef?.current ?? null;
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
     const threadRootElement = threadRootRef.current;
     if (scrollContainerElement === null || threadRootElement === null) {
       return;
@@ -268,21 +331,152 @@ export function SessionConversationMainContent({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [pinnedTurnId, reservedSpacerHeight, scrollContainerRef]);
+  }, [input.enabled, pinnedTurnId, reservedSpacerHeight, input.scrollContainerRef]);
+
+  return {
+    pinnedTurnId,
+    reservedSpacerHeight,
+    threadRootRef,
+  };
+}
+
+function useFollowStreamingAtBottomScrollBehavior(input: {
+  chatEntries: readonly ChatEntry[];
+  enabled: boolean;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null> | undefined;
+}): void {
+  const shouldAutoFollowBottomRef = useRef(true);
+  const previousScrollHeightRef = useRef(0);
+  const hasStreamingEntries = hasStreamingChatEntries(input.chatEntries);
+
+  useEffect(() => {
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
+    if (scrollContainerElement === null) {
+      return;
+    }
+
+    previousScrollHeightRef.current = scrollContainerElement.scrollHeight;
+
+    const updateShouldAutoFollowBottom = (): void => {
+      shouldAutoFollowBottomRef.current = isScrollContainerNearBottom(scrollContainerElement);
+    };
+
+    updateShouldAutoFollowBottom();
+    scrollContainerElement.addEventListener("scroll", updateShouldAutoFollowBottom, {
+      passive: true,
+    });
+
+    return () => {
+      scrollContainerElement.removeEventListener("scroll", updateShouldAutoFollowBottom);
+    };
+  }, [input.scrollContainerRef]);
+
+  useLayoutEffect(() => {
+    if (!input.enabled) {
+      return;
+    }
+
+    if (!hasStreamingEntries) {
+      return;
+    }
+
+    if (!shouldAutoFollowBottomRef.current) {
+      return;
+    }
+
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
+    if (scrollContainerElement === null) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let nestedAnimationFrameId = 0;
+    const previousScrollHeight = previousScrollHeightRef.current;
+    const wasNearBottomBeforeUpdate =
+      previousScrollHeight === 0 ||
+      previousScrollHeight -
+        scrollContainerElement.clientHeight -
+        scrollContainerElement.scrollTop <=
+        ScrollFollowBottomThresholdPx;
+
+    const followStreamingContent = (): void => {
+      scrollContainerToBottom(scrollContainerElement);
+      previousScrollHeightRef.current = scrollContainerElement.scrollHeight;
+      shouldAutoFollowBottomRef.current = isScrollContainerNearBottom(scrollContainerElement);
+    };
+
+    if (shouldAutoFollowBottomRef.current || wasNearBottomBeforeUpdate) {
+      followStreamingContent();
+    } else {
+      previousScrollHeightRef.current = scrollContainerElement.scrollHeight;
+    }
+
+    animationFrameId = requestAnimationFrame(() => {
+      if (shouldAutoFollowBottomRef.current || wasNearBottomBeforeUpdate) {
+        followStreamingContent();
+      } else {
+        previousScrollHeightRef.current = scrollContainerElement.scrollHeight;
+      }
+      nestedAnimationFrameId = requestAnimationFrame(() => {
+        if (shouldAutoFollowBottomRef.current || wasNearBottomBeforeUpdate) {
+          followStreamingContent();
+          return;
+        }
+
+        previousScrollHeightRef.current = scrollContainerElement.scrollHeight;
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      cancelAnimationFrame(nestedAnimationFrameId);
+    };
+  }, [input.chatEntries, input.enabled, hasStreamingEntries, input.scrollContainerRef]);
+}
+
+export function SessionConversationMainContent({
+  activeTurnId,
+  isTurnInProgress,
+  pendingTurnId,
+  scrollBehavior = "pin-active-turn-to-top",
+  chatEntries,
+  serverRequestPanelEntries,
+  isRespondingToServerRequest,
+  onRespondToServerRequest,
+  scrollContainerRef,
+}: SessionConversationMainContentProps): React.JSX.Element {
+  const pinnedTurnScrollBehavior = usePinnedTurnToTopScrollBehavior({
+    activeTurnId,
+    chatEntries,
+    enabled: scrollBehavior === "pin-active-turn-to-top",
+    isTurnInProgress,
+    pendingTurnId,
+    scrollContainerRef,
+  });
+  useFollowStreamingAtBottomScrollBehavior({
+    chatEntries,
+    enabled: scrollBehavior === "follow-streaming-at-bottom",
+    scrollContainerRef,
+  });
 
   return (
-    <div ref={threadRootRef} style={pinnedTurnId === null ? undefined : { overflowAnchor: "none" }}>
+    <div
+      ref={pinnedTurnScrollBehavior.threadRootRef}
+      style={
+        pinnedTurnScrollBehavior.pinnedTurnId === null ? undefined : { overflowAnchor: "none" }
+      }
+    >
       <ChatThread
         entries={chatEntries}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}
         pendingServerRequests={serverRequestPanelEntries}
       />
-      {pinnedTurnId === null ? null : (
+      {pinnedTurnScrollBehavior.pinnedTurnId === null ? null : (
         <div
           aria-hidden="true"
           data-slot="conversation-bottom-spacer"
-          style={{ height: `${reservedSpacerHeight}px` }}
+          style={{ height: `${pinnedTurnScrollBehavior.reservedSpacerHeight}px` }}
         />
       )}
     </div>

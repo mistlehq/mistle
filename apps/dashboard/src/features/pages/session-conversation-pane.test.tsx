@@ -141,6 +141,7 @@ function ConversationScrollHarness(input: {
   activeTurnId: string | null;
   isTurnInProgress?: boolean;
   pendingTurnId: string | null;
+  scrollBehavior?: React.ComponentProps<typeof SessionConversationMainContent>["scrollBehavior"];
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -156,6 +157,7 @@ function ConversationScrollHarness(input: {
         pendingTurnId={input.pendingTurnId}
         scrollContainerRef={scrollContainerRef}
         serverRequestPanelEntries={[]}
+        {...(input.scrollBehavior === undefined ? {} : { scrollBehavior: input.scrollBehavior })}
       />
     </div>
   );
@@ -205,6 +207,8 @@ function defineScrollContainerMetrics(
   scrollContainerElement: HTMLDivElement,
   input: {
     clientHeight: number;
+    scrollHeight?: number;
+    scrollTop?: number;
     top: number;
   },
 ): void {
@@ -231,9 +235,35 @@ function defineScrollContainerMetrics(
   });
   Object.defineProperty(scrollContainerElement, "scrollTop", {
     configurable: true,
-    value: 0,
+    value: input.scrollTop ?? 0,
     writable: true,
   });
+  Object.defineProperty(scrollContainerElement, "scrollHeight", {
+    configurable: true,
+    get() {
+      return input.scrollHeight ?? input.clientHeight;
+    },
+  });
+}
+
+function renderConversationScrollScenario(
+  input: React.ComponentProps<typeof ConversationScrollHarness>,
+): {
+  rerenderConversation: (nextInput: React.ComponentProps<typeof ConversationScrollHarness>) => void;
+  scrollContainerElement: HTMLDivElement;
+} {
+  const rendered = render(<ConversationScrollHarness {...input} />);
+  const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
+  if (!(scrollContainerElement instanceof HTMLDivElement)) {
+    throw new Error("Expected a div scroll container.");
+  }
+
+  return {
+    rerenderConversation(nextInput) {
+      rendered.rerender(<ConversationScrollHarness {...nextInput} />);
+    },
+    scrollContainerElement,
+  };
 }
 
 describe("SessionConversationBottomPanel", () => {
@@ -391,18 +421,12 @@ describe("SessionConversationBottomPanel", () => {
         text: "Streaming response",
       },
     ] as const;
-    const rendered = render(
-      <ConversationScrollHarness
-        activeTurnId="turn-1"
-        chatEntries={initialEntries}
-        pendingTurnId={null}
-      />,
-    );
-
-    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
-    if (!(scrollContainerElement instanceof HTMLDivElement)) {
-      throw new Error("Expected a div scroll container.");
-    }
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: "turn-1",
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     defineScrollContainerMetrics(scrollContainerElement, {
       clientHeight: 420,
@@ -413,13 +437,12 @@ describe("SessionConversationBottomPanel", () => {
       top: 120,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={nextEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: nextEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     const newestTurnElement = screen.getByText("Newest turn").closest("[data-turn-id]");
     if (!(newestTurnElement instanceof HTMLDivElement)) {
@@ -432,13 +455,12 @@ describe("SessionConversationBottomPanel", () => {
       top: 340,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={nextEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: nextEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     await waitFor(() => {
       expect(scrollContainerElement.scrollTop).toBe(228);
@@ -478,27 +500,24 @@ describe("SessionConversationBottomPanel", () => {
         text: "Completed response",
       },
     ] as const;
-    const rendered = render(
-      <ConversationScrollHarness activeTurnId="turn-1" chatEntries={[]} pendingTurnId={null} />,
-    );
-
-    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
-    if (!(scrollContainerElement instanceof HTMLDivElement)) {
-      throw new Error("Expected a div scroll container.");
-    }
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: "turn-1",
+      chatEntries: [],
+      pendingTurnId: null,
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     defineScrollContainerMetrics(scrollContainerElement, {
       clientHeight: 420,
       top: 100,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={streamingEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: streamingEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     const newestTurnElement = screen.getByText("Newest turn").closest("[data-turn-id]");
     if (!(newestTurnElement instanceof HTMLDivElement)) {
@@ -511,13 +530,12 @@ describe("SessionConversationBottomPanel", () => {
       top: 280,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={streamingEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: streamingEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     await waitFor(() => {
       const spacerElement = scrollContainerElement.querySelector(
@@ -532,13 +550,12 @@ describe("SessionConversationBottomPanel", () => {
       top: 100,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={completedEntries}
-        pendingTurnId={null}
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: completedEntries,
+      pendingTurnId: null,
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     await waitFor(() => {
       const spacerElement = scrollContainerElement.querySelector(
@@ -584,31 +601,24 @@ describe("SessionConversationBottomPanel", () => {
         text: "Streaming response",
       },
     ] as const;
-    const rendered = render(
-      <ConversationScrollHarness
-        activeTurnId="turn-1"
-        chatEntries={initialEntries}
-        pendingTurnId={null}
-      />,
-    );
-
-    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
-    if (!(scrollContainerElement instanceof HTMLDivElement)) {
-      throw new Error("Expected a div scroll container.");
-    }
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: "turn-1",
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     defineScrollContainerMetrics(scrollContainerElement, {
       clientHeight: 640,
       top: 100,
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={nextEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: nextEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     const newestTurnElement = screen.getByText("Newest turn").closest("[data-turn-id]");
     if (!(newestTurnElement instanceof HTMLDivElement)) {
@@ -632,13 +642,12 @@ describe("SessionConversationBottomPanel", () => {
       },
     });
 
-    rendered.rerender(
-      <ConversationScrollHarness
-        activeTurnId="turn-2"
-        chatEntries={nextEntries}
-        pendingTurnId="turn-2"
-      />,
-    );
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: nextEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "pin-active-turn-to-top",
+    });
 
     Object.defineProperty(scrollContainerElement, "scrollTop", {
       configurable: true,
@@ -719,6 +728,7 @@ describe("SessionConversationBottomPanel", () => {
         activeTurnId="turn-1"
         chatEntries={initialEntries}
         pendingTurnId={null}
+        scrollBehavior="pin-active-turn-to-top"
       />,
     );
 
@@ -737,6 +747,7 @@ describe("SessionConversationBottomPanel", () => {
         activeTurnId="turn-2"
         chatEntries={startedEntries}
         pendingTurnId="turn-2"
+        scrollBehavior="pin-active-turn-to-top"
       />,
     );
 
@@ -756,6 +767,7 @@ describe("SessionConversationBottomPanel", () => {
         activeTurnId="turn-2"
         chatEntries={startedEntries}
         pendingTurnId="turn-2"
+        scrollBehavior="pin-active-turn-to-top"
       />,
     );
 
@@ -780,6 +792,7 @@ describe("SessionConversationBottomPanel", () => {
         activeTurnId="turn-2"
         chatEntries={streamedEntries}
         pendingTurnId={null}
+        scrollBehavior="pin-active-turn-to-top"
       />,
     );
 
@@ -789,6 +802,291 @@ describe("SessionConversationBottomPanel", () => {
       );
       expect(spacerElement?.getAttribute("style")).toBe("height: 160px;");
       expect(scrollContainerElement.scrollTop).toBe(228);
+    });
+  });
+
+  it("does not pin a new turn to the top when top pinning is disabled", async () => {
+    const initialEntries = [
+      {
+        id: "user-turn-1",
+        turnId: "turn-1",
+        kind: "user-message",
+        status: "completed",
+        text: "Earlier turn",
+      },
+      {
+        id: "assistant-turn-1",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        phase: null,
+        status: "completed",
+        text: "Earlier response",
+      },
+    ] as const;
+    const nextEntries = [
+      ...initialEntries,
+      {
+        id: "user-turn-2",
+        turnId: "turn-2",
+        kind: "user-message",
+        status: "completed",
+        text: "Newest turn",
+      },
+      {
+        id: "assistant-turn-2",
+        turnId: "turn-2",
+        kind: "assistant-message",
+        phase: null,
+        status: "streaming",
+        text: "Streaming response",
+      },
+    ] as const;
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: "turn-1",
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "follow-streaming-at-bottom",
+    });
+
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 420,
+      scrollHeight: 620,
+      scrollTop: 0,
+      top: 100,
+    });
+    fireEvent.scroll(scrollContainerElement);
+
+    rerenderConversation({
+      activeTurnId: "turn-2",
+      chatEntries: nextEntries,
+      pendingTurnId: "turn-2",
+      scrollBehavior: "follow-streaming-at-bottom",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(0);
+      expect(
+        scrollContainerElement.querySelector('[data-slot="conversation-bottom-spacer"]'),
+      ).toBeNull();
+    });
+  });
+
+  it("follows streaming content when the viewer is already at the bottom", async () => {
+    const initialEntries = [
+      {
+        id: "user-turn-1",
+        turnId: "turn-1",
+        kind: "user-message",
+        status: "completed",
+        text: "Earlier turn",
+      },
+      {
+        id: "assistant-turn-1",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        phase: null,
+        status: "streaming",
+        text: "First chunk",
+      },
+    ] as const;
+    const streamedEntries = [
+      {
+        ...initialEntries[0],
+      },
+      {
+        ...initialEntries[1],
+        text: "First chunk\nSecond chunk",
+      },
+    ] as const;
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: "turn-1",
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "follow-streaming-at-bottom",
+    });
+
+    let scrollHeight = 1000;
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight,
+      scrollTop: 600,
+      top: 100,
+    });
+
+    fireEvent.scroll(scrollContainerElement);
+
+    scrollHeight = 1160;
+    Object.defineProperty(scrollContainerElement, "scrollHeight", {
+      configurable: true,
+      get() {
+        return scrollHeight;
+      },
+    });
+
+    rerenderConversation({
+      activeTurnId: "turn-1",
+      chatEntries: streamedEntries,
+      pendingTurnId: null,
+      scrollBehavior: "follow-streaming-at-bottom",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(760);
+    });
+  });
+
+  it("follows a sudden large assistant block when the thread previously fit without scrolling", async () => {
+    const initialEntries = [
+      {
+        id: "user-turn-1",
+        turnId: "turn-1",
+        kind: "user-message",
+        status: "completed",
+        text: "Start a new response",
+      },
+      {
+        id: "assistant-turn-1",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        phase: null,
+        status: "streaming",
+        text: "Short opening chunk",
+      },
+    ] as const;
+    const largeBlockEntries = [
+      {
+        ...initialEntries[0],
+      },
+      {
+        ...initialEntries[1],
+        text: [
+          "Short opening chunk",
+          "Second large paragraph that appears all at once and makes the conversation overflow.",
+          "Third large paragraph that keeps extending the assistant output in one render pass.",
+          "Fourth large paragraph so the thread clearly grows beyond the viewport height.",
+        ].join("\n\n"),
+      },
+    ] as const;
+    const rendered = render(
+      <ConversationScrollHarness
+        activeTurnId="turn-1"
+        chatEntries={initialEntries}
+        pendingTurnId={null}
+        scrollBehavior="follow-streaming-at-bottom"
+      />,
+    );
+
+    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
+    if (!(scrollContainerElement instanceof HTMLDivElement)) {
+      throw new Error("Expected a div scroll container.");
+    }
+
+    let scrollHeight = 320;
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight,
+      scrollTop: 0,
+      top: 100,
+    });
+    fireEvent.scroll(scrollContainerElement);
+
+    scrollHeight = 980;
+    Object.defineProperty(scrollContainerElement, "scrollHeight", {
+      configurable: true,
+      get() {
+        return scrollHeight;
+      },
+    });
+
+    rendered.rerender(
+      <ConversationScrollHarness
+        activeTurnId="turn-1"
+        chatEntries={largeBlockEntries}
+        pendingTurnId={null}
+        scrollBehavior="follow-streaming-at-bottom"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(580);
+    });
+  });
+
+  it("follows a sudden large assistant block when the viewer was already at the bottom of an existing scroll container", async () => {
+    const initialEntries = [
+      {
+        id: "user-turn-1",
+        turnId: "turn-1",
+        kind: "user-message",
+        status: "completed",
+        text: "Start a new response",
+      },
+      {
+        id: "assistant-turn-1",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        phase: null,
+        status: "streaming",
+        text: "First paragraph\n\nSecond paragraph\n\nThird paragraph",
+      },
+    ] as const;
+    const largeBlockEntries = [
+      {
+        ...initialEntries[0],
+      },
+      {
+        ...initialEntries[1],
+        text: [
+          initialEntries[1].text,
+          "Fourth paragraph arrives in the same render and grows the thread substantially.",
+          "Fifth paragraph keeps extending the content so the container needs to move farther.",
+          "Sixth paragraph ensures the resulting scroll delta is large enough to catch regressions.",
+          "Seventh paragraph finishes the sudden block append.",
+        ].join("\n\n"),
+      },
+    ] as const;
+    const rendered = render(
+      <ConversationScrollHarness
+        activeTurnId="turn-1"
+        chatEntries={initialEntries}
+        pendingTurnId={null}
+        scrollBehavior="follow-streaming-at-bottom"
+      />,
+    );
+
+    const scrollContainerElement = screen.getByTestId("conversation-scroll-container");
+    if (!(scrollContainerElement instanceof HTMLDivElement)) {
+      throw new Error("Expected a div scroll container.");
+    }
+
+    let scrollHeight = 1000;
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight,
+      scrollTop: 600,
+      top: 100,
+    });
+    fireEvent.scroll(scrollContainerElement);
+
+    scrollHeight = 1480;
+    Object.defineProperty(scrollContainerElement, "scrollHeight", {
+      configurable: true,
+      get() {
+        return scrollHeight;
+      },
+    });
+
+    rendered.rerender(
+      <ConversationScrollHarness
+        activeTurnId="turn-1"
+        chatEntries={largeBlockEntries}
+        pendingTurnId={null}
+        scrollBehavior="follow-streaming-at-bottom"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(1080);
     });
   });
 });
