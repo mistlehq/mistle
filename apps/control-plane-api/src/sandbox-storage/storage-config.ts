@@ -64,12 +64,6 @@ export function parseOrganizationSandboxStorageConfigV1(
   return OrganizationSandboxStorageConfigV1Schema.parse(JSON.parse(input));
 }
 
-export function serializeOrganizationSandboxStorageConfigV1(
-  input: OrganizationSandboxStorageConfigV1,
-): string {
-  return JSON.stringify(input);
-}
-
 export function summarizeOrganizationSandboxStorageConfig(
   input: OrganizationSandboxStorageConfigV1,
 ): OrganizationSandboxStorageConfigSummary {

@@ -11,7 +11,6 @@ import { sql } from "drizzle-orm";
 import {
   OrganizationSandboxStorageConfigVersion,
   parseOrganizationSandboxStorageConfigV1,
-  serializeOrganizationSandboxStorageConfigV1,
   summarizeOrganizationSandboxStorageConfig,
   type OrganizationSandboxStorageConfigSummary,
   type OrganizationSandboxStorageConfigV1,
@@ -172,7 +171,7 @@ export async function upsertOrganizationSandboxStorageSettings(input: {
     const encryptedStorageConfig = await encryptOrganizationBackedValue({
       db: input.db,
       organizationId: input.organizationId,
-      plaintext: serializeOrganizationSandboxStorageConfigV1(input.organizationStorageConfig),
+      plaintext: JSON.stringify(input.organizationStorageConfig),
       encryptionConfig: input.encryptionConfig,
     });
 
