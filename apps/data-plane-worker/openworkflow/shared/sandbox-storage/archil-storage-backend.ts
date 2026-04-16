@@ -7,6 +7,7 @@ import {
 import type { ResolveStorageConfigurationOutput } from "@mistle/control-plane-internal-client";
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  SandboxInstancePersistenceModes,
   SandboxStorageCredentialKinds,
   sandboxInstances,
   SandboxStorageProviders,
@@ -33,6 +34,7 @@ import {
   tryDeleteSandboxInstanceStorageById,
   type CompensationAction,
 } from "./storage-persistence.js";
+import { withSandboxStorageTelemetry } from "./telemetry.js";
 
 type ManagedArchilConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["archil"]
@@ -235,14 +237,30 @@ export function requireReadyArchilSandboxStorage(input: {
 export async function resolveSandboxStorageDiskToken(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   organizationId: string;
+  sandboxInstanceId: string;
+  runtimeProvider: "e2b";
   storage: ArchilReadySandboxInstanceStorage;
 }): Promise<string> {
-  const resolvedCredential = await input.controlPlaneInternalClient.resolveStorageCredential({
-    organizationId: input.organizationId,
-    credentialKind: input.storage.credentialKind,
-    ciphertext: input.storage.credentialCiphertext,
-    nonce: input.storage.credentialNonce,
-    organizationCredentialKeyVersion: input.storage.organizationCredentialKeyVersion,
+  const resolvedCredential = await withSandboxStorageTelemetry({
+    operation: "load_and_decrypt_credential",
+    telemetry: {
+      sandboxInstanceId: input.sandboxInstanceId,
+      organizationId: input.organizationId,
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      runtimeProvider: input.runtimeProvider,
+      storageBackend: SandboxStorageBackend.ARCHIL,
+      region: input.storage.region,
+      operation: "load_and_decrypt_credential",
+    },
+    providerOperation: "control_plane.resolve_storage_credential",
+    fn: async () =>
+      input.controlPlaneInternalClient.resolveStorageCredential({
+        organizationId: input.organizationId,
+        credentialKind: input.storage.credentialKind,
+        ciphertext: input.storage.credentialCiphertext,
+        nonce: input.storage.credentialNonce,
+        organizationCredentialKeyVersion: input.storage.organizationCredentialKeyVersion,
+      }),
   });
 
   return resolvedCredential.plaintext;
@@ -347,11 +365,28 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
           );
         }
 
-        const resolvedStorageConfiguration =
-          await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+        const resolvedStorageConfiguration = await withSandboxStorageTelemetry({
+          operation: "resolve_storage_profile",
+          telemetry: {
+            sandboxInstanceId: input.sandboxInstanceId,
             organizationId: input.organizationId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
             runtimeProvider: this.#runtimeProvider,
-          });
+            storageBackend: SandboxStorageBackend.ARCHIL,
+            operation: "resolve_storage_profile",
+          },
+          providerOperation: "control_plane.resolve_storage_configuration",
+          fn: async ({ setAttributes }) => {
+            const output = await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+              organizationId: input.organizationId,
+              runtimeProvider: this.#runtimeProvider,
+            });
+            setAttributes({
+              "mistle.sandbox.storage.config_source": output.storageConfigSource,
+            });
+            return output;
+          },
+        });
 
         const archilProfile = resolveArchilProvisioningProfile({
           managedArchilConfig: this.#workerConfig.sandboxStorage?.archil,
@@ -363,12 +398,27 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
           region: archilProfile.region,
         });
 
-        const createdDisk = await archil.disks.create(
-          createArchilDiskRequest({
+        const createdDisk = await withSandboxStorageTelemetry({
+          operation: "provision",
+          telemetry: {
             sandboxInstanceId: input.sandboxInstanceId,
-            profile: archilProfile,
-          }),
-        );
+            organizationId: input.organizationId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: this.#runtimeProvider,
+            storageBackend: SandboxStorageBackend.ARCHIL,
+            storageConfigSource: resolvedStorageConfiguration.storageConfigSource,
+            region: archilProfile.region,
+            operation: "provision",
+          },
+          providerOperation: "archil.disks.create",
+          fn: async () =>
+            archil.disks.create(
+              createArchilDiskRequest({
+                sandboxInstanceId: input.sandboxInstanceId,
+                profile: archilProfile,
+              }),
+            ),
+        });
 
         registerCompensationAction({
           compensationActions,
@@ -388,28 +438,44 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
           sandboxInstanceId: input.sandboxInstanceId,
         });
 
-        const encryptedToken = await this.#controlPlaneInternalClient.encryptStorageCredential({
-          organizationId: input.organizationId,
-          credentialKind: "disk_token",
-          plaintext: plaintextToken,
-        });
-
-        const insertedStorage = await insertSandboxInstanceStorage(
-          {
-            db: tx,
-          },
-          {
+        const insertedStorage = await withSandboxStorageTelemetry({
+          operation: "encrypt_and_persist_credential",
+          telemetry: {
             sandboxInstanceId: input.sandboxInstanceId,
-            provider: SandboxStorageProviders.ARCHIL,
-            handle: createdDisk.disk.id,
+            organizationId: input.organizationId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: this.#runtimeProvider,
+            storageBackend: SandboxStorageBackend.ARCHIL,
+            storageConfigSource: resolvedStorageConfiguration.storageConfigSource,
             region: archilProfile.region,
-            status: SandboxStorageStatuses.READY,
-            credentialCiphertext: encryptedToken.ciphertext,
-            credentialNonce: encryptedToken.nonce,
-            credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-            organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
+            operation: "encrypt_and_persist_credential",
           },
-        );
+          providerOperation: "control_plane.encrypt_storage_credential",
+          fn: async () => {
+            const encryptedToken = await this.#controlPlaneInternalClient.encryptStorageCredential({
+              organizationId: input.organizationId,
+              credentialKind: "disk_token",
+              plaintext: plaintextToken,
+            });
+
+            return insertSandboxInstanceStorage(
+              {
+                db: tx,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+                provider: SandboxStorageProviders.ARCHIL,
+                handle: createdDisk.disk.id,
+                region: archilProfile.region,
+                status: SandboxStorageStatuses.READY,
+                credentialCiphertext: encryptedToken.ciphertext,
+                credentialNonce: encryptedToken.nonce,
+                credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+                organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
+              },
+            );
+          },
+        });
 
         registerCompensationAction({
           compensationActions,
@@ -459,6 +525,8 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
     const credential = await resolveSandboxStorageDiskToken({
       controlPlaneInternalClient: this.#controlPlaneInternalClient,
       organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      runtimeProvider: this.#runtimeProvider,
       storage,
     });
 
@@ -511,11 +579,29 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
       storage: existingStorage,
     });
 
-    const resolvedStorageConfiguration =
-      await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+    const resolvedStorageConfiguration = await withSandboxStorageTelemetry({
+      operation: "resolve_storage_profile",
+      telemetry: {
+        sandboxInstanceId: input.sandboxInstanceId,
         organizationId: input.organizationId,
+        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         runtimeProvider: this.#runtimeProvider,
-      });
+        storageBackend: SandboxStorageBackend.ARCHIL,
+        region: storage.region,
+        operation: "resolve_storage_profile",
+      },
+      providerOperation: "control_plane.resolve_storage_configuration",
+      fn: async ({ setAttributes }) => {
+        const output = await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+          organizationId: input.organizationId,
+          runtimeProvider: this.#runtimeProvider,
+        });
+        setAttributes({
+          "mistle.sandbox.storage.config_source": output.storageConfigSource,
+        });
+        return output;
+      },
+    });
 
     const archilProfile = resolveArchilProvisioningProfile({
       managedArchilConfig: this.#workerConfig.sandboxStorage?.archil,
@@ -529,8 +615,24 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
 
     let diskDeleteError: unknown;
     try {
-      const disk = await archil.disks.get(storage.handle);
-      await disk.delete();
+      await withSandboxStorageTelemetry({
+        operation: "deprovision",
+        telemetry: {
+          sandboxInstanceId: input.sandboxInstanceId,
+          organizationId: input.organizationId,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          runtimeProvider: this.#runtimeProvider,
+          storageBackend: SandboxStorageBackend.ARCHIL,
+          storageConfigSource: resolvedStorageConfiguration.storageConfigSource,
+          region: storage.region,
+          operation: "deprovision",
+        },
+        providerOperation: "archil.disks.delete",
+        fn: async () => {
+          const disk = await archil.disks.get(storage.handle);
+          await disk.delete();
+        },
+      });
     } catch (error) {
       diskDeleteError = error;
     }

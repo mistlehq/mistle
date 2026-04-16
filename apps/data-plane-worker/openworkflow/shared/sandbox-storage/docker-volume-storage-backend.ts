@@ -1,5 +1,6 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  SandboxInstancePersistenceModes,
   sandboxInstances,
   SandboxStorageProviders,
   SandboxStorageStatuses,
@@ -25,6 +26,7 @@ import {
   tryDeleteSandboxInstanceStorageById,
   type CompensationAction,
 } from "./storage-persistence.js";
+import { withSandboxStorageTelemetry } from "./telemetry.js";
 
 type ManagedDockerVolumeConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["dockerVolume"]
@@ -196,8 +198,21 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
           sandboxInstanceId: input.sandboxInstanceId,
         });
 
-        await dockerClient.createVolume({
-          volumeName,
+        await withSandboxStorageTelemetry({
+          operation: "provision",
+          telemetry: {
+            sandboxInstanceId: input.sandboxInstanceId,
+            organizationId: input.organizationId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: "docker",
+            storageBackend: SandboxStorageBackend.DOCKER_VOLUME,
+            operation: "provision",
+          },
+          providerOperation: "docker.volumes.create",
+          fn: async () =>
+            dockerClient.createVolume({
+              volumeName,
+            }),
         });
 
         registerCompensationAction({
@@ -212,22 +227,34 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
           },
         });
 
-        const insertedStorage = await insertSandboxInstanceStorage(
-          {
-            db: tx,
-          },
-          {
+        const insertedStorage = await withSandboxStorageTelemetry({
+          operation: "persist_storage_record",
+          telemetry: {
             sandboxInstanceId: input.sandboxInstanceId,
-            provider: SandboxStorageProviders.DOCKER_VOLUME,
-            handle: volumeName,
-            region: null,
-            status: SandboxStorageStatuses.READY,
-            credentialCiphertext: null,
-            credentialNonce: null,
-            credentialKind: null,
-            organizationCredentialKeyVersion: null,
+            organizationId: input.organizationId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: "docker",
+            storageBackend: SandboxStorageBackend.DOCKER_VOLUME,
+            operation: "persist_storage_record",
           },
-        );
+          fn: async () =>
+            insertSandboxInstanceStorage(
+              {
+                db: tx,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+                provider: SandboxStorageProviders.DOCKER_VOLUME,
+                handle: volumeName,
+                region: null,
+                status: SandboxStorageStatuses.READY,
+                credentialCiphertext: null,
+                credentialNonce: null,
+                credentialKind: null,
+                organizationCredentialKeyVersion: null,
+              },
+            ),
+        });
 
         registerCompensationAction({
           compensationActions,
@@ -335,8 +362,21 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
 
     let volumeDeleteError: unknown;
     try {
-      await dockerClient.deleteVolume({
-        volumeName: storage.handle,
+      await withSandboxStorageTelemetry({
+        operation: "deprovision",
+        telemetry: {
+          sandboxInstanceId: input.sandboxInstanceId,
+          organizationId: input.organizationId,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          runtimeProvider: "docker",
+          storageBackend: SandboxStorageBackend.DOCKER_VOLUME,
+          operation: "deprovision",
+        },
+        providerOperation: "docker.volumes.delete",
+        fn: async () =>
+          dockerClient.deleteVolume({
+            volumeName: storage.handle,
+          }),
       });
     } catch (error) {
       volumeDeleteError = error;

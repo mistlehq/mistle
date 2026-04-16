@@ -14,6 +14,7 @@ import {
 
 import type { DataPlaneWorkerConfig } from "../core/config.js";
 import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { withSandboxStorageTelemetry } from "./sandbox-storage/telemetry.js";
 
 export async function cleanupSandboxStorage(
   ctx: {
@@ -43,32 +44,49 @@ export async function cleanupSandboxStorage(
     );
   }
 
-  const storageBackendAdapter = createSandboxStorageBackendAdapter({
-    db: ctx.db,
-    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-    workerConfig: ctx.workerConfig,
-    runtimeProvider: input.runtimeProvider,
-    storageBackend: ctx.storageBackend,
-  });
-
-  const storage = await storageBackendAdapter.resolveCleanup({
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-
-  await ctx.sandboxAdapter.cleanupStorage({
-    sandboxInstanceId: input.sandboxInstanceId,
-    sandbox: {
-      provider: input.runtimeProvider,
-      id: input.providerSandboxId,
+  await withSandboxStorageTelemetry({
+    operation: "cleanup",
+    telemetry: {
+      sandboxInstanceId: input.sandboxInstanceId,
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      runtimeProvider: input.runtimeProvider,
+      operation: "cleanup",
+      ...(ctx.storageBackend === undefined
+        ? {}
+        : {
+            storageBackend: ctx.storageBackend,
+          }),
     },
-    storage,
-    lifecycle:
-      input.lifecycle === "stop"
-        ? SandboxStorageCleanupLifecycles.STOP
-        : SandboxStorageCleanupLifecycles.DESTROY,
-    timing:
-      input.timing === "before_compute_teardown"
-        ? SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN
-        : SandboxStorageCleanupTimings.AFTER_COMPUTE_TEARDOWN,
+    providerOperation: `${input.runtimeProvider}.cleanup_storage`,
+    fn: async () => {
+      const storageBackendAdapter = createSandboxStorageBackendAdapter({
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.workerConfig,
+        runtimeProvider: input.runtimeProvider,
+        storageBackend: ctx.storageBackend,
+      });
+
+      const storage = await storageBackendAdapter.resolveCleanup({
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+
+      await ctx.sandboxAdapter.cleanupStorage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandbox: {
+          provider: input.runtimeProvider,
+          id: input.providerSandboxId,
+        },
+        storage,
+        lifecycle:
+          input.lifecycle === "stop"
+            ? SandboxStorageCleanupLifecycles.STOP
+            : SandboxStorageCleanupLifecycles.DESTROY,
+        timing:
+          input.timing === "before_compute_teardown"
+            ? SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN
+            : SandboxStorageCleanupTimings.AFTER_COMPUTE_TEARDOWN,
+      });
+    },
   });
 }

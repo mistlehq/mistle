@@ -589,6 +589,9 @@ importers:
       '@mistle/workflow-registry':
         specifier: workspace:*
         version: link:../../packages/workflow-registry
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@openworkflow/cli':
         specifier: ^0.4.3
         version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))

@@ -13,6 +13,7 @@ import {
 
 import type { DataPlaneWorkerConfig } from "../core/config.js";
 import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { withSandboxStorageTelemetry } from "./sandbox-storage/telemetry.js";
 
 export async function attachSandboxStorage(
   ctx: {
@@ -42,29 +43,47 @@ export async function attachSandboxStorage(
     );
   }
 
-  const storageBackendAdapter = createSandboxStorageBackendAdapter({
-    db: ctx.db,
-    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-    workerConfig: ctx.workerConfig,
-    runtimeProvider: input.runtimeProvider,
-    storageBackend: ctx.storageBackend,
-  });
-
-  const resolvedStorage = await storageBackendAdapter.resolveAttachment({
-    organizationId: input.organizationId,
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-
-  await ctx.sandboxAdapter.attachStorage({
-    sandboxInstanceId: input.sandboxInstanceId,
-    sandbox: {
-      provider: input.runtimeProvider,
-      id: input.providerSandboxId,
+  await withSandboxStorageTelemetry({
+    operation: "attach",
+    telemetry: {
+      sandboxInstanceId: input.sandboxInstanceId,
+      organizationId: input.organizationId,
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      runtimeProvider: input.runtimeProvider,
+      operation: "attach",
+      ...(ctx.storageBackend === undefined
+        ? {}
+        : {
+            storageBackend: ctx.storageBackend,
+          }),
     },
-    storage: resolvedStorage,
-    lifecycle:
-      input.lifecycle === "start"
-        ? SandboxStorageAttachLifecycles.START
-        : SandboxStorageAttachLifecycles.RESUME,
+    providerOperation: `${input.runtimeProvider}.attach_storage`,
+    fn: async () => {
+      const storageBackendAdapter = createSandboxStorageBackendAdapter({
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.workerConfig,
+        runtimeProvider: input.runtimeProvider,
+        storageBackend: ctx.storageBackend,
+      });
+
+      const resolvedStorage = await storageBackendAdapter.resolveAttachment({
+        organizationId: input.organizationId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+
+      await ctx.sandboxAdapter.attachStorage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandbox: {
+          provider: input.runtimeProvider,
+          id: input.providerSandboxId,
+        },
+        storage: resolvedStorage,
+        lifecycle:
+          input.lifecycle === "start"
+            ? SandboxStorageAttachLifecycles.START
+            : SandboxStorageAttachLifecycles.RESUME,
+      });
+    },
   });
 }
