@@ -239,9 +239,7 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
     };
   }
 
-  it("mounts Archil storage in guest, bind-mounts durable paths, and cleans them up", async ({
-    fixture,
-  }) => {
+  it("mounts Archil storage in guest and bind-mounts durable paths", async ({ fixture }) => {
     const sandboxInstanceId = `sbi_pr9_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
     let sandboxId: string | undefined;
     let diskId: string | undefined;
@@ -279,15 +277,17 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /root)\"",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /etc/codex)\"",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /usr/local/bin)\"",
+          "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /mnt/mistle/archil)\"",
           "mountpoint -q /mnt/mistle/archil",
         ].join("\n"),
         { user: "root" },
       );
 
       expect(mountState.stdout.trim().split("\n")).toEqual([
-        "/mnt/mistle/archil/root",
-        "/mnt/mistle/archil/etc/codex",
-        "/mnt/mistle/archil/usr/local/bin",
+        `${disk.diskId}[${TestArchilRegion}][/root]`,
+        `${disk.diskId}[${TestArchilRegion}][/etc/codex]`,
+        `${disk.diskId}[${TestArchilRegion}][/usr/local/bin]`,
+        `${disk.diskId}[${TestArchilRegion}]`,
       ]);
 
       const writeThroughBindMount = await connectedSandbox.commands.run(
@@ -300,6 +300,48 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
       );
 
       expect(writeThroughBindMount.stdout.trim()).toBe("persistent-e2b-archil");
+    } finally {
+      if (sandboxId !== undefined) {
+        await fixture.adapter.destroy({ id: sandboxId }).catch(() => undefined);
+      }
+
+      if (diskId !== undefined) {
+        const disk = await archil.disks.get(diskId).catch(() => undefined);
+        await disk?.delete().catch(() => undefined);
+      }
+    }
+  }, 300_000);
+
+  it("cleans up attached Archil storage before compute teardown", async ({ fixture }) => {
+    const sandboxInstanceId = `sbi_pr9_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    let sandboxId: string | undefined;
+    let diskId: string | undefined;
+
+    try {
+      const disk = await createDiskToken({
+        sandboxInstanceId,
+      });
+      diskId = disk.diskId;
+
+      const sandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+      });
+      sandboxId = sandbox.id;
+
+      await fixture.adapter.attachStorage({
+        sandboxInstanceId,
+        sandbox: {
+          provider: SandboxProvider.E2B,
+          id: sandbox.id,
+        },
+        lifecycle: "start",
+        storage: {
+          backend: SandboxAttachedStorageBackends.ARCHIL,
+          handle: disk.diskId,
+          region: TestArchilRegion,
+          credential: disk.token,
+        },
+      });
 
       await fixture.adapter.cleanupStorage({
         sandboxInstanceId,
@@ -307,10 +349,16 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
           provider: SandboxProvider.E2B,
           id: sandbox.id,
         },
+        storage: {
+          backend: SandboxAttachedStorageBackends.ARCHIL,
+          handle: disk.diskId,
+          region: TestArchilRegion,
+        },
         lifecycle: SandboxStorageCleanupLifecycles.STOP,
         timing: SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN,
       });
 
+      const connectedSandbox = await fixture.connectSandbox(sandbox.id);
       const cleanupState = await connectedSandbox.commands.run(
         [
           "set -eu",
@@ -320,7 +368,7 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
         { user: "root" },
       );
 
-      expect(cleanupState.stdout.trim()).not.toBe("/mnt/mistle/archil/root");
+      expect(cleanupState.stdout.trim()).not.toBe(`${disk.diskId}[${TestArchilRegion}][/root]`);
     } finally {
       if (sandboxId !== undefined) {
         await fixture.adapter.destroy({ id: sandboxId }).catch(() => undefined);

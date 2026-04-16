@@ -23,7 +23,8 @@ import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from ".
 import type { E2BSandboxInspectResult } from "./types.js";
 
 const ArchilMountTokenEnv = "ARCHIL_MOUNT_TOKEN";
-const E2BStorageCommandTimeoutMs = 2 * 60 * 1000;
+const E2BAttachStorageCommandTimeoutMs = 2 * 60 * 1000;
+const E2BCleanupStorageCommandTimeoutMs = 5 * 60 * 1000;
 
 function createSandboxHandle(sandboxId: string): SandboxHandle {
   return {
@@ -112,7 +113,8 @@ export class E2BSandboxAdapter implements SandboxAdapter {
       env: {
         [ArchilMountTokenEnv]: request.storage.credential,
       },
-      timeoutMs: E2BStorageCommandTimeoutMs,
+      cwd: "/",
+      timeoutMs: E2BAttachStorageCommandTimeoutMs,
       user: "root",
     });
   }
@@ -131,7 +133,8 @@ export class E2BSandboxAdapter implements SandboxAdapter {
       command,
       operation: E2BClientOperationIds.CLEANUP_STORAGE,
       commandDescription: "E2B sandbox storage cleanup command",
-      timeoutMs: E2BStorageCommandTimeoutMs,
+      cwd: "/",
+      timeoutMs: E2BCleanupStorageCommandTimeoutMs,
       user: "root",
     });
   }

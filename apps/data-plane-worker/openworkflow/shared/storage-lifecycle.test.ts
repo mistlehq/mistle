@@ -31,6 +31,7 @@ describe("sandbox storage lifecycle helpers", () => {
     await expect(
       cleanupSandboxStorage(
         {
+          db: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
         },
@@ -73,6 +74,7 @@ describe("sandbox storage lifecycle helpers", () => {
     await expect(
       cleanupSandboxStorage(
         {
+          db: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
         },
@@ -90,7 +92,7 @@ describe("sandbox storage lifecycle helpers", () => {
     );
   });
 
-  it("routes persistent lifecycle preparation and cleanup through the configured provider adapter", async () => {
+  it("routes persistent lifecycle preparation through the configured provider adapter", async () => {
     const adapter = createSandboxAdapter({
       provider: SandboxProvider.E2B,
       e2b: {
@@ -111,22 +113,5 @@ describe("sandbox storage lifecycle helpers", () => {
         },
       ),
     ).resolves.toEqual({});
-
-    await expect(
-      cleanupSandboxStorage(
-        {
-          configuredSandboxProvider: SandboxProvider.E2B,
-          sandboxAdapter: adapter,
-        },
-        {
-          sandboxInstanceId: "sbi_12345678901234567890123456",
-          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-          runtimeProvider: SandboxProvider.E2B,
-          providerSandboxId: "provider-sandbox-id",
-          lifecycle: "destroy",
-          timing: "after_compute_teardown",
-        },
-      ),
-    ).resolves.toBeUndefined();
   });
 });

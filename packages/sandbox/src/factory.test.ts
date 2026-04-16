@@ -97,6 +97,11 @@ describe("provider storage lifecycle no-op hooks", () => {
           provider: SandboxProvider.DOCKER,
           id: "docker-runtime-id",
         },
+        storage: {
+          backend: SandboxAttachedStorageBackends.ARCHIL,
+          handle: "dsk-0123456789abcdef",
+          region: "aws-us-east-1",
+        },
         lifecycle: "stop",
         timing: "before_compute_teardown",
       }),

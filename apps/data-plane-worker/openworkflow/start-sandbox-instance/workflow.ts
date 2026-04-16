@@ -92,6 +92,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await step.run({ name: "destroy-sandbox-after-start-failure" }, async () => {
             await destroySandbox(
               {
+                db: ctx.db,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
               },

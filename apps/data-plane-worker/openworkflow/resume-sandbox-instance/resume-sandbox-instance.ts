@@ -70,6 +70,7 @@ export async function resumeSandboxInstance(
       try {
         await stopSandbox(
           {
+            db: ctx.db,
             config: ctx.config,
             sandboxAdapter: ctx.sandboxAdapter,
           },

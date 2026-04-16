@@ -151,6 +151,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   try {
     await stopSandbox(
       {
+        db: ctx.db,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
       },

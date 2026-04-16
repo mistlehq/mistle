@@ -61,6 +61,7 @@ export interface E2BClient {
     commandDescription: string;
     env?: Record<string, string>;
     user?: string;
+    cwd?: string;
     timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }>;
 }
@@ -298,12 +299,14 @@ export class E2BApiClient implements E2BClient {
     commandDescription: string;
     env?: Record<string, string>;
     user?: string;
+    cwd?: string;
     timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }> {
     try {
       const sandbox = await Sandbox.connect(request.sandboxId, this.#connectionOptions);
       const result = await sandbox.commands.run(request.command, {
         user: request.user ?? "root",
+        ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
         ...(request.env === undefined ? {} : { envs: request.env }),
         ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
       });

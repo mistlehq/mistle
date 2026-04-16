@@ -1,6 +1,7 @@
 import {
   SandboxAttachedStorageBackends,
   type SandboxAttachedArchilStorage,
+  type SandboxCleanupArchilStorage,
   type SandboxCleanupStorageRequest,
 } from "../../types.js";
 
@@ -21,36 +22,71 @@ const E2BDurableBindMounts = [
   },
 ] as const;
 
+function formatArchilBindMountSource(input: {
+  storage: {
+    handle: string;
+    region: string;
+  };
+  path: string;
+}): string {
+  return `${input.storage.handle}[${input.storage.region}][${input.path}]`;
+}
+
+function formatArchilMountRootSource(input: {
+  storage: {
+    handle: string;
+    region: string;
+  };
+}): string {
+  return `${input.storage.handle}[${input.storage.region}]`;
+}
+
 function quoteShell(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
+function createMountRootDirectoryCommand(): string {
+  return `mkdir -p ${quoteShell(E2BArchilMountRoot)}`;
+}
+
 function createBindMountDirectoriesCommand(): string {
   const directories = [
-    E2BArchilMountRoot,
     `${E2BArchilMountRoot}/root`,
     `${E2BArchilMountRoot}/etc/codex`,
     `${E2BArchilMountRoot}/usr/local/bin`,
     "/etc/codex",
     "/usr/local/bin",
   ];
-
   return `mkdir -p ${directories.map((directory) => quoteShell(directory)).join(" ")}`;
 }
 
-function createEnsureBindMountCommand(input: { source: string; target: string }): string {
+function createEnsureBindMountCommand(input: {
+  storage: SandboxAttachedArchilStorage;
+  path: string;
+  source: string;
+  target: string;
+}): string {
   return [
-    `current_source="$(findmnt -n -o SOURCE --target ${quoteShell(input.target)} 2>/dev/null || true)"`,
-    `if [ "$current_source" != ${quoteShell(input.source)} ]; then`,
+    `if mountpoint -q ${quoteShell(input.target)}; then`,
+    `  current_source="$(findmnt -n -o SOURCE --target ${quoteShell(input.target)} 2>/dev/null || true)"`,
+    `  if [ "$current_source" != ${quoteShell(formatArchilBindMountSource({ storage: input.storage, path: input.path }))} ]; then`,
+    `    echo "Refusing to attach Archil bind mount onto ${input.target}: target already mounted from unexpected source: $current_source" >&2`,
+    "    exit 1",
+    "  fi",
+    "else",
     `  mount --bind ${quoteShell(input.source)} ${quoteShell(input.target)}`,
     "fi",
   ].join("\n");
 }
 
-function createCleanupBindMountCommand(input: { source: string; target: string }): string {
+function createCleanupBindMountCommand(input: {
+  storage: SandboxCleanupArchilStorage;
+  path: string;
+  target: string;
+}): string {
   return [
     `current_source="$(findmnt -n -o SOURCE --target ${quoteShell(input.target)} 2>/dev/null || true)"`,
-    `if [ "$current_source" = ${quoteShell(input.source)} ]; then`,
+    `if [ "$current_source" = ${quoteShell(formatArchilBindMountSource({ storage: input.storage, path: input.path }))} ]; then`,
     `  umount ${quoteShell(input.target)}`,
     "fi",
   ].join("\n");
@@ -65,6 +101,8 @@ export function createE2BAttachStorageCommand(input: {
 
   const bindMountCommands = E2BDurableBindMounts.map((mount) =>
     createEnsureBindMountCommand({
+      storage: input.storage,
+      path: mount.source.slice(E2BArchilMountRoot.length),
       source: mount.source,
       target: mount.target,
     }),
@@ -72,8 +110,14 @@ export function createE2BAttachStorageCommand(input: {
 
   return [
     "set -eu",
-    createBindMountDirectoriesCommand(),
-    `if ! mountpoint -q ${quoteShell(E2BArchilMountRoot)}; then`,
+    createMountRootDirectoryCommand(),
+    `if mountpoint -q ${quoteShell(E2BArchilMountRoot)}; then`,
+    `  current_source="$(findmnt -n -o SOURCE --target ${quoteShell(E2BArchilMountRoot)} 2>/dev/null || true)"`,
+    `  if [ "$current_source" != ${quoteShell(formatArchilMountRootSource({ storage: input.storage }))} ]; then`,
+    `    echo "Refusing to attach Archil mount root onto ${E2BArchilMountRoot}: target already mounted from unexpected source: $current_source" >&2`,
+    "    exit 1",
+    "  fi",
+    "else",
     `  /opt/mistle/bin/archil mount ${quoteShell(input.storage.handle)} ${quoteShell(E2BArchilMountRoot)} --region ${quoteShell(input.storage.region)}`,
     "fi",
     createBindMountDirectoriesCommand(),
@@ -88,18 +132,27 @@ export function createE2BCleanupStorageCommand(input: {
     return null;
   }
 
+  if (input.request.storage.backend !== SandboxAttachedStorageBackends.ARCHIL) {
+    throw new Error("Expected Archil storage attachment for E2B cleanup.");
+  }
+
   const cleanupBindMountCommands = [...E2BDurableBindMounts].reverse().map((mount) =>
     createCleanupBindMountCommand({
-      source: mount.source,
+      storage: input.request.storage,
+      path: mount.source.slice(E2BArchilMountRoot.length),
       target: mount.target,
     }),
   );
 
   return [
     "set -eu",
+    "cd /",
     ...cleanupBindMountCommands,
     `if mountpoint -q ${quoteShell(E2BArchilMountRoot)}; then`,
-    `  /opt/mistle/bin/archil unmount ${quoteShell(E2BArchilMountRoot)}`,
+    `  current_source="$(findmnt -n -o SOURCE --target ${quoteShell(E2BArchilMountRoot)} 2>/dev/null || true)"`,
+    `  if [ "$current_source" = ${quoteShell(formatArchilMountRootSource({ storage: input.request.storage }))} ]; then`,
+    `    /opt/mistle/bin/archil unmount ${quoteShell(E2BArchilMountRoot)}`,
+    "  fi",
     "fi",
   ].join("\n");
 }

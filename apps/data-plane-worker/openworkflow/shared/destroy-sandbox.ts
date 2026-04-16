@@ -1,4 +1,4 @@
-import type { SandboxInstancePersistenceMode } from "@mistle/db/data-plane";
+import type { DataPlaneDatabase, SandboxInstancePersistenceMode } from "@mistle/db/data-plane";
 import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
@@ -10,6 +10,7 @@ import {
 
 export async function destroySandbox(
   ctx: {
+    db: DataPlaneDatabase;
     config: DataPlaneWorkerRuntimeConfig;
     sandboxAdapter: SandboxAdapter;
   },
@@ -30,6 +31,7 @@ export async function destroySandbox(
   try {
     await cleanupSandboxStorage(
       {
+        db: ctx.db,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
       },
@@ -59,6 +61,7 @@ export async function destroySandbox(
   try {
     await cleanupSandboxStorage(
       {
+        db: ctx.db,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
       },
