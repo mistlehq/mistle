@@ -15,6 +15,139 @@ function renderWithinFixedWidth(
   );
 }
 
+const comprehensiveStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
+  connectionId: "icn_story",
+  onRefreshResource: () => {},
+  resources: [
+    {
+      count: 11,
+      kind: "repository",
+      lastSyncedAt: "2026-04-13T15:37:00.000Z",
+      syncState: "ready",
+    },
+    {
+      count: 2,
+      kind: "workspace",
+      lastSyncedAt: "2026-04-13T15:37:00.000Z",
+      syncState: "syncing",
+      isRefreshing: true,
+    },
+    {
+      count: 0,
+      kind: "branch",
+      syncState: "never-synced",
+    },
+    {
+      count: 0,
+      kind: "user",
+      syncState: "error",
+    },
+    {
+      count: 0,
+      kind: "environment",
+      lastSyncedAt: "2026-04-13T15:37:00.000Z",
+      syncState: "ready",
+    },
+    {
+      count: 0,
+      kind: "organization",
+      syncState: "error",
+      lastErrorMessage: "GitHub returned a 403 while syncing organizations.",
+    },
+  ],
+  resourceContentByKey: new Map([
+    [
+      "icn_story:repository",
+      {
+        errorMessage: null,
+        isLoading: false,
+        items: [
+          {
+            id: "repo_1",
+            familyId: "github",
+            kind: "repository",
+            handle: "mistlehq/dashboard",
+            displayName: "mistlehq/dashboard",
+            status: "accessible",
+            metadata: {},
+          },
+          {
+            id: "repo_2",
+            familyId: "github",
+            kind: "repository",
+            handle: "mistlehq/control-plane-api",
+            displayName: "mistlehq/control-plane-api",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+        kind: "repository",
+        previewState: null,
+      },
+    ],
+    [
+      "icn_story:workspace",
+      {
+        errorMessage: null,
+        isLoading: true,
+        items: [],
+        kind: "workspace",
+        previewState: null,
+      },
+    ],
+    [
+      "icn_story:branch",
+      {
+        errorMessage: null,
+        isLoading: false,
+        items: [],
+        kind: "branch",
+        previewState: "not-synced" as const,
+      },
+    ],
+    [
+      "icn_story:user",
+      {
+        errorMessage: "GitHub returned a 403 while loading user data.",
+        isLoading: false,
+        items: [],
+        kind: "user",
+        previewState: "error" as const,
+      },
+    ],
+    [
+      "icn_story:environment",
+      {
+        errorMessage: null,
+        isLoading: false,
+        items: [],
+        kind: "environment",
+        previewState: null,
+      },
+    ],
+    [
+      "icn_story:organization",
+      {
+        errorMessage: null,
+        isLoading: false,
+        items: [
+          {
+            id: "org_1",
+            familyId: "github",
+            kind: "organization",
+            handle: "mistlehq",
+            displayName: "mistlehq",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+        kind: "organization",
+        previewState: null,
+      },
+    ],
+  ]),
+};
+
 const baseArgs: React.ComponentProps<typeof IntegrationResourceList> = {
   connectionId: "icn_story",
   onRefreshResource: () => {},
@@ -108,61 +241,8 @@ type Story = StoryObj<typeof meta>;
 
 export const SyncedGroup: Story = {};
 
-export const MixedStates: Story = {
-  args: {
-    resources: [
-      {
-        count: 11,
-        kind: "repository",
-        lastSyncedAt: "2026-04-13T15:37:00.000Z",
-        syncState: "ready",
-      },
-      {
-        count: 0,
-        kind: "branch",
-        syncState: "never-synced",
-      },
-      {
-        count: 4,
-        kind: "user",
-        lastSyncedAt: "2026-04-13T15:37:00.000Z",
-        syncState: "ready",
-      },
-    ],
-    resourceContentByKey: new Map([
-      ...baseArgs.resourceContentByKey!.entries(),
-      [
-        "icn_story:user",
-        {
-          errorMessage: "GitHub returned a 403 while loading user data.",
-          isLoading: false,
-          items: [
-            {
-              id: "user_1",
-              familyId: "github",
-              kind: "user",
-              handle: "dependabot[bot]",
-              displayName: "dependabot[bot]",
-              status: "accessible",
-              metadata: {},
-            },
-          ],
-          kind: "user",
-          previewState: "error" as const,
-        },
-      ],
-      [
-        "icn_story:branch",
-        {
-          errorMessage: null,
-          isLoading: false,
-          items: [],
-          kind: "branch",
-          previewState: "not-synced" as const,
-        },
-      ],
-    ]),
-  },
+export const AllStatesAndWordings: Story = {
+  args: comprehensiveStateArgs,
 };
 
 export const Expanded: Story = {
@@ -170,5 +250,27 @@ export const Expanded: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Expand repository resources" }));
     await expect(canvas.getByText("mistlehq/dashboard")).toBeVisible();
+  },
+};
+
+export const ExpandedStateWordings: Story = {
+  args: comprehensiveStateArgs,
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand repository resources" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand workspace resources" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand branch resources" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand user resources" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand environment resources" }));
+
+    await expect(canvas.getByText("mistlehq/dashboard")).toBeVisible();
+    await expect(canvas.getByText("Loading items...")).toBeVisible();
+    await expect(canvas.getByText("Not synced yet.")).toBeVisible();
+    await expect(canvas.getByText("GitHub returned a 403 while loading user data.")).toBeVisible();
+    await expect(canvas.getByText("No items available.")).toBeVisible();
+    await expect(
+      canvas.getByText("GitHub returned a 403 while syncing organizations."),
+    ).toBeVisible();
   },
 };

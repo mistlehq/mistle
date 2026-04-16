@@ -168,5 +168,17 @@ function renderExpandedResourceItems(
     return <p className="mt-1 text-muted-foreground text-xs">Not synced yet.</p>;
   }
 
+  if (resourceItems.previewState === "error") {
+    if (resourceItems.errorMessage === null) {
+      throw new Error("Expected an integration resource preview error message.");
+    }
+
+    return (
+      <Notice className="mt-1" variant="alert">
+        {resourceItems.errorMessage}
+      </Notice>
+    );
+  }
+
   return <p className="mt-1 text-muted-foreground text-xs">No items available.</p>;
 }

@@ -349,6 +349,48 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("No items available.")).toBeNull();
   });
 
+  it("shows the preview error message instead of an empty state when expanded preview loading fails", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "error",
+              },
+            ],
+          },
+        ]}
+        resourceContentByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: "Could not load repositories.",
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                previewState: "error",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("Could not load repositories.")).toBeTruthy();
+    expect(screen.queryByText("No items available.")).toBeNull();
+  });
+
   it("shows an expanded empty state when a resource has no items", () => {
     render(
       <IntegrationConnectionDetailView
