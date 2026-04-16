@@ -1,7 +1,8 @@
 import {
   SandboxStorageBackend,
+  SandboxStorageAttachLifecycles,
   type SandboxArchilStorageAttachment,
-  type SandboxArchilStorageCleanup,
+  type SandboxAttachStorageRequest,
   type SandboxCleanupStorageRequest,
 } from "../../types.js";
 
@@ -77,20 +78,8 @@ function createEnsureBindMountCommand(input: {
   ].join("\n");
 }
 
-function createCleanupBindMountCommand(input: {
-  storage: SandboxArchilStorageCleanup;
-  sourcePath: string;
-  target: string;
-}): string {
-  return [
-    `current_source="$(findmnt -n -o SOURCE --target ${quoteShell(input.target)} 2>/dev/null || true)"`,
-    `if [ "$current_source" = ${quoteShell(formatArchilBindMountSource({ storage: input.storage, sourcePath: input.sourcePath }))} ]; then`,
-    `  umount ${quoteShell(input.target)}`,
-    "fi",
-  ].join("\n");
-}
-
 export function createE2BAttachStorageCommand(input: {
+  lifecycle: SandboxAttachStorageRequest["lifecycle"];
   storage: SandboxArchilStorageAttachment;
 }): string {
   if (input.storage.backend !== SandboxStorageBackend.ARCHIL) {
@@ -116,7 +105,14 @@ export function createE2BAttachStorageCommand(input: {
     "    exit 1",
     "  fi",
     "else",
-    `  /opt/mistle/bin/archil mount ${quoteShell(input.storage.handle)} ${quoteShell(E2BArchilMountRoot)} --region ${quoteShell(input.storage.region)}`,
+    [
+      "  /opt/mistle/bin/archil mount",
+      quoteShell(input.storage.handle),
+      quoteShell(E2BArchilMountRoot),
+      "--region",
+      quoteShell(input.storage.region),
+      ...(input.lifecycle === SandboxStorageAttachLifecycles.START ? ["--force"] : []),
+    ].join(" "),
     "fi",
     createBindMountDirectoriesCommand({
       storage: input.storage,
@@ -128,33 +124,16 @@ export function createE2BAttachStorageCommand(input: {
 export function createE2BCleanupStorageCommand(input: {
   request: SandboxCleanupStorageRequest;
 }): string | null {
-  if (input.request.timing === "after_compute_teardown") {
+  if (
+    input.request.lifecycle === "stop" ||
+    input.request.lifecycle === "destroy" ||
+    input.request.timing === "after_compute_teardown"
+  ) {
     return null;
   }
 
   if (input.request.storage.backend !== SandboxStorageBackend.ARCHIL) {
     throw new Error("Expected Archil storage attachment for E2B cleanup.");
   }
-
-  const storage = input.request.storage;
-
-  const cleanupBindMountCommands = [...storage.layout.bindings].reverse().map((binding) =>
-    createCleanupBindMountCommand({
-      storage,
-      sourcePath: binding.sourcePath,
-      target: binding.targetPath,
-    }),
-  );
-
-  return [
-    "set -eu",
-    "cd /",
-    ...cleanupBindMountCommands,
-    `if mountpoint -q ${quoteShell(E2BArchilMountRoot)}; then`,
-    `  current_source="$(findmnt -n -o SOURCE --target ${quoteShell(E2BArchilMountRoot)} 2>/dev/null || true)"`,
-    `  if [ "$current_source" = ${quoteShell(formatArchilMountRootSource({ storage }))} ]; then`,
-    `    /opt/mistle/bin/archil unmount ${quoteShell(E2BArchilMountRoot)}`,
-    "  fi",
-    "fi",
-  ].join("\n");
+  return null;
 }

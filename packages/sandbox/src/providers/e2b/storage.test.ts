@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SandboxPersistentStorageLayout,
   SandboxProvider,
+  SandboxStorageAttachLifecycles,
   SandboxStorageBackend,
   SandboxStorageCleanupLifecycles,
   SandboxStorageCleanupTimings,
@@ -12,6 +13,7 @@ import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from ".
 describe("createE2BAttachStorageCommand", () => {
   it("builds the expected Archil mount and bind-mount sequence", () => {
     const command = createE2BAttachStorageCommand({
+      lifecycle: SandboxStorageAttachLifecycles.START,
       storage: {
         backend: SandboxStorageBackend.ARCHIL,
         handle: "dsk-0123456789abcdef",
@@ -22,7 +24,7 @@ describe("createE2BAttachStorageCommand", () => {
     });
 
     const archilMountCommand =
-      "/opt/mistle/bin/archil mount 'dsk-0123456789abcdef' '/mnt/mistle/archil' --region 'aws-us-east-1'";
+      "/opt/mistle/bin/archil mount 'dsk-0123456789abcdef' '/mnt/mistle/archil' --region 'aws-us-east-1' --force";
 
     expect(command).toContain("mkdir -p '/mnt/mistle/archil'");
     expect(command).toContain(archilMountCommand);
@@ -56,10 +58,28 @@ describe("createE2BAttachStorageCommand", () => {
     expect(command).toContain("mount --bind '/mnt/mistle/archil/etc/codex' '/etc/codex'");
     expect(command).toContain("mount --bind '/mnt/mistle/archil/usr/local/bin' '/usr/local/bin'");
   });
+
+  it("omits force when reattaching storage on provider-native resume", () => {
+    const command = createE2BAttachStorageCommand({
+      lifecycle: SandboxStorageAttachLifecycles.RESUME,
+      storage: {
+        backend: SandboxStorageBackend.ARCHIL,
+        handle: "dsk-0123456789abcdef",
+        region: "aws-us-east-1",
+        credential: "token-value",
+        layout: SandboxPersistentStorageLayout,
+      },
+    });
+
+    expect(command).toContain(
+      "/opt/mistle/bin/archil mount 'dsk-0123456789abcdef' '/mnt/mistle/archil' --region 'aws-us-east-1'",
+    );
+    expect(command).not.toContain("--force");
+  });
 });
 
 describe("createE2BCleanupStorageCommand", () => {
-  it("builds the expected pre-teardown unmount sequence", () => {
+  it("returns null for stop cleanup because E2B cleanup is deferred to compute teardown", () => {
     const command = createE2BCleanupStorageCommand({
       request: {
         sandboxInstanceId: "sbi_e2b_storage_cleanup",
@@ -78,23 +98,32 @@ describe("createE2BCleanupStorageCommand", () => {
       },
     });
 
-    expect(command).not.toBeNull();
-    expect(command).toContain(
-      `if [ "$current_source" = 'dsk-0123456789abcdef[aws-us-east-1][/usr/local/bin]' ]; then`,
-    );
-    expect(command).toContain(
-      `if [ "$current_source" = 'dsk-0123456789abcdef[aws-us-east-1][/root]' ]; then`,
-    );
-    expect(command).toContain(
-      `if [ "$current_source" = 'dsk-0123456789abcdef[aws-us-east-1]' ]; then`,
-    );
-    expect(command).toContain("umount '/usr/local/bin'");
-    expect(command).toContain("umount '/etc/codex'");
-    expect(command).toContain("umount '/root'");
-    expect(command).toContain("/opt/mistle/bin/archil unmount '/mnt/mistle/archil'");
+    expect(command).toBeNull();
   });
 
-  it("returns null for post-teardown cleanup because E2B cleanup must run while compute is live", () => {
+  it("returns null for destroy cleanup because E2B cleanup is deferred to compute teardown", () => {
+    const command = createE2BCleanupStorageCommand({
+      request: {
+        sandboxInstanceId: "sbi_e2b_storage_cleanup_destroy",
+        sandbox: {
+          provider: SandboxProvider.E2B,
+          id: "sbx_e2b_storage_cleanup_destroy",
+        },
+        storage: {
+          backend: SandboxStorageBackend.ARCHIL,
+          handle: "dsk-0123456789abcdef",
+          region: "aws-us-east-1",
+          layout: SandboxPersistentStorageLayout,
+        },
+        lifecycle: SandboxStorageCleanupLifecycles.DESTROY,
+        timing: SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN,
+      },
+    });
+
+    expect(command).toBeNull();
+  });
+
+  it("returns null for post-teardown cleanup because E2B cleanup is deferred to compute teardown", () => {
     const command = createE2BCleanupStorageCommand({
       request: {
         sandboxInstanceId: "sbi_e2b_storage_cleanup_after",

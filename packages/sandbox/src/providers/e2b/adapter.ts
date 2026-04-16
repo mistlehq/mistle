@@ -131,6 +131,7 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     await this.#client.runCommand({
       sandboxId: request.sandbox.id,
       command: createE2BAttachStorageCommand({
+        lifecycle: request.lifecycle,
         storage,
       }),
       operation: E2BClientOperationIds.ATTACH_STORAGE,

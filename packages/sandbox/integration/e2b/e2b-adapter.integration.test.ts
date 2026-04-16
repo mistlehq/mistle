@@ -314,7 +314,7 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
     }
   }, 300_000);
 
-  it("cleans up attached Archil storage before compute teardown", async ({ fixture }) => {
+  it("defers attached Archil storage cleanup to E2B compute teardown", async ({ fixture }) => {
     const sandboxInstanceId = `sbi_pr9_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
     let sandboxId: string | undefined;
     let diskId: string | undefined;
@@ -367,12 +367,13 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
         [
           "set -eu",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /root)\"",
-          "if mountpoint -q /mnt/mistle/archil; then exit 1; fi",
+          "mountpoint -q /mnt/mistle/archil",
         ].join("\n"),
         { user: "root" },
       );
 
-      expect(cleanupState.stdout.trim()).not.toBe(`${disk.diskId}[${TestArchilRegion}][/root]`);
+      expect(cleanupState.exitCode).toBe(0);
+      expect(cleanupState.stdout.trim()).toBe(`${disk.diskId}[${TestArchilRegion}][/root]`);
     } finally {
       if (sandboxId !== undefined) {
         await fixture.adapter.destroy({ id: sandboxId }).catch(() => undefined);

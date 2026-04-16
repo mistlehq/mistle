@@ -21,6 +21,7 @@ const OPENAI_API_KEY = "sk-system-sandbox-restart";
 const SANDBOX_READY_TIMEOUT_MS = 3 * 60_000;
 const POLL_INTERVAL_MS = 1_000;
 const RUNTIME_READY_POLL_INTERVAL_MS = 100;
+const SANDBOX_SESSION_CONNECT_TIMEOUT_MS = 120_000;
 
 const IntegrationConnectionResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -122,11 +123,14 @@ const InternalAuthServiceTokenHeader = "x-mistle-service-token";
 
 export async function prepareCodexSandbox(input: {
   fixture: SystemTestFixture;
-  email: string;
+  email?: string;
+  authenticatedSession?: AuthenticatedSession;
 }): Promise<{ authenticatedSession: AuthenticatedSession; sandboxInstanceId: string }> {
-  const authenticatedSession = await input.fixture.authSession({
-    email: input.email,
-  });
+  const authenticatedSession =
+    input.authenticatedSession ??
+    (await input.fixture.authSession({
+      ...(input.email === undefined ? {} : { email: input.email }),
+    }));
   const openAiConnectionId = await createOpenAiConnection({
     fixture: input.fixture,
     authenticatedSession,
@@ -192,6 +196,7 @@ export async function connectCodexAgentSession(input: {
   const connectionUrl = await mintSandboxConnectionUrl(input);
   const transport = new SandboxSessionTransport({
     runtime: createNodeCodexSessionRuntime(),
+    connectTimeoutMs: SANDBOX_SESSION_CONNECT_TIMEOUT_MS,
   });
   const sessionClient = new AgentStreamClient({
     transport,
@@ -703,6 +708,7 @@ async function runSandboxExecCommand(input: {
 }): Promise<SandboxExecResult> {
   const transport = new SandboxSessionTransport({
     runtime: createNodeSandboxSessionRuntime(),
+    connectTimeoutMs: SANDBOX_SESSION_CONNECT_TIMEOUT_MS,
   });
 
   await transport.connect({
@@ -741,6 +747,7 @@ async function runSandboxPtyCommand(input: {
   });
   const transport = new SandboxSessionTransport({
     runtime: createNodeSandboxSessionRuntime(),
+    connectTimeoutMs: SANDBOX_SESSION_CONNECT_TIMEOUT_MS,
   });
 
   await transport.connect({

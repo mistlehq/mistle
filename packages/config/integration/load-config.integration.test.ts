@@ -959,7 +959,7 @@ describe("loadConfig integrations", () => {
     expect(config.app.controlPlaneApi).toEqual({
       baseUrl: "http://127.0.0.1:5000",
     });
-    expect(config.app.sandboxStorage).toBeUndefined();
+    expect(config.app.sandboxStorage).toEqual({});
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

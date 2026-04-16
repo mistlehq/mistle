@@ -34,6 +34,9 @@ const ArchilIntegrationRequiredConfigValues = [
   },
 ] as const satisfies readonly RequiredConfigValue[];
 
+const E2BIntegrationSandboxBaseImage =
+  "ghcr.io/mistlehq/sandbox-base@sha256:8a56c023b441511c09767761847bb4d137dbcc5ca497374406cecb29f63c1298";
+
 export type IntegrationProviderPreset = {
   defaults: ConfigRecord;
   prunePaths: readonly (readonly string[])[];
@@ -47,6 +50,9 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.DOCKER,
+        storage: {
+          backend: "docker_volume",
+        },
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway:5202/tunnel/sandbox",
       },
@@ -72,13 +78,18 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
             socket_path: "/var/run/docker.sock",
           },
         },
+        sandbox_storage: {
+          docker_volume: {
+            name_prefix: "it-system-",
+          },
+        },
       },
     },
   },
   prunePaths: [
-    ["global", "sandbox", "storage"],
     ["apps", "data_plane_api", "sandbox", "e2b"],
     ["apps", "data_plane_worker", "sandbox", "e2b"],
+    ["apps", "data_plane_worker", "sandbox_storage", "archil"],
   ],
   requiredConfigValues: [],
   outputFileName: IntegrationConfigFileNames.DOCKER,
@@ -90,6 +101,10 @@ const E2B_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.E2B,
+        default_base_image: E2BIntegrationSandboxBaseImage,
+        storage: {
+          backend: "archil",
+        },
         gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
         internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
       },
@@ -115,12 +130,18 @@ const E2B_PRESET: IntegrationProviderPreset = {
             domain: "e2b.app",
           },
         },
+        sandbox_storage: {
+          archil: {
+            name_prefix: "it-system-",
+          },
+        },
       },
     },
   },
   prunePaths: [
     ["apps", "data_plane_api", "sandbox", "docker"],
     ["apps", "data_plane_worker", "sandbox", "docker"],
+    ["apps", "data_plane_worker", "sandbox_storage", "docker_volume"],
   ],
   requiredConfigValues: [
     {
