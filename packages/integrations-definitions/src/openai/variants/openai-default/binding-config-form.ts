@@ -132,8 +132,8 @@ export function resolveOpenAiBindingConfigForm(
                   default: defaultReasoning,
                 },
                 additionalInstructions: {
-                  title: "Additional instructions",
-                  description: "Appended after Mistle-managed runtime instructions.",
+                  title: "Agent Instructions",
+                  description: "Appended to the developer message.",
                 },
               },
             },
