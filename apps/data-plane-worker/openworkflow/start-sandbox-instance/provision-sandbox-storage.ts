@@ -39,6 +39,51 @@ type ArchilProvisioningProfile = {
   mounts?: [] | [ArchilProvisioningMount];
 };
 
+type ArchilMountInput = {
+  type: "s3-compatible";
+  bucket: string;
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+};
+
+function createArchilProvisioningMountEntry(input: {
+  mount: ArchilMountInput;
+}): ArchilProvisioningMount {
+  return {
+    type: input.mount.type,
+    bucket: input.mount.bucket,
+    endpoint: input.mount.endpoint,
+    accessKeyId: input.mount.accessKeyId,
+    secretAccessKey: input.mount.secretAccessKey,
+  };
+}
+
+function resolveArchilProvisioningMounts(input: {
+  mounts: readonly ArchilMountInput[] | undefined;
+}): Pick<ArchilProvisioningProfile, "mounts"> | object {
+  if (input.mounts === undefined) {
+    return {};
+  }
+
+  if (input.mounts.length === 0) {
+    return { mounts: [] };
+  }
+
+  const firstMount = input.mounts[0];
+  if (firstMount === undefined) {
+    throw new Error("Expected Archil mount entry.");
+  }
+
+  return {
+    mounts: [
+      createArchilProvisioningMountEntry({
+        mount: firstMount,
+      }),
+    ] satisfies [ArchilProvisioningMount],
+  };
+}
+
 export function createArchilDiskName(input: {
   sandboxInstanceId: string;
   namePrefix?: string;
@@ -65,28 +110,9 @@ export function resolveArchilProvisioningProfile(input: {
       ...(input.managedArchilConfig.namePrefix === undefined
         ? {}
         : { namePrefix: input.managedArchilConfig.namePrefix }),
-      ...(input.managedArchilConfig.mounts === undefined
-        ? {}
-        : input.managedArchilConfig.mounts.length === 0
-          ? { mounts: [] }
-          : (() => {
-              const firstMount = input.managedArchilConfig.mounts[0];
-              if (firstMount === undefined) {
-                throw new Error("Expected managed Archil mount entry.");
-              }
-
-              return {
-                mounts: [
-                  {
-                    type: firstMount.type,
-                    bucket: firstMount.bucket,
-                    endpoint: firstMount.endpoint,
-                    accessKeyId: firstMount.accessKeyId,
-                    secretAccessKey: firstMount.secretAccessKey,
-                  },
-                ] satisfies [ArchilProvisioningMount],
-              };
-            })()),
+      ...resolveArchilProvisioningMounts({
+        mounts: input.managedArchilConfig.mounts,
+      }),
     };
   }
 
@@ -105,28 +131,9 @@ export function resolveArchilProvisioningProfile(input: {
     ...(organizationStorageConfig.namePrefix === undefined
       ? {}
       : { namePrefix: organizationStorageConfig.namePrefix }),
-    ...(organizationStorageConfig.mounts === undefined
-      ? {}
-      : organizationStorageConfig.mounts.length === 0
-        ? { mounts: [] }
-        : (() => {
-            const firstMount = organizationStorageConfig.mounts[0];
-            if (firstMount === undefined) {
-              throw new Error("Expected organization Archil mount entry.");
-            }
-
-            return {
-              mounts: [
-                {
-                  type: firstMount.type,
-                  bucket: firstMount.bucket,
-                  endpoint: firstMount.endpoint,
-                  accessKeyId: firstMount.accessKeyId,
-                  secretAccessKey: firstMount.secretAccessKey,
-                },
-              ] satisfies [ArchilProvisioningMount],
-            };
-          })()),
+    ...resolveArchilProvisioningMounts({
+      mounts: organizationStorageConfig.mounts,
+    }),
   };
 }
 
@@ -181,13 +188,23 @@ export async function insertSandboxInstanceStorage(
     db: DataPlaneDatabase;
   },
   input: InsertSandboxInstanceStorage,
-): Promise<void> {
-  await ctx.db
+): Promise<SandboxInstanceStorage> {
+  const insertedRows = await ctx.db
     .insert(sandboxInstanceStorages)
     .values(input)
     .onConflictDoNothing({
       target: [sandboxInstanceStorages.sandboxInstanceId],
-    });
+    })
+    .returning();
+
+  const insertedRow = insertedRows[0];
+  if (insertedRow === undefined) {
+    throw new Error(
+      `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists.`,
+    );
+  }
+
+  return insertedRow;
 }
 
 export async function updateSandboxInstanceStorageCredential(
@@ -256,6 +273,16 @@ async function resolveArchilDiskToken(input: {
   return createdToken.token;
 }
 
+async function deleteArchilDiskBestEffort(input: {
+  archil: Archil;
+  diskId: string;
+}): Promise<void> {
+  try {
+    const disk = await input.archil.disks.get(input.diskId);
+    await disk.delete();
+  } catch {}
+}
+
 export async function provisionSandboxStorage(input: {
   db: DataPlaneDatabase;
   controlPlaneInternalClient: ControlPlaneInternalClient;
@@ -264,14 +291,16 @@ export async function provisionSandboxStorage(input: {
   sandboxInstanceId: string;
 }): Promise<SandboxInstanceStorage> {
   return input.db.transaction(async (tx) => {
-    const lockedSandboxInstances = await tx.execute<{ id: string }>(sql`
-      select ${sandboxInstances.id} as id
-      from ${sandboxInstances}
-      where ${sandboxInstances.id} = ${input.sandboxInstanceId}
-      for update
-    `);
+    const [lockedSandboxInstance] = await tx
+      .select({
+        id: sandboxInstances.id,
+      })
+      .from(sandboxInstances)
+      .where(eq(sandboxInstances.id, input.sandboxInstanceId))
+      .limit(1)
+      .for("update");
 
-    if (lockedSandboxInstances.rows[0] === undefined) {
+    if (lockedSandboxInstance === undefined) {
       throw new Error(
         `Sandbox instance '${input.sandboxInstanceId}' was not found before storage provisioning.`,
       );
@@ -321,50 +350,41 @@ export async function provisionSandboxStorage(input: {
       }),
     );
 
-    const plaintextToken = await resolveArchilDiskToken({
-      archil,
-      createdDisk,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-
-    const encryptedToken = await input.controlPlaneInternalClient.encryptStorageCredential({
-      organizationId: input.organizationId,
-      credentialKind: "disk_token",
-      plaintext: plaintextToken,
-    });
-
-    await insertSandboxInstanceStorage(
-      {
-        db: tx,
-      },
-      {
+    try {
+      const plaintextToken = await resolveArchilDiskToken({
+        archil,
+        createdDisk,
         sandboxInstanceId: input.sandboxInstanceId,
-        provider: SandboxStorageProviders.ARCHIL,
-        handle: createdDisk.disk.id,
-        region: archilProfile.region,
-        status: SandboxStorageStatuses.READY,
-        credentialCiphertext: encryptedToken.ciphertext,
-        credentialNonce: encryptedToken.nonce,
-        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-        organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
-      },
-    );
+      });
 
-    const persistedStorage = await getSandboxInstanceStorageBySandboxInstanceId(
-      {
-        db: tx,
-      },
-      {
-        sandboxInstanceId: input.sandboxInstanceId,
-      },
-    );
+      const encryptedToken = await input.controlPlaneInternalClient.encryptStorageCredential({
+        organizationId: input.organizationId,
+        credentialKind: "disk_token",
+        plaintext: plaintextToken,
+      });
 
-    if (persistedStorage === undefined) {
-      throw new Error(
-        `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' was not persisted.`,
+      return insertSandboxInstanceStorage(
+        {
+          db: tx,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+          provider: SandboxStorageProviders.ARCHIL,
+          handle: createdDisk.disk.id,
+          region: archilProfile.region,
+          status: SandboxStorageStatuses.READY,
+          credentialCiphertext: encryptedToken.ciphertext,
+          credentialNonce: encryptedToken.nonce,
+          credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+          organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
+        },
       );
+    } catch (error) {
+      await deleteArchilDiskBestEffort({
+        archil,
+        diskId: createdDisk.disk.id,
+      });
+      throw error;
     }
-
-    return persistedStorage;
   });
 }
