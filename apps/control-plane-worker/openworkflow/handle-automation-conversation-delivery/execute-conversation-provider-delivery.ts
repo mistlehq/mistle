@@ -79,6 +79,10 @@ async function recoverLateSteerExecution(input: {
       throw new ConversationDeliveryExecutionError(
         `AutomationConversation '${input.conversationId}' references missing provider conversation '${input.providerConversationId}' after steer reported no active turn.`,
       );
+    case AutomationConversationSteerRecoveryActions.FAIL_NOT_LOADED:
+      throw new ConversationDeliveryExecutionError(
+        `AutomationConversation '${input.conversationId}' provider conversation '${input.providerConversationId}' remained not loaded after steer reported no active turn.`,
+      );
     case AutomationConversationSteerRecoveryActions.FAIL_PROVIDER_ERROR:
       throw new ConversationDeliveryExecutionError(
         `AutomationConversation '${input.conversationId}' provider conversation '${input.providerConversationId}' is in error state after steer reported no active turn.`,
@@ -109,10 +113,20 @@ export async function executeConversationProviderDelivery(
       createdConversationState = createdConversation.providerState;
     }
 
-    const inspectResult = await adapter.inspectAutomationConversation({
+    let inspectResult = await adapter.inspectAutomationConversation({
       connection,
       providerConversationId,
     });
+    if (inspectResult.exists && inspectResult.status === "not_loaded") {
+      await adapter.resumeAutomationConversation({
+        connection,
+        providerConversationId,
+      });
+      inspectResult = await adapter.inspectAutomationConversation({
+        connection,
+        providerConversationId,
+      });
+    }
     const executionAction = resolveAutomationConversationExecutionAction({
       inspectAutomationConversation: inspectResult,
       providerExecutionId: input.providerExecutionId,
@@ -165,6 +179,10 @@ export async function executeConversationProviderDelivery(
       case AutomationConversationExecutionActions.FAIL_MISSING_CONVERSATION:
         throw new ConversationDeliveryExecutionError(
           `AutomationConversation '${input.conversationId}' references missing provider conversation '${providerConversationId}'.`,
+        );
+      case AutomationConversationExecutionActions.FAIL_NOT_LOADED:
+        throw new ConversationDeliveryExecutionError(
+          `AutomationConversation '${input.conversationId}' provider conversation '${providerConversationId}' remained not loaded after resume.`,
         );
       case AutomationConversationExecutionActions.FAIL_PROVIDER_ERROR:
         throw new ConversationDeliveryExecutionError(

@@ -168,6 +168,24 @@ describe("conversation delivery plans", () => {
       ).toBe(AutomationConversationExecutionActions.FAIL_PROVIDER_ERROR);
     });
 
+    it("fails closed when the provider conversation still is not loaded", () => {
+      expect(
+        resolveAutomationConversationExecutionAction({
+          inspectAutomationConversation: {
+            exists: true,
+            status: "not_loaded",
+            activeExecutionId: null,
+          },
+          providerExecutionId: null,
+          adapter: {
+            steerExecution: async () => ({
+              providerExecutionId: "turn_123",
+            }),
+          },
+        }),
+      ).toBe(AutomationConversationExecutionActions.FAIL_NOT_LOADED);
+    });
+
     it("starts a new execution when the provider conversation is idle", () => {
       expect(
         resolveAutomationConversationExecutionAction({
@@ -295,6 +313,18 @@ describe("conversation delivery plans", () => {
           },
         }),
       ).toBe(AutomationConversationSteerRecoveryActions.FAIL_STILL_ACTIVE);
+    });
+
+    it("fails closed when the conversation becomes not loaded after the steer race", () => {
+      expect(
+        resolveAutomationConversationSteerRecoveryAction({
+          inspectAutomationConversation: {
+            exists: true,
+            status: "not_loaded",
+            activeExecutionId: null,
+          },
+        }),
+      ).toBe(AutomationConversationSteerRecoveryActions.FAIL_NOT_LOADED);
     });
 
     it("fails when the conversation is in an error state after the steer race", () => {

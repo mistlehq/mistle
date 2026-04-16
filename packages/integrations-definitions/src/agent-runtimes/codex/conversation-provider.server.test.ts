@@ -12,7 +12,10 @@ describe("normalizeCodexThreadStatus", () => {
 
   it("treats idle terminal thread statuses as idle", () => {
     expect(normalizeCodexThreadStatus({ type: "idle" })).toBe("idle");
-    expect(normalizeCodexThreadStatus({ type: "notLoaded" })).toBe("idle");
+  });
+
+  it("keeps not-loaded threads distinct from idle loaded threads", () => {
+    expect(normalizeCodexThreadStatus({ type: "notLoaded" })).toBe("not_loaded");
   });
 
   it("treats systemError threads as startable for a new turn", () => {

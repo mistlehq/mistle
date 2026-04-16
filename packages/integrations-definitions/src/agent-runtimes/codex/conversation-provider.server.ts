@@ -5,6 +5,7 @@ import type {
   AgentConversationInspectResult,
   AgentConversationProvider,
 } from "@mistle/integrations-core";
+import { AgentConversationStatuses } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 
 import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
@@ -100,15 +101,16 @@ export function normalizeCodexThreadStatus(
 
   switch (statusValue.type) {
     case "active":
-      return "active";
+      return AgentConversationStatuses.ACTIVE;
     case "systemError":
       // Codex reports non-active terminal threads as `systemError`. Automation
       // delivery should still attempt a fresh turn on that thread instead of
       // failing the conversation before trying `turn/start`.
-      return "idle";
+      return AgentConversationStatuses.IDLE;
     case "idle":
+      return AgentConversationStatuses.IDLE;
     case "notLoaded":
-      return "idle";
+      return AgentConversationStatuses.NOT_LOADED;
     default:
       throw new ConversationProviderError({
         code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
@@ -254,7 +256,7 @@ function isThreadResumeNoRolloutError(error: unknown): boolean {
 function missingInspectConversationOutput(): AgentConversationInspectResult {
   return {
     exists: false,
-    status: "idle",
+    status: AgentConversationStatuses.IDLE,
     activeExecutionId: null,
   };
 }

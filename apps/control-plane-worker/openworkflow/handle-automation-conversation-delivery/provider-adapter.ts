@@ -4,7 +4,7 @@ import type {
 } from "@mistle/integrations-core";
 import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent-runtimes/server";
 
-export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
+export type ProviderAutomationConversationStatus = "idle" | "not_loaded" | "active" | "error";
 
 export type ProviderInspectConversationOutput = {
   exists: boolean;

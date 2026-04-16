@@ -32,6 +32,7 @@ export const AutomationRunTimeoutMs = 3 * 60_000;
 export const ResourceSyncTimeoutMs = 2 * 60_000;
 export const ThreadReadTimeoutMs = 90_000;
 export const AgentReplyTimeoutMs = 3 * 60_000;
+export const GitHubIssueCommentConsistencyTimeoutMs = 30_000;
 
 const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
@@ -136,6 +137,7 @@ export type GitHubRepository = {
 
 export type GitHubWebhookAutomationConversation = {
   automationRunId: string;
+  conversationId: string;
   automationInstructionsSnapshot: string | null;
   issueNumber: number;
   payloadMarker: string;
@@ -147,7 +149,17 @@ export type GitHubWebhookAutomationConversation = {
   rpcClient: CodexJsonRpcClient;
   initialThreadRead: CodexThreadReadResult;
   buildExpectedSessionLinkUrl: () => string;
+  reconnectRpcClient: () => Promise<CodexJsonRpcClient>;
   cleanup: () => Promise<void>;
+};
+
+export type GitHubWebhookAutomationFollowUp = {
+  automationRunId: string;
+  conversationId: string;
+  commentBody: string;
+  expectedInputSubstring: string;
+  providerConversationId: string;
+  sandboxInstanceId: string;
 };
 
 export function hasRequiredGitHubWebhookAutomationEnv(): boolean {
@@ -309,6 +321,47 @@ async function githubRequestJson<TSchema extends z.ZodType>(input: {
   return input.schema.parse(parsed);
 }
 
+function isGitHubIssueCommentNodeConsistencyError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("GitHub issue comment creation") &&
+    error.message.includes("Could not resolve to a node with the global id")
+  );
+}
+
+async function createGitHubIssueCommentWithConsistencyWait(input: {
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  token: string;
+  body: string;
+}): Promise<GitHubIssueComment> {
+  return await waitForCondition({
+    description: `GitHub issue ${String(input.issueNumber)} comment creation`,
+    timeoutMs: GitHubIssueCommentConsistencyTimeoutMs,
+    evaluate: async () => {
+      try {
+        return await githubRequestJson({
+          method: "POST",
+          path: `/repos/${input.owner}/${input.repo}/issues/${String(input.issueNumber)}/comments`,
+          token: input.token,
+          description: "GitHub issue comment creation",
+          schema: GitHubIssueCommentResponseSchema,
+          body: {
+            body: input.body,
+          },
+        });
+      } catch (error) {
+        if (isGitHubIssueCommentNodeConsistencyError(error)) {
+          return null;
+        }
+
+        throw error;
+      }
+    },
+  });
+}
+
 async function closeGitHubIssue(input: {
   owner: string;
   repo: string;
@@ -381,6 +434,31 @@ export async function waitForGitHubIssueComment(input: {
   });
 }
 
+export async function waitForCodexPersistedUserMessageText(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  expectedSubstring: string;
+  timeoutMs: number;
+}): Promise<CodexThreadReadResult> {
+  return await waitForCondition({
+    description: `Codex persisted user message containing '${input.expectedSubstring}'`,
+    timeoutMs: input.timeoutMs,
+    evaluate: async () => {
+      const result = await readCodexThread({
+        rpcClient: input.rpcClient,
+        threadId: input.threadId,
+      });
+
+      return hasPersistedUserMessageText({
+        threadReadResult: result.response,
+        expectedSubstring: input.expectedSubstring,
+      })
+        ? result
+        : null;
+    },
+  });
+}
+
 export async function waitForCodexTurnCompleted(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
@@ -407,6 +485,129 @@ export async function waitForCodexTurnCompleted(input: {
       return turn.status === "completed" ? true : null;
     },
   });
+}
+
+export async function triggerGitHubWebhookAutomationFollowUp(input: {
+  fixture: SystemTestFixture;
+  conversation: GitHubWebhookAutomationConversation;
+  followUpMarker: string;
+}): Promise<GitHubWebhookAutomationFollowUp> {
+  const commentBody = `${input.conversation.payloadMarker}\n${input.followUpMarker}`;
+
+  const issueComment = await githubRequestJson({
+    method: "POST",
+    path: `/repos/${input.conversation.repository.owner}/${input.conversation.repository.repo}/issues/${String(input.conversation.issueNumber)}/comments`,
+    token: input.conversation.githubToken,
+    description: "GitHub issue comment creation for follow-up automation",
+    schema: GitHubIssueCommentResponseSchema,
+    body: {
+      body: commentBody,
+    },
+  });
+  if (!issueComment.body.includes(input.followUpMarker)) {
+    throw new Error("Expected follow-up GitHub issue comment to persist the follow-up marker.");
+  }
+
+  const webhookEvent = await waitForCondition({
+    description: "processed GitHub follow-up webhook event",
+    timeoutMs: WebhookDeliveryTimeoutMs,
+    evaluate: async () => {
+      const events = await input.fixture.db.query.integrationWebhookEvents.findMany({
+        where: (table, { eq }) => eq(table.targetKey, GitHubTargetKey),
+        orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
+      });
+
+      for (const event of events) {
+        const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
+        const body = comment === null ? null : comment.body;
+        if (
+          event.eventType === "github.issue_comment.created" &&
+          typeof body === "string" &&
+          body.includes(input.followUpMarker)
+        ) {
+          if (event.status === "failed") {
+            throw new Error(
+              `GitHub follow-up webhook event '${event.id}' failed during processing.`,
+            );
+          }
+
+          return event.status === "processed" ? event : null;
+        }
+      }
+
+      return null;
+    },
+  });
+
+  const automationRun = await waitForCondition({
+    description: "completed follow-up automation run",
+    timeoutMs: AutomationRunTimeoutMs,
+    evaluate: async () => {
+      const run = await input.fixture.db.query.automationRuns.findFirst({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEvent.id),
+      });
+
+      if (run === undefined) {
+        return null;
+      }
+
+      if (run.status === AutomationRunStatuses.FAILED) {
+        const conversationId = run.conversationId;
+        const route =
+          conversationId === null
+            ? null
+            : await input.fixture.db.query.automationConversationRoutes.findFirst({
+                where: (table, { eq }) => eq(table.conversationId, conversationId),
+              });
+        throw new Error(
+          `Follow-up automation run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)}`,
+        );
+      }
+
+      return run.status === AutomationRunStatuses.COMPLETED ? run : null;
+    },
+  });
+
+  if (automationRun.conversationId === null) {
+    throw new Error("Expected completed follow-up automation run to persist conversationId.");
+  }
+  const conversationId = automationRun.conversationId;
+
+  const route = await waitForCondition({
+    description: "follow-up automation conversation route",
+    timeoutMs: SandboxReadyTimeoutMs,
+    evaluate: async () => {
+      const persistedRoute = await input.fixture.db.query.automationConversationRoutes.findFirst({
+        where: (table, { eq }) => eq(table.conversationId, conversationId),
+      });
+
+      if (
+        persistedRoute === undefined ||
+        persistedRoute.providerConversationId === null ||
+        persistedRoute.sandboxInstanceId === null
+      ) {
+        return null;
+      }
+
+      return persistedRoute;
+    },
+  });
+  const providerConversationId = route.providerConversationId;
+  const sandboxInstanceId = route.sandboxInstanceId;
+  if (providerConversationId === null || sandboxInstanceId === null) {
+    throw new Error(
+      "Expected follow-up automation conversation route to persist sandbox and provider ids.",
+    );
+  }
+
+  return {
+    automationRunId: automationRun.id,
+    conversationId,
+    commentBody,
+    expectedInputSubstring: input.followUpMarker,
+    providerConversationId,
+    sandboxInstanceId,
+  };
 }
 
 function turnContainsCommandExecution(input: {
@@ -1133,6 +1334,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
     insecureSsl?: string;
   } | null = null;
   let didCleanup = false;
+  let conversation: GitHubWebhookAutomationConversation | null = null;
 
   async function cleanup(): Promise<void> {
     if (didCleanup) {
@@ -1164,6 +1366,64 @@ export async function startGitHubWebhookAutomationConversation(input: {
         token: githubToken,
       });
     }
+  }
+
+  async function connectRpcClient(connectionInput: {
+    sandboxInstanceId: string;
+    dataPlaneGatewayBaseUrl: string;
+  }): Promise<CodexJsonRpcClient> {
+    rpcClient?.dispose();
+    rpcClient = null;
+    if (sessionClient !== null) {
+      sessionClient.disconnect();
+      sessionClient = null;
+    }
+    if (sessionTransport !== null) {
+      sessionTransport.disconnect(1000, "System test reconnect.");
+      sessionTransport = null;
+    }
+
+    const mintedConnectionToken = await requestJsonOrThrow({
+      request: input.fixture.request,
+      path: `/v1/sandbox/instances/${encodeURIComponent(connectionInput.sandboxInstanceId)}/connection-tokens`,
+      expectedStatus: 201,
+      description: "sandbox connection token minting",
+      schema: SandboxInstanceConnectionTokenResponseSchema,
+      init: {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    });
+
+    sessionTransport = new SandboxSessionTransport({
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+    await sessionTransport.connect({
+      connectionUrl: resolveGatewayWebSocketUrl({
+        mintedUrl: mintedConnectionToken.url,
+        gatewayBaseUrl: connectionInput.dataPlaneGatewayBaseUrl,
+      }),
+    });
+    sessionClient = new AgentStreamClient({
+      transport: sessionTransport,
+    });
+    await sessionClient.connect();
+
+    const connectedRpcClient = new CodexJsonRpcClient(sessionClient);
+    rpcClient = connectedRpcClient;
+    await connectedRpcClient.initialize({
+      clientInfo: {
+        name: "mistle-system-tests",
+        version: "0.1.0",
+      },
+    });
+    if (conversation !== null) {
+      conversation.rpcClient = connectedRpcClient;
+    }
+
+    return connectedRpcClient;
   }
 
   try {
@@ -1303,15 +1563,12 @@ export async function startGitHubWebhookAutomationConversation(input: {
     });
     issueNumber = issue.number;
 
-    const issueComment = await githubRequestJson({
-      method: "POST",
-      path: `/repos/${repository.owner}/${repository.repo}/issues/${String(issue.number)}/comments`,
+    const issueComment = await createGitHubIssueCommentWithConsistencyWait({
+      owner: repository.owner,
+      repo: repository.repo,
+      issueNumber: issue.number,
       token: githubToken,
-      description: "GitHub issue comment creation",
-      schema: GitHubIssueCommentResponseSchema,
-      body: {
-        body: payloadMarker,
-      },
+      body: payloadMarker,
     });
     if (!issueComment.body.includes(payloadMarker)) {
       throw new Error("Expected GitHub issue comment creation to persist the webhook marker.");
@@ -1459,41 +1716,9 @@ export async function startGitHubWebhookAutomationConversation(input: {
       },
     });
 
-    const mintedConnectionToken = await requestJsonOrThrow({
-      request: input.fixture.request,
-      path: `/v1/sandbox/instances/${encodeURIComponent(route.sandboxInstanceId)}/connection-tokens`,
-      expectedStatus: 201,
-      description: "sandbox connection token minting",
-      schema: SandboxInstanceConnectionTokenResponseSchema,
-      init: {
-        method: "POST",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    });
-
-    sessionTransport = new SandboxSessionTransport({
-      runtime: createNodeSandboxSessionRuntime(),
-    });
-    await sessionTransport.connect({
-      connectionUrl: resolveGatewayWebSocketUrl({
-        mintedUrl: mintedConnectionToken.url,
-        gatewayBaseUrl: dataPlaneGatewayBaseUrl,
-      }),
-    });
-    sessionClient = new AgentStreamClient({
-      transport: sessionTransport,
-    });
-    await sessionClient.connect();
-
-    const connectedRpcClient = new CodexJsonRpcClient(sessionClient);
-    rpcClient = connectedRpcClient;
-    await connectedRpcClient.initialize({
-      clientInfo: {
-        name: "mistle-system-tests",
-        version: "0.1.0",
-      },
+    const connectedRpcClient = await connectRpcClient({
+      sandboxInstanceId: route.sandboxInstanceId,
+      dataPlaneGatewayBaseUrl,
     });
 
     await resumeCodexThread({
@@ -1523,8 +1748,9 @@ export async function startGitHubWebhookAutomationConversation(input: {
       throw new Error("Expected running sandbox instance id to match conversation route.");
     }
 
-    return {
+    conversation = {
       automationRunId: automationRun.id,
+      conversationId,
       automationInstructionsSnapshot: automationRun.instructions,
       issueNumber,
       payloadMarker,
@@ -1540,8 +1766,14 @@ export async function startGitHubWebhookAutomationConversation(input: {
           publicHostname,
           sandboxInstanceId: route.sandboxInstanceId,
         }),
+      reconnectRpcClient: async () =>
+        await connectRpcClient({
+          sandboxInstanceId: route.sandboxInstanceId,
+          dataPlaneGatewayBaseUrl,
+        }),
       cleanup,
     };
+    return conversation;
   } catch (error) {
     await cleanup();
     throw error;

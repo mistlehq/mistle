@@ -11,6 +11,7 @@ export const AutomationConversationExecutionActions = {
   START: "start",
   STEER: "steer",
   FAIL_MISSING_CONVERSATION: "fail_missing_conversation",
+  FAIL_NOT_LOADED: "fail_not_loaded",
   FAIL_PROVIDER_ERROR: "fail_provider_error",
   FAIL_MISSING_EXECUTION: "fail_missing_execution",
 } as const;
@@ -25,6 +26,9 @@ export function resolveAutomationConversationExecutionAction(input: {
 }): ConversationExecutionAction {
   if (!input.inspectAutomationConversation.exists) {
     return AutomationConversationExecutionActions.FAIL_MISSING_CONVERSATION;
+  }
+  if (input.inspectAutomationConversation.status === "not_loaded") {
+    return AutomationConversationExecutionActions.FAIL_NOT_LOADED;
   }
   if (input.inspectAutomationConversation.status === "error") {
     return AutomationConversationExecutionActions.FAIL_PROVIDER_ERROR;
@@ -41,6 +45,7 @@ export function resolveAutomationConversationExecutionAction(input: {
 export const AutomationConversationSteerRecoveryActions = {
   START: "start",
   FAIL_MISSING_CONVERSATION: "fail_missing_conversation",
+  FAIL_NOT_LOADED: "fail_not_loaded",
   FAIL_PROVIDER_ERROR: "fail_provider_error",
   FAIL_STILL_ACTIVE: "fail_still_active",
 } as const;
@@ -76,6 +81,9 @@ export function resolveAutomationConversationSteerRecoveryAction(input: {
 }): ConversationSteerRecoveryAction {
   if (!input.inspectAutomationConversation.exists) {
     return AutomationConversationSteerRecoveryActions.FAIL_MISSING_CONVERSATION;
+  }
+  if (input.inspectAutomationConversation.status === "not_loaded") {
+    return AutomationConversationSteerRecoveryActions.FAIL_NOT_LOADED;
   }
   if (input.inspectAutomationConversation.status === "error") {
     return AutomationConversationSteerRecoveryActions.FAIL_PROVIDER_ERROR;
