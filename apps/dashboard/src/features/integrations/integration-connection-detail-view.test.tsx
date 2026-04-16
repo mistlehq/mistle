@@ -254,7 +254,7 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByLabelText("View repository load error")).toBeTruthy();
+    expect(screen.queryByLabelText("View repository load error")).toBeNull();
     expect(screen.queryByText("Could not load repositories.")).toBeNull();
     expect(screen.queryByText(/Last synced/)).toBeNull();
     expect(screen.queryByText("mistle/dashboard")).toBeNull();
@@ -300,8 +300,49 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.queryByText("Not synced")).toBeNull();
-    expect(screen.getByText("Not synced yet")).toBeTruthy();
+    expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View repository load error")).toBeNull();
+  });
+
+  it("shows an expanded empty state when a resource has no items", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "ready",
+              },
+            ],
+          },
+        ]}
+        resourceContentByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: null,
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                previewState: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("No items available.")).toBeTruthy();
   });
 
   it("starts title editing when the connection title field receives focus", () => {

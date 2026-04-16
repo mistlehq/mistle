@@ -1,13 +1,5 @@
-import {
-  Badge,
-  BadgeListField,
-  Button,
-  Notice,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@mistle/ui";
-import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon, InfoIcon } from "@phosphor-icons/react";
+import { Badge, BadgeListField, Button, Notice } from "@mistle/ui";
+import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import {
@@ -48,23 +40,23 @@ export function IntegrationResourceListItem(
   const [isExpanded, setIsExpanded] = useState(false);
   const resourceLabel = formatResourceLabel(input.resource.kind);
   const resourceCount = input.resource.count;
-  const resourceStateIndicator = resolveResourceStateIndicator({
-    errorMessage: input.resourceItems?.errorMessage ?? null,
-    kindLabel: resourceLabel,
+  const hasPreviewError = input.resourceItems?.previewState === "error";
+  const secondaryStatusText = resolveResourceSecondaryStatusText({
+    resource: input.resource,
     previewState: input.resourceItems?.previewState ?? null,
   });
-  const shouldReplaceMetadataWithPreviewError = input.resourceItems?.previewState === "error";
+  const shouldRenderFooter = secondaryStatusText.length > 0 || hasPreviewError;
 
   return (
     <div
-      className={`pl-3 pr-1 py-1 flex flex-col ${isExpanded ? "pb-2" : ""}`}
+      className={`px-3 py-2 flex flex-col ${isExpanded ? "pb-3" : ""}`}
       data-slot="integration-resource-list-item"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex flex-1 items-center gap-2">
           <Button
             aria-label={`${isExpanded ? "Collapse" : "Expand"} ${resourceLabel.toLowerCase()} resources`}
-            className="-ml-2 h-auto justify-start rounded-sm px-1 py-0 text-left text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground"
+            className="-ml-2 h-auto min-w-0 flex-1 justify-start rounded-sm px-1 py-0 text-left text-muted-foreground shadow-none transition-colors hover:bg-transparent hover:text-foreground"
             onClick={() => {
               setIsExpanded((current) => !current);
             }}
@@ -81,53 +73,65 @@ export function IntegrationResourceListItem(
               {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
             </span>
           </Button>
-          {shouldShowResourceSyncStateBadge(input.resource.syncState) ? (
-            <Badge variant="secondary">{formatSyncStateLabel(input.resource.syncState)}</Badge>
+          {shouldShowResourceSyncStateBadge(input.resource.syncState) && !hasPreviewError ? (
+            <Badge className="hidden sm:inline-flex" variant="secondary">
+              {formatSyncStateLabel(input.resource.syncState)}
+            </Badge>
           ) : null}
         </div>
-        <div className="flex items-center gap-2 sm:shrink-0">
-          {shouldReplaceMetadataWithPreviewError ? (
-            <div className="flex items-center">{resourceStateIndicator}</div>
-          ) : (
-            <div className="text-muted-foreground text-xs">
-              <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
-              {formatResourceInlineMetadata(input.resource)}
-            </div>
-          )}
-          {input.onRefreshResource ? (
-            <Button
-              aria-label={`Refresh ${input.resource.kind}`}
-              disabled={input.resource.isRefreshing === true}
-              onClick={() => {
-                input.onRefreshResource?.({
-                  connectionId: input.connectionId,
-                  kind: input.resource.kind,
-                });
-              }}
-              size="icon-sm"
-              title="Sync resource"
-              type="button"
-              variant="ghost"
-            >
-              <ArrowClockwiseIcon
-                aria-hidden
-                className={input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"}
-              />
-            </Button>
-          ) : null}
+        <div className="hidden min-w-0 items-center gap-2 sm:flex sm:shrink-0">
+          <div className="text-muted-foreground text-xs">
+            <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
+            {secondaryStatusText}
+          </div>
         </div>
+        {input.onRefreshResource ? (
+          <Button
+            aria-label={`Refresh ${input.resource.kind}`}
+            className="shrink-0"
+            disabled={input.resource.isRefreshing === true}
+            onClick={() => {
+              input.onRefreshResource?.({
+                connectionId: input.connectionId,
+                kind: input.resource.kind,
+              });
+            }}
+            size="icon-sm"
+            title="Sync resource"
+            type="button"
+            variant="ghost"
+          >
+            <ArrowClockwiseIcon
+              aria-hidden
+              className={input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"}
+            />
+          </Button>
+        ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
         <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
       ) : null}
-      {isExpanded && input.resourceItems !== null && input.resourceItems.items.length > 0 ? (
-        <div>
-          <BadgeListField
-            items={input.resourceItems.items.map((item) => ({
-              id: item.id,
-              label: item.displayName,
-            }))}
-          />
+      {isExpanded && input.resourceItems !== null ? (
+        input.resourceItems.items.length > 0 ? (
+          <div className="mt-1">
+            <BadgeListField
+              badgeClassName="px-2 py-0.5 text-[11px] sm:px-2.5 sm:py-1 sm:text-xs"
+              items={input.resourceItems.items.map((item) => ({
+                id: item.id,
+                label: item.displayName,
+              }))}
+            />
+          </div>
+        ) : (
+          <p className="mt-1 text-muted-foreground text-xs">No items available.</p>
+        )
+      ) : null}
+      {shouldRenderFooter ? (
+        <div className="mt-1 pt-1 sm:hidden">
+          <div className="flex min-w-0 items-center gap-1.5 pr-2 text-muted-foreground text-xs sm:pl-5">
+            <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
+            <span className="min-w-0 truncate">{secondaryStatusText}</span>
+          </div>
         </div>
       ) : null}
     </div>
@@ -140,27 +144,13 @@ function shouldShowResourceSyncStateBadge(
   return syncState !== "ready" && syncState !== "syncing" && syncState !== "never-synced";
 }
 
-function resolveResourceStateIndicator(input: {
-  errorMessage: string | null;
-  kindLabel: string;
+function resolveResourceSecondaryStatusText(input: {
+  resource: IntegrationResourceListItemResourceSummary;
   previewState: "error" | "not-synced" | null;
-}): React.JSX.Element | null {
-  if (input.previewState === "error" && input.errorMessage !== null) {
-    return (
-      <Tooltip delay={0}>
-        <TooltipTrigger
-          aria-label={`View ${input.kindLabel.toLowerCase()} load error`}
-          render={<Badge render={<span aria-hidden="true" />} variant="destructive" />}
-        >
-          Error
-          <InfoIcon className="size-3.5" data-icon="inline-end" />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
-          {input.errorMessage}
-        </TooltipContent>
-      </Tooltip>
-    );
+}): string {
+  if (input.previewState === "error") {
+    return "Sync failed";
   }
 
-  return null;
+  return formatResourceInlineMetadata(input.resource);
 }
