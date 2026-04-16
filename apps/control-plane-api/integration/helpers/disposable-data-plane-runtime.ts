@@ -243,6 +243,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       app: config,
       internalAuthServiceToken: input.internalAuthServiceToken,
       sandboxProvider: "docker",
+      sandboxStorageBackend: "none",
     });
     await runtime.start();
     gateway = await startGatewayProcess({

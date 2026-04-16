@@ -1,5 +1,6 @@
 import {
   createDataPlaneDatabase,
+  SandboxInstancePersistenceModes,
   sandboxInstanceRuntimePlans,
   sandboxInstances,
   SandboxInstanceStatuses,
@@ -97,6 +98,7 @@ describe("start sandbox instance provisioning integration", () => {
           organizationId: "org_start_provisioning_integration",
           sandboxProfileId: "sbp_start_provisioning_integration",
           sandboxProfileVersion: 3,
+          persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
           startedBy: {
             kind: "system",
             id: "worker_start_provisioning_integration",
@@ -108,6 +110,7 @@ describe("start sandbox instance provisioning integration", () => {
       const persistedStartingInstance = await db.query.sandboxInstances.findFirst({
         columns: {
           id: true,
+          persistenceMode: true,
           status: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
@@ -115,6 +118,7 @@ describe("start sandbox instance provisioning integration", () => {
 
       expect(persistedStartingInstance).toEqual({
         id: sandboxInstanceId,
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         status: SandboxInstanceStatuses.PENDING,
       });
 
