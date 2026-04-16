@@ -1,5 +1,6 @@
 import { Button, cn } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
+import * as React from "react";
 
 import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view-model.js";
 
@@ -10,18 +11,24 @@ type HomePageViewProps = {
 
 export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): React.JSX.Element {
   return (
-    <div className="flex min-h-full items-center justify-center px-4 py-6">
+    <div className="space-y-3">
+      {onboarding.steps.map((step) => (
+        <SetupStepRow
+          key={step.id}
+          step={step}
+          {...(onNavigate === undefined ? {} : { onNavigate })}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function HomePageShell({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="px-4 py-6">
       <div className="w-full max-w-4xl space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">Get started</h1>
-        <div className="space-y-3">
-          {onboarding.steps.map((step) => (
-            <SetupStepRow
-              key={step.id}
-              step={step}
-              {...(onNavigate === undefined ? {} : { onNavigate })}
-            />
-          ))}
-        </div>
+        {children}
       </div>
     </div>
   );
