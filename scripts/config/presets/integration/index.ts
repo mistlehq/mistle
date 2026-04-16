@@ -47,9 +47,6 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.DOCKER,
-        storage: {
-          backend: "none",
-        },
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway:5202/tunnel/sandbox",
       },
@@ -79,6 +76,7 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
     },
   },
   prunePaths: [
+    ["global", "sandbox", "storage"],
     ["apps", "data_plane_api", "sandbox", "e2b"],
     ["apps", "data_plane_worker", "sandbox", "e2b"],
   ],
@@ -92,9 +90,6 @@ const E2B_PRESET: IntegrationProviderPreset = {
       env: "development",
       sandbox: {
         provider: IntegrationSandboxProvider.E2B,
-        storage: {
-          backend: "none",
-        },
         gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
         internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
       },

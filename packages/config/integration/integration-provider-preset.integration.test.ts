@@ -5,6 +5,7 @@ import {
   getRequiredIntegrationConfigValues,
   IntegrationSandboxProvider,
 } from "../../../scripts/config/presets/integration/index.js";
+import { getValueAtPath } from "../src/core/record.js";
 
 describe("integration provider presets", () => {
   it("defaults docker integration config generation to no persistent sandbox storage", () => {
@@ -14,24 +15,18 @@ describe("integration provider presets", () => {
       global: {
         sandbox: {
           provider: IntegrationSandboxProvider.DOCKER,
-          storage: {
-            backend: "none",
-          },
         },
       },
     });
+    expect(getValueAtPath(preset.defaults, ["global", "sandbox", "storage"])).toBeUndefined();
   });
 
-  it("does not require Archil config values when storage backend remains none", () => {
+  it("does not require Archil config values when no storage backend is configured", () => {
     const requiredValues = getRequiredIntegrationConfigValues({
       provider: IntegrationSandboxProvider.DOCKER,
       configRoot: {
         global: {
-          sandbox: {
-            storage: {
-              backend: "none",
-            },
-          },
+          sandbox: {},
         },
       },
     });

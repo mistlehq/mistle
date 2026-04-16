@@ -957,7 +957,7 @@ describe("loadConfig integrations", () => {
 
     expect(config.global.sandbox.storage).toBeUndefined();
     expect(config.app.controlPlaneApi).toEqual({
-      baseUrl: "http://127.0.0.1:5100",
+      baseUrl: "http://127.0.0.1:5000",
     });
     expect(config.app.sandboxStorage).toBeUndefined();
   });
