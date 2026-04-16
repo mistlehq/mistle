@@ -48,7 +48,7 @@ const globalDevelopmentConfig = {
   sandbox: {
     provider: "docker",
     storage: {
-      backend: "archil",
+      e2b: "archil",
     },
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -104,7 +104,7 @@ const globalProductionConfig = {
   sandbox: {
     provider: "docker",
     storage: {
-      backend: "archil",
+      e2b: "archil",
     },
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -926,6 +926,7 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
+          MISTLE_GLOBAL_SANDBOX_STORAGE_E2B: "archil",
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
@@ -933,19 +934,21 @@ describe("loadConfig integrations", () => {
         }),
       }),
     ).toThrow(
-      /apps\.data_plane_worker\.sandbox_storage\.archil is required when global\.sandbox\.storage\.backend is 'archil'/,
+      /apps\.data_plane_worker\.sandbox_storage\.archil is required when global\.sandbox\.storage\.e2b is 'archil'/,
     );
   });
 
-  it("loads data-plane-worker config when sandbox storage backend is none and Archil worker config is omitted", () => {
+  it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
-        MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
+        MISTLE_GLOBAL_SANDBOX_STORAGE_E2B: undefined,
+        MISTLE_GLOBAL_SANDBOX_STORAGE_DOCKER: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: undefined,
       }),
     });
 
@@ -953,9 +956,7 @@ describe("loadConfig integrations", () => {
       throw new Error("Expected global config to be present.");
     }
 
-    expect(config.global.sandbox.storage).toEqual({
-      backend: "none",
-    });
+    expect(config.global.sandbox.storage).toBeUndefined();
     expect(config.app.controlPlaneApi).toEqual({
       baseUrl: "http://127.0.0.1:5100",
     });

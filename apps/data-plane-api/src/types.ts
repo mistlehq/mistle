@@ -9,8 +9,12 @@ type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.D
 
 export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
 export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult["global"]>;
+type DataPlaneApiGlobalSandboxStorageConfig = NonNullable<
+  DataPlaneApiGlobalConfig["sandbox"]["storage"]
+>;
 export type DataPlaneApiSandboxStorageBackend =
-  | NonNullable<DataPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"]
+  | DataPlaneApiGlobalSandboxStorageConfig["e2b"]
+  | DataPlaneApiGlobalSandboxStorageConfig["docker"]
   | undefined;
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
@@ -57,3 +61,15 @@ export type DataPlaneApiRuntime = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };
+
+export function resolveConfiguredSandboxStorageBackend(input: {
+  globalConfig: DataPlaneApiGlobalConfig;
+}): DataPlaneApiSandboxStorageBackend {
+  const sandboxStorageConfig = input.globalConfig.sandbox.storage;
+
+  if (input.globalConfig.sandbox.provider === "e2b") {
+    return sandboxStorageConfig?.e2b;
+  }
+
+  return sandboxStorageConfig?.docker;
+}

@@ -77,7 +77,7 @@ describe("provisionSandboxStorage helpers", () => {
       resolvedStorageConfiguration: {
         persistentSandboxesEnabled: true,
         storageConfigSource: "managed",
-        storageBackend: null,
+        storageBackend: "archil",
         organizationStorageConfig: null,
       },
     });
@@ -165,7 +165,7 @@ describe("provisionSandboxStorage helpers", () => {
     const profile = resolveArchilProvisioningProfile({
       managedArchilConfig: undefined,
       resolvedStorageConfiguration: {
-        persistentSandboxesEnabled: false,
+        persistentSandboxesEnabled: true,
         storageConfigSource: "organization",
         storageBackend: "archil",
         organizationStorageConfig: {

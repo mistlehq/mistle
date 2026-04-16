@@ -51,7 +51,7 @@ gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 internal_gateway_ws_url = "ws://host.docker.internal:5003/tunnel/sandbox"
 
 [global.sandbox.storage]
-backend = "archil"
+e2b = "archil"
 
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"

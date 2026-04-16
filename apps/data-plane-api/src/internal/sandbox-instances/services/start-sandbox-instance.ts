@@ -59,13 +59,14 @@ function createSandboxInstanceId(): string {
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
   persistentSandboxesEnabled: boolean;
+  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
   if (!input.persistentSandboxesEnabled) {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
 
-  if (input.configuredStorageBackend === "archil") {
+  if (input.sandboxProvider === "e2b" && input.configuredStorageBackend === "archil") {
     return SandboxInstancePersistenceModes.PERSISTENT;
   }
 
@@ -116,6 +117,7 @@ export async function startSandboxInstance(
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
     persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
+    sandboxProvider: ctx.sandboxProvider,
     configuredStorageBackend: ctx.sandboxStorageBackend,
   });
 

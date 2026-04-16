@@ -22,15 +22,9 @@ type ResolveSandboxStorageConfigurationResponse =
       organizationStorageConfig: null;
     }
   | {
-      persistentSandboxesEnabled: false;
-      storageConfigSource: "organization";
-      storageBackend: "archil";
-      organizationStorageConfig: OrganizationSandboxStorageConfigV1;
-    }
-  | {
       persistentSandboxesEnabled: true;
       storageConfigSource: "managed";
-      storageBackend: null;
+      storageBackend: "archil" | "docker_volume";
       organizationStorageConfig: null;
     }
   | {
@@ -62,15 +56,34 @@ export async function resolveSandboxStoragePersistenceMode(input: {
 export async function resolveSandboxStorageConfiguration(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
+  runtimeProvider: "e2b" | "docker";
   encryptionConfig: OrganizationCredentialEncryptionConfig;
 }): Promise<ResolveSandboxStorageConfigurationResponse> {
   const settings = await resolveOrganizationSandboxStorageSettings(input);
 
-  if (settings.storageConfigSource === "managed") {
+  if (!settings.persistentSandboxesEnabled) {
     return {
-      persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
+      persistentSandboxesEnabled: false,
       storageConfigSource: "managed",
       storageBackend: null,
+      organizationStorageConfig: null,
+    };
+  }
+
+  if (input.runtimeProvider === "docker") {
+    return {
+      persistentSandboxesEnabled: true,
+      storageConfigSource: "managed",
+      storageBackend: "docker_volume",
+      organizationStorageConfig: null,
+    };
+  }
+
+  if (settings.storageConfigSource === "managed") {
+    return {
+      persistentSandboxesEnabled: true,
+      storageConfigSource: "managed",
+      storageBackend: "archil",
       organizationStorageConfig: null,
     };
   }
@@ -82,7 +95,7 @@ export async function resolveSandboxStorageConfiguration(input: {
   }
 
   return {
-    persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
+    persistentSandboxesEnabled: true,
     storageConfigSource: "organization",
     storageBackend: "archil",
     organizationStorageConfig: settings.organizationStorageConfig,

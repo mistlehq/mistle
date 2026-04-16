@@ -58,6 +58,7 @@ export async function deprovisionSandboxStorage(input: {
   const resolvedStorageConfiguration =
     await input.controlPlaneInternalClient.resolveStorageConfiguration({
       organizationId: input.organizationId,
+      runtimeProvider: "e2b",
     });
 
   const archilProfile = resolveArchilProvisioningProfile({

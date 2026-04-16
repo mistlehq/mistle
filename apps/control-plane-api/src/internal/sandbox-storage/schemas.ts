@@ -4,6 +4,8 @@ import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
 import { OrganizationSandboxStorageConfigV1Schema } from "../../sandbox-storage/storage-config.js";
 
+const ManagedSandboxStorageBackends = [SandboxStorageBackends.ARCHIL, "docker_volume"] as const;
+
 export const ResolveSandboxStoragePersistenceModeRequestSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -19,6 +21,7 @@ export const ResolveSandboxStoragePersistenceModeResponseSchema = z
 export const ResolveSandboxStorageConfigurationRequestSchema = z
   .object({
     organizationId: z.string().min(1),
+    runtimeProvider: z.enum(["e2b", "docker"]),
   })
   .strict();
 
@@ -33,17 +36,9 @@ export const ResolveSandboxStorageConfigurationResponseSchema = z.union([
     .strict(),
   z
     .object({
-      persistentSandboxesEnabled: z.literal(false),
-      storageConfigSource: z.literal(SandboxStorageConfigSources.ORGANIZATION),
-      storageBackend: z.literal(SandboxStorageBackends.ARCHIL),
-      organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema,
-    })
-    .strict(),
-  z
-    .object({
       persistentSandboxesEnabled: z.literal(true),
       storageConfigSource: z.literal(SandboxStorageConfigSources.MANAGED),
-      storageBackend: z.null(),
+      storageBackend: z.enum(ManagedSandboxStorageBackends),
       organizationStorageConfig: z.null(),
     })
     .strict(),

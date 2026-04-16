@@ -62,9 +62,14 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
   },
   {
-    configPath: ["global", "sandbox", "storage", "backend"],
-    tomlPath: ["global", "sandbox", "storage", "backend"],
-    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND",
+    configPath: ["global", "sandbox", "storage", "e2b"],
+    tomlPath: ["global", "sandbox", "storage", "e2b"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_E2B",
+  },
+  {
+    configPath: ["global", "sandbox", "storage", "docker"],
+    tomlPath: ["global", "sandbox", "storage", "docker"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_DOCKER",
   },
   {
     configPath: ["global", "sandbox", "defaultBaseImage"],

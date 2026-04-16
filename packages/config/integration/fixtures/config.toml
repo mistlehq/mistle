@@ -51,7 +51,7 @@ gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 internal_gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 
 [global.sandbox.storage]
-backend = "archil"
+e2b = "archil"
 
 [apps.control_plane_api.server]
 host = "0.0.0.0"

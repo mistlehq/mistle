@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { type SandboxStorageBackend, SandboxStorageBackends } from "../../global/schema.js";
+import {
+  DockerSandboxStorageBackends,
+  E2BSandboxStorageBackends,
+  type GlobalConfig,
+} from "../../global/schema.js";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
@@ -134,15 +138,29 @@ export const PartialDataPlaneWorkerSandboxStorageArchilConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema = z
+  .object({
+    namePrefix: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerSandboxStorageDockerVolumeConfigSchema = z
+  .object({
+    namePrefix: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxStorageConfigSchema = z
   .object({
     archil: DataPlaneWorkerSandboxStorageArchilConfigSchema.optional(),
+    dockerVolume: DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema.optional(),
   })
   .strict();
 
 export const PartialDataPlaneWorkerSandboxStorageConfigSchema = z
   .object({
     archil: PartialDataPlaneWorkerSandboxStorageArchilConfigSchema.optional(),
+    dockerVolume: PartialDataPlaneWorkerSandboxStorageDockerVolumeConfigSchema.optional(),
   })
   .strict();
 
@@ -178,7 +196,9 @@ const DataPlaneWorkerProviderRequirementMessages = {
 
 const DataPlaneWorkerPersistentSandboxRequirementMessages = {
   ARCHIL:
-    "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
+    "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.e2b is 'archil'.",
+  DOCKER_VOLUME:
+    "apps.data_plane_worker.sandbox_storage.docker_volume is required when global.sandbox.storage.docker is 'docker_volume'.",
 } as const;
 
 export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
@@ -206,21 +226,28 @@ export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
 }
 
 export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
-  globalSandboxStorageBackend: SandboxStorageBackend | undefined;
+  globalSandboxStorageConfig: GlobalConfig["sandbox"]["storage"] | undefined;
   appConfig: DataPlaneWorkerConfig;
 }): {
-  path: readonly ["sandboxStorage", "archil"];
+  path: readonly ["sandboxStorage", "archil"] | readonly ["sandboxStorage", "dockerVolume"];
   message: string;
 } | null {
-  if (input.globalSandboxStorageBackend !== SandboxStorageBackends.ARCHIL) {
-    return null;
+  if (input.globalSandboxStorageConfig?.e2b === E2BSandboxStorageBackends.ARCHIL) {
+    if (input.appConfig.sandboxStorage?.archil === undefined) {
+      return {
+        path: ["sandboxStorage", "archil"],
+        message: DataPlaneWorkerPersistentSandboxRequirementMessages.ARCHIL,
+      };
+    }
   }
 
-  if (input.appConfig.sandboxStorage?.archil === undefined) {
-    return {
-      path: ["sandboxStorage", "archil"],
-      message: DataPlaneWorkerPersistentSandboxRequirementMessages.ARCHIL,
-    };
+  if (input.globalSandboxStorageConfig?.docker === DockerSandboxStorageBackends.DOCKER_VOLUME) {
+    if (input.appConfig.sandboxStorage?.dockerVolume === undefined) {
+      return {
+        path: ["sandboxStorage", "dockerVolume"],
+        message: DataPlaneWorkerPersistentSandboxRequirementMessages.DOCKER_VOLUME,
+      };
+    }
   }
 
   return null;

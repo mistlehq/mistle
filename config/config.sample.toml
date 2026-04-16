@@ -56,7 +56,8 @@ gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
 internal_gateway_ws_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
 
 [global.sandbox.storage]
-backend = "archil"
+e2b = "archil"
+# docker = "docker_volume"
 
 [apps.control_plane_api.server]
 host = "0.0.0.0"
@@ -215,6 +216,9 @@ bucket = "mistle-sandbox-storage"
 endpoint = "https://s3.example.com"
 access_key_id = "replace-with-archil-mount-access-key-id"
 secret_access_key = "replace-with-archil-mount-secret-access-key"
+
+#[apps.data_plane_worker.sandbox_storage.docker_volume]
+#name_prefix = "mistle-"
 
 [apps.tokenizer_proxy.server]
 host = "0.0.0.0"

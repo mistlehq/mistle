@@ -408,7 +408,7 @@ describe("sandboxInstances.start integration", () => {
       },
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       sandboxProvider: "docker",
-      sandboxStorageBackend: "none",
+      sandboxStorageBackend: undefined,
     });
     await runtime.start();
 

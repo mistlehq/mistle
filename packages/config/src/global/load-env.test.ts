@@ -25,29 +25,17 @@ describe("loadGlobalFromEnv", () => {
     expect(loadGlobalFromEnv({})).toEqual({});
   });
 
-  it("loads sandbox storage backend config from env", () => {
+  it("loads provider-aware sandbox storage config from env", () => {
     const loaded = loadGlobalFromEnv({
-      MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
+      MISTLE_GLOBAL_SANDBOX_STORAGE_E2B: "archil",
+      MISTLE_GLOBAL_SANDBOX_STORAGE_DOCKER: "docker_volume",
     });
 
     expect(loaded).toEqual({
       sandbox: {
         storage: {
-          backend: "archil",
-        },
-      },
-    });
-  });
-
-  it("loads disabled sandbox storage backend config from env", () => {
-    const loaded = loadGlobalFromEnv({
-      MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
-    });
-
-    expect(loaded).toEqual({
-      sandbox: {
-        storage: {
-          backend: "none",
+          e2b: "archil",
+          docker: "docker_volume",
         },
       },
     });
