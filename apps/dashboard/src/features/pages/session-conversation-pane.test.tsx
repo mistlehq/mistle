@@ -33,7 +33,7 @@ const UploadedImageFixture = {
   originalFilename: "screenshot.png",
   mimeType: "image/png",
   sizeBytes: 4,
-  path: "/tmp/attachments/thread_123/upload.png",
+  path: "/root/.local/attachments/thread_123/upload.png",
 } as const;
 
 function createImageFile(): File {

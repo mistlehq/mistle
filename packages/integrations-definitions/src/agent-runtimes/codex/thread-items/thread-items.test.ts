@@ -22,11 +22,11 @@ describe("openai thread item semantics", () => {
   it("normalizes local image attachment display metadata from a sandbox path", () => {
     expect(
       normalizeCodexLocalImageAttachment({
-        path: "/tmp/attachments/thread_123/screenshot.png",
+        path: "/root/.local/attachments/thread_123/screenshot.png",
       }),
     ).toEqual({
       kind: "image",
-      path: "/tmp/attachments/thread_123/screenshot.png",
+      path: "/root/.local/attachments/thread_123/screenshot.png",
       name: "screenshot.png",
     });
   });
@@ -113,7 +113,7 @@ describe("openai thread item semantics", () => {
             },
             {
               type: "localImage",
-              path: "/tmp/attachments/thread_123/screenshot.png",
+              path: "/root/.local/attachments/thread_123/screenshot.png",
             },
           ],
         },
@@ -127,7 +127,7 @@ describe("openai thread item semantics", () => {
         attachments: [
           {
             kind: "image",
-            path: "/tmp/attachments/thread_123/screenshot.png",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
             name: "screenshot.png",
           },
         ],

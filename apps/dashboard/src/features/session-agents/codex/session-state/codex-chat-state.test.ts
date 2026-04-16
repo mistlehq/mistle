@@ -11,7 +11,7 @@ describe("reduceCodexChatState", () => {
       attachments: [
         {
           type: "localImage",
-          path: "/tmp/attachments/thread_123/screenshot.png",
+          path: "/root/.local/attachments/thread_123/screenshot.png",
         },
       ],
     });
@@ -28,7 +28,7 @@ describe("reduceCodexChatState", () => {
         attachments: [
           {
             kind: "image",
-            path: "/tmp/attachments/thread_123/screenshot.png",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
             name: "screenshot.png",
           },
         ],
@@ -45,7 +45,7 @@ describe("reduceCodexChatState", () => {
       attachments: [
         {
           type: "localImage",
-          path: "/tmp/attachments/thread_123/screenshot.png",
+          path: "/root/.local/attachments/thread_123/screenshot.png",
         },
       ],
     });
@@ -69,7 +69,7 @@ describe("reduceCodexChatState", () => {
         attachments: [
           {
             kind: "image",
-            path: "/tmp/attachments/thread_123/screenshot.png",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
             name: "screenshot.png",
           },
         ],
@@ -114,7 +114,7 @@ describe("reduceCodexChatState", () => {
                 },
                 {
                   type: "localImage",
-                  path: "/tmp/attachments/thread_123/screenshot.png",
+                  path: "/root/.local/attachments/thread_123/screenshot.png",
                 },
               ],
             },
@@ -132,7 +132,7 @@ describe("reduceCodexChatState", () => {
         attachments: [
           {
             kind: "image",
-            path: "/tmp/attachments/thread_123/screenshot.png",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
             name: "screenshot.png",
           },
         ],
@@ -159,7 +159,7 @@ describe("reduceCodexChatState", () => {
                     "Review these screenshots",
                     "",
                     "Attached images:",
-                    "- /tmp/attachments/thread_123/screenshot.png",
+                    "- /root/.local/attachments/thread_123/screenshot.png",
                   ].join("\n"),
                 },
               ],
@@ -178,7 +178,7 @@ describe("reduceCodexChatState", () => {
           "Review these screenshots",
           "",
           "Attached images:",
-          "- /tmp/attachments/thread_123/screenshot.png",
+          "- /root/.local/attachments/thread_123/screenshot.png",
         ].join("\n"),
         status: "completed",
       },

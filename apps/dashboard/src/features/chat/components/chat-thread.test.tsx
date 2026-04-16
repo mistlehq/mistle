@@ -303,7 +303,7 @@ describe("ChatThread", () => {
             attachments: [
               {
                 kind: "image",
-                path: "/tmp/attachments/thread_1/screenshot.png",
+                path: "/root/.local/attachments/thread_1/screenshot.png",
                 name: "screenshot.png",
               },
             ],

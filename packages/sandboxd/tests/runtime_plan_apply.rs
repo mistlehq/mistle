@@ -119,6 +119,127 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         "hello from source repo\n"
     );
 
+    fs::write(&runtime_file_path, "{\"ok\":false}")
+        .expect("overwrite fixture should remain writable between cold starts");
+    fs::write(&if_absent_path, "keep-me-local")
+        .expect("if-absent fixture should remain writable between cold starts");
+    fs::write(clone_target_path.join("README.md"), "local workspace change\n")
+        .expect("existing git repository should remain writable between cold starts");
+    fs::write(clone_target_path.join("LOCAL_ONLY.txt"), "local only\n")
+        .expect("untracked file fixture should be writable");
+
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("cold init rerun should succeed against a reused durable filesystem");
+
+    assert_eq!(
+        fs::read_to_string(&runtime_file_path)
+            .expect("overwrite runtime file should exist after cold init rerun"),
+        "{\"ok\":true}"
+    );
+    assert_eq!(
+        fs::read_to_string(&if_absent_path)
+            .expect("if-absent runtime file should still exist after cold init rerun"),
+        "keep-me-local"
+    );
+    assert_eq!(
+        fs::read_to_string(clone_target_path.join("README.md"))
+            .expect("existing git repository should still be present after cold init rerun"),
+        "local workspace change\n"
+    );
+    assert_eq!(
+        fs::read_to_string(clone_target_path.join("LOCAL_ONLY.txt"))
+            .expect("untracked workspace file should still exist after cold init rerun"),
+        "local only\n"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+#[test]
+fn preserves_existing_non_git_workspace_source_target() {
+    let test_dir = create_temp_test_dir("runtime_plan_non_git_workspace");
+    let clone_source_path = test_dir.join("source-repo");
+    let clone_target_path = test_dir.join("workspace").join("repo");
+    create_git_repository(&clone_source_path);
+    fs::create_dir_all(&clone_target_path)
+        .expect("non-git workspace directory fixture should be creatable");
+    fs::write(clone_target_path.join("plain.txt"), "not a repository")
+        .expect("non-git workspace fixture should be writable");
+
+    let startup_input = create_runtime_plan_apply_input(&clone_source_path, &clone_target_path);
+
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("cold init should leave an existing non-git workspace path in place");
+
+    assert_eq!(
+        fs::read_to_string(clone_target_path.join("plain.txt"))
+            .expect("existing non-git workspace contents should be preserved"),
+        "not a repository"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+#[test]
+fn preserves_existing_workspace_source_target_inside_another_repository() {
+    let test_dir = create_temp_test_dir("runtime_plan_nested_non_git_workspace");
+    let clone_source_path = test_dir.join("source-repo");
+    let enclosing_repo_path = test_dir.join("enclosing-repo");
+    let clone_target_path = enclosing_repo_path.join("nested").join("repo");
+    create_git_repository(&clone_source_path);
+    create_git_repository(&enclosing_repo_path);
+    fs::create_dir_all(&clone_target_path)
+        .expect("nested non-git workspace directory fixture should be creatable");
+    fs::write(clone_target_path.join("plain.txt"), "not the repo root")
+        .expect("nested non-git workspace fixture should be writable");
+
+    let startup_input = create_runtime_plan_apply_input(&clone_source_path, &clone_target_path);
+
+    runtime::apply_runtime_plan(&startup_input).expect(
+        "cold init should leave an existing workspace path alone even when it sits inside another repository",
+    );
+
+    assert_eq!(
+        fs::read_to_string(clone_target_path.join("plain.txt"))
+            .expect("nested workspace path contents should be preserved"),
+        "not the repo root"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
+#[test]
+fn preserves_existing_git_repository_with_origin_mismatch() {
+    let test_dir = create_temp_test_dir("runtime_plan_origin_mismatch");
+    let clone_source_path = test_dir.join("source-repo");
+    let mismatched_origin_path = test_dir.join("other-source-repo");
+    let clone_target_path = test_dir.join("workspace").join("repo");
+    create_git_repository(&clone_source_path);
+    create_git_repository(&mismatched_origin_path);
+
+    let startup_input = create_runtime_plan_apply_input(&clone_source_path, &clone_target_path);
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("initial clone should succeed before origin mismatch is introduced");
+
+    run_command(
+        &[
+            "git",
+            "remote",
+            "set-url",
+            "origin",
+            &mismatched_origin_path.display().to_string(),
+        ],
+        &clone_target_path,
+    );
+
+    runtime::apply_runtime_plan(&startup_input)
+        .expect("cold init should leave an existing git repository in place even when origin changes");
+
+    assert_eq!(
+        git_remote_url(&clone_target_path, "origin"),
+        mismatched_origin_path.display().to_string()
+    );
+
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }
 
@@ -608,6 +729,36 @@ fn create_git_repository(path: &Path) {
     run_command(&["git", "commit", "--quiet", "-m", "initial commit"], path);
 }
 
+fn create_runtime_plan_apply_input(clone_source_path: &Path, clone_target_path: &Path) -> StartupInput {
+    StartupInput {
+        startup_mode: StartupMode::New,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        runtime_plan: serde_json::json!({
+          "sandboxProfileId": "sbp_123",
+          "version": 1,
+          "image": {
+            "source": "base",
+            "imageRef": "mistle/sandbox-base:dev"
+          },
+          "egressRoutes": [],
+          "artifacts": [],
+          "runtimeClients": [],
+          "workspaceSources": [
+            {
+              "sourceKind": "git-clone",
+              "resourceKind": "repository",
+              "path": clone_target_path.display().to_string(),
+              "originUrl": clone_source_path.display().to_string()
+            }
+          ],
+          "agentRuntimes": []
+        }),
+        egress_grant_by_rule_id: BTreeMap::new(),
+    }
+}
+
 fn run_command(args: &[&str], cwd: &Path) {
     let status = Command::new(args[0])
         .args(&args[1..])
@@ -615,6 +766,23 @@ fn run_command(args: &[&str], cwd: &Path) {
         .status()
         .expect("test helper command should start");
     assert!(status.success(), "test helper command should succeed");
+}
+
+fn git_remote_url(path: &Path, remote_name: &str) -> String {
+    let output = Command::new("git")
+        .args(["remote", "get-url", remote_name])
+        .current_dir(path)
+        .output()
+        .expect("git remote get-url should execute");
+    assert!(
+        output.status.success(),
+        "git remote get-url should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("git remote get-url output should be valid utf-8")
+        .trim()
+        .to_string()
 }
 
 fn create_temp_test_dir(prefix: &str) -> PathBuf {

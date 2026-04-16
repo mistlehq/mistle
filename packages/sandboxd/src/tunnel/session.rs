@@ -85,7 +85,7 @@ use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
-pub const DEFAULT_ATTACHMENT_ROOT: &str = "/tmp/attachments";
+pub const DEFAULT_ATTACHMENT_ROOT: &str = "/root/.local/attachments";
 /// Poll interval while the live tunnel session has no immediately available work.
 pub const DEFAULT_TUNNEL_SESSION_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Poll interval while PTY output threads wait for the next blocking event.
@@ -110,6 +110,23 @@ const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
+
+fn resolve_default_attachment_root() -> PathBuf {
+    if let Some(attachment_root) = crate::test_support::attachment_root_override() {
+        return attachment_root;
+    }
+
+    #[cfg(test)]
+    {
+        std::env::temp_dir().join(format!(
+            "mistle-sandboxd-test-attachments-{}",
+            std::process::id()
+        ))
+    }
+
+    #[cfg(not(test))]
+    PathBuf::from(DEFAULT_ATTACHMENT_ROOT)
+}
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
 #[derive(Debug)]
@@ -350,7 +367,7 @@ impl TunnelSession {
             )]),
         );
         supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
-        let attachment_root = PathBuf::from(DEFAULT_ATTACHMENT_ROOT);
+        let attachment_root = resolve_default_attachment_root();
         fs::create_dir_all(&attachment_root)
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 

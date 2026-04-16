@@ -10,7 +10,7 @@ describe("buildCodexTurnInputItems", () => {
         attachments: [
           {
             type: "localImage",
-            path: "/tmp/attachments/thread_123/image.png",
+            path: "/root/.local/attachments/thread_123/image.png",
           },
         ],
       }),
@@ -21,7 +21,7 @@ describe("buildCodexTurnInputItems", () => {
       },
       {
         type: "localImage",
-        path: "/tmp/attachments/thread_123/image.png",
+        path: "/root/.local/attachments/thread_123/image.png",
       },
     ]);
   });
@@ -33,14 +33,14 @@ describe("buildCodexTurnInputItems", () => {
         attachments: [
           {
             type: "localImage",
-            path: "/tmp/attachments/thread_123/image.png",
+            path: "/root/.local/attachments/thread_123/image.png",
           },
         ],
       }),
     ).toEqual([
       {
         type: "localImage",
-        path: "/tmp/attachments/thread_123/image.png",
+        path: "/root/.local/attachments/thread_123/image.png",
       },
     ]);
   });
