@@ -3,7 +3,6 @@ import { ArrowSquareOutIcon, BooksIcon, RocketLaunchIcon } from "@phosphor-icons
 import {
   NavigationMenu,
   NavigationMenuContent,
-  NavigationMenuIndicator,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
@@ -46,7 +45,6 @@ export const Default = {
             </NavigationMenuLink>
           </NavigationMenuItem>
         </NavigationMenuList>
-        <NavigationMenuIndicator />
       </NavigationMenu>
     );
   },
