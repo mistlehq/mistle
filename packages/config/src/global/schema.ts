@@ -2,21 +2,13 @@ import { z } from "zod";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 
-export const E2BSandboxStorageBackends = {
+export const SandboxStorageBackend = {
   ARCHIL: "archil",
-} as const;
-
-export const DockerSandboxStorageBackends = {
   DOCKER_VOLUME: "docker_volume",
 } as const;
 
-export type E2BSandboxStorageBackend =
-  (typeof E2BSandboxStorageBackends)[keyof typeof E2BSandboxStorageBackends];
-
-export type DockerSandboxStorageBackend =
-  (typeof DockerSandboxStorageBackends)[keyof typeof DockerSandboxStorageBackends];
-
-export type SandboxStorageBackend = E2BSandboxStorageBackend | DockerSandboxStorageBackend;
+export type SandboxStorageBackend =
+  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
 
 const GlobalTelemetryEndpointSchema = z
   .url()
@@ -117,15 +109,13 @@ export const PartialGlobalSandboxPublishConfigSchema = z
 
 export const GlobalSandboxStorageConfigSchema = z
   .object({
-    e2b: z.enum([E2BSandboxStorageBackends.ARCHIL]).optional(),
-    docker: z.enum([DockerSandboxStorageBackends.DOCKER_VOLUME]).optional(),
+    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
   })
   .strict();
 
 export const PartialGlobalSandboxStorageConfigSchema = z
   .object({
-    e2b: z.enum([E2BSandboxStorageBackends.ARCHIL]).optional(),
-    docker: z.enum([DockerSandboxStorageBackends.DOCKER_VOLUME]).optional(),
+    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
   })
   .strict();
 

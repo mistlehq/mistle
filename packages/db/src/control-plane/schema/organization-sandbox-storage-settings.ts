@@ -9,15 +9,16 @@ export const SandboxStorageConfigSources = {
   ORGANIZATION: "organization",
 } as const;
 
-export const SandboxStorageBackends = {
+export const SandboxStorageBackend = {
   ARCHIL: "archil",
+  DOCKER_VOLUME: "docker_volume",
 } as const;
 
 export type SandboxStorageConfigSource =
   (typeof SandboxStorageConfigSources)[keyof typeof SandboxStorageConfigSources];
 
 export type SandboxStorageBackend =
-  (typeof SandboxStorageBackends)[keyof typeof SandboxStorageBackends];
+  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
 
 export const organizationSandboxStorageSettings = controlPlaneSchema.table(
   "organization_sandbox_storage_settings",

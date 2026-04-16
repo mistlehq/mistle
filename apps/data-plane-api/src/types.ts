@@ -12,10 +12,7 @@ export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult[
 type DataPlaneApiGlobalSandboxStorageConfig = NonNullable<
   DataPlaneApiGlobalConfig["sandbox"]["storage"]
 >;
-export type DataPlaneApiSandboxStorageBackend =
-  | DataPlaneApiGlobalSandboxStorageConfig["e2b"]
-  | DataPlaneApiGlobalSandboxStorageConfig["docker"]
-  | undefined;
+export type DataPlaneApiSandboxStorageBackend = DataPlaneApiGlobalSandboxStorageConfig["backend"];
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
   internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
@@ -65,11 +62,5 @@ export type DataPlaneApiRuntime = {
 export function resolveConfiguredSandboxStorageBackend(input: {
   globalConfig: DataPlaneApiGlobalConfig;
 }): DataPlaneApiSandboxStorageBackend {
-  const sandboxStorageConfig = input.globalConfig.sandbox.storage;
-
-  if (input.globalConfig.sandbox.provider === "e2b") {
-    return sandboxStorageConfig?.e2b;
-  }
-
-  return sandboxStorageConfig?.docker;
+  return input.globalConfig.sandbox.storage?.backend;
 }

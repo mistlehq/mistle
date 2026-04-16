@@ -160,12 +160,8 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
 
 const loadSandboxStorageEnv = createEnvLoader<typeof PartialGlobalSandboxStorageConfigSchema>([
   {
-    key: "e2b",
-    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_E2B",
-  },
-  {
-    key: "docker",
-    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_DOCKER",
+    key: "backend",
+    envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND",
   },
 ]);
 

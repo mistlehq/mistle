@@ -1,4 +1,9 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  SandboxStorageBackend,
+  type SandboxStorageBackend as SandboxStorageBackendValue,
+} from "@mistle/db/control-plane";
+import { SandboxProvider, type SandboxProvider as SandboxProviderValue } from "@mistle/sandbox";
 
 import type { OrganizationSandboxStorageConfigV1 } from "../storage-config.js";
 import {
@@ -24,13 +29,13 @@ type ResolveSandboxStorageConfigurationResponse =
   | {
       persistentSandboxesEnabled: true;
       storageConfigSource: "managed";
-      storageBackend: "archil" | "docker_volume";
+      storageBackend: SandboxStorageBackendValue;
       organizationStorageConfig: null;
     }
   | {
       persistentSandboxesEnabled: true;
       storageConfigSource: "organization";
-      storageBackend: "archil";
+      storageBackend: typeof SandboxStorageBackend.ARCHIL;
       organizationStorageConfig: OrganizationSandboxStorageConfigV1;
     };
 
@@ -56,7 +61,8 @@ export async function resolveSandboxStoragePersistenceMode(input: {
 export async function resolveSandboxStorageConfiguration(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
-  runtimeProvider: "e2b" | "docker";
+  runtimeProvider: SandboxProviderValue;
+  managedStorageBackend: SandboxStorageBackendValue | undefined;
   encryptionConfig: OrganizationCredentialEncryptionConfig;
 }): Promise<ResolveSandboxStorageConfigurationResponse> {
   const settings = await resolveOrganizationSandboxStorageSettings(input);
@@ -70,25 +76,28 @@ export async function resolveSandboxStorageConfiguration(input: {
     };
   }
 
-  if (input.runtimeProvider === "docker") {
+  if (input.managedStorageBackend === undefined) {
+    throw new Error(
+      `Persistent sandboxes are enabled for organization '${input.organizationId}' but no managed sandbox storage backend is configured.`,
+    );
+  }
+
+  if (
+    input.runtimeProvider === SandboxProvider.DOCKER ||
+    settings.storageConfigSource === "managed"
+  ) {
     return {
       persistentSandboxesEnabled: true,
       storageConfigSource: "managed",
-      storageBackend: "docker_volume",
+      storageBackend: input.managedStorageBackend,
       organizationStorageConfig: null,
     };
   }
 
-  if (settings.storageConfigSource === "managed") {
-    return {
-      persistentSandboxesEnabled: true,
-      storageConfigSource: "managed",
-      storageBackend: "archil",
-      organizationStorageConfig: null,
-    };
-  }
-
-  if (settings.organizationStorageConfig === null || settings.storageBackend !== "archil") {
+  if (
+    settings.organizationStorageConfig === null ||
+    settings.storageBackend !== SandboxStorageBackend.ARCHIL
+  ) {
     throw new Error(
       `Expected organization storage override for organization '${input.organizationId}'.`,
     );
@@ -97,7 +106,7 @@ export async function resolveSandboxStorageConfiguration(input: {
   return {
     persistentSandboxesEnabled: true,
     storageConfigSource: "organization",
-    storageBackend: "archil",
+    storageBackend: SandboxStorageBackend.ARCHIL,
     organizationStorageConfig: settings.organizationStorageConfig,
   };
 }

@@ -113,6 +113,9 @@ importers:
       '@mistle/port-access-auth':
         specifier: workspace:*
         version: link:../../packages/port-access-auth
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

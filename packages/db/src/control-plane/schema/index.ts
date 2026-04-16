@@ -144,11 +144,10 @@ export {
 } from "./organization-credential-keys.js";
 export {
   organizationSandboxStorageSettings,
-  SandboxStorageBackends,
+  SandboxStorageBackend,
   SandboxStorageConfigSources,
   type InsertOrganizationSandboxStorageSettings,
   type OrganizationSandboxStorageSettings,
-  type SandboxStorageBackend,
   type SandboxStorageConfigSource,
 } from "./organization-sandbox-storage-settings.js";
 export { organizations } from "./organizations.js";

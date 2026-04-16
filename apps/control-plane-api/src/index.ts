@@ -25,6 +25,7 @@ async function startControlPlaneApi(): Promise<void> {
     sandbox: {
       defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
       gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
+      storageBackend: globalConfig.sandbox.storage?.backend,
     },
   });
 

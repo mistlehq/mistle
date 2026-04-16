@@ -68,8 +68,7 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
     typeof sandboxBootstrap.token_secret === "string" ||
     typeof sandboxConnect.token_secret === "string" ||
     typeof sandboxEgress.token_secret === "string" ||
-    typeof sandboxStorage.e2b === "string" ||
-    typeof sandboxStorage.docker === "string" ||
+    typeof sandboxStorage.backend === "string" ||
     typeof sandboxPublish.base_domain === "string" ||
     typeof sandboxPublishAccess.token_secret === "string" ||
     typeof sandboxPublishSession.cookie_signing_secret === "string"
@@ -94,11 +93,10 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
               tokenIssuer: sandboxEgress.token_issuer,
               tokenAudience: sandboxEgress.token_audience,
             },
-            ...(typeof sandboxStorage.e2b === "string" || typeof sandboxStorage.docker === "string"
+            ...(typeof sandboxStorage.backend === "string"
               ? {
                   storage: {
-                    e2b: sandboxStorage.e2b,
-                    docker: sandboxStorage.docker,
+                    backend: sandboxStorage.backend,
                   },
                 }
               : {}),

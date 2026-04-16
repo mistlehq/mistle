@@ -171,7 +171,7 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
   it("requires Archil worker config when Archil storage is enabled", () => {
     const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
       globalSandboxStorageConfig: {
-        e2b: "archil",
+        backend: "archil",
       },
       appConfig: {
         database: {
@@ -202,14 +202,14 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
     expect(issue).toEqual({
       path: ["sandboxStorage", "archil"],
       message:
-        "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.e2b is 'archil'.",
+        "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
     });
   });
 
   it("requires docker volume worker config when Docker volume storage is enabled", () => {
     const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
       globalSandboxStorageConfig: {
-        docker: "docker_volume",
+        backend: "docker_volume",
       },
       appConfig: {
         database: {
@@ -240,7 +240,7 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
     expect(issue).toEqual({
       path: ["sandboxStorage", "dockerVolume"],
       message:
-        "apps.data_plane_worker.sandbox_storage.docker_volume is required when global.sandbox.storage.docker is 'docker_volume'.",
+        "apps.data_plane_worker.sandbox_storage.docker_volume is required when global.sandbox.storage.backend is 'docker_volume'.",
     });
   });
 });

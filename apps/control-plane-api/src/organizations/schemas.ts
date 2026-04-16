@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { SandboxStorageBackends, SandboxStorageConfigSources } from "@mistle/db/control-plane";
+import { SandboxStorageBackend, SandboxStorageConfigSources } from "@mistle/db/control-plane";
 
 import { ORGANIZATION_ROLES } from "../auth/services/organization-policy.js";
 import { singletonImageMetadataResponseSchema } from "../lib/singleton-image-metadata.js";
@@ -98,7 +98,9 @@ export const GetOrganizationSandboxStorageSettingsResponseSchema = z
       SandboxStorageConfigSources.MANAGED,
       SandboxStorageConfigSources.ORGANIZATION,
     ]),
-    storageBackend: z.enum([SandboxStorageBackends.ARCHIL]).nullable(),
+    storageBackend: z
+      .enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME])
+      .nullable(),
     storageConfigVersion: z.number().int().nullable(),
     organizationStorageConfigSummary: OrganizationSandboxStorageConfigSummarySchema.nullable(),
   })

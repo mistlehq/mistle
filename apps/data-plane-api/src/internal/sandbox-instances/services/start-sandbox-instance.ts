@@ -7,6 +7,7 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
+import { SandboxProvider } from "@mistle/sandbox";
 import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { typeid } from "typeid-js";
 import { z } from "zod";
@@ -66,7 +67,10 @@ export function resolveSandboxInstancePersistenceMode(input: {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
 
-  if (input.sandboxProvider === "e2b" && input.configuredStorageBackend === "archil") {
+  if (
+    input.sandboxProvider === SandboxProvider.E2B &&
+    input.configuredStorageBackend === "archil"
+  ) {
     return SandboxInstancePersistenceModes.PERSISTENT;
   }
 

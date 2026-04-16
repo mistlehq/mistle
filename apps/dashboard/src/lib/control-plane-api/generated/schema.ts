@@ -3998,7 +3998,7 @@ export interface paths {
               } | null;
               persistentSandboxesEnabled: boolean;
               /** @enum {string|null} */
-              storageBackend: "archil" | null;
+              storageBackend: "archil" | "docker_volume" | null;
               /** @enum {string} */
               storageConfigSource: "managed" | "organization";
               storageConfigVersion: number | null;
@@ -4126,7 +4126,7 @@ export interface paths {
               } | null;
               persistentSandboxesEnabled: boolean;
               /** @enum {string|null} */
-              storageBackend: "archil" | null;
+              storageBackend: "archil" | "docker_volume" | null;
               /** @enum {string} */
               storageConfigSource: "managed" | "organization";
               storageConfigVersion: number | null;

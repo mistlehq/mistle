@@ -2,7 +2,7 @@ import {
   MemberRoles,
   members,
   organizationSandboxStorageSettings,
-  SandboxStorageBackends,
+  SandboxStorageBackend,
   SandboxStorageConfigSources,
   sessions,
 } from "@mistle/db/control-plane";
@@ -113,7 +113,7 @@ describe("organization sandbox storage settings", () => {
     expect(storedSettings).toMatchObject({
       organizationId: session.organizationId,
       persistentSandboxesEnabled: true,
-      storageBackend: SandboxStorageBackends.ARCHIL,
+      storageBackend: SandboxStorageBackend.ARCHIL,
       storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
       storageConfigVersion: 1,
     });
@@ -141,7 +141,7 @@ describe("organization sandbox storage settings", () => {
     await fixture.db.insert(organizationSandboxStorageSettings).values({
       organizationId: session.organizationId,
       persistentSandboxesEnabled: true,
-      storageBackend: SandboxStorageBackends.ARCHIL,
+      storageBackend: SandboxStorageBackend.ARCHIL,
       storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
       storageConfigVersion: 1,
       storageConfigCiphertext: "ciphertext",

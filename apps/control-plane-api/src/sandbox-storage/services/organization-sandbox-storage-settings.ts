@@ -1,6 +1,6 @@
 import {
   organizationSandboxStorageSettings,
-  SandboxStorageBackends,
+  SandboxStorageBackend as SandboxStorageBackendValues,
   SandboxStorageConfigSources,
   type ControlPlaneDatabase,
   type SandboxStorageBackend,
@@ -75,7 +75,7 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
     };
   }
 
-  if (settings.storageBackend !== SandboxStorageBackends.ARCHIL) {
+  if (settings.storageBackend !== SandboxStorageBackendValues.ARCHIL) {
     throw new Error(
       `Unsupported organization sandbox storage backend '${String(settings.storageBackend)}' for organization '${input.organizationId}'.`,
     );
@@ -107,7 +107,7 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
   return {
     persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
     storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
-    storageBackend: SandboxStorageBackends.ARCHIL,
+    storageBackend: SandboxStorageBackendValues.ARCHIL,
     storageConfigVersion: OrganizationSandboxStorageConfigVersion,
     organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema.parse(
       JSON.parse(plaintext),

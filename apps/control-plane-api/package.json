@@ -31,6 +31,7 @@
     "@mistle/logging": "workspace:*",
     "@mistle/object-store": "workspace:*",
     "@mistle/port-access-auth": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/webhooks": "workspace:*",
