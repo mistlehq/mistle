@@ -24,15 +24,14 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
+import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
 import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { insertSandboxInstanceStorage } from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
+import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
-import {
-  insertSandboxInstanceStorage,
-  resolveReadyArchilSandboxStorage,
-} from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
 import { startControlPlaneApiProcess } from "./helpers/control-plane-api.js";
 import { insertInitialOrganizationCredentialKey } from "./helpers/organization-credential-keys.js";
 
@@ -67,6 +66,46 @@ function createControlPlaneDb() {
 
 function createDataPlaneDb() {
   return createDataPlaneDatabase(getDbPool());
+}
+
+function createArchilStorageBackendAdapter(input: {
+  db: ReturnType<typeof createDataPlaneDb>;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+}) {
+  return createSandboxStorageBackendAdapter({
+    db: input.db,
+    controlPlaneInternalClient: input.controlPlaneInternalClient,
+    workerConfig: {
+      database: { url: "postgresql://unused" },
+      workflow: {
+        databaseUrl: "postgresql://unused",
+        namespaceId: "integration",
+        runMigrations: false,
+        concurrency: 1,
+      },
+      tunnel: {
+        bootstrapTokenTtlSeconds: 120,
+        exchangeTokenTtlSeconds: 3600,
+      },
+      runtimeState: {
+        gatewayBaseUrl: "http://127.0.0.1:5202",
+      },
+      controlPlaneApi: {
+        baseUrl: "http://127.0.0.1:5100",
+      },
+      sandbox: {
+        tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
+      },
+      sandboxStorage: {
+        archil: {
+          apiKey: "managed-api-key",
+          region: "aws-us-east-1",
+        },
+      },
+    },
+    runtimeProvider: SandboxProvider.E2B,
+    storageBackend: SandboxStorageBackend.ARCHIL,
+  });
 }
 
 async function seedOrganizationWithCredentialKey(input: { organizationId: string }): Promise<void> {
@@ -161,7 +200,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
-          runtimeProvider: "docker",
+          runtimeProvider: "e2b",
         },
         {
           sandboxInstanceId,
@@ -200,21 +239,25 @@ describe("resolve ready Archil sandbox storage integration", () => {
         },
       );
 
-      const resolvedStorage = await resolveReadyArchilSandboxStorage({
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
         controlPlaneInternalClient,
+      });
+
+      const resolvedStorage = await storageBackendAdapter.resolveAttachment({
         organizationId,
         sandboxInstanceId,
       });
 
-      expect(resolvedStorage.diskToken).toBe("disk-token-pr5");
-      expect(resolvedStorage.storage).toMatchObject({
-        sandboxInstanceId,
-        provider: SandboxStorageProviders.ARCHIL,
+      if (resolvedStorage.backend !== SandboxStorageBackend.ARCHIL) {
+        throw new Error("Expected Archil sandbox storage attachment.");
+      }
+
+      expect(resolvedStorage.credential).toBe("disk-token-pr5");
+      expect(resolvedStorage).toMatchObject({
+        backend: SandboxStorageBackend.ARCHIL,
         handle: "dsk-0123456789abcdef",
         region: "aws-us-east-1",
-        status: SandboxStorageStatuses.READY,
-        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
       });
     },
     IntegrationTestTimeoutMs,
@@ -239,7 +282,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
-        runtimeProvider: "docker",
+        runtimeProvider: "e2b",
       },
       {
         sandboxInstanceId,
@@ -255,10 +298,13 @@ describe("resolve ready Archil sandbox storage integration", () => {
       },
     );
 
+    const storageBackendAdapter = createArchilStorageBackendAdapter({
+      db: createDataPlaneDb(),
+      controlPlaneInternalClient,
+    });
+
     await expect(
-      resolveReadyArchilSandboxStorage({
-        db: createDataPlaneDb(),
-        controlPlaneInternalClient,
+      storageBackendAdapter.resolveAttachment({
         organizationId,
         sandboxInstanceId,
       }),
@@ -286,7 +332,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
-        runtimeProvider: "docker",
+        runtimeProvider: "e2b",
       },
       {
         sandboxInstanceId,
@@ -325,10 +371,13 @@ describe("resolve ready Archil sandbox storage integration", () => {
       },
     );
 
+    const storageBackendAdapter = createArchilStorageBackendAdapter({
+      db: createDataPlaneDb(),
+      controlPlaneInternalClient,
+    });
+
     await expect(
-      resolveReadyArchilSandboxStorage({
-        db: createDataPlaneDb(),
-        controlPlaneInternalClient,
+      storageBackendAdapter.resolveAttachment({
         organizationId,
         sandboxInstanceId,
       }),
@@ -357,7 +406,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
-        runtimeProvider: "docker",
+        runtimeProvider: "e2b",
       },
       {
         sandboxInstanceId,
@@ -396,10 +445,13 @@ describe("resolve ready Archil sandbox storage integration", () => {
       },
     );
 
+    const storageBackendAdapter = createArchilStorageBackendAdapter({
+      db: createDataPlaneDb(),
+      controlPlaneInternalClient,
+    });
+
     await expect(
-      resolveReadyArchilSandboxStorage({
-        db: createDataPlaneDb(),
-        controlPlaneInternalClient,
+      storageBackendAdapter.resolveAttachment({
         organizationId: wrongOrganizationId,
         sandboxInstanceId,
       }),

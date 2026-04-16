@@ -23,28 +23,65 @@ export interface SandboxPrepareStorageForStartRequest {
   readonly sandboxInstanceId: string;
 }
 
-export const SandboxAttachedStorageBackends = {
+export const SandboxStorageBackend = {
   ARCHIL: "archil",
+  DOCKER_VOLUME: "docker_volume",
 } as const;
-export type SandboxAttachedStorageBackend =
-  (typeof SandboxAttachedStorageBackends)[keyof typeof SandboxAttachedStorageBackends];
+export type SandboxStorageBackend =
+  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
 
-export interface SandboxAttachedArchilStorage {
-  readonly backend: typeof SandboxAttachedStorageBackends.ARCHIL;
+export interface SandboxStorageAttachmentBinding {
+  readonly sourcePath: string;
+  readonly targetPath: string;
+}
+
+export interface SandboxStorageAttachmentLayout {
+  readonly bindings: readonly SandboxStorageAttachmentBinding[];
+}
+
+export const SandboxPersistentStorageLayout: SandboxStorageAttachmentLayout = {
+  bindings: [
+    {
+      sourcePath: "root",
+      targetPath: "/root",
+    },
+    {
+      sourcePath: "etc/codex",
+      targetPath: "/etc/codex",
+    },
+    {
+      sourcePath: "usr/local/bin",
+      targetPath: "/usr/local/bin",
+    },
+  ],
+};
+
+interface SandboxArchilStorageReference {
+  readonly backend: typeof SandboxStorageBackend.ARCHIL;
   readonly handle: string;
   readonly region: string;
+  readonly layout: SandboxStorageAttachmentLayout;
+}
+
+export interface SandboxArchilStorageAttachment extends SandboxArchilStorageReference {
   readonly credential: string;
 }
 
-export type SandboxAttachedStorage = SandboxAttachedArchilStorage;
-
-export interface SandboxCleanupArchilStorage {
-  readonly backend: typeof SandboxAttachedStorageBackends.ARCHIL;
+export interface SandboxDockerVolumeStorageAttachment {
+  readonly backend: typeof SandboxStorageBackend.DOCKER_VOLUME;
   readonly handle: string;
-  readonly region: string;
+  readonly layout: SandboxStorageAttachmentLayout;
 }
 
-export type SandboxCleanupStorage = SandboxCleanupArchilStorage;
+export type SandboxStorageAttachment =
+  | SandboxArchilStorageAttachment
+  | SandboxDockerVolumeStorageAttachment;
+
+export interface SandboxArchilStorageCleanup extends SandboxArchilStorageReference {}
+
+export type SandboxStorageCleanup =
+  | SandboxArchilStorageCleanup
+  | SandboxDockerVolumeStorageAttachment;
 
 export const SandboxStorageAttachLifecycles = {
   START: "start",
@@ -71,13 +108,13 @@ export interface SandboxAttachStorageRequest {
   readonly sandboxInstanceId: string;
   readonly sandbox: SandboxHandle;
   readonly lifecycle: SandboxStorageAttachLifecycle;
-  readonly storage: SandboxAttachedStorage;
+  readonly storage: SandboxStorageAttachment;
 }
 
 export interface SandboxCleanupStorageRequest {
   readonly sandboxInstanceId: string;
   readonly sandbox: SandboxHandle;
-  readonly storage: SandboxCleanupStorage;
+  readonly storage: SandboxStorageCleanup;
   readonly lifecycle: SandboxStorageCleanupLifecycle;
   readonly timing: SandboxStorageCleanupTiming;
 }

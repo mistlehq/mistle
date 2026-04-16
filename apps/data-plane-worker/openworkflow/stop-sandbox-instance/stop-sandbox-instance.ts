@@ -1,3 +1,4 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
@@ -84,6 +85,7 @@ export async function stopSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
@@ -120,6 +122,7 @@ export async function stopSandboxInstance(
     await stopSandbox(
       {
         db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
       },

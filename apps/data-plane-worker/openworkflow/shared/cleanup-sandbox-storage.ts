@@ -1,23 +1,28 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstancePersistenceModes,
   type DataPlaneDatabase,
   type SandboxInstancePersistenceMode,
 } from "@mistle/db/data-plane";
 import {
-  SandboxAttachedStorageBackends,
   SandboxStorageCleanupLifecycles,
   SandboxStorageCleanupTimings,
   type SandboxAdapter,
   type SandboxProvider,
+  type SandboxStorageBackend,
 } from "@mistle/sandbox";
 
-import { requireReadyArchilSandboxStorage } from "../start-sandbox-instance/provision-sandbox-storage.js";
+import type { DataPlaneWorkerConfig } from "../core/config.js";
+import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
 
 export async function cleanupSandboxStorage(
   ctx: {
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
+    workerConfig: DataPlaneWorkerConfig;
     configuredSandboxProvider: SandboxProvider;
     sandboxAdapter: SandboxAdapter;
+    storageBackend: SandboxStorageBackend | undefined;
   },
   input: {
     sandboxInstanceId: string;
@@ -38,11 +43,16 @@ export async function cleanupSandboxStorage(
     );
   }
 
-  const storage = requireReadyArchilSandboxStorage({
+  const storageBackendAdapter = createSandboxStorageBackendAdapter({
+    db: ctx.db,
+    controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+    workerConfig: ctx.workerConfig,
+    runtimeProvider: input.runtimeProvider,
+    storageBackend: ctx.storageBackend,
+  });
+
+  const storage = await storageBackendAdapter.resolveCleanup({
     sandboxInstanceId: input.sandboxInstanceId,
-    storage: await ctx.db.query.sandboxInstanceStorages.findFirst({
-      where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
-    }),
   });
 
   await ctx.sandboxAdapter.cleanupStorage({
@@ -51,11 +61,7 @@ export async function cleanupSandboxStorage(
       provider: input.runtimeProvider,
       id: input.providerSandboxId,
     },
-    storage: {
-      backend: SandboxAttachedStorageBackends.ARCHIL,
-      handle: storage.handle,
-      region: storage.region,
-    },
+    storage,
     lifecycle:
       input.lifecycle === "stop"
         ? SandboxStorageCleanupLifecycles.STOP

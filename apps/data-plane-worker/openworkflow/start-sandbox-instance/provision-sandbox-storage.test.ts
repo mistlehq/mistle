@@ -11,7 +11,7 @@ import {
   createArchilDiskRequest,
   requireReadyArchilSandboxStorage,
   resolveArchilProvisioningProfile,
-} from "./provision-sandbox-storage.js";
+} from "../shared/sandbox-storage/archil-storage-backend.js";
 
 function createSandboxInstanceStorage(
   input: Partial<{
@@ -40,7 +40,7 @@ function createSandboxInstanceStorage(
   };
 }
 
-describe("provisionSandboxStorage helpers", () => {
+describe("Archil sandbox storage backend helpers", () => {
   it("builds the Archil disk name from the sandbox instance id when no prefix is set", () => {
     expect(
       createArchilDiskName({

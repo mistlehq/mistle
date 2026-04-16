@@ -17,6 +17,7 @@ export const HandleSandboxInstanceDeadlineWorkflow = defineTracedDataPlaneWorkfl
         {
           config: ctx.config,
           db: ctx.db,
+          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxAdapter: ctx.sandboxAdapter,
           runtimeStateReader: ctx.runtimeStateReader,
           clock: ctx.clock,

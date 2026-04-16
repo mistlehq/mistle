@@ -5,7 +5,10 @@ import {
 } from "../../errors.js";
 import {
   SandboxProvider,
+  SandboxStorageBackend,
   type SandboxAdapter,
+  type SandboxArchilStorageAttachment,
+  type SandboxArchilStorageCleanup,
   type SandboxAttachStorageRequest,
   type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
@@ -45,6 +48,26 @@ function requireSandboxId(id: string): void {
   if (id.trim().length === 0) {
     throw new SandboxConfigurationError("Sandbox id is required.");
   }
+}
+
+function requireArchilStorageAttachment(
+  request: SandboxAttachStorageRequest,
+): SandboxArchilStorageAttachment {
+  if (request.storage.backend !== SandboxStorageBackend.ARCHIL) {
+    throw new SandboxConfigurationError("E2B adapter expected an Archil storage attachment.");
+  }
+
+  return request.storage;
+}
+
+function requireArchilStorageCleanup(
+  request: SandboxCleanupStorageRequest,
+): SandboxArchilStorageCleanup {
+  if (request.storage.backend !== SandboxStorageBackend.ARCHIL) {
+    throw new SandboxConfigurationError("E2B adapter expected an Archil storage cleanup payload.");
+  }
+
+  return request.storage;
 }
 
 export class E2BSandboxAdapter implements SandboxAdapter {
@@ -103,15 +126,17 @@ export class E2BSandboxAdapter implements SandboxAdapter {
   }
 
   async attachStorage(request: SandboxAttachStorageRequest): Promise<void> {
+    const storage = requireArchilStorageAttachment(request);
+
     await this.#client.runCommand({
       sandboxId: request.sandbox.id,
       command: createE2BAttachStorageCommand({
-        storage: request.storage,
+        storage,
       }),
       operation: E2BClientOperationIds.ATTACH_STORAGE,
       commandDescription: "E2B sandbox storage attach command",
       env: {
-        [ArchilMountTokenEnv]: request.storage.credential,
+        [ArchilMountTokenEnv]: storage.credential,
       },
       cwd: "/",
       timeoutMs: E2BAttachStorageCommandTimeoutMs,
@@ -120,8 +145,13 @@ export class E2BSandboxAdapter implements SandboxAdapter {
   }
 
   async cleanupStorage(request: SandboxCleanupStorageRequest): Promise<void> {
+    const storage = requireArchilStorageCleanup(request);
+
     const command = createE2BCleanupStorageCommand({
-      request,
+      request: {
+        ...request,
+        storage,
+      },
     });
 
     if (command === null) {

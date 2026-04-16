@@ -1,3 +1,4 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { DataPlaneDatabase, SandboxInstancePersistenceMode } from "@mistle/db/data-plane";
 import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 
@@ -11,6 +12,7 @@ import {
 export async function destroySandbox(
   ctx: {
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
     config: DataPlaneWorkerRuntimeConfig;
     sandboxAdapter: SandboxAdapter;
   },
@@ -32,8 +34,11 @@ export async function destroySandbox(
     await cleanupSandboxStorage(
       {
         db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.config.app,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
+        storageBackend: ctx.config.sandbox.storage?.backend,
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,
@@ -62,8 +67,11 @@ export async function destroySandbox(
     await cleanupSandboxStorage(
       {
         db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.config.app,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
+        storageBackend: ctx.config.sandbox.storage?.backend,
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,

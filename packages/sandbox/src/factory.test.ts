@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "./errors.js";
 import { createSandboxAdapter, createSandboxRuntimeControl } from "./factory.js";
-import { SandboxAttachedStorageBackends, SandboxProvider } from "./types.js";
+import { SandboxPersistentStorageLayout, SandboxProvider, SandboxStorageBackend } from "./types.js";
 
 describe("createSandboxAdapter", () => {
   it("creates a docker adapter when docker config is provided", () => {
@@ -81,10 +81,11 @@ describe("provider storage lifecycle no-op hooks", () => {
           id: "docker-runtime-id",
         },
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: "dsk-0123456789abcdef",
           region: "aws-us-east-1",
           credential: "token",
+          layout: SandboxPersistentStorageLayout,
         },
         lifecycle: "start",
       }),
@@ -98,9 +99,10 @@ describe("provider storage lifecycle no-op hooks", () => {
           id: "docker-runtime-id",
         },
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: "dsk-0123456789abcdef",
           region: "aws-us-east-1",
+          layout: SandboxPersistentStorageLayout,
         },
         lifecycle: "stop",
         timing: "before_compute_teardown",

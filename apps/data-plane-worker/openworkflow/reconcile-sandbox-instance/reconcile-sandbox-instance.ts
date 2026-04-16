@@ -1,3 +1,4 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
@@ -144,6 +145,7 @@ async function inspectProviderStateOrMissing(ctx: {
  */
 async function stopProviderSandboxOrMarkMissing(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
   sandboxAdapter: SandboxAdapter;
   db: DataPlaneDatabase;
   sandboxInstance: ActiveSandboxInstance;
@@ -152,6 +154,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     await stopSandbox(
       {
         db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
       },
@@ -199,6 +202,7 @@ export async function reconcileSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
@@ -259,6 +263,7 @@ export async function reconcileSandboxInstance(
     case "stop_then_mark_stopped":
       await stopProviderSandboxOrMarkMissing({
         config: ctx.config,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         sandboxAdapter: ctx.sandboxAdapter,
         db: ctx.db,
         sandboxInstance,

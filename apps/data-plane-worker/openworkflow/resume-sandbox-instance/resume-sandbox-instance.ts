@@ -71,6 +71,7 @@ export async function resumeSandboxInstance(
         await stopSandbox(
           {
             db: ctx.db,
+            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             config: ctx.config,
             sandboxAdapter: ctx.sandboxAdapter,
           },
@@ -162,8 +163,10 @@ export async function resumeSandboxInstance(
       {
         db: ctx.db,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+        workerConfig: ctx.config.app,
         configuredSandboxProvider: ctx.config.sandbox.provider,
         sandboxAdapter: ctx.sandboxAdapter,
+        storageBackend: ctx.config.sandbox.storage?.backend,
       },
       {
         organizationId: resumableSandboxInstance.organizationId,

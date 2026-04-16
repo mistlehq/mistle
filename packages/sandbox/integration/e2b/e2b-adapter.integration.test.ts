@@ -5,11 +5,12 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import {
-  SandboxAttachedStorageBackends,
+  SandboxPersistentStorageLayout,
   SandboxProvider,
   SandboxResourceNotFoundError,
   SandboxRuntimeEnv,
   SandboxRuntimeEnvDefaults,
+  SandboxStorageBackend,
   SandboxStorageCleanupLifecycles,
   SandboxStorageCleanupTimings,
 } from "../../src/index.js";
@@ -263,10 +264,11 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
         },
         lifecycle: "start",
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: disk.diskId,
           region: TestArchilRegion,
           credential: disk.token,
+          layout: SandboxPersistentStorageLayout,
         },
       });
 
@@ -336,10 +338,11 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
         },
         lifecycle: "start",
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: disk.diskId,
           region: TestArchilRegion,
           credential: disk.token,
+          layout: SandboxPersistentStorageLayout,
         },
       });
 
@@ -350,9 +353,10 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
           id: sandbox.id,
         },
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: disk.diskId,
           region: TestArchilRegion,
+          layout: SandboxPersistentStorageLayout,
         },
         lifecycle: SandboxStorageCleanupLifecycles.STOP,
         timing: SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN,

@@ -4,21 +4,24 @@ import {
   type DataPlaneDatabase,
   type SandboxInstancePersistenceMode,
 } from "@mistle/db/data-plane";
-import { SandboxAttachedStorageBackends } from "@mistle/sandbox";
 import {
   SandboxStorageAttachLifecycles,
   type SandboxAdapter,
   type SandboxProvider,
+  type SandboxStorageBackend,
 } from "@mistle/sandbox";
 
-import { resolveReadyArchilSandboxStorage } from "../start-sandbox-instance/provision-sandbox-storage.js";
+import type { DataPlaneWorkerConfig } from "../core/config.js";
+import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
 
 export async function attachSandboxStorage(
   ctx: {
     db: DataPlaneDatabase;
     controlPlaneInternalClient: ControlPlaneInternalClient;
+    workerConfig: DataPlaneWorkerConfig;
     configuredSandboxProvider: SandboxProvider;
     sandboxAdapter: SandboxAdapter;
+    storageBackend: SandboxStorageBackend | undefined;
   },
   input: {
     organizationId: string;
@@ -39,9 +42,15 @@ export async function attachSandboxStorage(
     );
   }
 
-  const resolvedStorage = await resolveReadyArchilSandboxStorage({
+  const storageBackendAdapter = createSandboxStorageBackendAdapter({
     db: ctx.db,
     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+    workerConfig: ctx.workerConfig,
+    runtimeProvider: input.runtimeProvider,
+    storageBackend: ctx.storageBackend,
+  });
+
+  const resolvedStorage = await storageBackendAdapter.resolveAttachment({
     organizationId: input.organizationId,
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -52,12 +61,7 @@ export async function attachSandboxStorage(
       provider: input.runtimeProvider,
       id: input.providerSandboxId,
     },
-    storage: {
-      backend: SandboxAttachedStorageBackends.ARCHIL,
-      handle: resolvedStorage.storage.handle,
-      region: resolvedStorage.storage.region,
-      credential: resolvedStorage.diskToken,
-    },
+    storage: resolvedStorage,
     lifecycle:
       input.lifecycle === "start"
         ? SandboxStorageAttachLifecycles.START

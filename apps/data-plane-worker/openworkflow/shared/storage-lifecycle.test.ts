@@ -32,8 +32,11 @@ describe("sandbox storage lifecycle helpers", () => {
       cleanupSandboxStorage(
         {
           db: undefined as never,
+          controlPlaneInternalClient: undefined as never,
+          workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
+          storageBackend: undefined,
         },
         {
           sandboxInstanceId: "sbi_12345678901234567890123456",
@@ -75,8 +78,11 @@ describe("sandbox storage lifecycle helpers", () => {
       cleanupSandboxStorage(
         {
           db: undefined as never,
+          controlPlaneInternalClient: undefined as never,
+          workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
           sandboxAdapter: adapter,
+          storageBackend: undefined,
         },
         {
           sandboxInstanceId: "sbi_12345678901234567890123456",

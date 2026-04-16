@@ -19,13 +19,13 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
-import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
 import {
   getSandboxInstanceStorageBySandboxInstanceId,
   insertSandboxInstanceStorage,
   updateSandboxInstanceStorageCredential,
-} from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
+} from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
+import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
+import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 

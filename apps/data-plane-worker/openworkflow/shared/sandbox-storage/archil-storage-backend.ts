@@ -16,9 +16,16 @@ import {
   type InsertSandboxInstanceStorage,
   type SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
+import {
+  SandboxPersistentStorageLayout,
+  SandboxStorageBackend,
+  type SandboxArchilStorageAttachment,
+  type SandboxArchilStorageCleanup,
+} from "@mistle/sandbox";
 import { eq, sql } from "drizzle-orm";
 
-import type { DataPlaneWorkerConfig } from "../core/config.js";
+import type { DataPlaneWorkerConfig } from "../../core/config.js";
+import type { SandboxStorageBackendAdapter, SandboxStorageBackendRecord } from "./backend.js";
 
 type ManagedArchilConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["archil"]
@@ -133,7 +140,7 @@ export function resolveArchilProvisioningProfile(input: {
     };
   }
 
-  if (input.resolvedStorageConfiguration.storageBackend !== "archil") {
+  if (input.resolvedStorageConfiguration.storageBackend !== SandboxStorageBackend.ARCHIL) {
     throw new Error("Expected organization sandbox storage override to use the Archil backend.");
   }
 
@@ -245,39 +252,6 @@ export async function resolveSandboxStorageDiskToken(input: {
   });
 
   return resolvedCredential.plaintext;
-}
-
-export async function resolveReadyArchilSandboxStorage(input: {
-  db: DataPlaneDatabase;
-  controlPlaneInternalClient: ControlPlaneInternalClient;
-  organizationId: string;
-  sandboxInstanceId: string;
-}): Promise<{
-  storage: ArchilReadySandboxInstanceStorage;
-  diskToken: string;
-}> {
-  const storage = requireReadyArchilSandboxStorage({
-    sandboxInstanceId: input.sandboxInstanceId,
-    storage: await getSandboxInstanceStorageBySandboxInstanceId(
-      {
-        db: input.db,
-      },
-      {
-        sandboxInstanceId: input.sandboxInstanceId,
-      },
-    ),
-  });
-
-  const diskToken = await resolveSandboxStorageDiskToken({
-    controlPlaneInternalClient: input.controlPlaneInternalClient,
-    organizationId: input.organizationId,
-    storage,
-  });
-
-  return {
-    storage,
-    diskToken,
-  };
 }
 
 export async function insertSandboxInstanceStorage(
@@ -421,139 +395,307 @@ async function runCompensationActions(input: {
   }
 }
 
-export async function provisionSandboxStorage(input: {
+type ArchilSandboxStorageBackendAdapterContext = {
   db: DataPlaneDatabase;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
-  organizationId: string;
-  sandboxInstanceId: string;
-}): Promise<SandboxInstanceStorage> {
-  const compensationActions: CompensationAction[] = [];
+  runtimeProvider: "e2b";
+};
 
-  try {
-    const provisionedStorage = await input.db.transaction(async (tx) => {
-      const [lockedSandboxInstance] = await tx
-        .select({
-          id: sandboxInstances.id,
-        })
-        .from(sandboxInstances)
-        .where(eq(sandboxInstances.id, input.sandboxInstanceId))
-        .limit(1)
-        .for("update");
+class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAdapter {
+  readonly #db: DataPlaneDatabase;
+  readonly #controlPlaneInternalClient: ControlPlaneInternalClient;
+  readonly #workerConfig: DataPlaneWorkerConfig;
+  readonly #runtimeProvider: "e2b";
 
-      if (lockedSandboxInstance === undefined) {
-        throw new Error(
-          `Sandbox instance '${input.sandboxInstanceId}' was not found before storage provisioning.`,
-        );
-      }
+  constructor(input: ArchilSandboxStorageBackendAdapterContext) {
+    this.#db = input.db;
+    this.#controlPlaneInternalClient = input.controlPlaneInternalClient;
+    this.#workerConfig = input.workerConfig;
+    this.#runtimeProvider = input.runtimeProvider;
+  }
 
-      const existingStorage = await getSandboxInstanceStorageBySandboxInstanceId(
-        {
-          db: tx,
-        },
-        {
-          sandboxInstanceId: input.sandboxInstanceId,
-        },
-      );
+  async provision(input: {
+    organizationId: string;
+    sandboxInstanceId: string;
+  }): Promise<SandboxStorageBackendRecord> {
+    const compensationActions: CompensationAction[] = [];
 
-      if (existingStorage !== undefined) {
-        if (
-          existingStorage.provider === SandboxStorageProviders.ARCHIL &&
-          existingStorage.status === SandboxStorageStatuses.READY
-        ) {
-          return existingStorage;
+    try {
+      const provisionedStorage = await this.#db.transaction(async (tx) => {
+        const [lockedSandboxInstance] = await tx
+          .select({
+            id: sandboxInstances.id,
+          })
+          .from(sandboxInstances)
+          .where(eq(sandboxInstances.id, input.sandboxInstanceId))
+          .limit(1)
+          .for("update");
+
+        if (lockedSandboxInstance === undefined) {
+          throw new Error(
+            `Sandbox instance '${input.sandboxInstanceId}' was not found before storage provisioning.`,
+          );
         }
 
-        throw new Error(
-          `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists in unsupported state '${existingStorage.status}'.`,
+        const existingStorage = await getSandboxInstanceStorageBySandboxInstanceId(
+          {
+            db: tx,
+          },
+          {
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
         );
-      }
 
-      const resolvedStorageConfiguration =
-        await input.controlPlaneInternalClient.resolveStorageConfiguration({
-          organizationId: input.organizationId,
-          runtimeProvider: "e2b",
+        if (existingStorage !== undefined) {
+          if (
+            existingStorage.provider === SandboxStorageProviders.ARCHIL &&
+            existingStorage.status === SandboxStorageStatuses.READY
+          ) {
+            return existingStorage;
+          }
+
+          throw new Error(
+            `Sandbox storage row for sandbox instance '${input.sandboxInstanceId}' already exists in unsupported state '${existingStorage.status}'.`,
+          );
+        }
+
+        const resolvedStorageConfiguration =
+          await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+            organizationId: input.organizationId,
+            runtimeProvider: this.#runtimeProvider,
+          });
+
+        const archilProfile = resolveArchilProvisioningProfile({
+          managedArchilConfig: this.#workerConfig.sandboxStorage?.archil,
+          resolvedStorageConfiguration,
         });
 
-      const archilProfile = resolveArchilProvisioningProfile({
-        managedArchilConfig: input.workerConfig.sandboxStorage?.archil,
-        resolvedStorageConfiguration,
-      });
-
-      const archil = new Archil({
-        apiKey: archilProfile.apiKey,
-        region: archilProfile.region,
-      });
-
-      const createdDisk = await archil.disks.create(
-        createArchilDiskRequest({
-          sandboxInstanceId: input.sandboxInstanceId,
-          profile: archilProfile,
-        }),
-      );
-
-      registerCompensationAction({
-        compensationActions,
-        action: {
-          run: async () => {
-            await tryDeleteArchilDisk({
-              archil,
-              diskId: createdDisk.disk.id,
-            });
-          },
-        },
-      });
-
-      const plaintextToken = await resolveArchilDiskToken({
-        archil,
-        createdDisk,
-        sandboxInstanceId: input.sandboxInstanceId,
-      });
-
-      const encryptedToken = await input.controlPlaneInternalClient.encryptStorageCredential({
-        organizationId: input.organizationId,
-        credentialKind: "disk_token",
-        plaintext: plaintextToken,
-      });
-
-      const insertedStorage = await insertSandboxInstanceStorage(
-        {
-          db: tx,
-        },
-        {
-          sandboxInstanceId: input.sandboxInstanceId,
-          provider: SandboxStorageProviders.ARCHIL,
-          handle: createdDisk.disk.id,
+        const archil = new Archil({
+          apiKey: archilProfile.apiKey,
           region: archilProfile.region,
-          status: SandboxStorageStatuses.READY,
-          credentialCiphertext: encryptedToken.ciphertext,
-          credentialNonce: encryptedToken.nonce,
-          credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-          organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
-        },
-      );
+        });
 
-      registerCompensationAction({
-        compensationActions,
-        action: {
-          run: async () => {
-            await tryDeleteSandboxInstanceStorage({
-              db: input.db,
-              sandboxInstanceStorageId: insertedStorage.id,
-            });
+        const createdDisk = await archil.disks.create(
+          createArchilDiskRequest({
+            sandboxInstanceId: input.sandboxInstanceId,
+            profile: archilProfile,
+          }),
+        );
+
+        registerCompensationAction({
+          compensationActions,
+          action: {
+            run: async () => {
+              await tryDeleteArchilDisk({
+                archil,
+                diskId: createdDisk.disk.id,
+              });
+            },
           },
-        },
+        });
+
+        const plaintextToken = await resolveArchilDiskToken({
+          archil,
+          createdDisk,
+          sandboxInstanceId: input.sandboxInstanceId,
+        });
+
+        const encryptedToken = await this.#controlPlaneInternalClient.encryptStorageCredential({
+          organizationId: input.organizationId,
+          credentialKind: "disk_token",
+          plaintext: plaintextToken,
+        });
+
+        const insertedStorage = await insertSandboxInstanceStorage(
+          {
+            db: tx,
+          },
+          {
+            sandboxInstanceId: input.sandboxInstanceId,
+            provider: SandboxStorageProviders.ARCHIL,
+            handle: createdDisk.disk.id,
+            region: archilProfile.region,
+            status: SandboxStorageStatuses.READY,
+            credentialCiphertext: encryptedToken.ciphertext,
+            credentialNonce: encryptedToken.nonce,
+            credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+            organizationCredentialKeyVersion: encryptedToken.organizationCredentialKeyVersion,
+          },
+        );
+
+        registerCompensationAction({
+          compensationActions,
+          action: {
+            run: async () => {
+              await tryDeleteSandboxInstanceStorage({
+                db: this.#db,
+                sandboxInstanceStorageId: insertedStorage.id,
+              });
+            },
+          },
+        });
+
+        return insertedStorage;
       });
 
-      return insertedStorage;
+      compensationActions.length = 0;
+      return {
+        backend: SandboxStorageBackend.ARCHIL,
+        handle: provisionedStorage.handle,
+        status: "ready",
+      };
+    } catch (error) {
+      await runCompensationActions({
+        compensationActions,
+      });
+      throw error;
+    }
+  }
+
+  async resolveAttachment(input: {
+    organizationId: string;
+    sandboxInstanceId: string;
+  }): Promise<SandboxArchilStorageAttachment> {
+    const storage = requireReadyArchilSandboxStorage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      storage: await getSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db: this.#db,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      ),
     });
 
-    compensationActions.length = 0;
-    return provisionedStorage;
-  } catch (error) {
-    await runCompensationActions({
-      compensationActions,
+    const credential = await resolveSandboxStorageDiskToken({
+      controlPlaneInternalClient: this.#controlPlaneInternalClient,
+      organizationId: input.organizationId,
+      storage,
     });
-    throw error;
+
+    return {
+      backend: SandboxStorageBackend.ARCHIL,
+      handle: storage.handle,
+      region: storage.region,
+      credential,
+      layout: SandboxPersistentStorageLayout,
+    };
   }
+
+  async resolveCleanup(input: { sandboxInstanceId: string }): Promise<SandboxArchilStorageCleanup> {
+    const storage = requireReadyArchilSandboxStorage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      storage: await getSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db: this.#db,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      ),
+    });
+
+    return {
+      backend: SandboxStorageBackend.ARCHIL,
+      handle: storage.handle,
+      region: storage.region,
+      layout: SandboxPersistentStorageLayout,
+    };
+  }
+
+  async deprovision(input: { organizationId: string; sandboxInstanceId: string }): Promise<void> {
+    const existingStorage = await getSandboxInstanceStorageBySandboxInstanceId(
+      {
+        db: this.#db,
+      },
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+    );
+
+    if (existingStorage === undefined) {
+      return;
+    }
+
+    const storage = requireReadyArchilSandboxStorage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      storage: existingStorage,
+    });
+
+    const resolvedStorageConfiguration =
+      await this.#controlPlaneInternalClient.resolveStorageConfiguration({
+        organizationId: input.organizationId,
+        runtimeProvider: this.#runtimeProvider,
+      });
+
+    const archilProfile = resolveArchilProvisioningProfile({
+      managedArchilConfig: this.#workerConfig.sandboxStorage?.archil,
+      resolvedStorageConfiguration,
+    });
+
+    const archil = new Archil({
+      apiKey: archilProfile.apiKey,
+      region: storage.region,
+    });
+
+    let diskDeleteError: unknown;
+    try {
+      const disk = await archil.disks.get(storage.handle);
+      await disk.delete();
+    } catch (error) {
+      diskDeleteError = error;
+    }
+
+    let deleteSandboxInstanceStorageError: unknown;
+    try {
+      await deleteSandboxInstanceStorageBySandboxInstanceId(
+        {
+          db: this.#db,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      );
+    } catch (error) {
+      deleteSandboxInstanceStorageError = error;
+    }
+
+    if (diskDeleteError !== undefined && deleteSandboxInstanceStorageError !== undefined) {
+      throw new Error(
+        `Failed to delete Archil sandbox storage disk and failed to delete sandbox storage row for sandbox instance '${input.sandboxInstanceId}'.`,
+        {
+          cause: {
+            diskDeleteError,
+            deleteSandboxInstanceStorageError,
+          },
+        },
+      );
+    }
+
+    if (diskDeleteError !== undefined) {
+      throw new Error(
+        `Failed to delete Archil sandbox storage disk for sandbox instance '${input.sandboxInstanceId}'.`,
+        {
+          cause: diskDeleteError,
+        },
+      );
+    }
+
+    if (deleteSandboxInstanceStorageError !== undefined) {
+      throw new Error(
+        `Failed to delete sandbox storage row for sandbox instance '${input.sandboxInstanceId}'.`,
+        {
+          cause: deleteSandboxInstanceStorageError,
+        },
+      );
+    }
+  }
+}
+
+export function createArchilSandboxStorageBackendAdapter(
+  input: ArchilSandboxStorageBackendAdapterContext,
+): SandboxStorageBackendAdapter {
+  return new ArchilSandboxStorageBackendAdapterImpl(input);
 }

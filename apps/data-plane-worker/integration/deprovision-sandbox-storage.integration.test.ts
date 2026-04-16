@@ -22,18 +22,16 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
+import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
 import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
-import { deprovisionSandboxStorage } from "../openworkflow/start-sandbox-instance/deprovision-sandbox-storage.js";
+import { getSandboxInstanceStorageBySandboxInstanceId } from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
+import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
-import {
-  getSandboxInstanceStorageBySandboxInstanceId,
-  provisionSandboxStorage,
-} from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
 import { startControlPlaneApiProcess } from "./helpers/control-plane-api.js";
 import { insertInitialOrganizationCredentialKey } from "./helpers/organization-credential-keys.js";
 
@@ -107,6 +105,20 @@ function createWorkerConfig(input: ArchilIntegrationEnvironment): DataPlaneWorke
       },
     },
   };
+}
+
+function createArchilStorageBackendAdapter(input: {
+  db: ReturnType<typeof createDataPlaneDatabase>;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  workerConfig: DataPlaneWorkerConfig;
+}) {
+  return createSandboxStorageBackendAdapter({
+    db: input.db,
+    controlPlaneInternalClient: input.controlPlaneInternalClient,
+    workerConfig: input.workerConfig,
+    runtimeProvider: SandboxProvider.E2B,
+    storageBackend: SandboxStorageBackend.ARCHIL,
+  });
 }
 
 describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
@@ -255,10 +267,13 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
         },
       );
 
-      const provisionedStorage = await provisionSandboxStorage({
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
+      });
+
+      const provisionedStorage = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });
@@ -266,10 +281,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
 
       expect(await archil.disks.get(provisionedStorage.handle)).toBeDefined();
 
-      await deprovisionSandboxStorage({
-        db: createDataPlaneDb(),
-        controlPlaneInternalClient,
-        workerConfig: createWorkerConfig(archilEnvironment),
+      await storageBackendAdapter.deprovision({
         organizationId,
         sandboxInstanceId,
       });
@@ -343,10 +355,13 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
         },
       );
 
-      const provisionedStorage = await provisionSandboxStorage({
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
+      });
+
+      const provisionedStorage = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });
@@ -357,10 +372,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       createdDiskIds.delete(provisionedStorage.handle);
 
       await expect(
-        deprovisionSandboxStorage({
-          db: createDataPlaneDb(),
-          controlPlaneInternalClient,
-          workerConfig: createWorkerConfig(archilEnvironment),
+        storageBackendAdapter.deprovision({
           organizationId,
           sandboxInstanceId,
         }),

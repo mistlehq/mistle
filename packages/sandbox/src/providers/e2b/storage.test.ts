@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  SandboxAttachedStorageBackends,
+  SandboxPersistentStorageLayout,
   SandboxProvider,
+  SandboxStorageBackend,
   SandboxStorageCleanupLifecycles,
   SandboxStorageCleanupTimings,
 } from "../../types.js";
@@ -12,10 +13,11 @@ describe("createE2BAttachStorageCommand", () => {
   it("builds the expected Archil mount and bind-mount sequence", () => {
     const command = createE2BAttachStorageCommand({
       storage: {
-        backend: SandboxAttachedStorageBackends.ARCHIL,
+        backend: SandboxStorageBackend.ARCHIL,
         handle: "dsk-0123456789abcdef",
         region: "aws-us-east-1",
         credential: "token-value",
+        layout: SandboxPersistentStorageLayout,
       },
     });
 
@@ -66,9 +68,10 @@ describe("createE2BCleanupStorageCommand", () => {
           id: "sbx_e2b_storage_cleanup",
         },
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: "dsk-0123456789abcdef",
           region: "aws-us-east-1",
+          layout: SandboxPersistentStorageLayout,
         },
         lifecycle: SandboxStorageCleanupLifecycles.STOP,
         timing: SandboxStorageCleanupTimings.BEFORE_COMPUTE_TEARDOWN,
@@ -100,9 +103,10 @@ describe("createE2BCleanupStorageCommand", () => {
           id: "sbx_e2b_storage_cleanup_after",
         },
         storage: {
-          backend: SandboxAttachedStorageBackends.ARCHIL,
+          backend: SandboxStorageBackend.ARCHIL,
           handle: "dsk-0123456789abcdef",
           region: "aws-us-east-1",
+          layout: SandboxPersistentStorageLayout,
         },
         lifecycle: SandboxStorageCleanupLifecycles.DESTROY,
         timing: SandboxStorageCleanupTimings.AFTER_COMPUTE_TEARDOWN,
