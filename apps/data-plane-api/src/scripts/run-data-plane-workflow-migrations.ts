@@ -1,8 +1,8 @@
 import {
   DataPlaneApiWorkflowConfigSchema,
+  loadDataPlaneApiWorkflowEnv,
+  loadDataPlaneApiWorkflowToml,
   loadConfigSection,
-  loadDataPlaneApiWorkflowFromEnv,
-  loadDataPlaneApiWorkflowFromToml,
 } from "@mistle/config";
 
 import { logger } from "../logger.js";
@@ -11,8 +11,8 @@ import { createDataPlaneBackend } from "../openworkflow/index.js";
 async function main(): Promise<void> {
   const workflowConfig = loadConfigSection({
     env: process.env,
-    loadEnv: loadDataPlaneApiWorkflowFromEnv,
-    loadToml: loadDataPlaneApiWorkflowFromToml,
+    loadEnv: loadDataPlaneApiWorkflowEnv,
+    loadToml: loadDataPlaneApiWorkflowToml,
     schema: DataPlaneApiWorkflowConfigSchema,
   });
 

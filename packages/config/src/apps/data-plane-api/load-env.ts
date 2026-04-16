@@ -23,27 +23,31 @@ const loadServerEnv = createEnvLoader<typeof DataPlaneApiServerConfigSchema>([
   },
 ]);
 
-const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>([
-  {
-    key: "url",
-    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
-  },
-  {
-    key: "migrationUrl",
-    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
-  },
-]);
+export const loadDataPlaneApiDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>(
+  [
+    {
+      key: "url",
+      envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
+    },
+    {
+      key: "migrationUrl",
+      envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
+    },
+  ],
+);
 
-const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>([
-  {
-    key: "databaseUrl",
-    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
-  },
-  {
-    key: "namespaceId",
-    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
-  },
-]);
+export const loadDataPlaneApiWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>(
+  [
+    {
+      key: "databaseUrl",
+      envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
+    },
+    {
+      key: "namespaceId",
+      envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
+    },
+  ],
+);
 
 const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>([
   {
@@ -85,12 +89,12 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
     partialConfig.server = server;
   }
 
-  const database = loadDatabaseEnv(env);
+  const database = loadDataPlaneApiDatabaseEnv(env);
   if (hasEntries(database)) {
     partialConfig.database = database;
   }
 
-  const workflow = loadWorkflowEnv(env);
+  const workflow = loadDataPlaneApiWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
   }
@@ -115,12 +119,4 @@ export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlan
   }
 
   return PartialDataPlaneApiConfigSchema.parse(partialConfig);
-}
-
-export function loadDataPlaneApiDatabaseFromEnv(env: NodeJS.ProcessEnv): Record<string, unknown> {
-  return loadDatabaseEnv(env);
-}
-
-export function loadDataPlaneApiWorkflowFromEnv(env: NodeJS.ProcessEnv): Record<string, unknown> {
-  return loadWorkflowEnv(env);
 }

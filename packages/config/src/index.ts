@@ -2,10 +2,10 @@ export { loadConfig, loadConfigSection } from "./loader.js";
 export { AppIds } from "./modules.js";
 export { readRepositoryVersion } from "./repository-version.js";
 export {
-  loadDataPlaneApiDatabaseFromEnv,
-  loadDataPlaneApiDatabaseFromToml,
-  loadDataPlaneApiWorkflowFromEnv,
-  loadDataPlaneApiWorkflowFromToml,
+  loadDataPlaneApiDatabaseEnv,
+  loadDataPlaneApiDatabaseToml,
+  loadDataPlaneApiWorkflowEnv,
+  loadDataPlaneApiWorkflowToml,
   DataPlaneApiDatabaseConfigSchema,
   DataPlaneApiWorkflowConfigSchema,
 } from "./apps/data-plane-api/index.js";

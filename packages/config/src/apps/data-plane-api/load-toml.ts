@@ -58,7 +58,7 @@ export function loadDataPlaneApiFromToml(
   });
 }
 
-export function loadDataPlaneApiDatabaseFromToml(
+export function loadDataPlaneApiDatabaseToml(
   tomlRoot: Record<string, unknown>,
 ): Record<string, unknown> {
   const apps = asObjectRecord(tomlRoot.apps);
@@ -71,7 +71,7 @@ export function loadDataPlaneApiDatabaseFromToml(
   };
 }
 
-export function loadDataPlaneApiWorkflowFromToml(
+export function loadDataPlaneApiWorkflowToml(
   tomlRoot: Record<string, unknown>,
 ): Record<string, unknown> {
   const apps = asObjectRecord(tomlRoot.apps);

@@ -1,8 +1,8 @@
 import {
   DataPlaneApiDatabaseConfigSchema,
+  loadDataPlaneApiDatabaseEnv,
+  loadDataPlaneApiDatabaseToml,
   loadConfigSection,
-  loadDataPlaneApiDatabaseFromEnv,
-  loadDataPlaneApiDatabaseFromToml,
 } from "@mistle/config";
 import { DATA_PLANE_SCHEMA_NAME } from "@mistle/db/data-plane";
 import {
@@ -16,8 +16,8 @@ import { logger } from "../logger.js";
 async function main(): Promise<void> {
   const databaseConfig = loadConfigSection({
     env: process.env,
-    loadEnv: loadDataPlaneApiDatabaseFromEnv,
-    loadToml: loadDataPlaneApiDatabaseFromToml,
+    loadEnv: loadDataPlaneApiDatabaseEnv,
+    loadToml: loadDataPlaneApiDatabaseToml,
     schema: DataPlaneApiDatabaseConfigSchema,
   });
 

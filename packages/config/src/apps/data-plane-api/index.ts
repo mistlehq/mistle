@@ -4,14 +4,14 @@ import { loadDataPlaneApiFromToml } from "./load-toml.js";
 import { DataPlaneApiConfigSchema } from "./schema.js";
 
 export {
-  loadDataPlaneApiDatabaseFromEnv,
+  loadDataPlaneApiDatabaseEnv,
   loadDataPlaneApiFromEnv,
-  loadDataPlaneApiWorkflowFromEnv,
+  loadDataPlaneApiWorkflowEnv,
 } from "./load-env.js";
 export {
-  loadDataPlaneApiDatabaseFromToml,
+  loadDataPlaneApiDatabaseToml,
   loadDataPlaneApiFromToml,
-  loadDataPlaneApiWorkflowFromToml,
+  loadDataPlaneApiWorkflowToml,
 } from "./load-toml.js";
 export {
   DataPlaneApiConfigSchema,

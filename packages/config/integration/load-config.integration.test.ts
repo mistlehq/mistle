@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import {
   DataPlaneApiDatabaseConfigSchema,
   DataPlaneApiWorkflowConfigSchema,
-  loadDataPlaneApiDatabaseFromEnv,
-  loadDataPlaneApiDatabaseFromToml,
-  loadDataPlaneApiWorkflowFromEnv,
-  loadDataPlaneApiWorkflowFromToml,
+  loadDataPlaneApiDatabaseEnv,
+  loadDataPlaneApiDatabaseToml,
+  loadDataPlaneApiWorkflowEnv,
+  loadDataPlaneApiWorkflowToml,
 } from "../src/apps/data-plane-api/index.js";
 import { loadConfig, loadConfigSection } from "../src/loader.js";
 import { AppIds } from "../src/modules.js";
@@ -987,8 +987,8 @@ describe("loadConfig integrations", () => {
       env: createIntegrationEnv({
         MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
       }),
-      loadEnv: loadDataPlaneApiDatabaseFromEnv,
-      loadToml: loadDataPlaneApiDatabaseFromToml,
+      loadEnv: loadDataPlaneApiDatabaseEnv,
+      loadToml: loadDataPlaneApiDatabaseToml,
       schema: DataPlaneApiDatabaseConfigSchema,
     });
 
@@ -1000,8 +1000,8 @@ describe("loadConfig integrations", () => {
       env: createIntegrationEnv({
         MISTLE_APPS_DATA_PLANE_API_PORT: "abc",
       }),
-      loadEnv: loadDataPlaneApiDatabaseFromEnv,
-      loadToml: loadDataPlaneApiDatabaseFromToml,
+      loadEnv: loadDataPlaneApiDatabaseEnv,
+      loadToml: loadDataPlaneApiDatabaseToml,
       schema: DataPlaneApiDatabaseConfigSchema,
     });
 
@@ -1013,8 +1013,8 @@ describe("loadConfig integrations", () => {
       env: createIntegrationEnv({
         MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
       }),
-      loadEnv: loadDataPlaneApiWorkflowFromEnv,
-      loadToml: loadDataPlaneApiWorkflowFromToml,
+      loadEnv: loadDataPlaneApiWorkflowEnv,
+      loadToml: loadDataPlaneApiWorkflowToml,
       schema: DataPlaneApiWorkflowConfigSchema,
     });
 
