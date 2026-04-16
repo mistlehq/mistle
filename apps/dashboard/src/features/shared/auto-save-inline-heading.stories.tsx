@@ -13,7 +13,7 @@ import {
 
 type StoryHarnessProps = Pick<
   AutoSaveInlineHeadingProps,
-  "value" | "placeholder" | "maxWidthClassName" | "inputClassName"
+  "value" | "placeholder" | "maxWidthClassName" | "inputClassName" | "size"
 > & {
   errorMessage?: string;
 };
@@ -59,6 +59,7 @@ function ComparisonPane(
       {...(headingProps.maxWidthClassName === undefined
         ? {}
         : { maxWidthClassName: headingProps.maxWidthClassName })}
+      {...(headingProps.size === undefined ? {} : { size: headingProps.size })}
       onSave={example.onSave}
       placeholder={headingProps.placeholder ?? "Display name"}
       validate={validateAutoSaveDisplayName}
@@ -73,6 +74,12 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
+  argTypes: {
+    size: {
+      control: "inline-radio",
+      options: ["lg", "sm"],
+    },
+  },
 } satisfies Meta<typeof StoryHarness>;
 
 export default meta;
@@ -81,6 +88,15 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
+    size: "lg",
     value: "Repo Maintainer",
+  },
+};
+
+export const Small: Story = {
+  args: {
+    size: "sm",
+    value: "Okay, short now",
+    maxWidthClassName: "max-w-[28rem]",
   },
 };

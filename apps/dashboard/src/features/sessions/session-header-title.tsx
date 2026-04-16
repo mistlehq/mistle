@@ -48,8 +48,8 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
   return (
     <AutoSaveTitleHeading
       ariaLabel="Session title"
+      size="sm"
       emptyDisplayText="Untitled"
-      inputClassName="truncate text-sm font-medium"
       maxWidthClassName="max-w-[28rem] flex-1"
       onSave={async (title) => {
         await patchTitleMutation.mutateAsync(title);

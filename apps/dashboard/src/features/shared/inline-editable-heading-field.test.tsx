@@ -58,6 +58,19 @@ describe("InlineEditableHeadingField", () => {
     expect(input.className).toContain("text-xl");
   });
 
+  it("renders the small size with tighter header spacing", () => {
+    renderInlineEditableHeadingField({
+      size: "sm",
+    });
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+
+    expect(input.className).toContain("h-7");
+    expect(input.className).toContain("text-sm");
+    expect(input.className).toContain("leading-tight");
+    expect(input.className).toContain("font-medium");
+  });
+
   it("commits on blur and cancels on escape", () => {
     let commitCount = 0;
     let cancelCount = 0;
