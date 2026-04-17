@@ -59,13 +59,13 @@ describe("settings model", () => {
     );
 
     expect(ownerOrganizationGroup?.items.map((item) => item.to)).toContain(
-      "/settings/organization/sandbox-storage",
+      "/settings/organization/sandboxes",
     );
     expect(adminOrganizationGroup?.items.map((item) => item.to)).toContain(
-      "/settings/organization/sandbox-storage",
+      "/settings/organization/sandboxes",
     );
     expect(memberOrganizationGroup?.items.map((item) => item.to)).not.toContain(
-      "/settings/organization/sandbox-storage",
+      "/settings/organization/sandboxes",
     );
   });
 });

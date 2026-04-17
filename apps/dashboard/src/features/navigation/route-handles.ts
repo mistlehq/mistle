@@ -290,10 +290,10 @@ export const ROUTE_HANDLES = {
     title: "Members",
     description: "",
   },
-  settingsOrganizationSandboxStorage: {
-    breadcrumb: "Sandbox Storage",
-    title: "Sandbox Storage",
-    description: "Configure organization-wide persistent sandbox storage.",
+  settingsOrganizationSandboxes: {
+    breadcrumb: "Sandboxes",
+    title: "Sandboxes",
+    description: "Configure organization-wide sandbox settings.",
   },
   settingsOrganizationIntegrations: {
     breadcrumb: "Integrations",
@@ -314,7 +314,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsPersonal",
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
-  "settingsOrganizationSandboxStorage",
+  "settingsOrganizationSandboxes",
   "settingsOrganizationIntegrations",
   "settingsOrganizationIntegrationDetail",
 ] as const;
@@ -325,7 +325,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsPersonal: ROUTE_HANDLES.settingsPersonal,
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
-  settingsOrganizationSandboxStorage: ROUTE_HANDLES.settingsOrganizationSandboxStorage,
+  settingsOrganizationSandboxes: ROUTE_HANDLES.settingsOrganizationSandboxes,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
   settingsOrganizationIntegrationDetail: ROUTE_HANDLES.settingsOrganizationIntegrationDetail,
 };

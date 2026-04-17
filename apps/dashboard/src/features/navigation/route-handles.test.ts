@@ -60,9 +60,9 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.settingsOrganizationMembers.title).toBe("Members");
     expect(ROUTE_HANDLES.settingsOrganizationMembers.description).toBe("");
 
-    expect(ROUTE_HANDLES.settingsOrganizationSandboxStorage.title).toBe("Sandbox Storage");
-    expect(ROUTE_HANDLES.settingsOrganizationSandboxStorage.description).toBe(
-      "Configure organization-wide persistent sandbox storage.",
+    expect(ROUTE_HANDLES.settingsOrganizationSandboxes.title).toBe("Sandboxes");
+    expect(ROUTE_HANDLES.settingsOrganizationSandboxes.description).toBe(
+      "Configure organization-wide sandbox settings.",
     );
 
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");

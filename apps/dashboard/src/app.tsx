@@ -119,7 +119,7 @@ export const APP_ROUTES = createRoutesFromElements(
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
-          organizationSandboxStorage: <OrganizationSandboxStorageSettingsPage />,
+          organizationSandboxes: <OrganizationSandboxStorageSettingsPage />,
         })}
       </Route>
     </Route>

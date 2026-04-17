@@ -37,8 +37,8 @@ export function resolveSettingsNavGroups(input: {
         })
           ? [
               {
-                to: "/settings/organization/sandbox-storage",
-                label: "Sandbox Storage",
+                to: "/settings/organization/sandboxes",
+                label: "Sandboxes",
                 icon: SandboxStorageNavIcon,
               },
             ]

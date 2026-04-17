@@ -30,7 +30,7 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const activeOrganizationId = useRequiredOrganizationId();
-  const { title, description } = resolvePageFrameText(pageMeta, "Sandbox Storage");
+  const { title, description } = resolvePageFrameText(pageMeta, "Sandboxes");
   const [draftState, setDraftState] = useState<OrganizationSandboxStorageFormState | null>(null);
   const [savedState, setSavedState] = useState<OrganizationSandboxStorageFormState | null>(null);
   const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
