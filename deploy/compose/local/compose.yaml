@@ -153,8 +153,6 @@ services:
     <<: *mistle-local-app
     environment:
       MISTLE_CONFIG_PATH: /app/config/mistle.toml
-    ports:
-      - "8085:5205"
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.17_full
@@ -178,8 +176,6 @@ services:
       retries: 30
     networks:
       - app
-    ports:
-      - "8333:8333"
 
   registry:
     image: registry:3
@@ -269,7 +265,6 @@ services:
     networks:
       - app
     ports:
-      - "1025:1025"
       - "8025:8025"
     healthcheck:
       test:

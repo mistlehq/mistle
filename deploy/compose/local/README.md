@@ -1,6 +1,6 @@
 # Local Compose
 
-This is the supported local full-product Compose entrypoint for Mistle.
+This is the supported local testing entrypoint for Mistle.
 
 It is designed for:
 
@@ -23,17 +23,13 @@ It is not the production deployment artifact.
    cd deploy/compose/local
    ```
 
-2. Copy the environment file if it does not exist yet:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Start the stack through the testing wrapper:
+2. Start the stack:
 
    ```bash
    ./up.sh
    ```
+
+   `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet.
 
    This build also publishes the local sandbox base image used for Docker-backed sessions
    into the bundled local registry:
@@ -43,59 +39,61 @@ It is not the production deployment artifact.
    `deploy/compose/local/config/integration-targets.provision.json`, so the dashboard starts
    with the supported integrations visible by default.
 
-   `./up.sh` always ensures the control plane has a public auth/callback URL for this run:
-   - if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is already set in `.env`, `./up.sh` uses
-     that value unchanged
-   - if it is blank, `./up.sh` starts a temporary `cloudflare/cloudflared` container, creates an
-     ephemeral `trycloudflare.com` URL for `http://localhost:8080`, writes that URL into a generated
-     runtime env file under `.generated/`, and starts Compose with that generated env file
+   `./up.sh` also makes the stack callback-capable for testing by default:
+   - if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set in `.env`, it uses that value
+   - if it is blank, it starts a temporary `cloudflare/cloudflared` container and injects the
+     generated public URL for this run
 
-   This makes the default local testing flow callback-capable without requiring any manual tunnel
-   setup.
-
-4. Open the product:
+3. Open the product:
 
 - Dashboard: `http://localhost:3000`
 - Control Plane API: `http://localhost:8080`
 - Data Plane Gateway: `http://localhost:8084`
-- Tokenizer Proxy: `http://localhost:8085`
 - Mailpit UI: `http://localhost:8025`
 
-The local registry at `http://localhost:5001` is an internal runtime dependency for sandbox
-image pulls. It is not a user-facing product surface.
+The local registry at `http://localhost:5001` is only an internal runtime dependency. It remains
+host-exposed because the host Docker daemon both pushes and later pulls the sandbox base image
+through that registry when local sandbox instances start.
 
-5. Run the acceptance smoke test from the repo root:
+4. Run the acceptance smoke test from the repo root:
 
    ```bash
    pnpm compose:local:smoke-test -- --restart-check
    ```
 
-## Callback URL Behavior
+## What You Usually Need To Change
+
+Most users do not need to edit `.env` at all.
+
+The main optional override is:
+
+- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
+  - leave it blank for the default quick-tunnel testing flow
+  - set it only when you want to override the quick tunnel with a stable public URL
+
+Optional advanced setup:
+
+- Google auth client ID/secret
+- stable public callback URL
+- local integration-target provisioning customization
+
+## Callback Behavior
 
 The dashboard always stays on `http://localhost:3000`.
 
-The control-plane public/auth base URL works like this:
+Integration callbacks derive from the control-plane auth/public base URL:
 
-- `./up.sh` reads `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` from `.env`
-- if it is set, that value becomes the callback/auth URL for the run
+- if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set, `./up.sh` uses it
 - if it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`
-- `./up.sh` captures the generated public URL and injects it through `.generated/runtime.env`
-- Compose uses that generated env file for the current run only
+- the generated public URL is injected through `.generated/runtime.env` for the current run only
 - `./down.sh` stops the stack and removes the wrapper-managed quick tunnel container and generated files
 
-This means the local stack is callback-capable by default for testing. Set
-`MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` explicitly only when you want to override the quick
-tunnel with a stable public URL.
-
-This still mirrors the existing dev model:
-
-- dashboard/browser origin can stay on localhost
-- integration callbacks derive from the control-plane auth/public base URL
-
-GitHub guidance:
+GitHub examples:
 
 - PAT/API key: no inbound callback required
 - GitHub App installation: requires a reachable webhook URL and shared webhook secret
+
+## Advanced Customization
 
 To customize the default local target provisioning:
 

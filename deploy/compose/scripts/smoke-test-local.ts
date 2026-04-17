@@ -19,7 +19,6 @@ const DefaultEnvFilePath = resolve(ScriptDirectoryPath, "../local/.env");
 const DashboardBaseUrl = "http://localhost:3000";
 const ControlPlaneApiBaseUrl = "http://localhost:8080";
 const DataPlaneGatewayBaseUrl = "http://localhost:8084";
-const TokenizerProxyBaseUrl = "http://localhost:8085";
 const MailpitBaseUrl = "http://localhost:8025";
 const AuthOrigin = DashboardBaseUrl;
 const WaitTimeoutMs = 3 * 60_000;
@@ -35,7 +34,6 @@ type SmokeTestOptions = {
 
 type SmokeTestConfig = {
   envFilePath: string;
-  internalAuthServiceToken: string;
 };
 
 type AuthSession = {
@@ -83,11 +81,6 @@ type SandboxInstanceConnectionTokenResponse = {
   expiresAt: string;
 };
 
-type RuntimeState = {
-  attachment: { ownerLeaseId: string } | null;
-  runtime: { ready: boolean };
-};
-
 type ComposePsService = {
   Service: string;
   State: string;
@@ -131,18 +124,10 @@ function parseArgs(argv: string[]): SmokeTestOptions {
 
 async function loadSmokeTestConfig(envFilePath: string): Promise<SmokeTestConfig> {
   const envFileContent = await readFile(envFilePath, "utf8");
-  const env = parseEnv(envFileContent);
-  const internalAuthServiceToken = env.MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN;
-
-  if (internalAuthServiceToken === undefined || internalAuthServiceToken.trim().length === 0) {
-    throw new Error(
-      `Expected MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN in env file '${envFilePath}'.`,
-    );
-  }
+  parseEnv(envFileContent);
 
   return {
     envFilePath,
-    internalAuthServiceToken: internalAuthServiceToken.trim(),
   };
 }
 
@@ -464,35 +449,6 @@ function parseSandboxInstanceConnectionTokenResponse(
   };
 }
 
-function parseRuntimeState(value: unknown): RuntimeState {
-  const record = expectRecord(value, "sandbox runtime state response");
-  const runtimeRecord = expectRecord(record.runtime, "sandbox runtime state response.runtime");
-  const attachmentValue = record.attachment;
-
-  if (
-    attachmentValue !== null &&
-    (typeof attachmentValue !== "object" || attachmentValue === null)
-  ) {
-    throw new Error("Expected sandbox runtime state response.attachment to be an object or null.");
-  }
-
-  return {
-    attachment:
-      attachmentValue === null
-        ? null
-        : {
-            ownerLeaseId: expectStringField(
-              expectRecord(attachmentValue, "sandbox runtime state response.attachment"),
-              "ownerLeaseId",
-              "sandbox runtime state response.attachment",
-            ),
-          },
-    runtime: {
-      ready: expectBooleanField(runtimeRecord, "ready", "sandbox runtime state response.runtime"),
-    },
-  };
-}
-
 function extractRequestCookie(response: Response): string {
   const setCookie = response.headers.get("set-cookie");
   if (setCookie === null || setCookie.length === 0) {
@@ -789,40 +745,6 @@ async function waitForSandboxRunningAndConnectable(
   );
 }
 
-async function waitForSandboxRuntimeReady(
-  internalAuthServiceToken: string,
-  sandboxInstanceId: string,
-): Promise<void> {
-  const deadlineMs = systemClock.nowMs() + WaitTimeoutMs;
-
-  while (systemClock.nowMs() < deadlineMs) {
-    const response = await fetch(
-      new URL(
-        `/internal/sandbox-instances/${encodeURIComponent(sandboxInstanceId)}/runtime-state`,
-        DataPlaneGatewayBaseUrl,
-      ),
-      {
-        headers: {
-          "x-mistle-service-token": internalAuthServiceToken,
-        },
-      },
-    );
-
-    if (response.status === 200) {
-      const snapshot = parseRuntimeState(await response.json().catch(() => null));
-      if (snapshot.attachment !== null && snapshot.runtime.ready) {
-        return;
-      }
-    }
-
-    await systemSleeper.sleep(PollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for sandbox '${sandboxInstanceId}' runtime attachment and readiness.`,
-  );
-}
-
 function resolveGatewayTunnelWebSocketUrl(mintedUrl: string): string {
   const mintUrl = new URL(mintedUrl);
   const gatewayBaseUrl = new URL(DataPlaneGatewayBaseUrl);
@@ -958,10 +880,6 @@ async function waitForCoreServicesAfterRestart(envFilePath: string): Promise<voi
         new URL("/__healthz", DataPlaneGatewayBaseUrl).toString(),
         "data-plane gateway",
       );
-      await assertHttpOk(
-        new URL("/__healthz", TokenizerProxyBaseUrl).toString(),
-        "tokenizer proxy",
-      );
       await assertHttpOk(MailpitBaseUrl, "Mailpit");
       await waitForComposeServices({
         envFilePath,
@@ -988,7 +906,6 @@ async function run(): Promise<void> {
     new URL("/__healthz", DataPlaneGatewayBaseUrl).toString(),
     "data-plane gateway",
   );
-  await assertHttpOk(new URL("/__healthz", TokenizerProxyBaseUrl).toString(), "tokenizer proxy");
   await assertHttpOk(MailpitBaseUrl, "Mailpit");
   await waitForComposeServices({
     envFilePath: config.envFilePath,
@@ -1003,10 +920,9 @@ async function run(): Promise<void> {
   console.log("Configuring baseline integration and sandbox profile...");
   const sandboxProfileId = await configureBaselineIntegrationAndProfile(session.cookie);
 
-  console.log("Starting sandbox instance and waiting for runtime readiness...");
+  console.log("Starting sandbox instance and waiting for it to become usable...");
   const sandboxInstanceId = await startSandboxInstance(session.cookie, sandboxProfileId);
   await waitForSandboxRunningAndConnectable(session.cookie, sandboxInstanceId);
-  await waitForSandboxRuntimeReady(config.internalAuthServiceToken, sandboxInstanceId);
 
   console.log("Verifying PTY round-trip...");
   await assertPtyRoundTrip(session.cookie, sandboxInstanceId);

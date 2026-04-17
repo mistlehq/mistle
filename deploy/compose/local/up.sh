@@ -3,7 +3,6 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 BASE_COMPOSE_PATH="${SCRIPT_DIR}/../base/compose.yaml"
 LOCAL_COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE_PATH="${SCRIPT_DIR}/.env"
@@ -14,7 +13,6 @@ CLOUDFLARED_LOG_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.log"
 CLOUDFLARED_CONTAINER_NAME_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.container-name"
 CLOUDFLARED_URL_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.url"
 CLOUDFLARED_IMAGE_REFERENCE="${CLOUDFLARED_IMAGE_REFERENCE:-cloudflare/cloudflared:latest}"
-CONTROL_PLANE_LOCAL_URL="http://localhost:8080"
 
 cleanup_on_failure() {
   cleanup_existing_tunnel
@@ -147,5 +145,4 @@ echo "Active callback base URL: ${runtime_auth_base_url}"
 echo "Dashboard: http://localhost:3000"
 echo "Control Plane API: http://localhost:8080"
 echo "Data Plane Gateway: http://localhost:8084"
-echo "Tokenizer Proxy: http://localhost:8085"
 echo "Mailpit UI: http://localhost:8025"
