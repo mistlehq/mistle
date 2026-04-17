@@ -96,7 +96,7 @@
 
 ## Workflows
 
-- Always run these scripts (in this order): `pnpm format`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- During development, prefer `pnpm validate:changed` for local validation instead of full-repo `pnpm format`, `pnpm lint`, `pnpm typecheck`, and `pnpm test`.
 - Before pushing, run `pnpm run ci` to mirror CI's end-to-end checks locally.
 - Do not use `--no-verify` for commits or pushes; fix the underlying hook failure instead.
 - Always commit using Conventional Commits (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`). Do not use any other format.
