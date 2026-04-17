@@ -64,6 +64,11 @@ Mistle is built around isolated agent execution and explicit configuration.
 
 Local development for Mistle requires Nix and uses a multi-service environment with Docker-backed dependencies.
 
+There are two distinct local workflows:
+
+- Use `pnpm dev` when you are contributing inside the monorepo and want the Nix-backed development harness.
+- Use `deploy/compose/local/` when you want the packaged standalone local product stack.
+
 Repo runtime provided by `nix develop`:
 
 - Node v25
@@ -74,9 +79,9 @@ Repo runtime provided by `nix develop`:
 
 - **Required:** Nix with flakes enabled
 - **Required to run the local dependency stack:** Docker (Desktop or Engine) with `docker compose`
-- **Required for stable public hostnames in local development:** `cloudflared`
-- **Required for tunnel setup:** access to the Cloudflare account and zone you want to use
-- **Required for tunnel setup:** permission to create named tunnels and DNS routes
+- **Required for stable public hostnames in the `pnpm dev` workflow:** `cloudflared`
+- **Required for named-tunnel setup in the `pnpm dev` workflow:** access to the Cloudflare account and zone you want to use
+- **Required for named-tunnel setup in the `pnpm dev` workflow:** permission to create named tunnels and DNS routes
 - **Optional:** `direnv` + `nix-direnv` for automatic shell activation
 
 ### Setup
@@ -267,8 +272,21 @@ Mistle should be treated as an integrated platform deployment rather than a sing
 ### Current Deployment Artifacts
 
 - **Kubernetes:** `deploy/helm/mistle/` is the current deployment artifact in this repository.
-- **Docker Compose:** `dev/docker-compose.yml` is for local development, not a generic self-hosting deployment.
-- **Single-node deployment:** a standalone Docker Compose deployment artifact is still in progress.
+- **Standalone local Compose:** `deploy/compose/local/` is the current single-node local testing artifact.
+- **Contributor dev harness:** `dev/docker-compose.yml` remains the dependency stack used by the `pnpm dev` workflow.
+- **Self-hosted Compose:** not implemented yet in this repository.
+
+### Standalone Local Compose
+
+The supported standalone local Compose flow lives under:
+
+- `deploy/compose/local/`
+
+Start there when you want the packaged local product stack instead of the Nix plus `pnpm dev` contributor workflow.
+
+The detailed operator guide is:
+
+- `deploy/compose/local/README.md`
 
 ### Kubernetes Packaging
 
