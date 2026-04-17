@@ -342,7 +342,7 @@ function isRootRepoCheckStep(step: Step): boolean {
 }
 
 function isRepoWideConfigPath(filePath: string): boolean {
-  return REPO_WIDE_FILES.has(filePath) || filePath.startsWith(".github/");
+  return filePath.startsWith(".github/") || filePath.includes("/") === false;
 }
 
 function normalizeChangedFiles(changedFiles: readonly string[]): string[] {
