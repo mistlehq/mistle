@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { MembersDirectoryTable } from "./members-directory-table.js";
 
 describe("MembersDirectoryTable interaction", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   function getInvitationRow(): HTMLElement {
     const invitationRow = screen.getAllByRole("row")[1];
     if (invitationRow === undefined) {

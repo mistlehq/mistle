@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { ChatComposer } from "./chat-composer.js";
 
@@ -30,10 +30,6 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
 }
 
 describe("ChatComposer", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders a Send action button when there is no active turn", () => {
     render(<ChatComposer {...createBaseComposerProps()} />);
 

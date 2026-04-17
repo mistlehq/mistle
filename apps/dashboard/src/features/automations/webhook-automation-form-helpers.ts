@@ -10,7 +10,7 @@ import {
   extractWebhookAutomationTriggerParameterValues,
   mergeWebhookAutomationPayloadFilter,
 } from "./webhook-automation-trigger-parameters.js";
-import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
+import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker-state.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type {
   CreateWebhookAutomationInput,

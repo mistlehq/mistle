@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import {
   resolvePostLoginPath,
@@ -16,7 +17,7 @@ import { AuthScreen } from "./auth-screen.js";
 import { resolveOAuthCallbackError } from "./messages.js";
 
 function renderAuthScreen(input: { initialEntry: string }) {
-  const queryClient = new QueryClient();
+  const queryClient = createTestQueryClient();
   queryClient.setQueryData(SESSION_QUERY_KEY, null);
 
   const router = createMemoryRouter(

@@ -37,7 +37,7 @@ import { applyWebhookAutomationTriggerParameterDefaults } from "./webhook-automa
 import {
   resolveSelectedWebhookAutomationEventOptions,
   type WebhookAutomationTriggerPickerDisabledState,
-} from "./webhook-automation-trigger-picker.js";
+} from "./webhook-automation-trigger-picker-state.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
   createWebhookAutomation,

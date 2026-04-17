@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SessionsNavToggleItem } from "./sessions-nav-toggle-item.js";
 
@@ -16,10 +16,6 @@ function renderItem(input: { checked: boolean }): void {
     </SidebarProvider>,
   );
 }
-
-afterEach(() => {
-  cleanup();
-});
 
 function installMatchMediaStub(): void {
   Object.defineProperty(window, "matchMedia", {

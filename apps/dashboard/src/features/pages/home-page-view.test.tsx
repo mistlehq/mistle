@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
 
 describe("HomePageView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders the current step status mark in desktop and mobile title positions", () => {
     render(<HomePageView onboarding={HomePageStoryModels.addIntegrations} />);
 

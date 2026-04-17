@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { IntegrationConnectionApiKeyDialog } from "./integration-connection-api-key-dialog.js";
 
 describe("IntegrationConnectionApiKeyDialog", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders a password input and emits value changes", () => {
     let updatedValue = "";
 

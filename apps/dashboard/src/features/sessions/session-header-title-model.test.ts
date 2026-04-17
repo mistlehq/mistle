@@ -1,6 +1,6 @@
-import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   applyPatchedSessionTitleToCache,
   resolveCachedSessionStatus,
@@ -9,7 +9,7 @@ import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
 
 describe("session header title model", () => {
   it("reads cached session status from the status query", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       title: "Existing title",
     });
@@ -20,7 +20,7 @@ describe("session header title model", () => {
   });
 
   it("applies a patched title onto an existing cached status record", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       title: null,
       status: "running",
@@ -40,7 +40,7 @@ describe("session header title model", () => {
   });
 
   it("creates a minimal cached status record when none exists yet", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
 
     applyPatchedSessionTitleToCache(queryClient, {
       id: "sbi_123",

@@ -1,17 +1,13 @@
 // @vitest-environment jsdom
 
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { AutoSaveInlineHeading, AutoSaveTitleHeading } from "./auto-save-inline-heading.js";
 
 describe("AutoSaveInlineHeading", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   function getSaveState(input: { label: string }): string | null {
     return (
       screen
@@ -380,10 +376,6 @@ describe("AutoSaveInlineHeading", () => {
 });
 
 describe("AutoSaveTitleHeading", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("uses the empty display text as placeholder without seeding the input value", () => {
     render(
       <AutoSaveTitleHeading

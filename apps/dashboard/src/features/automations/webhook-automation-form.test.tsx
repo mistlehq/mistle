@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
-import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationFormOption,
@@ -20,7 +19,7 @@ import {
   GitHubWebhookSourceId,
   RepoMaintainerSandboxProfileId,
 } from "./webhook-automation-test-fixtures.js";
-import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
@@ -69,13 +68,7 @@ const FormValues: WebhookAutomationFormValues = {
   triggerParameterValues: {},
 };
 
-const TestQueryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-    },
-  },
-});
+const TestQueryClient = createTestQueryClient();
 
 afterEach(() => {
   TestQueryClient.clear();
@@ -204,19 +197,6 @@ describe("WebhookAutomationForm", () => {
     });
 
     expect(within(container).queryByText("Group events by")).toBeNull();
-  });
-
-  it("does not inject an unsupported current conversation grouping option", () => {
-    const fieldOptions = resolveConversationKeyFieldOptions({
-      selectedEventOptions: [WebhookEventOptions[0]!],
-      currentTemplate: "{{payload.unsupported}}",
-    });
-
-    expect(fieldOptions.hasUnsupportedCurrentTemplate).toBe(true);
-    expect(fieldOptions.selectedTemplate).toBe("");
-    expect(
-      fieldOptions.options.some((option) => option.label === "Current setting (unsupported)"),
-    ).toBe(false);
   });
 
   it("shows the message template and automation instructions editors", () => {
@@ -436,15 +416,5 @@ describe("WebhookAutomationForm", () => {
     expect(screen.getAllByText("Select a trigger to insert event fields.").length).toBeGreaterThan(
       0,
     );
-  });
-
-  it("builds agent instruction tokens from the selected trigger payload paths", () => {
-    const tokens = buildAgentInstructionTokenCatalog({
-      selectedEventOptions: [WebhookEventOptions[0]!],
-    });
-
-    expect(tokens.some((token) => token.path === "payload.repository.full_name")).toBe(true);
-    expect(tokens.some((token) => token.path === "webhookEvent.eventType")).toBe(true);
-    expect(tokens.some((token) => token.path === "automationRun.id")).toBe(true);
   });
 });

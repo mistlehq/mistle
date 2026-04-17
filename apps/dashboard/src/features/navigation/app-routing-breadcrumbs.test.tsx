@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createMemoryRouter,
@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
@@ -59,7 +60,7 @@ function PageHarness(): React.JSX.Element {
 }
 
 function renderRoutingMarkup(router: ReturnType<typeof createMemoryRouter>): string {
-  const queryClient = new QueryClient();
+  const queryClient = createTestQueryClient();
 
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
@@ -291,7 +292,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("replaces the session detail breadcrumb trail with the session title", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       id: "sbi_123",
       title: "Investigate flaky title rendering",
@@ -320,7 +321,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("renders Untitled when the session detail resolves with no title", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       id: "sbi_123",
       title: null,
@@ -348,7 +349,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("leaves the session header blank while the detail title is unresolved", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     const router = createMemoryRouter(dashboardRoutes, {
       initialEntries: ["/sessions/sbi_123"],
     });

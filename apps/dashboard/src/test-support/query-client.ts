@@ -24,7 +24,11 @@ export function createTestQueryClient(input?: {
   return queryClient;
 }
 
-export async function cleanupTestQueryClients(): Promise<void> {
+export async function cleanupTestQueryClients(): Promise<boolean> {
+  if (ActiveQueryClients.size === 0) {
+    return false;
+  }
+
   await Promise.all(
     [...ActiveQueryClients].map(async (queryClient) => {
       await queryClient.cancelQueries();
@@ -33,6 +37,7 @@ export async function cleanupTestQueryClients(): Promise<void> {
   );
 
   ActiveQueryClients.clear();
+  return true;
 }
 
 export async function flushScheduledReactWork(): Promise<void> {

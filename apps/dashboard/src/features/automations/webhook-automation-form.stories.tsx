@@ -15,7 +15,7 @@ import {
 } from "./webhook-automation-form.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
-import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 
 const GitHubConnectionId = "conn_github_prod";
 const GitHubWebhookSourceId = "iws_github_prod";

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
@@ -14,11 +15,8 @@ import {
   GitHubGroupedConnectionLabel,
   GitHubWebhookSourceId,
 } from "./webhook-automation-test-fixtures.js";
-import {
-  groupWebhookAutomationEventOptions,
-  WebhookAutomationTriggerPicker,
-} from "./webhook-automation-trigger-picker.js";
-import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
+import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 const SlackConnectionId = "icn_slack";
@@ -57,13 +55,7 @@ const SlackAppMentionEventOption: WebhookAutomationEventOption = {
   ],
 };
 
-const TestQueryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-    },
-  },
-});
+const TestQueryClient = createTestQueryClient();
 
 afterEach(() => {
   TestQueryClient.clear();
@@ -146,16 +138,6 @@ function renderTriggerPicker(input: {
 }
 
 describe("WebhookAutomationTriggerPicker", () => {
-  it("groups available triggers by integration connection label", () => {
-    expect(groupWebhookAutomationEventOptions(WebhookEventOptions)).toEqual([
-      {
-        connectionLabel: "GitHub - GitHub Engineering",
-        logoKey: "github",
-        items: [WebhookEventOptions[0], WebhookEventOptions[1]],
-      },
-    ]);
-  });
-
   it("renders selected triggers with provider logos", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
