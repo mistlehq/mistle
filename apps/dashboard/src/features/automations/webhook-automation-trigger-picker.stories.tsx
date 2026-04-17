@@ -428,7 +428,7 @@ function StoryHarness(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="max-w-3xl">
+      <div className="w-full max-w-5xl">
         <WebhookAutomationTriggerPicker
           error={input.error}
           eventOptions={input.eventOptions}
