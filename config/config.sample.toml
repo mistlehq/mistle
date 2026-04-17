@@ -200,6 +200,8 @@ socket_path = "/var/run/docker.sock"
 [apps.data_plane_worker.sandbox.e2b]
 api_key = "replace-with-e2b-api-key"
 domain = "e2b.app"
+cpu_count = 4
+memory_mb = 8192
 
 [apps.data_plane_worker.sandbox_storage.archil]
 api_key = "replace-with-archil-api-key"
