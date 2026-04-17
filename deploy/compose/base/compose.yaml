@@ -13,6 +13,9 @@ services:
       <<: *docker-build
       target: dashboard-runtime
     image: mistle/dashboard:local
+    environment:
+      MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN: ${MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN}
+      MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE: ${MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE}
     depends_on:
       control-plane-api:
         condition: service_healthy

@@ -1,15 +1,8 @@
 # Local Compose
 
 This is the supported local testing entrypoint for Mistle.
-
-It is designed for:
-
-- running the full product on one machine
-- Mailpit-backed local auth
-- Docker-backed sandbox runtime
-- callback-capable local integration testing by default
-
-It is not the production deployment artifact.
+It runs the product on one machine with Mailpit-backed auth, Docker-backed sessions, and
+webhook-capable integration testing by default. It is not the production deployment artifact.
 
 ## Prerequisites
 
@@ -29,20 +22,9 @@ It is not the production deployment artifact.
    ./up.sh
    ```
 
-   `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet.
-
-   This build also publishes the local sandbox base image used for Docker-backed sessions
-   into the bundled local registry:
-   `localhost:5001/mistle/sandbox-base:local`
-
-   Local Compose also provisions integration targets from the generated default manifest at
-   `deploy/compose/local/config/integration-targets.provision.json`, so the dashboard starts
-   with the supported integrations visible by default.
-
-   `./up.sh` also makes the stack callback-capable for testing by default:
-   - if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set in `.env`, it uses that value
-   - if it is blank, it starts a temporary `cloudflare/cloudflared` container and injects the
-     generated public URL for this run
+   `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet, pushes
+   the local sandbox base image into the bundled registry, provisions the default integration
+   targets, and ensures the control plane has a public webhook URL for the current run.
 
 3. Open the product:
 
@@ -61,32 +43,29 @@ through that registry when local sandbox instances start.
    pnpm compose:local:smoke-test -- --restart-check
    ```
 
-## What You Usually Need To Change
+## Configuration
 
-Most users do not need to edit `.env` at all.
+Most users do not need to edit `.env`.
 
-The main optional override is:
+The main optional override is `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`:
 
-- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
-  - leave it blank for the default quick-tunnel testing flow
-  - set it only when you want to override the quick tunnel with a stable public URL
-
-Optional advanced setup:
-
-- Google auth client ID/secret
-- stable public callback URL
-- local integration-target provisioning customization
+- leave it blank for the default quick-tunnel flow
+- set it only when you want a stable public webhook URL instead
 
 ## Callback Behavior
 
 The dashboard always stays on `http://localhost:3000`.
 
-Integration callbacks derive from the control-plane auth/public base URL:
+Webhook-style integration callbacks derive from the control-plane auth/public base URL.
 
-- if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set, `./up.sh` uses it
-- if it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`
-- the generated public URL is injected through `.generated/runtime.env` for the current run only
-- `./down.sh` stops the stack and removes the wrapper-managed quick tunnel container and generated files
+- If `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set, `./up.sh` uses it.
+- If it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`.
+- The generated public URL is injected through `.generated/runtime.env` for the current run only.
+- `./down.sh` stops the stack and removes the wrapper-managed quick tunnel container and generated files.
+
+This default quick-tunnel flow is for server-to-server webhook delivery. It is not intended for
+browser callback flows such as Google sign-in or OAuth flows that start on `localhost` and return
+to a different public host.
 
 GitHub examples:
 
@@ -95,7 +74,7 @@ GitHub examples:
 
 ## Advanced Customization
 
-To customize the default local target provisioning:
+To customize the default provisioned targets:
 
 1. Edit `integration-targets.provision.example.json`
 2. Regenerate the local Compose manifest:

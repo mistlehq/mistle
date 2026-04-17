@@ -11,7 +11,6 @@ GENERATED_DIRECTORY_PATH="${SCRIPT_DIR}/.generated"
 RUNTIME_ENV_PATH="${GENERATED_DIRECTORY_PATH}/runtime.env"
 CLOUDFLARED_LOG_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.log"
 CLOUDFLARED_CONTAINER_NAME_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.container-name"
-CLOUDFLARED_URL_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.url"
 CLOUDFLARED_IMAGE_REFERENCE="${CLOUDFLARED_IMAGE_REFERENCE:-cloudflare/cloudflared:latest}"
 
 cleanup_on_failure() {
@@ -26,7 +25,7 @@ cleanup_existing_tunnel() {
       docker rm -f "${cloudflared_container_name}" >/dev/null 2>&1 || true
     fi
   fi
-  rm -f "${CLOUDFLARED_CONTAINER_NAME_PATH}" "${CLOUDFLARED_URL_PATH}" "${CLOUDFLARED_LOG_PATH}"
+  rm -f "${CLOUDFLARED_CONTAINER_NAME_PATH}" "${CLOUDFLARED_LOG_PATH}"
 }
 
 trap cleanup_on_failure ERR
@@ -85,7 +84,6 @@ if [[ -z "${runtime_auth_base_url}" ]]; then
     )"
 
     if [[ -n "${runtime_auth_base_url}" ]]; then
-      printf '%s\n' "${runtime_auth_base_url}" >"${CLOUDFLARED_URL_PATH}"
       break
     fi
 
