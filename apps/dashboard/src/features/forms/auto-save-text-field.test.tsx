@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { AutoSaveTextField } from "./auto-save-text-field.js";
 
 describe("AutoSaveTextField", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   function getSaveState(): string | null {
     return (
       screen

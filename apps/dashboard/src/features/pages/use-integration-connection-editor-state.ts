@@ -1,5 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
@@ -39,6 +39,7 @@ type UseIntegrationConnectionEditorStateInput = {
   onClose?: () => void | Promise<void>;
   onSubmitSuccess?: (input: IntegrationConnectionSubmitSuccessInput) => void | Promise<void>;
   queryKey: readonly unknown[];
+  scheduler?: Scheduler;
 };
 
 function isRedirectConnectionMethodId(
@@ -85,6 +86,7 @@ const DeviceAuthorizationPollFloorMs = 2_000;
 export function useIntegrationConnectionEditorState(
   input: UseIntegrationConnectionEditorStateInput,
 ) {
+  const scheduler = input.scheduler ?? systemScheduler;
   const queryClient = useQueryClient();
   const initialState = createInitialIntegrationConnectionEditorState({
     defaultMethodId:
@@ -209,7 +211,7 @@ export function useIntegrationConnectionEditorState(
     }
 
     let disposed = false;
-    const timer: TimerHandle = systemScheduler.schedule(
+    const timer: TimerHandle = scheduler.schedule(
       () => {
         void getDeviceAuthorizationAttempt({
           targetKey: deviceAuthorizationPending.targetKey,
@@ -287,9 +289,9 @@ export function useIntegrationConnectionEditorState(
 
     return () => {
       disposed = true;
-      systemScheduler.cancel(timer);
+      scheduler.cancel(timer);
     };
-  }, [deviceAuthorizationPending, editor, input.queryKey, queryClient]);
+  }, [deviceAuthorizationPending, editor, input.queryKey, queryClient, scheduler]);
 
   async function runSubmit(): Promise<void> {
     const validationError = resolveIntegrationConnectionEditorValidationError({

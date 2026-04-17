@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createMemoryRouter,
@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 
 function expectMarkupToContainCurrentPageLabel(markup: string, label: string): void {
@@ -28,7 +29,7 @@ function BreadcrumbHarness(): React.JSX.Element {
 }
 
 function renderBreadcrumbMarkup(router: ReturnType<typeof createMemoryRouter>): string {
-  const queryClient = new QueryClient();
+  const queryClient = createTestQueryClient();
 
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>

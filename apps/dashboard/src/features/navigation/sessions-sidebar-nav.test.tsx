@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
@@ -66,10 +66,6 @@ function getRepoMaintainerTrigger(): HTMLElement {
 function getSearchInput(): HTMLElement {
   return screen.getByRole("textbox", { name: "Search sessions" });
 }
-
-afterEach(() => {
-  cleanup();
-});
 
 function installMatchMediaStub(): void {
   Object.defineProperty(window, "matchMedia", {

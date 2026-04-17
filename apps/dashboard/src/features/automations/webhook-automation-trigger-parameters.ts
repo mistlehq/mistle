@@ -431,38 +431,3 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
       Object.keys(remainingPayloadFilter).length === 0 ? null : remainingPayloadFilter,
   };
 }
-
-export function applyWebhookAutomationTriggerParameterDefaults(input: {
-  eventOptions: readonly WebhookAutomationEventOption[];
-  selectedTriggerIds: readonly string[];
-  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
-}): WebhookAutomationTriggerParameterValueMap {
-  const nextValues: WebhookAutomationTriggerParameterValueMap = {};
-
-  for (const triggerId of input.selectedTriggerIds) {
-    const existingValues = input.triggerParameterValues[triggerId] ?? {};
-    const nextTriggerValues: Record<string, string> = { ...existingValues };
-    const eventOption = input.eventOptions.find((option) => option.id === triggerId);
-
-    for (const parameter of eventOption?.parameters ?? []) {
-      if (parameter.kind !== "string" || parameter.defaultEnabled !== true) {
-        continue;
-      }
-
-      if (Object.hasOwn(nextTriggerValues, parameter.id)) {
-        continue;
-      }
-
-      const defaultValue = parameter.defaultValue?.trim() ?? "";
-      if (defaultValue.length === 0) {
-        continue;
-      }
-
-      nextTriggerValues[parameter.id] = defaultValue;
-    }
-
-    nextValues[triggerId] = nextTriggerValues;
-  }
-
-  return nextValues;
-}

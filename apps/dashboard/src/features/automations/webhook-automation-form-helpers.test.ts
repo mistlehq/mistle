@@ -6,7 +6,7 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
-import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
+import type { WebhookAutomationFormValues } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
@@ -301,7 +301,7 @@ describe("toWebhookAutomationFormValues", () => {
       triggerIds: [IssueCommentCreatedTriggerId],
       triggerParameterValues: {
         [IssueCommentCreatedTriggerId]: {
-          explicitInvocation: "@mistlebot",
+          invocationToken: "@mistlebot",
         },
       },
     });
@@ -598,7 +598,7 @@ describe("automation payload transforms", () => {
           triggerIds: [IssueCommentCreatedTriggerId],
           triggerParameterValues: {
             [IssueCommentCreatedTriggerId]: {
-              explicitInvocation: "@mistlebot",
+              invocationToken: "@mistlebot",
             },
           },
         },

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
-import { cleanup, render, screen } from "@testing-library/react";
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/jira";
+import { render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import {
@@ -141,10 +141,6 @@ function createJiraCreateEditor(
 }
 
 describe("IntegrationConnectionEditorPage", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("disables 1Password autofill for form secret input", () => {
     renderEditorPage();
 

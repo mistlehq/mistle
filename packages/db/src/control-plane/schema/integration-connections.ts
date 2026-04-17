@@ -1,4 +1,4 @@
-import { index, jsonb, text, timestamp } from "drizzle-orm/pg-core";
+import { index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { integrationTargets } from "./integration-targets.js";
@@ -42,6 +42,11 @@ export const integrationConnections = controlPlaneSchema.table(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex("integration_connections_org_target_id_uidx").on(
+      table.organizationId,
+      table.targetKey,
+      table.id,
+    ),
     index("integration_connections_organization_id_idx").on(table.organizationId),
     index("integration_connections_organization_id_target_key_idx").on(
       table.organizationId,

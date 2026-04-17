@@ -98,6 +98,14 @@ export {
   type IntegrationTarget,
 } from "./integration-targets.js";
 export {
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
+} from "./organization-identity-link-provider-configs.js";
+export type {
+  InsertOrganizationIdentityLinkProviderConfig,
+  OrganizationIdentityLinkProviderConfig,
+} from "./organization-identity-link-provider-configs.js";
+export {
   integrationConnectionRedirectSessions,
   type InsertIntegrationConnectionRedirectSession,
   type IntegrationConnectionRedirectSession,
@@ -172,5 +180,33 @@ export {
 export { sessions } from "./sessions.js";
 export { teamMembers } from "./team-members.js";
 export { teams } from "./teams.js";
+export {
+  userExternalPrincipalCredentialSecrets,
+  UserExternalPrincipalCredentialSecretKinds,
+  type InsertUserExternalPrincipalCredentialSecret,
+  type UserExternalPrincipalCredentialSecret,
+  type UserExternalPrincipalCredentialSecretKind,
+} from "./user-external-principal-credential-secrets.js";
+export {
+  userExternalPrincipalCredentials,
+  UserExternalPrincipalCredentialStatuses,
+  type InsertUserExternalPrincipalCredential,
+  type UserExternalPrincipalCredential,
+  type UserExternalPrincipalCredentialStatus,
+} from "./user-external-principal-credentials.js";
+export {
+  userExternalPrincipalKeys,
+  UserExternalPrincipalKeyStatuses,
+  type InsertUserExternalPrincipalKey,
+  type UserExternalPrincipalKey,
+  type UserExternalPrincipalKeyStatus,
+} from "./user-external-principal-keys.js";
+export {
+  userExternalPrincipals,
+  UserExternalPrincipalStatuses,
+  type InsertUserExternalPrincipal,
+  type UserExternalPrincipal,
+  type UserExternalPrincipalStatus,
+} from "./user-external-principals.js";
 export { users } from "./users.js";
 export { verifications } from "./verifications.js";

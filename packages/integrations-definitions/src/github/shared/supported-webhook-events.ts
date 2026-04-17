@@ -4,6 +4,8 @@ import type {
   IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 
+import { createInvocationTokenParameter } from "../../shared/invocation-token-parameter.js";
+
 const GitHubRepositoryConversationKeyOption = {
   id: "repository",
   label: "Repository",
@@ -161,22 +163,6 @@ const GitHubIssueCommentTargetParameter: IntegrationWebhookEventParameterDefinit
   placeholder: "Any comment target",
 };
 
-function createGitHubExplicitInvocationParameter(
-  payloadPath: ReadonlyArray<string>,
-): IntegrationWebhookEventParameterDefinition {
-  return {
-    id: "explicitInvocation",
-    label: "explicit mention",
-    kind: "string",
-    payloadPath: [...payloadPath],
-    matchMode: "contains_token",
-    defaultValue: "@mistlebot",
-    defaultEnabled: true,
-    controlVariant: "explicit-invocation",
-    placeholder: 'Require "@mistlebot"',
-  };
-}
-
 const GitHubBaseBranchParameter: IntegrationWebhookEventParameterDefinition = {
   id: "baseBranch",
   label: "base branch",
@@ -247,7 +233,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
-      createGitHubExplicitInvocationParameter(["issue", "body"]),
+      createInvocationTokenParameter(["issue", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
     ],
@@ -287,7 +273,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
-      createGitHubExplicitInvocationParameter(["comment", "body"]),
+      createInvocationTokenParameter(["comment", "body"]),
       GitHubIssueCommentTargetParameter,
       GitHubRepositoryParameter,
       GitHubCommenterParameter,
@@ -304,7 +290,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
-      createGitHubExplicitInvocationParameter(["pull_request", "body"]),
+      createInvocationTokenParameter(["pull_request", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
       GitHubBaseBranchParameter,
@@ -371,7 +357,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
-      createGitHubExplicitInvocationParameter(["review", "body"]),
+      createInvocationTokenParameter(["review", "body"]),
       GitHubRepositoryParameter,
       GitHubAuthorParameter,
       GitHubBaseBranchParameter,
@@ -394,7 +380,7 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
       GitHubRepositoryConversationKeyOption,
     ],
     parameters: [
-      createGitHubExplicitInvocationParameter(["comment", "body"]),
+      createInvocationTokenParameter(["comment", "body"]),
       GitHubRepositoryParameter,
       GitHubCommenterParameter,
       GitHubBaseBranchParameter,

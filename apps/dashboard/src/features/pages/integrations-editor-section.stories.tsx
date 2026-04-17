@@ -13,8 +13,8 @@ import {
   StoryGithubResources,
   seedStoryIntegrationResources,
 } from "./integrations-editor-section-story-support.js";
+import { IntegrationsEditorSection } from "./integrations-editor-section.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
-import { IntegrationsEditorSection } from "./sandbox-profile-editor-page.js";
 
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {

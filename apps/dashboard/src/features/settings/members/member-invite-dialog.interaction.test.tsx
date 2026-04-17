@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { MemberInviteDialog } from "./member-invite-dialog.js";
 
 describe("MemberInviteDialog interaction", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("enables send invites when a valid draft email is typed without committing chips", async () => {
     render(
       <MemberInviteDialog

@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { ActionTile } from "./action-tile.js";
 
 describe("ActionTile", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("omits the trailing action container when action is null", () => {
     const { container } = render(
       <ActionTile action={null} description="Completed step description" title="Completed step" />,

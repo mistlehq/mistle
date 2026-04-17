@@ -24,20 +24,17 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
-import type {
-  WebhookAutomationEventOption,
-  WebhookAutomationFormValues,
-} from "./webhook-automation-form.js";
+import type { WebhookAutomationFormValues } from "./webhook-automation-form-types.js";
 import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
 } from "./webhook-automation-option-builders.js";
-import { applyWebhookAutomationTriggerParameterDefaults } from "./webhook-automation-trigger-parameters.js";
 import {
   resolveSelectedWebhookAutomationEventOptions,
   type WebhookAutomationTriggerPickerDisabledState,
-} from "./webhook-automation-trigger-picker.js";
+} from "./webhook-automation-trigger-picker-state.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
   createWebhookAutomation,
@@ -252,7 +249,6 @@ function applyWebhookAutomationValueChange(input: {
   key: keyof WebhookAutomationFormValues;
   value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"];
   eventOptions: readonly WebhookAutomationEventOption[];
-  applyTriggerParameterDefaults: boolean;
 }): WebhookAutomationFormValues {
   const nextValues: WebhookAutomationFormValues = {
     ...input.values,
@@ -260,18 +256,12 @@ function applyWebhookAutomationValueChange(input: {
   };
 
   if (input.key === "triggerIds") {
-    nextValues.triggerParameterValues = input.applyTriggerParameterDefaults
-      ? applyWebhookAutomationTriggerParameterDefaults({
-          eventOptions: input.eventOptions,
-          selectedTriggerIds: nextValues.triggerIds,
-          triggerParameterValues: nextValues.triggerParameterValues,
-        })
-      : Object.fromEntries(
-          nextValues.triggerIds.map((triggerId) => [
-            triggerId,
-            nextValues.triggerParameterValues[triggerId] ?? {},
-          ]),
-        );
+    nextValues.triggerParameterValues = Object.fromEntries(
+      nextValues.triggerIds.map((triggerId) => [
+        triggerId,
+        nextValues.triggerParameterValues[triggerId] ?? {},
+      ]),
+    );
     nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
       values: nextValues,
       eventOptions: input.eventOptions,
@@ -515,7 +505,6 @@ export function useLoadedWebhookAutomationEditorState(
       key,
       value,
       eventOptions: webhookEventOptions,
-      applyTriggerParameterDefaults: input.mode === "create",
     });
 
     setFormValues(nextValues);

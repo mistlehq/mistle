@@ -63,6 +63,77 @@ function resolveIssuePayload(input: Record<string, unknown>): Record<string, unk
   return Object.fromEntries(Object.entries(issue));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeJiraPlainTextWhitespace(value: string): string {
+  return value.replaceAll(/\s+/g, " ").trim();
+}
+
+function isJiraBlockNodeType(value: unknown): boolean {
+  return (
+    value === "doc" ||
+    value === "paragraph" ||
+    value === "blockquote" ||
+    value === "bulletList" ||
+    value === "orderedList" ||
+    value === "listItem" ||
+    value === "table" ||
+    value === "tableRow" ||
+    value === "tableCell" ||
+    value === "tableHeader" ||
+    value === "panel"
+  );
+}
+
+function extractJiraDocumentText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => extractJiraDocumentText(item)).join("");
+  }
+
+  if (!isRecord(value)) {
+    return "";
+  }
+
+  const nodeType = value["type"];
+  const text = value["text"];
+  const content = value["content"];
+  const attrs = value["attrs"];
+
+  if (nodeType === "hardBreak") {
+    return "\n";
+  }
+
+  const attrsText = isRecord(attrs) && typeof attrs["text"] === "string" ? attrs["text"] : "";
+  const contentText = Array.isArray(content)
+    ? content
+        .map((item) => extractJiraDocumentText(item))
+        .join(isJiraBlockNodeType(nodeType) && nodeType !== "paragraph" ? "\n" : "")
+    : "";
+
+  return `${typeof text === "string" ? text : attrsText}${contentText}`;
+}
+
+function normalizeJiraCommentPayload(input: Record<string, unknown>): Record<string, unknown> {
+  const comment = input.comment;
+  if (!isRecord(comment)) {
+    return input;
+  }
+
+  return {
+    ...input,
+    comment: {
+      ...comment,
+      mistlePlainText: normalizeJiraPlainTextWhitespace(extractJiraDocumentText(comment["body"])),
+    },
+  };
+}
+
 function resolveSiteUrlFromPayload(input: Record<string, unknown>): string | null {
   const issue = resolveIssuePayload(input);
   const issueSelf = issue.self;
@@ -277,7 +348,7 @@ export const JiraWebhookHandler: IntegrationWebhookHandler<
   Record<string, string>
 > = {
   resolveWebhookRequest(input) {
-    const payload = parseJsonPayload(input.rawBody);
+    const payload = normalizeJiraCommentPayload(parseJsonPayload(input.rawBody));
     const providerEventType = resolveProviderEventType(payload);
     const webhookIdentifier = resolveWebhookIdentifier(input.headers);
     const occurredAt = resolveWebhookTimestamp(payload);

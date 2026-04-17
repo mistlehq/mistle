@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
 
@@ -19,10 +19,6 @@ const ImplicitWebhookPolicy = {
 } as const;
 
 describe("IntegrationConnectionDetailView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
     let startedGitHubAppInstallationConnectionId: string | null = null;

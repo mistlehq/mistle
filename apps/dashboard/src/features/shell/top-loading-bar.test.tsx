@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
 function createDeferredPromise<T>() {
@@ -61,18 +62,8 @@ function MutationLoadingHarness(props: { promise: Promise<string> }): React.JSX.
 }
 
 describe("top-loading-bar", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("does not render when there is no active navigation or data fetch", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     const router = createMemoryRouter(
       createRoutesFromElements(<Route element={<TopLoadingBar />} path="/" />),
       { initialEntries: ["/"] },
@@ -88,13 +79,7 @@ describe("top-loading-bar", () => {
   });
 
   it("renders during query fetches and hides after the fetch resolves", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     const pendingQuery = createDeferredPromise<string>();
     const router = createMemoryRouter(
       createRoutesFromElements(
@@ -119,13 +104,7 @@ describe("top-loading-bar", () => {
   });
 
   it("does not render for queries that suppress top loading bar activity", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     const pendingQuery = createDeferredPromise<string>();
     const router = createMemoryRouter(
       createRoutesFromElements(
@@ -151,13 +130,7 @@ describe("top-loading-bar", () => {
   });
 
   it("renders during mutations and hides after the mutation resolves", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
+    const queryClient = createTestQueryClient();
     const pendingMutation = createDeferredPromise<string>();
     const router = createMemoryRouter(
       createRoutesFromElements(

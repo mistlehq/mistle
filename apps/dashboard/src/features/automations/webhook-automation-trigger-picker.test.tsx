@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
@@ -14,11 +15,8 @@ import {
   GitHubGroupedConnectionLabel,
   GitHubWebhookSourceId,
 } from "./webhook-automation-test-fixtures.js";
-import {
-  groupWebhookAutomationEventOptions,
-  WebhookAutomationTriggerPicker,
-} from "./webhook-automation-trigger-picker.js";
-import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
+import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 const SlackConnectionId = "icn_slack";
@@ -57,6 +55,12 @@ const SlackAppMentionEventOption: WebhookAutomationEventOption = {
   ],
 };
 
+const TestQueryClient = createTestQueryClient();
+
+afterEach(() => {
+  TestQueryClient.clear();
+});
+
 function renderTriggerPicker(input: {
   error?: string;
   hasConnectedIntegrations: boolean;
@@ -67,37 +71,32 @@ function renderTriggerPicker(input: {
   eventOptions?: readonly WebhookAutomationEventOption[];
   useStatefulSelection?: boolean;
 }): ReturnType<typeof render> {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
+  TestQueryClient.setQueryData(
+    ["automation-trigger-parameters", input.selectedConnectionId, "user"],
+    {
+      connectionId: input.selectedConnectionId,
+      familyId: "github",
+      kind: "user",
+      syncState: "ready",
+      items: [
+        {
+          id: "icr_github_user_1",
+          familyId: "github",
+          kind: "user",
+          externalId: "1001",
+          handle: "octocat",
+          displayName: "octocat",
+          status: "accessible",
+          metadata: {},
+        },
+      ],
+      page: {
+        totalResults: 1,
+        nextCursor: null,
+        previousCursor: null,
       },
     },
-  });
-
-  queryClient.setQueryData(["automation-trigger-parameters", input.selectedConnectionId, "user"], {
-    connectionId: input.selectedConnectionId,
-    familyId: "github",
-    kind: "user",
-    syncState: "ready",
-    items: [
-      {
-        id: "icr_github_user_1",
-        familyId: "github",
-        kind: "user",
-        externalId: "1001",
-        handle: "octocat",
-        displayName: "octocat",
-        status: "accessible",
-        metadata: {},
-      },
-    ],
-    page: {
-      totalResults: 1,
-      nextCursor: null,
-      previousCursor: null,
-    },
-  });
+  );
 
   function StatefulTriggerPicker(): React.JSX.Element {
     const [selectedTriggerIds, setSelectedTriggerIds] = useState([...input.selectedTriggerIds]);
@@ -118,7 +117,7 @@ function renderTriggerPicker(input: {
   }
 
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={TestQueryClient}>
       {input.useStatefulSelection === true ? (
         <StatefulTriggerPicker />
       ) : (
@@ -139,16 +138,6 @@ function renderTriggerPicker(input: {
 }
 
 describe("WebhookAutomationTriggerPicker", () => {
-  it("groups available triggers by integration connection label", () => {
-    expect(groupWebhookAutomationEventOptions(WebhookEventOptions)).toEqual([
-      {
-        connectionLabel: "GitHub - GitHub Engineering",
-        logoKey: "github",
-        items: [WebhookEventOptions[0], WebhookEventOptions[1]],
-      },
-    ]);
-  });
-
   it("renders selected triggers with provider logos", () => {
     const { container } = renderTriggerPicker({
       hasConnectedIntegrations: true,
@@ -375,15 +364,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   });
 
   it("renders Slack channel selector-backed trigger parameters", async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    queryClient.setQueryData(["automation-trigger-parameters", SlackConnectionId, "channel"], {
+    TestQueryClient.setQueryData(["automation-trigger-parameters", SlackConnectionId, "channel"], {
       connectionId: SlackConnectionId,
       familyId: "slack",
       kind: "channel",
@@ -407,7 +388,7 @@ describe("WebhookAutomationTriggerPicker", () => {
       },
     });
     render(
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={TestQueryClient}>
         <WebhookAutomationTriggerPicker
           error={undefined}
           eventOptions={[SlackAppMentionEventOption]}
@@ -481,63 +462,69 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(parameterSelect.textContent).toContain("pull request");
   });
 
-  it("renders explicit invocation parameters as an enabled switch", () => {
+  it("renders invocation token parameters as an optional input", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedTriggerIds: [
-        createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedTriggerIds: [triggerId],
       triggerParameterValues: {
-        [createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        })]: {
-          explicitInvocation: "@mistlebot",
+        [triggerId]: {
+          invocationToken: "@mistlebot",
         },
       },
     });
 
-    const toggle = screen
-      .getAllByRole("switch", {
-        name: /Only respond to @mistlebot/,
-      })
-      .find((element) => element.getAttribute("aria-checked") === "true");
-    if (toggle === undefined) {
-      throw new Error("Expected explicit invocation switch to be enabled.");
-    }
-
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getAllByText("includes").length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("@mistlebot")).toBeDefined();
   });
 
   it("renders the saved explicit invocation value instead of the default", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedTriggerIds: [
-        createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedTriggerIds: [triggerId],
       triggerParameterValues: {
-        [createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        })]: {
-          explicitInvocation: "@review-bot",
+        [triggerId]: {
+          invocationToken: "@review-bot",
         },
       },
     });
 
-    expect(
-      screen.getByRole("switch", {
-        name: /Only respond to @review-bot/,
-      }),
-    ).toBeDefined();
+    expect(screen.getByDisplayValue("@review-bot")).toBeDefined();
+  });
+
+  it("renders an empty invocation token input without showing an error", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [triggerId],
+      triggerParameterValues: {
+        [triggerId]: {
+          invocationToken: "",
+        },
+      },
+    });
+
+    expect(screen.queryByText("Enter an invocation token.")).toBeNull();
+    const emptyInvocationInput = screen
+      .getAllByRole("textbox")
+      .find((element) => element.getAttribute("value") === "");
+    if (emptyInvocationInput === undefined) {
+      throw new Error("Expected an empty invocation token input.");
+    }
   });
 
   it("renders unset enum-backed trigger parameters as placeholders", () => {
@@ -656,15 +643,7 @@ describe("WebhookAutomationTriggerPicker", () => {
   });
 
   it("resets unsaved resource query text when the selected value changes", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    queryClient.setQueryData(
+    TestQueryClient.setQueryData(
       ["automation-trigger-parameters", "icn_01kkk1g84mfetvga8a4b853k27", "user"],
       {
         connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
@@ -751,7 +730,7 @@ describe("WebhookAutomationTriggerPicker", () => {
     }
 
     render(
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={TestQueryClient}>
         <StatefulResourceSelection />
       </QueryClientProvider>,
     );

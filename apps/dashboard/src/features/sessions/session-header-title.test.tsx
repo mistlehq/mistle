@@ -1,19 +1,16 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import { SessionHeaderTitle } from "./session-header-title.js";
 import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
 
 describe("SessionHeaderTitle", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
-  function renderSessionHeaderTitle(input: { title: string | null }): QueryClient {
-    const queryClient = new QueryClient();
+  function renderSessionHeaderTitle(input: { title: string | null }) {
+    const queryClient = createTestQueryClient();
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_123"), {
       id: "sbi_123",
       title: input.title,

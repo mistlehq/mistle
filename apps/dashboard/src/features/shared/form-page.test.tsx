@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { FormPageStack } from "./form-page.js";
 
 describe("FormPageStack", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("uses the standard form document spacing", () => {
     const { container } = render(
       <FormPageStack>

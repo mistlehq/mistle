@@ -7,6 +7,7 @@ export type SettingsRouteElements = {
   personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
+  organizationSandboxes: React.JSX.Element;
 };
 
 export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX.Element {
@@ -32,6 +33,11 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
           element={elements.organizationMembers}
           handle={ROUTE_HANDLES.settingsOrganizationMembers}
           path="members"
+        />
+        <Route
+          element={elements.organizationSandboxes}
+          handle={ROUTE_HANDLES.settingsOrganizationSandboxes}
+          path="sandboxes"
         />
         <Route element={<LegacyOrganizationIntegrationsRedirect />} path="integrations/*" />
       </Route>

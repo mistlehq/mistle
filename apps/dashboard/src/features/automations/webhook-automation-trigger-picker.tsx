@@ -13,7 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -22,125 +21,20 @@ import {
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import {
-  createSyntheticWebhookAutomationEventOption,
-  isWebhookAutomationEventOptionUnavailable,
-} from "./webhook-automation-event-option-availability.js";
+  resolveSelectedWebhookAutomationEventOptions,
+  resolveWebhookAutomationTriggerPickerState,
+  type WebhookAutomationTriggerPickerDisabledState,
+} from "./webhook-automation-trigger-picker-state.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
-
-type GroupedWebhookAutomationEventOptions = {
-  connectionLabel: string;
-  logoKey?: string;
-  items: readonly WebhookAutomationEventOption[];
-};
-
-type WebhookAutomationTriggerPickerState = {
-  availableEventOptions: readonly WebhookAutomationEventOption[];
-  groupedAvailableEventOptions: readonly GroupedWebhookAutomationEventOptions[];
-  disabled: boolean;
-  helperMessage: string | null;
-  helperVariant: "default" | "alert";
-  inputPlaceholder: string;
-};
-
-export type WebhookAutomationTriggerPickerDisabledState = {
-  reason: string;
-  variant: "default" | "alert";
-};
-
-export function groupWebhookAutomationEventOptions(
-  eventOptions: readonly WebhookAutomationEventOption[],
-): readonly GroupedWebhookAutomationEventOptions[] {
-  const groups = new Map<string, WebhookAutomationEventOption[]>();
-
-  for (const option of eventOptions) {
-    const connectionLabel =
-      option.connectionLabel.trim().length > 0 ? option.connectionLabel : "Other integrations";
-    const existingItems = groups.get(connectionLabel);
-    if (existingItems === undefined) {
-      groups.set(connectionLabel, [option]);
-      continue;
-    }
-
-    existingItems.push(option);
-  }
-
-  return Array.from(groups.entries())
-    .sort(([leftConnectionLabel], [rightConnectionLabel]) =>
-      leftConnectionLabel.localeCompare(rightConnectionLabel),
-    )
-    .map(([connectionLabel, items]) => {
-      const sortedItems = [...items].sort((left, right) => left.label.localeCompare(right.label));
-
-      return {
-        connectionLabel,
-        ...(sortedItems[0]?.logoKey === undefined ? {} : { logoKey: sortedItems[0].logoKey }),
-        items: sortedItems,
-      };
-    });
-}
-
-export function resolveSelectedWebhookAutomationEventOptions(input: {
-  eventOptions: readonly WebhookAutomationEventOption[];
-  selectedTriggerIds: readonly string[];
-}): readonly WebhookAutomationEventOption[] {
-  return input.selectedTriggerIds.map((triggerId) => {
-    const matchedOption = input.eventOptions.find((candidate) => candidate.id === triggerId);
-    if (matchedOption !== undefined) {
-      return matchedOption;
-    }
-
-    return {
-      ...createSyntheticWebhookAutomationEventOption({
-        triggerId,
-        availability: "missing_integration",
-      }),
-    } satisfies WebhookAutomationEventOption;
-  });
-}
-
-function resolveWebhookAutomationTriggerPickerState(input: {
-  hasConnectedIntegrations: boolean;
-  selectedTriggerIds: readonly string[];
-  eventOptions: readonly WebhookAutomationEventOption[];
-  disabledState?: WebhookAutomationTriggerPickerDisabledState | null;
-}): WebhookAutomationTriggerPickerState {
-  if (input.disabledState !== undefined && input.disabledState !== null) {
-    return {
-      availableEventOptions: [],
-      groupedAvailableEventOptions: [],
-      disabled: true,
-      helperMessage: input.disabledState.reason,
-      helperVariant: input.disabledState.variant,
-      inputPlaceholder: "No triggers available",
-    };
-  }
-
-  const selectedTriggerIdSet = new Set(input.selectedTriggerIds);
-  const availableEventOptions = input.eventOptions.filter(
-    (option) =>
-      !isWebhookAutomationEventOptionUnavailable(option) && !selectedTriggerIdSet.has(option.id),
-  );
-  const hasAvailableTriggers = availableEventOptions.length > 0;
-
-  return {
-    availableEventOptions,
-    groupedAvailableEventOptions: groupWebhookAutomationEventOptions(availableEventOptions),
-    disabled: !input.hasConnectedIntegrations || !hasAvailableTriggers,
-    helperMessage: input.hasConnectedIntegrations
-      ? null
-      : "Connect an integration to add triggers.",
-    helperVariant: "default",
-    inputPlaceholder: hasAvailableTriggers ? "Add trigger" : "No triggers available",
-  };
-}
 
 export function WebhookAutomationTriggerPicker(input: {
   hasConnectedIntegrations: boolean;
@@ -337,46 +231,48 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
         )}
       </div>
 
-      <ComboboxContent
-        align={input.variant === "header" ? "end" : "start"}
-        anchor={anchorRef}
-        className="w-[min(34rem,calc(100vw-2rem))] p-0"
-      >
-        {input.variant === "header" ? (
-          <div className="border-b p-1">
-            <ComboboxInput
-              aria-invalid={input.error === undefined ? undefined : true}
-              className="w-full"
-              disabled={pickerState.disabled}
-              id={triggerPickerId}
-              placeholder="Search triggers"
-              showClear={false}
-            />
-          </div>
-        ) : null}
-        <ComboboxList className="max-h-80">
-          {pickerState.groupedAvailableEventOptions.map((group) => (
-            <ComboboxGroup key={group.connectionLabel}>
-              <ComboboxLabel className="flex items-center gap-2">
-                {group.logoKey === undefined ? null : (
-                  <img
-                    alt=""
-                    aria-hidden
-                    className="size-3.5 shrink-0"
-                    src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
-                  />
-                )}
-                <span>{group.connectionLabel}</span>
-              </ComboboxLabel>
-              {group.items.map((option) => (
-                <ComboboxItem key={option.id} value={option.id}>
-                  <span className="truncate">{option.label}</span>
-                </ComboboxItem>
-              ))}
-            </ComboboxGroup>
-          ))}
-        </ComboboxList>
-      </ComboboxContent>
+      {isOpen ? (
+        <ComboboxContent
+          align={input.variant === "header" ? "end" : "start"}
+          anchor={anchorRef}
+          className="w-[min(34rem,calc(100vw-2rem))] p-0"
+        >
+          {input.variant === "header" ? (
+            <div className="border-b p-1">
+              <ComboboxInput
+                aria-invalid={input.error === undefined ? undefined : true}
+                className="w-full"
+                disabled={pickerState.disabled}
+                id={triggerPickerId}
+                placeholder="Search triggers"
+                showClear={false}
+              />
+            </div>
+          ) : null}
+          <ComboboxList className="max-h-80">
+            {pickerState.groupedAvailableEventOptions.map((group) => (
+              <ComboboxGroup key={group.connectionLabel}>
+                <ComboboxLabel className="flex items-center gap-2">
+                  {group.logoKey === undefined ? null : (
+                    <img
+                      alt=""
+                      aria-hidden
+                      className="size-3.5 shrink-0"
+                      src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
+                    />
+                  )}
+                  <span>{group.connectionLabel}</span>
+                </ComboboxLabel>
+                {group.items.map((option) => (
+                  <ComboboxItem key={option.id} value={option.id}>
+                    <span className="truncate">{option.label}</span>
+                  </ComboboxItem>
+                ))}
+              </ComboboxGroup>
+            ))}
+          </ComboboxList>
+        </ComboboxContent>
+      ) : null}
     </Combobox>
   );
 }
@@ -388,17 +284,6 @@ function TriggerParameterField(input: {
   value: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element | null {
-  const [lastNonEmptyStringValue, setLastNonEmptyStringValue] = useState(() => input.value.trim());
-
-  useEffect(() => {
-    const nextValue = input.value.trim();
-    if (nextValue.length === 0) {
-      return;
-    }
-
-    setLastNonEmptyStringValue(nextValue);
-  }, [input.value]);
-
   const resourceQuery = useQuery({
     queryKey: [
       "automation-trigger-parameters",
@@ -427,28 +312,14 @@ function TriggerParameterField(input: {
   });
 
   if (input.parameter.kind === "string") {
-    if (input.parameter.controlVariant === "explicit-invocation") {
-      const switchId = `${input.eventType}:${input.parameter.id}`;
-      const defaultExplicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
-      const savedExplicitInvocationValue = input.value.trim();
-      const explicitInvocationValue =
-        savedExplicitInvocationValue.length > 0
-          ? savedExplicitInvocationValue
-          : lastNonEmptyStringValue.length > 0
-            ? lastNonEmptyStringValue
-            : defaultExplicitInvocationValue;
-      const checked = input.value.trim().length > 0;
-      const tooltipMessage = `Enable this to respond only when ${explicitInvocationValue} is mentioned. Disable it to respond to every event.`;
-
+    if (input.parameter.controlVariant === "invocation-token") {
       return (
-        <div className="inline-flex items-center gap-3 rounded-md border px-3 py-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="block text-sm">
-              Only respond to <span className="font-medium">{explicitInvocationValue}</span>
-            </span>
-            <Tooltip>
+        <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm whitespace-nowrap">
+            <span>includes</span>
+            <Tooltip delay={0}>
               <TooltipTrigger
-                aria-label="Explain explicit mention requirement"
+                aria-label="Explain invocation token filter"
                 render={
                   <button
                     className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
@@ -459,19 +330,19 @@ function TriggerParameterField(input: {
                 <InfoIcon aria-hidden className="size-3.5" />
               </TooltipTrigger>
               <TooltipContent className="max-w-64 text-left" side="top">
-                {tooltipMessage}
+                Example: @mistlebot, mistle, /triage. Leave blank to match all events.
               </TooltipContent>
             </Tooltip>
           </span>
-          <Switch
-            aria-label={`Only respond to ${explicitInvocationValue}`}
-            checked={checked}
-            id={switchId}
-            onCheckedChange={(nextChecked) => {
-              input.onValueChange(nextChecked ? explicitInvocationValue : "");
+          <Input
+            className="min-w-0 flex-1 md:min-w-44 md:flex-none"
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              input.onValueChange(event.currentTarget.value);
             }}
+            placeholder={input.parameter.placeholder}
+            value={input.value}
           />
-        </div>
+        </span>
       );
     }
 

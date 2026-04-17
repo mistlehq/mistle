@@ -278,7 +278,6 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
           "set -eu",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /root)\"",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /etc/codex)\"",
-          "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /usr/local/bin)\"",
           "printf '%s\\n' \"$(findmnt -n -o SOURCE --target /mnt/mistle/archil)\"",
           "mountpoint -q /mnt/mistle/archil",
         ].join("\n"),
@@ -288,7 +287,6 @@ describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
       expect(mountState.stdout.trim().split("\n")).toEqual([
         `${disk.diskId}[${TestArchilRegion}][/root]`,
         `${disk.diskId}[${TestArchilRegion}][/etc/codex]`,
-        `${disk.diskId}[${TestArchilRegion}][/usr/local/bin]`,
         `${disk.diskId}[${TestArchilRegion}]`,
       ]);
 

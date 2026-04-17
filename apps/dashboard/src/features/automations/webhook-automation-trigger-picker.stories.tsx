@@ -3,9 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
-import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import { createGitHubEventOption } from "./webhook-automation-test-fixtures.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import type {
   WebhookAutomationEventOption,
@@ -42,212 +43,45 @@ const SlackAppMentionTriggerId = createWebhookAutomationTriggerId({
 });
 
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
-  {
-    id: IssueCommentCreatedTriggerId,
+  createGitHubEventOption({
     eventType: "github.issue_comment.created",
-    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
     connectionLabel: "GitHub Engineering",
-    label: "Issue comment created",
-    category: "GitHub Engineering / Issues",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["comment", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "target",
-        label: "comment target",
-        kind: "enum-select",
-        payloadPath: ["issue", "pull_request"],
-        matchMode: "exists",
-        options: [
-          {
-            value: "exists",
-            label: "pull request",
-          },
-          {
-            value: "not_exists",
-            label: "issue",
-          },
-        ],
-        prefix: "in",
-        placeholder: "Any comment target",
-      },
-      {
-        id: "commenter",
-        label: "commenter",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any commenter",
-      },
-      {
-        id: "repository",
-        label: "repository",
-        kind: "resource-select",
-        resourceKind: "repository",
-        payloadPath: ["repository", "full_name"],
-        prefix: "in",
-      },
-    ],
-  },
-  {
-    id: createWebhookAutomationTriggerId({
-      webhookSourceId: GitHubWebhookSourceId,
-      eventType: "github.issues.opened",
-    }),
+    categoryPrefix: "GitHub Engineering",
+    overrides: { id: IssueCommentCreatedTriggerId },
+  }),
+  createGitHubEventOption({
     eventType: "github.issues.opened",
-    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
     connectionLabel: "GitHub Engineering",
-    label: "Issue opened",
-    category: "GitHub Engineering / Issues",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["issue", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-    ],
-  },
-  {
-    id: PullRequestOpenedTriggerId,
+    categoryPrefix: "GitHub Engineering",
+  }),
+  createGitHubEventOption({
     eventType: "github.pull_request.opened",
-    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
     connectionLabel: "GitHub Engineering",
-    label: "Pull request opened",
-    category: "GitHub Engineering / Pull requests",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["pull_request", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "repository",
-        label: "repository",
-        kind: "resource-select",
-        resourceKind: "repository",
-        payloadPath: ["repository", "full_name"],
-        prefix: "in",
-      },
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-      {
-        id: "baseBranch",
-        label: "base branch",
-        kind: "resource-select",
-        resourceKind: "branch",
-        payloadPath: ["pull_request", "base", "ref"],
-        prefix: "to",
-        placeholder: "Any base branch",
-      },
-    ],
-  },
-  {
-    id: PullRequestReviewSubmittedTriggerId,
+    categoryPrefix: "GitHub Engineering",
+    overrides: { id: PullRequestOpenedTriggerId },
+  }),
+  createGitHubEventOption({
     eventType: "github.pull_request_review.submitted",
-    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
     connectionLabel: "GitHub Engineering",
-    label: "Pull request review submitted",
-    category: "GitHub Engineering / Pull requests",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["review", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-      {
-        id: "repository",
-        label: "repository",
-        kind: "resource-select",
-        resourceKind: "repository",
-        payloadPath: ["repository", "full_name"],
-        prefix: "in",
-      },
-      {
-        id: "author",
-        label: "author",
-        kind: "resource-select",
-        resourceKind: "user",
-        payloadPath: ["sender", "login"],
-        prefix: "by",
-        placeholder: "Any author",
-      },
-      {
-        id: "baseBranch",
-        label: "base branch",
-        kind: "resource-select",
-        resourceKind: "branch",
-        payloadPath: ["pull_request", "base", "ref"],
-        prefix: "to",
-        placeholder: "Any base branch",
-      },
-    ],
-  },
-  {
-    id: PullRequestReviewCommentCreatedTriggerId,
+    categoryPrefix: "GitHub Engineering",
+    overrides: { id: PullRequestReviewSubmittedTriggerId },
+  }),
+  createGitHubEventOption({
     eventType: "github.pull_request_review_comment.created",
-    integrationWebhookSourceId: GitHubWebhookSourceId,
     connectionId: GitHubConnectionId,
+    webhookSourceId: GitHubWebhookSourceId,
     connectionLabel: "GitHub Engineering",
-    label: "Pull request review comment created",
-    category: "GitHub Engineering / Pull requests",
-    logoKey: "github",
-    parameters: [
-      {
-        id: "explicitInvocation",
-        label: "explicit mention",
-        kind: "string",
-        payloadPath: ["comment", "body"],
-        matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
-        controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
-      },
-    ],
-  },
+    categoryPrefix: "GitHub Engineering",
+    overrides: { id: PullRequestReviewCommentCreatedTriggerId },
+  }),
 ];
 
 const StoryGithubRepositoryResources: IntegrationConnectionResources = {
@@ -443,7 +277,7 @@ function StoryHarness(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="max-w-3xl">
+      <div className="w-full max-w-6xl px-6 py-8">
         <WebhookAutomationTriggerPicker
           error={input.error}
           eventOptions={input.eventOptions}
@@ -470,7 +304,10 @@ function StoryHarness(input: {
 const meta = {
   title: "Dashboard/Automations/WebhookAutomation/TriggerPicker",
   component: StoryHarness,
-  decorators: [withDashboardCenteredStory],
+  decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
 } satisfies Meta<typeof StoryHarness>;
 
 export default meta;
@@ -600,7 +437,7 @@ export const AddSecondTrigger: Story = {
     selectedTriggerIds: [IssueCommentCreatedTriggerId],
     triggerParameterValues: {
       [IssueCommentCreatedTriggerId]: {
-        explicitInvocation: "@mistlebot",
+        invocationToken: "@mistlebot",
       },
     },
     eventOptions: GitHubEventOptions,

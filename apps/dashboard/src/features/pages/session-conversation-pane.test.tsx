@@ -3,10 +3,10 @@
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { useMemo, useRef, useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { useSessionComposerAttachmentControl } from "./session-composer/index.js";
@@ -267,10 +267,6 @@ function renderConversationScrollScenario(
 }
 
 describe("SessionConversationBottomPanel", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders the session status message above the composer", () => {
     render(
       <SessionConversationBottomPanel

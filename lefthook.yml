@@ -13,6 +13,8 @@ commit-msg:
 pre-push:
   parallel: false
   commands:
+    format-check:
+      run: pnpm format:check
     lint:
       run: pnpm lint
     typecheck:

@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 
 describe("OrganizationIntegrationsSettingsPageView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders integration sections and forwards card actions", () => {
     let selectedTargetKey: string | null = null;
 

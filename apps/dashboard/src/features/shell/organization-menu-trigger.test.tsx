@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -27,10 +27,6 @@ function renderOrganizationMenuTrigger(
 }
 
 describe("OrganizationMenuTrigger", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders the organization trigger without crashing when an image URL is available", () => {
     renderOrganizationMenuTrigger({
       organizationImageUrl: "https://images.example.com/mistle-logo.webp",

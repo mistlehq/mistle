@@ -16,6 +16,7 @@
     "build": "turbo run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
+    "validate:changed": "tsx ./scripts/dev/validate-changed.ts",
     "lint": "pnpm lint:ts && pnpm lint:rust",
     "lint:workspace": "pnpm lint:oxlint",
     "lint:ts": "pnpm lint:oxlint && pnpm lint:openapi && pnpm lint:docs",
