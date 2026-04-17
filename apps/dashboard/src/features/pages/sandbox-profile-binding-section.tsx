@@ -92,6 +92,8 @@ function ConnectorBindingRows(input: {
   }): React.JSX.Element {
     const supportedToolToggleModel =
       params.toolToggleModel.mode === "supported" ? params.toolToggleModel : undefined;
+    const unsupportedToolToggleMessage =
+      params.toolToggleModel.mode === "unsupported" ? params.toolToggleModel.message : undefined;
 
     return (
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -101,7 +103,7 @@ function ConnectorBindingRows(input: {
           </DetailLabel>
         )}
         {supportedToolToggleModel === undefined ? (
-          <p className="text-sm text-destructive">{params.toolToggleModel.message}</p>
+          <p className="text-sm text-destructive">{unsupportedToolToggleMessage}</p>
         ) : (
           <div className="flex flex-col gap-1.5">
             {supportedToolToggleModel.options.map((option) => (

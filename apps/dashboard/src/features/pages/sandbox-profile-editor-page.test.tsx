@@ -267,12 +267,19 @@ describe("IntegrationsEditorSection", () => {
     });
 
     const connectorsSection = getSectionContainer("Connectors");
-    const linearMcpCheckbox = within(connectorsSection).getByRole("checkbox", {
+    const linearMcpCheckboxes = within(connectorsSection).getAllByRole("checkbox", {
       name: /Linear MCP/,
     });
+    const removeBindingButtons = within(connectorsSection).getAllByRole("button", {
+      name: "Remove binding",
+    });
+    const linearMcpCheckbox = linearMcpCheckboxes[0];
+    if (linearMcpCheckbox === undefined) {
+      throw new Error("Expected at least one Linear MCP checkbox.");
+    }
 
     expect(within(connectorsSection).queryByRole("button", { name: "Edit binding" })).toBeNull();
-    expect(within(connectorsSection).getByRole("button", { name: "Remove binding" })).toBeDefined();
+    expect(removeBindingButtons[0]).toBeDefined();
     expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("false");
 
     fireEvent.click(linearMcpCheckbox);

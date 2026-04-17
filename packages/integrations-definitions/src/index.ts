@@ -18,6 +18,7 @@ import { SlackDefinition } from "./slack/browser.js";
 export * from "./aws/browser.js";
 export * from "./datadog/index.js";
 export * from "./jira/browser.js";
+export * from "./jira-shared.js";
 export * from "./github/browser.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
