@@ -19,34 +19,6 @@ import {
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionConversationScrollBehaviorArgType } from "./session-conversation-story-scroll-behavior.js";
 
-function renderGroupingLegend(): React.JSX.Element {
-  return (
-    <aside className="bg-background/95 text-foreground sticky top-4 flex w-full flex-col gap-2 rounded-xl border p-3 shadow-lg backdrop-blur-sm">
-      <p className="font-medium text-xs tracking-[0.18em] uppercase">Layout Map</p>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="inline-block size-3 rounded-sm bg-sky-500/15 ring-1 ring-sky-500/45" />
-        <span>Turn group</span>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="inline-block size-3 rounded-sm bg-emerald-500/15 ring-1 ring-emerald-500/45" />
-        <span>Assistant stack</span>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="inline-block size-3 rounded-sm bg-amber-500/15 ring-1 ring-amber-500/45" />
-        <span>User bubble</span>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="inline-block size-3 rounded-sm bg-rose-500/15 ring-1 ring-rose-500/45" />
-        <span>Semantic group</span>
-      </div>
-      <div className="flex items-center gap-2 text-xs">
-        <span className="inline-block size-3 rounded-sm bg-violet-500/15 ring-1 ring-violet-500/45" />
-        <span>Plan block</span>
-      </div>
-    </aside>
-  );
-}
-
 function renderMeasurementHud(input: {
   fixture: SessionConversationPaneStoryArgs["fixture"];
   turnGapPx: SessionConversationPaneStoryArgs["turnGapPx"];
@@ -241,7 +213,6 @@ export function renderConversationPaneLayoutPlayground(
     planEntryGapPx,
     planIndentPx,
     planStepGapPx,
-    showGroupingOutlines,
     ...conversationArgs
   } = args;
 
@@ -281,7 +252,6 @@ export function renderConversationPaneLayoutPlayground(
       className="h-full"
       data-conversation-layout-playground
       data-highlight-target={hoveredTarget ?? ""}
-      data-show-grouping-outlines={showGroupingOutlines ? "true" : "false"}
       style={playgroundStyle}
     >
       <style>{`
@@ -320,36 +290,6 @@ export function renderConversationPaneLayoutPlayground(
           background: color-mix(in oklab, var(--color-amber-500) 10%, transparent);
           border-radius: 0.75rem;
         }
-
-        [data-conversation-layout-playground][data-show-grouping-outlines="true"] [data-chat-turn-group] {
-          background: color-mix(in oklab, var(--color-sky-500) 7%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-sky-500) 38%, transparent);
-          border-radius: 1rem;
-        }
-
-        [data-conversation-layout-playground][data-show-grouping-outlines="true"] [data-chat-assistant-blocks] {
-          background: color-mix(in oklab, var(--color-emerald-500) 7%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-emerald-500) 32%, transparent);
-          border-radius: 0.875rem;
-        }
-
-        [data-conversation-layout-playground][data-show-grouping-outlines="true"] [data-chat-user-message-bubble] {
-          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-amber-500) 42%, transparent);
-        }
-
-        [data-conversation-layout-playground][data-show-grouping-outlines="true"] [data-chat-semantic-group] {
-          background: color-mix(in oklab, var(--color-rose-500) 7%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-rose-500) 32%, transparent);
-          border-radius: 0.875rem;
-          padding: 0.5rem 0.625rem;
-        }
-
-        [data-conversation-layout-playground][data-show-grouping-outlines="true"] [data-chat-plan-entry] {
-          background: color-mix(in oklab, var(--color-violet-500) 7%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-violet-500) 32%, transparent);
-          border-radius: 0.875rem;
-          padding: 0.5rem 0.625rem;
-        }
       `}</style>
       <div className="relative h-full min-h-0 w-full">
         <div className="pointer-events-none absolute top-4 right-6 hidden w-80 translate-x-[calc(100%+3rem)] 2xl:flex 2xl:flex-col 2xl:gap-4">
@@ -384,9 +324,6 @@ export function renderConversationPaneLayoutPlayground(
               onHoverTarget: setHoveredTarget,
             })}
           </div>
-          {showGroupingOutlines ? (
-            <div className="pointer-events-auto">{renderGroupingLegend()}</div>
-          ) : null}
         </div>
         <div className="h-full min-h-0 min-w-0">
           <SessionConversationMainContent
@@ -531,10 +468,6 @@ export const SessionConversationPanePlaygroundArgTypes = {
     description: "Gap between plan steps, using the Tailwind spacing scale.",
     options: TailwindSpacingTokenOptions,
   },
-  showGroupingOutlines: {
-    control: "boolean",
-    description: "Draw color-coded overlays to show the conversation grouping boundaries.",
-  },
 } as const;
 
 export const SessionConversationPanePlaygroundControlInclude = [
@@ -563,7 +496,6 @@ export const SessionConversationPanePlaygroundControlInclude = [
   "planEntryGapPx",
   "planIndentPx",
   "planStepGapPx",
-  "showGroupingOutlines",
 ] as const;
 
 export const SessionConversationPanePlaygroundDocs = `Use the playground story to tune the conversation pane rhythm in-place. The Controls tab exposes the main spacing and width variables, while the optional grouping outlines show how turns, assistant stacks, semantic groups, and plan blocks nest inside the workbench shell.

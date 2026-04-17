@@ -59,7 +59,6 @@ export const SessionConversationPanePlaygroundBaseArgs = {
   planEntryGapPx: "gap-1",
   planIndentPx: "gap-4",
   planStepGapPx: "gap-0.5",
-  showGroupingOutlines: false,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
 } satisfies SessionConversationPaneStoryArgs;
 

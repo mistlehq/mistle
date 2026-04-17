@@ -128,7 +128,6 @@ export type ConversationPaneLayoutPlaygroundControls = {
   planEntryGapPx: TailwindSpacingToken;
   planIndentPx: TailwindSpacingToken;
   planStepGapPx: TailwindSpacingToken;
-  showGroupingOutlines: boolean;
 };
 
 export type ConversationPanePlaygroundStyle = React.CSSProperties & {
