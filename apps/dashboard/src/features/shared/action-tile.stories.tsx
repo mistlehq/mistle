@@ -75,3 +75,23 @@ export const IntegrationTileStyle: Story = {
     );
   },
 };
+
+export const NoAction: Story = {
+  render: function RenderNoAction() {
+    return (
+      <div className="w-full max-w-4xl">
+        <ActionTile
+          action={null}
+          actionContainerClassName="sm:items-start"
+          className="border-border/60 bg-muted/15"
+          description="Use this story at a narrow viewport to verify that omitting the action does not leave an empty trailing row."
+          leading={
+            <CheckCircleIcon aria-hidden className="size-5 text-emerald-600" weight="fill" />
+          }
+          leadingPlacement="detached"
+          title="Completed step"
+        />
+      </div>
+    );
+  },
+};

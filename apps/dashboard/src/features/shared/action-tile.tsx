@@ -31,6 +31,7 @@ export function ActionTile({
   titleClassName,
 }: ActionTileProps): React.JSX.Element {
   const isDetachedLeading = leading !== undefined && leadingPlacement === "detached";
+  const hasAction = action != null;
 
   return (
     <div
@@ -76,13 +77,13 @@ export function ActionTile({
           </div>
         </div>
       </div>
-      {action === undefined ? null : (
+      {hasAction ? (
         <div
           className={cn("flex items-center justify-end sm:justify-start", actionContainerClassName)}
         >
           {action}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
