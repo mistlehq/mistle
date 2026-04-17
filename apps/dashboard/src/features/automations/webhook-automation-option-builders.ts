@@ -8,11 +8,11 @@ import type {
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { createSyntheticWebhookAutomationEventOption } from "./webhook-automation-event-option-availability.js";
+import type { WebhookAutomationFormOption } from "./webhook-automation-form-types.js";
 import type {
   WebhookAutomationEventOption,
-  WebhookAutomationFormOption,
-} from "./webhook-automation-form.js";
-import type { WebhookAutomationEventOptionAvailability } from "./webhook-automation-trigger-types.js";
+  WebhookAutomationEventOptionAvailability,
+} from "./webhook-automation-trigger-types.js";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));

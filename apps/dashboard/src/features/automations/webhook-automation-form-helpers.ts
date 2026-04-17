@@ -3,7 +3,7 @@ import { resolveSelectedWebhookAutomationEventIssues } from "./webhook-automatio
 import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
-} from "./webhook-automation-form.js";
+} from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {

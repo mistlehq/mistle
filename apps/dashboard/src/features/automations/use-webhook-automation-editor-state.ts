@@ -24,10 +24,7 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
-import type {
-  WebhookAutomationEventOption,
-  WebhookAutomationFormValues,
-} from "./webhook-automation-form.js";
+import type { WebhookAutomationFormValues } from "./webhook-automation-form-types.js";
 import {
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
@@ -38,6 +35,7 @@ import {
   resolveSelectedWebhookAutomationEventOptions,
   type WebhookAutomationTriggerPickerDisabledState,
 } from "./webhook-automation-trigger-picker-state.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
   createWebhookAutomation,

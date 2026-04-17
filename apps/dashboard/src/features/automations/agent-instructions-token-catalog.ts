@@ -1,4 +1,4 @@
-import type { WebhookAutomationEventOption } from "./webhook-automation-form.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 export const AgentInstructionTokenGroups = {
   PAYLOAD: "payload",
