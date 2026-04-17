@@ -4,11 +4,11 @@ import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 type Step = "format" | "lint" | "typecheck" | "test";
+type Command = string[];
 
 type WorkspacePackage = {
   dependencies: Set<string>;
   name: string;
-  path: string;
   policySteps: Step[];
   relativePath: string;
 };
@@ -22,9 +22,13 @@ type ParseArgsResult = {
 };
 
 type ValidationPlan = {
-  allPackagesSelected: boolean;
   changedFiles: string[];
   extraCommands: Record<Step, string[][]>;
+  packageReasons: Map<string, string[]>;
+  selectedPackages: WorkspacePackage[];
+};
+
+type PackageSelection = {
   packageReasons: Map<string, string[]>;
   selectedPackages: WorkspacePackage[];
 };
@@ -37,6 +41,8 @@ const WORKSPACE_ROOTS = ["apps", "packages", "tests"] as const;
 const VALIDATION_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const DEFAULT_WORKSPACE_POLICY_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const TESTS_POLICY_STEPS: readonly Step[] = ["lint", "typecheck"];
+const WORKSPACE_TURBO_STEPS: readonly Step[] = ["lint", "test"];
+const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format", "typecheck"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 
@@ -48,6 +54,28 @@ const REPO_WIDE_FILES = new Set([
   "tsconfig.base.json",
   ".lintstagedrc.json",
 ]);
+
+function requireFlagValue(argv: readonly string[], index: number, flagName: string): string {
+  const nextValue = argv[index + 1];
+  if (nextValue === undefined) {
+    throw new Error(`Missing value for ${flagName}.`);
+  }
+
+  return nextValue;
+}
+
+function parseStepList(rawValue: string): Step[] {
+  const parsedSteps = rawValue
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value): value is Step => VALIDATION_STEPS.includes(value as Step));
+
+  if (parsedSteps.length === 0) {
+    throw new Error("Expected at least one valid step in --steps.");
+  }
+
+  return parsedSteps;
+}
 
 function printUsage(): void {
   console.log(`Usage: pnpm validate:changed [options]
@@ -78,31 +106,19 @@ function parseArgs(argv: readonly string[]): ParseArgsResult {
     const argument = argv[index];
 
     if (argument === "--base") {
-      const nextValue = argv[index + 1];
-      if (nextValue === undefined) {
-        throw new Error("Missing value for --base.");
-      }
-      baseRef = nextValue;
+      baseRef = requireFlagValue(argv, index, "--base");
       index += 1;
       continue;
     }
 
     if (argument === "--head") {
-      const nextValue = argv[index + 1];
-      if (nextValue === undefined) {
-        throw new Error("Missing value for --head.");
-      }
-      headRef = nextValue;
+      headRef = requireFlagValue(argv, index, "--head");
       index += 1;
       continue;
     }
 
     if (argument === "--files") {
-      const nextValue = argv[index + 1];
-      if (nextValue === undefined) {
-        throw new Error("Missing value for --files.");
-      }
-      changedFilesOverride = nextValue
+      changedFilesOverride = requireFlagValue(argv, index, "--files")
         .split(",")
         .map((value) => value.trim())
         .filter((value) => value.length > 0);
@@ -111,21 +127,7 @@ function parseArgs(argv: readonly string[]): ParseArgsResult {
     }
 
     if (argument === "--steps") {
-      const nextValue = argv[index + 1];
-      if (nextValue === undefined) {
-        throw new Error("Missing value for --steps.");
-      }
-
-      const parsedSteps = nextValue
-        .split(",")
-        .map((value) => value.trim())
-        .filter((value): value is Step => VALIDATION_STEPS.includes(value as Step));
-
-      if (parsedSteps.length === 0) {
-        throw new Error("Expected at least one valid step in --steps.");
-      }
-
-      steps = parsedSteps;
+      steps = parseStepList(requireFlagValue(argv, index, "--steps"));
       index += 1;
       continue;
     }
@@ -166,8 +168,8 @@ function normalizeRelativePath(inputPath: string): string {
   return relative(REPO_ROOT, resolvedPath).split(sep).join("/");
 }
 
-function getChangedFilesFromBranchComparison(baseRef: string, headRef: string): string[] {
-  const output = execFileSync("git", ["diff", "--name-only", `${baseRef}...${headRef}`], {
+function runGitLineCommand(args: readonly string[]): string[] {
+  const output = execFileSync("git", args, {
     cwd: REPO_ROOT,
     encoding: "utf8",
   });
@@ -178,26 +180,18 @@ function getChangedFilesFromBranchComparison(baseRef: string, headRef: string): 
     .filter((line) => line.length > 0);
 }
 
-function getChangedFilesFromWorkingTree(): string[] {
-  const trackedUnstagedOutput = execFileSync("git", ["diff", "--name-only"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-  });
-  const trackedStagedOutput = execFileSync("git", ["diff", "--name-only", "--cached"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-  });
-  const untrackedOutput = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-  });
+function getChangedFilesFromBranchComparison(baseRef: string, headRef: string): string[] {
+  return runGitLineCommand(["diff", "--name-only", `${baseRef}...${headRef}`]);
+}
 
+function getChangedFilesFromWorkingTree(): string[] {
   return Array.from(
     new Set(
-      [trackedUnstagedOutput, trackedStagedOutput, untrackedOutput]
-        .flatMap((output) => output.split("\n"))
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0),
+      [
+        runGitLineCommand(["diff", "--name-only"]),
+        runGitLineCommand(["diff", "--name-only", "--cached"]),
+        runGitLineCommand(["ls-files", "--others", "--exclude-standard"]),
+      ].flat(),
     ),
   ).sort();
 }
@@ -265,7 +259,6 @@ function loadWorkspacePackages(): WorkspacePackage[] {
     return {
       dependencies: readInternalDependencies(packageJson),
       name: String(packageJson["name"]),
-      path: packageDirectory,
       policySteps:
         relativePackagePath === "tests"
           ? [...TESTS_POLICY_STEPS]
@@ -338,102 +331,69 @@ function createEmptyExtraCommands(): Record<Step, string[][]> {
   };
 }
 
-function maybeAddCommand(commands: string[][], command: readonly string[], enabled: boolean): void {
+function maybeAddCommand(commands: Command[], command: readonly string[], enabled: boolean): void {
   if (enabled) {
     commands.push([...command]);
   }
 }
 
-function createValidationPlan(
-  changedFiles: readonly string[],
-  steps: readonly Step[],
-  workspacePackages: readonly WorkspacePackage[],
-): ValidationPlan {
-  const packageReasons = new Map<string, string[]>();
-  const selectedPackageNames = new Set<string>();
-  const extraCommands = createEmptyExtraCommands();
-  const dependentsMap = buildDependentsMap(workspacePackages);
-  const packageByName = new Map(
-    workspacePackages.map((workspacePackage) => [workspacePackage.name, workspacePackage]),
-  );
-  const packageByRelativePath = new Map(
-    workspacePackages.map((workspacePackage) => [workspacePackage.relativePath, workspacePackage]),
-  );
+function isRootRepoCheckStep(step: Step): boolean {
+  return ROOT_REPO_CHECK_STEPS.has(step);
+}
 
-  const normalizedChangedFiles = Array.from(
+function isRepoWideConfigPath(filePath: string): boolean {
+  return REPO_WIDE_FILES.has(filePath) || filePath.startsWith(".github/");
+}
+
+function normalizeChangedFiles(changedFiles: readonly string[]): string[] {
+  return Array.from(
     new Set(
       changedFiles
         .map((filePath) => normalizeRelativePath(filePath))
         .filter((filePath) => filePath !== ""),
     ),
   ).sort();
+}
 
-  const hasRepoWideConfigChange = normalizedChangedFiles.some((filePath) => {
-    if (REPO_WIDE_FILES.has(filePath)) {
-      return true;
-    }
+function findWorkspacePackageForFile(
+  filePath: string,
+  workspacePackages: readonly WorkspacePackage[],
+): WorkspacePackage | undefined {
+  return workspacePackages.find(
+    (workspacePackage) =>
+      filePath === workspacePackage.relativePath ||
+      filePath.startsWith(`${workspacePackage.relativePath}/`),
+  );
+}
 
-    return filePath.startsWith(".github/");
-  });
-
-  function addPackageReason(packageName: string, reason: string): void {
-    if (selectedPackageNames.has(packageName) === false) {
-      selectedPackageNames.add(packageName);
-      packageReasons.set(packageName, []);
-    }
-
-    const reasons = packageReasons.get(packageName);
-    if (reasons !== undefined && reasons.includes(reason) === false) {
-      reasons.push(reason);
-    }
+function addPackageReason(
+  packageReasons: Map<string, string[]>,
+  selectedPackageNames: Set<string>,
+  packageName: string,
+  reason: string,
+): void {
+  if (selectedPackageNames.has(packageName) === false) {
+    selectedPackageNames.add(packageName);
+    packageReasons.set(packageName, []);
   }
 
-  if (hasRepoWideConfigChange) {
-    for (const workspacePackage of workspacePackages) {
-      addPackageReason(workspacePackage.name, ALL_PACKAGES_REASON);
-    }
+  const reasons = packageReasons.get(packageName);
+  if (reasons !== undefined && reasons.includes(reason) === false) {
+    reasons.push(reason);
   }
+}
 
-  for (const filePath of normalizedChangedFiles) {
-    const matchingPackage = Array.from(packageByRelativePath.values()).find(
-      (workspacePackage) =>
-        filePath === workspacePackage.relativePath ||
-        filePath.startsWith(`${workspacePackage.relativePath}/`),
-    );
-
-    if (matchingPackage === undefined) {
-      continue;
-    }
-
-    addPackageReason(matchingPackage.name, `changed file in ${matchingPackage.relativePath}`);
-
-    for (const dependentName of collectTransitiveDependents(matchingPackage.name, dependentsMap)) {
-      addPackageReason(dependentName, `depends on ${matchingPackage.name}`);
-    }
-  }
-
-  const hasRootOrScriptFileChange = normalizedChangedFiles.some(
-    (filePath) =>
-      filePath.startsWith("scripts/") ||
-      (filePath.includes("/") === false && REPO_WIDE_FILES.has(filePath) === false),
-  );
+function getLintRepoCheckCommands(
+  changedFiles: readonly string[],
+  steps: readonly Step[],
+): Command[] {
+  const commands: Command[] = [];
 
   maybeAddCommand(
-    extraCommands.format,
-    ["pnpm", "format:check"],
-    steps.includes("format") && hasRootOrScriptFileChange,
-  );
-  maybeAddCommand(
-    extraCommands.typecheck,
-    ["pnpm", "typecheck:scripts"],
-    steps.includes("typecheck") &&
-      normalizedChangedFiles.some((filePath) => filePath.startsWith("scripts/")),
-  );
-  maybeAddCommand(
-    extraCommands.lint,
+    commands,
     ["pnpm", "lint:openapi"],
     steps.includes("lint") &&
-      normalizedChangedFiles.some((filePath) => {
+      changedFiles.some((filePath) => {
         return (
           filePath.startsWith("apps/control-plane-api/") ||
           filePath.startsWith("apps/data-plane-api/") ||
@@ -442,12 +402,62 @@ function createValidationPlan(
         );
       }),
   );
+
   maybeAddCommand(
-    extraCommands.lint,
+    commands,
     ["pnpm", "lint:sql"],
-    steps.includes("lint") &&
-      normalizedChangedFiles.some((filePath) => filePath.startsWith("packages/db/")),
+    steps.includes("lint") && changedFiles.some((filePath) => filePath.startsWith("packages/db/")),
   );
+
+  return commands;
+}
+
+function selectWorkspacePackages(
+  changedFiles: readonly string[],
+  workspacePackages: readonly WorkspacePackage[],
+): PackageSelection {
+  const packageReasons = new Map<string, string[]>();
+  const selectedPackageNames = new Set<string>();
+  const dependentsMap = buildDependentsMap(workspacePackages);
+  const packageByName = new Map(
+    workspacePackages.map((workspacePackage) => [workspacePackage.name, workspacePackage]),
+  );
+  const hasRepoWideConfigChange = changedFiles.some((filePath) => isRepoWideConfigPath(filePath));
+
+  if (hasRepoWideConfigChange) {
+    for (const workspacePackage of workspacePackages) {
+      addPackageReason(
+        packageReasons,
+        selectedPackageNames,
+        workspacePackage.name,
+        ALL_PACKAGES_REASON,
+      );
+    }
+  }
+
+  for (const filePath of changedFiles) {
+    const matchingPackage = findWorkspacePackageForFile(filePath, workspacePackages);
+
+    if (matchingPackage === undefined) {
+      continue;
+    }
+
+    addPackageReason(
+      packageReasons,
+      selectedPackageNames,
+      matchingPackage.name,
+      `changed file in ${matchingPackage.relativePath}`,
+    );
+
+    for (const dependentName of collectTransitiveDependents(matchingPackage.name, dependentsMap)) {
+      addPackageReason(
+        packageReasons,
+        selectedPackageNames,
+        dependentName,
+        `depends on ${matchingPackage.name}`,
+      );
+    }
+  }
 
   const selectedPackages = Array.from(selectedPackageNames)
     .map((packageName) => packageByName.get(packageName))
@@ -457,79 +467,199 @@ function createValidationPlan(
     .sort((left, right) => left.name.localeCompare(right.name));
 
   return {
-    allPackagesSelected: hasRepoWideConfigChange,
-    changedFiles: normalizedChangedFiles,
-    extraCommands,
     packageReasons,
     selectedPackages,
   };
 }
 
-function buildStepCommand(
-  step: Step,
+function createValidationPlan(
+  changedFiles: readonly string[],
+  steps: readonly Step[],
+  workspacePackages: readonly WorkspacePackage[],
+): ValidationPlan {
+  const extraCommands = createEmptyExtraCommands();
+  const normalizedChangedFiles = normalizeChangedFiles(changedFiles);
+  const packageSelection = selectWorkspacePackages(normalizedChangedFiles, workspacePackages);
+
+  extraCommands.lint.push(...getLintRepoCheckCommands(normalizedChangedFiles, steps));
+
+  return {
+    changedFiles: normalizedChangedFiles,
+    extraCommands,
+    packageReasons: packageSelection.packageReasons,
+    selectedPackages: packageSelection.selectedPackages,
+  };
+}
+
+function buildWorkspaceTurboCommand(
+  steps: readonly Step[],
   workspacePackages: readonly WorkspacePackage[],
 ): string[] | null {
-  const packagesWithStep = workspacePackages.filter((workspacePackage) =>
-    workspacePackage.policySteps.includes(step),
+  const turboSteps = WORKSPACE_TURBO_STEPS.filter(
+    (step) =>
+      steps.includes(step) &&
+      workspacePackages.some((workspacePackage) => workspacePackage.policySteps.includes(step)),
   );
-  if (packagesWithStep.length === 0) {
+
+  if (turboSteps.length === 0) {
     return null;
   }
 
-  const command = ["pnpm"];
-  for (const workspacePackage of packagesWithStep) {
-    command.push("--filter", workspacePackage.name);
+  const selectedPackageNames = Array.from(
+    new Set(
+      workspacePackages
+        .filter((workspacePackage) =>
+          turboSteps.some((step) => workspacePackage.policySteps.includes(step)),
+        )
+        .map((workspacePackage) => workspacePackage.name),
+    ),
+  ).sort();
+
+  const command = ["turbo", "run", ...turboSteps, "--output-logs=errors-only"];
+  for (const packageName of selectedPackageNames) {
+    command.push("--filter", packageName);
   }
-  command.push(step);
+
   return command;
+}
+
+function buildExecutionCommands(plan: ValidationPlan, steps: readonly Step[]): string[][] {
+  const commands: Command[] = [];
+
+  for (const step of steps) {
+    if (isRootRepoCheckStep(step) && plan.changedFiles.length > 0) {
+      commands.push(["pnpm", step]);
+    }
+  }
+
+  const workspaceTurboCommand = buildWorkspaceTurboCommand(steps, plan.selectedPackages);
+  if (workspaceTurboCommand !== null) {
+    commands.push(workspaceTurboCommand);
+  }
+
+  for (const step of steps) {
+    if (step === "format") {
+      continue;
+    }
+
+    for (const extraCommand of plan.extraCommands[step]) {
+      commands.push(extraCommand);
+    }
+  }
+
+  return commands;
 }
 
 function formatCommand(command: readonly string[]): string {
   return command.join(" ");
 }
 
-function printPlan(plan: ValidationPlan, steps: readonly Step[], dryRun: boolean): void {
-  if (dryRun) {
-    console.log(`Changed files (${String(plan.changedFiles.length)}):`);
-    if (plan.changedFiles.length === 0) {
-      console.log("  - none");
-    } else {
-      for (const filePath of plan.changedFiles) {
-        console.log(`  - ${filePath}`);
-      }
+function getPlannedStepsForPackage(
+  workspacePackage: WorkspacePackage,
+  steps: readonly Step[],
+): Step[] {
+  return steps.filter((step) => workspacePackage.policySteps.includes(step));
+}
+
+function getWorkspacePlanSteps(workspacePackage: WorkspacePackage, steps: readonly Step[]): Step[] {
+  return getPlannedStepsForPackage(workspacePackage, steps).filter(
+    (step) => isRootRepoCheckStep(step) === false,
+  );
+}
+
+function groupWorkspaceChecks(
+  workspacePackages: readonly WorkspacePackage[],
+  steps: readonly Step[],
+): Map<string, string[]> {
+  const groupedPackages = new Map<string, string[]>();
+
+  for (const workspacePackage of workspacePackages) {
+    const workspacePlannedSteps = getWorkspacePlanSteps(workspacePackage, steps);
+    if (workspacePlannedSteps.length === 0) {
+      continue;
     }
 
-    console.log("");
-    console.log(`Selected packages (${String(plan.selectedPackages.length)}):`);
-    if (plan.selectedPackages.length === 0) {
-      console.log("  - none");
-    } else {
-      for (const workspacePackage of plan.selectedPackages) {
-        const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
-        console.log(`  - ${workspacePackage.name} (${workspacePackage.relativePath})`);
-        for (const reason of reasons) {
-          console.log(`    reason: ${reason}`);
-        }
-      }
-    }
-
-    console.log("");
+    const groupingKey = workspacePlannedSteps.join(", ");
+    const groupedPackageNames = groupedPackages.get(groupingKey) ?? [];
+    groupedPackageNames.push(workspacePackage.name);
+    groupedPackages.set(groupingKey, groupedPackageNames);
   }
 
-  console.log(`Execution plan (${steps.join(", ")}):`);
-  for (const step of steps) {
-    const packageCommand = buildStepCommand(step, plan.selectedPackages);
-    if (packageCommand !== null) {
-      console.log(`  - ${formatCommand(packageCommand)}`);
+  return groupedPackages;
+}
+
+function getRepoCheckLabels(step: Step, plan: ValidationPlan): string[] {
+  if (isRootRepoCheckStep(step) && plan.changedFiles.length > 0) {
+    return [step];
+  }
+
+  return plan.extraCommands[step].map((command) => {
+    if (command[0] === "pnpm" && typeof command[1] === "string") {
+      return command[1];
     }
 
-    for (const extraCommand of plan.extraCommands[step]) {
-      console.log(`  - ${formatCommand(extraCommand)}`);
-    }
+    return formatCommand(command);
+  });
+}
 
-    if (packageCommand === null && plan.extraCommands[step].length === 0) {
-      console.log(`  - no ${step} commands`);
+function getAllRepoCheckLabels(plan: ValidationPlan, steps: readonly Step[]): string[] {
+  return steps.flatMap((step) => getRepoCheckLabels(step, plan));
+}
+
+function printDryRunDetails(plan: ValidationPlan): void {
+  console.log(`Changed files (${String(plan.changedFiles.length)}):`);
+  if (plan.changedFiles.length === 0) {
+    console.log("  - none");
+  } else {
+    for (const filePath of plan.changedFiles) {
+      console.log(`  - ${filePath}`);
     }
+  }
+
+  console.log("");
+  console.log(`Selected packages (${String(plan.selectedPackages.length)}):`);
+  if (plan.selectedPackages.length === 0) {
+    console.log("  - none");
+  } else {
+    for (const workspacePackage of plan.selectedPackages) {
+      const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
+      console.log(`  - ${workspacePackage.name} (${workspacePackage.relativePath})`);
+      for (const reason of reasons) {
+        console.log(`    reason: ${reason}`);
+      }
+    }
+  }
+
+  console.log("");
+}
+
+function printPlan(plan: ValidationPlan, steps: readonly Step[], dryRun: boolean): void {
+  if (dryRun) {
+    printDryRunDetails(plan);
+  }
+
+  console.log(`Validation plan (${steps.join(", ")}):`);
+  const groupedPackages = groupWorkspaceChecks(plan.selectedPackages, steps);
+  const hasWorkspaceChecks = groupedPackages.size > 0;
+  const repoCheckLabels = getAllRepoCheckLabels(plan, steps);
+  const hasRepoChecks = repoCheckLabels.length > 0;
+
+  if (hasWorkspaceChecks) {
+    console.log("  Workspace checks:");
+  }
+  for (const [groupingKey, packageNames] of groupedPackages.entries()) {
+    console.log(
+      `    - ${groupingKey}: ${packageNames.sort((left, right) => left.localeCompare(right)).join(", ")}`,
+    );
+  }
+
+  if (hasRepoChecks) {
+    console.log("  Repo checks:");
+    console.log(`    - ${repoCheckLabels.join(", ")}`);
+  }
+
+  if (hasWorkspaceChecks === false && hasRepoChecks === false) {
+    console.log("  - none");
   }
 }
 
@@ -574,16 +704,15 @@ function main(): void {
     return;
   }
 
-  for (const step of steps) {
-    const packageCommand = buildStepCommand(step, plan.selectedPackages);
-    if (packageCommand !== null) {
-      runCommand(packageCommand);
-    }
+  const commands = buildExecutionCommands(plan, steps);
 
-    for (const extraCommand of plan.extraCommands[step]) {
-      runCommand(extraCommand);
-    }
+  for (const command of commands) {
+    runCommand(command);
   }
+
+  console.log(
+    `Validation passed. Completed ${String(commands.length)} command${commands.length === 1 ? "" : "s"}.`,
+  );
 }
 
 main();
