@@ -197,9 +197,7 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
       : resolve(input.searchRootDirectory);
 
   if (searchRootDirectory === undefined) {
-    throw new Error(
-      `Could not discover '${IntegrationTargetsProvisionManifestFileName}' from '${currentDirectory}' because no git checkout root was found. Set ${IntegrationTargetsProvisionManifestPathEnvVarName} or ${IntegrationTargetsProvisionManifestJsonEnvVarName} explicitly when running outside a checkout.`,
-    );
+    return undefined;
   }
 
   while (true) {
