@@ -6,10 +6,14 @@ import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { integrationWebhookSources } from "./integration-webhook-sources.js";
+import { organizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
+import { userExternalPrincipals } from "./user-external-principals.js";
 
 export const integrationConnectionsRelations = relations(
   integrationConnections,
   ({ many, one }) => ({
+    identityLinkProviderConfigs: many(organizationIdentityLinkProviderConfigs),
+    externalPrincipals: many(userExternalPrincipals),
     target: one(integrationTargets, {
       fields: [integrationConnections.targetKey],
       references: [integrationTargets.targetKey],
@@ -43,6 +47,7 @@ export const integrationConnectionResourceStatesRelations = relations(
 
 export const integrationTargetsRelations = relations(integrationTargets, ({ many }) => ({
   connections: many(integrationConnections),
+  identityLinkProviderConfigs: many(organizationIdentityLinkProviderConfigs),
   webhookEvents: many(integrationWebhookEvents),
   webhookSources: many(integrationWebhookSources),
 }));

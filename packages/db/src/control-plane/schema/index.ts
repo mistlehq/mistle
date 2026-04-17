@@ -86,6 +86,16 @@ export {
   type InsertAutomationConversationRoute,
 } from "./automation-conversation-routes.js";
 export {
+  organizationCredentialKeysRelations,
+  organizationIdentityLinkProviderConfigsRelations,
+  organizationsRelations,
+  userExternalPrincipalCredentialSecretsRelations,
+  userExternalPrincipalCredentialsRelations,
+  userExternalPrincipalKeysRelations,
+  userExternalPrincipalsRelations,
+  usersRelations,
+} from "./identity-linking-relations.js";
+export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   type InsertIntegrationCredential,
@@ -97,6 +107,15 @@ export {
   type InsertIntegrationTarget,
   type IntegrationTarget,
 } from "./integration-targets.js";
+export {
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatuses,
+  type IdentityLinkProviderFamily,
+  type InsertOrganizationIdentityLinkProviderConfig,
+  type OrganizationIdentityLinkProviderConfig,
+  type OrganizationIdentityLinkProviderConfigPolicy,
+  type OrganizationIdentityLinkProviderConfigStatus,
+} from "./organization-identity-link-provider-configs.js";
 export {
   integrationConnectionRedirectSessions,
   type InsertIntegrationConnectionRedirectSession,
@@ -172,5 +191,37 @@ export {
 export { sessions } from "./sessions.js";
 export { teamMembers } from "./team-members.js";
 export { teams } from "./teams.js";
+export {
+  userExternalPrincipalCredentialSecrets,
+  UserExternalPrincipalCredentialSecretKinds,
+  type InsertUserExternalPrincipalCredentialSecret,
+  type UserExternalPrincipalCredentialSecret,
+  type UserExternalPrincipalCredentialSecretKind,
+  type UserExternalPrincipalCredentialSecretMetadata,
+} from "./user-external-principal-credential-secrets.js";
+export {
+  userExternalPrincipalCredentials,
+  UserExternalPrincipalCredentialStatuses,
+  type InsertUserExternalPrincipalCredential,
+  type UserExternalPrincipalCredential,
+  type UserExternalPrincipalCredentialKind,
+  type UserExternalPrincipalCredentialStatus,
+} from "./user-external-principal-credentials.js";
+export {
+  userExternalPrincipalKeys,
+  UserExternalPrincipalKeyStatuses,
+  type InsertUserExternalPrincipalKey,
+  type UserExternalPrincipalKey,
+  type UserExternalPrincipalKeyStatus,
+  type UserExternalPrincipalKeyType,
+} from "./user-external-principal-keys.js";
+export {
+  userExternalPrincipals,
+  UserExternalPrincipalStatuses,
+  type InsertUserExternalPrincipal,
+  type UserExternalPrincipal,
+  type UserExternalPrincipalProfile,
+  type UserExternalPrincipalStatus,
+} from "./user-external-principals.js";
 export { users } from "./users.js";
 export { verifications } from "./verifications.js";

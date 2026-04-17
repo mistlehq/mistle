@@ -78,6 +78,13 @@
       "when": 1776265866111,
       "tag": "0010_add-organization-sandbox-storage-settings",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1776433593157,
+      "tag": "0011_add-identity-linking-schema-foundation",
+      "breakpoints": true
     }
   ]
 }
