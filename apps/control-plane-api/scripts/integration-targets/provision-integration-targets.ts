@@ -191,16 +191,16 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
   searchRootDirectory?: string;
 }): string | undefined {
   let currentDirectory = resolve(input.startDirectory);
-  const resolvedSearchRootDirectory =
+  const searchRootDirectory =
     input.searchRootDirectory === undefined
       ? resolveRepositoryRootFromDirectory(currentDirectory)
       : resolve(input.searchRootDirectory);
 
-  if (resolvedSearchRootDirectory === undefined) {
-    return undefined;
+  if (searchRootDirectory === undefined) {
+    throw new Error(
+      `Could not discover '${IntegrationTargetsProvisionManifestFileName}' from '${currentDirectory}' because no git checkout root was found. Set ${IntegrationTargetsProvisionManifestPathEnvVarName} or ${IntegrationTargetsProvisionManifestJsonEnvVarName} explicitly when running outside a checkout.`,
+    );
   }
-
-  const searchRootDirectory = resolvedSearchRootDirectory;
 
   while (true) {
     const candidatePath = join(currentDirectory, IntegrationTargetsProvisionManifestFileName);

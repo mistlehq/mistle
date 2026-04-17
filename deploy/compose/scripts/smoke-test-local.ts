@@ -47,6 +47,17 @@ type IntegrationConnectionResponse = {
   id: string;
 };
 
+type IntegrationTargetDirectoryItem = {
+  targetKey: string;
+  enabled: boolean;
+  connectionMethods:
+    | Array<{
+        id: string;
+        kind: string;
+      }>
+    | undefined;
+};
+
 type SandboxProfileResponse = {
   id: string;
 };
@@ -323,6 +334,59 @@ function parseIntegrationConnectionResponse(value: unknown): IntegrationConnecti
   };
 }
 
+function parseIntegrationTargetsResponse(value: unknown): IntegrationTargetDirectoryItem[] {
+  const record = expectRecord(value, "integration targets response");
+  if (!Array.isArray(record.items)) {
+    throw new Error("Expected integration targets response.items to be an array.");
+  }
+
+  return record.items.map((item, index) => {
+    const itemRecord = expectRecord(item, `integration targets response.items[${String(index)}]`);
+    const connectionMethodsValue = itemRecord.connectionMethods;
+
+    return {
+      targetKey: expectStringField(
+        itemRecord,
+        "targetKey",
+        `integration targets response.items[${String(index)}]`,
+      ),
+      enabled: expectBooleanField(
+        itemRecord,
+        "enabled",
+        `integration targets response.items[${String(index)}]`,
+      ),
+      connectionMethods:
+        connectionMethodsValue === undefined
+          ? undefined
+          : Array.isArray(connectionMethodsValue)
+            ? connectionMethodsValue.map((method, methodIndex) => {
+                const methodRecord = expectRecord(
+                  method,
+                  `integration targets response.items[${String(index)}].connectionMethods[${String(methodIndex)}]`,
+                );
+
+                return {
+                  id: expectStringField(
+                    methodRecord,
+                    "id",
+                    `integration targets response.items[${String(index)}].connectionMethods[${String(methodIndex)}]`,
+                  ),
+                  kind: expectStringField(
+                    methodRecord,
+                    "kind",
+                    `integration targets response.items[${String(index)}].connectionMethods[${String(methodIndex)}]`,
+                  ),
+                };
+              })
+            : (() => {
+                throw new Error(
+                  `Expected integration targets response.items[${String(index)}].connectionMethods to be an array when present.`,
+                );
+              })(),
+    };
+  });
+}
+
 function parseSandboxProfileResponse(value: unknown): SandboxProfileResponse {
   const record = expectRecord(value, "sandbox profile response");
   return {
@@ -553,7 +617,45 @@ async function assertAuthenticatedHome(cookie: string): Promise<void> {
   }
 }
 
+async function assertSmokeTestIntegrationTargetAvailable(cookie: string): Promise<void> {
+  const targets = await requestJsonOrThrow({
+    path: "/v1/integration/targets?limit=100",
+    expectedStatus: 200,
+    description: "integration target listing",
+    parse: parseIntegrationTargetsResponse,
+    init: {
+      headers: {
+        cookie,
+      },
+    },
+  });
+
+  const openAiTarget = targets.find((target) => target.targetKey === OpenAiTargetKey);
+  if (openAiTarget === undefined) {
+    throw new Error(
+      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be provisioned. Update integration-targets.provision.example.json or adjust the smoke test prerequisites.`,
+    );
+  }
+
+  if (!openAiTarget.enabled) {
+    throw new Error(
+      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be enabled.`,
+    );
+  }
+
+  const supportsExpectedMethod = openAiTarget.connectionMethods?.some(
+    (method) => method.id === OpenAiConnectionMethodId && method.kind === "form",
+  );
+  if (!supportsExpectedMethod) {
+    throw new Error(
+      `Local compose smoke test requires '${OpenAiTargetKey}' to expose form connection method '${OpenAiConnectionMethodId}'.`,
+    );
+  }
+}
+
 async function configureBaselineIntegrationAndProfile(cookie: string): Promise<string> {
+  await assertSmokeTestIntegrationTargetAvailable(cookie);
+
   const connection = await requestJsonOrThrow({
     path: `/v1/integration/connections/${encodeURIComponent(OpenAiTargetKey)}/form`,
     expectedStatus: 201,

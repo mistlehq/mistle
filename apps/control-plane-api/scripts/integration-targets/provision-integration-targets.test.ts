@@ -261,7 +261,7 @@ describe("provision-integration-targets", () => {
     }
   });
 
-  it("does not discover manifests from unrelated parent directories when outside a git checkout", async () => {
+  it("fails fast when default discovery is used outside a git checkout", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
     const parentManifestPath = join(temporaryWorkspaceRoot, "integration-targets.provision.json");
     const externalWorkingDirectory = join(temporaryWorkspaceRoot, "outside", "runner");
@@ -277,17 +277,17 @@ describe("provision-integration-targets", () => {
     );
 
     try {
-      expect(
+      expect(() =>
         discoverIntegrationTargetProvisionManifestPath({
           startDirectory: externalWorkingDirectory,
         }),
-      ).toBeUndefined();
-      expect(
+      ).toThrow(/no git checkout root was found/u);
+      expect(() =>
         loadIntegrationTargetsProvisionManifest({
           env: {},
           startDirectory: externalWorkingDirectory,
         }),
-      ).toBeUndefined();
+      ).toThrow(/no git checkout root was found/u);
     } finally {
       await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
     }
