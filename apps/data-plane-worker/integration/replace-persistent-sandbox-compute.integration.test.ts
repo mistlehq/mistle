@@ -31,8 +31,13 @@ import {
   requireDataPlaneWorkerGlobalConfig,
 } from "../openworkflow/core/config.js";
 import { markSandboxInstanceStarting } from "../openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.js";
-import { replacePersistentSandboxCompute } from "../openworkflow/resume-sandbox-instance/replace-persistent-sandbox-compute.js";
+import { persistSandboxInstanceComputeReplacement } from "../openworkflow/resume-sandbox-instance/persist-sandbox-instance-compute-replacement.js";
+import { revertSandboxInstanceComputeReplacement } from "../openworkflow/resume-sandbox-instance/revert-sandbox-instance-compute-replacement.js";
+import { attachSandboxStorage } from "../openworkflow/shared/attach-sandbox-storage.js";
+import { prepareSandboxStorageForStart } from "../openworkflow/shared/prepare-sandbox-storage-for-start.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { initializeSandboxRuntime } from "../openworkflow/start-sandbox-instance/initialize-sandbox-runtime.js";
+import { markSandboxInstanceFailed } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { startSandbox } from "../openworkflow/start-sandbox-instance/start-sandbox.js";
 
 const DockerSocketPath = "/var/run/docker.sock";
@@ -175,6 +180,13 @@ function createRuntimePlan() {
     runtimeClients: [],
     workspaceSources: [],
     agentRuntimes: [],
+  };
+}
+
+function createReplacementImage() {
+  return {
+    imageId: SandboxBaseImageReference,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -391,22 +403,79 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         sandboxInstanceId,
       });
 
-      const replacedSandbox = await replacePersistentSandboxCompute({
-        db,
-        controlPlaneInternalClient,
-        config: runtimeConfig,
-        sandboxAdapter,
-        sandboxRuntimeControl,
-        resumableSandboxInstance: {
-          sandboxInstanceId,
+      const replacementImage = createReplacementImage();
+      const replacementStoragePreparation = await prepareSandboxStorageForStart(
+        {
+          db,
+          controlPlaneInternalClient,
+          workerConfig: runtimeConfig.app,
+          configuredSandboxProvider: runtimeConfig.sandbox.provider,
+          sandboxAdapter,
+          storageBackend: runtimeConfig.sandbox.storage?.backend,
+        },
+        {
           organizationId,
+          sandboxInstanceId,
+          image: replacementImage,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.DOCKER,
-          providerSandboxId: null,
-          computeGeneration: 1,
+        },
+      );
+
+      const replacedSandbox = await startSandbox(
+        {
+          config: runtimeConfig,
+          sandboxAdapter,
+        },
+        {
+          sandboxInstanceId,
+          image: replacementImage,
+          storagePreparation: replacementStoragePreparation,
+        },
+      );
+
+      await persistSandboxInstanceComputeReplacement(
+        {
+          db,
+        },
+        {
+          sandboxInstanceId,
+          providerSandboxId: replacedSandbox.providerSandboxId,
+          previousComputeGeneration: 1,
+        },
+      );
+
+      await attachSandboxStorage(
+        {
+          db,
+          controlPlaneInternalClient,
+          workerConfig: runtimeConfig.app,
+          configuredSandboxProvider: runtimeConfig.sandbox.provider,
+          sandboxAdapter,
+          storageBackend: runtimeConfig.sandbox.storage?.backend,
+        },
+        {
+          organizationId,
+          sandboxInstanceId,
+          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          runtimeProvider: SandboxProvider.DOCKER,
+          providerSandboxId: replacedSandbox.providerSandboxId,
+          lifecycle: "start",
+        },
+      );
+
+      await initializeSandboxRuntime(
+        {
+          config: runtimeConfig,
+          sandboxRuntimeControl,
+        },
+        {
+          sandboxInstanceId,
+          providerSandboxId: replacedSandbox.providerSandboxId,
+          startupMode: "new",
           runtimePlan,
         },
-      });
+      );
 
       expect(replacedSandbox.providerSandboxId).not.toBe(initialSandbox.providerSandboxId);
       expect(
@@ -515,24 +584,109 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       });
 
       try {
-        await expect(
-          replacePersistentSandboxCompute({
+        const replacementImage = createReplacementImage();
+        const replacementStoragePreparation = await prepareSandboxStorageForStart(
+          {
             db,
             controlPlaneInternalClient,
+            workerConfig: runtimeConfig.app,
+            configuredSandboxProvider: runtimeConfig.sandbox.provider,
+            sandboxAdapter,
+            storageBackend: runtimeConfig.sandbox.storage?.backend,
+          },
+          {
+            organizationId,
+            sandboxInstanceId,
+            image: replacementImage,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: SandboxProvider.DOCKER,
+          },
+        );
+
+        const replacementSandbox = await startSandbox(
+          {
             config: runtimeConfig,
             sandboxAdapter,
-            sandboxRuntimeControl,
-            resumableSandboxInstance: {
+          },
+          {
+            sandboxInstanceId,
+            image: replacementImage,
+            storagePreparation: replacementStoragePreparation,
+          },
+        );
+
+        const persistedReplacement = await persistSandboxInstanceComputeReplacement(
+          {
+            db,
+          },
+          {
+            sandboxInstanceId,
+            providerSandboxId: replacementSandbox.providerSandboxId,
+            previousComputeGeneration: 1,
+          },
+        );
+
+        await attachSandboxStorage(
+          {
+            db,
+            controlPlaneInternalClient,
+            workerConfig: runtimeConfig.app,
+            configuredSandboxProvider: runtimeConfig.sandbox.provider,
+            sandboxAdapter,
+            storageBackend: runtimeConfig.sandbox.storage?.backend,
+          },
+          {
+            organizationId,
+            sandboxInstanceId,
+            persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+            runtimeProvider: SandboxProvider.DOCKER,
+            providerSandboxId: replacementSandbox.providerSandboxId,
+            lifecycle: "start",
+          },
+        );
+
+        await expect(
+          initializeSandboxRuntime(
+            {
+              config: runtimeConfig,
+              sandboxRuntimeControl,
+            },
+            {
               sandboxInstanceId,
-              organizationId,
-              persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-              runtimeProvider: SandboxProvider.DOCKER,
-              providerSandboxId: null,
-              computeGeneration: 1,
+              providerSandboxId: replacementSandbox.providerSandboxId,
+              startupMode: "new",
               runtimePlan,
             },
-          }),
+          ),
         ).rejects.toThrow(/failed to submit sandbox init request/i);
+
+        await revertSandboxInstanceComputeReplacement(
+          {
+            db,
+          },
+          {
+            sandboxInstanceId,
+            replacementProviderSandboxId: replacementSandbox.providerSandboxId,
+            replacementComputeGeneration: persistedReplacement.computeGeneration,
+            previousProviderSandboxId: null,
+            previousComputeGeneration: 1,
+          },
+        );
+
+        await sandboxAdapter.destroy({
+          id: replacementSandbox.providerSandboxId,
+        });
+
+        await markSandboxInstanceFailed(
+          {
+            db,
+          },
+          {
+            sandboxInstanceId,
+            failureCode: "resume_sandbox_failed",
+            failureMessage: "Failed to replace missing sandbox compute during resume.",
+          },
+        );
 
         const persistedSandboxInstance = await db.query.sandboxInstances.findFirst({
           columns: {
