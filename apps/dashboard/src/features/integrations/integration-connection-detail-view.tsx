@@ -160,6 +160,7 @@ export function IntegrationConnectionDetailView(
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(
     props.connections[0]?.id ?? null,
   );
+  const [isMobileConnectionSelectOpen, setIsMobileConnectionSelectOpen] = useState(false);
 
   if (props.connections.length === 0) {
     return <p className="text-muted-foreground text-sm">No connections found for this target.</p>;
@@ -181,8 +182,10 @@ export function IntegrationConnectionDetailView(
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div className="md:hidden">
         <Select
+          onOpenChange={setIsMobileConnectionSelectOpen}
           onValueChange={(nextConnectionId) => {
             setSelectedConnectionId(nextConnectionId);
+            setIsMobileConnectionSelectOpen(false);
           }}
           value={selectedConnection.id}
         >
@@ -191,13 +194,15 @@ export function IntegrationConnectionDetailView(
               {selectedConnection.displayName}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            {props.connections.map((connection) => (
-              <SelectItem key={connection.id} value={connection.id}>
-                {connection.displayName}
-              </SelectItem>
-            ))}
-          </SelectContent>
+          {isMobileConnectionSelectOpen ? (
+            <SelectContent alignItemWithTrigger={false}>
+              {props.connections.map((connection) => (
+                <SelectItem key={connection.id} value={connection.id}>
+                  {connection.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          ) : null}
         </Select>
       </div>
       <div className="flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]">
