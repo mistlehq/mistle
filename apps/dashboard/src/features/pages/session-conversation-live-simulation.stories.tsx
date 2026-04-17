@@ -10,6 +10,10 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import {
+  SessionConversationScrollBehaviorArgType,
+  type SessionConversationScrollBehaviorStoryArg,
+} from "./session-conversation-story-scroll-behavior.js";
+import {
   SessionWorkbenchStoryChrome,
   StorySessionConversationPaneArgs,
 } from "./session-story-support.js";
@@ -17,9 +21,8 @@ import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchLiveSimulationStoryArgs = React.ComponentProps<
   typeof SessionWorkbenchPageView
-> & {
-  scrollBehavior: React.ComponentProps<typeof SessionConversationMainContent>["scrollBehavior"];
-};
+> &
+  SessionConversationScrollBehaviorStoryArg;
 
 const LiveHarnessSeedEntries: readonly ChatEntry[] = [
   {
@@ -118,7 +121,7 @@ function replaceTurnIdInEntries(input: {
 }
 
 function SessionConversationWorkbenchHarness(input: {
-  scrollBehavior: React.ComponentProps<typeof SessionConversationMainContent>["scrollBehavior"];
+  scrollBehavior: SessionConversationScrollBehaviorStoryArg["scrollBehavior"];
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<readonly ChatEntry[]>(LiveHarnessSeedEntries);
@@ -434,11 +437,7 @@ const meta = {
     secondaryPanelSize: 28,
   },
   argTypes: {
-    scrollBehavior: {
-      control: "radio",
-      options: ["pin-active-turn-to-top", "follow-streaming-at-bottom", "none"],
-      description: "Conversation scroll behavior for new and streaming turns.",
-    },
+    scrollBehavior: SessionConversationScrollBehaviorArgType,
   },
   decorators: [
     function StoryDecorator(Story): React.JSX.Element {
