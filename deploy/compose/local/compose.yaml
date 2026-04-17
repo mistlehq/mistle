@@ -88,6 +88,8 @@ services:
     depends_on:
       control-plane-db-migrate:
         condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
     ports:
       - "8080:5100"
 
