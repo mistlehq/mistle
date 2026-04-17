@@ -44,7 +44,6 @@ It is not the production deployment artifact.
    with the supported integrations visible by default.
 
    `./up.sh` always ensures the control plane has a public auth/callback URL for this run:
-
    - if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is already set in `.env`, `./up.sh` uses
      that value unchanged
    - if it is blank, `./up.sh` starts a temporary `cloudflare/cloudflared` container, creates an
