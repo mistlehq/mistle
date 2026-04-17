@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,9 +20,17 @@ function canonicalizeManifestJson(rawContent: string): string {
   return `${JSON.stringify(parsed, null, 2)}\n`;
 }
 
+function formatManifestJson(rawContent: string): string {
+  return execFileSync("pnpm", ["exec", "oxfmt", "--stdin-filepath", GeneratedManifestPath], {
+    cwd: RepositoryRootPath,
+    encoding: "utf8",
+    input: rawContent,
+  });
+}
+
 async function readCanonicalSourceManifest(): Promise<string> {
   const sourceManifestContent = await readFile(SourceManifestPath, "utf8");
-  return canonicalizeManifestJson(sourceManifestContent);
+  return formatManifestJson(canonicalizeManifestJson(sourceManifestContent));
 }
 
 async function generateLocalProvisionManifest(): Promise<void> {
