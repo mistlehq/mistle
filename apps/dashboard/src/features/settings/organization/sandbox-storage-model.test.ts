@@ -120,6 +120,7 @@ describe("sandbox storage model", () => {
     ).toEqual({
       persistentSandboxesEnabled: false,
       storageConfigSource: "managed",
+      organizationStorageConfig: null,
     });
   });
 

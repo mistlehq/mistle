@@ -1,5 +1,6 @@
 import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
+import { requestControlPlane } from "../../api/request-control-plane.js";
 import { MembersApiError } from "../members/members-api-errors.js";
 import type {
   OrganizationSandboxStorageSettingsResponse,
@@ -50,22 +51,21 @@ export async function updateOrganizationSandboxStorageSettings(input: {
   payload: UpdateOrganizationSandboxStorageSettingsRequest;
 }): Promise<OrganizationSandboxStorageSettingsResponse> {
   try {
-    const client = getControlPlaneApiClient();
-    const response = await client.PUT("/v1/organization/sandbox-storage-settings", {
-      credentials: "include",
+    const response = await requestControlPlane({
+      operation: "updateOrganizationSandboxStorageSettings",
+      pathname: "/v1/organization/sandbox-storage-settings",
+      method: "PUT",
       body: input.payload,
+      fallbackMessage: "Could not update sandbox storage settings.",
     });
-    if (response.error !== undefined) {
-      throw response.error;
-    }
 
-    const data = response.data;
+    const data: unknown = await response.json().catch(() => null);
 
-    if (data === undefined) {
+    if (!isOrganizationSandboxStorageSettingsResponsePayload(data)) {
       throw new MembersApiError({
         operation: "updateOrganizationSandboxStorageSettings",
         status: 500,
-        body: null,
+        body: data,
         message: "Updated sandbox storage settings response was empty.",
         code: null,
       });
@@ -81,6 +81,86 @@ export async function updateOrganizationSandboxStorageSettings(input: {
       }),
     );
   }
+}
+
+function isOrganizationSandboxStorageSettingsResponsePayload(input: unknown): input is {
+  organizationStorageConfigSummary: {
+    apiKeyConfigured: boolean;
+    backend: "archil";
+    mounts:
+      | []
+      | {
+          accessKeyId: string;
+          bucket: string;
+          endpoint: string;
+          secretAccessKeyConfigured: boolean;
+          type: "s3-compatible";
+        }[];
+    namePrefix: string | null;
+    region: string;
+  } | null;
+  persistentSandboxesEnabled: boolean;
+  storageBackend: "archil" | null;
+  storageConfigSource: "managed" | "organization";
+  storageConfigVersion: number | null;
+} {
+  if (typeof input !== "object" || input === null) {
+    return false;
+  }
+
+  if (
+    !("persistentSandboxesEnabled" in input) ||
+    typeof input.persistentSandboxesEnabled !== "boolean"
+  ) {
+    return false;
+  }
+
+  if (
+    !("storageConfigSource" in input) ||
+    (input.storageConfigSource !== "managed" && input.storageConfigSource !== "organization")
+  ) {
+    return false;
+  }
+
+  if (
+    !("storageBackend" in input) ||
+    (input.storageBackend !== null && input.storageBackend !== "archil")
+  ) {
+    return false;
+  }
+
+  if (
+    !("storageConfigVersion" in input) ||
+    (input.storageConfigVersion !== null && typeof input.storageConfigVersion !== "number")
+  ) {
+    return false;
+  }
+
+  if (!("organizationStorageConfigSummary" in input)) {
+    return false;
+  }
+
+  const summary = input.organizationStorageConfigSummary;
+  if (summary === null) {
+    return true;
+  }
+
+  if (typeof summary !== "object") {
+    return false;
+  }
+
+  return (
+    "apiKeyConfigured" in summary &&
+    typeof summary.apiKeyConfigured === "boolean" &&
+    "backend" in summary &&
+    summary.backend === "archil" &&
+    "mounts" in summary &&
+    Array.isArray(summary.mounts) &&
+    "namePrefix" in summary &&
+    (summary.namePrefix === null || typeof summary.namePrefix === "string") &&
+    "region" in summary &&
+    typeof summary.region === "string"
+  );
 }
 
 function normalizeOrganizationSandboxStorageSettingsResponse(input: {

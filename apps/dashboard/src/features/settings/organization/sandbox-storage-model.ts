@@ -27,6 +27,7 @@ export type UpdateOrganizationSandboxStorageSettingsRequest =
   | {
       persistentSandboxesEnabled: boolean;
       storageConfigSource: "managed";
+      organizationStorageConfig: null;
     }
   | {
       persistentSandboxesEnabled: boolean;
@@ -150,6 +151,7 @@ export function createOrganizationSandboxStorageUpdatePayload(
     return {
       persistentSandboxesEnabled: input.persistentSandboxesEnabled,
       storageConfigSource: "managed",
+      organizationStorageConfig: null,
     };
   }
 
