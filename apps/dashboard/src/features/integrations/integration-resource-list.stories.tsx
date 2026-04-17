@@ -42,7 +42,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       syncState: "error",
     },
   ],
-  resourceContentByKey: new Map([
+  resourceItemsByKey: new Map([
     [
       "icn_story:repository",
       {
@@ -68,7 +68,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
           },
         ],
         kind: "repository",
-        loadErrorMessage: null,
+        errorMessage: null,
       },
     ],
     [
@@ -77,7 +77,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
         isLoading: true,
         items: [],
         kind: "workspace",
-        loadErrorMessage: null,
+        errorMessage: null,
       },
     ],
     [
@@ -86,7 +86,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
         isLoading: false,
         items: [],
         kind: "branch",
-        loadErrorMessage: null,
+        errorMessage: null,
       },
     ],
     [
@@ -95,7 +95,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
         isLoading: false,
         items: [],
         kind: "user",
-        loadErrorMessage: "GitHub returned a 403 while loading user data.",
+        errorMessage: "GitHub returned a 403 while loading user data.",
       },
     ],
   ]),

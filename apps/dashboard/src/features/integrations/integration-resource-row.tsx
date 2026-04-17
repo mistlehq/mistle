@@ -18,18 +18,18 @@ export type IntegrationResourceListItemResourceSummary = {
   syncState: "never-synced" | "syncing" | "ready" | "error";
 };
 
-export type IntegrationResourceListItemPreviewData = {
+export type IntegrationResourceListItemData = {
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
-  loadErrorMessage: string | null;
+  errorMessage: string | null;
 };
 
 export type IntegrationResourceListItemProps = {
   connectionId: string;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resource: IntegrationResourceListItemResourceSummary;
-  resourceItems: IntegrationResourceListItemPreviewData | null;
+  resourceItems: IntegrationResourceListItemData | null;
 };
 
 export function IntegrationResourceListItem(
@@ -39,13 +39,15 @@ export function IntegrationResourceListItem(
   const resourceLabel = formatResourceLabel(input.resource.kind);
   const resourceCount = input.resource.count;
   const errorTooltipMessage =
-    input.resource.lastErrorMessage ?? input.resourceItems?.loadErrorMessage ?? null;
+    input.resource.lastErrorMessage ?? input.resourceItems?.errorMessage ?? null;
   const secondaryStatusText =
     input.resource.syncState === "error"
       ? ""
       : formatResourceMetadata({
-          lastSyncedAt: input.resource.lastSyncedAt,
           syncState: input.resource.syncState,
+          ...(input.resource.lastSyncedAt === undefined
+            ? {}
+            : { lastSyncedAt: input.resource.lastSyncedAt }),
         });
   const statusSummary = `${resourceCount} resources. `;
   let statusContent: React.JSX.Element | null = null;
@@ -155,7 +157,7 @@ export function IntegrationResourceListItem(
 }
 
 function renderExpandedResourceItems(
-  resourceItems: IntegrationResourceListItemPreviewData,
+  resourceItems: IntegrationResourceListItemData,
 ): React.JSX.Element {
   if (resourceItems.items.length > 0) {
     return (

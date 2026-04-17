@@ -77,7 +77,7 @@ export function useIntegrationsDirectoryState(input: { detailTargetKey: string |
     integrationsQuery,
     onRefreshResource: resourceState.onRefreshResource,
     refreshingResourceKeys: resourceState.refreshingResourceKeys,
-    resourceContentByKey: resourceState.resourceContentByKey,
+    resourceItemsByKey: resourceState.resourceItemsByKey,
     selectedDetailCard,
     selectedDetailConnections,
   };

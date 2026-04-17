@@ -3,7 +3,7 @@ import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitio
 
 import {
   buildIntegrationConnectionDetailItems,
-  buildIntegrationConnectionResourceContentByKey,
+  buildIntegrationConnectionResourceItemsByKey,
   createIntegrationConnectionResourceKey,
   resolveIntegrationConnectionDetailWebhookPolicy,
 } from "../pages/integrations-page-view-model.js";
@@ -291,7 +291,7 @@ export function createDetailViewStoryProps(input?: {
       connections,
       refreshingResourceKeys,
     }),
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId: "icn_github_primary",
         state: {
@@ -317,7 +317,7 @@ export function createDetailViewStoryProps(input?: {
             },
           ],
           kind: "repositories",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
       {
@@ -326,7 +326,7 @@ export function createDetailViewStoryProps(input?: {
           isLoading: false,
           items: [],
           kind: "repositories",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
     ]),
@@ -403,7 +403,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
       },
     ],
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId,
         state: {
@@ -447,13 +447,13 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "repository",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          loadErrorMessage:
+          errorMessage:
             "GitHub returned a 403 while loading branch data. Check installation repository access.",
           isLoading: false,
           items: [
@@ -512,7 +512,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           isLoading: false,
           items: [],
           kind: "user",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
     ]),
@@ -628,8 +628,8 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
   };
 }
 
-export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  const connectionId = "icn_github_preview_error";
+export function createGitHubResourceLoadErrorDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_github_resource_load_error";
 
   return {
     connections: [
@@ -679,11 +679,11 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
       },
     ],
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId,
         state: {
-          loadErrorMessage:
+          errorMessage:
             "GitHub returned a 403 while loading repository data. Check installation repository access.",
           isLoading: false,
           items: [
@@ -716,7 +716,7 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "organizations",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
     ]),
@@ -777,14 +777,14 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
       },
     ],
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId,
         state: {
           isLoading: false,
           items: [],
           kind: "repositories",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
       {
@@ -793,7 +793,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
           isLoading: false,
           items: [],
           kind: "branches",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
       {
@@ -802,7 +802,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
           isLoading: false,
           items: [],
           kind: "users",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
     ]),
@@ -842,13 +842,13 @@ type ScenarioDetailStorySpec = {
   webhookSources?: readonly IntegrationWebhookSource[];
 };
 
-function createResourceContent(
+function createResourceItems(
   input: ScenarioDetailStorySpec,
-): IntegrationConnectionDetailViewProps["resourceContentByKey"] {
+): IntegrationConnectionDetailViewProps["resourceItemsByKey"] {
   const resources = input.resources ?? [];
   const familyId = input.familyId ?? "integration";
 
-  return buildIntegrationConnectionResourceContentByKey(
+  return buildIntegrationConnectionResourceItemsByKey(
     resources.map((resource) => ({
       connectionId: input.connectionId,
       state: {
@@ -865,7 +865,7 @@ function createResourceContent(
           }),
         ),
         kind: resource.kind,
-        loadErrorMessage: null,
+        errorMessage: null,
       },
     })),
   );
@@ -919,7 +919,7 @@ function createScenarioDetailViewStoryProps(
             : { connectionConfig: input.connectionConfig }),
           connectionId: input.connectionId,
         });
-  const resourceContentByKey = createResourceContent(input);
+  const resourceItemsByKey = createResourceItems(input);
   const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
 
@@ -951,7 +951,7 @@ function createScenarioDetailViewStoryProps(
     ],
     onEditAuthentication: () => {},
     onRefreshResource: () => {},
-    ...(resourceContentByKey === undefined ? {} : { resourceContentByKey }),
+    ...(resourceItemsByKey === undefined ? {} : { resourceItemsByKey }),
     ...(webhookSourceStateByConnectionId === undefined
       ? {}
       : {
@@ -1205,9 +1205,9 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
   return {
     connections: storyProps.flatMap((story) => story.connections),
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey(
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey(
       storyProps.flatMap((story) =>
-        Array.from(story.resourceContentByKey?.entries() ?? []).map(([key, state]) => ({
+        Array.from(story.resourceItemsByKey?.entries() ?? []).map(([key, state]) => ({
           connectionId: key.slice(0, key.lastIndexOf(":")),
           state,
         })),

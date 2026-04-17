@@ -10,7 +10,7 @@ import {
   type IntegrationConnection,
 } from "../integrations/integrations-service.js";
 import {
-  buildIntegrationConnectionResourceContentByKey,
+  buildIntegrationConnectionResourceItemsByKey,
   buildIntegrationConnectionResourceRequests,
   createIntegrationConnectionResourceKey,
   shouldPollIntegrationDetailResources,
@@ -61,18 +61,18 @@ function createRefreshingResourceKeys(pendingMutationVariables: readonly unknown
   );
 }
 
-function buildResourceContentByKey(input: {
+function buildResourceItemsByKey(input: {
   resourceRequests: ReturnType<typeof buildIntegrationConnectionResourceRequests>;
   resourceQueries: readonly IntegrationResourceQueryState[];
 }) {
-  return buildIntegrationConnectionResourceContentByKey(
+  return buildIntegrationConnectionResourceItemsByKey(
     input.resourceRequests.map((resource, index) => {
       const query = input.resourceQueries[index];
 
       return {
         connectionId: resource.connectionId,
         state: {
-          loadErrorMessage:
+          errorMessage:
             query?.isError === true
               ? resolveApiErrorMessage({
                   error: query.error,
@@ -158,7 +158,7 @@ export function useIntegrationResourceState(input: {
     })),
   });
 
-  const resourceContentByKey = buildResourceContentByKey({
+  const resourceItemsByKey = buildResourceItemsByKey({
     resourceRequests,
     resourceQueries,
   });
@@ -166,6 +166,6 @@ export function useIntegrationResourceState(input: {
   return {
     onRefreshResource: refreshResourceMutation.mutate,
     refreshingResourceKeys,
-    resourceContentByKey,
+    resourceItemsByKey,
   };
 }

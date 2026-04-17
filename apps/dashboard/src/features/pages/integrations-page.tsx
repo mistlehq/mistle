@@ -114,7 +114,7 @@ export function IntegrationsPage() {
         }}
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
-        resourceContentByKey={directoryState.resourceContentByKey}
+        resourceItemsByKey={directoryState.resourceItemsByKey}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
         onCreateWebhookSource={({ connectionId }) => {
           webhookSourceState.createWebhookSource({ connectionId });

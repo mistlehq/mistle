@@ -69,7 +69,7 @@ describe("IntegrationConnectionDetailView", () => {
         onStartGitHubAppInstallation={(connectionId) => {
           startedGitHubAppInstallationConnectionId = connectionId;
         }}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -123,7 +123,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
           ])
@@ -226,7 +226,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -244,7 +244,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                loadErrorMessage: "Could not load repositories.",
+                errorMessage: "Could not load repositories.",
               },
             ],
           ])
@@ -252,7 +252,7 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.queryByLabelText("View repository load error")).toBeNull();
+    expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     expect(screen.queryByText("Could not load repositories.")).toBeNull();
     expect(screen.queryByText(/Last synced/)).toBeNull();
     expect(screen.queryByText("mistle/dashboard")).toBeNull();
@@ -260,7 +260,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("shows the empty state when no preview snapshot exists yet", () => {
+  it("shows the empty state when no resource items exist yet", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -280,7 +280,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -288,7 +288,7 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
           ])
@@ -298,13 +298,13 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.queryByText("Not synced")).toBeNull();
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
-    expect(screen.queryByLabelText("View repository load error")).toBeNull();
+    expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.getByText("No items available.")).toBeTruthy();
     expect(screen.queryByText("Not synced yet.")).toBeNull();
   });
 
-  it("shows a loading state instead of an empty state while resource preview items are loading", () => {
+  it("shows a loading state instead of an empty state while resource items are loading", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -324,7 +324,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -332,7 +332,7 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: true,
                 items: [],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
           ])
@@ -345,7 +345,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("No items available.")).toBeNull();
   });
 
-  it("shows the empty state when expanded preview loading fails", () => {
+  it("shows the empty state when loading resource items fails", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -365,7 +365,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -373,7 +373,7 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                loadErrorMessage: "Could not load repositories.",
+                errorMessage: "Could not load repositories.",
               },
             ],
           ])
@@ -406,7 +406,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -414,7 +414,7 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
           ])
@@ -509,7 +509,7 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
@@ -527,7 +527,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
             [
@@ -546,7 +546,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                loadErrorMessage: null,
+                errorMessage: null,
               },
             ],
           ])

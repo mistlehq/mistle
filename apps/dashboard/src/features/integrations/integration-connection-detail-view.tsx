@@ -27,7 +27,7 @@ import {
 } from "./integration-connection-detail-formatters.js";
 import { IntegrationResourceList } from "./integration-resource-list.js";
 import {
-  type IntegrationResourceListItemPreviewData,
+  type IntegrationResourceListItemData,
   type IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 import type { IntegrationWebhookSource } from "./integrations-service.js";
@@ -78,7 +78,7 @@ export type IntegrationConnectionDetailViewProps = {
   onEditAuthentication?: (connectionId: string) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewData>;
+  resourceItemsByKey?: ReadonlyMap<string, IntegrationResourceListItemData>;
   titleEditor?:
     | {
         disabled: boolean;
@@ -263,9 +263,9 @@ export function IntegrationConnectionDetailView(
             {...(props.onStartGitHubAppInstallation === undefined
               ? {}
               : { onStartGitHubAppInstallation: props.onStartGitHubAppInstallation })}
-            {...(props.resourceContentByKey === undefined
+            {...(props.resourceItemsByKey === undefined
               ? {}
-              : { resourceContentByKey: props.resourceContentByKey })}
+              : { resourceItemsByKey: props.resourceItemsByKey })}
             {...(props.webhookPolicy === undefined ? {} : { webhookPolicy: props.webhookPolicy })}
             {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
             {...(selectedWebhookSourceState === undefined
@@ -286,7 +286,7 @@ function ConnectionDetailPane(input: {
   onEditAuthentication?: (connectionId: string) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  resourceContentByKey?: IntegrationConnectionDetailViewProps["resourceContentByKey"];
+  resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
@@ -455,7 +455,7 @@ function ConnectionDetailPane(input: {
           <ResourcesSection
             connectionId={input.connection.id}
             onRefreshResource={input.onRefreshResource}
-            resourceContentByKey={input.resourceContentByKey}
+            resourceItemsByKey={input.resourceItemsByKey}
             resources={input.connection.resources}
           />
         </SectionBlock>
@@ -675,16 +675,16 @@ function resolveGitHubPostInstallationSetupUrl(input: {
 function ResourcesSection(input: {
   connectionId: string;
   onRefreshResource: ((input: { connectionId: string; kind: string }) => void) | undefined;
-  resourceContentByKey: IntegrationConnectionDetailViewProps["resourceContentByKey"];
+  resourceItemsByKey: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   resources: readonly IntegrationConnectionDetailResourceSummary[];
 }): React.JSX.Element {
   return (
     <IntegrationResourceList
       connectionId={input.connectionId}
       resources={input.resources}
-      {...(input.resourceContentByKey === undefined
+      {...(input.resourceItemsByKey === undefined
         ? {}
-        : { resourceContentByKey: input.resourceContentByKey })}
+        : { resourceItemsByKey: input.resourceItemsByKey })}
       {...(input.onRefreshResource === undefined
         ? {}
         : { onRefreshResource: input.onRefreshResource })}

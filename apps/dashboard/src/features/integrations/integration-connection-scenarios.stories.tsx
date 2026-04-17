@@ -20,8 +20,8 @@ import {
 function mergeDetailViewStoryProps(
   ...inputs: readonly React.ComponentProps<typeof IntegrationConnectionDetailView>[]
 ): React.ComponentProps<typeof IntegrationConnectionDetailView> {
-  const resourceContentEntries = inputs.flatMap((input) =>
-    input.resourceContentByKey === undefined ? [] : [...input.resourceContentByKey.entries()],
+  const resourceItemsEntries = inputs.flatMap((input) =>
+    input.resourceItemsByKey === undefined ? [] : [...input.resourceItemsByKey.entries()],
   );
   const webhookSourceEntries = inputs.flatMap((input) =>
     input.webhookSourceStateByConnectionId === undefined
@@ -31,9 +31,9 @@ function mergeDetailViewStoryProps(
 
   return {
     connections: inputs.flatMap((input) => input.connections),
-    ...(resourceContentEntries.length === 0
+    ...(resourceItemsEntries.length === 0
       ? {}
-      : { resourceContentByKey: new Map(resourceContentEntries) }),
+      : { resourceItemsByKey: new Map(resourceItemsEntries) }),
     ...(webhookSourceEntries.length === 0
       ? {}
       : { webhookSourceStateByConnectionId: new Map(webhookSourceEntries) }),

@@ -400,19 +400,19 @@ export function buildIntegrationConnectionResourceRequests(
   );
 }
 
-export type IntegrationConnectionResourceContentState = {
+export type IntegrationConnectionResourceItemsState = {
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
-  loadErrorMessage: string | null;
+  errorMessage: string | null;
 };
 
-export function buildIntegrationConnectionResourceContentByKey(
+export function buildIntegrationConnectionResourceItemsByKey(
   input: readonly {
     connectionId: string;
-    state: IntegrationConnectionResourceContentState;
+    state: IntegrationConnectionResourceItemsState;
   }[],
-): ReadonlyMap<string, IntegrationConnectionResourceContentState> {
+): ReadonlyMap<string, IntegrationConnectionResourceItemsState> {
   return new Map(
     input.map((entry) => [
       createIntegrationConnectionResourceKey({

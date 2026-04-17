@@ -10,7 +10,7 @@ import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
-  buildIntegrationConnectionResourceContentByKey,
+  buildIntegrationConnectionResourceItemsByKey,
   buildIntegrationConnectionResourceRequests,
   buildOpenCreateIntegrationConnectionInput,
   buildOpenUpdateIntegrationConnectionInput,
@@ -668,14 +668,14 @@ describe("integrations page view model", () => {
       },
     ]);
 
-    const itemsByKey = buildIntegrationConnectionResourceContentByKey([
+    const itemsByKey = buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId: "icn_primary",
         state: {
           isLoading: false,
           items: [],
           kind: "repositories",
-          loadErrorMessage: null,
+          errorMessage: null,
         },
       },
     ]);
@@ -691,7 +691,7 @@ describe("integrations page view model", () => {
       isLoading: false,
       items: [],
       kind: "repositories",
-      loadErrorMessage: null,
+      errorMessage: null,
     });
   });
 

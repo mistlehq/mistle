@@ -1,13 +1,13 @@
 import { IntegrationResourceListItem } from "./integration-resource-row.js";
 import type {
-  IntegrationResourceListItemPreviewData,
+  IntegrationResourceListItemData,
   IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 
 export type IntegrationResourceListProps = {
   connectionId: string;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewData>;
+  resourceItemsByKey?: ReadonlyMap<string, IntegrationResourceListItemData>;
   resources: readonly IntegrationResourceListItemResourceSummary[];
 };
 
@@ -20,7 +20,7 @@ export function IntegrationResourceList(input: IntegrationResourceListProps): Re
             connectionId={input.connectionId}
             resource={resource}
             resourceItems={
-              input.resourceContentByKey?.get(`${input.connectionId}:${resource.kind}`) ?? null
+              input.resourceItemsByKey?.get(`${input.connectionId}:${resource.kind}`) ?? null
             }
             {...(input.onRefreshResource === undefined
               ? {}
