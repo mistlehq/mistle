@@ -85,6 +85,11 @@ describe("app routing breadcrumb integration", () => {
             handle={ROUTE_HANDLES.settingsOrganizationMembers}
             path="members"
           />
+          <Route
+            element={<PageHarness />}
+            handle={ROUTE_HANDLES.settingsOrganizationSandboxStorage}
+            path="sandbox-storage"
+          />
         </Route>
       </Route>
     </Route>,
@@ -211,6 +216,7 @@ describe("app routing breadcrumb integration", () => {
       "/settings/personal",
       "/settings/organization/general",
       "/settings/organization/members",
+      "/settings/organization/sandbox-storage",
     ];
 
     for (const destination of settingsDestinations) {
