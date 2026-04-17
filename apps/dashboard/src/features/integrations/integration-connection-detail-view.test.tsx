@@ -260,7 +260,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("shows the empty state when no resource items exist yet", () => {
+  it("keeps the never-synced status separate from the expanded empty contents", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -296,12 +296,11 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.queryByText("Not synced")).toBeNull();
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.getByText("No items available.")).toBeTruthy();
-    expect(screen.queryByText("Not synced yet.")).toBeNull();
   });
 
   it("shows a loading state instead of an empty state while resource items are loading", () => {
@@ -345,7 +344,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("No items available.")).toBeNull();
   });
 
-  it("shows the empty state when loading resource items fails", () => {
+  it("keeps the sync failure status separate from the expanded empty contents", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -381,7 +380,11 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
+    expect(screen.getAllByText("Sync failed")).toHaveLength(2);
+    expect(screen.getAllByLabelText("View sync failure details")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getAllByText("Sync failed")).toHaveLength(2);
+    expect(screen.getAllByLabelText("View sync failure details")).toHaveLength(2);
     expect(screen.queryByText("Could not load repositories.")).toBeNull();
     expect(screen.getByText("No items available.")).toBeTruthy();
   });
