@@ -1,0 +1,1 @@
+window.__MISTLE_RUNTIME_CONFIG__ = window.__MISTLE_RUNTIME_CONFIG__ ?? {};

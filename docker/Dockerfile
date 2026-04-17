@@ -16,6 +16,10 @@ RUN pnpm install --frozen-lockfile
 FROM workspace-deps AS control-plane-api-build
 RUN pnpm --filter @mistle/control-plane-api... build
 
+FROM workspace-deps AS dashboard-build
+ENV MISTLE_CONFIG_PATH=/app/config/config.sample.toml
+RUN pnpm --filter @mistle/dashboard... build
+
 FROM workspace-deps AS control-plane-worker-build
 RUN pnpm --filter @mistle/control-plane-worker... build
 
@@ -41,6 +45,18 @@ RUN chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
 EXPOSE 5101
 
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-worker-entrypoint"]
+
+FROM nginx:1.29-alpine AS dashboard-runtime
+
+COPY --from=dashboard-build /app/apps/dashboard/dist /usr/share/nginx/html
+COPY docker/apps/dashboard/entrypoint.sh /usr/local/bin/mistle-dashboard-entrypoint
+COPY docker/apps/dashboard/nginx.conf /etc/nginx/conf.d/default.conf
+
+RUN chmod +x /usr/local/bin/mistle-dashboard-entrypoint
+
+EXPOSE 80
+
+ENTRYPOINT ["/usr/local/bin/mistle-dashboard-entrypoint"]
 
 FROM base AS data-plane-api-runtime
 

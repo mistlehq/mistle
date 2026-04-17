@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -16,6 +17,10 @@ export const IntegrationTargetsProvisionManifestJsonEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_JSON";
 export const IntegrationTargetsProvisionManifestPathEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH";
+const DefaultIntegrationTargetsProvisionManifestSearchRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../",
+);
 
 const IntegrationTargetProvisionTargetSchema = z
   .object({
@@ -169,35 +174,14 @@ function resolveProvisionTargetSecrets(
   return resolvedSecrets;
 }
 
-function isRepositoryRoot(directoryPath: string): boolean {
-  return existsSync(join(directoryPath, ".git"));
-}
-
-export function resolveRepositoryRootFromDirectory(startDirectory: string): string {
-  let currentDirectory = resolve(startDirectory);
-
-  while (true) {
-    if (isRepositoryRoot(currentDirectory)) {
-      return currentDirectory;
-    }
-
-    const parentDirectory = dirname(currentDirectory);
-    if (parentDirectory === currentDirectory) {
-      throw new Error(
-        `Could not resolve repository root from '${resolve(startDirectory)}'. Expected a parent directory containing '.git'.`,
-      );
-    }
-
-    currentDirectory = parentDirectory;
-  }
-}
-
 export function discoverIntegrationTargetProvisionManifestPath(input: {
   startDirectory: string;
-  repositoryRoot: string;
+  searchRootDirectory?: string;
 }): string | undefined {
   let currentDirectory = resolve(input.startDirectory);
-  const repositoryRoot = resolve(input.repositoryRoot);
+  const searchRootDirectory = resolve(
+    input.searchRootDirectory ?? DefaultIntegrationTargetsProvisionManifestSearchRoot,
+  );
 
   while (true) {
     const candidatePath = join(currentDirectory, IntegrationTargetsProvisionManifestFileName);
@@ -205,7 +189,7 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
       return candidatePath;
     }
 
-    if (currentDirectory === repositoryRoot) {
+    if (currentDirectory === searchRootDirectory) {
       return undefined;
     }
 
@@ -242,7 +226,7 @@ export function parseIntegrationTargetsProvisionManifest(
 export function loadIntegrationTargetsProvisionManifest(input: {
   env?: IntegrationTargetsProvisionEnv;
   startDirectory: string;
-  repositoryRoot?: string;
+  searchRootDirectory?: string;
 }): LoadedIntegrationTargetsProvisionManifest | undefined {
   const env = input.env ?? process.env;
   const manifestJson = env[IntegrationTargetsProvisionManifestJsonEnvVarName];
@@ -279,14 +263,16 @@ export function loadIntegrationTargetsProvisionManifest(input: {
     };
   }
 
-  const repositoryRoot =
-    input.repositoryRoot === undefined
-      ? resolveRepositoryRootFromDirectory(input.startDirectory)
-      : resolve(input.repositoryRoot);
-  const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath({
-    startDirectory: input.startDirectory,
-    repositoryRoot,
-  });
+  const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath(
+    input.searchRootDirectory === undefined
+      ? {
+          startDirectory: input.startDirectory,
+        }
+      : {
+          startDirectory: input.startDirectory,
+          searchRootDirectory: input.searchRootDirectory,
+        },
+  );
   if (discoveredManifestPath === undefined) {
     return undefined;
   }

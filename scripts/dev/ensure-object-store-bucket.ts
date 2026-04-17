@@ -6,6 +6,7 @@ import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
 
 const DEV_OBJECT_STORE_ACCESS_KEY_ID_ENV_VAR = "DEV_OBJECT_STORE_ACCESS_KEY_ID";
 const DEV_OBJECT_STORE_SECRET_ACCESS_KEY_ENV_VAR = "DEV_OBJECT_STORE_SECRET_ACCESS_KEY";
+const DEV_OBJECT_STORE_ENDPOINT_ENV_VAR = "DEV_OBJECT_STORE_ENDPOINT";
 const DEV_OBJECT_STORE_PORT_ENV_VAR = "DEV_OBJECT_STORE_PORT";
 const DEV_OBJECT_STORE_BUCKET_NAME_ENV_VAR = "DEV_OBJECT_STORE_BUCKET_NAME";
 const DEFAULT_DEV_OBJECT_STORE_ACCESS_KEY_ID = "mistle-access-key";
@@ -46,6 +47,7 @@ export async function ensureDevObjectStoreBucketExists(
   );
   const endpoint =
     input.endpoint ??
+    readOptionalEnv(env, DEV_OBJECT_STORE_ENDPOINT_ENV_VAR) ??
     `http://127.0.0.1:${readEnvWithDefault(env, DEV_OBJECT_STORE_PORT_ENV_VAR, DEFAULT_DEV_OBJECT_STORE_PORT)}`;
   const startupTimeoutMs = input.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const deadline = Date.now() + startupTimeoutMs;
@@ -104,10 +106,14 @@ function readEnvWithDefault(
   envVarName: string,
   defaultValue: string,
 ): string {
+  return readOptionalEnv(env, envVarName) ?? defaultValue;
+}
+
+function readOptionalEnv(env: NodeJS.ProcessEnv, envVarName: string): string | undefined {
   const value = env[envVarName];
 
   if (typeof value !== "string" || value.trim().length === 0) {
-    return defaultValue;
+    return undefined;
   }
 
   return value.trim();

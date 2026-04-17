@@ -3,6 +3,15 @@ type DashboardEnv = {
   readonly VITE_AUTH_METHOD_GOOGLE?: string;
 };
 
+type DashboardRuntimeConfig = {
+  readonly controlPlaneApiOrigin?: string;
+  readonly authMethodGoogle?: string;
+};
+
+declare global {
+  var __MISTLE_RUNTIME_CONFIG__: DashboardRuntimeConfig | undefined;
+}
+
 export type DashboardConfig = {
   controlPlaneApiOrigin: string;
   authBasePath: "/v1/auth";
@@ -57,14 +66,23 @@ export function buildDashboardConfig(env: DashboardEnv): DashboardConfig {
 
 let cachedDashboardConfig: DashboardConfig | undefined;
 
+function readDashboardEnvironment(): DashboardEnv {
+  const runtimeConfig = globalThis.__MISTLE_RUNTIME_CONFIG__;
+
+  return {
+    VITE_CONTROL_PLANE_API_ORIGIN:
+      runtimeConfig?.controlPlaneApiOrigin ?? import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN,
+    VITE_AUTH_METHOD_GOOGLE:
+      runtimeConfig?.authMethodGoogle ?? import.meta.env.VITE_AUTH_METHOD_GOOGLE,
+  };
+}
+
 export function getDashboardConfig(): DashboardConfig {
   if (cachedDashboardConfig) {
     return cachedDashboardConfig;
   }
 
-  cachedDashboardConfig = buildDashboardConfig({
-    VITE_CONTROL_PLANE_API_ORIGIN: import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN,
-  });
+  cachedDashboardConfig = buildDashboardConfig(readDashboardEnvironment());
 
   return cachedDashboardConfig;
 }
@@ -74,5 +92,8 @@ export function resetDashboardConfigForTest(): void {
 }
 
 export function getDashboardGoogleAuthMethodEnabled(): boolean {
-  return parseRequiredBoolean(import.meta.env.VITE_AUTH_METHOD_GOOGLE, "VITE_AUTH_METHOD_GOOGLE");
+  return parseRequiredBoolean(
+    readDashboardEnvironment().VITE_AUTH_METHOD_GOOGLE,
+    "VITE_AUTH_METHOD_GOOGLE",
+  );
 }

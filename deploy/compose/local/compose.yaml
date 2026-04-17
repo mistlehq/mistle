@@ -1,0 +1,241 @@
+x-mistle-local-config-volume: &mistle-local-config-volume
+  type: bind
+  source: ../local/config/config.local.toml
+  target: /app/config/mistle.toml
+  read_only: true
+
+x-mistle-local-provision-manifest-volume: &mistle-local-provision-manifest-volume
+  type: bind
+  source: ../local/config/integration-targets.provision.json
+  target: /app/deploy/compose/local/config/integration-targets.provision.json
+  read_only: true
+
+x-mistle-local-app: &mistle-local-app
+  env_file:
+    - ../local/.env
+  volumes:
+    - *mistle-local-config-volume
+
+x-mistle-local-bootstrap: &mistle-local-bootstrap
+  env_file:
+    - ../local/.env
+  volumes:
+    - *mistle-local-config-volume
+    - *mistle-local-provision-manifest-volume
+  restart: "no"
+
+services:
+  sandbox-base-image:
+    build:
+      context: ../../..
+      dockerfile: packages/sandboxd/Dockerfile
+      target: sandbox-base
+    image: localhost:5001/mistle/sandbox-base:local
+    entrypoint:
+      - sh
+      - -lc
+    command:
+      - echo "sandbox base image ready"
+    restart: "no"
+
+  sandbox-base-publish:
+    image: docker:28-cli
+    env_file:
+      - ../local/.env
+    entrypoint:
+      - sh
+      - -lc
+    command:
+      - >
+        docker image inspect "${MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE}" >/dev/null &&
+        attempts=0 &&
+        until docker push "${MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE}";
+        do
+          attempts=$$((attempts + 1));
+          if [ "$$attempts" -ge 30 ]; then
+            exit 1;
+          fi;
+          sleep 1;
+        done
+    volumes:
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    depends_on:
+      registry:
+        condition: service_started
+      sandbox-base-image:
+        condition: service_completed_successfully
+    restart: "no"
+
+  dashboard:
+    env_file:
+      - ../local/.env
+    ports:
+      - "3000:80"
+
+  control-plane-api:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    ports:
+      - "8080:5100"
+
+  control-plane-worker:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    depends_on:
+      sandbox-base-publish:
+        condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
+
+  data-plane-api:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    volumes:
+      - *mistle-local-config-volume
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  data-plane-gateway:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    ports:
+      - "8084:5202"
+
+  data-plane-worker:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: ${MISTLE_SANDBOX_NETWORK_NAME}
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: ${MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX}
+    volumes:
+      - *mistle-local-config-volume
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: /tmp
+        target: /tmp
+    depends_on:
+      sandbox-base-publish:
+        condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
+      object-store-bootstrap:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  tokenizer-proxy:
+    <<: *mistle-local-app
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    ports:
+      - "8085:5205"
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.17_full
+    environment:
+      AWS_ACCESS_KEY_ID: mistle-access-key
+      AWS_SECRET_ACCESS_KEY: mistle-secret-key
+    command:
+      - server
+      - -ip=0.0.0.0
+      - -dir=/data
+      - -s3
+    restart: unless-stopped
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:8333/status || exit 1
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks:
+      - app
+    ports:
+      - "8333:8333"
+
+  registry:
+    image: registry:3
+    restart: unless-stopped
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-data:/var/lib/registry
+    networks:
+      - app
+    ports:
+      - "5001:5000"
+
+  object-store-bootstrap:
+    <<: *mistle-local-bootstrap
+    image: mistle/control-plane-api:local
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    entrypoint:
+      - pnpm
+      - tsx
+      - scripts/dev/ensure-object-store-bucket.ts
+    environment:
+      DEV_OBJECT_STORE_ACCESS_KEY_ID: mistle-access-key
+      DEV_OBJECT_STORE_SECRET_ACCESS_KEY: mistle-secret-key
+      DEV_OBJECT_STORE_ENDPOINT: http://seaweedfs:8333
+      DEV_OBJECT_STORE_BUCKET_NAME: mistle-assets
+      DEV_OBJECT_STORE_PORT: "8333"
+    networks:
+      - app
+
+  control-plane-bootstrap:
+    <<: *mistle-local-bootstrap
+    image: mistle/control-plane-api:local
+    depends_on:
+      control-plane-api:
+        condition: service_healthy
+      object-store-bootstrap:
+        condition: service_completed_successfully
+    entrypoint:
+      - pnpm
+      - --filter
+      - "@mistle/control-plane-api"
+      - integration-targets:sync
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+      MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH: /app/deploy/compose/local/config/integration-targets.provision.json
+    networks:
+      - app
+
+  mailpit:
+    image: axllent/mailpit:v1.28
+    restart: unless-stopped
+    networks:
+      - app
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:8025/ || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  seaweedfs-data:
+  registry-data:
+
+networks:
+  sandbox:
+    name: ${MISTLE_SANDBOX_NETWORK_NAME}

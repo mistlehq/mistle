@@ -11,7 +11,6 @@ import {
   IntegrationTargetsProvisionManifestPathEnvVarName,
   loadIntegrationTargetsProvisionManifest,
   parseIntegrationTargetsProvisionManifest,
-  resolveRepositoryRootFromDirectory,
 } from "./provision-integration-targets.js";
 import { SyncIntegrationTargetsForTests } from "./sync-integration-targets.js";
 
@@ -148,13 +147,12 @@ describe("provision-integration-targets", () => {
     });
   });
 
-  it("resolves repository root and discovers provision manifest while walking parents", async () => {
+  it("discovers provision manifest while walking parents without requiring git metadata", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
-    const repoRoot = join(temporaryWorkspaceRoot, "repo");
-    const nestedWorkingDirectory = join(repoRoot, "apps", "control-plane-api");
-    const manifestPath = join(repoRoot, "integration-targets.provision.json");
+    const runtimeRoot = join(temporaryWorkspaceRoot, "runtime");
+    const nestedWorkingDirectory = join(runtimeRoot, "apps", "control-plane-api");
+    const manifestPath = join(runtimeRoot, "integration-targets.provision.json");
 
-    await mkdir(join(repoRoot, ".git"), { recursive: true });
     await mkdir(nestedWorkingDirectory, { recursive: true });
     await writeFile(
       manifestPath,
@@ -166,14 +164,71 @@ describe("provision-integration-targets", () => {
     );
 
     try {
-      const resolvedRepositoryRoot = resolveRepositoryRootFromDirectory(nestedWorkingDirectory);
-      expect(resolvedRepositoryRoot).toBe(repoRoot);
-
       const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath({
         startDirectory: nestedWorkingDirectory,
-        repositoryRoot: resolvedRepositoryRoot,
+        searchRootDirectory: runtimeRoot,
       });
       expect(discoveredManifestPath).toBe(manifestPath);
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns undefined when no provision manifest exists in any parent directory", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const startDirectory = join(temporaryWorkspaceRoot, "runtime", "apps", "control-plane-api");
+
+    await mkdir(startDirectory, { recursive: true });
+
+    try {
+      expect(
+        discoverIntegrationTargetProvisionManifestPath({
+          startDirectory,
+          searchRootDirectory: temporaryWorkspaceRoot,
+        }),
+      ).toBeUndefined();
+      expect(
+        loadIntegrationTargetsProvisionManifest({
+          env: {},
+          startDirectory,
+          searchRootDirectory: temporaryWorkspaceRoot,
+        }),
+      ).toBeUndefined();
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not discover manifests above the configured search root boundary", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const parentManifestPath = join(temporaryWorkspaceRoot, "integration-targets.provision.json");
+    const runtimeRoot = join(temporaryWorkspaceRoot, "runtime");
+    const nestedWorkingDirectory = join(runtimeRoot, "apps", "control-plane-api");
+
+    await mkdir(nestedWorkingDirectory, { recursive: true });
+    await writeFile(
+      parentManifestPath,
+      JSON.stringify({
+        version: 1,
+        targets: [],
+      }),
+      "utf8",
+    );
+
+    try {
+      expect(
+        discoverIntegrationTargetProvisionManifestPath({
+          startDirectory: nestedWorkingDirectory,
+          searchRootDirectory: runtimeRoot,
+        }),
+      ).toBeUndefined();
+      expect(
+        loadIntegrationTargetsProvisionManifest({
+          env: {},
+          startDirectory: nestedWorkingDirectory,
+          searchRootDirectory: runtimeRoot,
+        }),
+      ).toBeUndefined();
     } finally {
       await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
     }
@@ -286,7 +341,6 @@ describe("provision-integration-targets", () => {
     const repoRoot = join(temporaryWorkspaceRoot, "repo");
     const nestedWorkingDirectory = join(repoRoot, "apps", "control-plane-api");
 
-    await mkdir(join(repoRoot, ".git"), { recursive: true });
     await mkdir(nestedWorkingDirectory, { recursive: true });
 
     try {
@@ -306,7 +360,6 @@ describe("provision-integration-targets", () => {
           }),
         },
         startDirectory: nestedWorkingDirectory,
-        repositoryRoot: repoRoot,
       });
 
       expect(loadedManifest).toEqual({

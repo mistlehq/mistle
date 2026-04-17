@@ -7,6 +7,7 @@
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/docs --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",
+    "compose:local:smoke-test": "tsx ./deploy/compose/scripts/smoke-test-local.ts",
     "storybook": "pnpm --filter @mistle/storybook storybook",
     "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
     "emails:preview": "pnpm --filter @mistle/emails preview",
