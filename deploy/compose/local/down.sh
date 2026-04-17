@@ -30,19 +30,17 @@ read_compose_env_value() {
 }
 
 cleanup_sandbox_runtime_containers() {
-  local project_name sandbox_network_name sandbox_container_ids
+  local sandbox_network_name sandbox_container_ids
 
-  project_name="$(read_compose_env_value "MISTLE_COMPOSE_PROJECT_NAME")"
   sandbox_network_name="$(read_compose_env_value "MISTLE_SANDBOX_NETWORK_NAME")"
 
-  if [[ -z "${project_name}" || -z "${sandbox_network_name}" ]]; then
+  if [[ -z "${sandbox_network_name}" ]]; then
     return
   fi
 
   sandbox_container_ids="$(
     docker ps -aq \
       --filter "label=mistle.sandbox.provider=docker" \
-      --filter "label=com.docker.compose.project=${project_name}" \
       --filter "network=${sandbox_network_name}"
   )"
 
