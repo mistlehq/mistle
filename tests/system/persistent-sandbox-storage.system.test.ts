@@ -547,6 +547,33 @@ async function readDurableState(input: {
   return result.stdout.trim();
 }
 
+async function assertDurablePathsExposed(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  const result = await runSandboxShellCommand({
+    fixture: input.fixture,
+    authenticatedSession: input.authenticatedSession,
+    sandboxInstanceId: input.sandboxInstanceId,
+    command: [
+      "test -d /root",
+      "test -d /etc/codex",
+      "test -d /usr/local/bin",
+      'root_marker="/root/.mistle-durable-path-check"',
+      'codex_marker="/etc/codex/.mistle-durable-path-check"',
+      'bin_marker="/usr/local/bin/.mistle-durable-path-check"',
+      'touch "$root_marker" "$codex_marker" "$bin_marker"',
+      'test -f "$root_marker"',
+      'test -f "$codex_marker"',
+      'test -f "$bin_marker"',
+      'rm -f "$root_marker" "$codex_marker" "$bin_marker"',
+    ].join(" && "),
+  });
+
+  expect(result.exitCode).toBe(0);
+}
+
 async function deleteProviderCompute(input: {
   provider: SystemSandboxProvider;
   providerSandboxId: string;
@@ -1046,6 +1073,33 @@ async function preparePersistentSandbox(input: {
 }
 
 describe("persistent sandbox storage", () => {
+  it("starts a persistent sandbox with the durable paths exposed", async ({ fixture }) => {
+    const sandboxInstanceIdsToCleanup: string[] = [];
+    let testError: unknown;
+
+    try {
+      const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
+        fixture,
+        email: `persistent-start-paths-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
+      });
+      sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+
+      await assertDurablePathsExposed({
+        fixture,
+        authenticatedSession,
+        sandboxInstanceId,
+      });
+    } catch (error) {
+      testError = error;
+    } finally {
+      await finalizePersistentSandboxTest({
+        fixture,
+        sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+        testError,
+      });
+    }
+  }, 300_000);
+
   it("preserves durable state across stop and resume", async ({ fixture }) => {
     const sandboxInstanceIdsToCleanup: string[] = [];
     let testError: unknown;
