@@ -233,7 +233,7 @@ describe("sandbox tunnel pty stream integration", () => {
               originalFilename: "gateway.png",
               mimeType: "image/png",
               sizeBytes: 3,
-              path: "/tmp/attachments/thread_gateway_it/gateway.png",
+              path: "/root/.local/attachments/thread_gateway_it/gateway.png",
             },
           }),
         );
@@ -249,7 +249,7 @@ describe("sandbox tunnel pty stream integration", () => {
             originalFilename: "gateway.png",
             mimeType: "image/png",
             sizeBytes: 3,
-            path: "/tmp/attachments/thread_gateway_it/gateway.png",
+            path: "/root/.local/attachments/thread_gateway_it/gateway.png",
           },
         });
 

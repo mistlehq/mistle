@@ -27,6 +27,7 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
+import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
 import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { Pool } from "pg";
@@ -34,12 +35,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
-import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 import {
   createArchilDiskName,
   createArchilDiskRequest,
-  provisionSandboxStorage,
-} from "../openworkflow/start-sandbox-instance/provision-sandbox-storage.js";
+} from "../openworkflow/shared/sandbox-storage/archil-storage-backend.js";
+import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
 
 const IntegrationTestTimeoutMs = 120_000;
 const ControlPlaneApiHealthcheckPath = "/__healthz";
@@ -98,6 +99,37 @@ function readArchilIntegrationEnvironment(): ArchilIntegrationEnvironment | null
   return parsedEnvironment.data;
 }
 
+function createArchilStorageBackendAdapter(input: {
+  db: ReturnType<typeof createDataPlaneDataPlaneDatabase>;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  workerConfig: DataPlaneWorkerConfig;
+}) {
+  return createSandboxStorageBackendAdapter({
+    db: input.db,
+    controlPlaneInternalClient: input.controlPlaneInternalClient,
+    workerConfig: input.workerConfig,
+    runtimeProvider: SandboxProvider.E2B,
+    storageBackend: SandboxStorageBackend.ARCHIL,
+  });
+}
+
+async function requireSandboxStorageRow(input: {
+  db: ReturnType<typeof createDataPlaneDataPlaneDatabase>;
+  sandboxInstanceId: string;
+}) {
+  const sandboxStorage = await input.db.query.sandboxInstanceStorages.findFirst({
+    where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
+  });
+
+  if (sandboxStorage === undefined) {
+    throw new Error(
+      `Expected sandbox storage row for sandbox instance '${input.sandboxInstanceId}'.`,
+    );
+  }
+
+  return sandboxStorage;
+}
+
 const archilIntegrationEnvironment = readArchilIntegrationEnvironment();
 const describeIfArchilIntegration =
   archilIntegrationEnvironment === null ? describe.skip : describe;
@@ -109,6 +141,7 @@ function createControlPlaneApiEnvironment(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -122,6 +155,7 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: input.dataPlaneApiBaseUrl,
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
   };
 }
 
@@ -132,6 +166,7 @@ function startControlPlaneApiChildProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -180,6 +215,7 @@ async function startControlPlaneApiProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): Promise<StartedControlPlaneApiProcess> {
   const childProcess = startControlPlaneApiChildProcess(input);
   const stdoutChunks: string[] = [];
@@ -383,6 +419,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       dataPlaneApiBaseUrl: "http://127.0.0.1:5201",
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
+      sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
     });
   }, IntegrationTestTimeoutMs);
 
@@ -451,7 +488,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
-          runtimeProvider: "docker",
+          runtimeProvider: "e2b",
         },
         {
           sandboxInstanceId,
@@ -467,26 +504,47 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
         },
       );
 
-      const provisionedStorage = await provisionSandboxStorage({
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: dataPlaneDb,
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
+      });
+
+      const provisionedStorage = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });
       createdDiskIds.add(provisionedStorage.handle);
 
-      expect(provisionedStorage.provider).toBe(SandboxStorageProviders.ARCHIL);
+      expect(provisionedStorage.backend).toBe(SandboxStorageBackend.ARCHIL);
       expect(provisionedStorage.status).toBe(SandboxStorageStatuses.READY);
-      expect(provisionedStorage.region).toBe(TestArchilRegion);
       expect(provisionedStorage.handle).toMatch(/^dsk-[0-9a-f]{16}$/u);
+
+      const persistedStorage = await requireSandboxStorageRow({
+        db: dataPlaneDb,
+        sandboxInstanceId,
+      });
+
+      expect(persistedStorage.provider).toBe(SandboxStorageProviders.ARCHIL);
+      expect(persistedStorage.region).toBe(TestArchilRegion);
+      expect(persistedStorage.credentialCiphertext).not.toBeNull();
+      expect(persistedStorage.credentialNonce).not.toBeNull();
+      expect(persistedStorage.organizationCredentialKeyVersion).not.toBeNull();
+
+      if (
+        persistedStorage.credentialCiphertext === null ||
+        persistedStorage.credentialNonce === null ||
+        persistedStorage.organizationCredentialKeyVersion === null
+      ) {
+        throw new Error("Expected persisted Archil credential fields.");
+      }
 
       const decryptedCredential = await controlPlaneInternalClient.resolveStorageCredential({
         organizationId,
         credentialKind: "disk_token",
-        ciphertext: provisionedStorage.credentialCiphertext,
-        nonce: provisionedStorage.credentialNonce,
-        organizationCredentialKeyVersion: provisionedStorage.organizationCredentialKeyVersion,
+        ciphertext: persistedStorage.credentialCiphertext,
+        nonce: persistedStorage.credentialNonce,
+        organizationCredentialKeyVersion: persistedStorage.organizationCredentialKeyVersion,
       });
 
       expect(decryptedCredential.plaintext).not.toBe("");
@@ -498,15 +556,12 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
         1,
       );
 
-      const provisionedStorageAgain = await provisionSandboxStorage({
-        db: dataPlaneDb,
-        controlPlaneInternalClient,
-        workerConfig: createWorkerConfig(archilEnvironment),
+      const provisionedStorageAgain = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });
 
-      expect(provisionedStorageAgain.id).toBe(provisionedStorage.id);
+      expect(provisionedStorageAgain.backend).toBe(provisionedStorage.backend);
       expect(provisionedStorageAgain.handle).toBe(provisionedStorage.handle);
 
       const diskAfterRepeat = await archil.disks.get(provisionedStorage.handle);
@@ -555,7 +610,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
-          runtimeProvider: "docker",
+          runtimeProvider: "e2b",
         },
         {
           sandboxInstanceId,
@@ -571,11 +626,14 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
         },
       );
 
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
+        db: dataPlaneDb,
+        controlPlaneInternalClient,
+        workerConfig,
+      });
+
       await expect(
-        provisionSandboxStorage({
-          db: dataPlaneDb,
-          controlPlaneInternalClient,
-          workerConfig,
+        storageBackendAdapter.provision({
           organizationId,
           sandboxInstanceId,
         }),
@@ -639,7 +697,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
-          runtimeProvider: "docker",
+          runtimeProvider: "e2b",
         },
         {
           sandboxInstanceId,
@@ -654,6 +712,12 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           source: "dashboard",
         },
       );
+
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
+        db: dataPlaneDb,
+        controlPlaneInternalClient,
+        workerConfig,
+      });
 
       const precreatedDisk = await archil.disks.create(
         createArchilDiskRequest({
@@ -684,22 +748,35 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       await precreatedDisk.disk.removeTokenUser(precreatedDisk.tokenIdentifier);
 
-      const provisionedStorage = await provisionSandboxStorage({
-        db: dataPlaneDb,
-        controlPlaneInternalClient,
-        workerConfig,
+      const provisionedStorage = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });
 
       expect(provisionedStorage.handle).toBe(precreatedDisk.disk.id);
 
+      const persistedStorage = await requireSandboxStorageRow({
+        db: dataPlaneDb,
+        sandboxInstanceId,
+      });
+      expect(persistedStorage.credentialCiphertext).not.toBeNull();
+      expect(persistedStorage.credentialNonce).not.toBeNull();
+      expect(persistedStorage.organizationCredentialKeyVersion).not.toBeNull();
+
+      if (
+        persistedStorage.credentialCiphertext === null ||
+        persistedStorage.credentialNonce === null ||
+        persistedStorage.organizationCredentialKeyVersion === null
+      ) {
+        throw new Error("Expected persisted Archil credential fields.");
+      }
+
       const decryptedCredential = await controlPlaneInternalClient.resolveStorageCredential({
         organizationId,
         credentialKind: "disk_token",
-        ciphertext: provisionedStorage.credentialCiphertext,
-        nonce: provisionedStorage.credentialNonce,
-        organizationCredentialKeyVersion: provisionedStorage.organizationCredentialKeyVersion,
+        ciphertext: persistedStorage.credentialCiphertext,
+        nonce: persistedStorage.credentialNonce,
+        organizationCredentialKeyVersion: persistedStorage.organizationCredentialKeyVersion,
       });
 
       expect(decryptedCredential.plaintext).not.toBe("");
@@ -757,7 +834,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
-          runtimeProvider: "docker",
+          runtimeProvider: "e2b",
         },
         {
           sandboxInstanceId,
@@ -772,6 +849,12 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           source: "dashboard",
         },
       );
+
+      const storageBackendAdapter = createArchilStorageBackendAdapter({
+        db: dataPlaneDb,
+        controlPlaneInternalClient,
+        workerConfig,
+      });
 
       const precreatedDisk = await archil.disks.create(
         createArchilDiskRequest({
@@ -798,10 +881,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       await precreatedDisk.disk.createToken(sandboxInstanceId);
 
-      const provisionedStorage = await provisionSandboxStorage({
-        db: dataPlaneDb,
-        controlPlaneInternalClient,
-        workerConfig,
+      const provisionedStorage = await storageBackendAdapter.provision({
         organizationId,
         sandboxInstanceId,
       });

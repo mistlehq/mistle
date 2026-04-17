@@ -1,6 +1,6 @@
 import {
   organizationSandboxStorageSettings,
-  SandboxStorageBackends,
+  SandboxStorageBackend as SandboxStorageBackendValues,
   SandboxStorageConfigSources,
   type ControlPlaneDatabase,
   type SandboxStorageBackend,
@@ -35,7 +35,7 @@ export type ResolvedOrganizationSandboxStorageSettings = {
 export type PublicOrganizationSandboxStorageSettingsResponse = {
   persistentSandboxesEnabled: boolean;
   storageConfigSource: SandboxStorageConfigSource;
-  storageBackend: SandboxStorageBackend | null;
+  storageBackend: typeof SandboxStorageBackendValues.ARCHIL | null;
   storageConfigVersion: number | null;
   organizationStorageConfigSummary: OrganizationSandboxStorageConfigSummary | null;
 };
@@ -75,7 +75,7 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
     };
   }
 
-  if (settings.storageBackend !== SandboxStorageBackends.ARCHIL) {
+  if (settings.storageBackend !== SandboxStorageBackendValues.ARCHIL) {
     throw new Error(
       `Unsupported organization sandbox storage backend '${String(settings.storageBackend)}' for organization '${input.organizationId}'.`,
     );
@@ -107,7 +107,7 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
   return {
     persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
     storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
-    storageBackend: SandboxStorageBackends.ARCHIL,
+    storageBackend: SandboxStorageBackendValues.ARCHIL,
     storageConfigVersion: OrganizationSandboxStorageConfigVersion,
     organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema.parse(
       JSON.parse(plaintext),
@@ -118,10 +118,15 @@ export async function resolveOrganizationSandboxStorageSettings(input: {
 export function createPublicOrganizationSandboxStorageSettingsResponse(
   input: ResolvedOrganizationSandboxStorageSettings,
 ): PublicOrganizationSandboxStorageSettingsResponse {
+  const storageBackend =
+    input.storageBackend === SandboxStorageBackendValues.ARCHIL
+      ? SandboxStorageBackendValues.ARCHIL
+      : null;
+
   return {
     persistentSandboxesEnabled: input.persistentSandboxesEnabled,
     storageConfigSource: input.storageConfigSource,
-    storageBackend: input.storageBackend,
+    storageBackend,
     storageConfigVersion: input.storageConfigVersion,
     organizationStorageConfigSummary:
       input.organizationStorageConfig === null

@@ -1,4 +1,4 @@
-import { Button, Notice } from "@mistle/ui";
+import { Notice, ScreenActionButton } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -226,14 +226,9 @@ export function InvitationAcceptPage(): React.JSX.Element {
         maxWidthClass={AuthPageWidths.LG}
         title="Invitation accepted"
         actions={
-          <Button
-            className="h-12 w-full text-sm"
-            onClick={() => void navigate("/", { replace: true })}
-            size="lg"
-            type="button"
-          >
+          <ScreenActionButton onClick={() => void navigate("/", { replace: true })} type="button">
             Continue
-          </Button>
+          </ScreenActionButton>
         }
       >
         <Notice>

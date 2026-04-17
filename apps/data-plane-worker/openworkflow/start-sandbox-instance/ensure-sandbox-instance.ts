@@ -32,6 +32,7 @@ export async function ensureSandboxInstance(
       sandboxProfileVersion: input.sandboxProfileVersion,
       runtimeProvider: ctx.runtimeProvider,
       providerSandboxId: null,
+      computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,

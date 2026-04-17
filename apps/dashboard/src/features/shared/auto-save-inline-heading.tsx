@@ -21,6 +21,7 @@ export type AutoSaveInlineHeadingProps = {
   placeholder?: string;
   maxWidthClassName?: string;
   inputClassName?: string;
+  size?: "sm" | "lg";
   cancelOnEscape?: boolean;
   validate: (nextValue: string) => string | null;
   onSave: (nextValue: string) => Promise<void> | void;
@@ -268,6 +269,7 @@ export function AutoSaveInlineHeading(input: AutoSaveInlineHeadingProps): React.
           ? {}
           : { errorMessage: heading.errorState.message })}
         {...(input.inputClassName === undefined ? {} : { inputClassName: input.inputClassName })}
+        {...(input.size === undefined ? {} : { size: input.size })}
         {...(input.maxWidthClassName === undefined
           ? {}
           : { maxWidthClassName: input.maxWidthClassName })}

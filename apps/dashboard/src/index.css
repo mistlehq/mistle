@@ -19,19 +19,41 @@
   margin-top: 0.35rem !important;
 }
 
-.chat-markdown-content ul,
-.chat-markdown-content ol {
-  padding-inline-start: 0.5rem;
+.chat-markdown-content :is(ul, ol) {
+  padding-inline-start: 0.2rem;
+  list-style-position: inside;
+}
+
+.chat-markdown-content :is(ul, ol) > [data-streamdown="list-item"] {
+  padding-left: 1rem;
+  text-indent: -1rem;
+}
+
+.chat-markdown-content :is(ul, ol) > [data-streamdown="list-item"]::marker {
+  font: inherit;
+  color: inherit;
 }
 
 .chat-markdown-content .contains-task-list {
   list-style-type: none;
-  padding-inline-start: 0.25rem;
+  padding-inline-start: 0.2rem;
 }
 
 .chat-markdown-content [data-streamdown="list-item"] {
   padding-top: 0;
   padding-bottom: 0;
+}
+
+.chat-markdown-content [data-streamdown="list-item"] + [data-streamdown="list-item"] {
+  margin-top: 0.4rem;
+}
+
+.chat-markdown-content [data-streamdown="list-item"] > :is(ul, ol) {
+  margin-top: 0.4rem;
+}
+
+.chat-markdown-content :is(ul, ol) :is(ul, ol) {
+  padding-inline-start: 0.5rem;
 }
 
 .chat-markdown-content .task-list-item {
@@ -53,6 +75,25 @@
 .chat-markdown-content [data-streamdown$="button"],
 .chat-markdown-content [data-streamdown$="actions"] button {
   cursor: default;
+}
+
+.chat-markdown-content :where(p, li) code {
+  font-size: 0.9em;
+  line-height: inherit;
+  vertical-align: baseline;
+  padding-block: 0.125rem;
+  padding-inline: 0.1875rem;
+}
+
+@media (max-width: 767px) {
+  .chat-markdown-content p {
+    line-height: 1.5rem;
+  }
+
+  .chat-markdown-content [data-streamdown="list-item"],
+  .chat-markdown-content [data-streamdown="list-item"] > p {
+    line-height: 1.5rem;
+  }
 }
 
 .chat-markdown-content > :first-child,

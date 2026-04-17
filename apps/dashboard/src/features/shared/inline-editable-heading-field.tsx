@@ -14,6 +14,7 @@ export type InlineEditableHeadingFieldProps = {
   cancelOnEscape?: boolean | undefined;
   maxWidthClassName?: string | undefined;
   inputClassName?: string | undefined;
+  size?: "sm" | "lg";
   autoFocus?: boolean | undefined;
   onFocus?: (() => void) | undefined;
   onDraftValueChange: (nextValue: string) => void;
@@ -28,6 +29,11 @@ export function InlineEditableHeadingField(
   const saveStatus = input.saveStatus ?? "idle";
   const saveState = input.errorMessage === undefined ? saveStatus : "error";
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const size = input.size ?? "lg";
+  const headingFieldClassName =
+    size === "sm"
+      ? "field-sizing-content h-7 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-sm font-medium leading-tight shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70"
+      : "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70";
 
   function focusInput(): void {
     inputRef.current?.focus();
@@ -41,7 +47,7 @@ export function InlineEditableHeadingField(
           aria-label={input.ariaLabel}
           autoFocus={input.autoFocus}
           className={cn(
-            "field-sizing-content h-10 max-w-full min-w-0 w-fit border-x-0 border-t-0 rounded-none border-b-transparent px-0 py-0 text-xl font-semibold leading-none shadow-none hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 aria-invalid:border-b-destructive aria-invalid:ring-0 placeholder:!text-muted-foreground/70",
+            headingFieldClassName,
             "hover:border-b-border focus-visible:border-b-border",
             input.inputClassName,
           )}

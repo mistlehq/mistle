@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import {
   CodexFixtureExploringGroupEntry,
@@ -12,8 +12,6 @@ import {
 } from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import type { ChatSemanticGroupEntry } from "../chat-types.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
-
-afterEach(cleanup);
 
 function openSemanticGroup(): void {
   const groupSummary = screen.getByText("Toggle group").closest("summary");

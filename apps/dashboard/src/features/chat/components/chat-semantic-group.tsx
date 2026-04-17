@@ -93,10 +93,10 @@ function getSemanticGroupDetailClassName(input: {
   detailKind: ChatSemanticGroupDetailKind;
 }): string {
   if (input.detailKind === "code") {
-    return "text-muted-foreground font-mono text-xs leading-5";
+    return "text-muted-foreground font-mono text-xs";
   }
 
-  return "text-muted-foreground text-xs leading-5";
+  return "text-muted-foreground text-xs";
 }
 
 function shouldAutoOpenSemanticGroup(input: {
@@ -145,15 +145,37 @@ export function ChatSemanticGroup({
 
   return (
     <details
-      className="group/semantic space-y-3"
+      className="group/semantic flex flex-col open:pb-2"
+      data-chat-semantic-group
       onToggle={(event) => {
         setIsOpen(event.currentTarget.open);
       }}
       open={isOpen}
+      style={{
+        gap: "var(--chat-semantic-group-gap, 0.25rem)",
+      }}
     >
-      <summary className="flex cursor-default list-none items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex items-center gap-1.5">
+      <summary
+        className="flex cursor-default list-none items-center justify-between"
+        data-chat-semantic-group-summary
+        style={{
+          gap: "var(--chat-semantic-group-header-gap, 0.75rem)",
+        }}
+      >
+        <div
+          className="flex min-w-0 items-center"
+          data-chat-semantic-group-summary-cluster
+          style={{
+            gap: "var(--chat-semantic-group-summary-gap, 0.5rem)",
+          }}
+        >
+          <div
+            className="flex items-center"
+            data-chat-semantic-group-title-cluster
+            style={{
+              gap: "var(--chat-semantic-group-title-gap, 0.375rem)",
+            }}
+          >
             <AnimatedStatusText
               active={block.status === "streaming"}
               className="font-medium text-sm"
@@ -172,11 +194,21 @@ export function ChatSemanticGroup({
             </span>
           </div>
           {groupSummary === null ? null : (
-            <p className="text-muted-foreground text-xs">{groupSummary}</p>
+            <p className="text-muted-foreground text-xs" data-chat-semantic-group-summary-text>
+              {groupSummary}
+            </p>
           )}
         </div>
       </summary>
-      <div className="border-border/70 mt-3 space-y-1.5 border-l pl-4">
+      <div
+        className="border-border/70 flex flex-col border-l"
+        data-chat-semantic-group-items
+        style={{
+          gap: "var(--chat-semantic-group-item-gap, 0px)",
+          marginTop: "var(--chat-semantic-group-content-gap, 0.75rem)",
+          paddingLeft: "var(--chat-semantic-group-indent, 1rem)",
+        }}
+      >
         {block.items.map((item) => {
           const commandApprovalRequest =
             item.sourceKind === "command-execution"
@@ -190,17 +222,39 @@ export function ChatSemanticGroup({
 
           return (
             <details
-              className="group/item space-y-1"
+              className={["group/item flex flex-col", hasExpandableOutput ? "open:pb-2" : ""].join(
+                " ",
+              )}
+              data-chat-semantic-group-item
+              data-chat-semantic-group-item-has-output={hasExpandableOutput ? "true" : "false"}
               key={item.id}
               open={
                 item.status === "streaming" ||
                 commandApprovalRequest !== null ||
                 fileChangeApprovalRequest !== null
               }
+              style={{
+                gap: "var(--chat-semantic-group-item-detail-gap, 0.25rem)",
+              }}
             >
-              <summary className="flex cursor-default list-none items-start justify-between gap-3">
-                <div className="min-w-0 flex items-baseline gap-2.5 text-sm leading-6">
-                  <span className="inline-flex shrink-0 items-center gap-1.5">
+              <summary
+                className="flex cursor-default list-none items-start justify-between gap-3"
+                data-chat-semantic-group-item-summary
+              >
+                <div
+                  className="min-w-0 flex items-baseline text-sm"
+                  data-chat-semantic-group-item-row
+                  style={{
+                    gap: "var(--chat-semantic-group-row-gap, 0.5rem)",
+                    lineHeight: "var(--chat-semantic-group-row-leading, 1.5rem)",
+                  }}
+                >
+                  <span
+                    className="inline-flex shrink-0 items-center"
+                    style={{
+                      gap: "var(--chat-semantic-group-title-gap, 0.375rem)",
+                    }}
+                  >
                     <span className="font-medium">{item.label}</span>
                     {hasExpandableOutput ? (
                       <span className="text-muted-foreground flex size-3.5 items-center justify-center">
@@ -220,13 +274,23 @@ export function ChatSemanticGroup({
                           detailKind: item.detailKind,
                         }),
                       ].join(" ")}
+                      data-chat-semantic-group-item-detail
+                      style={{
+                        lineHeight: "var(--chat-semantic-group-detail-leading, 1.25rem)",
+                      }}
                     >
                       {item.detail}
                     </span>
                   )}
                 </div>
                 <div className="text-muted-foreground flex items-center gap-1.5 self-start pt-0.5">
-                  <p className="text-xs leading-5">
+                  <p
+                    className="text-xs"
+                    data-chat-semantic-group-item-status
+                    style={{
+                      lineHeight: "var(--chat-semantic-group-detail-leading, 1.25rem)",
+                    }}
+                  >
                     {item.status === "streaming" ? "Running" : "Done"}
                   </p>
                 </div>

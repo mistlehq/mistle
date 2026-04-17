@@ -726,6 +726,8 @@ export interface paths {
         content: {
           "application/json": {
             organizationId: string;
+            /** @enum {string} */
+            runtimeProvider: "e2b" | "docker";
           };
         };
       };
@@ -746,37 +748,11 @@ export interface paths {
                   storageConfigSource: "managed";
                 }
               | {
-                  organizationStorageConfig: {
-                    apiKey: string;
-                    /** @enum {string} */
-                    backend: "archil";
-                    mounts?:
-                      | []
-                      | [
-                          {
-                            accessKeyId: string;
-                            bucket: string;
-                            endpoint: string;
-                            secretAccessKey: string;
-                            /** @enum {string} */
-                            type: "s3-compatible";
-                          },
-                        ];
-                    namePrefix?: string;
-                    region: string;
-                  };
-                  /** @enum {boolean} */
-                  persistentSandboxesEnabled: false;
-                  /** @enum {string} */
-                  storageBackend: "archil";
-                  /** @enum {string} */
-                  storageConfigSource: "organization";
-                }
-              | {
                   organizationStorageConfig: null;
                   /** @enum {boolean} */
                   persistentSandboxesEnabled: true;
-                  storageBackend: null;
+                  /** @enum {string} */
+                  storageBackend: "archil" | "docker_volume";
                   /** @enum {string} */
                   storageConfigSource: "managed";
                 }

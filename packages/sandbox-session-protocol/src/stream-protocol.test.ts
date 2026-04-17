@@ -243,7 +243,7 @@ describe("stream control message parser", () => {
             originalFilename: "screenshot.png",
             mimeType: "image/png",
             sizeBytes: 1024,
-            path: "/tmp/attachments/thread_123/upload.png",
+            path: "/root/.local/attachments/thread_123/upload.png",
           },
         }),
       ),
@@ -257,7 +257,7 @@ describe("stream control message parser", () => {
         originalFilename: "screenshot.png",
         mimeType: "image/png",
         sizeBytes: 1024,
-        path: "/tmp/attachments/thread_123/upload.png",
+        path: "/root/.local/attachments/thread_123/upload.png",
       },
     });
 

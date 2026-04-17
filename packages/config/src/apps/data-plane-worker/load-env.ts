@@ -9,6 +9,7 @@ import {
   DataPlaneWorkerSandboxE2BConfigSchema,
   DataPlaneWorkerSandboxStorageArchilMountConfigSchema,
   DataPlaneWorkerSandboxStorageArchilConfigSchema,
+  DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -163,6 +164,15 @@ const loadSandboxStorageArchilEnv = createEnvLoader<
   },
 ]);
 
+const loadSandboxStorageDockerVolumeEnv = createEnvLoader<
+  typeof DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema
+>([
+  {
+    key: "namePrefix",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",
+  },
+]);
+
 export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneWorkerConfigInput {
@@ -197,6 +207,7 @@ export function loadDataPlaneWorkerFromEnv(
   const sandboxDocker = loadSandboxDockerEnv(env);
   const sandboxE2B = loadSandboxE2BEnv(env);
   const sandboxStorageArchil = loadSandboxStorageArchilEnv(env);
+  const sandboxStorageDockerVolume = loadSandboxStorageDockerVolumeEnv(env);
 
   if (hasEntries(sandbox) || hasEntries(sandboxDocker) || hasEntries(sandboxE2B)) {
     const sandboxConfig: Record<string, unknown> = {
@@ -214,9 +225,12 @@ export function loadDataPlaneWorkerFromEnv(
     partialConfig.sandbox = sandboxConfig;
   }
 
-  if (hasEntries(sandboxStorageArchil)) {
+  if (hasEntries(sandboxStorageArchil) || hasEntries(sandboxStorageDockerVolume)) {
     partialConfig.sandboxStorage = {
-      archil: sandboxStorageArchil,
+      ...(hasEntries(sandboxStorageArchil) ? { archil: sandboxStorageArchil } : {}),
+      ...(hasEntries(sandboxStorageDockerVolume)
+        ? { dockerVolume: sandboxStorageDockerVolume }
+        : {}),
     };
   }
 

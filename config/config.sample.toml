@@ -200,6 +200,8 @@ socket_path = "/var/run/docker.sock"
 [apps.data_plane_worker.sandbox.e2b]
 api_key = "replace-with-e2b-api-key"
 domain = "e2b.app"
+cpu_count = 4
+memory_mb = 8192
 
 [apps.data_plane_worker.sandbox_storage.archil]
 api_key = "replace-with-archil-api-key"
@@ -215,6 +217,9 @@ bucket = "mistle-sandbox-storage"
 endpoint = "https://s3.example.com"
 access_key_id = "replace-with-archil-mount-access-key-id"
 secret_access_key = "replace-with-archil-mount-secret-access-key"
+
+#[apps.data_plane_worker.sandbox_storage.docker_volume]
+#name_prefix = "mistle-"
 
 [apps.tokenizer_proxy.server]
 host = "0.0.0.0"

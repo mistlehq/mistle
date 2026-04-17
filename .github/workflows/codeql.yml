@@ -1,0 +1,150 @@
+name: CodeQL
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "23 5 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect CodeQL changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      actions: ${{ steps.resolve.outputs.actions }}
+      javascript_typescript: ${{ steps.resolve.outputs.javascript_typescript }}
+      rust: ${{ steps.resolve.outputs.rust }}
+
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v6
+
+      - name: Detect PR file changes
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            actions:
+              - '.github/workflows/**'
+              - '.github/actions/**'
+            javascript_typescript:
+              - '.github/workflows/codeql.yml'
+              - 'apps/**/*.{cjs,cts,js,json,jsonc,jsx,mjs,mts,ts,tsx}'
+              - 'packages/**/*.{cjs,cts,js,json,jsonc,jsx,mjs,mts,ts,tsx}'
+              - 'tests/**/*.{cjs,cts,js,json,jsonc,jsx,mjs,mts,ts,tsx}'
+              - 'scripts/**/*.{cjs,cts,js,json,jsonc,jsx,mjs,mts,ts,tsx}'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+            rust:
+              - '.github/workflows/codeql.yml'
+              - 'packages/sandboxd/**/*.rs'
+              - 'packages/sandboxd/**/Cargo.toml'
+              - 'packages/sandboxd/**/Cargo.lock'
+
+      - name: Resolve scan targets
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "actions=${{ steps.filter.outputs.actions }}" >> "$GITHUB_OUTPUT"
+            echo "javascript_typescript=${{ steps.filter.outputs.javascript_typescript }}" >> "$GITHUB_OUTPUT"
+            echo "rust=${{ steps.filter.outputs.rust }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "actions=true" >> "$GITHUB_OUTPUT"
+          echo "javascript_typescript=true" >> "$GITHUB_OUTPUT"
+          echo "rust=true" >> "$GITHUB_OUTPUT"
+
+  analyze-actions:
+    name: Analyze (actions)
+    needs:
+      - changes
+    if: needs.changes.outputs.actions == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: actions
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:actions"
+
+  analyze-javascript-typescript:
+    name: Analyze (javascript-typescript)
+    needs:
+      - changes
+    if: needs.changes.outputs.javascript_typescript == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"
+
+  analyze-rust:
+    name: Analyze (rust)
+    needs:
+      - changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: rust
+          build-mode: none
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:rust"

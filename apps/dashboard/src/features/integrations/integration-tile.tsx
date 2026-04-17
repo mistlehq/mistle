@@ -1,5 +1,6 @@
 import { Button } from "@mistle/ui";
 
+import { ActionTile } from "../shared/action-tile.js";
 import { resolveIntegrationLogoPath } from "./logo.js";
 
 type IntegrationTileProps = {
@@ -20,25 +21,8 @@ export function IntegrationTile(props: IntegrationTileProps) {
       : "border";
 
   return (
-    <div className="border rounded-md p-3 gap-3 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 gap-1 flex flex-col">
-        <div className="items-center gap-2 flex">
-          <IntegrationNameBadge
-            displayName={props.displayName}
-            {...(props.logoKey === undefined ? {} : { logoKey: props.logoKey })}
-          />
-          <p className="text-sm font-medium">{props.displayName}</p>
-          {props.statusBadge === undefined ? null : (
-            <span
-              className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClassName}`}
-            >
-              {props.statusBadge}
-            </span>
-          )}
-        </div>
-        <p className="text-muted-foreground text-xs">{props.description}</p>
-      </div>
-      <div className="gap-2 flex justify-end sm:justify-start">
+    <ActionTile
+      action={
         <Button
           disabled={props.actionDisabled ?? false}
           onClick={props.onAction}
@@ -47,8 +31,27 @@ export function IntegrationTile(props: IntegrationTileProps) {
         >
           {props.actionLabel}
         </Button>
-      </div>
-    </div>
+      }
+      actionContainerClassName="gap-2"
+      badge={
+        props.statusBadge === undefined ? null : (
+          <span
+            className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClassName}`}
+          >
+            {props.statusBadge}
+          </span>
+        )
+      }
+      description={props.description}
+      descriptionClassName="text-xs"
+      leading={
+        <IntegrationNameBadge
+          displayName={props.displayName}
+          {...(props.logoKey === undefined ? {} : { logoKey: props.logoKey })}
+        />
+      }
+      title={props.displayName}
+    />
   );
 }
 

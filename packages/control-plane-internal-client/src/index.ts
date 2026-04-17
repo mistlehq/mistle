@@ -208,10 +208,19 @@ export class ControlPlaneInternalClient {
 
     if (result.response.status === 200 && result.data !== undefined) {
       if (result.data.storageConfigSource === "managed") {
+        if (!result.data.persistentSandboxesEnabled) {
+          return {
+            persistentSandboxesEnabled: false,
+            storageConfigSource: "managed",
+            storageBackend: null,
+            organizationStorageConfig: null,
+          };
+        }
+
         return {
-          persistentSandboxesEnabled: result.data.persistentSandboxesEnabled,
+          persistentSandboxesEnabled: true,
           storageConfigSource: "managed",
-          storageBackend: null,
+          storageBackend: result.data.storageBackend,
           organizationStorageConfig: null,
         };
       }
@@ -239,7 +248,7 @@ export class ControlPlaneInternalClient {
               })();
 
       return {
-        persistentSandboxesEnabled: result.data.persistentSandboxesEnabled,
+        persistentSandboxesEnabled: true,
         storageConfigSource: "organization",
         storageBackend: "archil",
         organizationStorageConfig: {

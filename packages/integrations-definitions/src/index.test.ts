@@ -260,13 +260,11 @@ describe("integrations-definitions index", () => {
           category: "Issues",
           parameters: expect.arrayContaining([
             expect.objectContaining({
-              id: "explicitInvocation",
+              id: "invocationToken",
               kind: "string",
               payloadPath: ["comment", "body"],
               matchMode: "contains_token",
-              defaultValue: "@mistlebot",
-              defaultEnabled: true,
-              controlVariant: "explicit-invocation",
+              controlVariant: "invocation-token",
             }),
           ]),
         }),
@@ -277,13 +275,11 @@ describe("integrations-definitions index", () => {
           category: "Pull requests",
           parameters: expect.arrayContaining([
             expect.objectContaining({
-              id: "explicitInvocation",
+              id: "invocationToken",
               kind: "string",
               payloadPath: ["review", "body"],
               matchMode: "contains_token",
-              defaultValue: "@mistlebot",
-              defaultEnabled: true,
-              controlVariant: "explicit-invocation",
+              controlVariant: "invocation-token",
             }),
           ]),
         }),

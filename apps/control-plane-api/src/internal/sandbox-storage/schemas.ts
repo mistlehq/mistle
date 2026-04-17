@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
-import { SandboxStorageBackends, SandboxStorageConfigSources } from "@mistle/db/control-plane";
+import { SandboxStorageBackend, SandboxStorageConfigSources } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import { SandboxProvider } from "@mistle/sandbox";
 
 import { OrganizationSandboxStorageConfigV1Schema } from "../../sandbox-storage/storage-config.js";
 
@@ -19,6 +20,7 @@ export const ResolveSandboxStoragePersistenceModeResponseSchema = z
 export const ResolveSandboxStorageConfigurationRequestSchema = z
   .object({
     organizationId: z.string().min(1),
+    runtimeProvider: z.enum([SandboxProvider.E2B, SandboxProvider.DOCKER]),
   })
   .strict();
 
@@ -33,17 +35,9 @@ export const ResolveSandboxStorageConfigurationResponseSchema = z.union([
     .strict(),
   z
     .object({
-      persistentSandboxesEnabled: z.literal(false),
-      storageConfigSource: z.literal(SandboxStorageConfigSources.ORGANIZATION),
-      storageBackend: z.literal(SandboxStorageBackends.ARCHIL),
-      organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema,
-    })
-    .strict(),
-  z
-    .object({
       persistentSandboxesEnabled: z.literal(true),
       storageConfigSource: z.literal(SandboxStorageConfigSources.MANAGED),
-      storageBackend: z.null(),
+      storageBackend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]),
       organizationStorageConfig: z.null(),
     })
     .strict(),
@@ -51,7 +45,7 @@ export const ResolveSandboxStorageConfigurationResponseSchema = z.union([
     .object({
       persistentSandboxesEnabled: z.literal(true),
       storageConfigSource: z.literal(SandboxStorageConfigSources.ORGANIZATION),
-      storageBackend: z.literal(SandboxStorageBackends.ARCHIL),
+      storageBackend: z.literal(SandboxStorageBackend.ARCHIL),
       organizationStorageConfig: OrganizationSandboxStorageConfigV1Schema,
     })
     .strict(),

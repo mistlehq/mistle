@@ -1,13 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { expect, it } from "vitest";
 
 import { ToolbarSearchInput } from "./toolbar-search-input.js";
-
-afterEach(() => {
-  cleanup();
-});
 
 it("uses the default h-9 input size for toolbar search fields", () => {
   const { container } = render(

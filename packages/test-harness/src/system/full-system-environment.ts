@@ -1,6 +1,11 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { systemClock, systemSleeper } from "@mistle/time";
 import { type StartedNetwork } from "testcontainers";
 import { GenericContainer } from "testcontainers";
 
@@ -50,6 +55,14 @@ const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
 const TRACE_FULL_SYSTEM = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
+const CLOUDFLARED_IMAGE_REFERENCE = "cloudflare/cloudflared:latest";
+const CloudflaredTunnelStartupTimeoutMs = 180_000;
+const CloudflaredTunnelPollIntervalMs = 1_000;
+const SystemSandboxProvider = {
+  DOCKER: "docker",
+  E2B: "e2b",
+} as const;
+type SystemSandboxProvider = (typeof SystemSandboxProvider)[keyof typeof SystemSandboxProvider];
 
 const execFileAsync = promisify(execFile);
 
@@ -65,6 +78,7 @@ type SharedPostgresOptions = Omit<
 export type StartFullSystemEnvironmentInput = {
   buildContextHostPath: string;
   configPathInContainer: string;
+  sandboxProvider: SystemSandboxProvider;
   startupTimeoutMs: number;
   sharedInfraKey: string;
   postgres: SharedPostgresOptions;
@@ -80,6 +94,12 @@ export type StartFullSystemEnvironmentInput = {
   dataPlaneWorkerEnvironment?: Record<string, string>;
   dataPlaneGatewayEnvironment?: Record<string, string>;
   tokenizerProxyEnvironment?: Record<string, string>;
+  sandboxPublicGatewayTunnel?:
+    | {
+        cloudflareTunnelToken: string;
+        publicHostname: string;
+      }
+    | undefined;
 };
 
 export type StartedFullSystemEnvironment = {
@@ -191,6 +211,134 @@ function traceFullSystem(message: string): void {
   }
 
   console.info(`[test-harness:full-system] ${message}`);
+}
+
+async function waitForCloudflaredHealth(input: {
+  publicBaseUrl: string;
+  timeoutMs: number;
+}): Promise<void> {
+  const deadline = systemClock.nowMs() + input.timeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      const response = await fetch(`${input.publicBaseUrl}/__healthz`);
+      if (response.status === 200) {
+        return;
+      }
+    } catch {
+      // Retry until timeout.
+    }
+
+    await systemSleeper.sleep(CloudflaredTunnelPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for cloudflared healthcheck at ${input.publicBaseUrl}/__healthz after ${String(input.timeoutMs)}ms.`,
+  );
+}
+
+async function readCloudflaredLogs(containerName: string): Promise<string> {
+  try {
+    const result = await execFileAsync("docker", ["logs", containerName], {
+      timeout: 30_000,
+      maxBuffer: 1_000_000,
+    });
+
+    return result.stderr.trim().length > 0 ? result.stderr : result.stdout;
+  } catch (error) {
+    return readErrorString(error, "stderr") || readErrorString(error, "stdout");
+  }
+}
+
+async function startCloudflaredGatewayTunnel(input: {
+  networkName: string;
+  cloudflareTunnelToken: string;
+  publicHostname: string;
+  targetHost: string;
+  targetPort: number;
+}): Promise<{
+  gatewayWsUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const configDirectory = await mkdtemp(join(tmpdir(), "mistle-cloudflared-"));
+  const configPath = join(configDirectory, "config.yml");
+  const containerName = `mistle-cloudflared-${randomUUID().replaceAll("-", "")}`;
+  const publicBaseUrl = `https://${input.publicHostname}`;
+  const configContent = [
+    "ingress:",
+    `  - hostname: ${input.publicHostname}`,
+    `    service: http://${input.targetHost}:${String(input.targetPort)}`,
+    "  - service: http_status:404",
+    "",
+  ].join("\n");
+
+  await writeFile(configPath, configContent, "utf8");
+
+  let started = false;
+  try {
+    await execFileAsync(
+      "docker",
+      [
+        "run",
+        "--detach",
+        "--rm",
+        "--name",
+        containerName,
+        "--network",
+        input.networkName,
+        "--volume",
+        `${configPath}:/etc/cloudflared/config.yml:ro`,
+        CLOUDFLARED_IMAGE_REFERENCE,
+        "tunnel",
+        "--config",
+        "/etc/cloudflared/config.yml",
+        "run",
+        "--token",
+        input.cloudflareTunnelToken,
+      ],
+      {
+        timeout: 30_000,
+        maxBuffer: 1_000_000,
+      },
+    );
+    started = true;
+
+    await waitForCloudflaredHealth({
+      publicBaseUrl,
+      timeoutMs: CloudflaredTunnelStartupTimeoutMs,
+    });
+
+    return {
+      gatewayWsUrl: `wss://${input.publicHostname}/tunnel/sandbox`,
+      stop: async () => {
+        if (started) {
+          await execFileAsync("docker", ["stop", containerName], {
+            timeout: 30_000,
+            maxBuffer: 1_000_000,
+          }).catch(() => undefined);
+        }
+
+        await rm(configDirectory, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    const writtenConfig = await readFile(configPath, "utf8").catch(() => "");
+    const logs = started ? await readCloudflaredLogs(containerName) : "";
+
+    if (started) {
+      await execFileAsync("docker", ["stop", containerName], {
+        timeout: 30_000,
+        maxBuffer: 1_000_000,
+      }).catch(() => undefined);
+    }
+    await rm(configDirectory, { recursive: true, force: true });
+
+    throw new Error(
+      `Failed to start cloudflared gateway tunnel for ${input.publicHostname}. ${
+        error instanceof Error ? error.message : String(error)
+      } Config: ${writtenConfig} Logs: ${logs}`,
+    );
+  }
 }
 
 async function withStepTiming<T>(label: string, operation: () => Promise<T>): Promise<T> {
@@ -386,6 +534,7 @@ export async function startFullSystemEnvironment(
       },
     );
     const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
+    const isDockerSandboxProvider = input.sandboxProvider === SystemSandboxProvider.DOCKER;
 
     const hostDatabaseUrl = sharedInfraLease.infra.postgres.directUrl;
     const containerDatabaseUrl = createDatabaseUrl({
@@ -408,13 +557,17 @@ export async function startFullSystemEnvironment(
             }),
         prebuiltImageName: preparedRuntime.appImages.dataPlaneApi,
         network: activeNetwork,
-        bindMounts: [
-          {
-            source: DockerSocketPath,
-            target: DockerSocketPath,
-            mode: "rw",
-          },
-        ],
+        ...(isDockerSandboxProvider
+          ? {
+              bindMounts: [
+                {
+                  source: DockerSocketPath,
+                  target: DockerSocketPath,
+                  mode: "rw",
+                },
+              ],
+            }
+          : {}),
         environment: {
           ...input.dataPlaneApiEnvironment,
           MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
@@ -423,7 +576,11 @@ export async function startFullSystemEnvironment(
           MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
           MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
             DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
-          MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+          ...(isDockerSandboxProvider
+            ? {
+                MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+              }
+            : {}),
         },
       });
     });
@@ -455,6 +612,23 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await dataPlaneGateway.stop();
     });
+    let gatewayWsUrl = DATA_PLANE_GATEWAY_TUNNEL_WS_URL;
+    if (input.sandboxPublicGatewayTunnel !== undefined) {
+      const publicGatewayTunnel = input.sandboxPublicGatewayTunnel;
+      const startedGatewayTunnel = await withStepTiming("start public gateway tunnel", async () => {
+        return startCloudflaredGatewayTunnel({
+          networkName: activeNetwork.getName(),
+          cloudflareTunnelToken: publicGatewayTunnel.cloudflareTunnelToken,
+          publicHostname: publicGatewayTunnel.publicHostname,
+          targetHost: "data-plane-gateway",
+          targetPort: 5202,
+        });
+      });
+      cleanupTasks.unshift(async () => {
+        await startedGatewayTunnel.stop();
+      });
+      gatewayWsUrl = startedGatewayTunnel.gatewayWsUrl;
+    }
     const controlPlaneApi = await withStepTiming("start control-plane-api", async () => {
       return startControlPlaneApi({
         buildContextHostPath: input.buildContextHostPath,
@@ -478,8 +652,12 @@ export async function startFullSystemEnvironment(
           MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
           MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
           MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
-          MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
-          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+          ...(isDockerSandboxProvider
+            ? {
+                MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
+              }
+            : {}),
+          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: gatewayWsUrl,
         },
       });
     });
@@ -572,15 +750,19 @@ export async function startFullSystemEnvironment(
           MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
           MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL:
             DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
-            sandboxSnapshotRepository,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
-            "http://otel-lgtm:4318/v1/traces",
-          MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-          MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+          ...(isDockerSandboxProvider
+            ? {
+                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
+                  sandboxSnapshotRepository,
+                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
+                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
+                  "http://otel-lgtm:4318/v1/traces",
+              }
+            : {}),
+          MISTLE_GLOBAL_SANDBOX_PROVIDER: input.sandboxProvider,
+          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: gatewayWsUrl,
+          MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: gatewayWsUrl,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
             TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL,
         },

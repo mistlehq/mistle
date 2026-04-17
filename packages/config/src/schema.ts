@@ -57,7 +57,7 @@ export const ConfigSchema = z
     }
 
     const dataPlaneWorkerPersistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageBackend: value.global.sandbox.storage?.backend,
+      globalSandboxStorageConfig: value.global.sandbox.storage,
       appConfig: value.apps.data_plane_worker,
     });
 

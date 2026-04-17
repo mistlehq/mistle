@@ -73,11 +73,11 @@ describe("SandboxProfileBindingConfigEditor", () => {
     expect(screen.queryByText("options")).toBeNull();
     const additionalInstructionsField = screen
       .getAllByRole("textbox", {
-        name: "Additional instructions",
+        name: "Agent Instructions",
       })
       .find((field) => field instanceof HTMLTextAreaElement);
     if (additionalInstructionsField === undefined) {
-      throw new Error("Expected Additional instructions textarea.");
+      throw new Error("Expected Agent Instructions textarea.");
     }
 
     expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
@@ -141,11 +141,11 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     const additionalInstructionsField = screen
       .getAllByRole("textbox", {
-        name: "Additional instructions",
+        name: "Agent Instructions",
       })
       .find((field) => field instanceof HTMLTextAreaElement && field.value.length > 0);
     if (additionalInstructionsField === undefined) {
-      throw new Error("Expected Additional instructions textarea.");
+      throw new Error("Expected Agent Instructions textarea.");
     }
 
     fireEvent.change(additionalInstructionsField, {
@@ -346,7 +346,12 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Jira CLI")).toBeDefined();
     expect(screen.queryByText("jira-cli")).toBeNull();
-    const jiraCliCheckbox = screen.getByRole("checkbox", { name: /Jira CLI/ });
+    const jiraCliCheckbox = screen
+      .getAllByRole("checkbox")
+      .find((checkbox) => checkbox.getAttribute("aria-label") === "Jira CLI");
+    if (jiraCliCheckbox === undefined) {
+      throw new Error("Expected Jira CLI checkbox.");
+    }
     expect(jiraCliCheckbox.getAttribute("aria-checked")).toBe("true");
   });
 
@@ -439,7 +444,12 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Linear MCP")).toBeDefined();
     expect(screen.queryByText("linear-mcp")).toBeNull();
-    const linearMcpCheckbox = screen.getByRole("checkbox", { name: /Linear MCP/ });
+    const linearMcpCheckbox = screen
+      .getAllByRole("checkbox")
+      .find((checkbox) => checkbox.getAttribute("aria-label") === "Linear MCP");
+    if (linearMcpCheckbox === undefined) {
+      throw new Error("Expected Linear MCP checkbox.");
+    }
     expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("false");
   });
 });

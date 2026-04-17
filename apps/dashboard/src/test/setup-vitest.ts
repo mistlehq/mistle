@@ -13,6 +13,8 @@ resetDashboardConfigForTest();
 
 afterEach(async () => {
   cleanup();
-  await cleanupTestQueryClients();
-  await flushScheduledReactWork();
+  const cleanedQueryClients = await cleanupTestQueryClients();
+  if (cleanedQueryClients) {
+    await flushScheduledReactWork();
+  }
 });

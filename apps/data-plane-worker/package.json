@@ -28,6 +28,7 @@
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
     "@openworkflow/cli": "^0.4.3",
     "drizzle-orm": "^0.45.2",
     "openworkflow": "^0.8.1",
@@ -37,6 +38,8 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.20.0"
   }
 }

@@ -20,40 +20,30 @@ import { TrashIcon } from "@phosphor-icons/react";
 
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
-import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
-import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
-import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
+import { resolveWebhookAutomationFormState } from "./webhook-automation-form-state.js";
+import {
+  type WebhookAutomationFormOption,
+  type WebhookAutomationFormValueKey,
+  type WebhookAutomationFormValues,
+} from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
-import { WebhookAutomationTriggerPickerAddButton } from "./webhook-automation-trigger-picker.js";
-import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
-import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker.js";
-import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
+import { type WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
+import {
+  WebhookAutomationTriggerPicker,
+  WebhookAutomationTriggerPickerAddButton,
+} from "./webhook-automation-trigger-picker.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
+export type {
+  WebhookAutomationFormOption,
+  WebhookAutomationFormValueKey,
+  WebhookAutomationFormValues,
+} from "./webhook-automation-form-types.js";
 export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 export type { WebhookAutomationEventOptionAvailability } from "./webhook-automation-trigger-types.js";
-
-export type WebhookAutomationFormOption = {
-  value: string;
-  label: string;
-  description?: string;
-};
-
-export type WebhookAutomationFormValues = {
-  name: string;
-  sandboxProfileId: string;
-  enabled: boolean;
-  inputTemplate: string;
-  instructions: string;
-  conversationKeyTemplate: string;
-  triggerIds: string[];
-  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
-};
-
-export type WebhookAutomationFormValueKey = keyof WebhookAutomationFormValues;
 
 type WebhookAutomationFormProps = {
   mode: "create" | "edit";
@@ -153,38 +143,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   const inputTemplateLabelId = "automation-input-template-label";
   const instructionsLabelId = "automation-instructions-label";
   const submitLabel = input.mode === "create" ? "Create" : "Save";
-  const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
-    eventOptions: input.webhookEventOptions,
+  const formState = resolveWebhookAutomationFormState({
+    webhookEventOptions: input.webhookEventOptions,
     selectedTriggerIds: input.values.triggerIds,
-  });
-  const selectedConnectionIds = new Set(
-    selectedTriggerOptions
-      .filter((option) => !isWebhookAutomationEventOptionUnavailable(option))
-      .map((option) => option.connectionId)
-      .filter((connectionId) => connectionId.trim().length > 0),
-  );
-  const selectedConnectionId =
-    selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
-  const conversationKeySelectionState = resolveConversationKeyFieldOptions({
-    selectedEventOptions: selectedTriggerOptions,
-    currentTemplate: input.values.conversationKeyTemplate,
-  });
-  const selectedConversationGroupingOption = conversationKeySelectionState.options.find(
-    (option) => option.template === conversationKeySelectionState.selectedTemplate,
-  );
-  const selectedConversationGroupingLabel =
-    selectedConversationGroupingOption === undefined
-      ? undefined
-      : selectedConversationGroupingOption.label;
-  const triggerHeaderMessage =
-    input.values.triggerIds.length > 0 &&
-    input.fieldErrors.triggerIds !== undefined &&
-    input.fieldErrors.triggerIds !== "Trigger is unavailable for the selected sandbox profile."
-      ? input.fieldErrors.triggerIds
-      : undefined;
-  const hasSelectedTrigger = input.values.triggerIds.length > 0;
-  const agentInstructionTokens = buildAgentInstructionTokenCatalog({
-    selectedEventOptions: selectedTriggerOptions,
+    conversationKeyTemplate: input.values.conversationKeyTemplate,
+    triggerIdsError: input.fieldErrors.triggerIds,
   });
 
   return (
@@ -300,8 +263,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1">
               <h2 className="text-base font-semibold">Triggers</h2>
-              {triggerHeaderMessage === undefined ? null : (
-                <p className="text-destructive text-sm">{triggerHeaderMessage}</p>
+              {formState.triggerHeaderMessage === undefined ? null : (
+                <p className="text-destructive text-sm">{formState.triggerHeaderMessage}</p>
               )}
             </div>
             <WebhookAutomationTriggerPickerAddButton
@@ -336,7 +299,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             onValueChange={(value) => {
               input.onValueChange("triggerIds", value);
             }}
-            selectedConnectionId={selectedConnectionId}
+            selectedConnectionId={formState.selectedConnectionId}
             selectedTriggerIds={input.values.triggerIds}
             showAddTriggerControl={false}
             triggerParameterValues={input.values.triggerParameterValues}
@@ -351,7 +314,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               </FieldHeader>
               <FieldContent>
                 <Select
-                  disabled={conversationKeySelectionState.options.length === 0}
+                  disabled={formState.conversationKeySelectionState.options.length === 0}
                   onValueChange={(value) => {
                     if (value === null) {
                       return;
@@ -359,7 +322,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
                     input.onValueChange("conversationKeyTemplate", value);
                   }}
-                  value={conversationKeySelectionState.selectedTemplate}
+                  value={formState.conversationKeySelectionState.selectedTemplate}
                 >
                   <SelectTrigger
                     aria-invalid={
@@ -368,11 +331,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                     className="w-full"
                   >
                     <SelectValue placeholder="Select conversation grouping">
-                      {selectedConversationGroupingLabel}
+                      {formState.selectedConversationGroupingLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {conversationKeySelectionState.options.map((option) => (
+                    {formState.conversationKeySelectionState.options.map((option) => (
                       <SelectItem key={option.id} value={option.template}>
                         <div className="flex flex-col gap-0.5">
                           <span>{option.label}</span>
@@ -424,7 +387,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             <FieldHeader>
               <div className="space-y-1">
                 <FieldLabel id={inputTemplateLabelId}>Message Template</FieldLabel>
-                {hasSelectedTrigger ? (
+                {formState.hasSelectedTrigger ? (
                   <FieldDescription>
                     <span className="block">
                       Template for the message sent to the agent each time this automation is
@@ -454,7 +417,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   input.onValueChange("inputTemplate", nextValue);
                 }}
                 placeholderText={DefaultWebhookAutomationMessageTemplate}
-                tokens={agentInstructionTokens}
+                tokens={formState.agentInstructionTokens}
                 value={input.values.inputTemplate}
               />
               <FieldError

@@ -2010,9 +2010,9 @@ mod tests {
                 "image.png",
                 "image/png",
                 8,
-                "/tmp/attachments/thread_123/file.png",
+                "/root/.local/attachments/thread_123/file.png",
             ),
-            r#"{"type":"stream.event","streamId":7,"event":{"type":"fileUpload.completed","attachmentId":"att_123","threadId":"thread_123","originalFilename":"image.png","mimeType":"image/png","sizeBytes":8,"path":"/tmp/attachments/thread_123/file.png"}}"#
+            r#"{"type":"stream.event","streamId":7,"event":{"type":"fileUpload.completed","attachmentId":"att_123","threadId":"thread_123","originalFilename":"image.png","mimeType":"image/png","sizeBytes":8,"path":"/root/.local/attachments/thread_123/file.png"}}"#
         );
         assert_eq!(
             exec_result_event(9, 0, "stdout", "stderr", true),

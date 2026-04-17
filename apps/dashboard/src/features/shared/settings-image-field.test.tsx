@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { SettingsImageField } from "./settings-image-field.js";
 
 describe("SettingsImageField", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders image operation errors at the full field-content width", () => {
     render(
       <SettingsImageField

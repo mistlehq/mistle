@@ -10,7 +10,7 @@ export type BadgeListFieldItem = {
 
 type BadgeListFieldProps = React.ComponentProps<"div"> & {
   items: readonly BadgeListFieldItem[];
-  label: React.ReactNode;
+  label?: React.ReactNode;
   badgeClassName?: string;
 };
 
@@ -27,12 +27,14 @@ function BadgeListField({
 
   return (
     <div className={cn("gap-1.5 flex flex-col", className)} data-slot="badge-list-field" {...props}>
-      <p
-        className="text-muted-foreground text-xs uppercase tracking-wide"
-        data-slot="badge-list-label"
-      >
-        {label}
-      </p>
+      {label === undefined ? null : (
+        <p
+          className="text-muted-foreground text-xs uppercase tracking-wide"
+          data-slot="badge-list-label"
+        >
+          {label}
+        </p>
+      )}
       <div className="flex flex-wrap gap-2" data-slot="badge-list-items">
         {items.map((item) => (
           <Badge

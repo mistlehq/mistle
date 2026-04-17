@@ -5,11 +5,14 @@
   "scripts": {
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:system:prepare": "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm --dir .. config:init:integration && pnpm --filter @mistle/control-plane-api... --filter @mistle/control-plane-worker... --filter @mistle/data-plane-api... --filter @mistle/data-plane-worker... --filter @mistle/data-plane-gateway... --filter @mistle/tokenizer-proxy... build && pnpm --dir .. run test-harness:prepare-runtime",
+    "test:system:prepare": "node ./scripts/prepare-system.mjs",
     "test:system": "pnpm run test:system:prepare && vitest -c vitest.system.config.ts --run --passWithNoTests",
+    "test:system:docker": "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=docker pnpm run test:system",
+    "test:system:e2b": "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=e2b pnpm run test:system",
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
   },
   "devDependencies": {
+    "@archildata/client": "^0.8.7",
     "@mistle/db": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
@@ -18,6 +21,7 @@
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
     "drizzle-orm": "^0.45.2",
+    "e2b": "^2.19.0",
     "openapi-fetch": "^0.17.0",
     "pg": "^8.20.0",
     "ws": "^8.20.0",

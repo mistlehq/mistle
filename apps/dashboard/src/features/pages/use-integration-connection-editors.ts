@@ -24,6 +24,9 @@ export function useIntegrationConnectionEditors(input: {
   const [githubAppInstallErrorByConnectionId, setGitHubAppInstallErrorByConnectionId] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
+  const [redirectingGitHubAppConnectionId, setRedirectingGitHubAppConnectionId] = useState<
+    string | null
+  >(null);
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -168,10 +171,13 @@ export function useIntegrationConnectionEditors(input: {
     },
     githubAppInstallation: {
       errorMessageByConnectionId: githubAppInstallErrorByConnectionId,
-      pendingConnectionId: startGitHubAppInstallationMutation.isPending
-        ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
-        : null,
+      pendingConnectionId:
+        redirectingGitHubAppConnectionId ??
+        (startGitHubAppInstallationMutation.isPending
+          ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
+          : null),
       onStartInstallation: async (connectionId: string) => {
+        setRedirectingGitHubAppConnectionId(connectionId);
         setGitHubAppInstallErrorByConnectionId((current) => ({
           ...current,
           [connectionId]: undefined,
@@ -182,6 +188,7 @@ export function useIntegrationConnectionEditors(input: {
             connectionId,
           });
         } catch (error) {
+          setRedirectingGitHubAppConnectionId(null);
           const errorMessage = resolveApiErrorMessage({
             error,
             fallbackMessage: "Could not start GitHub App installation.",

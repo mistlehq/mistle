@@ -1,10 +1,10 @@
 import {
-  Button,
   InputOTP,
   InputOTPGroup,
   InputOTPSlot,
   Label,
   REGEXP_ONLY_DIGITS,
+  ScreenActionButton,
 } from "@mistle/ui";
 import { useRef } from "react";
 
@@ -57,24 +57,18 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
           </InputOTPGroup>
         </InputOTP>
       </div>
-      <Button
-        className="h-12 w-full text-sm"
-        disabled={props.isVerifyingOtp}
-        size="lg"
-        type="submit"
-      >
+      <ScreenActionButton disabled={props.isVerifyingOtp} type="submit">
         {props.isVerifyingOtp ? "Verifying..." : "Sign in"}
-      </Button>
+      </ScreenActionButton>
       {props.onUseDifferentEmail === undefined ? null : (
-        <Button
-          className="h-12 w-full text-sm text-zinc-500 hover:text-zinc-700"
+        <ScreenActionButton
+          className="text-zinc-500 hover:text-zinc-700"
           onClick={props.onUseDifferentEmail}
-          size="lg"
           type="button"
           variant="link"
         >
           Use a different email
-        </Button>
+        </ScreenActionButton>
       )}
     </form>
   );

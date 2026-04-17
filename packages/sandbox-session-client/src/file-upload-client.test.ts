@@ -99,7 +99,7 @@ function sendFileUploadCompleted(
       originalFilename: "screenshot.png",
       mimeType: "image/png",
       sizeBytes: input.sizeBytes,
-      path: "/tmp/attachments/thread_123/upload.png",
+      path: "/root/.local/attachments/thread_123/upload.png",
     },
   });
 }
@@ -252,7 +252,7 @@ describe("UploadStreamClient", () => {
       originalFilename: "screenshot.png",
       mimeType: "image/png",
       sizeBytes: 4,
-      path: "/tmp/attachments/thread_123/upload.png",
+      path: "/root/.local/attachments/thread_123/upload.png",
     });
     expect(Array.from(server.receivedBytes())).toEqual([1, 2, 3, 4]);
 

@@ -20,6 +20,7 @@ export function loadDataPlaneWorkerFromToml(
   const sandboxE2B = asObjectRecord(sandbox.e2b);
   const sandboxStorage = asObjectRecord(dataPlaneWorker.sandbox_storage);
   const sandboxStorageArchil = asObjectRecord(sandboxStorage.archil);
+  const sandboxStorageDockerVolume = asObjectRecord(sandboxStorage.docker_volume);
 
   let sandboxStorageArchilMounts: Array<Record<string, unknown>> | undefined;
   if (Array.isArray(sandboxStorageArchil.mounts)) {
@@ -73,6 +74,12 @@ export function loadDataPlaneWorkerFromToml(
       region: sandboxStorageArchil.region,
       namePrefix: sandboxStorageArchil.name_prefix,
       mounts: sandboxStorageArchilMounts,
+    };
+  }
+
+  if (typeof sandboxStorageDockerVolume.name_prefix === "string") {
+    sandboxStorageConfig.dockerVolume = {
+      namePrefix: sandboxStorageDockerVolume.name_prefix,
     };
   }
 

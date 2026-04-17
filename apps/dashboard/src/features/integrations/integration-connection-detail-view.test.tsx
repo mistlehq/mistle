@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
 
@@ -19,10 +19,6 @@ const ImplicitWebhookPolicy = {
 } as const;
 
 describe("IntegrationConnectionDetailView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
     let startedGitHubAppInstallationConnectionId: string | null = null;
@@ -69,12 +65,11 @@ describe("IntegrationConnectionDetailView", () => {
         onStartGitHubAppInstallation={(connectionId) => {
           startedGitHubAppInstallationConnectionId = connectionId;
         }}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -124,6 +119,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                errorMessage: null,
               },
             ],
           ])
@@ -165,8 +161,8 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Repository")).toBeTruthy();
     expect(screen.getByText("- 0")).toBeTruthy();
     expect(
-      screen.getByText("GitHub returned a 403 while reading repository visibility."),
-    ).toBeTruthy();
+      screen.queryByText("GitHub returned a 403 while reading repository visibility."),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: "Manage installation" })).toBeNull();
   });
 
@@ -226,12 +222,11 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: "Could not load repositories.",
                 isLoading: false,
                 items: [
                   {
@@ -245,6 +240,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                errorMessage: "Could not load repositories.",
               },
             ],
           ])
@@ -252,12 +248,233 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.getByLabelText("View repository load error")).toBeTruthy();
+    expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     expect(screen.queryByText("Could not load repositories.")).toBeNull();
     expect(screen.queryByText(/Last synced/)).toBeNull();
     expect(screen.queryByText("mistle/dashboard")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
+  });
+
+  it("keeps the never-synced status separate from the expanded empty contents", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "never-synced",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                errorMessage: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
+    expect(screen.queryByLabelText("View sync failure details")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
+    expect(screen.getByText("No items available.")).toBeTruthy();
+  });
+
+  it("shows a loading state instead of an empty state while resource items are loading", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "ready",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: true,
+                items: [],
+                kind: "repositories",
+                errorMessage: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("Loading items...")).toBeTruthy();
+    expect(screen.queryByText("No items available.")).toBeNull();
+  });
+
+  it("keeps the sync failure status separate from the expanded empty contents", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "error",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                errorMessage: "Could not load repositories.",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getAllByText("Sync failed")).toHaveLength(2);
+    expect(screen.getAllByLabelText("View sync failure details")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getAllByText("Sync failed")).toHaveLength(2);
+    expect(screen.getAllByLabelText("View sync failure details")).toHaveLength(2);
+    expect(screen.queryByText("Could not load repositories.")).toBeNull();
+    expect(screen.getByText("No items available.")).toBeTruthy();
+  });
+
+  it("prefers the sync failure reason over the resource items error in the tooltip", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "error",
+                lastErrorMessage:
+                  "GitHub returned a 403 while syncing repositories from the last sync attempt.",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                errorMessage: "Could not load repositories.",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    const tooltipTrigger = screen.getAllByLabelText("View sync failure details")[0];
+    if (tooltipTrigger === undefined) {
+      throw new Error("Expected a sync failure tooltip trigger.");
+    }
+    fireEvent.mouseEnter(tooltipTrigger);
+
+    expect(
+      screen.getByText(
+        "GitHub returned a 403 while syncing repositories from the last sync attempt.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Could not load repositories.")).toBeNull();
+  });
+
+  it("shows an expanded empty state when a resource has no items", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "ready",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                errorMessage: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.getByText("No items available.")).toBeTruthy();
   });
 
   it("starts title editing when the connection title field receives focus", () => {
@@ -343,12 +560,11 @@ describe("IntegrationConnectionDetailView", () => {
             ],
           },
         ]}
-        resourceContentByKey={
+        resourceItemsByKey={
           new Map([
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -362,12 +578,12 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                errorMessage: null,
               },
             ],
             [
               "icn_github_archive:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -381,6 +597,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                errorMessage: null,
               },
             ],
           ])

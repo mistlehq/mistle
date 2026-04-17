@@ -1,3 +1,4 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   createDataPlaneDatabase,
   sandboxInstanceDeadlines,
@@ -89,6 +90,10 @@ function createDeadlineExecutionContext(input: { gatewayBaseUrl: string }) {
   return {
     config: runtimeConfig,
     db: createDatabase(),
+    controlPlaneInternalClient: new ControlPlaneInternalClient({
+      baseUrl: "http://127.0.0.1:5100",
+      internalAuthServiceToken: InternalAuthServiceToken,
+    }),
     sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
     runtimeStateReader: createSandboxRuntimeStateReader({
       gatewayBaseUrl: input.gatewayBaseUrl,
@@ -313,23 +318,11 @@ describe("sandbox instance deadlines integration", () => {
         ownerLeaseId: "own_deadline_runtime_state_mismatch",
         dueAt: MatchingDeadlineDueAt,
       });
-
-      const runtimeConfig = createWorkerRuntimeConfig({
-        gatewayBaseUrl,
-      });
-
       await expect(
         handleSandboxInstanceDeadline(
-          {
-            config: runtimeConfig,
-            db: createDatabase(),
-            sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
-            runtimeStateReader: createSandboxRuntimeStateReader({
-              gatewayBaseUrl,
-              serviceToken: InternalAuthServiceToken,
-            }),
-            clock: systemClock,
-          },
+          createDeadlineExecutionContext({
+            gatewayBaseUrl,
+          }),
           {
             sandboxInstanceId,
             kind: SandboxInstanceDeadlineKinds.IDLE,
@@ -443,23 +436,11 @@ describe("sandbox instance deadlines integration", () => {
       dueAt: MatchingDeadlineDueAt,
       generation: 2,
     });
-
-    const runtimeConfig = createWorkerRuntimeConfig({
-      gatewayBaseUrl,
-    });
-
     await expect(
       handleSandboxInstanceDeadline(
-        {
-          config: runtimeConfig,
-          db: createDatabase(),
-          sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
-          runtimeStateReader: createSandboxRuntimeStateReader({
-            gatewayBaseUrl,
-            serviceToken: InternalAuthServiceToken,
-          }),
-          clock: systemClock,
-        },
+        createDeadlineExecutionContext({
+          gatewayBaseUrl,
+        }),
         {
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.IDLE,
@@ -505,6 +486,10 @@ describe("sandbox instance deadlines integration", () => {
         {
           config: runtimeConfig,
           db: createDatabase(),
+          controlPlaneInternalClient: new ControlPlaneInternalClient({
+            baseUrl: "http://127.0.0.1:5100",
+            internalAuthServiceToken: InternalAuthServiceToken,
+          }),
           sandboxAdapter,
           runtimeStateReader,
           clock: systemClock,
@@ -528,6 +513,10 @@ describe("sandbox instance deadlines integration", () => {
         {
           config: runtimeConfig,
           db: createDatabase(),
+          controlPlaneInternalClient: new ControlPlaneInternalClient({
+            baseUrl: "http://127.0.0.1:5100",
+            internalAuthServiceToken: InternalAuthServiceToken,
+          }),
           sandboxAdapter,
           runtimeStateReader,
           clock: systemClock,
@@ -572,23 +561,11 @@ describe("sandbox instance deadlines integration", () => {
       dueAt: MatchingDeadlineDueAt,
       clearedAt: MatchingDeadlineDueAt,
     });
-
-    const runtimeConfig = createWorkerRuntimeConfig({
-      gatewayBaseUrl,
-    });
-
     await expect(
       handleSandboxInstanceDeadline(
-        {
-          config: runtimeConfig,
-          db: createDatabase(),
-          sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
-          runtimeStateReader: createSandboxRuntimeStateReader({
-            gatewayBaseUrl,
-            serviceToken: InternalAuthServiceToken,
-          }),
-          clock: systemClock,
-        },
+        createDeadlineExecutionContext({
+          gatewayBaseUrl,
+        }),
         {
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.IDLE,

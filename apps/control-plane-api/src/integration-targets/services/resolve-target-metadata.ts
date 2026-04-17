@@ -38,7 +38,7 @@ type ResolvedWebhookEventParameter =
       matchMode?: "eq" | "contains" | "contains_token";
       defaultValue?: string;
       defaultEnabled?: boolean;
-      controlVariant?: "explicit-invocation";
+      controlVariant?: "invocation-token";
       prefix?: string;
       placeholder?: string;
     }

@@ -26,6 +26,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@archildata/client": "^0.8.7",
     "@mistle/time": "workspace:*",
     "dockerode": "^4.0.10",
     "e2b": "^2.19.0",

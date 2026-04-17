@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 describe("ProfileSettingsPageView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("shows edit and remove actions when a profile image is available", () => {
     render(
       <ProfileSettingsPageView

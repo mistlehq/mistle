@@ -11,18 +11,18 @@ import {
   createArchilDiskRequest,
   requireReadyArchilSandboxStorage,
   resolveArchilProvisioningProfile,
-} from "./provision-sandbox-storage.js";
+} from "../shared/sandbox-storage/archil-storage-backend.js";
 
 function createSandboxInstanceStorage(
   input: Partial<{
     provider: string;
     status: string;
-    credentialKind: string;
+    credentialKind: string | null;
   }> = {},
 ): Omit<SandboxInstanceStorage, "provider" | "status" | "credentialKind"> & {
   provider: string;
   status: string;
-  credentialKind: string;
+  credentialKind: string | null;
 } {
   return {
     id: "sto_01knvnbakhfevv29xs862a8txe",
@@ -40,7 +40,7 @@ function createSandboxInstanceStorage(
   };
 }
 
-describe("provisionSandboxStorage helpers", () => {
+describe("Archil sandbox storage backend helpers", () => {
   it("builds the Archil disk name from the sandbox instance id when no prefix is set", () => {
     expect(
       createArchilDiskName({
@@ -77,7 +77,7 @@ describe("provisionSandboxStorage helpers", () => {
       resolvedStorageConfiguration: {
         persistentSandboxesEnabled: true,
         storageConfigSource: "managed",
-        storageBackend: null,
+        storageBackend: "archil",
         organizationStorageConfig: null,
       },
     });
@@ -165,7 +165,7 @@ describe("provisionSandboxStorage helpers", () => {
     const profile = resolveArchilProvisioningProfile({
       managedArchilConfig: undefined,
       resolvedStorageConfiguration: {
-        persistentSandboxesEnabled: false,
+        persistentSandboxesEnabled: true,
         storageConfigSource: "organization",
         storageBackend: "archil",
         organizationStorageConfig: {

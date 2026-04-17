@@ -4,6 +4,7 @@ import type {
   IntegrationWebhookPayloadReference,
 } from "@mistle/integrations-core";
 
+import { createInvocationTokenParameter } from "../../../shared/invocation-token-parameter.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 
 const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
@@ -92,6 +93,10 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
   prefix: "in",
 };
 
+function createSlackInvocationTokenParameter(): IntegrationWebhookEventParameterDefinition {
+  return createInvocationTokenParameter(["event", "text"]);
+}
+
 function createSlackWebhookEventDefinition(input: {
   eventType: string;
   providerEventType: string;
@@ -125,6 +130,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     category: "Messages",
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
+    parameters: [createSlackInvocationTokenParameter()],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:app_mention",
@@ -133,7 +139,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     category: "Messages",
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
-    parameters: [SlackChannelParameter],
+    parameters: [createSlackInvocationTokenParameter(), SlackChannelParameter],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_added",

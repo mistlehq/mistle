@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { OrganizationMembersSettingsPageView } from "./organization-members-settings-page-view.js";
 import {
@@ -11,10 +11,6 @@ import {
 } from "./organization-members-settings-page-view.story-fixtures.js";
 
 describe("OrganizationMembersSettingsPageView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders active and invited tabs with a shared invite action", () => {
     render(
       <OrganizationMembersSettingsPageView

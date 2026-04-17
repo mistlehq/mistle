@@ -3,13 +3,16 @@ import { shutdownTelemetry } from "@mistle/telemetry";
 import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createDataPlaneApiRuntime } from "./main.js";
+import { resolveConfiguredSandboxStorageBackend } from "./types.js";
 
 async function startDataPlaneApi(): Promise<void> {
   const runtime = await createDataPlaneApiRuntime({
     app: appConfig,
     internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
     sandboxProvider: globalConfig.sandbox.provider,
-    sandboxStorageBackend: globalConfig.sandbox.storage?.backend,
+    sandboxStorageBackend: resolveConfiguredSandboxStorageBackend({
+      globalConfig,
+    }),
   });
 
   await runtime.start();

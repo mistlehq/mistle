@@ -178,6 +178,14 @@ describe("compileCodexRuntime", () => {
           OPENAI_MODEL: "gpt-5.3-codex",
           OPENAI_REASONING_EFFORT: "medium",
         },
+        files: [
+          {
+            fileId: "codex_config",
+            path: "/etc/codex/config.toml",
+            mode: 384,
+            writeMode: "if-absent",
+          },
+        ],
       },
     });
     expect(compiled.runtimeClients[0]?.processes).toEqual([

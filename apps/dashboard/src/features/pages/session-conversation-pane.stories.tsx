@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type React from "react";
 
 import {
+  CodexFixtureChatThreadEntriesWithSequentialActionGroups,
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
 } from "../session-agents/codex/fixtures/chat-fixtures.js";
@@ -11,34 +13,39 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixturePropsUploadingImageAttachments,
   SessionComposerFixturePropsWithPendingImageAttachments,
-  SessionComposerFixtureProps,
-  CodexFixtureSessionEntries,
   CodexFixtureSessionEntriesWithExploringGroup,
-  CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import {
+  SessionConversationPanePlaygroundBaseArgs,
+  type SessionConversationPaneStoryArgs,
+} from "./session-conversation-pane-playground-fixtures.js";
+import {
+  SessionConversationPanePlaygroundArgTypes,
+  SessionConversationPanePlaygroundControlInclude,
+  SessionConversationPanePlaygroundDocs,
+  renderConversationPaneLayoutPlayground,
+} from "./session-conversation-pane-playground.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import {
   createStorySessionBottomPanel,
   renderSessionWorkbenchContentStory,
-  StorySessionConversationPaneArgs,
-  type SessionConversationStoryArgs,
 } from "./session-story-support.js";
-
-const baseArgs = {
-  ...StorySessionConversationPaneArgs,
-  chatEntries: CodexFixtureSessionEntries,
-  composerViewModel: SessionComposerFixtureProps,
-  serverRequestPanelEntries: CodexFixtureSessionServerRequests,
-};
 
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/ConversationPane",
   component: SessionConversationMainContent,
-  tags: ["autodocs"],
+  tags: ["!autodocs"],
   parameters: {
+    docs: {
+      description: {
+        component: SessionConversationPanePlaygroundDocs,
+      },
+      disable: true,
+    },
     layout: "fullscreen",
   },
-  args: baseArgs,
+  argTypes: SessionConversationPanePlaygroundArgTypes,
+  args: SessionConversationPanePlaygroundBaseArgs,
   decorators: [
     function StoryDecorator(Story, context): React.JSX.Element {
       return renderSessionWorkbenchContentStory({
@@ -47,17 +54,35 @@ const meta = {
       });
     },
   ],
-} satisfies Meta<SessionConversationStoryArgs>;
+} satisfies Meta<SessionConversationPaneStoryArgs>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+export const LayoutPlayground: Story = {
+  args: {
+    semanticGroupItemGapPx: "gap-0",
+  },
+  parameters: {
+    controls: {
+      include: SessionConversationPanePlaygroundControlInclude,
+    },
+  },
+  render: renderConversationPaneLayoutPlayground,
+};
 
 export const Default: Story = {};
 
 export const WithExploringGroup: Story = {
   args: {
     chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
+  },
+};
+
+export const WithSequentialActionGroups: Story = {
+  args: {
+    chatEntries: CodexFixtureChatThreadEntriesWithSequentialActionGroups,
   },
 };
 
@@ -93,7 +118,6 @@ export const UploadingImageAttachments: Story = {
 export const WithWorkingFooter: Story = {
   args: {
     activeTurnId: "turn-2",
-    chatEntries: CodexFixtureSessionEntries,
     isTurnInProgress: true,
     showWorkingIndicator: true,
   },
@@ -102,7 +126,7 @@ export const WithWorkingFooter: Story = {
 export const PendingStartWithoutWorkingFooter: Story = {
   args: {
     composerViewModel: {
-      ...SessionComposerFixtureProps,
+      ...SessionConversationPanePlaygroundBaseArgs.composerViewModel,
       isSubmitPending: true,
       submitDisabled: true,
       submitLabel: "Sending...",
@@ -114,7 +138,7 @@ export const PendingStartWithoutWorkingFooter: Story = {
 export const DisconnectedWithError: Story = {
   args: {
     composerViewModel: {
-      ...SessionComposerFixtureProps,
+      ...SessionConversationPanePlaygroundBaseArgs.composerViewModel,
       submitDisabled: true,
     },
     statusMessage: {

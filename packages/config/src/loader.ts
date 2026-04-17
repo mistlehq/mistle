@@ -189,7 +189,7 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
     }
 
     const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageBackend: globalConfig.sandbox.storage?.backend,
+      globalSandboxStorageConfig: globalConfig.sandbox.storage,
       appConfig: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot),
     });
 

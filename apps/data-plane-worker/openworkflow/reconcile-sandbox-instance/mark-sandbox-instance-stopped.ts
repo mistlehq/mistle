@@ -12,12 +12,14 @@ export async function markSandboxInstanceStopped(ctx: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
   currentStatus: "starting" | "running";
+  clearProviderSandboxId?: boolean;
 }): Promise<void> {
   const updatedRows = await ctx.db.transaction(async (tx) => {
     const stoppedRows = await tx
       .update(sandboxInstances)
       .set({
         status: SandboxInstanceStatuses.STOPPED,
+        ...(ctx.clearProviderSandboxId === true ? { providerSandboxId: null } : {}),
         stoppedAt: sql`now()`,
         failedAt: null,
         stopReason: SandboxStopReasons.DISCONNECTED,

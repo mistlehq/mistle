@@ -67,6 +67,7 @@ export const sandboxInstances = dataPlaneSchema.table(
     sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
     runtimeProvider: text("runtime_provider").notNull().$type<SandboxInstanceProvider>(),
     providerSandboxId: text("provider_sandbox_id"),
+    computeGeneration: bigint("compute_generation", { mode: "number" }).notNull().default(1),
     status: text("status")
       .notNull()
       .$type<SandboxInstanceStatus>()

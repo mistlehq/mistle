@@ -2,13 +2,13 @@ import { z } from "zod";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 
-export const SandboxStorageBackends = {
-  NONE: "none",
+export const SandboxStorageBackend = {
   ARCHIL: "archil",
+  DOCKER_VOLUME: "docker_volume",
 } as const;
 
 export type SandboxStorageBackend =
-  (typeof SandboxStorageBackends)[keyof typeof SandboxStorageBackends];
+  (typeof SandboxStorageBackend)[keyof typeof SandboxStorageBackend];
 
 const GlobalTelemetryEndpointSchema = z
   .url()
@@ -109,13 +109,13 @@ export const PartialGlobalSandboxPublishConfigSchema = z
 
 export const GlobalSandboxStorageConfigSchema = z
   .object({
-    backend: z.enum([SandboxStorageBackends.NONE, SandboxStorageBackends.ARCHIL]),
+    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
   })
   .strict();
 
 export const PartialGlobalSandboxStorageConfigSchema = z
   .object({
-    backend: z.enum([SandboxStorageBackends.NONE, SandboxStorageBackends.ARCHIL]).optional(),
+    backend: z.enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME]).optional(),
   })
   .strict();
 

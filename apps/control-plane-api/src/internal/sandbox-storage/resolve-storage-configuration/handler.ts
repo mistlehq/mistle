@@ -12,6 +12,8 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     await resolveSandboxStorageConfiguration({
       db: ctx.get("db"),
       organizationId: body.organizationId,
+      runtimeProvider: body.runtimeProvider,
+      managedStorageBackend: ctx.get("sandboxConfig").storageBackend,
       encryptionConfig: {
         masterEncryptionKeys: ctx.get("config").integrations.masterEncryptionKeys,
       },

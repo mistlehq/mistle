@@ -17,7 +17,7 @@ import {
 } from "./client-errors.js";
 import type { DockerSandboxConfig } from "./config.js";
 
-const InitCommand = ["/usr/local/bin/sandboxd", "init"];
+const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
 const DockerExecExitPollIntervalMs = 50;
 const DockerInitExecExitTimeoutMs = 120_000;
 const DockerExecExitPollAttempts = DockerInitExecExitTimeoutMs / DockerExecExitPollIntervalMs;

@@ -3,7 +3,7 @@ import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitio
 
 import {
   buildIntegrationConnectionDetailItems,
-  buildIntegrationConnectionResourceContentByKey,
+  buildIntegrationConnectionResourceItemsByKey,
   createIntegrationConnectionResourceKey,
   resolveIntegrationConnectionDetailWebhookPolicy,
 } from "../pages/integrations-page-view-model.js";
@@ -291,11 +291,10 @@ export function createDetailViewStoryProps(input?: {
       connections,
       refreshingResourceKeys,
     }),
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId: "icn_github_primary",
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [
             {
@@ -318,15 +317,16 @@ export function createDetailViewStoryProps(input?: {
             },
           ],
           kind: "repositories",
+          errorMessage: null,
         },
       },
       {
         connectionId: "icn_github_archive",
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "repositories",
+          errorMessage: null,
         },
       },
     ]),
@@ -378,7 +378,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             value: "116007157",
           },
         ],
-        displayName: "GH",
+        displayName: "GitHub App (Ready)",
         installActionLabel: "Manage installation",
         resources: [
           {
@@ -391,24 +391,22 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             count: 45,
             kind: "branch",
             lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            syncState: "error",
           },
           {
-            count: 5,
+            count: 0,
             kind: "user",
-            lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            syncState: "never-synced",
           },
         ],
         status: "active",
       },
     ],
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [
             {
@@ -449,12 +447,14 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "repository",
+          errorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage: null,
+          errorMessage:
+            "GitHub returned a 403 while loading branch data. Check installation repository access.",
           isLoading: false,
           items: [
             {
@@ -509,38 +509,10 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
-          items: [
-            {
-              id: "user_dense_1",
-              familyId: "github",
-              kind: "user",
-              handle: "blacksmith-sh[bot]",
-              displayName: "blacksmith-sh[bot]",
-              status: "accessible",
-              metadata: {},
-            },
-            {
-              id: "user_dense_2",
-              familyId: "github",
-              kind: "user",
-              handle: "dependabot[bot]",
-              displayName: "dependabot[bot]",
-              status: "accessible",
-              metadata: {},
-            },
-            {
-              id: "user_dense_3",
-              familyId: "github",
-              kind: "user",
-              handle: "jlowhy",
-              displayName: "jlowhy",
-              status: "accessible",
-              metadata: {},
-            },
-          ],
+          items: [],
           kind: "user",
+          errorMessage: null,
         },
       },
     ]),
@@ -610,7 +582,7 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
             value: "Pending",
           },
         ],
-        displayName: "GitHub App Setup",
+        displayName: "GitHub App (Setup Incomplete)",
         installActionLabel: "Install GitHub App",
         resources: [],
         setup: {
@@ -656,8 +628,8 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
   };
 }
 
-export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
-  const connectionId = "icn_github_preview_error";
+export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_github_not_synced";
 
   return {
     connections: [
@@ -671,8 +643,8 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
           },
           connectionId,
         }),
-        bindingCount: 1,
-        canDelete: false,
+        bindingCount: 0,
+        canDelete: true,
         contextItems: [
           {
             label: "App ID",
@@ -687,64 +659,55 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             value: "116007157",
           },
         ],
-        displayName: "Engineering GitHub",
+        displayName: "New GitHub Connection",
         installActionLabel: "Manage installation",
         resources: [
           {
-            count: 41,
+            count: 0,
             kind: "repositories",
-            lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            syncState: "never-synced",
           },
           {
-            count: 1,
-            kind: "organizations",
-            lastSyncedAt: "2026-04-13T15:37:00.000Z",
-            syncState: "ready",
+            count: 0,
+            kind: "branches",
+            syncState: "never-synced",
+          },
+          {
+            count: 0,
+            kind: "users",
+            syncState: "never-synced",
           },
         ],
         status: "active",
       },
     ],
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey([
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey([
       {
         connectionId,
         state: {
-          errorMessage:
-            "GitHub returned a 403 while loading repository data. Check installation repository access.",
           isLoading: false,
-          items: [
-            {
-              id: "repo_error_1",
-              familyId: "github",
-              kind: "repositories",
-              handle: "mistlehq/private-repo",
-              displayName: "mistlehq/private-repo",
-              status: "accessible",
-              metadata: {},
-            },
-          ],
+          items: [],
           kind: "repositories",
+          errorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
-          items: [
-            {
-              id: "org_error_1",
-              familyId: "github",
-              kind: "organizations",
-              handle: "mistlehq",
-              displayName: "mistlehq",
-              status: "accessible",
-              metadata: {},
-            },
-          ],
-          kind: "organizations",
+          items: [],
+          kind: "branches",
+          errorMessage: null,
+        },
+      },
+      {
+        connectionId,
+        state: {
+          isLoading: false,
+          items: [],
+          kind: "users",
+          errorMessage: null,
         },
       },
     ]),
@@ -784,17 +747,16 @@ type ScenarioDetailStorySpec = {
   webhookSources?: readonly IntegrationWebhookSource[];
 };
 
-function createResourceContent(
+function createResourceItems(
   input: ScenarioDetailStorySpec,
-): IntegrationConnectionDetailViewProps["resourceContentByKey"] {
+): IntegrationConnectionDetailViewProps["resourceItemsByKey"] {
   const resources = input.resources ?? [];
   const familyId = input.familyId ?? "integration";
 
-  return buildIntegrationConnectionResourceContentByKey(
+  return buildIntegrationConnectionResourceItemsByKey(
     resources.map((resource) => ({
       connectionId: input.connectionId,
       state: {
-        errorMessage: null,
         isLoading: false,
         items: resource.items.map(
           (item, index): IntegrationConnectionResource => ({
@@ -808,6 +770,7 @@ function createResourceContent(
           }),
         ),
         kind: resource.kind,
+        errorMessage: null,
       },
     })),
   );
@@ -861,7 +824,7 @@ function createScenarioDetailViewStoryProps(
             : { connectionConfig: input.connectionConfig }),
           connectionId: input.connectionId,
         });
-  const resourceContentByKey = createResourceContent(input);
+  const resourceItemsByKey = createResourceItems(input);
   const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
 
@@ -893,7 +856,7 @@ function createScenarioDetailViewStoryProps(
     ],
     onEditAuthentication: () => {},
     onRefreshResource: () => {},
-    ...(resourceContentByKey === undefined ? {} : { resourceContentByKey }),
+    ...(resourceItemsByKey === undefined ? {} : { resourceItemsByKey }),
     ...(webhookSourceStateByConnectionId === undefined
       ? {}
       : {
@@ -975,7 +938,7 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
       site_url: "https://mistle.atlassian.net",
     },
     connectionId: "icn_jira_dense",
-    displayName: "Jira Production",
+    displayName: "Jira (Webhook Configured)",
     webhookLifecycle: "managed",
     webhookSources: [
       {
@@ -1017,7 +980,7 @@ export function createJiraWebhookNotConfiguredDetailViewStoryProps(): Integratio
       site_url: "https://mistle.atlassian.net",
     },
     connectionId: "icn_jira_setup_incomplete",
-    displayName: "Jira Production",
+    displayName: "Jira (Webhook Not Configured)",
     webhookLifecycle: "managed",
     webhookSources: [],
   });
@@ -1147,9 +1110,9 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
   return {
     connections: storyProps.flatMap((story) => story.connections),
     onRefreshResource: () => {},
-    resourceContentByKey: buildIntegrationConnectionResourceContentByKey(
+    resourceItemsByKey: buildIntegrationConnectionResourceItemsByKey(
       storyProps.flatMap((story) =>
-        Array.from(story.resourceContentByKey?.entries() ?? []).map(([key, state]) => ({
+        Array.from(story.resourceItemsByKey?.entries() ?? []).map(([key, state]) => ({
           connectionId: key.slice(0, key.lastIndexOf(":")),
           state,
         })),

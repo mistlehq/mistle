@@ -9,6 +9,7 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { SandboxStorageBackend } from "@mistle/sandbox";
 import {
   createIntegrationRuntimeScopeId,
   createIntegrationRuntimeDatabaseName,
@@ -216,6 +217,7 @@ function createControlPlaneApiEnvironment(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: string;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -229,6 +231,7 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: input.dataPlaneApiBaseUrl,
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
   };
 }
 
@@ -239,6 +242,7 @@ function startControlPlaneApiChildProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: string;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -318,6 +322,7 @@ async function startControlPlaneApiProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: string;
 }): Promise<StartedControlPlaneApiProcess> {
   const baseUrl = `http://${input.host}:${String(input.port)}`;
   const childProcess = startControlPlaneApiChildProcess(input);
@@ -455,6 +460,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           dataPlaneApiBaseUrl: `http://${config.server.host}:${String(config.server.port)}`,
           workflowNamespaceId: sharedInfraConfig.workflowNamespaceId,
           internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
+          sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
         });
         cleanupTasks.unshift(async () => {
           await controlPlaneRuntime.stop();

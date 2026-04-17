@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
   DockerIntegrationConfigPathInContainer,
+  E2BIntegrationConfigPathInContainer,
   removeTestContext,
   startOtlpReceiver,
   startFullSystemEnvironment,
@@ -14,7 +15,6 @@ import {
 } from "@mistle/test-harness";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
-const CONFIG_PATH_IN_CONTAINER = DockerIntegrationConfigPathInContainer;
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const INTERNAL_AUTH_SERVICE_TOKEN = "system-internal-service-token";
@@ -22,7 +22,61 @@ const DATA_PLANE_GATEWAY_IDLE_TIMEOUT_MS = 20_000;
 const DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS = 8_000;
 const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
   "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED";
+const CloudflareTunnelTokenEnvVar = "CLOUDFLARE_TUNNEL_TOKEN";
+const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
+const SystemSandboxProvider = {
+  DOCKER: "docker",
+  E2B: "e2b",
+} as const;
+
+type SystemSandboxProvider = (typeof SystemSandboxProvider)[keyof typeof SystemSandboxProvider];
+
+function readSystemSandboxProvider(): SystemSandboxProvider {
+  const rawProvider =
+    process.env.MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER ?? SystemSandboxProvider.DOCKER;
+
+  if (rawProvider === SystemSandboxProvider.DOCKER || rawProvider === SystemSandboxProvider.E2B) {
+    return rawProvider;
+  }
+
+  throw new Error(
+    `Unsupported MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER '${rawProvider}'. Expected 'docker' or 'e2b'.`,
+  );
+}
+
+function resolveConfigPathInContainer(provider: SystemSandboxProvider): string {
+  if (provider === SystemSandboxProvider.DOCKER) {
+    return DockerIntegrationConfigPathInContainer;
+  }
+
+  return E2BIntegrationConfigPathInContainer;
+}
+
+function readRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(`${name} is required for this system test environment.`);
+  }
+
+  return value;
+}
+
+function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvider }):
+  | {
+      cloudflareTunnelToken: string;
+      publicHostname: string;
+    }
+  | undefined {
+  if (input.provider !== SystemSandboxProvider.E2B) {
+    return undefined;
+  }
+
+  return {
+    cloudflareTunnelToken: readRequiredEnvVar(CloudflareTunnelTokenEnvVar),
+    publicHostname: readRequiredEnvVar(DataPlaneGatewayTunnelHostnameEnvVar),
+  };
+}
 
 function createTelemetryEnvironmentOverrides(input: {
   tracesEndpoint: string;
@@ -57,6 +111,7 @@ function readGatewayLifecycleOrThrow(input: {
 
 export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
   return async function setup(): Promise<() => Promise<void>> {
+    const sandboxProvider = readSystemSandboxProvider();
     const otlpTraceCaptureFilePath = join(
       tmpdir(),
       `mistle-system-otlp-${randomUUID().replaceAll("-", "")}.jsonl`,
@@ -72,7 +127,11 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
     });
     const environment = await startFullSystemEnvironment({
       buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-      configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+      configPathInContainer: resolveConfigPathInContainer(sandboxProvider),
+      sandboxProvider,
+      sandboxPublicGatewayTunnel: resolveSandboxPublicGatewayTunnel({
+        provider: sandboxProvider,
+      }),
       startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
       sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,
       postgres: {},
@@ -123,6 +182,7 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
           tokenizerProxyContainerId: environment.tokenizerProxy.containerId,
           mailpitHttpBaseUrl: environment.mailpit.httpBaseUrl,
           controlPlaneDatabaseUrl: environment.database.hostDatabaseUrl,
+          sandboxProvider,
           internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
           otlpTraceCaptureFilePath,
           sandboxNetworkName: environment.sandboxNetworkName,

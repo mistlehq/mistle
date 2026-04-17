@@ -25,6 +25,7 @@ describe("full system environment integration", () => {
       const environment = await startFullSystemEnvironment({
         buildContextHostPath: PROJECT_ROOT_HOST_PATH,
         configPathInContainer: DockerIntegrationConfigPathInContainer,
+        sandboxProvider: "docker",
         startupTimeoutMs: 120_000,
         sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,
         postgres: {},

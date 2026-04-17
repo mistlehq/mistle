@@ -210,6 +210,7 @@ export function compileCodexRuntime(
               fileId: "codex_config",
               path: "/etc/codex/config.toml",
               mode: 384,
+              writeMode: "if-absent",
               content: renderCodexConfig({
                 model: input.providerAccess.defaultModel,
                 reasoningEffort: providerMetadata.reasoningEffort,

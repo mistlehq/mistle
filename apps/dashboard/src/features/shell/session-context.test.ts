@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   MISSING_AUTHENTICATED_SESSION_ERROR_MESSAGE,
   requireAuthenticatedSession,
@@ -45,7 +46,7 @@ describe("requireAuthenticatedSession", () => {
   });
 
   it("reads the authenticated session from the query cache", () => {
-    const queryClient = new QueryClient();
+    const queryClient = createTestQueryClient();
     seedAuthenticatedSession(queryClient);
 
     const wrapper = ({ children }: { children: ReactNode }) =>

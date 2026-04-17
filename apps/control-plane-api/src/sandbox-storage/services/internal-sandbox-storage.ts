@@ -1,4 +1,9 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  SandboxStorageBackend,
+  type SandboxStorageBackend as SandboxStorageBackendValue,
+} from "@mistle/db/control-plane";
+import { SandboxProvider, type SandboxProvider as SandboxProviderValue } from "@mistle/sandbox";
 
 import type { OrganizationSandboxStorageConfigV1 } from "../storage-config.js";
 import {
@@ -22,21 +27,15 @@ type ResolveSandboxStorageConfigurationResponse =
       organizationStorageConfig: null;
     }
   | {
-      persistentSandboxesEnabled: false;
-      storageConfigSource: "organization";
-      storageBackend: "archil";
-      organizationStorageConfig: OrganizationSandboxStorageConfigV1;
-    }
-  | {
       persistentSandboxesEnabled: true;
       storageConfigSource: "managed";
-      storageBackend: null;
+      storageBackend: SandboxStorageBackendValue;
       organizationStorageConfig: null;
     }
   | {
       persistentSandboxesEnabled: true;
       storageConfigSource: "organization";
-      storageBackend: "archil";
+      storageBackend: typeof SandboxStorageBackend.ARCHIL;
       organizationStorageConfig: OrganizationSandboxStorageConfigV1;
     };
 
@@ -62,29 +61,52 @@ export async function resolveSandboxStoragePersistenceMode(input: {
 export async function resolveSandboxStorageConfiguration(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
+  runtimeProvider: SandboxProviderValue;
+  managedStorageBackend: SandboxStorageBackendValue | undefined;
   encryptionConfig: OrganizationCredentialEncryptionConfig;
 }): Promise<ResolveSandboxStorageConfigurationResponse> {
   const settings = await resolveOrganizationSandboxStorageSettings(input);
 
-  if (settings.storageConfigSource === "managed") {
+  if (!settings.persistentSandboxesEnabled) {
     return {
-      persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
+      persistentSandboxesEnabled: false,
       storageConfigSource: "managed",
       storageBackend: null,
       organizationStorageConfig: null,
     };
   }
 
-  if (settings.organizationStorageConfig === null || settings.storageBackend !== "archil") {
+  if (input.managedStorageBackend === undefined) {
+    throw new Error(
+      `Persistent sandboxes are enabled for organization '${input.organizationId}' but no managed sandbox storage backend is configured.`,
+    );
+  }
+
+  if (
+    input.runtimeProvider === SandboxProvider.DOCKER ||
+    settings.storageConfigSource === "managed"
+  ) {
+    return {
+      persistentSandboxesEnabled: true,
+      storageConfigSource: "managed",
+      storageBackend: input.managedStorageBackend,
+      organizationStorageConfig: null,
+    };
+  }
+
+  if (
+    settings.organizationStorageConfig === null ||
+    settings.storageBackend !== SandboxStorageBackend.ARCHIL
+  ) {
     throw new Error(
       `Expected organization storage override for organization '${input.organizationId}'.`,
     );
   }
 
   return {
-    persistentSandboxesEnabled: settings.persistentSandboxesEnabled,
+    persistentSandboxesEnabled: true,
     storageConfigSource: "organization",
-    storageBackend: "archil",
+    storageBackend: SandboxStorageBackend.ARCHIL,
     organizationStorageConfig: settings.organizationStorageConfig,
   };
 }

@@ -1,4 +1,4 @@
-import { Button, Input, Label } from "@mistle/ui";
+import { Input, Label, ScreenActionButton } from "@mistle/ui";
 
 type EmailStepFormProps = {
   email: string;
@@ -47,9 +47,9 @@ export function EmailStepForm(props: EmailStepFormProps): React.JSX.Element {
           {props.email}
         </div>
       )}
-      <Button className="h-12 w-full text-sm" disabled={props.isSendingOtp} size="lg" type="submit">
+      <ScreenActionButton disabled={props.isSendingOtp} type="submit">
         {props.isSendingOtp ? "Sending code..." : (props.submitLabel ?? "Continue with email")}
-      </Button>
+      </ScreenActionButton>
     </form>
   );
 }

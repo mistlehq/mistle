@@ -14,7 +14,7 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
   return (
     <div
       className={[
-        "chat-markdown-message min-w-0 text-sm leading-5 md:text-[15px] md:leading-7",
+        "chat-markdown-message min-w-0 text-sm leading-5 md:text-[15px] md:leading-6",
         props.className,
       ]
         .filter(Boolean)

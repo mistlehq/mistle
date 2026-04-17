@@ -230,6 +230,10 @@ dataPlaneWorker:
     # Uncomment when MISTLE_GLOBAL_SANDBOX_PROVIDER=e2b.
     # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN
     #   value: e2b.app
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT
+    #   value: "4"
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB
+    #   value: "8192"
   secretEnv:
     - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
       secretName: mistle-runtime

@@ -96,7 +96,7 @@
 
 ## Workflows
 
-- Always run these scripts (in this order): `pnpm format`, `pnpm lint`, `pnpm typecheck`, `pnpm test`.
+- Always run `pnpm validate:changed`, which runs repo-level `format` and `typecheck` plus scoped workspace `lint` and `test` based on the current changed files.
 - Before pushing, run `pnpm run ci` to mirror CI's end-to-end checks locally.
 - Do not use `--no-verify` for commits or pushes; fix the underlying hook failure instead.
 - Always commit using Conventional Commits (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`). Do not use any other format.
@@ -133,3 +133,4 @@
 - If the app is for a browser, assume we use all modern browsers unless otherwise specified, we don't need most polyfills.
 - Avoid IIFEs; use module scope or named functions for one-off initialization.
 - Avoid unnecessary inline closures, especially in hot paths or render loops; prefer named functions when it improves clarity or stable references. Closures are fine when they make intent clearer.
+- When a module has a clear primary flow or entrypoint, prefer placing that main flow first and supporting helper functions below it.

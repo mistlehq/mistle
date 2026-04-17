@@ -1,4 +1,8 @@
-import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import type {
+  SandboxAdapter,
+  SandboxProvider,
+  SandboxStartStoragePreparation,
+} from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
@@ -32,6 +36,7 @@ export async function startSandbox(
   input: {
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
+    storagePreparation?: SandboxStartStoragePreparation;
   },
 ): Promise<{
   sandboxInstanceId: string;
@@ -47,6 +52,9 @@ export async function startSandbox(
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
+    ...(input.storagePreparation === undefined
+      ? {}
+      : { storagePreparation: input.storagePreparation }),
   });
 
   if (startedSandbox.provider !== ctx.config.sandbox.provider) {

@@ -36,4 +36,24 @@ describe("BadgeListField", () => {
 
     expect(container.firstChild).toBeNull();
   });
+
+  it("renders badges without a label when none is provided", () => {
+    const { container } = render(
+      <BadgeListField
+        items={[
+          { id: "repo_1", label: "mistlehq/dashboard" },
+          { id: "repo_2", label: "mistlehq/control-plane-api" },
+        ]}
+      />,
+    );
+
+    const field = container.querySelector('[data-slot="badge-list-field"]');
+    if (field === null) {
+      throw new Error("Expected badge list field to render.");
+    }
+
+    expect(container.querySelector('[data-slot="badge-list-label"]')).toBeNull();
+    expect(screen.getByText("mistlehq/dashboard")).toBeTruthy();
+    expect(screen.getByText("mistlehq/control-plane-api")).toBeTruthy();
+  });
 });

@@ -113,7 +113,7 @@ export function ChatComposer({
 
   return (
     <div
-      className="bg-card flex flex-col gap-3 rounded-md border p-1 shadow-xs"
+      className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs"
       onDragOver={(event) => {
         event.preventDefault();
       }}
@@ -134,7 +134,7 @@ export function ChatComposer({
         type="file"
       />
       {pendingAttachments.length === 0 ? null : (
-        <div className="flex flex-wrap gap-2 px-1 pt-1">
+        <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
           {pendingAttachments.map((attachment) => (
             <div
               className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
@@ -157,7 +157,7 @@ export function ChatComposer({
         </div>
       )}
       <Textarea
-        className="min-h-12 resize-none border-0 bg-transparent p-1 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
+        className="min-h-12 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
         id="session-composer"
         onChange={(event) => {
           onComposerTextChange(event.target.value);

@@ -24,7 +24,7 @@ export function formatSyncStateLabel(
   syncState: "never-synced" | "syncing" | "ready" | "error",
 ): string {
   if (syncState === "never-synced") {
-    return "Never synced";
+    return "Not synced";
   }
   if (syncState === "syncing") {
     return "Syncing";
@@ -36,38 +36,25 @@ export function formatSyncStateLabel(
 }
 
 export function formatResourceMetadata(input: {
-  lastErrorMessage?: string;
   lastSyncedAt?: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
+  syncState: "never-synced" | "syncing" | "ready";
 }): string {
-  if (input.syncState === "error") {
-    if (input.lastErrorMessage !== undefined) {
-      return input.lastErrorMessage;
-    }
-    return "The last sync attempt failed.";
-  }
-
   if (input.syncState === "syncing") {
     if (input.lastSyncedAt !== undefined) {
-      return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
+      return `Synced ${formatDateTime(input.lastSyncedAt)}`;
     }
-    return "Resources have not been synced yet.";
+    return "Not synced yet";
   }
 
   if (input.syncState === "never-synced") {
-    return "Resources have not been synced yet.";
+    return "Not synced yet";
   }
 
   if (input.lastSyncedAt === undefined) {
     return "Resources are ready.";
   }
 
-  return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
-}
-
-export function formatResourceHeading(input: { count: number; kind: string }): string {
-  const label = formatResourceLabel(input.kind);
-  return `${label} (${input.count})`;
+  return `Synced ${formatDateTime(input.lastSyncedAt)}`;
 }
 
 export function formatResourceLabel(kind: string): string {
@@ -88,20 +75,4 @@ export function formatResourceLabel(kind: string): string {
       : firstWord;
 
   return [singularFirstWord, ...remainingWords].join(" ");
-}
-
-export function formatResourceCountSummary(input: { count: number; kind: string }): string {
-  return `${input.count} resources`;
-}
-
-export function formatResourceInlineMetadata(input: {
-  lastErrorMessage?: string;
-  lastSyncedAt?: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
-}): string {
-  if (input.syncState === "error" && input.lastErrorMessage !== undefined) {
-    return "The last sync attempt failed.";
-  }
-
-  return formatResourceMetadata(input);
 }

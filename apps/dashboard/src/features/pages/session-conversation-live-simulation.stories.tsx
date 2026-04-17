@@ -10,6 +10,10 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import {
+  SessionConversationScrollBehaviorArgType,
+  type SessionConversationScrollBehaviorStoryArg,
+} from "./session-conversation-story-scroll-behavior.js";
+import {
   SessionWorkbenchStoryChrome,
   StorySessionConversationPaneArgs,
 } from "./session-story-support.js";
@@ -17,7 +21,8 @@ import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchLiveSimulationStoryArgs = React.ComponentProps<
   typeof SessionWorkbenchPageView
->;
+> &
+  SessionConversationScrollBehaviorStoryArg;
 
 const LiveHarnessSeedEntries: readonly ChatEntry[] = [
   {
@@ -41,11 +46,37 @@ const LiveHarnessSeedEntries: readonly ChatEntry[] = [
   },
 ];
 
-const LiveHarnessStreamingChunks = [
-  "1. When a flagless wreck drifts into Brinehollow and vanishes by dawn, strange failures spread through the village and panic follows.",
+const LiveHarnessStreamingChunkStarts = [
+  "When a flagless wreck drifts into Brinehollow and vanishes by dawn, strange failures spread through the village and panic follows.",
   "Cartographer Elin traces the pattern to a forgotten fire, a missing keeper, and a copper-bound storm ledger that suggests the sea can be bargained with, but never ignored.",
   "To save her home, she must turn scattered memory into action before the next wave settles the balance.",
+  "Each bell tower along the coast remembers the pact differently, and every retelling changes what Elin believes she owes the sea.",
+  "What begins as salvage becomes witness work: tide charts, burial records, and half-burned harbor maps that refuse to line up cleanly.",
+  "The closer she gets to the truth, the more Brinehollow starts behaving like a place waiting to be reclaimed rather than rescued.",
 ] as const;
+
+const LiveHarnessStreamingChunkClosers = [
+  "The village calls it bad luck; Elin recognizes a pattern that is trying to finish an older story.",
+  "Every answer widens the debt ledger, and every witness seems to remember a different price being paid.",
+  "What the town dismissed as folklore starts reading like operating instructions for surviving the next storm.",
+  "The deeper she looks, the clearer it becomes that silence has been part of the ritual all along.",
+  "By the time the harbor lights begin failing in sequence, delay is no longer neutral.",
+  "What she uncovers would be easier to bury again, but the coastline has already started choosing for her.",
+] as const;
+
+function createStreamingChunk(chunkNumber: number): string {
+  const start =
+    LiveHarnessStreamingChunkStarts[(chunkNumber - 1) % LiveHarnessStreamingChunkStarts.length];
+  const closer =
+    LiveHarnessStreamingChunkClosers[(chunkNumber - 1) % LiveHarnessStreamingChunkClosers.length];
+  return `${chunkNumber}. ${start} ${closer}`;
+}
+
+function createLargeAssistantBlock(startingChunkNumber: number, chunkCount: number): string {
+  return Array.from({ length: chunkCount }, (_, index) =>
+    createStreamingChunk(startingChunkNumber + index),
+  ).join("\n\n");
+}
 
 function createLiveHarnessStartedTurnEntries(input: {
   assistantText: string;
@@ -89,7 +120,9 @@ function replaceTurnIdInEntries(input: {
   });
 }
 
-function SessionConversationWorkbenchHarness(): React.JSX.Element {
+function SessionConversationWorkbenchHarness(input: {
+  scrollBehavior: SessionConversationScrollBehaviorStoryArg["scrollBehavior"];
+}): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [entries, setEntries] = useState<readonly ChatEntry[]>(LiveHarnessSeedEntries);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
@@ -133,7 +166,7 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
     setEntries((currentEntries) => [
       ...currentEntries,
       ...createLiveHarnessStartedTurnEntries({
-        assistantText: LiveHarnessStreamingChunks[0],
+        assistantText: createStreamingChunk(1),
         turnId: pendingId,
         userText: submittedPrompt,
       }),
@@ -202,9 +235,6 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
     }
 
     const nextChunkIndex = streamChunkIndex + 1;
-    if (nextChunkIndex > LiveHarnessStreamingChunks.length) {
-      return;
-    }
 
     setStreamChunkIndex(nextChunkIndex);
     setEntries((currentEntries) =>
@@ -216,7 +246,32 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
         return {
           ...entry,
           status: "streaming",
-          text: LiveHarnessStreamingChunks.slice(0, nextChunkIndex).join(" "),
+          text: `${entry.text}\n\n${createStreamingChunk(nextChunkIndex)}`,
+        };
+      }),
+    );
+  }
+
+  function showLargeBlock(): void {
+    if (activeTurnId === null || pendingTurnId !== null) {
+      return;
+    }
+
+    const chunkCount = 12;
+    const startingChunkIndex = streamChunkIndex + 1;
+    const nextChunkIndex = streamChunkIndex + chunkCount;
+
+    setStreamChunkIndex(nextChunkIndex);
+    setEntries((currentEntries) =>
+      currentEntries.map((entry) => {
+        if (entry.kind !== "assistant-message" || entry.turnId !== activeTurnId) {
+          return entry;
+        }
+
+        return {
+          ...entry,
+          status: "streaming",
+          text: `${entry.text}\n\n${createLargeAssistantBlock(startingChunkIndex, chunkCount)}`,
         };
       }),
     );
@@ -251,6 +306,11 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
           pendingTurnId={pendingTurnId}
           scrollContainerRef={scrollContainerRef}
           serverRequestPanelEntries={[]}
+          {...(input.scrollBehavior === undefined
+            ? {}
+            : {
+                scrollBehavior: input.scrollBehavior,
+              })}
         />
       }
       mainContentScrollContainerRef={scrollContainerRef}
@@ -330,6 +390,13 @@ function SessionConversationWorkbenchHarness(): React.JSX.Element {
               Stream Chunk
             </Button>
             <Button
+              disabled={activeTurnId === null || pendingTurnId !== null}
+              onClick={showLargeBlock}
+              variant="secondary"
+            >
+              Show Large Block
+            </Button>
+            <Button
               disabled={activeTurnId === null}
               onClick={completeActiveTurn}
               variant="secondary"
@@ -364,9 +431,13 @@ const meta = {
     mainContent: <></>,
     onBottomPanelResize: () => {},
     onSecondaryPanelResize: () => {},
+    scrollBehavior: "follow-streaming-at-bottom",
     primaryBottomPanel: <></>,
     secondaryPanel: <></>,
     secondaryPanelSize: 28,
+  },
+  argTypes: {
+    scrollBehavior: SessionConversationScrollBehaviorArgType,
   },
   decorators: [
     function StoryDecorator(Story): React.JSX.Element {
@@ -384,9 +455,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: () => (
-    <div className="h-screen">
-      <SessionConversationWorkbenchHarness />
+  render: (args) => (
+    <div className="h-full min-h-0">
+      <SessionConversationWorkbenchHarness scrollBehavior={args.scrollBehavior} />
     </div>
   ),
 };

@@ -603,9 +603,13 @@
                   "organizationId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "runtimeProvider": {
+                    "type": "string",
+                    "enum": ["e2b", "docker"]
                   }
                 },
-                "required": ["organizationId"],
+                "required": ["organizationId", "runtimeProvider"],
                 "additionalProperties": false
               }
             }
@@ -649,99 +653,6 @@
                       "properties": {
                         "persistentSandboxesEnabled": {
                           "type": "boolean",
-                          "enum": [false]
-                        },
-                        "storageConfigSource": {
-                          "type": "string",
-                          "enum": ["organization"]
-                        },
-                        "storageBackend": {
-                          "type": "string",
-                          "enum": ["archil"]
-                        },
-                        "organizationStorageConfig": {
-                          "type": "object",
-                          "properties": {
-                            "backend": {
-                              "type": "string",
-                              "enum": ["archil"]
-                            },
-                            "apiKey": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "region": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "namePrefix": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "mounts": {
-                              "anyOf": [
-                                {
-                                  "type": "array",
-                                  "prefixItems": []
-                                },
-                                {
-                                  "type": "array",
-                                  "prefixItems": [
-                                    {
-                                      "type": "object",
-                                      "properties": {
-                                        "type": {
-                                          "type": "string",
-                                          "enum": ["s3-compatible"]
-                                        },
-                                        "bucket": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "endpoint": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "accessKeyId": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "secretAccessKey": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        }
-                                      },
-                                      "required": [
-                                        "type",
-                                        "bucket",
-                                        "endpoint",
-                                        "accessKeyId",
-                                        "secretAccessKey"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          },
-                          "required": ["backend", "apiKey", "region"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": [
-                        "persistentSandboxesEnabled",
-                        "storageConfigSource",
-                        "storageBackend",
-                        "organizationStorageConfig"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "persistentSandboxesEnabled": {
-                          "type": "boolean",
                           "enum": [true]
                         },
                         "storageConfigSource": {
@@ -749,7 +660,8 @@
                           "enum": ["managed"]
                         },
                         "storageBackend": {
-                          "type": "null"
+                          "type": "string",
+                          "enum": ["archil", "docker_volume"]
                         },
                         "organizationStorageConfig": {
                           "type": "null"

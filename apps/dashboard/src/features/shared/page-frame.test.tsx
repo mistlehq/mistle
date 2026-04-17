@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { FormPageFrame, PageFrame } from "./page-frame.js";
 
 describe("PageFrame", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("renders a centered constrained layout for the form page frame", () => {
     const { container } = render(
       <FormPageFrame title="Editor Shell">

@@ -2,6 +2,7 @@ import {
   createDataPlaneDatabase,
   sandboxInstanceRuntimePlans,
   sandboxInstances,
+  SandboxInstancePersistenceModes,
   SandboxStopReasons,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
@@ -135,11 +136,66 @@ describe("resume sandbox instance state integration", () => {
         }),
       ).resolves.toEqual({
         sandboxInstanceId,
+        organizationId: "org_resume_state_runtime_plan",
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         runtimeProvider: "docker",
         providerSandboxId: "provider-runtime-plan",
+        computeGeneration: 1,
         runtimePlan: createRuntimePlan({
           sandboxProfileId: "sbp_resume_state_runtime_plan",
           version: 2,
+        }),
+      });
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "allows a persistent sandbox instance without provider compute to remain resumable",
+    async () => {
+      const db = createDatabase();
+      const sandboxInstanceId = "sbi_resume_state_missing_provider_persistent";
+
+      await db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId: "org_resume_state_missing_provider_persistent",
+        sandboxProfileId: "sbp_resume_state_missing_provider_persistent",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: null,
+        status: SandboxInstanceStatuses.STOPPED,
+        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        startedByKind: "system",
+        startedById: "worker_resume_state_missing_provider_persistent",
+        source: "dashboard",
+      });
+
+      await db.insert(sandboxInstanceRuntimePlans).values({
+        sandboxInstanceId,
+        revision: 1,
+        compiledRuntimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_resume_state_missing_provider_persistent",
+          version: 1,
+        }),
+        compiledFromProfileId: "sbp_resume_state_missing_provider_persistent",
+        compiledFromProfileVersion: 1,
+      });
+
+      await expect(
+        resolveResumableSandboxInstanceState({
+          db,
+          sandboxInstanceId,
+        }),
+      ).resolves.toEqual({
+        sandboxInstanceId,
+        organizationId: "org_resume_state_missing_provider_persistent",
+        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        runtimeProvider: "docker",
+        providerSandboxId: null,
+        computeGeneration: 1,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_resume_state_missing_provider_persistent",
+          version: 1,
         }),
       });
     },

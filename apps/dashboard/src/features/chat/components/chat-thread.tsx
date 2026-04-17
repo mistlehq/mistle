@@ -19,6 +19,51 @@ type ChatThreadProps = {
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
   pendingServerRequests: readonly CodexApprovalRequestEntry[];
 };
+
+function getAssistantBlockSpacingClass(input: {
+  block: ChatEntry;
+  previousBlock: ChatEntry | null;
+}): string {
+  if (input.previousBlock === null) {
+    return "";
+  }
+
+  if (input.previousBlock.kind === "semantic-group" && input.block.kind === "semantic-group") {
+    return "mt-1.5";
+  }
+
+  if (input.previousBlock.kind === "assistant-message" && input.block.kind === "semantic-group") {
+    return "mt-1";
+  }
+
+  return "mt-2";
+}
+
+function getAssistantBlockSpacingStyle(input: {
+  block: ChatEntry;
+  previousBlock: ChatEntry | null;
+}): React.CSSProperties | undefined {
+  if (input.previousBlock === null) {
+    return undefined;
+  }
+
+  if (input.previousBlock.kind === "semantic-group" && input.block.kind === "semantic-group") {
+    return {
+      marginTop: "var(--chat-thread-semantic-stack-gap, 0.5rem)",
+    };
+  }
+
+  if (input.previousBlock.kind === "assistant-message" && input.block.kind === "semantic-group") {
+    return {
+      marginTop: "var(--chat-thread-assistant-to-semantic-gap, 1rem)",
+    };
+  }
+
+  return {
+    marginTop: "var(--chat-thread-assistant-block-gap, 1rem)",
+  };
+}
+
 export function ChatThread({
   entries,
   isRespondingToServerRequest,
@@ -28,9 +73,24 @@ export function ChatThread({
   const chatTurnGroups = buildChatTurnGroups(entries);
 
   return (
-    <div className="flex flex-col gap-10 pt-2">
+    <div
+      className="flex flex-col pt-2"
+      data-chat-thread
+      style={{
+        gap: "var(--chat-thread-turn-gap, 1rem)",
+        paddingTop: "var(--chat-thread-padding-top, 0.5rem)",
+      }}
+    >
       {chatTurnGroups.map((group) => (
-        <div className="flex flex-col gap-4" data-turn-id={group.turnId} key={group.turnId}>
+        <div
+          className="flex flex-col"
+          data-chat-turn-group
+          data-turn-id={group.turnId}
+          key={group.turnId}
+          style={{
+            gap: "var(--chat-thread-turn-content-gap, 1rem)",
+          }}
+        >
           {group.userEntry === null ? null : (
             <ChatUserMessage
               {...(group.userEntry.attachments === undefined
@@ -40,10 +100,26 @@ export function ChatThread({
             />
           )}
           {group.assistantBlocks.length === 0 ? null : (
-            <div className="max-w-[72ch] space-y-4">
-              {group.assistantBlocks.map((block) => {
+            <div
+              data-chat-assistant-blocks
+              style={{
+                maxWidth: "var(--chat-thread-assistant-max-width, 72ch)",
+              }}
+            >
+              {group.assistantBlocks.map((block, index) => {
+                const previousBlock =
+                  index === 0 ? null : (group.assistantBlocks[index - 1] ?? null);
+                const spacingClassName = getAssistantBlockSpacingClass({
+                  block,
+                  previousBlock,
+                });
+                const spacingStyle = getAssistantBlockSpacingStyle({
+                  block,
+                  previousBlock,
+                });
+                let renderedBlock: React.JSX.Element | null = null;
                 if (block.kind === "semantic-group") {
-                  return (
+                  renderedBlock = (
                     <ChatSemanticGroup
                       block={block}
                       isRespondingToServerRequest={isRespondingToServerRequest}
@@ -52,10 +128,8 @@ export function ChatThread({
                       pendingServerRequests={pendingServerRequests}
                     />
                   );
-                }
-
-                if (block.kind === "assistant-message") {
-                  return (
+                } else if (block.kind === "assistant-message") {
+                  renderedBlock = (
                     <div key={block.id}>
                       <ChatAssistantMessage
                         isStreaming={block.status === "streaming"}
@@ -63,9 +137,7 @@ export function ChatThread({
                       />
                     </div>
                   );
-                }
-
-                if (block.kind === "reasoning") {
+                } else if (block.kind === "reasoning") {
                   const normalizedSummary = block.summary.trim();
                   const isSuppressedRawReasoning =
                     block.source === "content" &&
@@ -77,7 +149,7 @@ export function ChatThread({
                     return null;
                   }
 
-                  return (
+                  renderedBlock = (
                     <div className="space-y-2" key={block.id}>
                       <p className="text-muted-foreground text-xs uppercase tracking-[0.18em]">
                         {block.source === "summary" ? "Thinking" : "Reasoning"}
@@ -87,19 +159,31 @@ export function ChatThread({
                       </p>
                     </div>
                   );
-                }
-
-                if (block.kind === "plan") {
-                  return <ChatPlanEntry block={block} key={block.id} />;
-                }
-
-                if (block.kind === "file-change") {
+                } else if (block.kind === "plan") {
+                  renderedBlock = <ChatPlanEntry block={block} key={block.id} />;
+                } else if (block.kind === "file-change") {
                   const approvalRequest = findFileChangeApprovalRequest(
                     pendingServerRequests,
                     block.id,
                   );
-                  return (
+                  renderedBlock = (
                     <ChatFileChangeBlock
+                      approvalRequest={approvalRequest}
+                      block={block}
+                      isRespondingToServerRequest={isRespondingToServerRequest}
+                      key={block.id}
+                      onRespondToServerRequest={onRespondToServerRequest}
+                    />
+                  );
+                } else if (block.kind === "generic-item") {
+                  renderedBlock = <ChatGenericItem block={block} key={block.id} />;
+                } else {
+                  const approvalRequest = findCommandApprovalRequest(
+                    pendingServerRequests,
+                    block.id,
+                  );
+                  renderedBlock = (
+                    <ChatCommandBlock
                       approvalRequest={approvalRequest}
                       block={block}
                       isRespondingToServerRequest={isRespondingToServerRequest}
@@ -109,19 +193,16 @@ export function ChatThread({
                   );
                 }
 
-                if (block.kind === "generic-item") {
-                  return <ChatGenericItem block={block} key={block.id} />;
-                }
-
-                const approvalRequest = findCommandApprovalRequest(pendingServerRequests, block.id);
                 return (
-                  <ChatCommandBlock
-                    approvalRequest={approvalRequest}
-                    block={block}
-                    isRespondingToServerRequest={isRespondingToServerRequest}
+                  <div
+                    className={spacingClassName}
+                    data-chat-assistant-block
+                    data-chat-block-kind={block.kind}
                     key={block.id}
-                    onRespondToServerRequest={onRespondToServerRequest}
-                  />
+                    style={spacingStyle}
+                  >
+                    {renderedBlock}
+                  </div>
                 );
               })}
             </div>

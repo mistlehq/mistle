@@ -33,7 +33,7 @@ fn apply_git_clone_workspace_source(
     egress_grant_token: Option<&str>,
 ) -> Result<(), String> {
     if Path::new(path).exists() {
-        return Err(format!("workspace source path '{path}' already exists"));
+        return Ok(());
     }
 
     let parent_directory = Path::new(path)

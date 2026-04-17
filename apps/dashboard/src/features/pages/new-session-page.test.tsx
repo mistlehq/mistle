@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -79,10 +79,6 @@ function renderNewSessionPage(input?: {
     </QueryClientProvider>,
   );
 }
-
-afterEach(() => {
-  cleanup();
-});
 
 describe("NewSessionPage", () => {
   installMatchMediaStub();

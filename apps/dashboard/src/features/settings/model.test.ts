@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isSettingsPath,
+  resolveSettingsNavGroups,
   resolveSettingsBackDestination,
   SETTINGS_DEFAULT_PATH,
   SETTINGS_NAV_GROUPS,
@@ -44,5 +45,27 @@ describe("settings model", () => {
     for (const item of accountGroup?.items ?? []) {
       expect(typeof item.icon).toBe("function");
     }
+  });
+
+  it("shows sandbox storage settings only for owners and admins", () => {
+    const ownerOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "owner" }).find(
+      (group) => group.label === "Organization",
+    );
+    const adminOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "admin" }).find(
+      (group) => group.label === "Organization",
+    );
+    const memberOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "member" }).find(
+      (group) => group.label === "Organization",
+    );
+
+    expect(ownerOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/sandboxes",
+    );
+    expect(adminOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/sandboxes",
+    );
+    expect(memberOrganizationGroup?.items.map((item) => item.to)).not.toContain(
+      "/settings/organization/sandboxes",
+    );
   });
 });

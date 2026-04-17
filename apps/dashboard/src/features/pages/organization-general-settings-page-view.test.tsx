@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { OrganizationGeneralSettingsPageView } from "./organization-general-settings-page-view.js";
 
 describe("OrganizationGeneralSettingsPageView", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   it("shows edit and remove actions when an organization logo is available", () => {
     render(
       <OrganizationGeneralSettingsPageView

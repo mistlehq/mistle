@@ -926,6 +926,7 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
+          MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
@@ -937,15 +938,16 @@ describe("loadConfig integrations", () => {
     );
   });
 
-  it("loads data-plane-worker config when sandbox storage backend is none and Archil worker config is omitted", () => {
+  it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
-        MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "none",
+        MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: undefined,
       }),
     });
 
@@ -953,13 +955,11 @@ describe("loadConfig integrations", () => {
       throw new Error("Expected global config to be present.");
     }
 
-    expect(config.global.sandbox.storage).toEqual({
-      backend: "none",
-    });
+    expect(config.global.sandbox.storage).toBeUndefined();
     expect(config.app.controlPlaneApi).toEqual({
-      baseUrl: "http://127.0.0.1:5100",
+      baseUrl: "http://127.0.0.1:5000",
     });
-    expect(config.app.sandboxStorage).toBeUndefined();
+    expect(config.app.sandboxStorage).toEqual({});
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

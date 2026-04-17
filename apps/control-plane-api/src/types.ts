@@ -33,6 +33,7 @@ export type ControlPlaneApiPortAccessConfig = {
 export type ControlPlaneApiSandboxRuntimeConfig = {
   defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
   gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
+  storageBackend?: NonNullable<ControlPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"];
 };
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;

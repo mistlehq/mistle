@@ -9,9 +9,10 @@ type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.D
 
 export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
 export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult["global"]>;
-export type DataPlaneApiSandboxStorageBackend =
-  | NonNullable<DataPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"]
-  | undefined;
+type DataPlaneApiGlobalSandboxStorageConfig = NonNullable<
+  DataPlaneApiGlobalConfig["sandbox"]["storage"]
+>;
+export type DataPlaneApiSandboxStorageBackend = DataPlaneApiGlobalSandboxStorageConfig["backend"];
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
   internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
@@ -57,3 +58,9 @@ export type DataPlaneApiRuntime = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };
+
+export function resolveConfiguredSandboxStorageBackend(input: {
+  globalConfig: DataPlaneApiGlobalConfig;
+}): DataPlaneApiSandboxStorageBackend {
+  return input.globalConfig.sandbox.storage?.backend;
+}

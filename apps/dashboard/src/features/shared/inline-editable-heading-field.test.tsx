@@ -1,15 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { InlineEditableHeadingField } from "./inline-editable-heading-field.js";
 
 describe("InlineEditableHeadingField", () => {
-  afterEach(() => {
-    cleanup();
-  });
-
   function renderInlineEditableHeadingField(
     overrides: Partial<Parameters<typeof InlineEditableHeadingField>[0]> = {},
   ): ReturnType<typeof render> {
@@ -56,6 +52,19 @@ describe("InlineEditableHeadingField", () => {
     expect(input.className).toContain("border-t-0");
     expect(input.className).toContain("px-0");
     expect(input.className).toContain("text-xl");
+  });
+
+  it("renders the small size with tighter header spacing", () => {
+    renderInlineEditableHeadingField({
+      size: "sm",
+    });
+
+    const input = screen.getByRole("textbox", { name: "Heading" });
+
+    expect(input.className).toContain("h-7");
+    expect(input.className).toContain("text-sm");
+    expect(input.className).toContain("leading-tight");
+    expect(input.className).toContain("font-medium");
   });
 
   it("commits on blur and cancels on escape", () => {

@@ -23,6 +23,7 @@ import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
+import { OrganizationSandboxStorageSettingsPage } from "./features/pages/organization-sandbox-storage-settings-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
@@ -118,6 +119,7 @@ export const APP_ROUTES = createRoutesFromElements(
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
+          organizationSandboxes: <OrganizationSandboxStorageSettingsPage />,
         })}
       </Route>
     </Route>

@@ -1,3 +1,4 @@
+import { SandboxStorageBackend } from "@mistle/sandbox";
 import { shutdownTelemetry } from "@mistle/telemetry";
 import { z } from "zod";
 
@@ -11,6 +12,10 @@ const EnvironmentSchema = z
     MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: z.string().min(1),
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: z.string().min(1),
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: z.string().min(1),
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: z.enum([
+      SandboxStorageBackend.ARCHIL,
+      SandboxStorageBackend.DOCKER_VOLUME,
+    ]),
   })
   .strict();
 
@@ -26,6 +31,8 @@ function readEnvironment(): z.infer<typeof EnvironmentSchema> {
       process.env.MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN:
       process.env.MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN,
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND:
+      process.env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
   });
 }
 
@@ -92,6 +99,7 @@ async function main(): Promise<void> {
     sandbox: {
       defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
       gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      storageBackend: env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
     },
   });
 

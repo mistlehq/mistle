@@ -7,7 +7,6 @@ import {
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
   createGitHubAppDetailViewStoryProps,
-  createGitHubPreviewErrorDetailViewStoryProps,
   createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
   createJiraWebhookNotConfiguredDetailViewStoryProps,
@@ -17,6 +16,32 @@ import {
   createSigNozDetailViewStoryProps,
   createSlackDetailViewStoryProps,
 } from "./integration-story-harness.js";
+
+function mergeDetailViewStoryProps(
+  ...inputs: readonly React.ComponentProps<typeof IntegrationConnectionDetailView>[]
+): React.ComponentProps<typeof IntegrationConnectionDetailView> {
+  const resourceItemsEntries = inputs.flatMap((input) =>
+    input.resourceItemsByKey === undefined ? [] : [...input.resourceItemsByKey.entries()],
+  );
+  const webhookSourceEntries = inputs.flatMap((input) =>
+    input.webhookSourceStateByConnectionId === undefined
+      ? []
+      : [...input.webhookSourceStateByConnectionId.entries()],
+  );
+
+  return {
+    connections: inputs.flatMap((input) => input.connections),
+    ...(resourceItemsEntries.length === 0
+      ? {}
+      : { resourceItemsByKey: new Map(resourceItemsEntries) }),
+    ...(webhookSourceEntries.length === 0
+      ? {}
+      : { webhookSourceStateByConnectionId: new Map(webhookSourceEntries) }),
+    ...(inputs.some((input) => input.webhookPolicy !== undefined)
+      ? { webhookPolicy: inputs.find((input) => input.webhookPolicy !== undefined)?.webhookPolicy }
+      : {}),
+  };
+}
 
 function withoutStoryHandlers(
   input: React.ComponentProps<typeof IntegrationConnectionDetailView>,
@@ -63,24 +88,15 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const GitHubApp: Story = {
-  name: "GitHub App",
+export const GitHub: Story = {
+  name: "GitHub",
   args: {
-    ...withoutStoryHandlers(createGitHubAppDetailViewStoryProps()),
-  },
-};
-
-export const GitHubAppSetupIncomplete: Story = {
-  name: "GitHub App Setup Incomplete",
-  args: {
-    ...withoutStoryHandlers(createGitHubAppSetupIncompleteDetailViewStoryProps()),
-  },
-};
-
-export const GitHubPreviewError: Story = {
-  name: "GitHub Preview Error",
-  args: {
-    ...withoutStoryHandlers(createGitHubPreviewErrorDetailViewStoryProps()),
+    ...withoutStoryHandlers(
+      mergeDetailViewStoryProps(
+        createGitHubAppDetailViewStoryProps(),
+        createGitHubAppSetupIncompleteDetailViewStoryProps(),
+      ),
+    ),
   },
 };
 
@@ -92,16 +108,14 @@ export const GitHubEnterpriseServer: Story = {
 };
 
 export const Jira: Story = {
-  name: "Jira Complete",
+  name: "Jira",
   args: {
-    ...withoutStoryHandlers(createJiraDetailViewStoryProps()),
-  },
-};
-
-export const JiraWebhookNotConfigured: Story = {
-  name: "Jira Webhook Not Configured",
-  args: {
-    ...withoutStoryHandlers(createJiraWebhookNotConfiguredDetailViewStoryProps()),
+    ...withoutStoryHandlers(
+      mergeDetailViewStoryProps(
+        createJiraDetailViewStoryProps(),
+        createJiraWebhookNotConfiguredDetailViewStoryProps(),
+      ),
+    ),
   },
 };
 

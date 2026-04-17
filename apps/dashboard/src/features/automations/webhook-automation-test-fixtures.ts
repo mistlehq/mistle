@@ -2,7 +2,10 @@ import { GitHubCloudBrowserDefinition } from "@mistle/integrations-definitions/b
 
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-types.js";
 import { createWebhookAutomationEventOption } from "./webhook-automation-option-builders.js";
-import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationEventParameterOption,
+} from "./webhook-automation-trigger-types.js";
 import type {
   WebhookAutomationListEvent,
   WebhookAutomationListItem,
@@ -17,6 +20,10 @@ export const RepoMaintainerSandboxProfileId = "sbp_01kkk1mbmxfetvga8kcmw612jj";
 
 export function createGitHubEventOption(input: {
   eventType: string;
+  connectionId?: string;
+  webhookSourceId?: string;
+  connectionLabel?: string;
+  categoryPrefix?: string;
   overrides?: Partial<WebhookAutomationEventOption>;
 }): WebhookAutomationEventOption {
   const eventDefinition = GitHubCloudBrowserDefinition.supportedWebhookEvents?.find(
@@ -30,12 +37,26 @@ export function createGitHubEventOption(input: {
   return {
     ...createWebhookAutomationEventOption({
       eventDefinition,
-      webhookSourceId: GitHubWebhookSourceId,
-      connectionId: GitHubConnectionId,
-      connectionLabel: GitHubConnectionLabel,
+      webhookSourceId: input.webhookSourceId ?? GitHubWebhookSourceId,
+      connectionId: input.connectionId ?? GitHubConnectionId,
+      connectionLabel: input.connectionLabel ?? GitHubConnectionLabel,
       logoKey: "github",
+      ...(input.categoryPrefix === undefined ? {} : { categoryPrefix: input.categoryPrefix }),
     }),
     ...input.overrides,
+  };
+}
+
+export function createInvocationTokenParameter(
+  payloadPath: string[],
+): WebhookAutomationEventParameterOption {
+  return {
+    id: "invocationToken",
+    label: "invocation token",
+    kind: "string",
+    payloadPath,
+    matchMode: "contains_token",
+    controlVariant: "invocation-token",
   };
 }
 

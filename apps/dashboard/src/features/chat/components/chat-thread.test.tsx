@@ -1,11 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
-
-afterEach(cleanup);
 
 describe("ChatThread", () => {
   it("renders command approvals inline with the matching command block", () => {
@@ -303,7 +301,7 @@ describe("ChatThread", () => {
             attachments: [
               {
                 kind: "image",
-                path: "/tmp/attachments/thread_1/screenshot.png",
+                path: "/root/.local/attachments/thread_1/screenshot.png",
                 name: "screenshot.png",
               },
             ],

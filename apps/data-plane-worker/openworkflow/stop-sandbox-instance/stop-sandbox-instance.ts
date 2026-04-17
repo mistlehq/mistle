@@ -1,6 +1,8 @@
+import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import type { SandboxAdapter } from "@mistle/sandbox";
@@ -17,6 +19,7 @@ import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
+  persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   providerSandboxId: string;
 };
@@ -43,6 +46,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
 }): Promise<RunningSandboxInstanceStopState | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
+      persistenceMode: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,
@@ -71,6 +75,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
   }
 
   return {
+    persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,
   };
@@ -80,6 +85,7 @@ export async function stopSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
@@ -115,10 +121,14 @@ export async function stopSandboxInstance(
   try {
     await stopSandbox(
       {
+        db: ctx.db,
+        controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
       },
       {
+        sandboxInstanceId: input.sandboxInstanceId,
+        persistenceMode: sandboxInstanceState.persistenceMode,
         runtimeProvider: sandboxInstanceState.runtimeProvider,
         providerSandboxId: sandboxInstanceState.providerSandboxId,
       },

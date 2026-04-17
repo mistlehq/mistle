@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+use std::net::SocketAddr;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -85,7 +86,7 @@ use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
-pub const DEFAULT_ATTACHMENT_ROOT: &str = "/tmp/attachments";
+pub const DEFAULT_ATTACHMENT_ROOT: &str = "/root/.local/attachments";
 /// Poll interval while the live tunnel session has no immediately available work.
 pub const DEFAULT_TUNNEL_SESSION_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Poll interval while PTY output threads wait for the next blocking event.
@@ -110,6 +111,28 @@ const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
+
+fn resolve_default_attachment_root() -> PathBuf {
+    if let Some(attachment_root) = crate::test_support::attachment_root_override() {
+        return attachment_root;
+    }
+
+    #[cfg(test)]
+    {
+        std::env::temp_dir().join(format!(
+            "mistle-sandboxd-test-attachments-{}",
+            std::process::id()
+        ))
+    }
+
+    #[cfg(not(test))]
+    PathBuf::from(DEFAULT_ATTACHMENT_ROOT)
+}
+
+fn prioritize_ipv4_socket_addresses(mut addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    addresses.sort_by_key(|address| if address.is_ipv4() { 0 } else { 1 });
+    addresses
+}
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
 #[derive(Debug)]
@@ -350,7 +373,7 @@ impl TunnelSession {
             )]),
         );
         supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
-        let attachment_root = PathBuf::from(DEFAULT_ATTACHMENT_ROOT);
+        let attachment_root = resolve_default_attachment_root();
         fs::create_dir_all(&attachment_root)
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 
@@ -1477,7 +1500,8 @@ async fn connect_bootstrap_websocket(
         )));
     }
 
-    let resolved_addresses = timeout(
+    let resolved_addresses = prioritize_ipv4_socket_addresses(
+        timeout(
         DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT,
         lookup_host((host.as_str(), port)),
     )
@@ -1489,7 +1513,8 @@ async fn connect_bootstrap_websocket(
         ))
     })?
     .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
-    .collect::<Vec<_>>();
+    .collect::<Vec<_>>(),
+    );
     if resolved_addresses.is_empty() {
         return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
             "bootstrap websocket host lookup returned no addresses: {host}:{port}"
@@ -3867,6 +3892,7 @@ mod tests {
         TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
         connect_bootstrap_websocket, handle_tunnel_session_event, resolve_bootstrap_tunnel_url,
         run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
+        prioritize_ipv4_socket_addresses,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -5173,6 +5199,31 @@ mod tests {
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn prioritize_ipv4_socket_addresses_sorts_ipv4_before_ipv6() {
+        let addresses = vec![
+            "[2606:4700:3031::ac43:8542]:443"
+                .parse()
+                .expect("ipv6 address should parse"),
+            "104.21.133.66:443"
+                .parse()
+                .expect("ipv4 address should parse"),
+            "[2606:4700:3032::6815:8542]:443"
+                .parse()
+                .expect("second ipv6 address should parse"),
+            "172.67.133.66:443"
+                .parse()
+                .expect("second ipv4 address should parse"),
+        ];
+
+        let prioritized = prioritize_ipv4_socket_addresses(addresses);
+
+        assert!(prioritized[0].is_ipv4(), "first address should prefer ipv4");
+        assert!(prioritized[1].is_ipv4(), "second address should prefer ipv4");
+        assert!(prioritized[2].is_ipv6(), "third address should fall back to ipv6");
+        assert!(prioritized[3].is_ipv6(), "fourth address should fall back to ipv6");
     }
 
     #[test]

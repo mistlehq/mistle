@@ -11,6 +11,14 @@ describe("SlackSupportedWebhookEvents", () => {
 
     expect(appMentionEvent?.parameters).toEqual([
       {
+        id: "invocationToken",
+        label: "invocation token",
+        kind: "string",
+        payloadPath: ["event", "text"],
+        matchMode: "contains_token",
+        controlVariant: "invocation-token",
+      },
+      {
         id: "channel",
         label: "channel",
         kind: "resource-select",

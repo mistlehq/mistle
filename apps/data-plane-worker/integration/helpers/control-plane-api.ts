@@ -2,6 +2,7 @@ import { spawn, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import { SandboxStorageBackend } from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 
 const ControlPlaneApiHealthcheckPath = "/__healthz";
@@ -24,6 +25,7 @@ function createControlPlaneApiEnvironment(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -37,6 +39,7 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: input.dataPlaneApiBaseUrl,
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
+    MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
   };
 }
 
@@ -47,6 +50,7 @@ function startControlPlaneApiChildProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -95,6 +99,7 @@ export async function startControlPlaneApiProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
+  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
 }): Promise<StartedControlPlaneApiProcess> {
   const childProcess = startControlPlaneApiChildProcess(input);
   const stdoutChunks: string[] = [];
