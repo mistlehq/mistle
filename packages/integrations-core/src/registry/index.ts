@@ -41,6 +41,96 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
     );
   }
 
+  const identityLinking = input.identityLinking;
+  if (identityLinking !== undefined) {
+    const definedConnectionMethodIds = new Set(input.connectionMethods.map((method) => method.id));
+    const eligibleConnectionMethodIds = new Set<string>();
+
+    if (identityLinking.eligibleConnectionMethodIds.length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition identityLinking.eligibleConnectionMethodIds must be non-empty.",
+      );
+    }
+
+    for (const eligibleConnectionMethodId of identityLinking.eligibleConnectionMethodIds) {
+      if (eligibleConnectionMethodId.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition identityLinking.eligibleConnectionMethodIds[*] must be non-empty.",
+        );
+      }
+
+      if (!definedConnectionMethodIds.has(eligibleConnectionMethodId)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition identityLinking.eligibleConnectionMethodIds[*] must reference an existing connection method id.",
+        );
+      }
+
+      if (eligibleConnectionMethodIds.has(eligibleConnectionMethodId)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          `Integration definition identityLinking contains duplicate eligible connection method id '${eligibleConnectionMethodId}'.`,
+        );
+      }
+
+      eligibleConnectionMethodIds.add(eligibleConnectionMethodId);
+    }
+
+    if (identityLinking.principalKeyTypes.length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition identityLinking.principalKeyTypes must be non-empty.",
+      );
+    }
+
+    const principalKeyTypes = new Set<string>();
+    for (const principalKeyType of identityLinking.principalKeyTypes) {
+      if (principalKeyType.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition identityLinking.principalKeyTypes[*] must be non-empty.",
+        );
+      }
+
+      if (principalKeyTypes.has(principalKeyType)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          `Integration definition identityLinking contains duplicate principal key type '${principalKeyType}'.`,
+        );
+      }
+
+      principalKeyTypes.add(principalKeyType);
+    }
+
+    if (identityLinking.supportsUserCredentials && identityLinking.credentialKinds.length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition identityLinking.credentialKinds must be non-empty when supportsUserCredentials is true.",
+      );
+    }
+
+    const credentialKinds = new Set<string>();
+    for (const credentialKind of identityLinking.credentialKinds) {
+      if (credentialKind.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition identityLinking.credentialKinds[*] must be non-empty.",
+        );
+      }
+
+      if (credentialKinds.has(credentialKind)) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          `Integration definition identityLinking contains duplicate credential kind '${credentialKind}'.`,
+        );
+      }
+
+      credentialKinds.add(credentialKind);
+    }
+  }
+
   for (const supportedWebhookEvent of input.supportedWebhookEvents ?? []) {
     if (supportedWebhookEvent.eventType.trim().length === 0) {
       throw new IntegrationDefinitionRegistryError(

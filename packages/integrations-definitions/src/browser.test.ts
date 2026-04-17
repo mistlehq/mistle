@@ -20,6 +20,14 @@ describe("browser definitions", () => {
     expect(GitHubCloudBrowserDefinition.redirectHandler).toBeUndefined();
     expect(GitHubCloudBrowserDefinition.webhookHandler).toBeUndefined();
     expect(GitHubCloudBrowserDefinition.webhookSource).toBeUndefined();
+    expect(GitHubCloudBrowserDefinition.identityLinking).toEqual({
+      supported: true,
+      eligibleConnectionMethodIds: ["github-app-installation"],
+      supportsUserCredentials: true,
+      supportsInboundResolution: true,
+      principalKeyTypes: ["account_id", "login"],
+      credentialKinds: ["github_app_user_access_token"],
+    });
   });
 
   it("registers jira in the browser-safe definitions bundle", () => {
@@ -58,6 +66,14 @@ describe("browser definitions", () => {
   it("keeps slack browser definitions free of server-only webhook hooks", () => {
     expect(SlackBrowserDefinition.webhookHandler).toBeUndefined();
     expect(SlackBrowserDefinition.webhookSource).toBeUndefined();
+    expect(SlackBrowserDefinition.identityLinking).toEqual({
+      supported: true,
+      eligibleConnectionMethodIds: ["slack-bot-token"],
+      supportsUserCredentials: true,
+      supportsInboundResolution: true,
+      principalKeyTypes: ["workspace_id", "user_id"],
+      credentialKinds: ["slack_user_token"],
+    });
   });
 
   it("keeps signoz browser definitions free of server-only OAuth handlers", () => {

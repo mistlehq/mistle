@@ -295,6 +295,111 @@ describe("integration registry", () => {
     expect(definition?.credentialResolvers?.custom?.github_installation_token).toBeDefined();
   });
 
+  it("registers definitions with static identity-linking metadata", () => {
+    const registry = new IntegrationRegistry();
+
+    registry.register({
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
+      bindingConfigSchema: ConfigSchema,
+      connectionMethods: GitHubConnectionMethods,
+      identityLinking: {
+        supported: true,
+        eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+        supportsUserCredentials: true,
+        supportsInboundResolution: true,
+        principalKeyTypes: ["account_id", "login"],
+        credentialKinds: ["github_app_user_access_token"],
+      },
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClients: [],
+      }),
+    });
+
+    expect(
+      registry.getDefinition({
+        familyId: "github",
+        variantId: "github-cloud",
+      })?.identityLinking,
+    ).toEqual({
+      supported: true,
+      eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+      supportsUserCredentials: true,
+      supportsInboundResolution: true,
+      principalKeyTypes: ["account_id", "login"],
+      credentialKinds: ["github_app_user_access_token"],
+    });
+  });
+
+  it("rejects identity-linking metadata with unknown eligible connection methods", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        identityLinking: {
+          supported: true,
+          eligibleConnectionMethodIds: ["missing-method"],
+          supportsUserCredentials: true,
+          supportsInboundResolution: true,
+          principalKeyTypes: ["account_id"],
+          credentialKinds: ["github_app_user_access_token"],
+        },
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
+  it("rejects identity-linking metadata with duplicate principal key types", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        identityLinking: {
+          supported: true,
+          eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+          supportsUserCredentials: true,
+          supportsInboundResolution: true,
+          principalKeyTypes: ["account_id", "account_id"],
+          credentialKinds: ["github_app_user_access_token"],
+        },
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
   it("registers definitions with oauth2 client-credentials capability", () => {
     const registry = new IntegrationRegistry();
 

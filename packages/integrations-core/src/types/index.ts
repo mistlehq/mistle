@@ -102,6 +102,15 @@ export type IntegrationConnection = {
   config: Record<string, unknown>;
 };
 
+export type IntegrationIdentityLinkingCapability = {
+  supported: boolean;
+  eligibleConnectionMethodIds: ReadonlyArray<IntegrationConnectionMethodId>;
+  supportsUserCredentials: boolean;
+  supportsInboundResolution: boolean;
+  principalKeyTypes: ReadonlyArray<string>;
+  credentialKinds: ReadonlyArray<string>;
+};
+
 export type IntegrationBinding = {
   id: string;
   kind: IntegrationKind;
@@ -1674,6 +1683,7 @@ export type IntegrationDefinition<
       TConnectionConfig
     >
   >;
+  identityLinking?: IntegrationIdentityLinkingCapability;
   credentialResolvers?: IntegrationCredentialResolvers;
   oauth2AuthorizationCode?: IntegrationOAuth2AuthorizationCodeCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
