@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
@@ -524,7 +524,6 @@ function StoryHarness(input: {
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
   enableSubmitValidation?: boolean;
-  validateOnMount?: boolean;
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookAutomationStoryQueryClient());
   const [values, setValues] = useState(input.values);
@@ -537,23 +536,6 @@ function StoryHarness(input: {
     input.validationSummaryError ?? null,
   );
   const pageTitle = input.mode === "create" ? "Create automation" : "";
-
-  useEffect(() => {
-    if (input.validateOnMount !== true) {
-      return;
-    }
-
-    const nextFieldErrors = validateWebhookAutomationFormValues(
-      values,
-      input.webhookEventOptions ?? GitHubWebhookEventOptions,
-    );
-    setFieldErrors(nextFieldErrors);
-    setValidationSummaryError(
-      Object.keys(nextFieldErrors).length > 0
-        ? "Please address the fields highlighted in red."
-        : null,
-    );
-  }, [input.validateOnMount, input.webhookEventOptions, values]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -648,22 +630,6 @@ export const ValidationErrors: Story = {
     values: {
       ...EmptyCreateValues,
       inputTemplate: "",
-    },
-  },
-};
-
-export const PlaceholderInstructionsValidation: Story = {
-  args: {
-    mode: "create",
-    enableSubmitValidation: true,
-    validateOnMount: true,
-    values: {
-      ...EmptyCreateValues,
-      name: "Review pull requests",
-      sandboxProfileId: "sbp_repo_maintainer",
-      triggerIds: [PullRequestOpenedTriggerId],
-      conversationKeyTemplate:
-        "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
     },
   },
 };
