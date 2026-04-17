@@ -92,6 +92,17 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
   prefix: "in",
 };
 
+function createSlackInvocationTokenParameter(): IntegrationWebhookEventParameterDefinition {
+  return {
+    id: "invocationToken",
+    label: "invocation token",
+    kind: "string",
+    payloadPath: ["event", "text"],
+    matchMode: "contains_token",
+    controlVariant: "explicit-invocation",
+  };
+}
+
 function createSlackWebhookEventDefinition(input: {
   eventType: string;
   providerEventType: string;
@@ -125,6 +136,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     category: "Messages",
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
+    parameters: [createSlackInvocationTokenParameter()],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:app_mention",
@@ -133,7 +145,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     category: "Messages",
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
-    parameters: [SlackChannelParameter],
+    parameters: [createSlackInvocationTokenParameter(), SlackChannelParameter],
   }),
   createSlackWebhookEventDefinition({
     eventType: "slack:reaction_added",

@@ -29,8 +29,6 @@ function createDirectoryData(input?: {
       kind: "string";
       payloadPath: string[];
       matchMode?: "eq" | "contains" | "contains_token";
-      defaultValue?: string;
-      defaultEnabled?: boolean;
       controlVariant?: "explicit-invocation";
     }>;
   }[];
@@ -248,7 +246,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
   });
 
-  it("applies explicit invocation defaults when a trigger is selected", () => {
+  it("does not apply invocation token defaults when a trigger is selected", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
       webhookSourceId: LinearWebhookSourceId,
@@ -293,13 +291,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 displayName: "Issue comment created",
                 parameters: [
                   {
-                    id: "explicitInvocation",
-                    label: "explicit mention",
+                    id: "invocationToken",
+                    label: "invocation token",
                     kind: "string",
                     payloadPath: ["comment", "body"],
                     matchMode: "contains_token",
-                    defaultValue: "@mistlebot",
-                    defaultEnabled: true,
                     controlVariant: "explicit-invocation",
                   },
                 ],
@@ -319,9 +315,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
 
     expect(result.current.values.triggerParameterValues).toEqual({
-      [triggerId]: {
-        explicitInvocation: "@mistlebot",
-      },
+      [triggerId]: {},
     });
   });
 
@@ -374,13 +368,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 displayName: "Issue comment created",
                 parameters: [
                   {
-                    id: "explicitInvocation",
-                    label: "explicit mention",
+                    id: "invocationToken",
+                    label: "invocation token",
                     kind: "string",
                     payloadPath: ["comment", "body"],
                     matchMode: "contains_token",
-                    defaultValue: "@mistlebot",
-                    defaultEnabled: true,
                     controlVariant: "explicit-invocation",
                   },
                 ],
@@ -408,7 +400,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       result.current.onValueChange("triggerParameterValues", {
         ...result.current.values.triggerParameterValues,
         [firstTriggerId]: {
-          explicitInvocation: "",
+          invocationToken: "",
         },
       });
     });
@@ -419,7 +411,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
 
     expect(result.current.values.triggerParameterValues).toEqual({
       [firstTriggerId]: {
-        explicitInvocation: "",
+        invocationToken: "",
       },
       [secondTriggerId]: {},
     });
@@ -476,13 +468,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 displayName: "Issue comment created",
                 parameters: [
                   {
-                    id: "explicitInvocation",
-                    label: "explicit mention",
+                    id: "invocationToken",
+                    label: "invocation token",
                     kind: "string",
                     payloadPath: ["comment", "body"],
                     matchMode: "contains_token",
-                    defaultValue: "@mistlebot",
-                    defaultEnabled: true,
                     controlVariant: "explicit-invocation",
                   },
                 ],
@@ -493,13 +483,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 displayName: "Issue opened",
                 parameters: [
                   {
-                    id: "explicitInvocation",
-                    label: "explicit mention",
+                    id: "invocationToken",
+                    label: "invocation token",
                     kind: "string",
                     payloadPath: ["issue", "body"],
                     matchMode: "contains_token",
-                    defaultValue: "@mistlebot",
-                    defaultEnabled: true,
                     controlVariant: "explicit-invocation",
                   },
                 ],

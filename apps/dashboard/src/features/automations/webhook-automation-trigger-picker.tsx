@@ -13,7 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -22,7 +21,7 @@ import {
 } from "@mistle/ui";
 import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -285,17 +284,6 @@ function TriggerParameterField(input: {
   value: string;
   onValueChange: (value: string) => void;
 }): React.JSX.Element | null {
-  const [lastNonEmptyStringValue, setLastNonEmptyStringValue] = useState(() => input.value.trim());
-
-  useEffect(() => {
-    const nextValue = input.value.trim();
-    if (nextValue.length === 0) {
-      return;
-    }
-
-    setLastNonEmptyStringValue(nextValue);
-  }, [input.value]);
-
   const resourceQuery = useQuery({
     queryKey: [
       "automation-trigger-parameters",
@@ -325,27 +313,13 @@ function TriggerParameterField(input: {
 
   if (input.parameter.kind === "string") {
     if (input.parameter.controlVariant === "explicit-invocation") {
-      const switchId = `${input.eventType}:${input.parameter.id}`;
-      const defaultExplicitInvocationValue = input.parameter.defaultValue ?? "@mistlebot";
-      const savedExplicitInvocationValue = input.value.trim();
-      const explicitInvocationValue =
-        savedExplicitInvocationValue.length > 0
-          ? savedExplicitInvocationValue
-          : lastNonEmptyStringValue.length > 0
-            ? lastNonEmptyStringValue
-            : defaultExplicitInvocationValue;
-      const checked = input.value.trim().length > 0;
-      const tooltipMessage = `Enable this to respond only when ${explicitInvocationValue} is mentioned. Disable it to respond to every event.`;
-
       return (
-        <div className="inline-flex items-center gap-3 rounded-md border px-3 py-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="block text-sm">
-              Only respond to <span className="font-medium">{explicitInvocationValue}</span>
-            </span>
-            <Tooltip>
+        <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
+          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm whitespace-nowrap">
+            <span>includes</span>
+            <Tooltip delay={0}>
               <TooltipTrigger
-                aria-label="Explain explicit mention requirement"
+                aria-label="Explain invocation token filter"
                 render={
                   <button
                     className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
@@ -356,19 +330,19 @@ function TriggerParameterField(input: {
                 <InfoIcon aria-hidden className="size-3.5" />
               </TooltipTrigger>
               <TooltipContent className="max-w-64 text-left" side="top">
-                {tooltipMessage}
+                Example: @mistlebot, mistle, /triage. Leave blank to match all events.
               </TooltipContent>
             </Tooltip>
           </span>
-          <Switch
-            aria-label={`Only respond to ${explicitInvocationValue}`}
-            checked={checked}
-            id={switchId}
-            onCheckedChange={(nextChecked) => {
-              input.onValueChange(nextChecked ? explicitInvocationValue : "");
+          <Input
+            className="min-w-0 flex-1 md:min-w-44 md:flex-none"
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              input.onValueChange(event.currentTarget.value);
             }}
+            placeholder={input.parameter.placeholder}
+            value={input.value}
           />
-        </div>
+        </span>
       );
     }
 

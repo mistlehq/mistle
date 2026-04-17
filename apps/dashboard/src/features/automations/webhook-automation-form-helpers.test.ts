@@ -301,7 +301,7 @@ describe("toWebhookAutomationFormValues", () => {
       triggerIds: [IssueCommentCreatedTriggerId],
       triggerParameterValues: {
         [IssueCommentCreatedTriggerId]: {
-          explicitInvocation: "@mistlebot",
+          invocationToken: "@mistlebot",
         },
       },
     });
@@ -598,7 +598,7 @@ describe("automation payload transforms", () => {
           triggerIds: [IssueCommentCreatedTriggerId],
           triggerParameterValues: {
             [IssueCommentCreatedTriggerId]: {
-              explicitInvocation: "@mistlebot",
+              invocationToken: "@mistlebot",
             },
           },
         },

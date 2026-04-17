@@ -110,7 +110,12 @@ describe("WebhookAutomationForm", () => {
     webhookEventOptions?: typeof WebhookEventOptions;
     onValueChange?: (
       key: keyof WebhookAutomationFormValues,
-      value: string | boolean | string[] | Record<string, Record<string, string>>,
+      value:
+        | string
+        | boolean
+        | string[]
+        | Record<string, Record<string, string>>
+        | Record<string, Record<string, boolean>>,
     ) => void;
   }): ReturnType<typeof render> {
     return render(
@@ -370,7 +375,7 @@ describe("WebhookAutomationForm", () => {
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
     expect(screen.queryByText("Automation name is required.")).toBeNull();
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
-    expect(screen.getByText("Input template is required.")).toBeDefined();
+    expect(screen.getAllByText("Input template is required.").length).toBeGreaterThan(0);
     expect(screen.getByText("Please add a trigger")).toBeDefined();
   });
 

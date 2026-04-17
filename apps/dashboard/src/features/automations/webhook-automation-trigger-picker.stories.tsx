@@ -53,15 +53,12 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
-        id: "explicitInvocation",
-        label: "explicit mention",
+        id: "invocationToken",
+        label: "invocation token",
         kind: "string",
         payloadPath: ["comment", "body"],
         matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
         controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
       },
       {
         id: "target",
@@ -115,15 +112,12 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
-        id: "explicitInvocation",
-        label: "explicit mention",
+        id: "invocationToken",
+        label: "invocation token",
         kind: "string",
         payloadPath: ["issue", "body"],
         matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
         controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
       },
     ],
   },
@@ -138,15 +132,12 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
-        id: "explicitInvocation",
-        label: "explicit mention",
+        id: "invocationToken",
+        label: "invocation token",
         kind: "string",
         payloadPath: ["pull_request", "body"],
         matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
         controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
       },
       {
         id: "repository",
@@ -187,15 +178,12 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
-        id: "explicitInvocation",
-        label: "explicit mention",
+        id: "invocationToken",
+        label: "invocation token",
         kind: "string",
         payloadPath: ["review", "body"],
         matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
         controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
       },
       {
         id: "repository",
@@ -236,15 +224,12 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     logoKey: "github",
     parameters: [
       {
-        id: "explicitInvocation",
-        label: "explicit mention",
+        id: "invocationToken",
+        label: "invocation token",
         kind: "string",
         payloadPath: ["comment", "body"],
         matchMode: "contains_token",
-        defaultValue: "@mistlebot",
-        defaultEnabled: true,
         controlVariant: "explicit-invocation",
-        placeholder: 'Require "@mistlebot"',
       },
     ],
   },
@@ -600,7 +585,7 @@ export const AddSecondTrigger: Story = {
     selectedTriggerIds: [IssueCommentCreatedTriggerId],
     triggerParameterValues: {
       [IssueCommentCreatedTriggerId]: {
-        explicitInvocation: "@mistlebot",
+        invocationToken: "@mistlebot",
       },
     },
     eventOptions: GitHubEventOptions,

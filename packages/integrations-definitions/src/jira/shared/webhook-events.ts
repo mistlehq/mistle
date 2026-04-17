@@ -25,6 +25,15 @@ const JiraActorParameter = {
   placeholder: "Any actor",
 } as const;
 
+const JiraInvocationTokenParameter = {
+  id: "invocationToken",
+  label: "invocation token",
+  kind: "string",
+  payloadPath: ["comment", "mistlePlainText"],
+  matchMode: "contains_token",
+  controlVariant: "explicit-invocation",
+} as const;
+
 type JiraWebhookEventType =
   | "jira:issue_created"
   | "jira:issue_updated"
@@ -46,7 +55,13 @@ function createJiraWebhookEventDefinition(
     displayName: input.displayName,
     category: input.category,
     conversationKeyOptions: [JiraIssueConversationKeyOption],
-    parameters: [JiraIssueKeyParameter, JiraActorParameter],
+    parameters: [
+      ...(input.eventType === "comment_created" || input.eventType === "comment_updated"
+        ? [JiraInvocationTokenParameter]
+        : []),
+      JiraIssueKeyParameter,
+      JiraActorParameter,
+    ],
   };
 }
 

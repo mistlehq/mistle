@@ -462,63 +462,69 @@ describe("WebhookAutomationTriggerPicker", () => {
     expect(parameterSelect.textContent).toContain("pull request");
   });
 
-  it("renders explicit invocation parameters as an enabled switch", () => {
+  it("renders invocation token parameters as an optional input", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedTriggerIds: [
-        createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedTriggerIds: [triggerId],
       triggerParameterValues: {
-        [createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        })]: {
-          explicitInvocation: "@mistlebot",
+        [triggerId]: {
+          invocationToken: "@mistlebot",
         },
       },
     });
 
-    const toggle = screen
-      .getAllByRole("switch", {
-        name: /Only respond to @mistlebot/,
-      })
-      .find((element) => element.getAttribute("aria-checked") === "true");
-    if (toggle === undefined) {
-      throw new Error("Expected explicit invocation switch to be enabled.");
-    }
-
-    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getAllByText("includes").length).toBeGreaterThan(0);
+    expect(screen.getByDisplayValue("@mistlebot")).toBeDefined();
   });
 
   it("renders the saved explicit invocation value instead of the default", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
     renderTriggerPicker({
       hasConnectedIntegrations: true,
       selectedConnectionId: GitHubConnectionId,
-      selectedTriggerIds: [
-        createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        }),
-      ],
+      selectedTriggerIds: [triggerId],
       triggerParameterValues: {
-        [createWebhookAutomationTriggerId({
-          webhookSourceId: GitHubWebhookSourceId,
-          eventType: "github.issue_comment.created",
-        })]: {
-          explicitInvocation: "@review-bot",
+        [triggerId]: {
+          invocationToken: "@review-bot",
         },
       },
     });
 
-    expect(
-      screen.getByRole("switch", {
-        name: /Only respond to @review-bot/,
-      }),
-    ).toBeDefined();
+    expect(screen.getByDisplayValue("@review-bot")).toBeDefined();
+  });
+
+  it("renders an empty invocation token input without showing an error", () => {
+    const triggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+
+    renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedTriggerIds: [triggerId],
+      triggerParameterValues: {
+        [triggerId]: {
+          invocationToken: "",
+        },
+      },
+    });
+
+    expect(screen.queryByText("Enter an invocation token.")).toBeNull();
+    const emptyInvocationInput = screen
+      .getAllByRole("textbox")
+      .find((element) => element.getAttribute("value") === "");
+    if (emptyInvocationInput === undefined) {
+      throw new Error("Expected an empty invocation token input.");
+    }
   });
 
   it("renders unset enum-backed trigger parameters as placeholders", () => {

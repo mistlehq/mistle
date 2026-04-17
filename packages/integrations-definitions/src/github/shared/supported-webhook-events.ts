@@ -165,15 +165,12 @@ function createGitHubExplicitInvocationParameter(
   payloadPath: ReadonlyArray<string>,
 ): IntegrationWebhookEventParameterDefinition {
   return {
-    id: "explicitInvocation",
-    label: "explicit mention",
+    id: "invocationToken",
+    label: "invocation token",
     kind: "string",
     payloadPath: [...payloadPath],
     matchMode: "contains_token",
-    defaultValue: "@mistlebot",
-    defaultEnabled: true,
     controlVariant: "explicit-invocation",
-    placeholder: 'Require "@mistlebot"',
   };
 }
 
