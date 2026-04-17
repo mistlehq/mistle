@@ -36,17 +36,9 @@ export function formatSyncStateLabel(
 }
 
 export function formatResourceMetadata(input: {
-  lastErrorMessage?: string;
   lastSyncedAt?: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
+  syncState: "never-synced" | "syncing" | "ready";
 }): string {
-  if (input.syncState === "error") {
-    if (input.lastErrorMessage !== undefined) {
-      return input.lastErrorMessage;
-    }
-    return formatSyncStateLabel(input.syncState);
-  }
-
   if (input.syncState === "syncing") {
     if (input.lastSyncedAt !== undefined) {
       return `Synced ${formatDateTime(input.lastSyncedAt)}`;
@@ -63,11 +55,6 @@ export function formatResourceMetadata(input: {
   }
 
   return `Synced ${formatDateTime(input.lastSyncedAt)}`;
-}
-
-export function formatResourceHeading(input: { count: number; kind: string }): string {
-  const label = formatResourceLabel(input.kind);
-  return `${label} (${input.count})`;
 }
 
 export function formatResourceLabel(kind: string): string {

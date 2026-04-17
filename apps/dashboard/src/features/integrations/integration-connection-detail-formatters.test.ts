@@ -35,12 +35,5 @@ describe("integration connection detail formatters", () => {
         lastSyncedAt: "2026-03-11T04:25:00.000Z",
       }),
     ).toContain("Synced");
-    expect(
-      formatResourceMetadata({
-        syncState: "error",
-        lastErrorMessage: "Token expired.",
-      }),
-    ).toBe("Token expired.");
-    expect(formatResourceMetadata({ syncState: "error" })).toBe("Sync failed");
   });
 });

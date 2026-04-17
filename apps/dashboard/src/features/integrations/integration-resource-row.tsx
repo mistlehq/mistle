@@ -39,12 +39,15 @@ export function IntegrationResourceListItem(
   const [isExpanded, setIsExpanded] = useState(false);
   const resourceLabel = formatResourceLabel(input.resource.kind);
   const resourceCount = input.resource.count;
-  const errorTooltipMessage = resolveResourceErrorTooltipMessage({
-    resource: input.resource,
-    resourceItems: input.resourceItems,
-  });
-  const secondaryStatusText = resolveResourceSecondaryStatusText(input.resource);
-  const shouldRenderFooter = secondaryStatusText.length > 0;
+  const errorTooltipMessage =
+    input.resource.lastErrorMessage ?? input.resourceItems?.errorMessage ?? null;
+  const secondaryStatusText =
+    input.resource.syncState === "error"
+      ? ""
+      : formatResourceMetadata({
+          lastSyncedAt: input.resource.lastSyncedAt,
+          syncState: input.resource.syncState,
+        });
 
   return (
     <div
@@ -72,7 +75,7 @@ export function IntegrationResourceListItem(
               {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
             </span>
           </Button>
-          {shouldRenderResourceSyncStateText(input.resource.syncState) ? (
+          {input.resource.syncState === "error" ? (
             <div className="hidden items-center gap-1 sm:flex">
               <span className="text-destructive text-xs">
                 {formatSyncStateLabel(input.resource.syncState)}
@@ -125,7 +128,7 @@ export function IntegrationResourceListItem(
       {isExpanded && input.resourceItems !== null
         ? renderExpandedResourceItems(input.resourceItems)
         : null}
-      {shouldRenderFooter ? (
+      {secondaryStatusText.length > 0 ? (
         <div className="mt-1 pt-1 sm:hidden">
           <div className="flex min-w-0 items-center gap-1.5 pr-2 text-muted-foreground text-xs sm:pl-5">
             <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
@@ -135,40 +138,6 @@ export function IntegrationResourceListItem(
       ) : null}
     </div>
   );
-}
-
-function shouldRenderResourceSyncStateText(
-  syncState: IntegrationResourceListItemResourceSummary["syncState"],
-): boolean {
-  return syncState === "error";
-}
-
-function resolveResourceSecondaryStatusText(
-  resource: IntegrationResourceListItemResourceSummary,
-): string {
-  if (resource.syncState === "error") {
-    return "";
-  }
-
-  return formatResourceMetadata(resource);
-}
-
-function resolveResourceErrorTooltipMessage(input: {
-  resource: IntegrationResourceListItemResourceSummary;
-  resourceItems: IntegrationResourceListItemPreviewState | null;
-}): string | null {
-  if (input.resource.lastErrorMessage !== undefined) {
-    return input.resource.lastErrorMessage;
-  }
-
-  if (
-    input.resourceItems?.errorMessage !== null &&
-    input.resourceItems?.errorMessage !== undefined
-  ) {
-    return input.resourceItems.errorMessage;
-  }
-
-  return null;
 }
 
 function renderExpandedResourceItems(
