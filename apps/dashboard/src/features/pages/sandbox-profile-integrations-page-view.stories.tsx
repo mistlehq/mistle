@@ -16,6 +16,8 @@ import {
   StoryJiraConnection,
   StoryLinearConnection,
   StoryOpenAiConnection,
+  StoryPlanetScaleConnection,
+  StoryPlanetScaleTools,
 } from "./integrations-editor-section-story-support.js";
 import { IntegrationsEditorSection } from "./integrations-editor-section.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
@@ -54,6 +56,14 @@ const InitialRows: readonly SandboxProfileBindingEditorRow[] = [
     kind: "connector",
     config: {
       tools: ["jira-cli"],
+    },
+  },
+  {
+    clientId: "row-planetscale-connector",
+    connectionId: StoryPlanetScaleConnection.id,
+    kind: "connector",
+    config: {
+      tools: [...StoryPlanetScaleTools],
     },
   },
   {

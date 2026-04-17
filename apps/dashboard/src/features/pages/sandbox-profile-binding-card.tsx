@@ -1,4 +1,4 @@
-import { Button, Notice } from "@mistle/ui";
+import { Button, DetailLabel, Notice } from "@mistle/ui";
 import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
@@ -107,9 +107,7 @@ export function SandboxProfileBindingCard(input: {
         <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {summaryItems.map((item) => (
             <div className="gap-1 flex flex-col" key={item.label}>
-              <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                {item.label}
-              </dt>
+              <DetailLabel>{item.label}</DetailLabel>
               <dd className="text-sm">{item.value}</dd>
             </div>
           ))}

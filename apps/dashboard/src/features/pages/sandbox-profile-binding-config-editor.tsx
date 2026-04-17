@@ -67,6 +67,23 @@ type BindingConfigUiModel =
       defaultConfig?: Record<string, unknown> | undefined;
     };
 
+export type BindingToolToggleOption = {
+  label: string;
+  value: string;
+  checked: boolean;
+};
+
+export type BindingToolToggleModel =
+  | {
+      mode: "supported";
+      config: Record<string, unknown>;
+      options: readonly BindingToolToggleOption[];
+    }
+  | {
+      mode: "unsupported";
+      message: string;
+    };
+
 type ResolvedBindingEditorContext = {
   definition: IntegrationDefinition;
   connection: IntegrationConnectionSummary;
@@ -144,6 +161,71 @@ function createDefaultConfigFromSchema(schema: RJSFSchema): Record<string, unkno
     schema: resolveRecord(schema),
     formData: {},
   });
+}
+
+function resolveArrayFieldOptions(input: {
+  schema: RJSFSchema;
+  uiSchema: UiSchema<JsonObject, RJSFSchema>;
+  propertyKey: string;
+}): readonly { label: string; value: string }[] {
+  const properties = resolveSchemaProperties(input.schema);
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema)) {
+    return [];
+  }
+
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (isRecord(propertyUiSchema)) {
+    const enumNames = propertyUiSchema["ui:enumNames"];
+    const itemsSchema = propertySchema.items;
+    if (Array.isArray(enumNames) && isRecord(itemsSchema) && Array.isArray(itemsSchema.enum)) {
+      const options: { label: string; value: string }[] = [];
+      for (const [index, itemValue] of itemsSchema.enum.entries()) {
+        const itemLabel = enumNames[index];
+        if (typeof itemValue === "string" && typeof itemLabel === "string") {
+          options.push({
+            label: itemLabel,
+            value: itemValue,
+          });
+        }
+      }
+      return options;
+    }
+  }
+
+  const itemsSchema = propertySchema.items;
+  if (!isRecord(itemsSchema)) {
+    return [];
+  }
+
+  if (Array.isArray(itemsSchema.oneOf)) {
+    const options: { label: string; value: string }[] = [];
+    for (const option of itemsSchema.oneOf) {
+      if (
+        !isRecord(option) ||
+        typeof option.const !== "string" ||
+        typeof option.title !== "string"
+      ) {
+        continue;
+      }
+      options.push({
+        label: option.title,
+        value: option.const,
+      });
+    }
+    return options;
+  }
+
+  if (Array.isArray(itemsSchema.enum)) {
+    return itemsSchema.enum
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => ({
+        label: entry,
+        value: entry,
+      }));
+  }
+
+  return [];
 }
 
 function resolveBindingDefinitionContext(input: {
@@ -432,6 +514,61 @@ export function resolveBindingConfigUiModel(input: {
     row: input.row,
     context: contextResult.value,
   });
+}
+
+export function resolveBindingToolToggleModel(input: {
+  row: SandboxProfileBindingEditorRow;
+  connections: readonly IntegrationConnectionSummary[];
+  targets: readonly IntegrationTargetSummary[];
+}): BindingToolToggleModel {
+  const configUiModel = resolveBindingConfigUiModel(input);
+  if (configUiModel.mode === "unsupported") {
+    return {
+      mode: "unsupported",
+      message: configUiModel.message,
+    };
+  }
+
+  if (configUiModel.mode !== "form") {
+    return {
+      mode: "unsupported",
+      message: "This binding does not expose inline tool toggles.",
+    };
+  }
+
+  if (!configUiModel.visiblePropertyKeys.includes("tools")) {
+    return {
+      mode: "unsupported",
+      message: "This binding does not expose inline tool toggles.",
+    };
+  }
+
+  const options = resolveArrayFieldOptions({
+    schema: configUiModel.schema,
+    uiSchema: configUiModel.uiSchema,
+    propertyKey: "tools",
+  });
+  if (options.length === 0) {
+    return {
+      mode: "unsupported",
+      message: "This binding does not expose inline tool toggles.",
+    };
+  }
+
+  const selectedTools = new Set(
+    Array.isArray(configUiModel.value["tools"])
+      ? configUiModel.value["tools"].filter((entry): entry is string => typeof entry === "string")
+      : [],
+  );
+
+  return {
+    mode: "supported",
+    config: configUiModel.value,
+    options: options.map((option) => ({
+      ...option,
+      checked: selectedTools.has(option.value),
+    })),
+  };
 }
 
 export function SandboxProfileBindingConfigEditor(input: {

@@ -38,6 +38,19 @@ function createTarget(
     };
   }
 
+  if (kind === "connector") {
+    return {
+      targetKey,
+      displayName: targetKey,
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+  }
+
   return {
     targetKey,
     displayName: targetKey,
@@ -76,11 +89,21 @@ function Harness(): React.JSX.Element {
       targetKey: "target-git",
       status: "active",
     },
+    {
+      id: "conn-connector",
+      displayName: "Linear Workspace",
+      targetKey: "target-connector",
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    },
   ];
   const targets: readonly IntegrationTargetSummary[] = [
     createTarget("target-agent", "agent"),
     createTarget("target-agent-2", "agent"),
     createTarget("target-git", "git"),
+    createTarget("target-connector", "connector"),
   ];
 
   return (
@@ -135,7 +158,7 @@ function getSectionContainer(sectionTitle: string): HTMLElement {
     throw new Error(`Could not resolve section heading for ${sectionTitle}.`);
   }
 
-  const sectionContainer = sectionHeading.parentElement?.parentElement;
+  const sectionContainer = sectionHeading.closest("section");
 
   if (sectionContainer === null || sectionContainer === undefined) {
     throw new Error(`Could not resolve section container for ${sectionTitle}.`);
@@ -225,6 +248,38 @@ describe("IntegrationsEditorSection", () => {
 
     expect(within(listbox).getByText("Primary OpenAI Workspace")).toBeDefined();
     expect(within(listbox).getByText("Backup OpenAI Workspace")).toBeDefined();
+  });
+
+  it("renders connector bindings as inline tool switches without an edit action", async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(getSectionAddButton("Connectors"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Add connector" })).toBeNull();
+    });
+
+    const connectorsSection = getSectionContainer("Connectors");
+    const linearMcpCheckbox = within(connectorsSection).getByRole("checkbox", {
+      name: /Linear MCP/,
+    });
+
+    expect(within(connectorsSection).queryByRole("button", { name: "Edit binding" })).toBeNull();
+    expect(within(connectorsSection).getByRole("button", { name: "Remove binding" })).toBeDefined();
+    expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(linearMcpCheckbox);
+
+    await waitFor(() => {
+      expect(linearMcpCheckbox.getAttribute("aria-checked")).toBe("true");
+    });
   });
 
   it("disables adding another agent harness after one is assigned", async () => {

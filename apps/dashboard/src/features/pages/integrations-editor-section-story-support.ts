@@ -1,4 +1,7 @@
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions/openai";
+import {
+  PlanetScaleToolIds,
+  createOpenAiRawBindingCapabilitiesByConnectionMethod,
+} from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-string-array-widget-story-support.js";
@@ -92,7 +95,7 @@ export const StoryGithubConnection: IntegrationConnectionSummary = {
     connection_method: "github-app-installation",
     app_id: "123",
     app_slug: "mistle-github-app",
-    installation_id: 12345,
+    installation_id: "12345",
   },
 };
 
@@ -142,19 +145,49 @@ export const StoryLinearConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryPlanetScaleTarget: IntegrationTargetSummary = {
+  targetKey: "target-planetscale",
+  displayName: "PlanetScale",
+  logoKey: "planetscale",
+  familyId: "planetscale",
+  variantId: "planetscale-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryPlanetScaleConnection: IntegrationConnectionSummary = {
+  id: "connection-planetscale",
+  displayName: "PlanetScale Production",
+  targetKey: StoryPlanetScaleTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "oauth2-authorization-code",
+    client_id: "planetscale-story-client",
+  },
+};
+
 export const StoryIntegrationTargets = [
   StoryOpenAiTarget,
   StoryGithubTarget,
   StoryJiraTarget,
   StoryLinearTarget,
+  StoryPlanetScaleTarget,
 ] as const;
 export const StoryIntegrationConnections = [
   StoryOpenAiConnection,
   StoryGithubConnection,
   StoryJiraConnection,
   StoryLinearConnection,
+  StoryPlanetScaleConnection,
 ] as const;
 
 export const StoryGithubResources = createGithubRepositoryResources({
   connectionId: StoryGithubConnection.id,
 });
+
+export const StoryPlanetScaleTools = [
+  PlanetScaleToolIds.PLANETSCALE_MCP,
+  PlanetScaleToolIds.PLANETSCALE_INSIGHTS_MCP,
+] as const;

@@ -265,6 +265,7 @@ export function IntegrationsEditorSection(
             openAddDialog(kind);
           }}
           onEdit={openEditDialog}
+          onRowChange={props.onIntegrationBindingRowChange}
           onRemove={props.onRemoveIntegrationBindingRow}
           rowErrorsByClientId={props.integrationRowErrorsByClientId}
           rows={integrationRowsByKind[kind]}

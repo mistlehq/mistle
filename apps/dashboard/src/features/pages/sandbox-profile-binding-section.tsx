@@ -1,6 +1,18 @@
-import { Button, SectionBlock, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
-import { PlusIcon } from "@phosphor-icons/react";
+import {
+  Button,
+  Checkbox,
+  DetailLabel,
+  Notice,
+  SectionBlock,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@mistle/ui";
+import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import * as React from "react";
 
+import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
@@ -8,6 +20,7 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
+import { resolveBindingToolToggleModel } from "./sandbox-profile-binding-config-editor.js";
 
 function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
@@ -36,6 +49,247 @@ function formatBindingSectionConstraint(kind: SandboxIntegrationBindingKind): st
   return null;
 }
 
+function resolveRowBindingMetadata(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): {
+  connection: IntegrationConnectionSummary;
+  target: IntegrationTargetSummary | undefined;
+} | null {
+  const connection = input.availableConnections.find(
+    (candidate) => candidate.id === input.row.connectionId,
+  );
+  if (connection === undefined) {
+    return null;
+  }
+
+  return {
+    connection,
+    target: input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    ),
+  };
+}
+
+function ConnectorBindingRows(input: {
+  rows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowErrorsByClientId: Readonly<Record<string, string>>;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onRemove: (clientId: string) => void;
+}): React.JSX.Element {
+  function renderToolContent(params: {
+    row: SandboxProfileBindingEditorRow;
+    toolToggleModel: ReturnType<typeof resolveBindingToolToggleModel>;
+    rowErrorMessage: string | undefined;
+    detailLabelClassName?: string;
+  }): React.JSX.Element {
+    const supportedToolToggleModel =
+      params.toolToggleModel.mode === "supported" ? params.toolToggleModel : undefined;
+
+    return (
+      <div className="flex min-w-0 flex-col gap-2">
+        <DetailLabel as="p" className={params.detailLabelClassName}>
+          Tools
+        </DetailLabel>
+        {supportedToolToggleModel === undefined ? (
+          <p className="text-sm text-destructive">{params.toolToggleModel.message}</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {supportedToolToggleModel.options.map((option) => (
+              <label className="flex items-center gap-1.5" key={option.value}>
+                <Checkbox
+                  aria-label={option.label}
+                  checked={option.checked}
+                  onCheckedChange={(checked) => {
+                    input.onChange(params.row.clientId, {
+                      config: {
+                        ...supportedToolToggleModel.config,
+                        tools:
+                          checked === true
+                            ? supportedToolToggleModel.options
+                                .filter(
+                                  (candidate) =>
+                                    candidate.checked || candidate.value === option.value,
+                                )
+                                .map((candidate) => candidate.value)
+                            : supportedToolToggleModel.options
+                                .filter(
+                                  (candidate) =>
+                                    candidate.checked && candidate.value !== option.value,
+                                )
+                                .map((candidate) => candidate.value),
+                      },
+                    });
+                  }}
+                />
+                <span className="text-sm">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {params.rowErrorMessage === undefined ? null : (
+          <Notice variant="alert">{params.rowErrorMessage}</Notice>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="text-muted-foreground hidden border-b py-2 text-xs uppercase tracking-wide md:grid md:grid-cols-[minmax(0,12rem)_minmax(0,14rem)_minmax(0,1fr)_auto] md:items-center md:gap-x-4">
+        <p>Integration</p>
+        <p>Connection</p>
+        <p>Tools</p>
+        <div />
+      </div>
+      <div className="hidden md:flex md:flex-col">
+        {input.rows.map((row) => {
+          const rowMetadata = resolveRowBindingMetadata({
+            row,
+            availableConnections: input.availableConnections,
+            availableTargets: input.availableTargets,
+          });
+          const target = rowMetadata?.target;
+          const connectionDisplayName =
+            rowMetadata === null
+              ? undefined
+              : formatConnectionDisplayName({
+                  connection: rowMetadata.connection,
+                });
+          const toolToggleModel = resolveBindingToolToggleModel({
+            row,
+            connections: input.availableConnections,
+            targets: input.availableTargets,
+          });
+          const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
+
+          return (
+            <div
+              className="grid border-b py-4 md:grid-cols-[minmax(0,12rem)_minmax(0,14rem)_minmax(0,1fr)_auto] md:items-center md:gap-x-4"
+              key={row.clientId}
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  {target?.logoKey ? (
+                    <img
+                      alt={`${target.displayName} logo`}
+                      className="h-5 w-5 rounded-sm"
+                      src={resolveIntegrationLogoPath({ logoKey: target.logoKey })}
+                    />
+                  ) : (
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-muted text-[10px] font-semibold text-muted-foreground">
+                      {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <p className="truncate text-sm font-medium">
+                    {target?.displayName ?? "Integration"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-muted-foreground min-w-0 text-sm">
+                <p className="truncate">{connectionDisplayName ?? row.connectionId}</p>
+              </div>
+              <div>
+                {renderToolContent({
+                  row,
+                  toolToggleModel,
+                  rowErrorMessage,
+                  detailLabelClassName: "sr-only",
+                })}
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  aria-label="Remove binding"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    input.onRemove(row.clientId);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex flex-col md:hidden">
+        {input.rows.map((row) => {
+          const rowMetadata = resolveRowBindingMetadata({
+            row,
+            availableConnections: input.availableConnections,
+            availableTargets: input.availableTargets,
+          });
+          const target = rowMetadata?.target;
+          const connectionDisplayName =
+            rowMetadata === null
+              ? undefined
+              : formatConnectionDisplayName({
+                  connection: rowMetadata.connection,
+                });
+          const toolToggleModel = resolveBindingToolToggleModel({
+            row,
+            connections: input.availableConnections,
+            targets: input.availableTargets,
+          });
+          const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
+
+          return (
+            <div className="relative grid gap-4 border-b py-4 pr-10" key={row.clientId}>
+              <div className="min-w-0 flex items-center gap-3">
+                {target?.logoKey ? (
+                  <img
+                    alt={`${target.displayName} logo`}
+                    className="h-5 w-5 rounded-sm"
+                    src={resolveIntegrationLogoPath({ logoKey: target.logoKey })}
+                  />
+                ) : (
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-muted text-[10px] font-semibold text-muted-foreground">
+                    {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <div className="min-w-0 flex flex-col gap-0.5">
+                  <p className="truncate text-sm font-medium">
+                    {target?.displayName ?? "Integration"}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {connectionDisplayName ?? row.connectionId}
+                  </p>
+                </div>
+              </div>
+              {renderToolContent({
+                row,
+                toolToggleModel,
+                rowErrorMessage,
+              })}
+              <div className="absolute top-4 right-0 self-start">
+                <Button
+                  aria-label="Remove binding"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    input.onRemove(row.clientId);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function SandboxProfileBindingSection(input: {
   kind: SandboxIntegrationBindingKind;
   rows: readonly SandboxProfileBindingEditorRow[];
@@ -45,6 +299,10 @@ export function SandboxProfileBindingSection(input: {
   rowErrorsByClientId: Readonly<Record<string, string>>;
   onAdd: () => void;
   onEdit: (row: SandboxProfileBindingEditorRow) => void;
+  onRowChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
   onRemove: (clientId: string) => void;
 }): React.JSX.Element {
   const addConstraintMessage =
@@ -87,21 +345,34 @@ export function SandboxProfileBindingSection(input: {
           </Tooltip>
         )
       }
-      children={input.rows.map((row) => (
-        <SandboxProfileBindingCard
-          availableConnections={input.availableConnections}
-          availableTargets={input.availableTargets}
-          errorMessage={input.rowErrorsByClientId[row.clientId]}
-          key={row.clientId}
-          onEdit={() => {
-            input.onEdit(row);
-          }}
-          onRemove={() => {
-            input.onRemove(row.clientId);
-          }}
-          row={row}
-        />
-      ))}
+      children={
+        input.kind === "connector" ? (
+          <ConnectorBindingRows
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            onChange={input.onRowChange}
+            onRemove={input.onRemove}
+            rowErrorsByClientId={input.rowErrorsByClientId}
+            rows={input.rows}
+          />
+        ) : (
+          input.rows.map((row) => (
+            <SandboxProfileBindingCard
+              availableConnections={input.availableConnections}
+              availableTargets={input.availableTargets}
+              errorMessage={input.rowErrorsByClientId[row.clientId]}
+              key={row.clientId}
+              onEdit={() => {
+                input.onEdit(row);
+              }}
+              onRemove={() => {
+                input.onRemove(row.clientId);
+              }}
+              row={row}
+            />
+          ))
+        )
+      }
       title={formatBindingSectionTitle(input.kind)}
     />
   );
