@@ -88,15 +88,18 @@ function ConnectorBindingRows(input: {
     toolToggleModel: ReturnType<typeof resolveBindingToolToggleModel>;
     rowErrorMessage: string | undefined;
     detailLabelClassName?: string;
+    showLabel?: boolean;
   }): React.JSX.Element {
     const supportedToolToggleModel =
       params.toolToggleModel.mode === "supported" ? params.toolToggleModel : undefined;
 
     return (
-      <div className="flex min-w-0 flex-col gap-2">
-        <DetailLabel as="p" className={params.detailLabelClassName}>
-          Tools
-        </DetailLabel>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        {params.showLabel === false ? null : (
+          <DetailLabel as="p" className={params.detailLabelClassName}>
+            Tools
+          </DetailLabel>
+        )}
         {supportedToolToggleModel === undefined ? (
           <p className="text-sm text-destructive">{params.toolToggleModel.message}</p>
         ) : (
@@ -243,7 +246,7 @@ function ConnectorBindingRows(input: {
 
           return (
             <div className="relative grid gap-4 border-b py-4 pr-10" key={row.clientId}>
-              <div className="min-w-0 flex items-center gap-3">
+              <div className="min-w-0 flex items-start gap-3">
                 {target?.logoKey ? (
                   <img
                     alt={`${target.displayName} logo`}
@@ -259,16 +262,19 @@ function ConnectorBindingRows(input: {
                   <p className="truncate text-sm font-medium">
                     {target?.displayName ?? "Integration"}
                   </p>
-                  <p className="text-muted-foreground truncate text-xs">
+                  <p className="text-muted-foreground truncate text-sm">
                     {connectionDisplayName ?? row.connectionId}
                   </p>
+                  <div className="pt-4">
+                    {renderToolContent({
+                      row,
+                      toolToggleModel,
+                      rowErrorMessage,
+                      showLabel: false,
+                    })}
+                  </div>
                 </div>
               </div>
-              {renderToolContent({
-                row,
-                toolToggleModel,
-                rowErrorMessage,
-              })}
               <div className="absolute top-4 right-0 self-start">
                 <Button
                   aria-label="Remove binding"
