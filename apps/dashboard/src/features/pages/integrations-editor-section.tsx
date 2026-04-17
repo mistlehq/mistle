@@ -4,7 +4,6 @@ import { useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
-  createDefaultBindingConfig,
   resolveBindingKindFromTarget,
   type IntegrationConnectionSummary,
   type IntegrationTargetSummary,
@@ -106,24 +105,11 @@ export function IntegrationsEditorSection(
     kind: SandboxIntegrationBindingKind,
     connectionId: string,
   ): SandboxProfileBindingEditorRow {
-    const selectedConnection = availableConnectionsByKind[kind].find(
-      (connection) => connection.id === connectionId,
-    );
-    const selectedTarget =
-      selectedConnection === undefined
-        ? undefined
-        : props.availableTargets.find(
-            (target) => target.targetKey === selectedConnection.targetKey,
-          );
-
     return {
       clientId: "dialog-draft",
       connectionId,
       kind,
-      config: createDefaultBindingConfig({
-        ...(selectedConnection === undefined ? {} : { connection: selectedConnection }),
-        ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-      }),
+      config: {},
     };
   }
 

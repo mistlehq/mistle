@@ -62,6 +62,10 @@ export function SandboxProfileBindingDialog(input: {
   ) => void;
   onSave: () => void;
 }): React.JSX.Element {
+  if (input.state === null) {
+    return <></>;
+  }
+
   return (
     <Dialog
       onOpenChange={(nextOpen) => {
@@ -69,89 +73,87 @@ export function SandboxProfileBindingDialog(input: {
           input.onClose();
         }
       }}
-      open={input.state !== null}
+      open
     >
-      {input.state ? (
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader variant="sectioned">
-            <DialogTitle>
-              {input.state.mode === "add"
-                ? formatAddBindingLabel(input.state.row.kind)
-                : "Edit binding"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className={IntegrationHorizontalFieldGroupClassName}>
-            <Field className="gap-2" contentWidth="fill" orientation="horizontal">
-              <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
-              <FieldContent>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null) {
-                      return;
-                    }
-                    input.onConnectionIdChange(nextValue);
-                  }}
-                  value={resolveSelectableValue({
-                    selectedValue: input.state.row.connectionId,
-                    optionValues: input.availableConnectionsByKind[input.state.row.kind].map(
-                      (connection) => connection.id,
-                    ),
-                  })}
-                >
-                  <div className="md:flex md:justify-end">
-                    <SelectTrigger
-                      aria-label="Add binding connection"
-                      className="w-full md:w-auto md:min-w-fit md:max-w-full"
-                      id="add-binding-connection"
-                    >
-                      <SelectValue placeholder="Select integration connection">
-                        {input.resolveSelectedConnectionDisplayName(input.state.row)}
-                      </SelectValue>
-                    </SelectTrigger>
-                  </div>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={IntegrationSelectContentClassName}
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader variant="sectioned">
+          <DialogTitle>
+            {input.state.mode === "add"
+              ? formatAddBindingLabel(input.state.row.kind)
+              : "Edit binding"}
+          </DialogTitle>
+        </DialogHeader>
+        <div className={IntegrationHorizontalFieldGroupClassName}>
+          <Field className="gap-2" contentWidth="fill" orientation="horizontal">
+            <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
+            <FieldContent>
+              <Select
+                onValueChange={(nextValue) => {
+                  if (nextValue === null) {
+                    return;
+                  }
+                  input.onConnectionIdChange(nextValue);
+                }}
+                value={resolveSelectableValue({
+                  selectedValue: input.state.row.connectionId,
+                  optionValues: input.availableConnectionsByKind[input.state.row.kind].map(
+                    (connection) => connection.id,
+                  ),
+                })}
+              >
+                <div className="md:flex md:justify-end">
+                  <SelectTrigger
+                    aria-label="Add binding connection"
+                    className="w-full md:w-auto md:min-w-fit md:max-w-full"
+                    id="add-binding-connection"
                   >
-                    {input.availableConnectionsByKind[input.state.row.kind].map((connection) => (
-                      <SelectItem key={connection.id} value={connection.id}>
-                        {formatConnectionDisplayName({ connection })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FieldContent>
-            </Field>
-            <SandboxProfileBindingConfigEditor
-              availableConnections={input.availableConnections}
-              availableTargets={input.availableTargets}
-              layout="horizontal"
-              onIntegrationBindingRowChange={input.onRowChange}
-              row={input.state.row}
-            />
-            {input.state.error ? (
-              <p className="text-destructive text-sm">{input.state.error}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button onClick={input.onClose} type="button" variant="outline">
-              Cancel
-            </Button>
-            <Button
-              disabled={
-                input.isSubmittingIntegrationBindings ||
-                input.availableConnectionsByKind[input.state.row.kind].length === 0
-              }
-              onClick={input.onSave}
-              type="button"
-            >
-              {input.state.mode === "add" ? <PlusIcon /> : null}
-              {input.state.mode === "add" ? "Add" : "Save changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      ) : null}
+                    <SelectValue placeholder="Select integration connection">
+                      {input.resolveSelectedConnectionDisplayName(input.state.row)}
+                    </SelectValue>
+                  </SelectTrigger>
+                </div>
+                <SelectContent
+                  align="end"
+                  alignItemWithTrigger={false}
+                  className={IntegrationSelectContentClassName}
+                >
+                  {input.availableConnectionsByKind[input.state.row.kind].map((connection) => (
+                    <SelectItem key={connection.id} value={connection.id}>
+                      {formatConnectionDisplayName({ connection })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldContent>
+          </Field>
+          <SandboxProfileBindingConfigEditor
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            layout="horizontal"
+            onIntegrationBindingRowChange={input.onRowChange}
+            row={input.state.row}
+          />
+          {input.state.error ? (
+            <p className="text-destructive text-sm">{input.state.error}</p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button onClick={input.onClose} type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={
+              input.isSubmittingIntegrationBindings ||
+              input.availableConnectionsByKind[input.state.row.kind].length === 0
+            }
+            onClick={input.onSave}
+            type="button"
+          >
+            {input.state.mode === "add" ? <PlusIcon /> : null}
+            {input.state.mode === "add" ? "Add" : "Save changes"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }
