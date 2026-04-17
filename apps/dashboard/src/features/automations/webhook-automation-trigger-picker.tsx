@@ -232,46 +232,48 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
         )}
       </div>
 
-      <ComboboxContent
-        align={input.variant === "header" ? "end" : "start"}
-        anchor={anchorRef}
-        className="w-[min(34rem,calc(100vw-2rem))] p-0"
-      >
-        {input.variant === "header" ? (
-          <div className="border-b p-1">
-            <ComboboxInput
-              aria-invalid={input.error === undefined ? undefined : true}
-              className="w-full"
-              disabled={pickerState.disabled}
-              id={triggerPickerId}
-              placeholder="Search triggers"
-              showClear={false}
-            />
-          </div>
-        ) : null}
-        <ComboboxList className="max-h-80">
-          {pickerState.groupedAvailableEventOptions.map((group) => (
-            <ComboboxGroup key={group.connectionLabel}>
-              <ComboboxLabel className="flex items-center gap-2">
-                {group.logoKey === undefined ? null : (
-                  <img
-                    alt=""
-                    aria-hidden
-                    className="size-3.5 shrink-0"
-                    src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
-                  />
-                )}
-                <span>{group.connectionLabel}</span>
-              </ComboboxLabel>
-              {group.items.map((option) => (
-                <ComboboxItem key={option.id} value={option.id}>
-                  <span className="truncate">{option.label}</span>
-                </ComboboxItem>
-              ))}
-            </ComboboxGroup>
-          ))}
-        </ComboboxList>
-      </ComboboxContent>
+      {isOpen ? (
+        <ComboboxContent
+          align={input.variant === "header" ? "end" : "start"}
+          anchor={anchorRef}
+          className="w-[min(34rem,calc(100vw-2rem))] p-0"
+        >
+          {input.variant === "header" ? (
+            <div className="border-b p-1">
+              <ComboboxInput
+                aria-invalid={input.error === undefined ? undefined : true}
+                className="w-full"
+                disabled={pickerState.disabled}
+                id={triggerPickerId}
+                placeholder="Search triggers"
+                showClear={false}
+              />
+            </div>
+          ) : null}
+          <ComboboxList className="max-h-80">
+            {pickerState.groupedAvailableEventOptions.map((group) => (
+              <ComboboxGroup key={group.connectionLabel}>
+                <ComboboxLabel className="flex items-center gap-2">
+                  {group.logoKey === undefined ? null : (
+                    <img
+                      alt=""
+                      aria-hidden
+                      className="size-3.5 shrink-0"
+                      src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
+                    />
+                  )}
+                  <span>{group.connectionLabel}</span>
+                </ComboboxLabel>
+                {group.items.map((option) => (
+                  <ComboboxItem key={option.id} value={option.id}>
+                    <span className="truncate">{option.label}</span>
+                  </ComboboxItem>
+                ))}
+              </ComboboxGroup>
+            ))}
+          </ComboboxList>
+        </ComboboxContent>
+      ) : null}
     </Combobox>
   );
 }
