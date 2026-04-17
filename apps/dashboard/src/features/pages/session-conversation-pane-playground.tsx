@@ -132,13 +132,12 @@ function renderMeasurementHud(input: {
   ] as const;
 
   return (
-    <aside className="bg-background/95 text-foreground sticky top-4 flex w-72 flex-col gap-3 rounded-xl border p-3 shadow-lg backdrop-blur-sm">
-      <div className="flex items-baseline justify-between gap-3">
+    <aside className="bg-background/95 text-foreground flex w-56 flex-col gap-3 rounded-xl border p-3 shadow-lg backdrop-blur-sm">
+      <div className="flex items-baseline gap-3">
         <p className="font-medium text-xs tracking-[0.18em] uppercase">Measurements</p>
-        <p className="text-muted-foreground text-[11px] uppercase tracking-[0.18em]">Live</p>
       </div>
-      <dl className="grid grid-cols-[auto_auto] justify-between gap-x-4 gap-y-1.5 text-xs">
-        {rows.map(([label, value, target]) => {
+      <dl className="flex flex-col gap-1.5 text-xs">
+        {rows.map(([label, _value, target]) => {
           const isHovered = target !== null && input.hoveredTarget === target;
           const interactiveProps =
             target === null
@@ -164,16 +163,6 @@ function renderMeasurementHud(input: {
               >
                 {label}
               </dt>
-              <dd
-                className={[
-                  "font-mono rounded px-1 py-0.5 transition-colors",
-                  target === null ? "" : "cursor-default",
-                  isHovered ? "bg-muted/80" : "",
-                ].join(" ")}
-                {...interactiveProps}
-              >
-                {value}
-              </dd>
             </Fragment>
           );
         })}
@@ -291,7 +280,7 @@ export function renderConversationPaneLayoutPlayground(
         }
       `}</style>
       <div className="relative h-full min-h-0 w-full">
-        <div className="pointer-events-none absolute top-4 right-6 hidden w-80 translate-x-[calc(100%+3rem)] 2xl:flex 2xl:flex-col 2xl:gap-4">
+        <div className="pointer-events-none fixed top-4 right-6 z-20 hidden w-56 xl:flex xl:flex-col">
           <div className="pointer-events-auto">
             {renderMeasurementHud({
               fixture,
