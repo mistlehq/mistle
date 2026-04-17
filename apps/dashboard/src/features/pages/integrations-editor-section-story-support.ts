@@ -96,8 +96,64 @@ export const StoryGithubConnection: IntegrationConnectionSummary = {
   },
 };
 
-export const StoryIntegrationTargets = [StoryOpenAiTarget, StoryGithubTarget] as const;
-export const StoryIntegrationConnections = [StoryOpenAiConnection, StoryGithubConnection] as const;
+export const StoryJiraTarget: IntegrationTargetSummary = {
+  targetKey: "target-jira",
+  displayName: "Jira",
+  logoKey: "jira",
+  familyId: "jira",
+  variantId: "jira-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryJiraConnection: IntegrationConnectionSummary = {
+  id: "connection-jira",
+  displayName: "Jira Production",
+  targetKey: StoryJiraTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "jira-personal-api-token",
+    site_url: "https://mistle.atlassian.net",
+    email: "user@example.com",
+  },
+};
+
+export const StoryLinearTarget: IntegrationTargetSummary = {
+  targetKey: "target-linear",
+  displayName: "Linear",
+  logoKey: "linear",
+  familyId: "linear",
+  variantId: "linear-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryLinearConnection: IntegrationConnectionSummary = {
+  id: "connection-linear",
+  displayName: "Linear Workspace",
+  targetKey: StoryLinearTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
+export const StoryIntegrationTargets = [
+  StoryOpenAiTarget,
+  StoryGithubTarget,
+  StoryJiraTarget,
+  StoryLinearTarget,
+] as const;
+export const StoryIntegrationConnections = [
+  StoryOpenAiConnection,
+  StoryGithubConnection,
+  StoryJiraConnection,
+  StoryLinearConnection,
+] as const;
 
 export const StoryGithubResources = createGithubRepositoryResources({
   connectionId: StoryGithubConnection.id,
