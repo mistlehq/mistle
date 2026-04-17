@@ -2896,7 +2896,7 @@ export interface paths {
                       }
                     | {
                         /** @enum {string} */
-                        controlVariant?: "invocation-token";
+                        controlVariant?: "explicit-invocation";
                         defaultEnabled?: boolean;
                         defaultValue?: string;
                         id: string;
