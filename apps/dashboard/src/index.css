@@ -43,25 +43,16 @@
 }
 
 .chat-markdown-content ol {
-  list-style: none;
-  padding-inline-start: 0.25rem;
-  counter-reset: chat-markdown-ordered-list;
+  padding-inline-start: 1.5rem;
 }
 
 .chat-markdown-content ol > [data-streamdown="list-item"] {
-  position: relative;
-  padding-left: 1.35rem;
-  counter-increment: chat-markdown-ordered-list;
+  padding-left: 0;
 }
 
-.chat-markdown-content ol > [data-streamdown="list-item"]::before {
-  content: counter(chat-markdown-ordered-list) ".";
-  position: absolute;
-  left: 0;
-  top: 0;
+.chat-markdown-content ol > [data-streamdown="list-item"]::marker {
   font: inherit;
   color: inherit;
-  line-height: 1.5rem;
 }
 
 .chat-markdown-content .contains-task-list {
