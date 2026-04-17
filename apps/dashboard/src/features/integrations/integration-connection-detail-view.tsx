@@ -17,7 +17,7 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { JiraWebhookEventDisplayNameByType } from "../../../../../packages/integrations-definitions/src/jira-shared.ts";
+import { JiraWebhookEventDisplayNameByType } from "../../../../../packages/integrations-definitions/src/jira-shared";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { CopyableValue } from "../shared/copyable-value.js";
