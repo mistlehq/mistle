@@ -44,7 +44,7 @@ export function formatResourceMetadata(input: {
     if (input.lastErrorMessage !== undefined) {
       return input.lastErrorMessage;
     }
-    return "The last sync attempt failed.";
+    return formatSyncStateLabel(input.syncState);
   }
 
   if (input.syncState === "syncing") {
@@ -92,16 +92,4 @@ export function formatResourceLabel(kind: string): string {
 
 export function formatResourceCountSummary(input: { count: number; kind: string }): string {
   return `${input.count} resources`;
-}
-
-export function formatResourceInlineMetadata(input: {
-  lastErrorMessage?: string;
-  lastSyncedAt?: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
-}): string {
-  if (input.syncState === "error" && input.lastErrorMessage !== undefined) {
-    return "The last sync attempt failed.";
-  }
-
-  return formatResourceMetadata(input);
 }

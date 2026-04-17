@@ -1,11 +1,18 @@
-import { Badge, BadgeListField, Button, Notice } from "@mistle/ui";
+import {
+  BadgeListField,
+  Button,
+  Notice,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@mistle/ui";
 import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import {
   formatResourceCountSummary,
-  formatResourceInlineMetadata,
   formatResourceLabel,
+  formatResourceMetadata,
   formatSyncStateLabel,
 } from "./integration-connection-detail-formatters.js";
 import type { IntegrationConnectionResource } from "./integrations-service.js";
@@ -40,12 +47,15 @@ export function IntegrationResourceListItem(
   const [isExpanded, setIsExpanded] = useState(false);
   const resourceLabel = formatResourceLabel(input.resource.kind);
   const resourceCount = input.resource.count;
-  const hasPreviewError = input.resourceItems?.previewState === "error";
+  const errorTooltipMessage = resolveResourceErrorTooltipMessage({
+    resource: input.resource,
+    resourceItems: input.resourceItems,
+  });
   const secondaryStatusText = resolveResourceSecondaryStatusText({
     resource: input.resource,
     previewState: input.resourceItems?.previewState ?? null,
   });
-  const shouldRenderFooter = secondaryStatusText.length > 0 || hasPreviewError;
+  const shouldRenderFooter = secondaryStatusText.length > 0;
 
   return (
     <div
@@ -73,10 +83,25 @@ export function IntegrationResourceListItem(
               {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
             </span>
           </Button>
-          {shouldShowResourceSyncStateBadge(input.resource.syncState) && !hasPreviewError ? (
-            <Badge className="hidden sm:inline-flex" variant="secondary">
-              {formatSyncStateLabel(input.resource.syncState)}
-            </Badge>
+          {shouldRenderResourceSyncStateText(input.resource.syncState) ? (
+            <div className="hidden items-center gap-1 sm:flex">
+              <span className="text-destructive text-xs">
+                {formatSyncStateLabel(input.resource.syncState)}
+              </span>
+              {errorTooltipMessage === null ? null : (
+                <Tooltip delay={0}>
+                  <TooltipTrigger
+                    aria-label="View sync error details"
+                    className="inline-flex size-4 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 text-[10px] text-destructive"
+                  >
+                    !
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
+                    {errorTooltipMessage}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           ) : null}
         </div>
         <div className="hidden min-w-0 items-center gap-2 sm:flex sm:shrink-0">
@@ -109,7 +134,9 @@ export function IntegrationResourceListItem(
         ) : null}
       </div>
       {input.resource.lastErrorMessage ? (
-        <Notice variant="alert">{input.resource.lastErrorMessage}</Notice>
+        <Notice appearance="subtle" variant="alert">
+          {input.resource.lastErrorMessage}
+        </Notice>
       ) : null}
       {isExpanded && input.resourceItems !== null
         ? renderExpandedResourceItems(input.resourceItems)
@@ -126,21 +153,36 @@ export function IntegrationResourceListItem(
   );
 }
 
-function shouldShowResourceSyncStateBadge(
+function shouldRenderResourceSyncStateText(
   syncState: IntegrationResourceListItemResourceSummary["syncState"],
 ): boolean {
-  return syncState !== "ready" && syncState !== "syncing" && syncState !== "never-synced";
+  return syncState === "error";
 }
 
 function resolveResourceSecondaryStatusText(input: {
   resource: IntegrationResourceListItemResourceSummary;
   previewState: "error" | "not-synced" | null;
 }): string {
-  if (input.previewState === "error") {
-    return "Sync failed";
+  if (input.previewState === "error" || input.resource.syncState === "error") {
+    return "";
   }
 
-  return formatResourceInlineMetadata(input.resource);
+  return formatResourceMetadata(input.resource);
+}
+
+function resolveResourceErrorTooltipMessage(input: {
+  resource: IntegrationResourceListItemResourceSummary;
+  resourceItems: IntegrationResourceListItemPreviewState | null;
+}): string | null {
+  if (input.resource.lastErrorMessage !== undefined) {
+    return input.resource.lastErrorMessage;
+  }
+
+  if (input.resourceItems?.previewState === "error" && input.resourceItems.errorMessage !== null) {
+    return input.resourceItems.errorMessage;
+  }
+
+  return null;
 }
 
 function renderExpandedResourceItems(
@@ -174,7 +216,7 @@ function renderExpandedResourceItems(
     }
 
     return (
-      <Notice className="mt-1" variant="alert">
+      <Notice appearance="subtle" className="mt-1" variant="alert">
         {resourceItems.errorMessage}
       </Notice>
     );

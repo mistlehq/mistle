@@ -41,5 +41,6 @@ describe("integration connection detail formatters", () => {
         lastErrorMessage: "Token expired.",
       }),
     ).toBe("Token expired.");
+    expect(formatResourceMetadata({ syncState: "error" })).toBe("Sync failed");
   });
 });
