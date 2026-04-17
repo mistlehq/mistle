@@ -770,16 +770,8 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
     await ptyClient.connect();
 
     const marker = `mistle-local-compose-${randomUUID()}`;
-    await ptyClient.open({
-      ptySessionId: "terminal",
-      cols: 120,
-      rows: 40,
-      cwd: "/root",
-      command: "sh",
-      args: ["-lc", `printf '%s\\n' ${shellQuote(marker)}`],
-    });
-
-    await new Promise<void>((resolvePromise, rejectPromise) => {
+    let cleanupPtyListeners = (): void => {};
+    const waitForPtyExit = new Promise<void>((resolvePromise, rejectPromise) => {
       const timeoutSignal = AbortSignal.timeout(30_000);
       const removeExitListener = ptyClient.onExit((exitInfo) => {
         cleanup();
@@ -821,9 +813,26 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
         removeResetListener();
         timeoutSignal.removeEventListener("abort", onTimeout);
       };
+      cleanupPtyListeners = cleanup;
 
       timeoutSignal.addEventListener("abort", onTimeout, { once: true });
     });
+
+    try {
+      await ptyClient.open({
+        ptySessionId: "terminal",
+        cols: 120,
+        rows: 40,
+        cwd: "/root",
+        command: "sh",
+        args: ["-lc", `printf '%s\\n' ${shellQuote(marker)}`],
+      });
+
+      await waitForPtyExit;
+    } catch (error) {
+      cleanupPtyListeners();
+      throw error;
+    }
   } finally {
     transport.disconnect(1000, "local compose smoke test cleanup");
   }

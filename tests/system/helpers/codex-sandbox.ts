@@ -765,16 +765,8 @@ async function runSandboxPtyCommand(input: {
     });
 
     await ptyClient.connect();
-    await ptyClient.open({
-      ptySessionId: "terminal",
-      cols: 120,
-      rows: 40,
-      cwd: input.cwd ?? "/root",
-      command: input.command,
-      ...(input.args === undefined ? {} : { args: input.args }),
-    });
-
-    const exit = await new Promise<{ exitCode: number }>((resolve, reject) => {
+    let cleanupPtyListeners = (): void => {};
+    const waitForExit = new Promise<{ exitCode: number }>((resolve, reject) => {
       const timeoutSignal = AbortSignal.timeout(input.timeoutMs ?? 30_000);
       const removeExitListener = ptyClient.onExit((exitInfo) => {
         cleanup();
@@ -806,9 +798,27 @@ async function runSandboxPtyCommand(input: {
         removeResetListener();
         timeoutSignal.removeEventListener("abort", onTimeout);
       };
+      cleanupPtyListeners = cleanup;
 
       timeoutSignal.addEventListener("abort", onTimeout, { once: true });
     });
+    let exit;
+
+    try {
+      await ptyClient.open({
+        ptySessionId: "terminal",
+        cols: 120,
+        rows: 40,
+        cwd: input.cwd ?? "/root",
+        command: input.command,
+        ...(input.args === undefined ? {} : { args: input.args }),
+      });
+
+      exit = await waitForExit;
+    } catch (error) {
+      cleanupPtyListeners();
+      throw error;
+    }
 
     return {
       exitCode: exit.exitCode,

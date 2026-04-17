@@ -17,7 +17,7 @@ require_env() {
 }
 
 escape_js_string() {
-  printf '%s' "$1" | sed "s/\\\\/\\\\\\\\/g; s/'/'\\\\''/g"
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
 }
 
 require_boolean() {
@@ -53,7 +53,7 @@ escaped_control_plane_api_origin=$(escape_js_string "${MISTLE_DASHBOARD_CONTROL_
 
 cat <<EOF >/usr/share/nginx/html/runtime-config.js
 window.__MISTLE_RUNTIME_CONFIG__ = {
-  controlPlaneApiOrigin: '${escaped_control_plane_api_origin}',
+  controlPlaneApiOrigin: "${escaped_control_plane_api_origin}",
   authMethodGoogle: '${MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE}',
 };
 EOF
