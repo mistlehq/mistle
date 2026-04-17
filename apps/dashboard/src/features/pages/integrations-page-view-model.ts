@@ -179,17 +179,11 @@ export function buildIntegrationConnectionDetailItems(input: {
       ...(githubAppConnectionContext === undefined
         ? {}
         : {
-            contextItems: githubAppConnectionContext.contextItems,
-            ...(githubAppConnectionContext.installActionLabel === undefined
+            ...(githubAppConnectionContext.installation === undefined
               ? {}
               : {
-                  installActionLabel: githubAppConnectionContext.installActionLabel,
-                }),
-            ...(githubAppConnectionContext.setup === undefined
-              ? {}
-              : {
-                  setup: {
-                    ...githubAppConnectionContext.setup,
+                  installation: {
+                    ...githubAppConnectionContext.installation,
                     ...(githubAppInstallationState?.errorMessage === undefined
                       ? {}
                       : { errorMessage: githubAppInstallationState.errorMessage }),
@@ -198,6 +192,9 @@ export function buildIntegrationConnectionDetailItems(input: {
                       : { isPending: githubAppInstallationState.isPending }),
                   },
                 }),
+            ...(githubAppConnectionContext.contextItems === undefined
+              ? {}
+              : { contextItems: githubAppConnectionContext.contextItems }),
           }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
@@ -294,14 +291,18 @@ function resolveGitHubAppConnectionContext(
   controlPlaneApiOrigin?: string,
 ):
   | {
-      contextItems: readonly {
+      contextItems?: readonly {
         label: string;
         value: string;
       }[];
-      installActionLabel?: string;
-      setup?:
+      installation?:
         | {
-            description: string;
+            actionLabel: string;
+            description?: string;
+            fields: readonly {
+              label: string;
+              value: string;
+            }[];
             postInstallationSetupUrl?: string;
           }
         | undefined;
@@ -327,47 +328,47 @@ function resolveGitHubAppConnectionContext(
         ? connection.externalSubjectId
         : null;
 
-  return {
-    contextItems: [
-      ...(appId === null
-        ? []
-        : [
-            {
-              label: "App ID",
-              value: appId,
-            },
-          ]),
-      ...(appSlug === null
-        ? []
-        : [
-            {
-              label: "App slug",
-              value: appSlug,
-            },
-          ]),
-      {
-        label: "Installation",
-        value: installationId === null ? "Pending" : installationId,
-      },
-    ],
-    ...(installationId === null
-      ? { installActionLabel: "Install GitHub App" }
-      : { installActionLabel: "Manage installation" }),
-    ...(installationId === null
-      ? {
-          setup: {
-            description: "Set these URLs in your GitHub App settings, then install the app.",
-            ...(controlPlaneApiOrigin === undefined
-              ? {}
-              : {
-                  postInstallationSetupUrl: new URL(
-                    GitHubAppInstallationCompletePath,
-                    controlPlaneApiOrigin,
-                  ).toString(),
-                }),
+  const installationFields = [
+    ...(appId === null
+      ? []
+      : [
+          {
+            label: "App ID",
+            value: appId,
           },
-        }
-      : {}),
+        ]),
+    ...(appSlug === null
+      ? []
+      : [
+          {
+            label: "App slug",
+            value: appSlug,
+          },
+        ]),
+    {
+      label: "Installation",
+      value: installationId === null ? "Pending" : installationId,
+    },
+  ];
+
+  return {
+    installation: {
+      actionLabel: installationId === null ? "Install GitHub App" : "Manage installation",
+      ...(installationId === null
+        ? {
+            description: "Set the URLs below in your Github App settings, then install the app",
+          }
+        : {}),
+      fields: installationFields,
+      ...(controlPlaneApiOrigin === undefined
+        ? {}
+        : {
+            postInstallationSetupUrl: new URL(
+              GitHubAppInstallationCompletePath,
+              controlPlaneApiOrigin,
+            ).toString(),
+          }),
+    },
   };
 }
 

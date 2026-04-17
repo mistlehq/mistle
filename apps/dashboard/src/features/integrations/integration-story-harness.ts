@@ -364,22 +364,24 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
         }),
         bindingCount: 3,
         canDelete: false,
-        contextItems: [
-          {
-            label: "App ID",
-            value: "3079908",
-          },
-          {
-            label: "App slug",
-            value: "jon-mistle-github-app",
-          },
-          {
-            label: "Installation",
-            value: "116007157",
-          },
-        ],
         displayName: "GitHub App (Ready)",
-        installActionLabel: "Manage installation",
+        installation: {
+          actionLabel: "Manage installation",
+          fields: [
+            {
+              label: "App ID",
+              value: "3079908",
+            },
+            {
+              label: "App slug",
+              value: "jon-mistle-github-app",
+            },
+            {
+              label: "Installation",
+              value: "116007157",
+            },
+          ],
+        },
         resources: [
           {
             count: 11,
@@ -568,25 +570,25 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
         }),
         bindingCount: 0,
         canDelete: true,
-        contextItems: [
-          {
-            label: "App ID",
-            value: "3079908",
-          },
-          {
-            label: "App slug",
-            value: "jon-mistle-github-app",
-          },
-          {
-            label: "Installation",
-            value: "Pending",
-          },
-        ],
         displayName: "GitHub App (Setup Incomplete)",
-        installActionLabel: "Install GitHub App",
         resources: [],
-        setup: {
-          description: "Set these URLs in your GitHub App settings, then install the app.",
+        installation: {
+          actionLabel: "Install GitHub App",
+          description: "Set the URLs below in your Github App settings, then install the app",
+          fields: [
+            {
+              label: "App ID",
+              value: "3079908",
+            },
+            {
+              label: "App slug",
+              value: "jon-mistle-github-app",
+            },
+            {
+              label: "Installation",
+              value: "Pending",
+            },
+          ],
           postInstallationSetupUrl:
             "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
         },
@@ -645,22 +647,24 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
         }),
         bindingCount: 0,
         canDelete: true,
-        contextItems: [
-          {
-            label: "App ID",
-            value: "3079908",
-          },
-          {
-            label: "App slug",
-            value: "mistle-github-app",
-          },
-          {
-            label: "Installation",
-            value: "116007157",
-          },
-        ],
         displayName: "New GitHub Connection",
-        installActionLabel: "Manage installation",
+        installation: {
+          actionLabel: "Manage installation",
+          fields: [
+            {
+              label: "App ID",
+              value: "3079908",
+            },
+            {
+              label: "App slug",
+              value: "mistle-github-app",
+            },
+            {
+              label: "Installation",
+              value: "116007157",
+            },
+          ],
+        },
         resources: [
           {
             count: 0,
@@ -725,7 +729,19 @@ type ScenarioDetailStorySpec = {
   }[];
   displayName: string;
   familyId?: string;
-  installActionLabel?: string;
+  installation?:
+    | {
+        actionLabel?: string;
+        description?: string;
+        errorMessage?: string;
+        fields?: readonly {
+          label: string;
+          value: string;
+        }[];
+        isPending?: boolean;
+        postInstallationSetupUrl?: string;
+      }
+    | undefined;
   resources?: readonly {
     count: number;
     items: readonly string[];
@@ -734,14 +750,6 @@ type ScenarioDetailStorySpec = {
     lastSyncedAt?: string;
     syncState: "never-synced" | "syncing" | "ready" | "error";
   }[];
-  setup?:
-    | {
-        description?: string;
-        errorMessage?: string;
-        isPending?: boolean;
-        postInstallationSetupUrl?: string;
-      }
-    | undefined;
   webhookLifecycle?: "implicit" | "managed";
   status?: "active" | "error" | "revoked";
   webhookSources?: readonly IntegrationWebhookSource[];
@@ -837,9 +845,7 @@ function createScenarioDetailViewStoryProps(
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,
         id: input.connectionId,
-        ...(input.installActionLabel === undefined
-          ? {}
-          : { installActionLabel: input.installActionLabel }),
+        ...(input.installation === undefined ? {} : { installation: input.installation }),
         resources: (input.resources ?? []).map((resource) => ({
           count: resource.count,
           isRefreshing: false,
@@ -850,7 +856,6 @@ function createScenarioDetailViewStoryProps(
           ...(resource.lastSyncedAt === undefined ? {} : { lastSyncedAt: resource.lastSyncedAt }),
           syncState: resource.syncState,
         })),
-        ...(input.setup === undefined ? {} : { setup: input.setup }),
         status: input.status ?? "active",
       },
     ],
@@ -878,13 +883,15 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
     },
     bindingCount: 2,
     connectionId: "icn_github_ghes_dense",
-    contextItems: [
-      { label: "App ID", value: "88421" },
-      { label: "App slug", value: "mistle-ghes" },
-      { label: "Installation", value: "992144" },
-    ],
     displayName: "GitHub Enterprise",
-    installActionLabel: "Manage installation",
+    installation: {
+      actionLabel: "Manage installation",
+      fields: [
+        { label: "App ID", value: "88421" },
+        { label: "App slug", value: "mistle-ghes" },
+        { label: "Installation", value: "992144" },
+      ],
+    },
     resources: [
       {
         count: 7,

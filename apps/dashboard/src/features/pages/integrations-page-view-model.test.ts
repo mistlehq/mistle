@@ -298,22 +298,26 @@ describe("integrations page view model", () => {
 
     expect(item?.authMethodLabel).toBe("GitHub App installation");
     expect(item?.authMethodId).toBe("github-app-installation");
-    expect(item?.contextItems).toEqual([
-      {
-        label: "App ID",
-        value: "123",
-      },
-      {
-        label: "App slug",
-        value: "mistle-github-app",
-      },
-      {
-        label: "Installation",
-        value: "mistle-labs",
-      },
-    ]);
-    expect(item?.setup).toBeUndefined();
-    expect(item?.installActionLabel).toBe("Manage installation");
+    expect(item?.contextItems).toBeUndefined();
+    expect(item?.installation).toEqual({
+      actionLabel: "Manage installation",
+      fields: [
+        {
+          label: "App ID",
+          value: "123",
+        },
+        {
+          label: "App slug",
+          value: "mistle-github-app",
+        },
+        {
+          label: "Installation",
+          value: "mistle-labs",
+        },
+      ],
+      postInstallationSetupUrl:
+        "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
+    });
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });
@@ -414,14 +418,15 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.installActionLabel).toBe("Install GitHub App");
-    expect(item?.setup?.description).toBe(
-      "Set these URLs in your GitHub App settings, then install the app.",
+    expect(item?.installation?.actionLabel).toBe("Install GitHub App");
+    expect(item?.installation?.description).toBe(
+      "Set the URLs below in your Github App settings, then install the app",
     );
-    expect(item?.setup?.postInstallationSetupUrl).toBe(
+    expect(item?.installation?.postInstallationSetupUrl).toBe(
       "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
     );
-    expect(item?.contextItems).toEqual([
+    expect(item?.contextItems).toBeUndefined();
+    expect(item?.installation?.fields).toEqual([
       {
         label: "App ID",
         value: "123",
@@ -566,8 +571,8 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.setup?.isPending).toBe(true);
-    expect(item?.setup?.errorMessage).toBe("Could not start GitHub App installation.");
+    expect(item?.installation?.isPending).toBe(true);
+    expect(item?.installation?.errorMessage).toBe("Could not start GitHub App installation.");
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

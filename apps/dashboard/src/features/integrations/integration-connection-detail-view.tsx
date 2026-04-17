@@ -50,16 +50,20 @@ export type IntegrationConnectionDetailItem = {
   }[];
   displayName: string;
   id: string;
-  installActionLabel?: string;
-  resources: readonly IntegrationConnectionDetailResourceSummary[];
-  setup?:
+  installation?:
     | {
+        actionLabel?: string;
         description?: string;
         errorMessage?: string;
+        fields?: readonly {
+          label: string;
+          value: string;
+        }[];
         isPending?: boolean;
         postInstallationSetupUrl?: string;
       }
     | undefined;
+  resources: readonly IntegrationConnectionDetailResourceSummary[];
   status: "active" | "error" | "revoked";
 };
 
@@ -121,28 +125,33 @@ function resolveConnectionDetailPaneViewState(input: {
   webhookPolicy: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState: IntegrationWebhookSourceSectionState | undefined;
 }) {
-  const setup =
-    input.connection.setup === undefined
+  const installation =
+    input.connection.installation === undefined
       ? undefined
       : {
-          ...input.connection.setup,
+          ...input.connection.installation,
           ...(input.connection.authMethodId === "github-app-installation" &&
           input.webhookSourceState?.items[0]?.callbackUrl !== undefined
             ? { callbackUrl: input.webhookSourceState.items[0].callbackUrl }
             : {}),
         };
-  const hasSetupSection =
-    setup !== undefined &&
-    (setup.description !== undefined ||
-      setup.errorMessage !== undefined ||
-      setup.postInstallationSetupUrl !== undefined ||
-      ("callbackUrl" in setup && setup.callbackUrl !== undefined));
+  const hasInstallationSection =
+    installation !== undefined &&
+    (installation.description !== undefined ||
+      installation.errorMessage !== undefined ||
+      installation.fields?.length !== undefined ||
+      installation.postInstallationSetupUrl !== undefined ||
+      installation.actionLabel !== undefined ||
+      ("callbackUrl" in installation && installation.callbackUrl !== undefined));
+  const hidesStandaloneWebhookSection = input.connection.authMethodId === "github-app-installation";
   const shouldRenderWebhookSection =
-    input.webhookPolicy?.showWebhookSources === true && input.webhookSourceState !== undefined;
+    hidesStandaloneWebhookSection === false &&
+    input.webhookPolicy?.showWebhookSources === true &&
+    input.webhookSourceState !== undefined;
 
   return {
-    hasSetupSection,
-    setup,
+    hasInstallationSection,
+    installation,
     webhookSectionUiState:
       !shouldRenderWebhookSection || input.webhookSourceState === undefined
         ? null
@@ -358,13 +367,13 @@ function ConnectionDetailPane(input: {
         </div>
       </header>
 
-      {viewState.hasSetupSection ? (
+      {viewState.hasInstallationSection ? (
         <SectionBlock
           action={
             input.onStartGitHubAppInstallation !== undefined &&
-            input.connection.installActionLabel !== undefined ? (
+            viewState.installation?.actionLabel !== undefined ? (
               <Button
-                disabled={input.connection.setup?.isPending ?? false}
+                disabled={viewState.installation?.isPending ?? false}
                 onClick={() => {
                   void input.onStartGitHubAppInstallation?.(input.connection.id);
                 }}
@@ -372,30 +381,31 @@ function ConnectionDetailPane(input: {
                 type="button"
                 variant="outline"
               >
-                {input.connection.setup?.isPending === true
+                {viewState.installation?.isPending === true
                   ? "Starting install..."
-                  : input.connection.installActionLabel}
+                  : viewState.installation.actionLabel}
               </Button>
             ) : null
           }
-          {...(viewState.setup?.description === undefined
+          {...(viewState.installation?.description === undefined
             ? {}
-            : { description: viewState.setup.description })}
-          title="Setup"
+            : { description: viewState.installation.description })}
+          title="Installation"
         >
           <div className="flex flex-col gap-4">
-            <SetupSection
-              {...(viewState.setup === undefined ||
-              !("callbackUrl" in viewState.setup) ||
-              viewState.setup.callbackUrl === undefined
+            <InstallationSection
+              fields={viewState.installation?.fields}
+              {...(viewState.installation === undefined ||
+              !("callbackUrl" in viewState.installation) ||
+              viewState.installation.callbackUrl === undefined
                 ? {}
-                : { callbackUrl: viewState.setup.callbackUrl })}
-              {...(viewState.setup?.postInstallationSetupUrl === undefined
+                : { callbackUrl: viewState.installation.callbackUrl })}
+              {...(viewState.installation?.postInstallationSetupUrl === undefined
                 ? {}
-                : { postInstallationSetupUrl: viewState.setup.postInstallationSetupUrl })}
+                : { postInstallationSetupUrl: viewState.installation.postInstallationSetupUrl })}
             />
-            {viewState.setup?.errorMessage === undefined ? null : (
-              <Notice variant="alert">{viewState.setup.errorMessage}</Notice>
+            {viewState.installation?.errorMessage === undefined ? null : (
+              <Notice variant="alert">{viewState.installation.errorMessage}</Notice>
             )}
           </div>
         </SectionBlock>
@@ -417,23 +427,7 @@ function ConnectionDetailPane(input: {
             >
               Edit
             </Button>
-          ) : viewState.hasSetupSection ||
-            input.onStartGitHubAppInstallation === undefined ||
-            input.connection.installActionLabel === undefined ? null : (
-            <Button
-              disabled={input.connection.setup?.isPending ?? false}
-              onClick={() => {
-                void input.onStartGitHubAppInstallation?.(input.connection.id);
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {input.connection.setup?.isPending === true
-                ? "Starting install..."
-                : input.connection.installActionLabel}
-            </Button>
-          )
+          ) : null
         }
         title="Authentication"
       >
@@ -619,11 +613,21 @@ function ConnectionAuthSection(input: {
   );
 }
 
-function SetupSection(input: {
+function InstallationSection(input: {
+  fields?:
+    | readonly {
+        label: string;
+        value: string;
+      }[]
+    | undefined;
   callbackUrl?: string;
   postInstallationSetupUrl?: string;
 }): React.JSX.Element | null {
-  if (input.callbackUrl === undefined && input.postInstallationSetupUrl === undefined) {
+  if (
+    (input.fields === undefined || input.fields.length === 0) &&
+    input.callbackUrl === undefined &&
+    input.postInstallationSetupUrl === undefined
+  ) {
     return null;
   }
 
@@ -636,6 +640,15 @@ function SetupSection(input: {
 
   return (
     <div className="gap-3 flex flex-col">
+      {input.fields === undefined || input.fields.length === 0 ? null : (
+        <DefinitionList
+          items={input.fields.map((field) => ({
+            id: field.label,
+            label: field.label,
+            value: field.value,
+          }))}
+        />
+      )}
       {resolvedPostInstallationSetupUrl === undefined && input.callbackUrl === undefined ? null : (
         <div className="flex flex-col gap-3">
           {resolvedPostInstallationSetupUrl === undefined ? null : (

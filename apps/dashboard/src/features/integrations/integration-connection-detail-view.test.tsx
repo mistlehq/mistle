@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
 
@@ -18,6 +18,10 @@ const ImplicitWebhookPolicy = {
   showWebhookSources: true,
 } as const;
 
+afterEach(() => {
+  cleanup();
+});
+
 describe("IntegrationConnectionDetailView", () => {
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
@@ -31,7 +35,14 @@ describe("IntegrationConnectionDetailView", () => {
             canDelete: false,
             displayName: "Engineering GitHub",
             status: "active",
-            installActionLabel: "Manage installation",
+            installation: {
+              actionLabel: "Manage installation",
+              fields: [
+                { label: "App ID", value: "123" },
+                { label: "App slug", value: "mistle-github-app" },
+                { label: "Installation", value: "116007157" },
+              ],
+            },
             authMethodLabel: "GitHub App installation",
             resources: [
               {
@@ -133,6 +144,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByRole("button", { name: "Select connection Archive Mirror" })).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Select connection" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Engineering GitHub" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Installation" })).toBeTruthy();
     expect(screen.getAllByText("Resources")).toHaveLength(1);
     expect(screen.getByText("Repository")).toBeTruthy();
     expect(screen.getByText("- 41")).toBeTruthy();
@@ -725,6 +737,48 @@ describe("IntegrationConnectionDetailView", () => {
     expect(editedConnectionId).toBe("icn_jira_primary");
   });
 
+  it("keeps Manage installation visible alongside Edit for installed GitHub App connections", () => {
+    let editedConnectionId: string | null = null;
+    let startedGitHubAppInstallationConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_installed",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "GitHub Production",
+            installation: {
+              actionLabel: "Manage installation",
+              fields: [
+                { label: "App ID", value: "123" },
+                { label: "App slug", value: "mistle-github-app" },
+                { label: "Installation", value: "116007157" },
+              ],
+            },
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onEditAuthentication={(connectionId) => {
+          editedConnectionId = connectionId;
+        }}
+        onStartGitHubAppInstallation={(connectionId) => {
+          startedGitHubAppInstallationConnectionId = connectionId;
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage installation" }));
+
+    expect(editedConnectionId).toBe("icn_github_installed");
+    expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_installed");
+  });
+
   it("renders visible non-secret auth fields under authentication", () => {
     render(
       <IntegrationConnectionDetailView
@@ -1010,11 +1064,12 @@ describe("IntegrationConnectionDetailView", () => {
             displayName: "GitHub App Setup",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
-            installActionLabel: "Install GitHub App",
             status: "active",
             resources: [],
-            setup: {
-              description: "Set these URLs in your GitHub App settings, then install the app.",
+            installation: {
+              actionLabel: "Install GitHub App",
+              description: "Set the URLs below in your Github App settings, then install the app",
+              fields: [{ label: "Installation", value: "Pending" }],
             },
           },
         ]}
@@ -1041,16 +1096,18 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    const setupSection = screen.getByText("Setup").closest("section");
-    expect(setupSection).toBeTruthy();
+    const installationSection = screen
+      .getByRole("heading", { name: "Installation" })
+      .closest("section");
+    expect(installationSection).toBeTruthy();
     expect(
-      within(setupSection as HTMLElement).getByText(
-        "Set these URLs in your GitHub App settings, then install the app.",
+      within(installationSection as HTMLElement).getByText(
+        "Set the URLs below in your Github App settings, then install the app",
       ),
     ).toBeTruthy();
-    expect(screen.getByText("Webhook")).toBeTruthy();
-    expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create webhook" })).toBeTruthy();
+    expect(screen.queryByText("Webhook")).toBeNull();
+    expect(screen.queryByText("No webhook is configured for this connection.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
     expect(screen.queryByText("Webhook URL")).toBeNull();
   });
 
@@ -1102,7 +1159,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(createdConnectionId).toBe("icn_jira_empty");
   });
 
-  it("does not show delete for implicit webhook sources", () => {
+  it("hides the standalone webhook section for GitHub App connections", () => {
     let startedGitHubAppInstallationConnectionId: string | null = null;
 
     render(
@@ -1113,13 +1170,14 @@ describe("IntegrationConnectionDetailView", () => {
             bindingCount: 0,
             canDelete: true,
             displayName: "GitHub Production",
-            installActionLabel: "Install GitHub App",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
-            setup: {
-              description: "Set these URLs in your GitHub App settings, then install the app.",
+            installation: {
+              actionLabel: "Install GitHub App",
+              description: "Set the URLs below in your Github App settings, then install the app",
+              fields: [{ label: "Installation", value: "Pending" }],
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/github-app-installation",
             },
@@ -1163,11 +1221,13 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    const setupSection = screen.getByText("Setup").closest("section");
-    expect(setupSection).toBeTruthy();
+    const installationSection = screen
+      .getByRole("heading", { name: "Installation" })
+      .closest("section");
+    expect(installationSection).toBeTruthy();
     expect(
-      within(setupSection as HTMLElement).getByText(
-        "Set these URLs in your GitHub App settings, then install the app.",
+      within(installationSection as HTMLElement).getByText(
+        "Set the URLs below in your Github App settings, then install the app",
       ),
     ).toBeTruthy();
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
@@ -1188,12 +1248,12 @@ describe("IntegrationConnectionDetailView", () => {
       screen.getAllByText(
         "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
       ),
-    ).toHaveLength(2);
-    expect(screen.getByText("Webhook")).toBeTruthy();
+    ).toHaveLength(1);
+    expect(screen.queryByText("Webhook")).toBeNull();
     expect(screen.queryByText("GitHub App webhook")).toBeNull();
-    expect(screen.getByText("Status")).toBeTruthy();
-    expect(screen.getByText("Active")).toBeTruthy();
-    expect(screen.getByText("Webhook URL")).toBeTruthy();
+    expect(screen.queryByText("Status")).toBeNull();
+    expect(screen.queryByText("Active")).toBeNull();
+    expect(screen.queryByText("Webhook URL")).toBeNull();
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
@@ -1210,7 +1270,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
   });
 
-  it("hides create webhook when the target only supports implicit webhook sources", () => {
+  it("hides the standalone webhook section for installed GitHub App connections", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -1223,6 +1283,10 @@ describe("IntegrationConnectionDetailView", () => {
             authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
+            installation: {
+              actionLabel: "Manage installation",
+              fields: [{ label: "Installation", value: "116007157" }],
+            },
           },
         ]}
         onCreateWebhookSource={() => {
@@ -1264,6 +1328,8 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Copy Webhook URL" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy Webhook URL" })).toBeNull();
+    expect(screen.queryByText("Webhook")).toBeNull();
+    expect(screen.getByText("Webhook callback URL")).toBeTruthy();
   });
 });
