@@ -76,7 +76,3 @@ export function formatResourceLabel(kind: string): string {
 
   return [singularFirstWord, ...remainingWords].join(" ");
 }
-
-export function formatResourceCountSummary(input: { count: number; kind: string }): string {
-  return `${input.count} resources`;
-}

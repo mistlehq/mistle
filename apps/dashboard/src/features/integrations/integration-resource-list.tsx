@@ -1,13 +1,13 @@
 import { IntegrationResourceListItem } from "./integration-resource-row.js";
 import type {
-  IntegrationResourceListItemPreviewState,
+  IntegrationResourceListItemPreviewData,
   IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 
 export type IntegrationResourceListProps = {
   connectionId: string;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewState>;
+  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewData>;
   resources: readonly IntegrationResourceListItemResourceSummary[];
 };
 

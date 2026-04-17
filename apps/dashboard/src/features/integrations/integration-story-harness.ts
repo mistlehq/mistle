@@ -295,7 +295,6 @@ export function createDetailViewStoryProps(input?: {
       {
         connectionId: "icn_github_primary",
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [
             {
@@ -318,15 +317,16 @@ export function createDetailViewStoryProps(input?: {
             },
           ],
           kind: "repositories",
+          loadErrorMessage: null,
         },
       },
       {
         connectionId: "icn_github_archive",
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "repositories",
+          loadErrorMessage: null,
         },
       },
     ]),
@@ -407,7 +407,6 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [
             {
@@ -448,12 +447,13 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "repository",
+          loadErrorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage:
+          loadErrorMessage:
             "GitHub returned a 403 while loading branch data. Check installation repository access.",
           isLoading: false,
           items: [
@@ -509,10 +509,10 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "user",
+          loadErrorMessage: null,
         },
       },
     ]),
@@ -683,7 +683,7 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
       {
         connectionId,
         state: {
-          errorMessage:
+          loadErrorMessage:
             "GitHub returned a 403 while loading repository data. Check installation repository access.",
           isLoading: false,
           items: [
@@ -703,7 +703,6 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [
             {
@@ -717,6 +716,7 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "organizations",
+          loadErrorMessage: null,
         },
       },
     ]),
@@ -781,28 +781,28 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "repositories",
+          loadErrorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "branches",
+          loadErrorMessage: null,
         },
       },
       {
         connectionId,
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "users",
+          loadErrorMessage: null,
         },
       },
     ]),
@@ -852,7 +852,6 @@ function createResourceContent(
     resources.map((resource) => ({
       connectionId: input.connectionId,
       state: {
-        errorMessage: null,
         isLoading: false,
         items: resource.items.map(
           (item, index): IntegrationConnectionResource => ({
@@ -866,6 +865,7 @@ function createResourceContent(
           }),
         ),
         kind: resource.kind,
+        loadErrorMessage: null,
       },
     })),
   );

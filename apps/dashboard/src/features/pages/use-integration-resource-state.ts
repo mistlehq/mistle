@@ -72,7 +72,7 @@ function buildResourceContentByKey(input: {
       return {
         connectionId: resource.connectionId,
         state: {
-          errorMessage:
+          loadErrorMessage:
             query?.isError === true
               ? resolveApiErrorMessage({
                   error: query.error,

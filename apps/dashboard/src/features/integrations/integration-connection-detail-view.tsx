@@ -27,7 +27,7 @@ import {
 } from "./integration-connection-detail-formatters.js";
 import { IntegrationResourceList } from "./integration-resource-list.js";
 import {
-  type IntegrationResourceListItemPreviewState,
+  type IntegrationResourceListItemPreviewData,
   type IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 import type { IntegrationWebhookSource } from "./integrations-service.js";
@@ -78,7 +78,7 @@ export type IntegrationConnectionDetailViewProps = {
   onEditAuthentication?: (connectionId: string) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewState>;
+  resourceContentByKey?: ReadonlyMap<string, IntegrationResourceListItemPreviewData>;
   titleEditor?:
     | {
         disabled: boolean;

@@ -672,10 +672,10 @@ describe("integrations page view model", () => {
       {
         connectionId: "icn_primary",
         state: {
-          errorMessage: null,
           isLoading: false,
           items: [],
           kind: "repositories",
+          loadErrorMessage: null,
         },
       },
     ]);
@@ -688,10 +688,10 @@ describe("integrations page view model", () => {
         }),
       ),
     ).toEqual({
-      errorMessage: null,
       isLoading: false,
       items: [],
       kind: "repositories",
+      loadErrorMessage: null,
     });
   });
 

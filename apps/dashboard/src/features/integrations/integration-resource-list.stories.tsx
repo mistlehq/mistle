@@ -14,7 +14,7 @@ function renderWithinFixedWidth(
   );
 }
 
-const comprehensiveStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
+const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
   connectionId: "icn_story",
   onRefreshResource: () => {},
   resources: [
@@ -46,7 +46,6 @@ const comprehensiveStateArgs: React.ComponentProps<typeof IntegrationResourceLis
     [
       "icn_story:repository",
       {
-        errorMessage: null,
         isLoading: false,
         items: [
           {
@@ -69,33 +68,34 @@ const comprehensiveStateArgs: React.ComponentProps<typeof IntegrationResourceLis
           },
         ],
         kind: "repository",
+        loadErrorMessage: null,
       },
     ],
     [
       "icn_story:workspace",
       {
-        errorMessage: null,
         isLoading: true,
         items: [],
         kind: "workspace",
+        loadErrorMessage: null,
       },
     ],
     [
       "icn_story:branch",
       {
-        errorMessage: null,
         isLoading: false,
         items: [],
         kind: "branch",
+        loadErrorMessage: null,
       },
     ],
     [
       "icn_story:user",
       {
-        errorMessage: "GitHub returned a 403 while loading user data.",
         isLoading: false,
         items: [],
         kind: "user",
+        loadErrorMessage: "GitHub returned a 403 while loading user data.",
       },
     ],
   ]),
@@ -105,7 +105,7 @@ const meta = {
   title: "Dashboard/Integrations/Connection/ResourceList",
   component: IntegrationResourceList,
   decorators: [withDashboardCenteredStory],
-  args: comprehensiveStateArgs,
+  args: allStateArgs,
   render: renderWithinFixedWidth,
 } satisfies Meta<typeof IntegrationResourceList>;
 
@@ -114,5 +114,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AllStates: Story = {
-  args: comprehensiveStateArgs,
+  args: allStateArgs,
 };

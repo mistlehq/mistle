@@ -401,10 +401,10 @@ export function buildIntegrationConnectionResourceRequests(
 }
 
 export type IntegrationConnectionResourceContentState = {
-  errorMessage: string | null;
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
+  loadErrorMessage: string | null;
 };
 
 export function buildIntegrationConnectionResourceContentByKey(

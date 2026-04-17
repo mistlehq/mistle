@@ -74,7 +74,6 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -124,6 +123,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
           ])
@@ -231,7 +231,6 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: "Could not load repositories.",
                 isLoading: false,
                 items: [
                   {
@@ -245,6 +244,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                loadErrorMessage: "Could not load repositories.",
               },
             ],
           ])
@@ -285,10 +285,10 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
           ])
@@ -329,10 +329,10 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: true,
                 items: [],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
           ])
@@ -370,10 +370,10 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: "Could not load repositories.",
                 isLoading: false,
                 items: [],
                 kind: "repositories",
+                loadErrorMessage: "Could not load repositories.",
               },
             ],
           ])
@@ -411,10 +411,10 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
           ])
@@ -514,7 +514,6 @@ describe("IntegrationConnectionDetailView", () => {
             [
               "icn_github_primary:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -528,12 +527,12 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
             [
               "icn_github_archive:repositories",
               {
-                errorMessage: null,
                 isLoading: false,
                 items: [
                   {
@@ -547,6 +546,7 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
+                loadErrorMessage: null,
               },
             ],
           ])

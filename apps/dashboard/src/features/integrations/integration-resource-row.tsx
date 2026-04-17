@@ -3,7 +3,6 @@ import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon, InfoIcon } from "@ph
 import { useState } from "react";
 
 import {
-  formatResourceCountSummary,
   formatResourceLabel,
   formatResourceMetadata,
   formatSyncStateLabel,
@@ -19,18 +18,18 @@ export type IntegrationResourceListItemResourceSummary = {
   syncState: "never-synced" | "syncing" | "ready" | "error";
 };
 
-export type IntegrationResourceListItemPreviewState = {
-  errorMessage: string | null;
+export type IntegrationResourceListItemPreviewData = {
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
+  loadErrorMessage: string | null;
 };
 
 export type IntegrationResourceListItemProps = {
   connectionId: string;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resource: IntegrationResourceListItemResourceSummary;
-  resourceItems: IntegrationResourceListItemPreviewState | null;
+  resourceItems: IntegrationResourceListItemPreviewData | null;
 };
 
 export function IntegrationResourceListItem(
@@ -40,7 +39,7 @@ export function IntegrationResourceListItem(
   const resourceLabel = formatResourceLabel(input.resource.kind);
   const resourceCount = input.resource.count;
   const errorTooltipMessage =
-    input.resource.lastErrorMessage ?? input.resourceItems?.errorMessage ?? null;
+    input.resource.lastErrorMessage ?? input.resourceItems?.loadErrorMessage ?? null;
   const secondaryStatusText =
     input.resource.syncState === "error"
       ? ""
@@ -48,6 +47,33 @@ export function IntegrationResourceListItem(
           lastSyncedAt: input.resource.lastSyncedAt,
           syncState: input.resource.syncState,
         });
+  const statusSummary = `${resourceCount} resources. `;
+  let statusContent: React.JSX.Element | null = null;
+
+  if (input.resource.syncState === "error") {
+    statusContent = (
+      <div className="flex items-center justify-end gap-1">
+        <span className="text-destructive text-xs">
+          {formatSyncStateLabel(input.resource.syncState)}
+        </span>
+        {errorTooltipMessage === null ? null : (
+          <Tooltip delay={0}>
+            <TooltipTrigger
+              aria-label="View sync failure details"
+              className="inline-flex size-4 items-center justify-center text-destructive/70 transition-colors hover:text-destructive focus-visible:text-destructive"
+            >
+              <InfoIcon aria-hidden className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
+              {errorTooltipMessage}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    );
+  } else if (secondaryStatusText.length > 0) {
+    statusContent = <span className="truncate">{secondaryStatusText}</span>;
+  }
 
   return (
     <div
@@ -75,33 +101,17 @@ export function IntegrationResourceListItem(
               {resourceLabel} <span className="text-current/80">- {resourceCount}</span>
             </span>
           </Button>
-          {input.resource.syncState === "error" ? (
-            <div className="hidden items-center gap-1 sm:flex">
-              <span className="text-destructive text-xs">
-                {formatSyncStateLabel(input.resource.syncState)}
-              </span>
-              {errorTooltipMessage === null ? null : (
-                <Tooltip delay={0}>
-                  <TooltipTrigger
-                    aria-label="View sync failure details"
-                    className="inline-flex size-4 items-center justify-center text-destructive/70 transition-colors hover:text-destructive focus-visible:text-destructive"
-                  >
-                    <InfoIcon aria-hidden className="size-3.5" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
-                    {errorTooltipMessage}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+        </div>
+        {statusContent === null ? null : (
+          <div className="hidden min-w-0 flex-1 items-center justify-end gap-2 sm:flex sm:shrink-0">
+            <div
+              className={`min-w-0 text-right text-xs ${input.resource.syncState === "error" ? "" : "text-muted-foreground"}`}
+            >
+              <span className="sr-only">{statusSummary}</span>
+              {statusContent}
             </div>
-          ) : null}
-        </div>
-        <div className="hidden min-w-0 items-center gap-2 sm:flex sm:shrink-0">
-          <div className="text-muted-foreground text-xs">
-            <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
-            {secondaryStatusText}
           </div>
-        </div>
+        )}
         {input.onRefreshResource ? (
           <Button
             aria-label={`Refresh ${input.resource.kind}`}
@@ -128,20 +138,24 @@ export function IntegrationResourceListItem(
       {isExpanded && input.resourceItems !== null
         ? renderExpandedResourceItems(input.resourceItems)
         : null}
-      {secondaryStatusText.length > 0 ? (
+      {statusContent === null ? null : (
         <div className="mt-1 pt-1 sm:hidden">
-          <div className="flex min-w-0 items-center gap-1.5 pr-2 text-muted-foreground text-xs sm:pl-5">
-            <span className="sr-only">{formatResourceCountSummary(input.resource)}. </span>
-            <span className="min-w-0 truncate">{secondaryStatusText}</span>
+          <div
+            className={`flex min-w-0 items-center justify-end gap-1.5 pr-2 text-xs sm:pl-5 ${
+              input.resource.syncState === "error" ? "" : "text-muted-foreground"
+            }`}
+          >
+            <span className="sr-only">{statusSummary}</span>
+            <div className="min-w-0">{statusContent}</div>
           </div>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
 
 function renderExpandedResourceItems(
-  resourceItems: IntegrationResourceListItemPreviewState,
+  resourceItems: IntegrationResourceListItemPreviewData,
 ): React.JSX.Element {
   if (resourceItems.items.length > 0) {
     return (
