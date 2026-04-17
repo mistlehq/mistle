@@ -46,8 +46,7 @@ export type OrganizationSandboxStorageSettingsPageViewProps = {
 export function OrganizationSandboxStorageSettingsPageView(
   input: OrganizationSandboxStorageSettingsPageViewProps,
 ): React.JSX.Element {
-  const selectedStorageConfigSourceLabel =
-    input.state.storageConfigSource === "managed" ? "Managed" : "BYOK";
+  const showConfigurationSource = false;
   const selectedRegionLabel =
     input.state.region.length === 0
       ? undefined
@@ -119,44 +118,39 @@ export function OrganizationSandboxStorageSettingsPageView(
 
             {input.state.persistentSandboxesEnabled ? (
               <>
-                <Field orientation="horizontal">
-                  <FieldHeader className="md:w-auto md:flex-1">
-                    <FieldLabel>Configuration source</FieldLabel>
-                    <FieldDescription>
-                      Managed uses the deployment default. BYOK stores Archil credentials for this
-                      organization.
-                    </FieldDescription>
-                  </FieldHeader>
-                  <FieldContent>
-                    <Select
-                      onValueChange={(value) => {
-                        if (value === null) {
-                          return;
-                        }
+                {showConfigurationSource ? (
+                  <Field orientation="horizontal">
+                    <FieldHeader className="md:w-auto md:flex-1">
+                      <FieldLabel>Configuration source</FieldLabel>
+                    </FieldHeader>
+                    <FieldContent>
+                      <Select
+                        onValueChange={(value) => {
+                          if (value === null) {
+                            return;
+                          }
 
-                        input.onStateChange({
-                          ...input.state,
-                          storageConfigSource: value,
-                        });
-                      }}
-                      value={input.state.storageConfigSource}
-                    >
-                      <SelectTrigger>
-                        <SelectValue>{selectedStorageConfigSourceLabel}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="managed">Managed</SelectItem>
-                        <SelectItem value="organization">BYOK</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FieldContent>
-                </Field>
-
-                {input.state.storageConfigSource === "managed" ? (
-                  <Notice>
-                    Deployment-managed sandbox storage settings will be used for this organization.
-                  </Notice>
-                ) : (
+                          input.onStateChange({
+                            ...input.state,
+                            storageConfigSource: value,
+                          });
+                        }}
+                        value={input.state.storageConfigSource}
+                      >
+                        <SelectTrigger>
+                          <SelectValue>
+                            {input.state.storageConfigSource === "managed" ? "Managed" : "BYOK"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="managed">Managed</SelectItem>
+                          <SelectItem value="organization">BYOK</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FieldContent>
+                  </Field>
+                ) : null}
+                {input.state.storageConfigSource === "managed" ? null : (
                   <>
                     {(input.state.apiKeyConfigured || input.state.secretAccessKeyConfigured) && (
                       <Notice>
