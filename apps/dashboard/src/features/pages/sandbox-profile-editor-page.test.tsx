@@ -7,15 +7,15 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import {
+  IntegrationsEditorSection,
+  preserveDialogRowIdentity,
+} from "./integrations-editor-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import {
-  IntegrationsEditorSection,
-  preserveDialogRowIdentity,
-} from "./sandbox-profile-editor-page.js";
 
 function createTarget(
   targetKey: string,

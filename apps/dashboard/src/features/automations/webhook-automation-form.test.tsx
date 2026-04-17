@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
@@ -69,6 +69,18 @@ const FormValues: WebhookAutomationFormValues = {
   triggerParameterValues: {},
 };
 
+const TestQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: false,
+    },
+  },
+});
+
+afterEach(() => {
+  TestQueryClient.clear();
+});
+
 describe("WebhookAutomationForm", () => {
   function buildFormValues(
     overrides: Partial<WebhookAutomationFormValues> = {},
@@ -109,7 +121,7 @@ describe("WebhookAutomationForm", () => {
     ) => void;
   }): ReturnType<typeof render> {
     return render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={TestQueryClient}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
@@ -303,7 +315,7 @@ describe("WebhookAutomationForm", () => {
 
   it("marks invalid controls with aria-invalid when field errors are present", () => {
     const { container } = render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={TestQueryClient}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{
@@ -342,7 +354,7 @@ describe("WebhookAutomationForm", () => {
 
   it("shows the required-fields summary and inline copy for generic input template errors", () => {
     render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={TestQueryClient}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{
@@ -384,7 +396,7 @@ describe("WebhookAutomationForm", () => {
 
   it("shows save failures at the top of the form", () => {
     const { container } = render(
-      <QueryClientProvider client={new QueryClient()}>
+      <QueryClientProvider client={TestQueryClient}>
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}

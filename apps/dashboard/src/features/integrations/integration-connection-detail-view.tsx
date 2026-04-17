@@ -1,4 +1,3 @@
-import { JiraSupportedWebhookEvents } from "@mistle/integrations-definitions";
 import {
   Badge,
   Button,
@@ -18,6 +17,7 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
+import { JiraWebhookEventDisplayNameByType } from "../../../../../packages/integrations-definitions/src/jira-shared.ts";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { CopyableValue } from "../shared/copyable-value.js";
@@ -31,12 +31,6 @@ import {
   type IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 import type { IntegrationWebhookSource } from "./integrations-service.js";
-
-const JiraWebhookEventDisplayNameByType = new Map(
-  JiraSupportedWebhookEvents.map((eventDefinition) => {
-    return [eventDefinition.eventType, eventDefinition.displayName] as const;
-  }),
-);
 
 export type IntegrationConnectionDetailResourceSummary = IntegrationResourceListItemResourceSummary;
 

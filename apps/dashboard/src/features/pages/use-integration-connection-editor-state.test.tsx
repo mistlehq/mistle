@@ -2,9 +2,10 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
+import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
@@ -22,6 +23,16 @@ type ServerRequestRecord = {
   body: unknown;
 };
 
+type ServerHandler = (request: ServerRequestRecord) =>
+  | {
+      status: number;
+      body: unknown;
+    }
+  | Promise<{
+      status: number;
+      body: unknown;
+    }>;
+
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of request) {
@@ -35,22 +46,15 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
-async function startControlPlaneTestServer(input: {
-  handler: (request: ServerRequestRecord) =>
-    | {
-        status: number;
-        body: unknown;
-      }
-    | Promise<{
-        status: number;
-        body: unknown;
-      }>;
-}): Promise<{
+async function startControlPlaneTestServer(input: { handler: ServerHandler }): Promise<{
   origin: string;
   requests: ServerRequestRecord[];
   close: () => Promise<void>;
+  setHandler: (handler: ServerHandler) => void;
+  clearRequests: () => void;
 }> {
   const requests: ServerRequestRecord[] = [];
+  let currentHandler = input.handler;
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const requestRecord: ServerRequestRecord = {
       method: request.method ?? "GET",
@@ -59,7 +63,7 @@ async function startControlPlaneTestServer(input: {
     };
     requests.push(requestRecord);
 
-    const handled = await input.handler(requestRecord);
+    const handled = await currentHandler(requestRecord);
     response.statusCode = handled.status;
     response.setHeader("content-type", "application/json");
     response.end(JSON.stringify(handled.body));
@@ -84,6 +88,9 @@ async function startControlPlaneTestServer(input: {
   return {
     origin: `http://127.0.0.1:${String(address.port)}`,
     requests,
+    clearRequests: () => {
+      requests.length = 0;
+    },
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error?: Error) => {
@@ -95,6 +102,9 @@ async function startControlPlaneTestServer(input: {
           resolve();
         });
       });
+    },
+    setHandler: (handler: ServerHandler) => {
+      currentHandler = handler;
     },
   };
 }
@@ -191,414 +201,433 @@ function openAiFormUpdateEditorInput() {
   };
 }
 
+function createManualTimeController() {
+  const clock = createMutableClock(0);
+  const scheduler = createManualScheduler(clock);
+
+  return {
+    advance: (durationMs: number) => {
+      act(() => {
+        clock.advanceMs(durationMs);
+        scheduler.runDue();
+      });
+    },
+    scheduler,
+  };
+}
+
 afterEach(async () => {
   await cleanupTestQueryClients();
   resetDashboardConfigForTest();
 });
 
 describe("useIntegrationConnectionEditorState", () => {
-  it("starts device authorization and calls submit success after completion is observed", async () => {
-    const server = await startControlPlaneTestServer({
+  let server: Awaited<ReturnType<typeof startControlPlaneTestServer>>;
+
+  beforeAll(async () => {
+    server = await startControlPlaneTestServer({
       handler: (request) => {
-        if (
-          request.method === "POST" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_complete",
-              status: "pending",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              userCode: "ABCD-1234",
-              pollAfterMs: 0,
-            },
-          };
-        }
-
-        if (
-          request.method === "GET" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_complete",
-              status: "completed",
-              connectionId: "icn_openai_complete",
-            },
-          };
-        }
-
         throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
       },
     });
+  });
 
-    try {
-      setControlPlaneOrigin(server.origin);
-      const queryClient = createTestQueryClient();
-      let submittedTargetKey: string | null = null;
-      const { result } = renderHook(
-        () =>
-          useIntegrationConnectionEditorState({
-            initialEditorInput: openAiCreateEditorInput(),
-            onSubmitSuccess: ({ editor }) => {
-              submittedTargetKey = editor.targetKey;
-            },
-            queryKey: ["integrations"],
-          }),
-        {
-          wrapper: createWrapper(queryClient),
-        },
-      );
+  beforeEach(() => {
+    server.clearRequests();
+    setControlPlaneOrigin(server.origin);
+  });
 
-      act(() => {
-        result.current.onConnectionDisplayNameChange("OpenAI Personal");
-      });
-      act(() => {
-        result.current.submitEditor();
-      });
+  afterAll(async () => {
+    await server.close();
+  });
 
-      await waitFor(() => {
-        expect(result.current.deviceAuthorizationPending?.attemptId).toBe("ida_complete");
-      });
+  afterEach(() => {
+    server.setHandler((request) => {
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+  });
 
-      await waitFor(
-        () => {
-          expect(submittedTargetKey).toBe("openai-default");
-          expect(result.current.deviceAuthorizationPending).toBeNull();
-        },
-        {
-          timeout: 5_000,
-        },
-      );
-
-      expect(server.requests).toEqual([
-        {
-          method: "POST",
-          pathname: "/v1/integration/connections/openai-default/device-authorization/attempts",
+  it("starts device authorization and calls submit success after completion is observed", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts"
+      ) {
+        return {
+          status: 200,
           body: {
-            methodId: "chatgpt-device-code",
-            displayName: "OpenAI Personal",
+            attemptId: "ida_complete",
+            status: "pending",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            userCode: "ABCD-1234",
+            pollAfterMs: 0,
           },
+        };
+      }
+
+      if (
+        request.method === "GET" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete"
+      ) {
+        return {
+          status: 200,
+          body: {
+            attemptId: "ida_complete",
+            status: "completed",
+            connectionId: "icn_openai_complete",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    const timeController = createManualTimeController();
+    let submittedTargetKey: string | null = null;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: openAiCreateEditorInput(),
+          onSubmitSuccess: ({ editor }) => {
+            submittedTargetKey = editor.targetKey;
+          },
+          queryKey: ["integrations"],
+          scheduler: timeController.scheduler,
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("OpenAI Personal");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(result.current.deviceAuthorizationPending?.attemptId).toBe("ida_complete");
+    });
+
+    timeController.advance(2_000);
+
+    await waitFor(
+      () => {
+        expect(submittedTargetKey).toBe("openai-default");
+        expect(result.current.deviceAuthorizationPending).toBeNull();
+      },
+      {
+        timeout: 5_000,
+      },
+    );
+
+    expect(server.requests).toEqual([
+      {
+        method: "POST",
+        pathname: "/v1/integration/connections/openai-default/device-authorization/attempts",
+        body: {
+          methodId: "chatgpt-device-code",
+          displayName: "OpenAI Personal",
         },
-        {
-          method: "GET",
-          pathname:
-            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete",
-          body: null,
-        },
-      ]);
-    } finally {
-      await server.close();
-    }
+      },
+      {
+        method: "GET",
+        pathname:
+          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_complete",
+        body: null,
+      },
+    ]);
   });
 
   it("surfaces device-authorization failure back into the editor", async () => {
-    const server = await startControlPlaneTestServer({
-      handler: (request) => {
-        if (
-          request.method === "POST" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_failed",
-              status: "pending",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              userCode: "WXYZ-9999",
-              pollAfterMs: 0,
-            },
-          };
-        }
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts"
+      ) {
+        return {
+          status: 200,
+          body: {
+            attemptId: "ida_failed",
+            status: "pending",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            userCode: "WXYZ-9999",
+            pollAfterMs: 0,
+          },
+        };
+      }
 
-        if (
-          request.method === "GET" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_failed"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_failed",
-              status: "failed",
-              error: {
-                code: "DEVICE_AUTH_EXPIRED",
-                message: "The device authorization attempt expired before approval completed.",
-              },
+      if (
+        request.method === "GET" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_failed"
+      ) {
+        return {
+          status: 200,
+          body: {
+            attemptId: "ida_failed",
+            status: "failed",
+            error: {
+              code: "DEVICE_AUTH_EXPIRED",
+              message: "The device authorization attempt expired before approval completed.",
             },
-          };
-        }
+          },
+        };
+      }
 
-        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
-      },
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
     });
 
-    try {
-      setControlPlaneOrigin(server.origin);
-      const queryClient = createTestQueryClient();
-      const { result } = renderHook(
-        () =>
-          useIntegrationConnectionEditorState({
-            initialEditorInput: openAiCreateEditorInput(),
-            queryKey: ["integrations"],
-          }),
-        {
-          wrapper: createWrapper(queryClient),
-        },
-      );
+    const queryClient = createTestQueryClient();
+    const timeController = createManualTimeController();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: openAiCreateEditorInput(),
+          queryKey: ["integrations"],
+          scheduler: timeController.scheduler,
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
 
-      act(() => {
-        result.current.onConnectionDisplayNameChange("OpenAI Personal");
-      });
-      act(() => {
-        result.current.submitEditor();
-      });
+    act(() => {
+      result.current.onConnectionDisplayNameChange("OpenAI Personal");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
 
-      await waitFor(
-        () => {
-          expect(result.current.deviceAuthorizationPending).toBeNull();
-          expect(result.current.editor.mode).toBe("create");
-          expect(result.current.error).toBe(
-            "The device authorization attempt expired before approval completed.",
-          );
-        },
-        {
-          timeout: 5_000,
-        },
-      );
-    } finally {
-      await server.close();
-    }
+    await waitFor(() => {
+      expect(result.current.deviceAuthorizationPending?.attemptId).toBe("ida_failed");
+    });
+
+    timeController.advance(2_000);
+
+    await waitFor(
+      () => {
+        expect(result.current.deviceAuthorizationPending).toBeNull();
+        expect(result.current.editor.mode).toBe("create");
+        expect(result.current.error).toBe(
+          "The device authorization attempt expired before approval completed.",
+        );
+      },
+      {
+        timeout: 5_000,
+      },
+    );
   });
 
   it("cancels the pending attempt when the editor is closed", async () => {
-    const server = await startControlPlaneTestServer({
-      handler: (request) => {
-        if (
-          request.method === "POST" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_cancel",
-              status: "pending",
-              verificationUrl: "https://auth.openai.com/codex/device",
-              userCode: "IJKL-0001",
-              pollAfterMs: 5_000,
-            },
-          };
-        }
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts"
+      ) {
+        return {
+          status: 200,
+          body: {
+            attemptId: "ida_cancel",
+            status: "pending",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            userCode: "IJKL-0001",
+            pollAfterMs: 5_000,
+          },
+        };
+      }
 
-        if (
-          request.method === "DELETE" &&
-          request.pathname ===
-            "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel"
-        ) {
-          return {
-            status: 200,
-            body: {
-              attemptId: "ida_cancel",
-              status: "cancelled",
-            },
-          };
-        }
+      if (
+        request.method === "DELETE" &&
+        request.pathname ===
+          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel"
+      ) {
+        return {
+          status: 200,
+          body: {
+            attemptId: "ida_cancel",
+            status: "cancelled",
+          },
+        };
+      }
 
-        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
-      },
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
     });
 
-    try {
-      setControlPlaneOrigin(server.origin);
-      const queryClient = createTestQueryClient();
-      let closeCount = 0;
-      const { result } = renderHook(
-        () =>
-          useIntegrationConnectionEditorState({
-            initialEditorInput: openAiCreateEditorInput(),
-            onClose: () => {
-              closeCount += 1;
-            },
-            queryKey: ["integrations"],
-          }),
-        {
-          wrapper: createWrapper(queryClient),
-        },
-      );
+    const queryClient = createTestQueryClient();
+    const timeController = createManualTimeController();
+    let closeCount = 0;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: openAiCreateEditorInput(),
+          onClose: () => {
+            closeCount += 1;
+          },
+          queryKey: ["integrations"],
+          scheduler: timeController.scheduler,
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
 
-      act(() => {
-        result.current.onConnectionDisplayNameChange("OpenAI Personal");
-      });
-      act(() => {
-        result.current.submitEditor();
-      });
+    act(() => {
+      result.current.onConnectionDisplayNameChange("OpenAI Personal");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
 
-      await waitFor(() => {
-        expect(result.current.deviceAuthorizationPending?.attemptId).toBe("ida_cancel");
-      });
+    await waitFor(() => {
+      expect(result.current.deviceAuthorizationPending?.attemptId).toBe("ida_cancel");
+    });
 
-      act(() => {
-        result.current.closeEditor();
-      });
+    act(() => {
+      result.current.closeEditor();
+    });
 
-      await waitFor(() => {
-        expect(closeCount).toBe(1);
-        expect(result.current.deviceAuthorizationPending).toBeNull();
-      });
+    await waitFor(() => {
+      expect(closeCount).toBe(1);
+      expect(result.current.deviceAuthorizationPending).toBeNull();
+    });
 
-      expect(server.requests).toContainEqual({
-        method: "DELETE",
-        pathname:
-          "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel",
-        body: null,
-      });
-    } finally {
-      await server.close();
-    }
+    expect(server.requests).toContainEqual({
+      method: "DELETE",
+      pathname:
+        "/v1/integration/connections/openai-default/device-authorization/attempts/ida_cancel",
+      body: null,
+    });
   });
 
   it("persists redirect config changes during update", async () => {
-    const server = await startControlPlaneTestServer({
-      handler: (request) => {
-        if (
-          request.method === "PUT" &&
-          request.pathname === "/v1/integration/connections/icn_signoz_001"
-        ) {
-          return {
-            status: 200,
-            body: {
-              id: "icn_signoz_001",
-              targetKey: "signoz-mcp",
-              displayName: "SigNoz EU",
-              status: "active",
-              config: {
-                connection_method: "oauth2-authorization-code",
-                region: "eu",
-              },
-              createdAt: "2026-04-15T00:00:00.000Z",
-              updatedAt: "2026-04-15T00:01:00.000Z",
+    server.setHandler((request) => {
+      if (
+        request.method === "PUT" &&
+        request.pathname === "/v1/integration/connections/icn_signoz_001"
+      ) {
+        return {
+          status: 200,
+          body: {
+            id: "icn_signoz_001",
+            targetKey: "signoz-mcp",
+            displayName: "SigNoz EU",
+            status: "active",
+            config: {
+              connection_method: "oauth2-authorization-code",
+              region: "eu",
             },
-          };
-        }
+            createdAt: "2026-04-15T00:00:00.000Z",
+            updatedAt: "2026-04-15T00:01:00.000Z",
+          },
+        };
+      }
 
-        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
-      },
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
     });
 
-    try {
-      setControlPlaneOrigin(server.origin);
-      const queryClient = createTestQueryClient();
-      const { result } = renderHook(
-        () =>
-          useIntegrationConnectionEditorState({
-            initialEditorInput: signozRedirectUpdateEditorInput(),
-            queryKey: ["integrations"],
-          }),
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: signozRedirectUpdateEditorInput(),
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("SigNoz EU");
+    });
+    act(() => {
+      result.current.onConfigChange({
+        connection_method: "oauth2-authorization-code",
+        region: "eu",
+      });
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(server.requests).toEqual([
         {
-          wrapper: createWrapper(queryClient),
-        },
-      );
-
-      act(() => {
-        result.current.onConnectionDisplayNameChange("SigNoz EU");
-      });
-      act(() => {
-        result.current.onConfigChange({
-          connection_method: "oauth2-authorization-code",
-          region: "eu",
-        });
-      });
-      act(() => {
-        result.current.submitEditor();
-      });
-
-      await waitFor(() => {
-        expect(server.requests).toEqual([
-          {
-            method: "PUT",
-            pathname: "/v1/integration/connections/icn_signoz_001",
-            body: {
-              displayName: "SigNoz EU",
-              config: {
-                region: "eu",
-              },
+          method: "PUT",
+          pathname: "/v1/integration/connections/icn_signoz_001",
+          body: {
+            displayName: "SigNoz EU",
+            config: {
+              region: "eu",
             },
           },
-        ]);
-      });
-    } finally {
-      await server.close();
-    }
+        },
+      ]);
+    });
   });
 
   it("does not send form secrets during update when the user leaves them blank", async () => {
-    const server = await startControlPlaneTestServer({
-      handler: (request) => {
-        if (
-          request.method === "PUT" &&
-          request.pathname === "/v1/integration/connections/icn_openai_001/form"
-        ) {
-          return {
-            status: 200,
-            body: {
-              id: "icn_openai_001",
-              targetKey: "openai-default",
-              displayName: "OpenAI Renamed",
-              status: "active",
-              config: {
-                connection_method: "api-key",
-              },
-              createdAt: "2026-04-15T00:00:00.000Z",
-              updatedAt: "2026-04-15T00:01:00.000Z",
+    server.setHandler((request) => {
+      if (
+        request.method === "PUT" &&
+        request.pathname === "/v1/integration/connections/icn_openai_001/form"
+      ) {
+        return {
+          status: 200,
+          body: {
+            id: "icn_openai_001",
+            targetKey: "openai-default",
+            displayName: "OpenAI Renamed",
+            status: "active",
+            config: {
+              connection_method: "api-key",
             },
-          };
-        }
+            createdAt: "2026-04-15T00:00:00.000Z",
+            updatedAt: "2026-04-15T00:01:00.000Z",
+          },
+        };
+      }
 
-        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
-      },
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
     });
 
-    try {
-      setControlPlaneOrigin(server.origin);
-      const queryClient = createTestQueryClient();
-      const { result } = renderHook(
-        () =>
-          useIntegrationConnectionEditorState({
-            initialEditorInput: openAiFormUpdateEditorInput(),
-            queryKey: ["integrations"],
-          }),
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: openAiFormUpdateEditorInput(),
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("OpenAI Renamed");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(server.requests).toEqual([
         {
-          wrapper: createWrapper(queryClient),
-        },
-      );
-
-      act(() => {
-        result.current.onConnectionDisplayNameChange("OpenAI Renamed");
-      });
-      act(() => {
-        result.current.submitEditor();
-      });
-
-      await waitFor(() => {
-        expect(server.requests).toEqual([
-          {
-            method: "PUT",
-            pathname: "/v1/integration/connections/icn_openai_001/form",
-            body: {
-              displayName: "OpenAI Renamed",
-              config: {},
-            },
+          method: "PUT",
+          pathname: "/v1/integration/connections/icn_openai_001/form",
+          body: {
+            displayName: "OpenAI Renamed",
+            config: {},
           },
-        ]);
-      });
-    } finally {
-      await server.close();
-    }
+        },
+      ]);
+    });
   });
 });
