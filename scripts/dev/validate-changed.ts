@@ -41,8 +41,8 @@ const WORKSPACE_ROOTS = ["apps", "packages", "tests"] as const;
 const VALIDATION_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const DEFAULT_WORKSPACE_POLICY_STEPS: readonly Step[] = ["format", "lint", "typecheck", "test"];
 const TESTS_POLICY_STEPS: readonly Step[] = ["lint", "typecheck"];
-const WORKSPACE_TURBO_STEPS: readonly Step[] = ["lint", "test"];
 const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format", "typecheck"]);
+const AFFECTED_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard", "@mistle/ui"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 
@@ -322,6 +322,37 @@ function collectTransitiveDependents(
   return collected;
 }
 
+function collectTransitiveDependencies(
+  packageName: string,
+  packageByName: ReadonlyMap<string, WorkspacePackage>,
+): Set<string> {
+  const collected = new Set<string>();
+  const queue = [packageName];
+
+  while (queue.length > 0) {
+    const nextPackage = queue.shift();
+    if (nextPackage === undefined) {
+      continue;
+    }
+
+    const workspacePackage = packageByName.get(nextPackage);
+    if (workspacePackage === undefined) {
+      continue;
+    }
+
+    for (const dependencyName of workspacePackage.dependencies) {
+      if (collected.has(dependencyName)) {
+        continue;
+      }
+
+      collected.add(dependencyName);
+      queue.push(dependencyName);
+    }
+  }
+
+  return collected;
+}
+
 function createEmptyExtraCommands(): Record<Step, string[][]> {
   return {
     format: [],
@@ -492,35 +523,146 @@ function createValidationPlan(
 }
 
 function buildWorkspaceTurboCommand(
-  steps: readonly Step[],
+  step: Extract<Step, "lint" | "test">,
   workspacePackages: readonly WorkspacePackage[],
 ): string[] | null {
-  const turboSteps = WORKSPACE_TURBO_STEPS.filter(
-    (step) =>
-      steps.includes(step) &&
-      workspacePackages.some((workspacePackage) => workspacePackage.policySteps.includes(step)),
-  );
-
-  if (turboSteps.length === 0) {
+  if (
+    workspacePackages.some((workspacePackage) => workspacePackage.policySteps.includes(step)) ===
+    false
+  ) {
     return null;
   }
 
   const selectedPackageNames = Array.from(
     new Set(
       workspacePackages
-        .filter((workspacePackage) =>
-          turboSteps.some((step) => workspacePackage.policySteps.includes(step)),
-        )
+        .filter((workspacePackage) => workspacePackage.policySteps.includes(step))
         .map((workspacePackage) => workspacePackage.name),
     ),
   ).sort();
 
-  const command = ["turbo", "run", ...turboSteps, "--output-logs=errors-only"];
+  const command = ["turbo", "run", step, "--output-logs=errors-only"];
   for (const packageName of selectedPackageNames) {
     command.push("--filter", packageName);
   }
 
   return command;
+}
+
+function isTestFilePath(filePath: string): boolean {
+  return filePath.endsWith(".test.ts") || filePath.endsWith(".test.tsx");
+}
+
+function isSupportedAffectedTestInputFilePath(filePath: string): boolean {
+  return /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(filePath);
+}
+
+function buildPackageByNameMap(
+  workspacePackages: readonly WorkspacePackage[],
+): Map<string, WorkspacePackage> {
+  return new Map(
+    workspacePackages.map((workspacePackage) => [workspacePackage.name, workspacePackage]),
+  );
+}
+
+function getAffectedTestRelevantFiles(
+  workspacePackage: WorkspacePackage,
+  changedFiles: readonly string[],
+  workspacePackages: readonly WorkspacePackage[],
+): string[] {
+  const packageByName = buildPackageByNameMap(workspacePackages);
+  const relevantPackageNames = collectTransitiveDependencies(workspacePackage.name, packageByName);
+  relevantPackageNames.add(workspacePackage.name);
+
+  return changedFiles.filter((filePath) => {
+    const matchingPackage = findWorkspacePackageForFile(filePath, workspacePackages);
+    return matchingPackage !== undefined && relevantPackageNames.has(matchingPackage.name);
+  });
+}
+
+function buildAffectedVitestCommand(
+  workspacePackage: WorkspacePackage,
+  vitestCommand: "related" | "run",
+  filePaths: readonly string[],
+): string[] {
+  const command = ["pnpm", "--dir", workspacePackage.relativePath, "exec", "vitest", vitestCommand];
+
+  if (vitestCommand === "related") {
+    command.push("--run");
+  }
+
+  command.push("--passWithNoTests");
+  command.push(...filePaths.map((filePath) => resolve(REPO_ROOT, filePath)));
+
+  return command;
+}
+
+function buildAffectedTestCommands(
+  plan: ValidationPlan,
+  workspacePackages: readonly WorkspacePackage[],
+): { commands: Command[]; turboPackages: WorkspacePackage[] } {
+  const affectedCommands: Command[] = [];
+  const turboPackages: WorkspacePackage[] = [];
+
+  for (const workspacePackage of plan.selectedPackages) {
+    if (
+      workspacePackage.policySteps.includes("test") === false ||
+      AFFECTED_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false
+    ) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
+    if (reasons.includes(ALL_PACKAGES_REASON)) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    const relevantFiles = getAffectedTestRelevantFiles(
+      workspacePackage,
+      plan.changedFiles,
+      workspacePackages,
+    );
+
+    if (relevantFiles.length === 0) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    const changedTestFiles = relevantFiles.filter(
+      (filePath) =>
+        filePath.startsWith(`${workspacePackage.relativePath}/`) && isTestFilePath(filePath),
+    );
+    const relatedFiles = relevantFiles.filter(
+      (filePath) => changedTestFiles.includes(filePath) === false,
+    );
+    const hasUnsupportedRelevantFile = relatedFiles.some(
+      (filePath) => isSupportedAffectedTestInputFilePath(filePath) === false,
+    );
+
+    if (hasUnsupportedRelevantFile) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    if (changedTestFiles.length > 0) {
+      affectedCommands.push(buildAffectedVitestCommand(workspacePackage, "run", changedTestFiles));
+    }
+
+    if (relatedFiles.length > 0) {
+      affectedCommands.push(buildAffectedVitestCommand(workspacePackage, "related", relatedFiles));
+    }
+
+    if (changedTestFiles.length === 0 && relatedFiles.length === 0) {
+      turboPackages.push(workspacePackage);
+    }
+  }
+
+  return {
+    commands: affectedCommands,
+    turboPackages,
+  };
 }
 
 function buildExecutionCommands(plan: ValidationPlan, steps: readonly Step[]): string[][] {
@@ -532,9 +674,21 @@ function buildExecutionCommands(plan: ValidationPlan, steps: readonly Step[]): s
     }
   }
 
-  const workspaceTurboCommand = buildWorkspaceTurboCommand(steps, plan.selectedPackages);
-  if (workspaceTurboCommand !== null) {
-    commands.push(workspaceTurboCommand);
+  if (steps.includes("lint")) {
+    const lintCommand = buildWorkspaceTurboCommand("lint", plan.selectedPackages);
+    if (lintCommand !== null) {
+      commands.push(lintCommand);
+    }
+  }
+
+  if (steps.includes("test")) {
+    const affectedTestPlan = buildAffectedTestCommands(plan, plan.selectedPackages);
+    const testCommand = buildWorkspaceTurboCommand("test", affectedTestPlan.turboPackages);
+    if (testCommand !== null) {
+      commands.push(testCommand);
+    }
+
+    commands.push(...affectedTestPlan.commands);
   }
 
   for (const step of steps) {

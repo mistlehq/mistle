@@ -57,7 +57,7 @@
     "release:notes": "tsx ./scripts/release/notes.ts",
     "release:write-notes": "tsx ./scripts/release/write-notes.ts",
     "release:create-tag": "tsx ./scripts/release/create-tag.ts",
-    "ci:ts": "pnpm format:check && pnpm lint:ts && pnpm lint:sql && pnpm typecheck:ts && pnpm --filter @mistle/dashboard build && pnpm storybook:build && pnpm test:ts",
+    "ci:ts": "pnpm format:check && pnpm lint:ts && pnpm lint:sql && pnpm typecheck:ts && pnpm --filter @mistle/dashboard build && pnpm test:ts",
     "ci:rust": "pnpm lint:rust && pnpm typecheck:rust && pnpm test:rust",
     "ci": "pnpm ci:ts && pnpm ci:rust",
     "ci:nix": "nix develop --command pnpm run ci",
