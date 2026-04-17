@@ -49,18 +49,19 @@ export async function listOrganizationIdentityLinkProviders(
     organizationId: string;
   },
 ): Promise<OrganizationIdentityLinkProvider[]> {
-  const providers = await listIdentityLinkProviderMetadata(ctx);
-
-  const configs = await ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
-    columns: {
-      providerFamily: true,
-      status: true,
-      integrationConnectionId: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    where: (table, { eq }) => eq(table.organizationId, input.organizationId),
-  });
+  const [providers, configs] = await Promise.all([
+    listIdentityLinkProviderMetadata(ctx),
+    ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
+      columns: {
+        providerFamily: true,
+        status: true,
+        integrationConnectionId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    }),
+  ]);
 
   const connectionIds = configs.map((config) => config.integrationConnectionId);
   const connections =
