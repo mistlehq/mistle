@@ -23,6 +23,13 @@ import type {
 import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
+const ArchilRegionOptions = [
+  { value: "aws-us-east-1", label: "AWS - US East (N. Virginia)" },
+  { value: "aws-us-west-2", label: "AWS - US West (Oregon)" },
+  { value: "aws-eu-west-1", label: "AWS - EU West (Ireland)" },
+  { value: "gcp-us-central1", label: "GCP - US Central (Iowa)" },
+] as const;
+
 export type OrganizationSandboxStorageSettingsPageViewProps = {
   state: OrganizationSandboxStorageFormState;
   isLoading: boolean;
@@ -41,6 +48,11 @@ export function OrganizationSandboxStorageSettingsPageView(
 ): React.JSX.Element {
   const selectedStorageConfigSourceLabel =
     input.state.storageConfigSource === "managed" ? "Managed" : "BYOK";
+  const selectedRegionLabel =
+    input.state.region.length === 0
+      ? undefined
+      : (ArchilRegionOptions.find((option) => option.value === input.state.region)?.label ??
+        input.state.region);
 
   if (input.isLoading) {
     return (
@@ -158,16 +170,32 @@ export function OrganizationSandboxStorageSettingsPageView(
                         <FieldLabel htmlFor="sandbox-storage-region">Region</FieldLabel>
                       </FieldHeader>
                       <FieldContent>
-                        <Input
-                          id="sandbox-storage-region"
-                          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        <Select
+                          onValueChange={(value) => {
+                            if (value === null) {
+                              return;
+                            }
+
                             input.onStateChange({
                               ...input.state,
-                              region: event.currentTarget.value,
+                              region: value,
                             });
                           }}
                           value={input.state.region}
-                        />
+                        >
+                          <SelectTrigger id="sandbox-storage-region">
+                            <SelectValue placeholder="Select region">
+                              {selectedRegionLabel}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ArchilRegionOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         {input.visibleErrors.region === undefined ? null : (
                           <FieldError errors={[{ message: input.visibleErrors.region }]} />
                         )}
