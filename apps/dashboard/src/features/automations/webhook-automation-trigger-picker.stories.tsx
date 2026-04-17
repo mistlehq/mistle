@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
 
-import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
@@ -428,7 +428,7 @@ function StoryHarness(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="w-full max-w-5xl">
+      <div className="w-full max-w-6xl px-6 py-8">
         <WebhookAutomationTriggerPicker
           error={input.error}
           eventOptions={input.eventOptions}
@@ -455,7 +455,10 @@ function StoryHarness(input: {
 const meta = {
   title: "Dashboard/Automations/WebhookAutomation/TriggerPicker",
   component: StoryHarness,
-  decorators: [withDashboardCenteredStory],
+  decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
 } satisfies Meta<typeof StoryHarness>;
 
 export default meta;
