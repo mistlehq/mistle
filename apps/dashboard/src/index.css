@@ -19,38 +19,17 @@
   margin-top: 0.35rem !important;
 }
 
-.chat-markdown-content ul,
-.chat-markdown-content ol {
-  padding-inline-start: 0.5rem;
+.chat-markdown-content :is(ul, ol) {
+  padding-inline-start: 0.2rem;
+  list-style-position: inside;
 }
 
-.chat-markdown-content ul {
-  list-style: none;
-  padding-inline-start: 0.25rem;
+.chat-markdown-content :is(ul, ol) > [data-streamdown="list-item"] {
+  padding-left: 1rem;
+  text-indent: -1rem;
 }
 
-.chat-markdown-content ul > [data-streamdown="list-item"] {
-  position: relative;
-  padding-left: 0.95rem;
-}
-
-.chat-markdown-content ul > [data-streamdown="list-item"]::before {
-  content: "•";
-  position: absolute;
-  left: 0;
-  top: 0;
-  line-height: 1.5rem;
-}
-
-.chat-markdown-content ol {
-  padding-inline-start: 1.5rem;
-}
-
-.chat-markdown-content ol > [data-streamdown="list-item"] {
-  padding-left: 0;
-}
-
-.chat-markdown-content ol > [data-streamdown="list-item"]::marker {
+.chat-markdown-content :is(ul, ol) > [data-streamdown="list-item"]::marker {
   font: inherit;
   color: inherit;
 }
@@ -71,6 +50,10 @@
 
 .chat-markdown-content [data-streamdown="list-item"] > :is(ul, ol) {
   margin-top: 0.4rem;
+}
+
+.chat-markdown-content :is(ul, ol) :is(ul, ol) {
+  padding-inline-start: 0.5rem;
 }
 
 .chat-markdown-content
