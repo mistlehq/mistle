@@ -16,7 +16,7 @@ describe("SlackSupportedWebhookEvents", () => {
         kind: "string",
         payloadPath: ["event", "text"],
         matchMode: "contains_token",
-        controlVariant: "explicit-invocation",
+        controlVariant: "invocation-token",
       },
       {
         id: "channel",

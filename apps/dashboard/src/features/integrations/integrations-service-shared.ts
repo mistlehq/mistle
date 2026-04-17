@@ -146,7 +146,7 @@ export const IntegrationTargetSchema = z
                       matchMode: z.enum(["eq", "contains", "contains_token"]).optional(),
                       defaultValue: z.string().min(1).optional(),
                       defaultEnabled: z.boolean().optional(),
-                      controlVariant: z.enum(["explicit-invocation"]).optional(),
+                      controlVariant: z.enum(["invocation-token"]).optional(),
                       prefix: z.string().min(1).optional(),
                       placeholder: z.string().min(1).optional(),
                     })

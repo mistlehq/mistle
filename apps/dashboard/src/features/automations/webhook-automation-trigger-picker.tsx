@@ -312,7 +312,7 @@ function TriggerParameterField(input: {
   });
 
   if (input.parameter.kind === "string") {
-    if (input.parameter.controlVariant === "explicit-invocation") {
+    if (input.parameter.controlVariant === "invocation-token") {
       return (
         <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
           <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm whitespace-nowrap">

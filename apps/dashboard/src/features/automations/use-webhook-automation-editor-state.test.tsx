@@ -18,6 +18,17 @@ import { createWebhookAutomationTriggerId } from "./webhook-automation-option-bu
 const LinearConnectionId = "conn_linear";
 const LinearWebhookSourceId = "iws_linear";
 
+function createInvocationTokenParameter(payloadPath: string[]) {
+  return {
+    id: "invocationToken",
+    label: "invocation token",
+    kind: "string" as const,
+    payloadPath,
+    matchMode: "contains_token" as const,
+    controlVariant: "invocation-token" as const,
+  };
+}
+
 function createDirectoryData(input?: {
   supportedWebhookEvents?: {
     eventType: string;
@@ -29,7 +40,7 @@ function createDirectoryData(input?: {
       kind: "string";
       payloadPath: string[];
       matchMode?: "eq" | "contains" | "contains_token";
-      controlVariant?: "explicit-invocation";
+      controlVariant?: "invocation-token";
     }>;
   }[];
 }) {
@@ -289,16 +300,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 eventType: "linear.issue_comment.created",
                 providerEventType: "IssueComment",
                 displayName: "Issue comment created",
-                parameters: [
-                  {
-                    id: "invocationToken",
-                    label: "invocation token",
-                    kind: "string",
-                    payloadPath: ["comment", "body"],
-                    matchMode: "contains_token",
-                    controlVariant: "explicit-invocation",
-                  },
-                ],
+                parameters: [createInvocationTokenParameter(["comment", "body"])],
               },
             ],
           }),
@@ -366,16 +368,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 eventType: "linear.issue_comment.created",
                 providerEventType: "IssueComment",
                 displayName: "Issue comment created",
-                parameters: [
-                  {
-                    id: "invocationToken",
-                    label: "invocation token",
-                    kind: "string",
-                    payloadPath: ["comment", "body"],
-                    matchMode: "contains_token",
-                    controlVariant: "explicit-invocation",
-                  },
-                ],
+                parameters: [createInvocationTokenParameter(["comment", "body"])],
               },
               {
                 eventType: "linear.issue.opened",
@@ -466,31 +459,13 @@ describe("useLoadedWebhookAutomationEditorState", () => {
                 eventType: "linear.issue_comment.created",
                 providerEventType: "IssueComment",
                 displayName: "Issue comment created",
-                parameters: [
-                  {
-                    id: "invocationToken",
-                    label: "invocation token",
-                    kind: "string",
-                    payloadPath: ["comment", "body"],
-                    matchMode: "contains_token",
-                    controlVariant: "explicit-invocation",
-                  },
-                ],
+                parameters: [createInvocationTokenParameter(["comment", "body"])],
               },
               {
                 eventType: "linear.issue.opened",
                 providerEventType: "Issue",
                 displayName: "Issue opened",
-                parameters: [
-                  {
-                    id: "invocationToken",
-                    label: "invocation token",
-                    kind: "string",
-                    payloadPath: ["issue", "body"],
-                    matchMode: "contains_token",
-                    controlVariant: "explicit-invocation",
-                  },
-                ],
+                parameters: [createInvocationTokenParameter(["issue", "body"])],
               },
             ],
           }),

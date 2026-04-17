@@ -1416,7 +1416,7 @@ export type IntegrationWebhookEventParameterDefinition =
       matchMode?: "eq" | "contains" | "contains_token" | undefined;
       defaultValue?: string | undefined;
       defaultEnabled?: boolean | undefined;
-      controlVariant?: "explicit-invocation" | undefined;
+      controlVariant?: "invocation-token" | undefined;
       prefix?: string | undefined;
       placeholder?: string | undefined;
     }
