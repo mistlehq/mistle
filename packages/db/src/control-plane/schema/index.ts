@@ -86,16 +86,6 @@ export {
   type InsertAutomationConversationRoute,
 } from "./automation-conversation-routes.js";
 export {
-  organizationCredentialKeysRelations,
-  organizationIdentityLinkProviderConfigsRelations,
-  organizationsRelations,
-  userExternalPrincipalCredentialSecretsRelations,
-  userExternalPrincipalCredentialsRelations,
-  userExternalPrincipalKeysRelations,
-  userExternalPrincipalsRelations,
-  usersRelations,
-} from "./identity-linking-relations.js";
-export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   type InsertIntegrationCredential,
