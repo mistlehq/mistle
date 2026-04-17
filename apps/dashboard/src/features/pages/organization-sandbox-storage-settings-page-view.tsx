@@ -40,7 +40,7 @@ export function OrganizationSandboxStorageSettingsPageView(
   input: OrganizationSandboxStorageSettingsPageViewProps,
 ): React.JSX.Element {
   const selectedStorageConfigSourceLabel =
-    input.state.storageConfigSource === "managed" ? "Managed" : "Organization override";
+    input.state.storageConfigSource === "managed" ? "Managed" : "BYOK";
 
   if (input.isLoading) {
     return (
@@ -83,7 +83,7 @@ export function OrganizationSandboxStorageSettingsPageView(
               <Notice variant="alert">{input.saveErrorMessage}</Notice>
             )}
             <Field orientation="horizontal">
-              <FieldHeader className="md:w-64">
+              <FieldHeader className="md:w-auto md:flex-1">
                 <FieldLabel htmlFor="persistent-sandboxes-enabled">
                   Persistent sandboxes enabled
                 </FieldLabel>
@@ -108,11 +108,11 @@ export function OrganizationSandboxStorageSettingsPageView(
             {input.state.persistentSandboxesEnabled ? (
               <>
                 <Field orientation="horizontal">
-                  <FieldHeader className="md:w-64">
+                  <FieldHeader className="md:w-auto md:flex-1">
                     <FieldLabel>Configuration source</FieldLabel>
                     <FieldDescription>
-                      Managed uses the deployment default. Organization override stores Archil
-                      credentials for this organization.
+                      Managed uses the deployment default. BYOK stores Archil credentials for this
+                      organization.
                     </FieldDescription>
                   </FieldHeader>
                   <FieldContent>
@@ -134,7 +134,7 @@ export function OrganizationSandboxStorageSettingsPageView(
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="managed">Managed</SelectItem>
-                        <SelectItem value="organization">Organization override</SelectItem>
+                        <SelectItem value="organization">BYOK</SelectItem>
                       </SelectContent>
                     </Select>
                   </FieldContent>
