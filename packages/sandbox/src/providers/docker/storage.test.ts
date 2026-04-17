@@ -29,7 +29,7 @@ describe("createDockerVolumeInitCommand", () => {
     expect(command).toContain("mkdir -p");
     expect(command).toContain("'/mnt/mistle/storage/root'");
     expect(command).toContain("'/mnt/mistle/storage/etc/codex'");
-    expect(command).toContain("'/mnt/mistle/storage/usr/local/bin'");
+    expect(command).not.toContain("/usr/local/bin");
   });
 });
 
@@ -82,20 +82,6 @@ describe("createDockerVolumeSubpathMounts", () => {
             Options: {},
           },
           Subpath: "etc/codex",
-        },
-      },
-      {
-        Type: "volume",
-        Source: "vol-0123456789abcdef",
-        Target: "/usr/local/bin",
-        VolumeOptions: {
-          NoCopy: false,
-          Labels: {},
-          DriverConfig: {
-            Name: "local",
-            Options: {},
-          },
-          Subpath: "usr/local/bin",
         },
       },
     ]);

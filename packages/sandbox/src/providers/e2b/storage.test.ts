@@ -56,7 +56,7 @@ describe("createE2BAttachStorageCommand", () => {
     );
     expect(command).toContain("mount --bind '/mnt/mistle/archil/root' '/root'");
     expect(command).toContain("mount --bind '/mnt/mistle/archil/etc/codex' '/etc/codex'");
-    expect(command).toContain("mount --bind '/mnt/mistle/archil/usr/local/bin' '/usr/local/bin'");
+    expect(command).not.toContain("/usr/local/bin");
   });
 
   it("omits force when reattaching storage on provider-native resume", () => {

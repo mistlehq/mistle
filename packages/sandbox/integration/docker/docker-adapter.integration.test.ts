@@ -342,10 +342,8 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     const volumeName = `mistle-pr13-${randomUUID()}`;
     const rootMarkerPath = "/root/.mistle-durable-root.txt";
     const codexMarkerPath = "/etc/codex/.mistle-durable-codex.txt";
-    const binMarkerPath = "/usr/local/bin/.mistle-durable-bin.txt";
     const rootMarker = `root-${randomUUID()}`;
     const codexMarker = `codex-${randomUUID()}`;
-    const binMarker = `bin-${randomUUID()}`;
     let firstSandboxId: string | undefined;
     let secondSandboxId: string | undefined;
 
@@ -387,11 +385,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
             Name: volumeName,
             Destination: "/etc/codex",
           }),
-          expect.objectContaining({
-            Type: "volume",
-            Name: volumeName,
-            Destination: "/usr/local/bin",
-          }),
         ]),
       );
 
@@ -406,12 +399,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         id: firstSandbox.id,
         path: codexMarkerPath,
         fileContents: codexMarker,
-      });
-      await writeSandboxFile({
-        dockerClient: fixture.dockerClient,
-        id: firstSandbox.id,
-        path: binMarkerPath,
-        fileContents: binMarker,
       });
 
       await fixture.adapter.destroy({ id: firstSandbox.id });
@@ -447,13 +434,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
           path: codexMarkerPath,
         }),
       ).resolves.toBe(codexMarker);
-      await expect(
-        readSandboxFile({
-          dockerClient: fixture.dockerClient,
-          id: secondSandbox.id,
-          path: binMarkerPath,
-        }),
-      ).resolves.toBe(binMarker);
     } finally {
       if (firstSandboxId !== undefined) {
         await fixture.adapter.destroy({ id: firstSandboxId });
@@ -505,11 +485,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
 
       const inspectorContainer = await fixture.dockerClient.createContainer({
         Image: "alpine:3.20",
-        Cmd: [
-          "sh",
-          "-lc",
-          "test -d /mnt/root && test -d /mnt/etc/codex && test -d /mnt/usr/local/bin",
-        ],
+        Cmd: ["sh", "-lc", "test -d /mnt/root && test -d /mnt/etc/codex"],
         HostConfig: {
           Mounts: [
             {

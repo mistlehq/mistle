@@ -43,10 +43,6 @@ export const SandboxPersistentStorageLayout: SandboxStorageAttachmentLayout = {
       sourcePath: "etc/codex",
       targetPath: "/etc/codex",
     },
-    {
-      sourcePath: "usr/local/bin",
-      targetPath: "/usr/local/bin",
-    },
   ],
 };
 

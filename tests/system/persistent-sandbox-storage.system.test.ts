@@ -485,19 +485,15 @@ async function writeDurableState(input: {
       ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
     });
     await sandbox.files.makeDir("/etc/codex");
-    await sandbox.files.makeDir("/usr/local/bin");
     await sandbox.files.write("/root/persistent-marker.txt", input.marker);
     await sandbox.files.write("/etc/codex/persistent-marker.txt", input.marker);
-    await sandbox.files.write("/usr/local/bin/persistent-marker.txt", input.marker);
     return;
   }
 
   const command = [
-    "mkdir -p /etc/codex /usr/local/bin",
+    "mkdir -p /etc/codex",
     `printf '%s' '${input.marker}' > /root/persistent-marker.txt`,
     `printf '%s' '${input.marker}' > /etc/codex/persistent-marker.txt`,
-    `printf '%s' '${input.marker}' > /usr/local/bin/persistent-marker.txt`,
-    "chmod +x /usr/local/bin/persistent-marker.txt",
   ].join(" && ");
 
   const result = await runSandboxShellCommand({
@@ -531,13 +527,12 @@ async function readDurableState(input: {
       apiKey: e2bEnvironment.apiKey,
       ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
     });
-    const [rootMarker, codexMarker, usrLocalBinMarker] = await Promise.all([
+    const [rootMarker, codexMarker] = await Promise.all([
       sandbox.files.read("/root/persistent-marker.txt"),
       sandbox.files.read("/etc/codex/persistent-marker.txt"),
-      sandbox.files.read("/usr/local/bin/persistent-marker.txt"),
     ]);
 
-    return [rootMarker, codexMarker, usrLocalBinMarker].join("\n");
+    return [rootMarker, codexMarker].join("\n");
   }
 
   const result = await runSandboxShellCommand({
@@ -545,7 +540,7 @@ async function readDurableState(input: {
     authenticatedSession: input.authenticatedSession,
     sandboxInstanceId: input.sandboxInstanceId,
     command:
-      "cat /root/persistent-marker.txt && printf '\\n' && cat /etc/codex/persistent-marker.txt && printf '\\n' && cat /usr/local/bin/persistent-marker.txt",
+      "cat /root/persistent-marker.txt && printf '\\n' && cat /etc/codex/persistent-marker.txt",
   });
 
   expect(result.exitCode).toBe(0);
@@ -564,15 +559,12 @@ async function assertDurablePathsExposed(input: {
     command: [
       "test -d /root",
       "test -d /etc/codex",
-      "test -d /usr/local/bin",
       'root_marker="/root/.mistle-durable-path-check"',
       'codex_marker="/etc/codex/.mistle-durable-path-check"',
-      'bin_marker="/usr/local/bin/.mistle-durable-path-check"',
-      'touch "$root_marker" "$codex_marker" "$bin_marker"',
+      'touch "$root_marker" "$codex_marker"',
       'test -f "$root_marker"',
       'test -f "$codex_marker"',
-      'test -f "$bin_marker"',
-      'rm -f "$root_marker" "$codex_marker" "$bin_marker"',
+      'rm -f "$root_marker" "$codex_marker"',
     ].join(" && "),
   });
 
