@@ -2,7 +2,6 @@ import { Fragment, useState } from "react";
 import type React from "react";
 
 import {
-  SessionConversationPanePlaygroundBaseArgs,
   getPlaygroundChatEntries,
   type SessionConversationPaneStoryArgs,
 } from "./session-conversation-pane-playground-fixtures.js";
