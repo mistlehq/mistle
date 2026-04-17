@@ -12,13 +12,13 @@ x-mistle-local-provision-manifest-volume: &mistle-local-provision-manifest-volum
 
 x-mistle-local-app: &mistle-local-app
   env_file:
-    - ../local/.env
+    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
   volumes:
     - *mistle-local-config-volume
 
 x-mistle-local-bootstrap: &mistle-local-bootstrap
   env_file:
-    - ../local/.env
+    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
   volumes:
     - *mistle-local-config-volume
     - *mistle-local-provision-manifest-volume
@@ -26,7 +26,7 @@ x-mistle-local-bootstrap: &mistle-local-bootstrap
 
 x-mistle-local-migration-job: &mistle-local-migration-job
   env_file:
-    - ../local/.env
+    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
   volumes:
     - *mistle-local-config-volume
   restart: "no"
@@ -48,7 +48,7 @@ services:
   sandbox-base-publish:
     image: docker:28-cli
     env_file:
-      - ../local/.env
+      - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
     entrypoint:
       - sh
       - -lc
@@ -77,7 +77,7 @@ services:
 
   dashboard:
     env_file:
-      - ../local/.env
+      - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
     ports:
       - "3000:80"
 

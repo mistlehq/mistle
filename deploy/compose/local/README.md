@@ -17,20 +17,22 @@ It is not the production deployment artifact.
 
 ## First Run
 
-1. Copy the environment file:
+1. Change into the local Compose directory:
 
    ```bash
-   cp deploy/compose/local/.env.example deploy/compose/local/.env
+   cd deploy/compose/local
    ```
 
-2. Start the stack:
+2. Copy the environment file if it does not exist yet:
 
    ```bash
-   docker compose \
-     -f deploy/compose/base/compose.yaml \
-     -f deploy/compose/local/compose.yaml \
-     --env-file deploy/compose/local/.env \
-     up -d --build
+   cp .env.example .env
+   ```
+
+3. Start the stack through the testing wrapper:
+
+   ```bash
+   ./up.sh
    ```
 
    This build also publishes the local sandbox base image used for Docker-backed sessions
@@ -41,7 +43,11 @@ It is not the production deployment artifact.
    `deploy/compose/local/config/integration-targets.provision.json`, so the dashboard starts
    with the supported integrations visible by default.
 
-3. Open the product:
+   If `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is blank in `.env`, `./up.sh` starts
+   an ephemeral Cloudflare quick tunnel in Docker for `http://localhost:8080` and injects the
+   public URL for this run. If the variable is already set, `./up.sh` uses that value unchanged.
+
+4. Open the product:
 
 - Dashboard: `http://localhost:3000`
 - Control Plane API: `http://localhost:8080`
@@ -52,7 +58,7 @@ It is not the production deployment artifact.
 The local registry at `http://localhost:5001` is an internal runtime dependency for sandbox
 image pulls. It is not a user-facing product surface.
 
-4. Run the acceptance smoke test:
+5. Run the acceptance smoke test from the repo root:
 
    ```bash
    pnpm compose:local:smoke-test -- --restart-check
@@ -60,13 +66,18 @@ image pulls. It is not a user-facing product surface.
 
 ## Callback-Capable Local Mode
 
-Baseline local mode assumes the dashboard talks to `http://localhost:8080`.
+Baseline local mode always keeps the dashboard on `http://localhost:3000`.
 
-For redirect- or webhook-based integrations, set:
+For redirect- or webhook-based integrations, `./up.sh` will create an ephemeral callback URL
+automatically when:
+
+- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is unset or blank
+
+Set this variable explicitly when you want to override the quick tunnel with a stable public URL:
 
 - `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
 
-to a reachable external URL before startup. This mirrors the existing dev model:
+This mirrors the existing dev model:
 
 - dashboard/browser origin can stay on localhost
 - integration callbacks derive from the control-plane auth/public base URL
@@ -90,19 +101,13 @@ To customize the default local target provisioning:
 Stop the stack:
 
 ```bash
-docker compose \
-  -f deploy/compose/base/compose.yaml \
-  -f deploy/compose/local/compose.yaml \
-  --env-file deploy/compose/local/.env \
-  down
+cd deploy/compose/local
+./down.sh
 ```
 
 Remove local state:
 
 ```bash
-docker compose \
-  -f deploy/compose/base/compose.yaml \
-  -f deploy/compose/local/compose.yaml \
-  --env-file deploy/compose/local/.env \
-  down -v
+cd deploy/compose/local
+./down.sh -v
 ```
