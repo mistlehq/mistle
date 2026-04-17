@@ -3,6 +3,7 @@ import {
   integrationConnections,
   integrationCredentials,
   integrationWebhookSources,
+  OrganizationIdentityLinkProviderConfigStatus,
   sandboxProfileVersionIntegrationBindings,
   type ControlPlaneDatabase,
   webhookAutomations,
@@ -83,6 +84,26 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
     throw new ConflictError(
       IntegrationConnectionsConflictCodes.CONNECTION_HAS_AUTOMATIONS,
       "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
+    );
+  }
+
+  const activeIdentityLinkProviderConfig =
+    await input.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+      columns: {
+        providerFamily: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, input.organizationId),
+          eq(table.integrationConnectionId, lockedConnection.id),
+          eq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
+        ),
+    });
+
+  if (activeIdentityLinkProviderConfig !== undefined) {
+    throw new ConflictError(
+      IntegrationConnectionsConflictCodes.CONNECTION_USED_BY_IDENTITY_LINKING,
+      "This integration connection cannot be deleted while it is configured for Identity Linking.",
     );
   }
 }

@@ -1,7 +1,13 @@
 import { z } from "@hono/zod-openapi";
-import { SandboxStorageBackend, SandboxStorageConfigSources } from "@mistle/db/control-plane";
+import {
+  OrganizationIdentityLinkProviderConfigStatus,
+  SandboxStorageBackend,
+  SandboxStorageConfigSources,
+} from "@mistle/db/control-plane";
+import { IntegrationConnectionStatuses } from "@mistle/db/control-plane";
 
 import { ORGANIZATION_ROLES } from "../auth/services/organization-policy.js";
+import { IdentityLinkProviderConfigurationStatus } from "../identity-linking/services/list-organization-identity-link-providers.js";
 import { singletonImageMetadataResponseSchema } from "../lib/singleton-image-metadata.js";
 import {
   OrganizationSandboxStorageConfigSummarySchema,
@@ -126,3 +132,44 @@ export const PutOrganizationSandboxStorageSettingsRequestSchema = z.discriminate
 
 export const PutOrganizationSandboxStorageSettingsResponseSchema =
   GetOrganizationSandboxStorageSettingsResponseSchema;
+
+export const OrganizationIdentityLinkProviderConnectionSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    targetKey: z.string().min(1),
+    displayName: z.string().min(1),
+    status: z.enum([
+      IntegrationConnectionStatuses.ACTIVE,
+      IntegrationConnectionStatuses.ERROR,
+      IntegrationConnectionStatuses.REVOKED,
+    ]),
+    connectionMethodId: z.string().min(1).optional(),
+    connectionMethodLabel: z.string().min(1).optional(),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
+export const OrganizationIdentityLinkProviderSchema = z
+  .object({
+    providerFamily: z.string().min(1),
+    displayName: z.string().min(1),
+    logoKey: z.string().min(1),
+    eligibleTargetKeys: z.array(z.string().min(1)),
+    eligibleConnectionMethodIds: z.array(z.string().min(1)),
+    configurationStatus: z.enum([
+      IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
+      OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+    ]),
+    selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema.nullable(),
+    configuredAt: z.string().min(1).nullable(),
+    updatedAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const OrganizationIdentityLinkProvidersResponseSchema = z
+  .object({
+    providers: z.array(OrganizationIdentityLinkProviderSchema),
+  })
+  .strict();

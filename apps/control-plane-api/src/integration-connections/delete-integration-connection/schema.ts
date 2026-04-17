@@ -31,5 +31,6 @@ export const DeleteIntegrationConnectionConflictResponseSchema = createCodeMessa
   z.union([
     z.literal(IntegrationConnectionsConflictCodes.CONNECTION_HAS_BINDINGS),
     z.literal(IntegrationConnectionsConflictCodes.CONNECTION_HAS_AUTOMATIONS),
+    z.literal(IntegrationConnectionsConflictCodes.CONNECTION_USED_BY_IDENTITY_LINKING),
   ]),
 );

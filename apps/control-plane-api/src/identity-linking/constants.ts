@@ -1,0 +1,9 @@
+export const IdentityLinkingBadRequestCodes = {
+  INVALID_PROVIDER_CONFIG_INPUT: "INVALID_PROVIDER_CONFIG_INPUT",
+} as const;
+
+export const IdentityLinkingNotFoundCodes = {
+  PROVIDER_NOT_FOUND: "PROVIDER_NOT_FOUND",
+  PROVIDER_CONFIG_NOT_FOUND: "PROVIDER_CONFIG_NOT_FOUND",
+  CONNECTION_NOT_FOUND: "CONNECTION_NOT_FOUND",
+} as const;

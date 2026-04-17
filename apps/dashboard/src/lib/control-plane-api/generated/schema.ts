@@ -1273,7 +1273,10 @@ export interface paths {
           };
           content: {
             "application/json": {
-              code: "CONNECTION_HAS_BINDINGS" | "CONNECTION_HAS_AUTOMATIONS";
+              code:
+                | "CONNECTION_HAS_BINDINGS"
+                | "CONNECTION_HAS_AUTOMATIONS"
+                | "CONNECTION_USED_BY_IDENTITY_LINKING";
               message: string;
             };
           };
@@ -3287,6 +3290,320 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organization/identity-linking/providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Identity-linking providers and current organization configuration state. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              providers: {
+                /** @enum {string} */
+                configurationStatus: "unconfigured" | "active" | "disabled";
+                configuredAt: string | null;
+                displayName: string;
+                eligibleConnectionMethodIds: string[];
+                eligibleTargetKeys: string[];
+                logoKey: string;
+                providerFamily: string;
+                selectedConnection: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                } | null;
+                updatedAt: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organization/identity-linking/providers/:providerFamily": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          providerFamily: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationConnectionId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Configure the integration connection used for identity linking. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "unconfigured" | "active" | "disabled";
+              configuredAt: string | null;
+              displayName: string;
+              eligibleConnectionMethodIds: string[];
+              eligibleTargetKeys: string[];
+              logoKey: string;
+              providerFamily: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              } | null;
+              updatedAt: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PROVIDER_CONFIG_INPUT";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          providerFamily: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Disable the active organization's identity-linking provider configuration. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "unconfigured" | "active" | "disabled";
+              configuredAt: string | null;
+              displayName: string;
+              eligibleConnectionMethodIds: string[];
+              eligibleTargetKeys: string[];
+              logoKey: string;
+              providerFamily: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              } | null;
+              updatedAt: string | null;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider or provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "PROVIDER_CONFIG_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
