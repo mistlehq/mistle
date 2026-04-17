@@ -16,6 +16,7 @@ export async function markSandboxInstanceFailed(
     sandboxInstanceId: string;
     failureCode: string;
     failureMessage: string;
+    allowStoppedCurrentStatus?: boolean;
   },
 ): Promise<void> {
   const updatedRows = await ctx.db.transaction(async (tx) => {
@@ -35,6 +36,9 @@ export async function markSandboxInstanceFailed(
           or(
             eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
             eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+            ...(input.allowStoppedCurrentStatus === true
+              ? [eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED)]
+              : []),
           ),
         ),
       )
@@ -53,8 +57,6 @@ export async function markSandboxInstanceFailed(
   });
 
   if (updatedRows[0] === undefined) {
-    throw new Error(
-      "Failed to transition sandbox instance status from pending or starting to failed.",
-    );
+    throw new Error("Failed to transition sandbox instance status to failed.");
   }
 }

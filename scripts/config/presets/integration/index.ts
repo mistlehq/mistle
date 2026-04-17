@@ -35,7 +35,7 @@ const ArchilIntegrationRequiredConfigValues = [
 ] as const satisfies readonly RequiredConfigValue[];
 
 const E2BIntegrationSandboxBaseImage =
-  "ghcr.io/mistlehq/sandbox-base@sha256:8a56c023b441511c09767761847bb4d137dbcc5ca497374406cecb29f63c1298";
+  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
 
 export type IntegrationProviderPreset = {
   defaults: ConfigRecord;

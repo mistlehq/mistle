@@ -38,6 +38,9 @@ type SystemSandboxProvider = (typeof SystemSandboxProvider)[keyof typeof SystemS
 
 const SandboxStatusPollIntervalMs = 1_000;
 const SandboxStatusTimeoutMs = 3 * 60_000;
+const ProviderReplacementStatusTimeoutMs = 5 * 60_000;
+const ExternalCleanupPollIntervalMs = 1_000;
+const ExternalCleanupTimeoutMs = 60_000;
 const TracePollIntervalMs = 200;
 const TracePollTimeoutMs = 30_000;
 const StoragePollIntervalMs = 500;
@@ -45,7 +48,7 @@ const StoragePollTimeoutMs = 30_000;
 const InvalidWorkspaceRepositoryUrl =
   "https://github.com/mistlehq/this-repository-does-not-exist-for-pr17-system-test.git";
 const SystemSandboxBaseImage =
-  "ghcr.io/mistlehq/sandbox-base@sha256:8a56c023b441511c09767761847bb4d137dbcc5ca497374406cecb29f63c1298";
+  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -216,11 +219,12 @@ async function waitForPersistedSandboxStatus(input: {
   fixture: SystemTestFixture;
   sandboxInstanceId: string;
   expectedStatus: "running" | "stopped" | "failed";
+  timeoutMs?: number;
 }): Promise<void> {
   const { pool, db } = createDataPlaneDb(input.fixture);
 
   try {
-    const deadline = systemClock.nowMs() + SandboxStatusTimeoutMs;
+    const deadline = systemClock.nowMs() + (input.timeoutMs ?? SandboxStatusTimeoutMs);
     while (systemClock.nowMs() < deadline) {
       const sandboxInstance = await db.query.sandboxInstances.findFirst({
         columns: {
@@ -283,8 +287,9 @@ async function waitForSandboxReady(input: {
 async function waitForRuntimeStateReady(input: {
   fixture: SystemTestFixture;
   sandboxInstanceId: string;
+  timeoutMs?: number;
 }): Promise<void> {
-  const deadline = systemClock.nowMs() + SandboxStatusTimeoutMs;
+  const deadline = systemClock.nowMs() + (input.timeoutMs ?? SandboxStatusTimeoutMs);
   let lastRuntimeState: unknown = null;
 
   while (systemClock.nowMs() < deadline) {
@@ -598,17 +603,59 @@ async function tryDeleteProviderCompute(input: {
   try {
     await deleteProviderCompute(input);
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
     if (
-      message.includes("No such container") ||
+      message.includes("no such container") ||
       message.includes("sandbox not found") ||
-      message.includes("Sandbox not found")
+      message.includes("not found")
     ) {
       return;
     }
 
     throw error;
   }
+}
+
+async function waitForProviderComputeDeletion(input: {
+  provider: SystemSandboxProvider;
+  providerSandboxId: string;
+}): Promise<void> {
+  const deadline = systemClock.nowMs() + ExternalCleanupTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    if (input.provider === SystemSandboxProvider.DOCKER) {
+      try {
+        await execFileAsync("docker", ["inspect", input.providerSandboxId]);
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+        if (message.includes("no such object") || message.includes("no such container")) {
+          return;
+        }
+
+        throw error;
+      }
+    } else {
+      const e2bEnvironment = readE2BEnvironment();
+
+      try {
+        await Sandbox.getInfo(input.providerSandboxId, {
+          apiKey: e2bEnvironment.apiKey,
+          ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
+        });
+      } catch (error) {
+        const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+        if (message.includes("sandbox not found") || message.includes("not found")) {
+          return;
+        }
+
+        throw error;
+      }
+    }
+
+    await systemSleeper.sleep(ExternalCleanupPollIntervalMs);
+  }
+
+  throw new Error(`Timed out waiting for provider compute '${input.providerSandboxId}' deletion.`);
 }
 
 async function tryDeleteArchilDisk(input: {
@@ -625,12 +672,44 @@ async function tryDeleteArchilDisk(input: {
     const disk = await archil.disks.get(input.diskId);
     await disk.delete();
   } catch (error) {
-    if (typeof error === "object" && error !== null && "status" in error && error.status === 404) {
+    if (isArchilDiskNotFoundError(error)) {
       return;
     }
 
     throw error;
   }
+}
+
+async function waitForArchilDiskDeletion(input: {
+  diskId: string;
+  region: string | null;
+}): Promise<void> {
+  const archilEnvironment = readArchilEnvironment();
+  const archil = new Archil({
+    apiKey: archilEnvironment.apiKey,
+    region: input.region ?? archilEnvironment.region,
+  });
+  const deadline = systemClock.nowMs() + ExternalCleanupTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      await archil.disks.get(input.diskId);
+    } catch (error) {
+      if (isArchilDiskNotFoundError(error)) {
+        return;
+      }
+
+      throw error;
+    }
+
+    await systemSleeper.sleep(ExternalCleanupPollIntervalMs);
+  }
+
+  throw new Error(`Timed out waiting for Archil disk '${input.diskId}' deletion.`);
+}
+
+function isArchilDiskNotFoundError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "status" in error && error.status === 404;
 }
 
 async function tryDeleteDockerVolume(input: { volumeName: string }): Promise<void> {
@@ -651,9 +730,38 @@ async function tryDeleteDockerVolume(input: { volumeName: string }): Promise<voi
   }
 }
 
+async function waitForDockerVolumeDeletion(input: { volumeName: string }): Promise<void> {
+  const deadline = systemClock.nowMs() + ExternalCleanupTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      await execFileAsync("docker", ["volume", "inspect", input.volumeName]);
+    } catch (error) {
+      const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+      if (message.includes("no such volume")) {
+        return;
+      }
+
+      throw error;
+    }
+
+    await systemSleeper.sleep(ExternalCleanupPollIntervalMs);
+  }
+
+  throw new Error(`Timed out waiting for Docker volume '${input.volumeName}' deletion.`);
+}
+
 async function cleanupPersistentSandboxes(input: {
   fixture: SystemTestFixture;
   sandboxInstanceIds: readonly string[];
+  storageCleanupOverrides?: ReadonlyMap<
+    string,
+    {
+      provider: "archil" | "docker_volume";
+      handle: string;
+      region: string | null;
+    }
+  >;
 }): Promise<void> {
   const sandboxInstanceIds = [...new Set(input.sandboxInstanceIds)];
   if (sandboxInstanceIds.length === 0) {
@@ -667,15 +775,21 @@ async function cleanupPersistentSandboxes(input: {
       fixture: input.fixture,
       sandboxInstanceId,
     }).catch(() => null);
-    const sandboxStorage = await readSandboxStorage({
-      fixture: input.fixture,
-      sandboxInstanceId,
-    });
+    const sandboxStorage =
+      input.storageCleanupOverrides?.get(sandboxInstanceId) ??
+      (await readSandboxStorage({
+        fixture: input.fixture,
+        sandboxInstanceId,
+      }));
     let externalCleanupFailed = false;
 
     if (sandboxInstanceState?.providerSandboxId !== null && sandboxInstanceState !== null) {
       try {
         await tryDeleteProviderCompute({
+          provider: input.fixture.sandboxProvider,
+          providerSandboxId: sandboxInstanceState.providerSandboxId,
+        });
+        await waitForProviderComputeDeletion({
           provider: input.fixture.sandboxProvider,
           providerSandboxId: sandboxInstanceState.providerSandboxId,
         });
@@ -696,8 +810,15 @@ async function cleanupPersistentSandboxes(input: {
             diskId: sandboxStorage.handle,
             region: sandboxStorage.region,
           });
+          await waitForArchilDiskDeletion({
+            diskId: sandboxStorage.handle,
+            region: sandboxStorage.region,
+          });
         } else if (sandboxStorage.provider === SandboxStorageProviders.DOCKER_VOLUME) {
           await tryDeleteDockerVolume({
+            volumeName: sandboxStorage.handle,
+          });
+          await waitForDockerVolumeDeletion({
             volumeName: sandboxStorage.handle,
           });
         }
@@ -752,6 +873,14 @@ async function finalizePersistentSandboxTest(input: {
   fixture: SystemTestFixture;
   sandboxInstanceIds: readonly string[];
   testError: unknown;
+  storageCleanupOverrides?: ReadonlyMap<
+    string,
+    {
+      provider: "archil" | "docker_volume";
+      handle: string;
+      region: string | null;
+    }
+  >;
 }): Promise<void> {
   let cleanupError: unknown;
 
@@ -759,6 +888,9 @@ async function finalizePersistentSandboxTest(input: {
     await cleanupPersistentSandboxes({
       fixture: input.fixture,
       sandboxInstanceIds: input.sandboxInstanceIds,
+      ...(input.storageCleanupOverrides === undefined
+        ? {}
+        : { storageCleanupOverrides: input.storageCleanupOverrides }),
     });
   } catch (error) {
     cleanupError = error;
@@ -1218,10 +1350,12 @@ describe("persistent sandbox storage", () => {
           fixture,
           sandboxInstanceId,
           expectedStatus: "running",
+          timeoutMs: ProviderReplacementStatusTimeoutMs,
         });
         await waitForRuntimeStateReady({
           fixture,
           sandboxInstanceId,
+          timeoutMs: ProviderReplacementStatusTimeoutMs,
         });
 
         const replacedState = await readSandboxInstanceState({
@@ -1249,13 +1383,21 @@ describe("persistent sandbox storage", () => {
         });
       }
     },
-    300_000,
+    8 * 60_000,
   );
 
   itForE2B(
     "surfaces storage attach failure clearly and leaves the sandbox failed",
     async ({ fixture }) => {
       const sandboxInstanceIdsToCleanup: string[] = [];
+      const storageCleanupOverrides = new Map<
+        string,
+        {
+          provider: "archil" | "docker_volume";
+          handle: string;
+          region: string | null;
+        }
+      >();
       let testError: unknown;
 
       try {
@@ -1264,6 +1406,16 @@ describe("persistent sandbox storage", () => {
           email: `persistent-attach-failure-${randomUUID()}@example.com`,
         });
         sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+        const originalStorage = await readSandboxStorage({
+          fixture,
+          sandboxInstanceId,
+        });
+        if (originalStorage === null) {
+          throw new Error(
+            `Expected persistent sandbox '${sandboxInstanceId}' to have a storage record before attach-failure mutation.`,
+          );
+        }
+        storageCleanupOverrides.set(sandboxInstanceId, originalStorage);
 
         await stopSandboxInstance({
           fixture,
@@ -1311,6 +1463,7 @@ describe("persistent sandbox storage", () => {
           fixture,
           sandboxInstanceIds: sandboxInstanceIdsToCleanup,
           testError,
+          storageCleanupOverrides,
         });
       }
     },

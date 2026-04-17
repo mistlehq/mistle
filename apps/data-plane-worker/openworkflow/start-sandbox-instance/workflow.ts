@@ -62,7 +62,10 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           {
             db: ctx.db,
           },
-          input,
+          {
+            ...input,
+            allowStoppedCurrentStatus: true,
+          },
         );
       });
     }

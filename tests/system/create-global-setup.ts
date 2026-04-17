@@ -23,7 +23,7 @@ const DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS = 8_000;
 const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
   "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED";
 const CloudflareTunnelTokenEnvVar = "CLOUDFLARE_TUNNEL_TOKEN";
-const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_GATEWAY_TUNNEL_HOSTNAME";
+const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
 const SystemSandboxProvider = {
   DOCKER: "docker",

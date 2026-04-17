@@ -56,7 +56,7 @@ const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
 const TRACE_FULL_SYSTEM = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
 const CLOUDFLARED_IMAGE_REFERENCE = "cloudflare/cloudflared:latest";
-const CloudflaredTunnelStartupTimeoutMs = 60_000;
+const CloudflaredTunnelStartupTimeoutMs = 180_000;
 const CloudflaredTunnelPollIntervalMs = 1_000;
 const SystemSandboxProvider = {
   DOCKER: "docker",

@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
+use std::net::SocketAddr;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -126,6 +127,11 @@ fn resolve_default_attachment_root() -> PathBuf {
 
     #[cfg(not(test))]
     PathBuf::from(DEFAULT_ATTACHMENT_ROOT)
+}
+
+fn prioritize_ipv4_socket_addresses(mut addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
+    addresses.sort_by_key(|address| if address.is_ipv4() { 0 } else { 1 });
+    addresses
 }
 
 /// Describes why the live bootstrap tunnel session could not start or stop.
@@ -1494,7 +1500,8 @@ async fn connect_bootstrap_websocket(
         )));
     }
 
-    let resolved_addresses = timeout(
+    let resolved_addresses = prioritize_ipv4_socket_addresses(
+        timeout(
         DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT,
         lookup_host((host.as_str(), port)),
     )
@@ -1506,7 +1513,8 @@ async fn connect_bootstrap_websocket(
         ))
     })?
     .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
-    .collect::<Vec<_>>();
+    .collect::<Vec<_>>(),
+    );
     if resolved_addresses.is_empty() {
         return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
             "bootstrap websocket host lookup returned no addresses: {host}:{port}"
@@ -3884,6 +3892,7 @@ mod tests {
         TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
         connect_bootstrap_websocket, handle_tunnel_session_event, resolve_bootstrap_tunnel_url,
         run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
+        prioritize_ipv4_socket_addresses,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -5190,6 +5199,31 @@ mod tests {
         gateway_thread
             .join()
             .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn prioritize_ipv4_socket_addresses_sorts_ipv4_before_ipv6() {
+        let addresses = vec![
+            "[2606:4700:3031::ac43:8542]:443"
+                .parse()
+                .expect("ipv6 address should parse"),
+            "104.21.133.66:443"
+                .parse()
+                .expect("ipv4 address should parse"),
+            "[2606:4700:3032::6815:8542]:443"
+                .parse()
+                .expect("second ipv6 address should parse"),
+            "172.67.133.66:443"
+                .parse()
+                .expect("second ipv4 address should parse"),
+        ];
+
+        let prioritized = prioritize_ipv4_socket_addresses(addresses);
+
+        assert!(prioritized[0].is_ipv4(), "first address should prefer ipv4");
+        assert!(prioritized[1].is_ipv4(), "second address should prefer ipv4");
+        assert!(prioritized[2].is_ipv6(), "third address should fall back to ipv6");
+        assert!(prioritized[3].is_ipv6(), "fourth address should fall back to ipv6");
     }
 
     #[test]
