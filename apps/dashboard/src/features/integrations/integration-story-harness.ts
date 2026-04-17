@@ -318,7 +318,6 @@ export function createDetailViewStoryProps(input?: {
             },
           ],
           kind: "repositories",
-          previewState: null,
         },
       },
       {
@@ -328,7 +327,6 @@ export function createDetailViewStoryProps(input?: {
           isLoading: false,
           items: [],
           kind: "repositories",
-          previewState: null,
         },
       },
     ]),
@@ -450,7 +448,6 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "repository",
-          previewState: null,
         },
       },
       {
@@ -507,7 +504,6 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
             },
           ],
           kind: "branch",
-          previewState: "error",
         },
       },
       {
@@ -517,7 +513,6 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           isLoading: false,
           items: [],
           kind: "user",
-          previewState: "not-synced",
         },
       },
     ]),
@@ -703,7 +698,6 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "repositories",
-          previewState: "error",
         },
       },
       {
@@ -723,7 +717,6 @@ export function createGitHubPreviewErrorDetailViewStoryProps(): IntegrationConne
             },
           ],
           kind: "organizations",
-          previewState: null,
         },
       },
     ]),
@@ -792,7 +785,6 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
           isLoading: false,
           items: [],
           kind: "repositories",
-          previewState: "not-synced",
         },
       },
       {
@@ -802,7 +794,6 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
           isLoading: false,
           items: [],
           kind: "branches",
-          previewState: "not-synced",
         },
       },
       {
@@ -812,7 +803,6 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
           isLoading: false,
           items: [],
           kind: "users",
-          previewState: "not-synced",
         },
       },
     ]),
@@ -876,7 +866,6 @@ function createResourceContent(
           }),
         ),
         kind: resource.kind,
-        previewState: null,
       },
     })),
   );

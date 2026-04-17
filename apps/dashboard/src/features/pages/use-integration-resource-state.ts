@@ -86,11 +86,6 @@ function buildResourceContentByKey(input: {
           isLoading: query?.isPending ?? false,
           items: query?.data?.items ?? [],
           kind: resource.kind,
-          previewState: isResourceSyncRequiredError
-            ? "not-synced"
-            : query?.isError
-              ? "error"
-              : null,
         },
       };
     }),

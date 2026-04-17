@@ -1,12 +1,5 @@
-import {
-  BadgeListField,
-  Button,
-  Notice,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@mistle/ui";
-import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
+import { BadgeListField, Button, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
+import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon, InfoIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import {
@@ -31,7 +24,6 @@ export type IntegrationResourceListItemPreviewState = {
   isLoading: boolean;
   items: readonly IntegrationConnectionResource[];
   kind: string;
-  previewState: "error" | "not-synced" | null;
 };
 
 export type IntegrationResourceListItemProps = {
@@ -51,10 +43,7 @@ export function IntegrationResourceListItem(
     resource: input.resource,
     resourceItems: input.resourceItems,
   });
-  const secondaryStatusText = resolveResourceSecondaryStatusText({
-    resource: input.resource,
-    previewState: input.resourceItems?.previewState ?? null,
-  });
+  const secondaryStatusText = resolveResourceSecondaryStatusText(input.resource);
   const shouldRenderFooter = secondaryStatusText.length > 0;
 
   return (
@@ -91,10 +80,10 @@ export function IntegrationResourceListItem(
               {errorTooltipMessage === null ? null : (
                 <Tooltip delay={0}>
                   <TooltipTrigger
-                    aria-label="View sync error details"
-                    className="inline-flex size-4 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 text-[10px] text-destructive"
+                    aria-label="View sync failure details"
+                    className="inline-flex size-4 items-center justify-center text-destructive/70 transition-colors hover:text-destructive focus-visible:text-destructive"
                   >
-                    !
+                    <InfoIcon aria-hidden className="size-3.5" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
                     {errorTooltipMessage}
@@ -133,11 +122,6 @@ export function IntegrationResourceListItem(
           </Button>
         ) : null}
       </div>
-      {input.resource.lastErrorMessage ? (
-        <Notice appearance="subtle" variant="alert">
-          {input.resource.lastErrorMessage}
-        </Notice>
-      ) : null}
       {isExpanded && input.resourceItems !== null
         ? renderExpandedResourceItems(input.resourceItems)
         : null}
@@ -159,15 +143,14 @@ function shouldRenderResourceSyncStateText(
   return syncState === "error";
 }
 
-function resolveResourceSecondaryStatusText(input: {
-  resource: IntegrationResourceListItemResourceSummary;
-  previewState: "error" | "not-synced" | null;
-}): string {
-  if (input.previewState === "error" || input.resource.syncState === "error") {
+function resolveResourceSecondaryStatusText(
+  resource: IntegrationResourceListItemResourceSummary,
+): string {
+  if (resource.syncState === "error") {
     return "";
   }
 
-  return formatResourceMetadata(input.resource);
+  return formatResourceMetadata(resource);
 }
 
 function resolveResourceErrorTooltipMessage(input: {
@@ -178,7 +161,10 @@ function resolveResourceErrorTooltipMessage(input: {
     return input.resource.lastErrorMessage;
   }
 
-  if (input.resourceItems?.previewState === "error" && input.resourceItems.errorMessage !== null) {
+  if (
+    input.resourceItems?.errorMessage !== null &&
+    input.resourceItems?.errorMessage !== undefined
+  ) {
     return input.resourceItems.errorMessage;
   }
 
@@ -204,22 +190,6 @@ function renderExpandedResourceItems(
 
   if (resourceItems.isLoading) {
     return <p className="mt-1 text-muted-foreground text-xs">Loading items...</p>;
-  }
-
-  if (resourceItems.previewState === "not-synced") {
-    return <p className="mt-1 text-muted-foreground text-xs">Not synced yet.</p>;
-  }
-
-  if (resourceItems.previewState === "error") {
-    if (resourceItems.errorMessage === null) {
-      throw new Error("Expected an integration resource preview error message.");
-    }
-
-    return (
-      <Notice appearance="subtle" className="mt-1" variant="alert">
-        {resourceItems.errorMessage}
-      </Notice>
-    );
   }
 
   return <p className="mt-1 text-muted-foreground text-xs">No items available.</p>;

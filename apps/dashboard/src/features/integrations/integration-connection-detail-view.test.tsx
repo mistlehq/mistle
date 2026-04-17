@@ -124,7 +124,6 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                previewState: null,
               },
             ],
           ])
@@ -166,8 +165,8 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Repository")).toBeTruthy();
     expect(screen.getByText("- 0")).toBeTruthy();
     expect(
-      screen.getByText("GitHub returned a 403 while reading repository visibility."),
-    ).toBeTruthy();
+      screen.queryByText("GitHub returned a 403 while reading repository visibility."),
+    ).toBeNull();
     expect(screen.queryByRole("button", { name: "Manage installation" })).toBeNull();
   });
 
@@ -246,7 +245,6 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                previewState: "error",
               },
             ],
           ])
@@ -262,7 +260,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("shows a neutral not-synced badge when no preview snapshot exists yet", () => {
+  it("shows the empty state when no preview snapshot exists yet", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -291,7 +289,6 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                previewState: "not-synced",
               },
             ],
           ])
@@ -303,8 +300,8 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View repository load error")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
-    expect(screen.getByText("Not synced yet.")).toBeTruthy();
-    expect(screen.queryByText("No items available.")).toBeNull();
+    expect(screen.getByText("No items available.")).toBeTruthy();
+    expect(screen.queryByText("Not synced yet.")).toBeNull();
   });
 
   it("shows a loading state instead of an empty state while resource preview items are loading", () => {
@@ -336,7 +333,6 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: true,
                 items: [],
                 kind: "repositories",
-                previewState: null,
               },
             ],
           ])
@@ -349,7 +345,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("No items available.")).toBeNull();
   });
 
-  it("shows the preview error message instead of an empty state when expanded preview loading fails", () => {
+  it("shows the empty state when expanded preview loading fails", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -378,7 +374,6 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                previewState: "error",
               },
             ],
           ])
@@ -387,8 +382,8 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
-    expect(screen.getByText("Could not load repositories.")).toBeTruthy();
-    expect(screen.queryByText("No items available.")).toBeNull();
+    expect(screen.queryByText("Could not load repositories.")).toBeNull();
+    expect(screen.getByText("No items available.")).toBeTruthy();
   });
 
   it("shows an expanded empty state when a resource has no items", () => {
@@ -420,7 +415,6 @@ describe("IntegrationConnectionDetailView", () => {
                 isLoading: false,
                 items: [],
                 kind: "repositories",
-                previewState: null,
               },
             ],
           ])
@@ -534,7 +528,6 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                previewState: null,
               },
             ],
             [
@@ -554,7 +547,6 @@ describe("IntegrationConnectionDetailView", () => {
                   },
                 ],
                 kind: "repositories",
-                previewState: null,
               },
             ],
           ])

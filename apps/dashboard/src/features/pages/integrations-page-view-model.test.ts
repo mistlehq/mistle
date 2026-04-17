@@ -676,7 +676,6 @@ describe("integrations page view model", () => {
           isLoading: false,
           items: [],
           kind: "repositories",
-          previewState: null,
         },
       },
     ]);
@@ -693,7 +692,6 @@ describe("integrations page view model", () => {
       isLoading: false,
       items: [],
       kind: "repositories",
-      previewState: null,
     });
   });
 
