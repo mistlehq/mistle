@@ -37,7 +37,7 @@ It is not the production deployment artifact.
    into the bundled local registry:
    `localhost:5001/mistle/sandbox-base:local`
 
-   Local Compose also provisions integration targets from the tracked default manifest at
+   Local Compose also provisions integration targets from the generated default manifest at
    `deploy/compose/local/config/integration-targets.provision.json`, so the dashboard starts
    with the supported integrations visible by default.
 
@@ -76,9 +76,14 @@ GitHub guidance:
 - PAT/API key: no inbound callback required
 - GitHub App installation: requires a reachable webhook URL and shared webhook secret
 
-To customize the default local target provisioning, edit:
+To customize the default local target provisioning:
 
-- `deploy/compose/local/config/integration-targets.provision.json`
+1. Edit `integration-targets.provision.example.json`
+2. Regenerate the local Compose manifest:
+
+   ```bash
+   pnpm generate:local-provision-manifest
+   ```
 
 ## Stop And Reset
 
