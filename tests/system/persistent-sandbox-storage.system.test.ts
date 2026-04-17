@@ -7,7 +7,12 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
 import { Archil } from "@archildata/client/api";
-import { createDataPlaneDatabase, sandboxInstanceStorages } from "@mistle/db/data-plane";
+import {
+  createDataPlaneDatabase,
+  sandboxInstances,
+  sandboxInstanceStorages,
+  SandboxStorageProviders,
+} from "@mistle/db/data-plane";
 import { readCapturedOtlpRequests } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { eq } from "drizzle-orm";
@@ -376,6 +381,32 @@ async function updateSandboxStorageHandle(input: {
   }
 }
 
+async function readSandboxStorage(input: {
+  fixture: SystemTestFixture;
+  sandboxInstanceId: string;
+}): Promise<{
+  provider: "archil" | "docker_volume";
+  handle: string;
+  region: string | null;
+} | null> {
+  const { pool, db } = createDataPlaneDb(input.fixture);
+
+  try {
+    const sandboxStorage = await db.query.sandboxInstanceStorages.findFirst({
+      columns: {
+        provider: true,
+        handle: true,
+        region: true,
+      },
+      where: (table, { eq }) => eq(table.sandboxInstanceId, input.sandboxInstanceId),
+    });
+
+    return sandboxStorage ?? null;
+  } finally {
+    await pool.end();
+  }
+}
+
 async function runSandboxShellCommand(input: {
   fixture: SystemTestFixture;
   authenticatedSession: AuthenticatedSession;
@@ -531,6 +562,199 @@ async function deleteProviderCompute(input: {
     ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
   });
   await sandbox.kill();
+}
+
+async function tryDeleteProviderCompute(input: {
+  provider: SystemSandboxProvider;
+  providerSandboxId: string;
+}): Promise<void> {
+  try {
+    await deleteProviderCompute(input);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes("No such container") ||
+      message.includes("sandbox not found") ||
+      message.includes("Sandbox not found")
+    ) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function tryDeleteArchilDisk(input: {
+  diskId: string;
+  region: string | null;
+}): Promise<void> {
+  const archilEnvironment = readArchilEnvironment();
+  const archil = new Archil({
+    apiKey: archilEnvironment.apiKey,
+    region: input.region ?? archilEnvironment.region,
+  });
+
+  try {
+    const disk = await archil.disks.get(input.diskId);
+    await disk.delete();
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "status" in error && error.status === 404) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function tryDeleteDockerVolume(input: { volumeName: string }): Promise<void> {
+  try {
+    await execFileAsync("docker", ["volume", "rm", "--force", input.volumeName]);
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "stderr" in error
+          ? String(error.stderr)
+          : String(error);
+    if (message.includes("No such volume")) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+async function cleanupPersistentSandboxes(input: {
+  fixture: SystemTestFixture;
+  sandboxInstanceIds: readonly string[];
+}): Promise<void> {
+  const sandboxInstanceIds = [...new Set(input.sandboxInstanceIds)];
+  if (sandboxInstanceIds.length === 0) {
+    return;
+  }
+
+  const errors: Error[] = [];
+
+  for (const sandboxInstanceId of sandboxInstanceIds) {
+    const sandboxInstanceState = await readSandboxInstanceState({
+      fixture: input.fixture,
+      sandboxInstanceId,
+    }).catch(() => null);
+    const sandboxStorage = await readSandboxStorage({
+      fixture: input.fixture,
+      sandboxInstanceId,
+    });
+    let externalCleanupFailed = false;
+
+    if (sandboxInstanceState?.providerSandboxId !== null && sandboxInstanceState !== null) {
+      try {
+        await tryDeleteProviderCompute({
+          provider: input.fixture.sandboxProvider,
+          providerSandboxId: sandboxInstanceState.providerSandboxId,
+        });
+      } catch (error) {
+        errors.push(
+          new Error(`Failed to delete provider compute for '${sandboxInstanceId}'.`, {
+            cause: error,
+          }),
+        );
+        externalCleanupFailed = true;
+      }
+    }
+
+    if (sandboxStorage !== null) {
+      try {
+        if (sandboxStorage.provider === SandboxStorageProviders.ARCHIL) {
+          await tryDeleteArchilDisk({
+            diskId: sandboxStorage.handle,
+            region: sandboxStorage.region,
+          });
+        } else if (sandboxStorage.provider === SandboxStorageProviders.DOCKER_VOLUME) {
+          await tryDeleteDockerVolume({
+            volumeName: sandboxStorage.handle,
+          });
+        }
+      } catch (error) {
+        errors.push(
+          new Error(`Failed to delete storage backend resource for '${sandboxInstanceId}'.`, {
+            cause: error,
+          }),
+        );
+        externalCleanupFailed = true;
+      }
+    }
+
+    if (externalCleanupFailed) {
+      continue;
+    }
+
+    const { pool, db } = createDataPlaneDb(input.fixture);
+    try {
+      await db.delete(sandboxInstances).where(eq(sandboxInstances.id, sandboxInstanceId));
+    } catch (error) {
+      errors.push(
+        new Error(`Failed to delete sandbox instance row for '${sandboxInstanceId}'.`, {
+          cause: error,
+        }),
+      );
+    } finally {
+      await pool.end();
+    }
+  }
+
+  if (errors.length === 0) {
+    return;
+  }
+
+  if (errors.length === 1) {
+    throw errors[0];
+  }
+
+  throw new AggregateError(errors, "Persistent sandbox system test cleanup failed.");
+}
+
+function normalizeCleanupError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(String(error));
+}
+
+async function finalizePersistentSandboxTest(input: {
+  fixture: SystemTestFixture;
+  sandboxInstanceIds: readonly string[];
+  testError: unknown;
+}): Promise<void> {
+  let cleanupError: unknown;
+
+  try {
+    await cleanupPersistentSandboxes({
+      fixture: input.fixture,
+      sandboxInstanceIds: input.sandboxInstanceIds,
+    });
+  } catch (error) {
+    cleanupError = error;
+  }
+
+  if (input.testError === undefined) {
+    if (cleanupError !== undefined) {
+      throw cleanupError;
+    }
+
+    return;
+  }
+
+  if (cleanupError === undefined) {
+    throw input.testError;
+  }
+
+  throw new Error("Persistent sandbox system test failed and cleanup also failed.", {
+    cause: new AggregateError(
+      [normalizeCleanupError(input.testError), normalizeCleanupError(cleanupError)],
+      "Primary test failure and cleanup failure.",
+    ),
+  });
 }
 
 async function assertArchilDiskAbsent(input: { sandboxInstanceId: string }): Promise<void> {
@@ -823,62 +1047,16 @@ async function preparePersistentSandbox(input: {
 
 describe("persistent sandbox storage", () => {
   it("preserves durable state across stop and resume", async ({ fixture }) => {
-    const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
-      fixture,
-      email: `persistent-stop-resume-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
-    });
-    const marker = `persistent-stop-resume-${randomUUID()}`;
+    const sandboxInstanceIdsToCleanup: string[] = [];
+    let testError: unknown;
 
-    await writeDurableState({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-      marker,
-    });
-    const initialContents = await readDurableState({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-    });
-    expect(initialContents).toBe([marker, marker, marker].join("\n"));
-
-    await stopSandboxInstance({
-      fixture,
-      sandboxInstanceId,
-    });
-    await waitForPersistedSandboxStatus({
-      fixture,
-      sandboxInstanceId,
-      expectedStatus: "stopped",
-    });
-
-    await resumeSandboxInstance({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-    });
-    await waitForSandboxReady({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-    });
-
-    const resumedContents = await readDurableState({
-      fixture,
-      authenticatedSession,
-      sandboxInstanceId,
-    });
-    expect(resumedContents).toBe([marker, marker, marker].join("\n"));
-  }, 300_000);
-
-  itForE2B(
-    "preserves durable state across provider compute replacement",
-    async ({ fixture }) => {
+    try {
       const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
         fixture,
-        email: `persistent-compute-replacement-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
+        email: `persistent-stop-resume-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
       });
-      const marker = `persistent-compute-replacement-${randomUUID()}`;
+      sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+      const marker = `persistent-stop-resume-${randomUUID()}`;
 
       await writeDurableState({
         fixture,
@@ -886,16 +1064,12 @@ describe("persistent sandbox storage", () => {
         sandboxInstanceId,
         marker,
       });
-
-      const originalState = await readSandboxInstanceState({
+      const initialContents = await readDurableState({
         fixture,
+        authenticatedSession,
         sandboxInstanceId,
       });
-      if (originalState.providerSandboxId === null) {
-        throw new Error(
-          `Expected sandbox '${sandboxInstanceId}' to have a provider sandbox id before compute replacement.`,
-        );
-      }
+      expect(initialContents).toBe([marker, marker, marker].join("\n"));
 
       await stopSandboxInstance({
         fixture,
@@ -907,41 +1081,119 @@ describe("persistent sandbox storage", () => {
         expectedStatus: "stopped",
       });
 
-      await deleteProviderCompute({
-        provider: fixture.sandboxProvider,
-        providerSandboxId: originalState.providerSandboxId,
-      });
-
       await resumeSandboxInstance({
         fixture,
         authenticatedSession,
         sandboxInstanceId,
       });
-      await waitForPersistedSandboxStatus({
-        fixture,
-        sandboxInstanceId,
-        expectedStatus: "running",
-      });
-      await waitForRuntimeStateReady({
-        fixture,
-        sandboxInstanceId,
-      });
-
-      const replacedState = await readSandboxInstanceState({
-        fixture,
-        sandboxInstanceId,
-      });
-
-      expect(replacedState.providerSandboxId).not.toBeNull();
-      expect(replacedState.providerSandboxId).not.toBe(originalState.providerSandboxId);
-      expect(replacedState.computeGeneration).toBe(originalState.computeGeneration + 1);
-
-      const contents = await readDurableState({
+      await waitForSandboxReady({
         fixture,
         authenticatedSession,
         sandboxInstanceId,
       });
-      expect(contents).toBe([marker, marker, marker].join("\n"));
+
+      const resumedContents = await readDurableState({
+        fixture,
+        authenticatedSession,
+        sandboxInstanceId,
+      });
+      expect(resumedContents).toBe([marker, marker, marker].join("\n"));
+    } catch (error) {
+      testError = error;
+    } finally {
+      await finalizePersistentSandboxTest({
+        fixture,
+        sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+        testError,
+      });
+    }
+  }, 300_000);
+
+  itForE2B(
+    "preserves durable state across provider compute replacement",
+    async ({ fixture }) => {
+      const sandboxInstanceIdsToCleanup: string[] = [];
+      let testError: unknown;
+
+      try {
+        const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
+          fixture,
+          email: `persistent-compute-replacement-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
+        });
+        sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+        const marker = `persistent-compute-replacement-${randomUUID()}`;
+
+        await writeDurableState({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          marker,
+        });
+
+        const originalState = await readSandboxInstanceState({
+          fixture,
+          sandboxInstanceId,
+        });
+        if (originalState.providerSandboxId === null) {
+          throw new Error(
+            `Expected sandbox '${sandboxInstanceId}' to have a provider sandbox id before compute replacement.`,
+          );
+        }
+
+        await stopSandboxInstance({
+          fixture,
+          sandboxInstanceId,
+        });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId,
+          expectedStatus: "stopped",
+        });
+
+        await deleteProviderCompute({
+          provider: fixture.sandboxProvider,
+          providerSandboxId: originalState.providerSandboxId,
+        });
+
+        await resumeSandboxInstance({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId,
+          expectedStatus: "running",
+        });
+        await waitForRuntimeStateReady({
+          fixture,
+          sandboxInstanceId,
+        });
+
+        const replacedState = await readSandboxInstanceState({
+          fixture,
+          sandboxInstanceId,
+        });
+
+        expect(replacedState.providerSandboxId).not.toBeNull();
+        expect(replacedState.providerSandboxId).not.toBe(originalState.providerSandboxId);
+        expect(replacedState.computeGeneration).toBe(originalState.computeGeneration + 1);
+
+        const contents = await readDurableState({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+        expect(contents).toBe([marker, marker, marker].join("\n"));
+      } catch (error) {
+        testError = error;
+      } finally {
+        await finalizePersistentSandboxTest({
+          fixture,
+          sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+          testError,
+        });
+      }
     },
     300_000,
   );
@@ -949,50 +1201,64 @@ describe("persistent sandbox storage", () => {
   itForE2B(
     "surfaces storage attach failure clearly and leaves the sandbox failed",
     async ({ fixture }) => {
-      const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
-        fixture,
-        email: `persistent-attach-failure-${randomUUID()}@example.com`,
-      });
+      const sandboxInstanceIdsToCleanup: string[] = [];
+      let testError: unknown;
 
-      await stopSandboxInstance({
-        fixture,
-        sandboxInstanceId,
-      });
-      await waitForPersistedSandboxStatus({
-        fixture,
-        sandboxInstanceId,
-        expectedStatus: "stopped",
-      });
+      try {
+        const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
+          fixture,
+          email: `persistent-attach-failure-${randomUUID()}@example.com`,
+        });
+        sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
 
-      await updateSandboxStorageHandle({
-        fixture,
-        sandboxInstanceId,
-        handle: `dsk_missing_${randomUUID().replaceAll("-", "")}`,
-      });
+        await stopSandboxInstance({
+          fixture,
+          sandboxInstanceId,
+        });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId,
+          expectedStatus: "stopped",
+        });
 
-      await resumeSandboxInstance({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
+        await updateSandboxStorageHandle({
+          fixture,
+          sandboxInstanceId,
+          handle: `dsk_missing_${randomUUID().replaceAll("-", "")}`,
+        });
 
-      await waitForPersistedSandboxStatus({
-        fixture,
-        sandboxInstanceId,
-        expectedStatus: "failed",
-      });
-      const failedState = await readSandboxInstanceState({
-        fixture,
-        sandboxInstanceId,
-      });
-      expect(failedState.status).toBe("failed");
-      expect(failedState.failureMessage).not.toBeNull();
+        await resumeSandboxInstance({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
 
-      await waitForStorageFailureSpan({
-        fixture,
-        sandboxInstanceId,
-        operation: "attach",
-      });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId,
+          expectedStatus: "failed",
+        });
+        const failedState = await readSandboxInstanceState({
+          fixture,
+          sandboxInstanceId,
+        });
+        expect(failedState.status).toBe("failed");
+        expect(failedState.failureMessage).not.toBeNull();
+
+        await waitForStorageFailureSpan({
+          fixture,
+          sandboxInstanceId,
+          operation: "attach",
+        });
+      } catch (error) {
+        testError = error;
+      } finally {
+        await finalizePersistentSandboxTest({
+          fixture,
+          sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+          testError,
+        });
+      }
     },
     300_000,
   );
@@ -1000,49 +1266,63 @@ describe("persistent sandbox storage", () => {
   itForE2B(
     "cleans up Archil storage after startup fails post-provisioning",
     async ({ fixture }) => {
-      const authenticatedSession = await fixture.authSession({
-        email: `persistent-startup-failure-${randomUUID()}@example.com`,
-      });
-      await fixture.enableManagedPersistentSandboxes({
-        cookie: authenticatedSession.cookie,
-      });
+      const sandboxInstanceIdsToCleanup: string[] = [];
+      let testError: unknown;
 
-      const sandboxProfileId = `sbp_startup_failure_${randomUUID().replaceAll("-", "_")}`;
-      const startedSandbox = await startSandboxInstanceInternally({
-        fixture,
-        authenticatedSession,
-        sandboxProfileId,
-        sandboxProfileVersion: 1,
-        runtimePlan: createRuntimePlan({
+      try {
+        const authenticatedSession = await fixture.authSession({
+          email: `persistent-startup-failure-${randomUUID()}@example.com`,
+        });
+        await fixture.enableManagedPersistentSandboxes({
+          cookie: authenticatedSession.cookie,
+        });
+
+        const sandboxProfileId = `sbp_startup_failure_${randomUUID().replaceAll("-", "_")}`;
+        const startedSandbox = await startSandboxInstanceInternally({
+          fixture,
+          authenticatedSession,
           sandboxProfileId,
           sandboxProfileVersion: 1,
-          workspaceSources: [
-            {
-              sourceKind: "git-clone",
-              resourceKind: "repository",
-              path: "/root/missing-repository",
-              originUrl: InvalidWorkspaceRepositoryUrl,
-            },
-          ],
-        }),
-      });
+          runtimePlan: createRuntimePlan({
+            sandboxProfileId,
+            sandboxProfileVersion: 1,
+            workspaceSources: [
+              {
+                sourceKind: "git-clone",
+                resourceKind: "repository",
+                path: "/root/missing-repository",
+                originUrl: InvalidWorkspaceRepositoryUrl,
+              },
+            ],
+          }),
+        });
+        sandboxInstanceIdsToCleanup.push(startedSandbox.sandboxInstanceId);
 
-      await waitForStorageProvisionSuccessSpan({
-        fixture,
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      });
-      await waitForPersistedSandboxStatus({
-        fixture,
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-        expectedStatus: "failed",
-      });
-      await waitForSandboxStorageDeletion({
-        fixture,
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      });
-      await assertArchilDiskAbsent({
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-      });
+        await waitForStorageProvisionSuccessSpan({
+          fixture,
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+          expectedStatus: "failed",
+        });
+        await waitForSandboxStorageDeletion({
+          fixture,
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        });
+        await assertArchilDiskAbsent({
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        });
+      } catch (error) {
+        testError = error;
+      } finally {
+        await finalizePersistentSandboxTest({
+          fixture,
+          sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+          testError,
+        });
+      }
     },
     300_000,
   );
