@@ -301,9 +301,13 @@ function SessionConversationWorkbenchHarness(input: {
           isTurnInProgress={activeTurnId !== null}
           onRespondToServerRequest={StorySessionConversationPaneArgs.onRespondToServerRequest}
           pendingTurnId={pendingTurnId}
-          scrollBehavior={input.scrollBehavior}
           scrollContainerRef={scrollContainerRef}
           serverRequestPanelEntries={[]}
+          {...(input.scrollBehavior === undefined
+            ? {}
+            : {
+                scrollBehavior: input.scrollBehavior,
+              })}
         />
       }
       mainContentScrollContainerRef={scrollContainerRef}

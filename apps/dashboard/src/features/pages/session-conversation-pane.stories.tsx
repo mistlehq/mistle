@@ -222,7 +222,7 @@ const baseArgs = {
   planStepGapPx: "gap-0.5",
   showGroupingOutlines: false,
   serverRequestPanelEntries: CodexFixtureSessionServerRequests,
-};
+} satisfies SessionConversationPaneStoryArgs;
 
 const CodexFixtureConversationPaneMixedEntries: SessionConversationStoryArgs["chatEntries"] = [
   ...CodexFixtureSessionEntries,
@@ -930,11 +930,6 @@ const meta = {
         "Gap between a semantic row and its expanded details, using the Tailwind spacing scale.",
       options: TailwindSpacingTokenOptions,
     },
-    semanticGroupOutputMarginTopPx: {
-      control: "select",
-      description: "Top margin above expanded semantic outputs like code blocks and logs.",
-      options: TailwindSpacingTokenOptions,
-    },
     semanticGroupOutputPaddingPx: {
       control: "select",
       description: "Inner padding for semantic output blocks and result indents.",
@@ -1013,7 +1008,6 @@ export const LayoutPlayground: Story = {
         "semanticGroupDetailLeading",
         "semanticGroupItemGapPx",
         "semanticGroupItemDetailGapPx",
-        "semanticGroupOutputMarginTopPx",
         "semanticGroupOutputPaddingPx",
         "semanticGroupOutputStackGapPx",
         "semanticGroupOutputLeading",
