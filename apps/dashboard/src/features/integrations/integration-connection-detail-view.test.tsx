@@ -386,6 +386,58 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("No items available.")).toBeTruthy();
   });
 
+  it("prefers the sync failure reason over the resource items error in the tooltip", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "error",
+                lastErrorMessage:
+                  "GitHub returned a 403 while syncing repositories from the last sync attempt.",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: false,
+                items: [],
+                kind: "repositories",
+                errorMessage: "Could not load repositories.",
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    const tooltipTrigger = screen.getAllByLabelText("View sync failure details")[0];
+    if (tooltipTrigger === undefined) {
+      throw new Error("Expected a sync failure tooltip trigger.");
+    }
+    fireEvent.mouseEnter(tooltipTrigger);
+
+    expect(
+      screen.getByText(
+        "GitHub returned a 403 while syncing repositories from the last sync attempt.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Could not load repositories.")).toBeNull();
+  });
+
   it("shows an expanded empty state when a resource has no items", () => {
     render(
       <IntegrationConnectionDetailView
