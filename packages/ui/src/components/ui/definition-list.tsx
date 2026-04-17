@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
+import { DetailLabel } from "./detail-label.js";
 
 export type DefinitionListItem = {
   id: React.Key;
@@ -26,12 +27,9 @@ function DefinitionList({ className, itemClassName, items, ...props }: Definitio
           data-slot="definition-list-item"
           key={item.id}
         >
-          <dt
-            className="text-muted-foreground text-xs uppercase tracking-wide"
-            data-slot="definition-list-label"
-          >
+          <DetailLabel as="dt" data-slot="definition-list-label">
             {item.label}
-          </dt>
+          </DetailLabel>
           <dd className="break-all text-sm" data-slot="definition-list-value">
             {item.value}
           </dd>
