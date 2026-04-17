@@ -174,6 +174,40 @@ describe("provision-integration-targets", () => {
     }
   });
 
+  it("supports the built dist layout when deriving the default manifest search boundary", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const repoRoot = join(temporaryWorkspaceRoot, "repo");
+    const packageRoot = join(repoRoot, "apps", "control-plane-api");
+    const builtScriptDirectory = join(packageRoot, "dist", "scripts", "integration-targets");
+    const manifestPath = join(repoRoot, "integration-targets.provision.json");
+
+    await mkdir(builtScriptDirectory, { recursive: true });
+    await writeFile(
+      join(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "@mistle/control-plane-api",
+      }),
+      "utf8",
+    );
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        version: 1,
+        targets: [],
+      }),
+      "utf8",
+    );
+
+    try {
+      const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath({
+        startDirectory: builtScriptDirectory,
+      });
+      expect(discoveredManifestPath).toBe(manifestPath);
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
   it("returns undefined when no provision manifest exists in any parent directory", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
     const startDirectory = join(temporaryWorkspaceRoot, "runtime", "apps", "control-plane-api");

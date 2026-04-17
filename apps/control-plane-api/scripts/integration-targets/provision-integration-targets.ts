@@ -17,10 +17,41 @@ export const IntegrationTargetsProvisionManifestJsonEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_JSON";
 export const IntegrationTargetsProvisionManifestPathEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH";
-const DefaultIntegrationTargetsProvisionManifestSearchRoot = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../",
-);
+const ControlPlanePackageName = "@mistle/control-plane-api";
+
+function resolveControlPlanePackageRoot(startDirectory: string): string {
+  let currentDirectory = resolve(startDirectory);
+
+  while (true) {
+    const packageJsonPath = join(currentDirectory, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+        name?: unknown;
+      };
+
+      if (packageJson.name === ControlPlanePackageName) {
+        return currentDirectory;
+      }
+    }
+
+    const parentDirectory = dirname(currentDirectory);
+    if (parentDirectory === currentDirectory) {
+      throw new Error(
+        `Could not resolve package root for '${ControlPlanePackageName}' from '${startDirectory}'.`,
+      );
+    }
+
+    currentDirectory = parentDirectory;
+  }
+}
+
+function resolveDefaultIntegrationTargetsProvisionManifestSearchRoot(): string {
+  const controlPlanePackageRoot = resolveControlPlanePackageRoot(
+    dirname(fileURLToPath(import.meta.url)),
+  );
+
+  return resolve(controlPlanePackageRoot, "../..");
+}
 
 const IntegrationTargetProvisionTargetSchema = z
   .object({
@@ -180,7 +211,7 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
 }): string | undefined {
   let currentDirectory = resolve(input.startDirectory);
   const searchRootDirectory = resolve(
-    input.searchRootDirectory ?? DefaultIntegrationTargetsProvisionManifestSearchRoot,
+    input.searchRootDirectory ?? resolveDefaultIntegrationTargetsProvisionManifestSearchRoot(),
   );
 
   while (true) {
