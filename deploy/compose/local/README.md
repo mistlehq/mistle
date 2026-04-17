@@ -3,6 +3,7 @@
 This is the supported local testing entrypoint for Mistle.
 It runs the product on one machine with Mailpit-backed auth, Docker-backed sessions, and
 webhook-capable integration testing by default. It is not the production deployment artifact.
+`deploy/compose/local/compose.yaml` is the single local Compose source of truth.
 
 ## Prerequisites
 

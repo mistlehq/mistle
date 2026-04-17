@@ -3,8 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-BASE_COMPOSE_PATH="${SCRIPT_DIR}/../base/compose.yaml"
-LOCAL_COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
+COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE_PATH="${SCRIPT_DIR}/.env"
 ENV_EXAMPLE_PATH="${SCRIPT_DIR}/.env.example"
 GENERATED_DIRECTORY_PATH="${SCRIPT_DIR}/.generated"
@@ -134,8 +133,7 @@ fi
 
 echo "Starting local Compose stack..."
 MISTLE_LOCAL_ENV_FILE="${RUNTIME_ENV_PATH}" docker compose \
-  -f "${BASE_COMPOSE_PATH}" \
-  -f "${LOCAL_COMPOSE_PATH}" \
+  -f "${COMPOSE_PATH}" \
   --env-file "${RUNTIME_ENV_PATH}" \
   up -d --build
 

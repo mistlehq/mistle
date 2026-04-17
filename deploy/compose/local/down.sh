@@ -3,8 +3,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-BASE_COMPOSE_PATH="${SCRIPT_DIR}/../base/compose.yaml"
-LOCAL_COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
+COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE_PATH="${SCRIPT_DIR}/.env"
 GENERATED_DIRECTORY_PATH="${SCRIPT_DIR}/.generated"
 RUNTIME_ENV_PATH="${GENERATED_DIRECTORY_PATH}/runtime.env"
@@ -17,8 +16,7 @@ if [[ -f "${RUNTIME_ENV_PATH}" ]]; then
 fi
 
 docker compose \
-  -f "${BASE_COMPOSE_PATH}" \
-  -f "${LOCAL_COMPOSE_PATH}" \
+  -f "${COMPOSE_PATH}" \
   --env-file "${compose_env_file}" \
   down "$@"
 

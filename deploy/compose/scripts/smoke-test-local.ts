@@ -179,16 +179,7 @@ async function runDockerComposeCommand(args: string[], envFilePath: string): Pro
   return await new Promise<string>((resolvePromise, rejectPromise) => {
     execFile(
       "docker",
-      [
-        "compose",
-        "-f",
-        "deploy/compose/base/compose.yaml",
-        "-f",
-        "deploy/compose/local/compose.yaml",
-        "--env-file",
-        envFilePath,
-        ...args,
-      ],
+      ["compose", "-f", "deploy/compose/local/compose.yaml", "--env-file", envFilePath, ...args],
       {
         cwd: RepositoryRootPath,
       },

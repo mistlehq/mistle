@@ -1,24 +1,33 @@
+name: ${MISTLE_COMPOSE_PROJECT_NAME}
+
+x-docker-build: &docker-build
+  context: ../../..
+  dockerfile: docker/Dockerfile
+
+x-mistle-runtime-environment: &mistle-runtime-environment
+  MISTLE_CONFIG_PATH: /app/config/mistle.toml
+
 x-mistle-local-config-volume: &mistle-local-config-volume
   type: bind
-  source: ../local/config/config.local.toml
+  source: ./config/config.local.toml
   target: /app/config/mistle.toml
   read_only: true
 
 x-mistle-local-provision-manifest-volume: &mistle-local-provision-manifest-volume
   type: bind
-  source: ../local/config/integration-targets.provision.json
+  source: ./config/integration-targets.provision.json
   target: /app/deploy/compose/local/config/integration-targets.provision.json
   read_only: true
 
 x-mistle-local-app: &mistle-local-app
   env_file:
-    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
+    - ${MISTLE_LOCAL_ENV_FILE:-./.env}
   volumes:
     - *mistle-local-config-volume
 
 x-mistle-local-bootstrap: &mistle-local-bootstrap
   env_file:
-    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
+    - ${MISTLE_LOCAL_ENV_FILE:-./.env}
   volumes:
     - *mistle-local-config-volume
     - *mistle-local-provision-manifest-volume
@@ -26,12 +35,245 @@ x-mistle-local-bootstrap: &mistle-local-bootstrap
 
 x-mistle-local-migration-job: &mistle-local-migration-job
   env_file:
-    - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
+    - ${MISTLE_LOCAL_ENV_FILE:-./.env}
   volumes:
     - *mistle-local-config-volume
   restart: "no"
 
 services:
+  dashboard:
+    build:
+      <<: *docker-build
+      target: dashboard-runtime
+    image: mistle/dashboard:local
+    environment:
+      MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN: ${MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN}
+      MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE: ${MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE}
+    env_file:
+      - ${MISTLE_LOCAL_ENV_FILE:-./.env}
+    depends_on:
+      control-plane-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1/ || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "3000:80"
+
+  control-plane-api:
+    build:
+      <<: *docker-build
+      target: control-plane-api-runtime
+    image: mistle/control-plane-api:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      control-plane-db-migrate:
+        condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:5100/__healthz || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "8080:5100"
+
+  control-plane-worker:
+    build:
+      <<: *docker-build
+      target: control-plane-worker-runtime
+    image: mistle/control-plane-worker:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+    depends_on:
+      control-plane-api:
+        condition: service_healthy
+      data-plane-api:
+        condition: service_healthy
+      sandbox-base-publish:
+        condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - app
+
+  data-plane-api:
+    build:
+      <<: *docker-build
+      target: data-plane-api-runtime
+    image: mistle/data-plane-api:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      data-plane-db-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:5200/__healthz || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - *mistle-local-config-volume
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  data-plane-gateway:
+    build:
+      <<: *docker-build
+      target: data-plane-gateway-runtime
+    image: mistle/data-plane-gateway:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+    depends_on:
+      data-plane-api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app
+      - sandbox
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:5202/__healthz || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "8084:5202"
+
+  data-plane-worker:
+    build:
+      <<: *docker-build
+      target: data-plane-worker-runtime
+    image: mistle/data-plane-worker:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: ${MISTLE_SANDBOX_NETWORK_NAME}
+      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: ${MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX}
+    depends_on:
+      control-plane-api:
+        condition: service_healthy
+      data-plane-api:
+        condition: service_healthy
+      data-plane-gateway:
+        condition: service_healthy
+      tokenizer-proxy:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      sandbox-base-publish:
+        condition: service_completed_successfully
+      control-plane-bootstrap:
+        condition: service_completed_successfully
+      object-store-bootstrap:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - app
+    volumes:
+      - *mistle-local-config-volume
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+      - type: bind
+        source: /tmp
+        target: /tmp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  tokenizer-proxy:
+    build:
+      <<: *docker-build
+      target: tokenizer-proxy-runtime
+    image: mistle/tokenizer-proxy:local
+    <<: *mistle-local-app
+    environment:
+      <<: *mistle-runtime-environment
+    depends_on:
+      control-plane-api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app
+      - sandbox
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:5205/__healthz || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: mistle_local
+      POSTGRES_USER: mistle
+      POSTGRES_PASSWORD: mistle
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:9.0-alpine
+    restart: unless-stopped
+    volumes:
+      - valkey-data:/data
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   sandbox-base-image:
     build:
       context: ../../..
@@ -48,7 +290,7 @@ services:
   sandbox-base-publish:
     image: docker:28-cli
     env_file:
-      - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
+      - ${MISTLE_LOCAL_ENV_FILE:-./.env}
     entrypoint:
       - sh
       - -lc
@@ -74,85 +316,6 @@ services:
       sandbox-base-image:
         condition: service_completed_successfully
     restart: "no"
-
-  dashboard:
-    env_file:
-      - ${MISTLE_LOCAL_ENV_FILE:-../local/.env}
-    ports:
-      - "3000:80"
-
-  control-plane-api:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
-    depends_on:
-      control-plane-db-migrate:
-        condition: service_completed_successfully
-      control-plane-bootstrap:
-        condition: service_completed_successfully
-    ports:
-      - "8080:5100"
-
-  control-plane-worker:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
-    depends_on:
-      sandbox-base-publish:
-        condition: service_completed_successfully
-      control-plane-bootstrap:
-        condition: service_completed_successfully
-
-  data-plane-api:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
-    depends_on:
-      data-plane-db-migrate:
-        condition: service_completed_successfully
-    volumes:
-      - *mistle-local-config-volume
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  data-plane-gateway:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
-    ports:
-      - "8084:5202"
-
-  data-plane-worker:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
-      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: ${MISTLE_SANDBOX_NETWORK_NAME}
-      MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: ${MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX}
-    volumes:
-      - *mistle-local-config-volume
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-      - type: bind
-        source: /tmp
-        target: /tmp
-    depends_on:
-      sandbox-base-publish:
-        condition: service_completed_successfully
-      control-plane-bootstrap:
-        condition: service_completed_successfully
-      object-store-bootstrap:
-        condition: service_completed_successfully
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  tokenizer-proxy:
-    <<: *mistle-local-app
-    environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.17_full
@@ -220,7 +383,7 @@ services:
       - "@mistle/control-plane-api"
       - db:migrate
     environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+      <<: *mistle-runtime-environment
     networks:
       - app
 
@@ -236,7 +399,7 @@ services:
       - "@mistle/data-plane-api"
       - db:migrate
     environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+      <<: *mistle-runtime-environment
     networks:
       - app
 
@@ -254,7 +417,7 @@ services:
       - "@mistle/control-plane-api"
       - integration-targets:sync
     environment:
-      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+      <<: *mistle-runtime-environment
       MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH: /app/deploy/compose/local/config/integration-targets.provision.json
     networks:
       - app
@@ -275,9 +438,12 @@ services:
       retries: 20
 
 volumes:
+  postgres-data:
+  valkey-data:
   seaweedfs-data:
   registry-data:
 
 networks:
+  app:
   sandbox:
     name: ${MISTLE_SANDBOX_NETWORK_NAME}
