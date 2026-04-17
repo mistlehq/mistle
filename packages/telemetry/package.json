@@ -27,7 +27,7 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/api-logs": "^0.214.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.71.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.72.0",
     "@opentelemetry/core": "^2.6.1",
     "@opentelemetry/exporter-logs-otlp-http": "^0.214.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.214.0",
