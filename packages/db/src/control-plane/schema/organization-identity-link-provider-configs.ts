@@ -7,16 +7,13 @@ import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 import { users } from "./users.js";
 
-export const OrganizationIdentityLinkProviderConfigStatuses = {
+export const OrganizationIdentityLinkProviderConfigStatus = {
   ACTIVE: "active",
   DISABLED: "disabled",
 } as const;
 
 export type OrganizationIdentityLinkProviderConfigStatus =
-  (typeof OrganizationIdentityLinkProviderConfigStatuses)[keyof typeof OrganizationIdentityLinkProviderConfigStatuses];
-
-export type IdentityLinkProviderFamily = string;
-export type OrganizationIdentityLinkProviderConfigPolicy = Record<string, unknown>;
+  (typeof OrganizationIdentityLinkProviderConfigStatus)[keyof typeof OrganizationIdentityLinkProviderConfigStatus];
 
 export const organizationIdentityLinkProviderConfigs = controlPlaneSchema.table(
   "organization_identity_link_provider_configs",
@@ -27,18 +24,18 @@ export const organizationIdentityLinkProviderConfigs = controlPlaneSchema.table(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    providerFamily: text("provider_family").$type<IdentityLinkProviderFamily>().notNull(),
+    providerFamily: text("provider_family").notNull(),
     status: text("status")
       .notNull()
       .$type<OrganizationIdentityLinkProviderConfigStatus>()
-      .default(OrganizationIdentityLinkProviderConfigStatuses.ACTIVE),
+      .default(OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
     integrationTargetKey: text("integration_target_key")
       .notNull()
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
     integrationConnectionId: text("integration_connection_id")
       .notNull()
       .references(() => integrationConnections.id, { onDelete: "restrict" }),
-    policy: jsonb("policy").$type<OrganizationIdentityLinkProviderConfigPolicy>(),
+    policy: jsonb("policy").$type<Record<string, unknown>>(),
     createdByUserId: text("created_by_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),

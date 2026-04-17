@@ -16,8 +16,6 @@ export const UserExternalPrincipalCredentialSecretKinds = {
 export type UserExternalPrincipalCredentialSecretKind =
   (typeof UserExternalPrincipalCredentialSecretKinds)[keyof typeof UserExternalPrincipalCredentialSecretKinds];
 
-export type UserExternalPrincipalCredentialSecretMetadata = Record<string, unknown>;
-
 export const userExternalPrincipalCredentialSecrets = controlPlaneSchema.table(
   "user_external_principal_credential_secrets",
   {
@@ -33,7 +31,7 @@ export const userExternalPrincipalCredentialSecrets = controlPlaneSchema.table(
     organizationCredentialKeyVersion: bigint("organization_credential_key_version", {
       mode: "number",
     }).notNull(),
-    metadata: jsonb("metadata").$type<UserExternalPrincipalCredentialSecretMetadata>(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

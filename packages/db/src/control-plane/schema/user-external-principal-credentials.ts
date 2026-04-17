@@ -16,8 +16,6 @@ export const UserExternalPrincipalCredentialStatuses = {
 export type UserExternalPrincipalCredentialStatus =
   (typeof UserExternalPrincipalCredentialStatuses)[keyof typeof UserExternalPrincipalCredentialStatuses];
 
-export type UserExternalPrincipalCredentialKind = string;
-
 export const userExternalPrincipalCredentials = controlPlaneSchema.table(
   "user_external_principal_credentials",
   {
@@ -31,7 +29,7 @@ export const userExternalPrincipalCredentials = controlPlaneSchema.table(
       .notNull()
       .references(() => userExternalPrincipals.id, { onDelete: "cascade" }),
     providerFamily: text("provider_family").notNull(),
-    credentialKind: text("credential_kind").$type<UserExternalPrincipalCredentialKind>().notNull(),
+    credentialKind: text("credential_kind").notNull(),
     status: text("status")
       .notNull()
       .$type<UserExternalPrincipalCredentialStatus>()

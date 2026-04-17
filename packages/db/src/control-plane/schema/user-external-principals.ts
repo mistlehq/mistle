@@ -17,8 +17,6 @@ export const UserExternalPrincipalStatuses = {
 export type UserExternalPrincipalStatus =
   (typeof UserExternalPrincipalStatuses)[keyof typeof UserExternalPrincipalStatuses];
 
-export type UserExternalPrincipalProfile = Record<string, unknown>;
-
 export const userExternalPrincipals = controlPlaneSchema.table(
   "user_external_principals",
   {
@@ -43,7 +41,7 @@ export const userExternalPrincipals = controlPlaneSchema.table(
       .notNull()
       .$type<UserExternalPrincipalStatus>()
       .default(UserExternalPrincipalStatuses.ACTIVE),
-    profile: jsonb("profile").$type<UserExternalPrincipalProfile>(),
+    profile: jsonb("profile").$type<Record<string, unknown>>(),
     linkedAt: timestamp("linked_at", { withTimezone: true, mode: "string" }).notNull().defaultNow(),
     unlinkedAt: timestamp("unlinked_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })

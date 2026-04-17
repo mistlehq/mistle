@@ -14,8 +14,6 @@ export const UserExternalPrincipalKeyStatuses = {
 export type UserExternalPrincipalKeyStatus =
   (typeof UserExternalPrincipalKeyStatuses)[keyof typeof UserExternalPrincipalKeyStatuses];
 
-export type UserExternalPrincipalKeyType = string;
-
 export const userExternalPrincipalKeys = controlPlaneSchema.table(
   "user_external_principal_keys",
   {
@@ -29,7 +27,7 @@ export const userExternalPrincipalKeys = controlPlaneSchema.table(
       .notNull()
       .references(() => userExternalPrincipals.id, { onDelete: "cascade" }),
     providerFamily: text("provider_family").notNull(),
-    keyType: text("key_type").$type<UserExternalPrincipalKeyType>().notNull(),
+    keyType: text("key_type").notNull(),
     keyValue: text("key_value").notNull(),
     status: text("status")
       .notNull()
