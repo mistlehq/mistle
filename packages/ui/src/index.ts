@@ -43,6 +43,7 @@ export * from "./components/ui/progress.js";
 export * from "./components/ui/radio-group.js";
 export * from "./components/ui/resizable.js";
 export * from "./components/ui/scroll-area.js";
+export * from "./components/ui/screen-action-button.js";
 export * from "./components/ui/select.js";
 export * from "./components/ui/separator.js";
 export * from "./components/ui/section-block.js";

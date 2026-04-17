@@ -1,4 +1,4 @@
-import { Button, Spinner, Notice } from "@mistle/ui";
+import { ScreenActionButton, Spinner, Notice } from "@mistle/ui";
 
 import { AuthPageShell, AuthPageWidths } from "./auth-page-shell.js";
 
@@ -31,9 +31,9 @@ export function AuthLoginCallbackPageView(
             {props.callbackError === null ? null : (
               <Notice variant="alert">{props.callbackError}</Notice>
             )}
-            <Button onClick={props.onBackToLogin} type="button" variant="outline">
+            <ScreenActionButton onClick={props.onBackToLogin} type="button" variant="outline">
               Back to login
-            </Button>
+            </ScreenActionButton>
           </>
         )}
       </div>

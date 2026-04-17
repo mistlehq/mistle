@@ -1,4 +1,4 @@
-import { Button, Field, FieldContent, Input, Notice } from "@mistle/ui";
+import { Field, FieldContent, Input, Notice, ScreenActionButton } from "@mistle/ui";
 
 type NoOrganizationAccessViewContentProps = {
   organizationName: string;
@@ -40,25 +40,18 @@ export function NoOrganizationAccessViewContent(
           </FieldContent>
         </Field>
 
-        <Button
-          className="h-12 w-full text-sm"
-          disabled={props.isCreatingOrganization}
-          size="lg"
-          type="submit"
-        >
+        <ScreenActionButton disabled={props.isCreatingOrganization} type="submit">
           {props.isCreatingOrganization ? "Creating organization..." : "Create organization"}
-        </Button>
+        </ScreenActionButton>
 
-        <Button
-          className="h-12 w-full text-sm"
+        <ScreenActionButton
           disabled={props.isSigningOut || props.isCreatingOrganization}
           onClick={props.onSignOut}
-          size="lg"
           type="button"
           variant="outline"
         >
           {props.isSigningOut ? "Signing out..." : "Sign Out"}
-        </Button>
+        </ScreenActionButton>
       </form>
 
       <div className="mt-6 grid gap-3">

@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, Notice } from "@mistle/ui";
+import { Card, CardContent, Notice, ScreenActionButton } from "@mistle/ui";
 
 import { AuthStatusPage } from "../auth/auth-status-page.js";
 import { formatInvitationRole } from "./invitation-accept-state.js";
@@ -48,25 +48,18 @@ export function InvitationAccessView(props: InvitationAccessViewProps): React.JS
         </Notice>
       )}
       <div className="flex flex-col gap-4">
-        <Button
-          className="h-12 w-full text-sm"
-          disabled={isSubmitting}
-          onClick={props.onAccept}
-          size="lg"
-          type="button"
-        >
+        <ScreenActionButton disabled={isSubmitting} onClick={props.onAccept} type="button">
           {props.isAccepting ? "Accepting..." : "Accept invitation"}
-        </Button>
-        <Button
-          className="h-12 w-full text-sm text-zinc-500 hover:text-zinc-700"
+        </ScreenActionButton>
+        <ScreenActionButton
+          className="text-zinc-500 hover:text-zinc-700"
           disabled={isSubmitting}
           onClick={props.onDecline}
-          size="lg"
           type="button"
           variant="link"
         >
           {props.isDeclining ? "Declining..." : "Decline"}
-        </Button>
+        </ScreenActionButton>
       </div>
     </AuthStatusPage>
   );

@@ -1,4 +1,4 @@
-import { Button, Notice } from "@mistle/ui";
+import { Notice, ScreenActionButton } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
@@ -95,11 +95,7 @@ export const InvitationAccepted: Story = {
         <p className="text-center">You now have access to Mistle Labs.</p>
       </Notice>
     ),
-    actions: (
-      <Button className="h-12 w-full text-sm" size="lg" type="button">
-        Continue
-      </Button>
-    ),
+    actions: <ScreenActionButton type="button">Continue</ScreenActionButton>,
   },
   parameters: {
     docs: {

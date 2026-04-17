@@ -1,4 +1,4 @@
-import { Button, Notice } from "@mistle/ui";
+import { Notice, ScreenActionButton } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { AuthStatusPage } from "./auth-status-page.js";
@@ -32,12 +32,12 @@ export const WithActions: Story = {
     children: <Notice variant="alert">This invitation belongs to a different account.</Notice>,
     actions: (
       <>
-        <Button className="h-12 w-full text-sm" size="lg" type="button" variant="secondary">
+        <ScreenActionButton type="button" variant="secondary">
           Sign out and use a different account
-        </Button>
-        <Button className="h-12 w-full text-sm" size="lg" type="button" variant="outline">
+        </ScreenActionButton>
+        <ScreenActionButton type="button" variant="outline">
           Go to dashboard
-        </Button>
+        </ScreenActionButton>
       </>
     ),
   },

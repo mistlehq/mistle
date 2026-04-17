@@ -1,4 +1,4 @@
-import { Button } from "@mistle/ui";
+import { ScreenActionButton } from "@mistle/ui";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 
@@ -10,13 +10,12 @@ type GoogleSignInButtonProps = {
 
 export function GoogleSignInButton(props: GoogleSignInButtonProps): React.JSX.Element {
   return (
-    <Button
-      className="h-12 w-full gap-2.5 text-sm"
+    <ScreenActionButton
+      className="gap-2.5"
       disabled={props.disabled ?? props.isPending}
       onClick={() => {
         void props.onClick();
       }}
-      size="lg"
       type="button"
       variant="outline"
     >
@@ -27,6 +26,6 @@ export function GoogleSignInButton(props: GoogleSignInButtonProps): React.JSX.El
         src={resolveIntegrationLogoPath({ logoKey: "google" })}
       />
       {props.isPending ? "Redirecting to Google..." : "Continue with Google"}
-    </Button>
+    </ScreenActionButton>
   );
 }
