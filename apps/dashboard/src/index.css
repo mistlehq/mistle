@@ -36,7 +36,7 @@
 
 .chat-markdown-content .contains-task-list {
   list-style-type: none;
-  padding-inline-start: 0.25rem;
+  padding-inline-start: 0.2rem;
 }
 
 .chat-markdown-content [data-streamdown="list-item"] {
@@ -54,14 +54,6 @@
 
 .chat-markdown-content :is(ul, ol) :is(ul, ol) {
   padding-inline-start: 0.5rem;
-}
-
-.chat-markdown-content
-  :is(ul, ol)
-  :is(ul, ol)
-  > [data-streamdown="list-item"]
-  + [data-streamdown="list-item"] {
-  margin-top: 0.4rem;
 }
 
 .chat-markdown-content .task-list-item {
