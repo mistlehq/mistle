@@ -7,7 +7,7 @@ It is designed for:
 - running the full product on one machine
 - Mailpit-backed local auth
 - Docker-backed sandbox runtime
-- optional callback-capable integration setup
+- callback-capable local integration testing by default
 
 It is not the production deployment artifact.
 
@@ -43,9 +43,16 @@ It is not the production deployment artifact.
    `deploy/compose/local/config/integration-targets.provision.json`, so the dashboard starts
    with the supported integrations visible by default.
 
-   If `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is blank in `.env`, `./up.sh` starts
-   an ephemeral Cloudflare quick tunnel in Docker for `http://localhost:8080` and injects the
-   public URL for this run. If the variable is already set, `./up.sh` uses that value unchanged.
+   `./up.sh` always ensures the control plane has a public auth/callback URL for this run:
+
+   - if `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is already set in `.env`, `./up.sh` uses
+     that value unchanged
+   - if it is blank, `./up.sh` starts a temporary `cloudflare/cloudflared` container, creates an
+     ephemeral `trycloudflare.com` URL for `http://localhost:8080`, writes that URL into a generated
+     runtime env file under `.generated/`, and starts Compose with that generated env file
+
+   This makes the default local testing flow callback-capable without requiring any manual tunnel
+   setup.
 
 4. Open the product:
 
@@ -64,20 +71,24 @@ image pulls. It is not a user-facing product surface.
    pnpm compose:local:smoke-test -- --restart-check
    ```
 
-## Callback-Capable Local Mode
+## Callback URL Behavior
 
-Baseline local mode always keeps the dashboard on `http://localhost:3000`.
+The dashboard always stays on `http://localhost:3000`.
 
-For redirect- or webhook-based integrations, `./up.sh` will create an ephemeral callback URL
-automatically when:
+The control-plane public/auth base URL works like this:
 
-- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is unset or blank
+- `./up.sh` reads `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` from `.env`
+- if it is set, that value becomes the callback/auth URL for the run
+- if it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`
+- `./up.sh` captures the generated public URL and injects it through `.generated/runtime.env`
+- Compose uses that generated env file for the current run only
+- `./down.sh` stops the stack and removes the wrapper-managed quick tunnel container and generated files
 
-Set this variable explicitly when you want to override the quick tunnel with a stable public URL:
+This means the local stack is callback-capable by default for testing. Set
+`MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` explicitly only when you want to override the quick
+tunnel with a stable public URL.
 
-- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
-
-This mirrors the existing dev model:
+This still mirrors the existing dev model:
 
 - dashboard/browser origin can stay on localhost
 - integration callbacks derive from the control-plane auth/public base URL
