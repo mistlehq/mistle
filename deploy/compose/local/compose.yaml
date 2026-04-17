@@ -24,6 +24,13 @@ x-mistle-local-bootstrap: &mistle-local-bootstrap
     - *mistle-local-provision-manifest-volume
   restart: "no"
 
+x-mistle-local-migration-job: &mistle-local-migration-job
+  env_file:
+    - ../local/.env
+  volumes:
+    - *mistle-local-config-volume
+  restart: "no"
+
 services:
   sandbox-base-image:
     build:
@@ -78,6 +85,9 @@ services:
     <<: *mistle-local-app
     environment:
       MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    depends_on:
+      control-plane-db-migrate:
+        condition: service_completed_successfully
     ports:
       - "8080:5100"
 
@@ -95,6 +105,9 @@ services:
     <<: *mistle-local-app
     environment:
       MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    depends_on:
+      data-plane-db-migrate:
+        condition: service_completed_successfully
     volumes:
       - *mistle-local-config-volume
       - type: bind
@@ -197,12 +210,44 @@ services:
     networks:
       - app
 
+  control-plane-db-migrate:
+    <<: *mistle-local-migration-job
+    image: mistle/control-plane-api:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - pnpm
+      - --filter
+      - "@mistle/control-plane-api"
+      - db:migrate
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    networks:
+      - app
+
+  data-plane-db-migrate:
+    <<: *mistle-local-migration-job
+    image: mistle/data-plane-api:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - pnpm
+      - --filter
+      - "@mistle/data-plane-api"
+      - db:migrate
+    environment:
+      MISTLE_CONFIG_PATH: /app/config/mistle.toml
+    networks:
+      - app
+
   control-plane-bootstrap:
     <<: *mistle-local-bootstrap
     image: mistle/control-plane-api:local
     depends_on:
-      control-plane-api:
-        condition: service_healthy
+      control-plane-db-migrate:
+        condition: service_completed_successfully
       object-store-bootstrap:
         condition: service_completed_successfully
     entrypoint:
