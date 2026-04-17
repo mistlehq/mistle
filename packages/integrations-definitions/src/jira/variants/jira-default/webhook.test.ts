@@ -298,4 +298,82 @@ describe("jira webhook handler", () => {
       },
     });
   });
+
+  it("keeps inline Jira text runs contiguous when formatting splits a token", () => {
+    const payload = {
+      timestamp: 1_775_151_763_000,
+      webhookEvent: "comment_created",
+      issue: {
+        id: "10001",
+        self: "https://mistle-test.atlassian.net/rest/api/2/issue/10001",
+        key: "MST-101",
+      },
+      comment: {
+        id: "20003",
+        body: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "@mistle",
+                },
+                {
+                  type: "text",
+                  text: "bot",
+                  marks: [{ type: "strong" }],
+                },
+                {
+                  type: "text",
+                  text: " please review /tri",
+                },
+                {
+                  type: "text",
+                  text: "age",
+                  marks: [{ type: "em" }],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    } satisfies Record<string, unknown>;
+    const rawBody = new TextEncoder().encode(JSON.stringify(payload));
+
+    const resolved = JiraWebhookHandler.resolveWebhookRequest({
+      targetKey: "jira-default",
+      target: {
+        familyId: "jira",
+        variantId: "jira-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      headers: {
+        "x-atlassian-webhook-identifier": "jira-webhook-comment-3",
+      },
+      rawBody,
+    });
+
+    expect(resolved).toEqual({
+      kind: "event",
+      event: {
+        externalEventId: "jira-webhook-comment-3",
+        externalDeliveryId: "jira-webhook-comment-3",
+        providerEventType: "comment_created",
+        eventType: "comment_created",
+        payload: {
+          ...payload,
+          comment: {
+            ...payload.comment,
+            mistlePlainText: "@mistlebot please review /triage",
+          },
+        },
+        occurredAt: "2026-04-02T17:42:43.000Z",
+        sourceOrderKey: "2026-04-02T17:42:43.000Z#20003",
+      },
+    });
+  });
 });

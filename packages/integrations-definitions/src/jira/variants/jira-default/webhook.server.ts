@@ -93,7 +93,7 @@ function extractJiraDocumentText(value: unknown): string {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => extractJiraDocumentText(item)).join("\n");
+    return value.map((item) => extractJiraDocumentText(item)).join("");
   }
 
   if (!isRecord(value)) {
@@ -113,7 +113,7 @@ function extractJiraDocumentText(value: unknown): string {
   const contentText = Array.isArray(content)
     ? content
         .map((item) => extractJiraDocumentText(item))
-        .join(isJiraBlockNodeType(nodeType) ? "\n" : "")
+        .join(isJiraBlockNodeType(nodeType) && nodeType !== "paragraph" ? "\n" : "")
     : "";
 
   return `${typeof text === "string" ? text : attrsText}${contentText}`;
