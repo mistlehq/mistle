@@ -438,4 +438,138 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
     },
     IntegrationTestTimeoutMs,
   );
+
+  it(
+    "compensates replacement compute when replacement fails after persisting the new compute id",
+    async () => {
+      const bootstrapWsServer = await startBootstrapWebSocketServer();
+      const runtimeConfig = createWorkerRuntimeConfig({
+        websocketBaseUrl: bootstrapWsServer.baseUrl,
+      });
+      const dockerSandboxConfig = requireDockerSandboxConfig({ runtimeConfig });
+      const db = createDatabase();
+      const sandboxAdapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: dockerSandboxConfig,
+      });
+      const sandboxRuntimeControl = createSandboxRuntimeControl({
+        provider: SandboxProvider.DOCKER,
+        docker: dockerSandboxConfig,
+      });
+      const controlPlaneInternalClient = new ControlPlaneInternalClient({
+        baseUrl: "http://127.0.0.1:1",
+        internalAuthServiceToken: "unused",
+      });
+
+      const sandboxInstanceId = `sbi_pr15_fail_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const organizationId = `org_pr15_fail_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const storageBackendAdapter = createSandboxStorageBackendAdapter({
+        db,
+        controlPlaneInternalClient,
+        workerConfig: runtimeConfig.app,
+        runtimeProvider: SandboxProvider.DOCKER,
+        storageBackend: SandboxStorageBackend.DOCKER_VOLUME,
+      });
+      const runtimePlan = {
+        ...createRuntimePlan(),
+        workspaceSources: [
+          {
+            sourceKind: "git-clone" as const,
+            resourceKind: "repository" as const,
+            path: "/root/does-not-exist",
+            originUrl:
+              "https://github.com/mistlehq/this-repository-does-not-exist-for-pr15-replacement-test.git",
+          },
+        ],
+      };
+
+      await db.insert(sandboxInstances).values({
+        id: sandboxInstanceId,
+        organizationId,
+        sandboxProfileId: runtimePlan.sandboxProfileId,
+        sandboxProfileVersion: runtimePlan.version,
+        runtimeProvider: SandboxProvider.DOCKER,
+        providerSandboxId: null,
+        computeGeneration: 1,
+        status: "stopped",
+        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        startedByKind: "system",
+        startedById: "worker_pr15_replace_compute_failure",
+        source: "dashboard",
+      });
+      await db.insert(sandboxInstanceRuntimePlans).values({
+        sandboxInstanceId,
+        revision: 1,
+        compiledRuntimePlan: runtimePlan,
+        compiledFromProfileId: runtimePlan.sandboxProfileId,
+        compiledFromProfileVersion: runtimePlan.version,
+      });
+
+      await storageBackendAdapter.provision({
+        organizationId,
+        sandboxInstanceId,
+      });
+      await markSandboxInstanceStarting({
+        db,
+        sandboxInstanceId,
+      });
+
+      try {
+        await expect(
+          replacePersistentSandboxCompute({
+            db,
+            controlPlaneInternalClient,
+            config: runtimeConfig,
+            sandboxAdapter,
+            sandboxRuntimeControl,
+            resumableSandboxInstance: {
+              sandboxInstanceId,
+              organizationId,
+              persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+              runtimeProvider: SandboxProvider.DOCKER,
+              providerSandboxId: null,
+              computeGeneration: 1,
+              runtimePlan,
+            },
+          }),
+        ).rejects.toThrow(/failed to submit sandbox init request/i);
+
+        const persistedSandboxInstance = await db.query.sandboxInstances.findFirst({
+          columns: {
+            providerSandboxId: true,
+            computeGeneration: true,
+            status: true,
+            failureCode: true,
+          },
+          where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+        });
+        expect(persistedSandboxInstance).toEqual({
+          providerSandboxId: null,
+          computeGeneration: 1,
+          status: "failed",
+          failureCode: "resume_sandbox_failed",
+        });
+
+        const replacementContainerIds = execFileSync(
+          "docker",
+          ["ps", "-aq", "--filter", `name=^it-pr15-${sandboxInstanceId}$`],
+          {
+            encoding: "utf8",
+          },
+        )
+          .trim()
+          .split("\n")
+          .filter((value) => value.length > 0);
+
+        expect(replacementContainerIds).toEqual([]);
+      } finally {
+        await storageBackendAdapter.deprovision({
+          organizationId,
+          sandboxInstanceId,
+        });
+        await bootstrapWsServer.close();
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 });

@@ -137,6 +137,7 @@ export async function resumeSandboxInstance(
     providerSandboxId: string;
   };
   let storageAttachLifecycle: "start" | "resume";
+  let replacedProviderSandboxId: string | undefined;
   if (resumableSandboxInstance.providerSandboxId !== null) {
     try {
       resumedRuntime = await resumeSandbox(
@@ -172,6 +173,7 @@ export async function resumeSandboxInstance(
         resumableSandboxInstance,
       });
       storageAttachLifecycle = "start";
+      replacedProviderSandboxId = resumableSandboxInstance.providerSandboxId;
     }
   } else {
     if (persistenceMode !== "persistent") {
@@ -260,6 +262,18 @@ export async function resumeSandboxInstance(
         }),
       });
       throw error;
+    }
+
+    if (replacedProviderSandboxId !== undefined) {
+      try {
+        await ctx.sandboxAdapter.destroy({
+          id: replacedProviderSandboxId,
+        });
+      } catch (error) {
+        if (!isSandboxResourceNotFoundError(error)) {
+          // Best-effort cleanup only. Replacement compute is already running.
+        }
+      }
     }
 
     return;

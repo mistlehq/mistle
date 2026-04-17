@@ -6,13 +6,19 @@ import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-re
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
+import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
+import {
+  type CompensationAction,
+  registerCompensationAction,
+} from "../shared/sandbox-storage/storage-persistence.js";
 import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { persistSandboxInstanceComputeReplacement } from "./persist-sandbox-instance-compute-replacement.js";
 import type { ResumableSandboxInstanceState } from "./resolve-resumable-sandbox-instance-state.js";
+import { revertSandboxInstanceComputeReplacement } from "./revert-sandbox-instance-compute-replacement.js";
 
 function createReplacementSandboxImage(input: {
   runtimePlan: ResumableSandboxInstanceState["runtimePlan"];
@@ -38,21 +44,43 @@ export async function replacePersistentSandboxCompute(input: {
   const replacementImage = createReplacementSandboxImage({
     runtimePlan: input.resumableSandboxInstance.runtimePlan,
   });
+  const compensationActions: CompensationAction[] = [];
+
+  async function runReplacementCompensationActions(): Promise<void> {
+    const compensationErrors: unknown[] = [];
+
+    for (const action of [...compensationActions].reverse()) {
+      try {
+        await action.run();
+      } catch (error) {
+        compensationErrors.push(error);
+      }
+    }
+
+    if (compensationErrors.length === 0) {
+      return;
+    }
+
+    if (compensationErrors.length === 1) {
+      throw new Error("Failed to compensate replacement sandbox compute.", {
+        cause: compensationErrors[0],
+      });
+    }
+
+    throw new Error("Failed to compensate replacement sandbox compute.", {
+      cause: compensationErrors,
+    });
+  }
 
   async function handleFailedReplacement(inputFailure: {
-    providerSandboxId?: string;
     failureCode: string;
     failureMessage: string;
   }): Promise<void> {
-    let destroySandboxError: unknown;
-    if (inputFailure.providerSandboxId !== undefined) {
-      try {
-        await input.sandboxAdapter.destroy({
-          id: inputFailure.providerSandboxId,
-        });
-      } catch (error) {
-        destroySandboxError = error;
-      }
+    let compensationError: unknown;
+    try {
+      await runReplacementCompensationActions();
+    } catch (error) {
+      compensationError = error;
     }
 
     let markFailedError: unknown;
@@ -71,21 +99,21 @@ export async function replacePersistentSandboxCompute(input: {
       markFailedError = error;
     }
 
-    if (destroySandboxError !== undefined && markFailedError !== undefined) {
+    if (compensationError !== undefined && markFailedError !== undefined) {
       throw new Error(
-        "Failed to destroy replacement sandbox and failed to mark sandbox instance as failed.",
+        "Failed to compensate replacement sandbox compute and failed to mark sandbox instance as failed.",
         {
           cause: {
-            destroySandboxError,
+            compensationError,
             markFailedError,
           },
         },
       );
     }
 
-    if (destroySandboxError !== undefined) {
-      throw new Error("Failed to destroy replacement sandbox after replacement failure.", {
-        cause: destroySandboxError,
+    if (compensationError !== undefined) {
+      throw new Error("Failed to compensate replacement sandbox after replacement failure.", {
+        cause: compensationError,
       });
     }
 
@@ -134,17 +162,62 @@ export async function replacePersistentSandboxCompute(input: {
         storagePreparation,
       },
     );
+    const replacementSandbox = startedSandbox;
 
-    await persistSandboxInstanceComputeReplacement(
+    registerCompensationAction({
+      compensationActions,
+      action: {
+        run: async () => {
+          await destroySandbox(
+            {
+              db: input.db,
+              controlPlaneInternalClient: input.controlPlaneInternalClient,
+              config: input.config,
+              sandboxAdapter: input.sandboxAdapter,
+            },
+            {
+              sandboxInstanceId: input.resumableSandboxInstance.sandboxInstanceId,
+              organizationId: input.resumableSandboxInstance.organizationId,
+              persistenceMode: input.resumableSandboxInstance.persistenceMode,
+              runtimeProvider: replacementSandbox.runtimeProvider,
+              providerSandboxId: replacementSandbox.providerSandboxId,
+              skipPersistentStorageDeprovision: true,
+            },
+          );
+        },
+      },
+    });
+
+    const persistedReplacement = await persistSandboxInstanceComputeReplacement(
       {
         db: input.db,
       },
       {
         sandboxInstanceId: input.resumableSandboxInstance.sandboxInstanceId,
-        providerSandboxId: startedSandbox.providerSandboxId,
+        providerSandboxId: replacementSandbox.providerSandboxId,
         previousComputeGeneration: input.resumableSandboxInstance.computeGeneration,
       },
     );
+
+    registerCompensationAction({
+      compensationActions,
+      action: {
+        run: async () => {
+          await revertSandboxInstanceComputeReplacement(
+            {
+              db: input.db,
+            },
+            {
+              sandboxInstanceId: input.resumableSandboxInstance.sandboxInstanceId,
+              replacementProviderSandboxId: replacementSandbox.providerSandboxId,
+              replacementComputeGeneration: persistedReplacement.computeGeneration,
+              previousProviderSandboxId: input.resumableSandboxInstance.providerSandboxId,
+              previousComputeGeneration: input.resumableSandboxInstance.computeGeneration,
+            },
+          );
+        },
+      },
+    });
 
     await attachSandboxStorage(
       {
@@ -181,11 +254,6 @@ export async function replacePersistentSandboxCompute(input: {
     return startedSandbox;
   } catch (error) {
     await handleFailedReplacement({
-      ...(startedSandbox === undefined
-        ? {}
-        : {
-            providerSandboxId: startedSandbox.providerSandboxId,
-          }),
       failureCode: "resume_sandbox_failed",
       failureMessage: formatPersistedFailureMessage({
         summary: "Failed to replace missing sandbox compute during resume.",
