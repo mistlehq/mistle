@@ -103,12 +103,7 @@ export type IntegrationConnection = {
 };
 
 export type IntegrationIdentityLinkingCapability = {
-  supported: boolean;
   eligibleConnectionMethodIds: ReadonlyArray<IntegrationConnectionMethodId>;
-  supportsUserCredentials: boolean;
-  supportsInboundResolution: boolean;
-  principalKeyTypes: ReadonlyArray<string>;
-  credentialKinds: ReadonlyArray<string>;
 };
 
 export type IntegrationBinding = {

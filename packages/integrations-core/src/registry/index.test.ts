@@ -309,12 +309,7 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       connectionMethods: GitHubConnectionMethods,
       identityLinking: {
-        supported: true,
         eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-        supportsUserCredentials: true,
-        supportsInboundResolution: true,
-        principalKeyTypes: ["account_id", "login"],
-        credentialKinds: ["github_app_user_access_token"],
       },
       compileBinding: () => ({
         egressRoutes: [],
@@ -329,12 +324,7 @@ describe("integration registry", () => {
         variantId: "github-cloud",
       })?.identityLinking,
     ).toEqual({
-      supported: true,
       eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-      supportsUserCredentials: true,
-      supportsInboundResolution: true,
-      principalKeyTypes: ["account_id", "login"],
-      credentialKinds: ["github_app_user_access_token"],
     });
   });
 
@@ -353,43 +343,7 @@ describe("integration registry", () => {
         bindingConfigSchema: ConfigSchema,
         connectionMethods: GitHubConnectionMethods,
         identityLinking: {
-          supported: true,
           eligibleConnectionMethodIds: ["missing-method"],
-          supportsUserCredentials: true,
-          supportsInboundResolution: true,
-          principalKeyTypes: ["account_id"],
-          credentialKinds: ["github_app_user_access_token"],
-        },
-        compileBinding: () => ({
-          egressRoutes: [],
-          artifacts: [],
-          runtimeClients: [],
-        }),
-      }),
-    ).toThrow(IntegrationDefinitionRegistryError);
-  });
-
-  it("rejects identity-linking metadata with duplicate principal key types", () => {
-    const registry = new IntegrationRegistry();
-
-    expect(() =>
-      registry.register({
-        familyId: "github",
-        variantId: "github-cloud",
-        kind: "git",
-        displayName: "GitHub",
-        logoKey: "github",
-        targetConfigSchema: ConfigSchema,
-        targetSecretSchema: EmptySecretsSchema,
-        bindingConfigSchema: ConfigSchema,
-        connectionMethods: GitHubConnectionMethods,
-        identityLinking: {
-          supported: true,
-          eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-          supportsUserCredentials: true,
-          supportsInboundResolution: true,
-          principalKeyTypes: ["account_id", "account_id"],
-          credentialKinds: ["github_app_user_access_token"],
         },
         compileBinding: () => ({
           egressRoutes: [],

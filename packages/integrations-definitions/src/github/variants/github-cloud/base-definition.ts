@@ -41,12 +41,7 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
   bindingConfigSchema: GitHubCloudBindingConfigSchema,
   bindingConfigForm: resolveGitHubBindingConfigForm,
   identityLinking: {
-    supported: true,
     eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-    supportsUserCredentials: true,
-    supportsInboundResolution: true,
-    principalKeyTypes: ["account_id", "login"],
-    credentialKinds: ["github_app_user_access_token"],
   },
   connectionMethods: [
     {

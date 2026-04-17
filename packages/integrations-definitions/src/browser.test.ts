@@ -21,12 +21,7 @@ describe("browser definitions", () => {
     expect(GitHubCloudBrowserDefinition.webhookHandler).toBeUndefined();
     expect(GitHubCloudBrowserDefinition.webhookSource).toBeUndefined();
     expect(GitHubCloudBrowserDefinition.identityLinking).toEqual({
-      supported: true,
       eligibleConnectionMethodIds: ["github-app-installation"],
-      supportsUserCredentials: true,
-      supportsInboundResolution: true,
-      principalKeyTypes: ["account_id", "login"],
-      credentialKinds: ["github_app_user_access_token"],
     });
   });
 
@@ -67,12 +62,7 @@ describe("browser definitions", () => {
     expect(SlackBrowserDefinition.webhookHandler).toBeUndefined();
     expect(SlackBrowserDefinition.webhookSource).toBeUndefined();
     expect(SlackBrowserDefinition.identityLinking).toEqual({
-      supported: true,
       eligibleConnectionMethodIds: ["slack-bot-token"],
-      supportsUserCredentials: true,
-      supportsInboundResolution: true,
-      principalKeyTypes: ["workspace_id", "user_id"],
-      credentialKinds: ["slack_user_token"],
     });
   });
 

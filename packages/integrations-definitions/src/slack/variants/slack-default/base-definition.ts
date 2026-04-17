@@ -34,12 +34,7 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
   bindingConfigSchema: SlackBindingConfigSchema,
   bindingConfigForm: resolveSlackBindingConfigForm,
   identityLinking: {
-    supported: true,
     eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_BOT_TOKEN],
-    supportsUserCredentials: true,
-    supportsInboundResolution: true,
-    principalKeyTypes: ["workspace_id", "user_id"],
-    credentialKinds: ["slack_user_token"],
   },
   connectionMethods: [
     {
