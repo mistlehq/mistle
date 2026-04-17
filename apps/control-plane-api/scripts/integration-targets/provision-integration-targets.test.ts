@@ -174,21 +174,14 @@ describe("provision-integration-targets", () => {
     }
   });
 
-  it("supports the built dist layout when deriving the default manifest search boundary", async () => {
+  it("discovers manifests within a git checkout by default", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
     const repoRoot = join(temporaryWorkspaceRoot, "repo");
-    const packageRoot = join(repoRoot, "apps", "control-plane-api");
-    const builtScriptDirectory = join(packageRoot, "dist", "scripts", "integration-targets");
+    const packageDirectory = join(repoRoot, "apps", "control-plane-api", "scripts");
     const manifestPath = join(repoRoot, "integration-targets.provision.json");
 
-    await mkdir(builtScriptDirectory, { recursive: true });
-    await writeFile(
-      join(packageRoot, "package.json"),
-      JSON.stringify({
-        name: "@mistle/control-plane-api",
-      }),
-      "utf8",
-    );
+    await mkdir(packageDirectory, { recursive: true });
+    await writeFile(join(repoRoot, ".git"), "", "utf8");
     await writeFile(
       manifestPath,
       JSON.stringify({
@@ -200,7 +193,7 @@ describe("provision-integration-targets", () => {
 
     try {
       const discoveredManifestPath = discoverIntegrationTargetProvisionManifestPath({
-        startDirectory: builtScriptDirectory,
+        startDirectory: packageDirectory,
       });
       expect(discoveredManifestPath).toBe(manifestPath);
     } finally {
@@ -261,6 +254,38 @@ describe("provision-integration-targets", () => {
           env: {},
           startDirectory: nestedWorkingDirectory,
           searchRootDirectory: runtimeRoot,
+        }),
+      ).toBeUndefined();
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not discover manifests from unrelated parent directories when outside a git checkout", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
+    const parentManifestPath = join(temporaryWorkspaceRoot, "integration-targets.provision.json");
+    const externalWorkingDirectory = join(temporaryWorkspaceRoot, "outside", "runner");
+
+    await mkdir(externalWorkingDirectory, { recursive: true });
+    await writeFile(
+      parentManifestPath,
+      JSON.stringify({
+        version: 1,
+        targets: [],
+      }),
+      "utf8",
+    );
+
+    try {
+      expect(
+        discoverIntegrationTargetProvisionManifestPath({
+          startDirectory: externalWorkingDirectory,
+        }),
+      ).toBeUndefined();
+      expect(
+        loadIntegrationTargetsProvisionManifest({
+          env: {},
+          startDirectory: externalWorkingDirectory,
         }),
       ).toBeUndefined();
     } finally {

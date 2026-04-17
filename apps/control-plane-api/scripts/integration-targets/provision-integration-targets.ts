@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -17,40 +16,22 @@ export const IntegrationTargetsProvisionManifestJsonEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_JSON";
 export const IntegrationTargetsProvisionManifestPathEnvVarName =
   "MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH";
-const ControlPlanePackageName = "@mistle/control-plane-api";
 
-function resolveControlPlanePackageRoot(startDirectory: string): string {
+function resolveRepositoryRootFromDirectory(startDirectory: string): string | undefined {
   let currentDirectory = resolve(startDirectory);
 
   while (true) {
-    const packageJsonPath = join(currentDirectory, "package.json");
-    if (existsSync(packageJsonPath)) {
-      const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
-        name?: unknown;
-      };
-
-      if (packageJson.name === ControlPlanePackageName) {
-        return currentDirectory;
-      }
+    if (existsSync(join(currentDirectory, ".git"))) {
+      return currentDirectory;
     }
 
     const parentDirectory = dirname(currentDirectory);
     if (parentDirectory === currentDirectory) {
-      throw new Error(
-        `Could not resolve package root for '${ControlPlanePackageName}' from '${startDirectory}'.`,
-      );
+      return undefined;
     }
 
     currentDirectory = parentDirectory;
   }
-}
-
-function resolveDefaultIntegrationTargetsProvisionManifestSearchRoot(): string {
-  const controlPlanePackageRoot = resolveControlPlanePackageRoot(
-    dirname(fileURLToPath(import.meta.url)),
-  );
-
-  return resolve(controlPlanePackageRoot, "../..");
 }
 
 const IntegrationTargetProvisionTargetSchema = z
@@ -210,9 +191,16 @@ export function discoverIntegrationTargetProvisionManifestPath(input: {
   searchRootDirectory?: string;
 }): string | undefined {
   let currentDirectory = resolve(input.startDirectory);
-  const searchRootDirectory = resolve(
-    input.searchRootDirectory ?? resolveDefaultIntegrationTargetsProvisionManifestSearchRoot(),
-  );
+  const resolvedSearchRootDirectory =
+    input.searchRootDirectory === undefined
+      ? resolveRepositoryRootFromDirectory(currentDirectory)
+      : resolve(input.searchRootDirectory);
+
+  if (resolvedSearchRootDirectory === undefined) {
+    return undefined;
+  }
+
+  const searchRootDirectory = resolvedSearchRootDirectory;
 
   while (true) {
     const candidatePath = join(currentDirectory, IntegrationTargetsProvisionManifestFileName);
