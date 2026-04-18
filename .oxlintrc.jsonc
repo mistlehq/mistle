@@ -6,6 +6,7 @@
   "jsPlugins": ["./tools/oxlint-plugins/no-qualified-timer-globals.js"],
   "plugins": ["eslint", "typescript", "node", "vitest"],
   "rules": {
+    "mistle/no-restricted-test-api-members": "error",
     "mistle/no-qualified-timer-globals": "error",
     "typescript/no-deprecated": "error",
     "eslint/no-restricted-imports": [
@@ -99,69 +100,6 @@
         "message": "Do not use jest-based mocks/spies. Assert observable behavior instead.",
       },
     ],
-    "eslint/no-restricted-properties": [
-      "error",
-      {
-        "object": "vi",
-        "property": "fn",
-        "message": "Do not use vi.fn mocks/stubs. Assert observable behavior instead.",
-      },
-      {
-        "object": "vi",
-        "property": "spyOn",
-        "message": "Do not use vi.spyOn. Assert observable behavior instead.",
-      },
-      {
-        "object": "vi",
-        "property": "mock",
-        "message": "Do not use vi.mock. Assert observable behavior instead.",
-      },
-      {
-        "object": "vi",
-        "property": "mocked",
-        "message": "Do not use vi.mocked. Assert observable behavior instead.",
-      },
-      {
-        "object": "vi",
-        "property": "stubGlobal",
-        "message": "Do not stub globals in tests. Assert observable behavior instead.",
-      },
-      {
-        "object": "jest",
-        "property": "fn",
-        "message": "Do not use jest.fn mocks/stubs. Assert observable behavior instead.",
-      },
-      {
-        "object": "jest",
-        "property": "spyOn",
-        "message": "Do not use jest.spyOn. Assert observable behavior instead.",
-      },
-      {
-        "object": "jest",
-        "property": "mock",
-        "message": "Do not use jest.mock. Assert observable behavior instead.",
-      },
-      {
-        "object": "jest",
-        "property": "mocked",
-        "message": "Do not use jest.mocked. Assert observable behavior instead.",
-      },
-      {
-        "object": "sinon",
-        "property": "stub",
-        "message": "Do not use sinon stubs. Assert observable behavior instead.",
-      },
-      {
-        "object": "sinon",
-        "property": "spy",
-        "message": "Do not use sinon spies. Assert observable behavior instead.",
-      },
-      {
-        "object": "sinon",
-        "property": "mock",
-        "message": "Do not use sinon mocks. Assert observable behavior instead.",
-      },
-    ],
   },
   "overrides": [
     {
@@ -178,23 +116,21 @@
         "apps/data-plane-gateway/**/*.tsx",
       ],
       "rules": {
-        "eslint/no-restricted-syntax": [
+        "eslint/no-restricted-imports": [
           "error",
           {
-            "selector": "ImportDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
-            "message": "Do not import @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
-          },
-          {
-            "selector": "ExportNamedDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
-            "message": "Do not re-export @mistle/test-environments from backend app workspaces. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
-          },
-          {
-            "selector": "ExportAllDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
-            "message": "Do not re-export @mistle/test-environments from backend app workspaces. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
-          },
-          {
-            "selector": "ImportExpression[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
-            "message": "Do not import @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+            "paths": [
+              {
+                "name": "@mistle/test-environments",
+                "message": "Do not import or re-export @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+              },
+            ],
+            "patterns": [
+              {
+                "group": ["@mistle/test-environments/*"],
+                "message": "Do not import or re-export @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+              },
+            ],
           },
         ],
       },
