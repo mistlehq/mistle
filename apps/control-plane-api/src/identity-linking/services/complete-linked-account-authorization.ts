@@ -16,7 +16,7 @@ import {
   type CompletedIdentityLinkingAuthorization,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 import {
   encryptCredentialUtf8,
@@ -77,7 +77,6 @@ function assertRedirectSessionNotUsedOrExpired(input: {
 async function retirePrincipalKeys(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
-  timestamp: string;
 }): Promise<void> {
   if (input.principalIds.length === 0) {
     return;
@@ -87,7 +86,7 @@ async function retirePrincipalKeys(input: {
     .update(userExternalPrincipalKeys)
     .set({
       status: UserExternalPrincipalKeyStatuses.RETIRED,
-      retiredAt: input.timestamp,
+      retiredAt: sql`now()`,
     })
     .where(
       and(
@@ -100,7 +99,6 @@ async function retirePrincipalKeys(input: {
 async function revokePrincipalCredentials(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
-  timestamp: string;
 }): Promise<void> {
   if (input.principalIds.length === 0) {
     return;
@@ -110,7 +108,7 @@ async function revokePrincipalCredentials(input: {
     .update(userExternalPrincipalCredentials)
     .set({
       status: UserExternalPrincipalCredentialStatuses.REVOKED,
-      updatedAt: input.timestamp,
+      updatedAt: sql`now()`,
     })
     .where(
       and(
@@ -126,7 +124,6 @@ async function revokePrincipalCredentials(input: {
 async function unlinkPrincipals(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
-  timestamp: string;
 }): Promise<void> {
   if (input.principalIds.length === 0) {
     return;
@@ -136,8 +133,8 @@ async function unlinkPrincipals(input: {
     .update(userExternalPrincipals)
     .set({
       status: UserExternalPrincipalStatuses.UNLINKED,
-      unlinkedAt: input.timestamp,
-      updatedAt: input.timestamp,
+      unlinkedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .where(inArray(userExternalPrincipals.id, input.principalIds));
 
@@ -269,7 +266,6 @@ async function persistLinkedAccountAuthorization(input: {
   integrationsConfig: {
     masterEncryptionKeys: Record<string, string>;
   };
-  timestamp: string;
 }): Promise<void> {
   const completedAuthorization = normalizeCompletedLinkedAccountAuthorizationOrThrow(
     input.completedAuthorization,
@@ -325,7 +321,6 @@ async function persistLinkedAccountAuthorization(input: {
   await unlinkPrincipals({
     db: input.db,
     principalIds: supersededPrincipalIds,
-    timestamp: input.timestamp,
   });
 
   let principalId = reusablePrincipal?.id;
@@ -343,8 +338,8 @@ async function persistLinkedAccountAuthorization(input: {
         ...(completedAuthorization.profile === undefined
           ? {}
           : { profile: completedAuthorization.profile }),
-        linkedAt: input.timestamp,
-        updatedAt: input.timestamp,
+        linkedAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .returning({
         id: userExternalPrincipals.id,
@@ -364,9 +359,9 @@ async function persistLinkedAccountAuthorization(input: {
         integrationConnectionId: input.integrationConnectionId,
         status: UserExternalPrincipalStatuses.ACTIVE,
         profile: completedAuthorization.profile ?? null,
-        linkedAt: input.timestamp,
+        linkedAt: sql`now()`,
         unlinkedAt: null,
-        updatedAt: input.timestamp,
+        updatedAt: sql`now()`,
       })
       .where(eq(userExternalPrincipals.id, principalId));
   }
@@ -374,7 +369,6 @@ async function persistLinkedAccountAuthorization(input: {
   await retirePrincipalKeys({
     db: input.db,
     principalIds: [principalId],
-    timestamp: input.timestamp,
   });
 
   await input.db.insert(userExternalPrincipalKeys).values(
@@ -391,7 +385,6 @@ async function persistLinkedAccountAuthorization(input: {
   await revokePrincipalCredentials({
     db: input.db,
     principalIds: [principalId],
-    timestamp: input.timestamp,
   });
 
   if (completedAuthorization.credential === undefined) {
@@ -417,8 +410,8 @@ async function persistLinkedAccountAuthorization(input: {
         : {
             refreshTokenExpiresAt: completedAuthorization.credential.refreshTokenExpiresAt,
           }),
-      lastValidatedAt: input.timestamp,
-      updatedAt: input.timestamp,
+      lastValidatedAt: sql`now()`,
+      updatedAt: sql`now()`,
     })
     .returning({
       id: userExternalPrincipalCredentials.id,
@@ -467,7 +460,7 @@ async function persistLinkedAccountAuthorization(input: {
           organizationCredentialKeyVersion: organizationCredentialKey.version,
           ...(secret.metadata === undefined ? {} : { metadata: secret.metadata }),
           ...(secret.expiresAt === undefined ? {} : { expiresAt: secret.expiresAt }),
-          updatedAt: input.timestamp,
+          updatedAt: sql`now()`,
         };
       }),
     );
@@ -591,12 +584,10 @@ export async function completeLinkedAccountAuthorization(
     throw error;
   }
 
-  const timestamp = new Date().toISOString();
   await ctx.db.transaction(async (tx) => {
     await markIdentityLinkRedirectSessionUsedOrThrow({
       db: tx,
       redirectSessionId: redirectSession.id,
-      usedAt: timestamp,
     });
 
     await persistLinkedAccountAuthorization({
@@ -608,7 +599,6 @@ export async function completeLinkedAccountAuthorization(
       integrationConnectionId: providerContext.integrationConnection.id,
       completedAuthorization,
       integrationsConfig: ctx.integrationsConfig,
-      timestamp,
     });
   });
 

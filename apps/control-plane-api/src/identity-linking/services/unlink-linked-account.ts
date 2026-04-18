@@ -7,7 +7,7 @@ import {
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 export async function unlinkLinkedAccount(
   ctx: {
@@ -19,15 +19,13 @@ export async function unlinkLinkedAccount(
     providerFamily: string;
   },
 ): Promise<void> {
-  const timestamp = new Date().toISOString();
-
   await ctx.db.transaction(async (tx) => {
     const updatedPrincipals = await tx
       .update(userExternalPrincipals)
       .set({
         status: UserExternalPrincipalStatuses.UNLINKED,
-        unlinkedAt: timestamp,
-        updatedAt: timestamp,
+        unlinkedAt: sql`now()`,
+        updatedAt: sql`now()`,
       })
       .where(
         and(
@@ -51,7 +49,7 @@ export async function unlinkLinkedAccount(
       .update(userExternalPrincipalKeys)
       .set({
         status: UserExternalPrincipalKeyStatuses.RETIRED,
-        retiredAt: timestamp,
+        retiredAt: sql`now()`,
       })
       .where(
         and(
@@ -64,7 +62,7 @@ export async function unlinkLinkedAccount(
       .update(userExternalPrincipalCredentials)
       .set({
         status: UserExternalPrincipalCredentialStatuses.REVOKED,
-        updatedAt: timestamp,
+        updatedAt: sql`now()`,
       })
       .where(
         and(

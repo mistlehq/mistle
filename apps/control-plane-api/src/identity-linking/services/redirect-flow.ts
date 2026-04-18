@@ -1,6 +1,6 @@
 import { identityLinkRedirectSessions, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
   decryptRedirectSessionSecretUtf8,
@@ -142,12 +142,11 @@ export async function persistIdentityLinkRedirectSession(input: {
 export async function markIdentityLinkRedirectSessionUsedOrThrow(input: {
   db: ControlPlaneDatabase;
   redirectSessionId: string;
-  usedAt: string;
 }): Promise<void> {
   const updatedRows = await input.db
     .update(identityLinkRedirectSessions)
     .set({
-      usedAt: input.usedAt,
+      usedAt: sql`now()`,
     })
     .where(
       and(
