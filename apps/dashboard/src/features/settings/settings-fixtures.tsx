@@ -25,8 +25,17 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       displayName="Mistle Developer"
       email="developer@mistle.so"
       imageUrl={null}
+      linkedAccountActionPending={false}
+      linkedAccountCallbackNotice={null}
+      linkedAccountCard={null}
+      linkedAccountErrorMessage={null}
+      linkedAccountsEmptyStateMessage={null}
+      linkedAccountsLoading={false}
+      linkedAccountsLoadErrorMessage={null}
       onDeleteProfileImage={async () => {}}
+      onLinkLinkedAccount={async () => {}}
       onSaveChanges={async () => {}}
+      onUnlinkLinkedAccount={async () => {}}
       onUploadProfileImage={async () => {}}
       profileImageBusy={false}
       profileImageErrorMessage={null}

@@ -81,6 +81,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("../../packages/time/src/index.ts", import.meta.url)),
       },
       {
+        find: /^@mistle\/http$/,
+        replacement: fileURLToPath(new URL("../../packages/http/src/index.ts", import.meta.url)),
+      },
+      {
         find: /^@mistle\/time\/testing$/,
         replacement: fileURLToPath(
           new URL("../../packages/time/src/testing/index.ts", import.meta.url),

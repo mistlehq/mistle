@@ -11,8 +11,17 @@ const meta = {
     displayName: "Mistle Developer",
     email: "developer@mistle.so",
     imageUrl: null,
+    linkedAccountActionPending: false,
+    linkedAccountCallbackNotice: null,
+    linkedAccountCard: null,
+    linkedAccountErrorMessage: null,
+    linkedAccountsEmptyStateMessage: null,
+    linkedAccountsLoading: false,
+    linkedAccountsLoadErrorMessage: null,
     onDeleteProfileImage: async () => {},
+    onLinkLinkedAccount: async () => {},
     onSaveChanges: async () => {},
+    onUnlinkLinkedAccount: async () => {},
     onUploadProfileImage: async () => {},
     profileImageBusy: false,
     profileImageErrorMessage: null,
@@ -25,3 +34,20 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const WithGitHubLinkedAccount: Story = {
+  args: {
+    linkedAccountCard: {
+      providerFamily: "github",
+      displayName: "GitHub",
+      logoKey: "github",
+      statusLabel: "Linked",
+      statusTone: "active",
+      accountLabel: "@mistle-user",
+      linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+      helperMessage: null,
+      primaryActionLabel: "Relink",
+      secondaryActionLabel: "Unlink",
+    },
+  },
+};

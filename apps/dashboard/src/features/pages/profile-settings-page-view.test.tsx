@@ -1,26 +1,36 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
+const baseProps = {
+  displayName: "Mistle Developer",
+  email: "developer@mistle.so",
+  imageUrl: null,
+  linkedAccountActionPending: false,
+  linkedAccountCallbackNotice: null,
+  linkedAccountCard: null,
+  linkedAccountErrorMessage: null,
+  linkedAccountsEmptyStateMessage: null,
+  linkedAccountsLoading: false,
+  linkedAccountsLoadErrorMessage: null,
+  onDeleteProfileImage: async () => {},
+  onLinkLinkedAccount: async () => {},
+  onSaveChanges: async () => {},
+  onUnlinkLinkedAccount: async () => {},
+  onUploadProfileImage: async () => {},
+  profileImageBusy: false,
+  profileImageErrorMessage: null,
+  saving: false,
+} satisfies React.ComponentProps<typeof ProfileSettingsPageView>;
+
 describe("ProfileSettingsPageView", () => {
   it("shows edit and remove actions when a profile image is available", () => {
-    render(
-      <ProfileSettingsPageView
-        displayName="Mistle Developer"
-        email="developer@mistle.so"
-        imageUrl="https://example.com/avatar.webp"
-        onDeleteProfileImage={async () => {}}
-        onSaveChanges={async () => {}}
-        onUploadProfileImage={async () => {}}
-        profileImageBusy={false}
-        profileImageErrorMessage={null}
-        saving={false}
-      />,
-    );
+    render(<ProfileSettingsPageView {...baseProps} imageUrl="https://example.com/avatar.webp" />);
 
     expect(screen.getByRole("button", { name: "Edit profile image" })).toBeTruthy();
     expect(
@@ -56,14 +66,12 @@ describe("ProfileSettingsPageView", () => {
 
       return (
         <ProfileSettingsPageView
-          displayName="Mistle Developer"
-          email="developer@mistle.so"
+          {...baseProps}
           imageUrl={imageUrl}
           onDeleteProfileImage={async () => {
             removeCount += 1;
             setImageUrl(null);
           }}
-          onSaveChanges={async () => {}}
           onUploadProfileImage={async (file) => {
             uploadedFiles.push(file);
             setBusy(true);
@@ -76,8 +84,6 @@ describe("ProfileSettingsPageView", () => {
             await deferred.promise;
           }}
           profileImageBusy={busy}
-          profileImageErrorMessage={null}
-          saving={false}
         />
       );
     }
@@ -116,6 +122,125 @@ describe("ProfileSettingsPageView", () => {
     });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Upload profile image" })).toBeTruthy();
+    });
+  });
+
+  it("renders the GitHub linked-account section for an unlinked account", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCard={{
+          providerFamily: "github",
+          displayName: "GitHub",
+          logoKey: "github",
+          statusLabel: "Not linked",
+          statusTone: "warning",
+          accountLabel: "No linked account yet",
+          linkedAtLabel: null,
+          helperMessage: null,
+          primaryActionLabel: "Link account",
+          secondaryActionLabel: null,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Linked Accounts")).toBeTruthy();
+    expect(screen.getByText("No linked account yet")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Link account" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Unlink" })).toBeNull();
+  });
+
+  it("renders linked GitHub account details with relink and unlink actions", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCard={{
+          providerFamily: "github",
+          displayName: "GitHub",
+          logoKey: "github",
+          statusLabel: "Linked",
+          statusTone: "active",
+          accountLabel: "@mistle-user",
+          linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+          helperMessage: null,
+          primaryActionLabel: "Relink",
+          secondaryActionLabel: "Unlink",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("@mistle-user")).toBeTruthy();
+    expect(screen.getByText("Linked Apr 19, 2026, 6:15 PM")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Relink" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unlink" })).toBeTruthy();
+  });
+
+  it("renders a callback notice when a linked-account result is present", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCallbackNotice={{
+          title: "GitHub linked",
+          message: "Your GitHub account is now linked to Mistle.",
+          variant: "default",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("GitHub linked")).toBeTruthy();
+    expect(screen.getByText("Your GitHub account is now linked to Mistle.")).toBeTruthy();
+  });
+
+  it("renders an empty state when no linked account providers are available", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountsEmptyStateMessage={
+          "Your organization has not enabled any linked account providers right now."
+        }
+      />,
+    );
+
+    expect(screen.getByText("Linked Accounts")).toBeTruthy();
+    expect(
+      screen.getByText("Your organization has not enabled any linked account providers right now."),
+    ).toBeTruthy();
+  });
+
+  it("triggers link and unlink handlers through the linked-account actions", async () => {
+    let linkCount = 0;
+    let unlinkCount = 0;
+
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCard={{
+          providerFamily: "github",
+          displayName: "GitHub",
+          logoKey: "github",
+          statusLabel: "Relink required",
+          statusTone: "warning",
+          accountLabel: "@mistle-user",
+          linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+          helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+          primaryActionLabel: "Relink",
+          secondaryActionLabel: "Unlink",
+        }}
+        onLinkLinkedAccount={async () => {
+          linkCount += 1;
+        }}
+        onUnlinkLinkedAccount={async () => {
+          unlinkCount += 1;
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Relink" }));
+    fireEvent.click(screen.getByRole("button", { name: "Unlink" }));
+
+    await waitFor(() => {
+      expect(linkCount).toBe(1);
+      expect(unlinkCount).toBe(1);
     });
   });
 });
