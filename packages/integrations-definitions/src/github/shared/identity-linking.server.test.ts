@@ -254,6 +254,150 @@ describe("github identity linking", () => {
     }
   });
 
+  it("prefers the primary verified email over a public profile email when both are available", async () => {
+    const seenRequests: string[] = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenRequests.push(requestUrl.pathname);
+        response.setHeader("content-type", "application/json");
+
+        if (requestUrl.pathname === "/login/oauth/access_token") {
+          response.end(
+            JSON.stringify({
+              access_token: "ghu_user_token",
+              expires_in: 28800,
+              refresh_token: "ghr_refresh_token",
+              refresh_token_expires_in: 15897600,
+              scope: "",
+              token_type: "bearer",
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/user") {
+          response.end(
+            JSON.stringify({
+              id: 12345,
+              login: "mistle-user",
+              name: "Mistle User",
+              email: "public-profile@example.com",
+              avatar_url: "https://avatars.example.com/u/12345",
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/user/emails") {
+          response.end(
+            JSON.stringify([
+              {
+                email: "primary@example.com",
+                primary: true,
+                verified: true,
+              },
+            ]),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "Not found." }));
+      },
+    });
+
+    try {
+      const result = await completeGitHubLinkedAccountAuthorization({
+        apiBaseUrl: server.baseUrl,
+        webBaseUrl: server.baseUrl,
+        clientId: "Iv1.client123",
+        clientSecret: "github-client-secret",
+        query: new URLSearchParams({
+          code: "code_123",
+          state: "state_123",
+        }),
+        redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/github",
+        pkceVerifier: "verifier_123",
+        now: "2026-04-18T10:00:00.000Z",
+      });
+
+      expect(seenRequests).toEqual(["/login/oauth/access_token", "/user", "/user/emails"]);
+      expect(result.profile.email).toBe("primary@example.com");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("fails with an authorization error when GitHub returns a malformed user profile response", async () => {
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        response.setHeader("content-type", "application/json");
+
+        if (requestUrl.pathname === "/login/oauth/access_token") {
+          response.end(
+            JSON.stringify({
+              access_token: "ghu_user_token",
+              expires_in: 28800,
+              refresh_token: "ghr_refresh_token",
+              refresh_token_expires_in: 15897600,
+              scope: "",
+              token_type: "bearer",
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/user") {
+          response.end(
+            JSON.stringify({
+              id: 12345,
+              name: "Mistle User",
+              email: null,
+            }),
+          );
+          return;
+        }
+
+        response.writeHead(404);
+        response.end(JSON.stringify({ message: "Not found." }));
+      },
+    });
+
+    try {
+      await expect(
+        completeGitHubLinkedAccountAuthorization({
+          apiBaseUrl: server.baseUrl,
+          webBaseUrl: server.baseUrl,
+          clientId: "Iv1.client123",
+          clientSecret: "github-client-secret",
+          query: new URLSearchParams({
+            code: "code_123",
+            state: "state_123",
+          }),
+          redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/github",
+          pkceVerifier: "verifier_123",
+          now: "2026-04-18T10:00:00.000Z",
+        }),
+      ).rejects.toThrow(GitHubIdentityLinkingAuthorizationError);
+    } finally {
+      await server.stop();
+    }
+  });
+
   it("fails when GitHub returns an authorization error in the callback query", async () => {
     await expect(
       completeGitHubLinkedAccountAuthorization({

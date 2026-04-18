@@ -177,6 +177,20 @@ async function readJsonResponseOrThrow<T>(input: {
   return input.schema.parse(parsedJson);
 }
 
+function toGitHubAuthorizationFailure(input: {
+  errorLabel: string;
+  error: unknown;
+}): GitHubIdentityLinkingAuthorizationError {
+  if (input.error instanceof GitHubIdentityLinkingAuthorizationError) {
+    return input.error;
+  }
+
+  const detail =
+    input.error instanceof Error ? input.error.message : "GitHub returned an invalid response.";
+
+  return new GitHubIdentityLinkingAuthorizationError(`${input.errorLabel} failed: ${detail}`);
+}
+
 function createAuthorizationErrorFromCallbackOrThrow(
   query: URLSearchParams,
 ): GitHubIdentityLinkingAuthorizationError | undefined {
@@ -279,11 +293,18 @@ async function exchangeAuthorizationCode(input: {
     );
   }
 
-  return readJsonResponseOrThrow({
-    response,
-    schema: GitHubUserAccessTokenResponseSchema,
-    errorLabel: "GitHub authorization code exchange",
-  });
+  try {
+    return await readJsonResponseOrThrow({
+      response,
+      schema: GitHubUserAccessTokenResponseSchema,
+      errorLabel: "GitHub authorization code exchange",
+    });
+  } catch (error) {
+    throw toGitHubAuthorizationFailure({
+      errorLabel: "GitHub authorization code exchange",
+      error,
+    });
+  }
 }
 
 async function fetchUserProfile(input: {
@@ -300,16 +321,23 @@ async function fetchUserProfile(input: {
   });
 
   if (!response.ok) {
-    throw new Error(
+    throw new GitHubIdentityLinkingAuthorizationError(
       `GitHub user profile request failed (${response.status} ${response.statusText}).`,
     );
   }
 
-  return readJsonResponseOrThrow({
-    response,
-    schema: GitHubUserProfileResponseSchema,
-    errorLabel: "GitHub user profile request",
-  });
+  try {
+    return await readJsonResponseOrThrow({
+      response,
+      schema: GitHubUserProfileResponseSchema,
+      errorLabel: "GitHub user profile request",
+    });
+  } catch (error) {
+    throw toGitHubAuthorizationFailure({
+      errorLabel: "GitHub user profile request",
+      error,
+    });
+  }
 }
 
 async function fetchPrimaryEmail(input: {
@@ -329,11 +357,19 @@ async function fetchPrimaryEmail(input: {
     return undefined;
   }
 
-  const emails = await readJsonResponseOrThrow({
-    response,
-    schema: GitHubUserEmailResponseSchema,
-    errorLabel: "GitHub user emails request",
-  });
+  let emails: z.infer<typeof GitHubUserEmailResponseSchema>;
+  try {
+    emails = await readJsonResponseOrThrow({
+      response,
+      schema: GitHubUserEmailResponseSchema,
+      errorLabel: "GitHub user emails request",
+    });
+  } catch (error) {
+    throw toGitHubAuthorizationFailure({
+      errorLabel: "GitHub user emails request",
+      error,
+    });
+  }
 
   return emails.find((email) => email.primary && email.verified)?.email;
 }
@@ -390,12 +426,11 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
     apiBaseUrl: input.apiBaseUrl,
     accessToken: tokenResponse.access_token,
   });
-  const primaryEmail =
-    userProfile.email ??
-    (await fetchPrimaryEmail({
-      apiBaseUrl: input.apiBaseUrl,
-      accessToken: tokenResponse.access_token,
-    }));
+  const primaryEmail = await fetchPrimaryEmail({
+    apiBaseUrl: input.apiBaseUrl,
+    accessToken: tokenResponse.access_token,
+  });
+  const resolvedEmail = primaryEmail ?? userProfile.email ?? undefined;
   const accessTokenExpiresAt = resolveFutureTimestamp({
     now: input.now,
     expiresInSeconds: tokenResponse.expires_in,
@@ -414,7 +449,7 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
         ? {}
         : { displayName: userProfile.name }),
       ...(userProfile.avatar_url === undefined ? {} : { avatarUrl: userProfile.avatar_url }),
-      ...(primaryEmail === undefined ? {} : { email: primaryEmail }),
+      ...(resolvedEmail === undefined ? {} : { email: resolvedEmail }),
     },
     keys: [
       {
