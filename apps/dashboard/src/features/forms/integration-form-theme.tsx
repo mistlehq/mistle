@@ -255,7 +255,6 @@ function MultiSelectStringArrayComboboxWidget(
     typeof props.options.emptyMessage === "string"
       ? props.options.emptyMessage
       : "No matching options.";
-  const selectedValueSet = new Set(selectedValues);
   const filteredOptions = options.filter((option) => {
     if (search.trim().length === 0) {
       return true;
