@@ -1,4 +1,10 @@
-import { HardDrivesIcon, SlidersHorizontalIcon, UserIcon, UsersIcon } from "@phosphor-icons/react";
+import {
+  HardDrivesIcon,
+  LinkSimpleIcon,
+  SlidersHorizontalIcon,
+  UserIcon,
+  UsersIcon,
+} from "@phosphor-icons/react";
 import { createElement } from "react";
 
 import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
@@ -32,6 +38,17 @@ export function resolveSettingsNavGroups(input: {
           label: "Members",
           icon: MembersNavIcon,
         },
+        ...(shouldRenderIdentityLinkingSettingsNavItem({
+          organizationRole: input.organizationRole,
+        })
+          ? [
+              {
+                to: "/settings/organization/identity-linking",
+                label: "Identity Linking",
+                icon: IdentityLinkingNavIcon,
+              },
+            ]
+          : []),
         ...(shouldRenderSandboxStorageSettingsNavItem({
           organizationRole: input.organizationRole,
         })
@@ -79,7 +96,20 @@ function SandboxStorageNavIcon(props: {
   return createElement(HardDrivesIcon, props);
 }
 
+function IdentityLinkingNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return createElement(LinkSimpleIcon, props);
+}
+
 function shouldRenderSandboxStorageSettingsNavItem(input: {
+  organizationRole: OrganizationRole | null;
+}): boolean {
+  return input.organizationRole === "owner" || input.organizationRole === "admin";
+}
+
+function shouldRenderIdentityLinkingSettingsNavItem(input: {
   organizationRole: OrganizationRole | null;
 }): boolean {
   return input.organizationRole === "owner" || input.organizationRole === "admin";

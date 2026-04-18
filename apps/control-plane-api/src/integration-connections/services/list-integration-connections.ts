@@ -1,6 +1,8 @@
 import {
   integrationConnections,
   integrationWebhookSources,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
   sandboxProfileVersionIntegrationBindings,
   webhookAutomations,
   type ControlPlaneDatabase,
@@ -22,7 +24,7 @@ import {
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
@@ -56,6 +58,7 @@ type IntegrationConnectionListItem = {
   status: IntegrationConnectionStatus;
   bindingCount: number;
   automationCount: number;
+  isIdentityLinked?: boolean;
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
@@ -185,6 +188,11 @@ export async function listIntegrationConnections(
       db,
       connectionIds: result.items.map((connection) => connection.id),
     });
+    const identityLinkedConnectionIds = await listIdentityLinkedConnectionIds({
+      db,
+      connectionIds: result.items.map((connection) => connection.id),
+      organizationId: input.organizationId,
+    });
 
     return {
       ...result,
@@ -220,6 +228,7 @@ export async function listIntegrationConnections(
             }),
             bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
             automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
+            ...(identityLinkedConnectionIds.has(connection.id) ? { isIdentityLinked: true } : {}),
             ...(supportsWebhookSources === undefined ? {} : { supportsWebhookSources }),
             createdAt: normalizeTimestamp(connection.createdAt),
             updatedAt: normalizeTimestamp(connection.updatedAt),
@@ -240,6 +249,36 @@ export async function listIntegrationConnections(
 
     throw error;
   }
+}
+
+async function listIdentityLinkedConnectionIds(input: {
+  db: ControlPlaneDatabase;
+  connectionIds: readonly string[];
+  organizationId: string;
+}): Promise<Set<string>> {
+  if (input.connectionIds.length === 0) {
+    return new Set();
+  }
+
+  const rows = await input.db
+    .select({
+      connectionId: organizationIdentityLinkProviderConfigs.integrationConnectionId,
+    })
+    .from(organizationIdentityLinkProviderConfigs)
+    .where(
+      and(
+        eq(organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
+        eq(
+          organizationIdentityLinkProviderConfigs.status,
+          OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        ),
+        inArray(organizationIdentityLinkProviderConfigs.integrationConnectionId, [
+          ...input.connectionIds,
+        ]),
+      ),
+    );
+
+  return new Set(rows.map((row) => row.connectionId));
 }
 
 async function listBindingCountsByConnectionId(input: {

@@ -1,15 +1,26 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 
 export function useIntegrationDetailState(input: {
   cards: readonly IntegrationCardViewModel[];
+  detailConnectionId: string | null;
   detailTargetKey: string | null;
 }) {
   const invalidatedRequestedConnectionIdsRef = useRef<Set<string>>(new Set());
+  const lastRouteConnectionIdRef = useRef<string | null>(null);
   const [requestedDetailConnectionId, setRequestedDetailConnectionId] = useState<string | null>(
     null,
   );
+
+  useEffect(() => {
+    if (input.detailConnectionId === lastRouteConnectionIdRef.current) {
+      return;
+    }
+
+    lastRouteConnectionIdRef.current = input.detailConnectionId;
+    setRequestedDetailConnectionId(input.detailConnectionId);
+  }, [input.detailConnectionId]);
 
   const selectedDetailCard =
     input.detailTargetKey === null

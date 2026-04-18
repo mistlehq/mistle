@@ -1,10 +1,11 @@
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -18,12 +19,16 @@ import {
 } from "./use-integrations-directory-state.js";
 
 export function IntegrationsPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
+  const [searchParams] = useSearchParams();
+  useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
+  const detailConnectionId = searchParams.get("connectionId");
   const dashboardConfig = getDashboardConfig();
-
   const directoryState = useIntegrationsDirectoryState({
+    detailConnectionId,
     detailTargetKey,
   });
 
@@ -95,6 +100,7 @@ export function IntegrationsPage() {
                 targetVariantId: directoryState.selectedDetailCard.target.variantId,
               }),
         })}
+        onSelectedConnectionChange={directoryState.setActiveDetailConnectionId}
         onDeleteConnection={connectionEditors.onDeleteConnection}
         onEditAuthentication={(connectionId) => {
           const editingConnection =
@@ -110,11 +116,12 @@ export function IntegrationsPage() {
             return;
           }
 
-          void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit`);
+          void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit${location.search}`);
         }}
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         resourceItemsByKey={directoryState.resourceItemsByKey}
+        selectedConnectionId={directoryState.activeDetailConnectionId}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
         onCreateWebhookSource={({ connectionId }) => {
           webhookSourceState.createWebhookSource({ connectionId });

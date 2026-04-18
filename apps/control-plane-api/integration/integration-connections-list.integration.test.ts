@@ -8,6 +8,8 @@ import {
   IntegrationConnectionResourceSyncStates,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
   integrationTargets,
   integrationWebhookSources,
   sandboxProfiles,
@@ -100,6 +102,17 @@ describe("integration connections list integration", () => {
       lastErrorMessage: null,
     });
 
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      id: "ilp_001",
+      organizationId: firstOrgSession.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      integrationTargetKey: "github_cloud",
+      integrationConnectionId: "icn_001",
+      createdByUserId: firstOrgSession.userId,
+      updatedByUserId: firstOrgSession.userId,
+    });
+
     await insertBindingUsage(fixture, {
       organizationId: firstOrgSession.organizationId,
       profileId: "spf_001",
@@ -147,6 +160,7 @@ describe("integration connections list integration", () => {
         status: IntegrationConnectionStatuses.ACTIVE,
         bindingCount: 1,
         automationCount: 0,
+        isIdentityLinked: true,
         externalSubjectId: "github-user-1",
         config: {
           installation_id: "12345",

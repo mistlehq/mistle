@@ -20,7 +20,10 @@ export const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integration
   "directory",
 ];
 
-export function useIntegrationsDirectoryState(input: { detailTargetKey: string | null }) {
+export function useIntegrationsDirectoryState(input: {
+  detailTargetKey: string | null;
+  detailConnectionId: string | null;
+}) {
   const navigate = useNavigate();
   const activeDetailConnectionIdRef = useRef<string | null>(null);
 
@@ -44,11 +47,16 @@ export function useIntegrationsDirectoryState(input: { detailTargetKey: string |
 
   const connectedIntegrationCards = cards.filter((card) => card.connections.length > 0);
 
-  const { activeDetailConnectionId, selectedDetailCard, selectedDetailConnections } =
-    useIntegrationDetailState({
-      cards,
-      detailTargetKey: input.detailTargetKey,
-    });
+  const {
+    activeDetailConnectionId,
+    selectedDetailCard,
+    selectedDetailConnections,
+    setActiveDetailConnectionId,
+  } = useIntegrationDetailState({
+    cards,
+    detailConnectionId: input.detailConnectionId,
+    detailTargetKey: input.detailTargetKey,
+  });
   activeDetailConnectionIdRef.current = activeDetailConnectionId;
 
   const resourceState = useIntegrationResourceState({
@@ -75,6 +83,8 @@ export function useIntegrationsDirectoryState(input: { detailTargetKey: string |
     cards,
     connectedViewCards,
     integrationsQuery,
+    activeDetailConnectionId,
+    setActiveDetailConnectionId,
     onRefreshResource: resourceState.onRefreshResource,
     refreshingResourceKeys: resourceState.refreshingResourceKeys,
     resourceItemsByKey: resourceState.resourceItemsByKey,

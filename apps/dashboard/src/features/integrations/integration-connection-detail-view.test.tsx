@@ -23,6 +23,82 @@ afterEach(() => {
 });
 
 describe("IntegrationConnectionDetailView", () => {
+  it("shows the identity badge for connections configured for identity linking", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            isIdentityLinked: true,
+            status: "active",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByText("IDENTITY")).toHaveLength(2);
+  });
+
+  it("disables delete when a connection is configured for identity linking", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: false,
+            displayName: "Engineering GitHub",
+            isIdentityLinked: true,
+            status: "active",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+        ]}
+        onDeleteConnection={() => {}}
+      />,
+    );
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete connection Engineering GitHub",
+    });
+
+    expect(deleteButton.getAttribute("disabled")).toBe("");
+    fireEvent.mouseEnter(deleteButton.parentElement ?? deleteButton);
+    expect(
+      screen.getByText(
+        "This connection can't be deleted while it is configured for Identity Linking.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("hides authentication editing when a connection is configured for identity linking", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: false,
+            displayName: "Engineering GitHub",
+            isIdentityLinked: true,
+            status: "active",
+            authMethodLabel: "GitHub App installation",
+            authMethodId: "github-app-installation",
+            resources: [],
+          },
+        ]}
+        onEditAuthentication={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+  });
+
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
     let startedGitHubAppInstallationConnectionId: string | null = null;

@@ -5,6 +5,7 @@ import { IntegrationConnectionSchema } from "../schemas.js";
 import {
   UpdateIntegrationConnectionBadRequestResponseSchema,
   UpdateIntegrationConnectionBodySchema,
+  UpdateIntegrationConnectionConflictResponseSchema,
   UpdateIntegrationConnectionNotFoundResponseSchema,
   UpdateIntegrationConnectionParamsSchema,
 } from "./schema.js";
@@ -62,6 +63,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: UpdateIntegrationConnectionNotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "The integration connection cannot be edited in its current state.",
+      content: {
+        "application/json": {
+          schema: UpdateIntegrationConnectionConflictResponseSchema,
         },
       },
     },

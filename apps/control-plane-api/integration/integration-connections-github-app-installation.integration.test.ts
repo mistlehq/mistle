@@ -3,6 +3,8 @@ import {
   integrationConnections,
   integrationConnectionRedirectSessions,
   integrationTargets,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
 } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
@@ -51,8 +53,12 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
 
 function createDashboardOrganizationIntegrationsUrl(
   fixture: ControlPlaneApiIntegrationFixture,
+  targetKey: string,
 ): string {
-  return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/integrations");
+  return buildDashboardUrl(
+    fixture.config.dashboard.baseUrl,
+    `/integrations/${encodeURIComponent(targetKey)}`,
+  );
 }
 
 describe("integration connections GitHub App installation integration", () => {
@@ -131,7 +137,7 @@ describe("integration connections GitHub App installation integration", () => {
 
     expect(completeResponse.status).toBe(302);
     expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture),
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud"),
     );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
@@ -229,7 +235,7 @@ describe("integration connections GitHub App installation integration", () => {
 
     expect(completeResponse.status).toBe(302);
     expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture),
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud"),
     );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
@@ -454,6 +460,50 @@ describe("integration connections GitHub App installation integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+  });
+
+  it("rejects GitHub App auth edits while the connection is configured for active identity linking", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
+      email: "integration-connections-github-app-installation-identity-linking@example.com",
+      displayName: "GitHub Prod",
+    });
+
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      organizationId: authenticatedSession.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      integrationTargetKey: "github-cloud",
+      integrationConnectionId: connectionId,
+      createdByUserId: authenticatedSession.userId,
+      updatedByUserId: authenticatedSession.userId,
+    });
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(connectionId)}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub Prod",
+          config: {
+            app_id: "123",
+            app_slug: "mistle-github-app",
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      code: "CONNECTION_USED_BY_IDENTITY_LINKING",
+    });
   });
 
   it("returns 404 when the GitHub App install start connection does not exist", async ({

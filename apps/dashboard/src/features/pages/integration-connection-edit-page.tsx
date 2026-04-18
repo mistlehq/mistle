@@ -1,6 +1,6 @@
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
@@ -10,6 +10,7 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
+import { resolveIntegrationConnectionReturnPath } from "./integration-connection-return-path.js";
 import { buildOpenUpdateIntegrationConnectionInput } from "./integrations-page-view-model.js";
 import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -18,9 +19,11 @@ export function IntegrationConnectionEditPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const { title, description } = resolvePageFrameText(pageMeta, "Edit Connection");
   const targetKey = params["targetKey"];
   const connectionId = params["connectionId"];
+  const returnPath = resolveIntegrationConnectionReturnPath(searchParams.get("returnTo"));
 
   if (targetKey === undefined) {
     throw new Error("Integration target key is required.");
@@ -54,7 +57,7 @@ export function IntegrationConnectionEditPage(): React.JSX.Element {
             <div>
               <Button
                 onClick={() => {
-                  void navigate(`/integrations/${targetKey}`);
+                  void navigate(returnPath ?? `/integrations/${targetKey}`);
                 }}
                 type="button"
                 variant="outline"
@@ -108,6 +111,7 @@ export function IntegrationConnectionEditPage(): React.JSX.Element {
           card,
           connection,
         })}
+        {...(returnPath === null ? {} : { returnPath })}
       />
     </FormPageFrame>
   );
@@ -115,13 +119,15 @@ export function IntegrationConnectionEditPage(): React.JSX.Element {
 
 function LoadedIntegrationConnectionEditPage(input: {
   initialEditorInput: OpenIntegrationConnectionEditorInput;
+  returnPath?: string;
 }): React.JSX.Element {
   const navigate = useNavigate();
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
-    onClose: () => navigate(`/integrations/${input.initialEditorInput.targetKey}`),
+    onClose: () =>
+      navigate(input.returnPath ?? `/integrations/${input.initialEditorInput.targetKey}`),
     onSubmitSuccess: async ({ editor }) => {
-      await navigate(`/integrations/${editor.targetKey}`);
+      await navigate(input.returnPath ?? `/integrations/${editor.targetKey}`);
     },
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });

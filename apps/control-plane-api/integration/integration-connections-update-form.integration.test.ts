@@ -2,6 +2,8 @@ import {
   integrationConnections,
   IntegrationCredentialSecretKinds,
   integrationTargets,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
@@ -157,6 +159,75 @@ describe("integration connections update form integration", () => {
     });
 
     expect(decryptedApiKey).toBe("sk-test-rotated-api-key");
+  });
+
+  it("rejects auth edits while the connection is configured for active identity linking", async ({
+    fixture,
+  }) => {
+    await upsertOpenAiTarget({ fixture, targetKey: "openai-default" });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-form-identity-linking@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/openai-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI primary",
+          methodId: IntegrationConnectionMethodIds.API_KEY,
+          config: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
+          secrets: {
+            apiKey: "sk-test-original-api-key",
+          },
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      organizationId: authenticatedSession.organizationId,
+      providerFamily: "openai",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      integrationTargetKey: "openai-default",
+      integrationConnectionId: createdConnection.id,
+      createdByUserId: authenticatedSession.userId,
+      updatedByUserId: authenticatedSession.userId,
+    });
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI rotated",
+          config: {
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
+          },
+          secrets: {
+            apiKey: "sk-test-rotated-api-key",
+          },
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(409);
+    expect(await updateResponse.json()).toMatchObject({
+      code: "CONNECTION_USED_BY_IDENTITY_LINKING",
+    });
   });
 
   it("updates AWS assume-role connections", async ({ fixture }) => {

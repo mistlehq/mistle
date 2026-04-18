@@ -60,6 +60,11 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.settingsOrganizationMembers.title).toBe("Members");
     expect(ROUTE_HANDLES.settingsOrganizationMembers.description).toBe("");
 
+    expect(ROUTE_HANDLES.settingsOrganizationIdentityLinking.title).toBe("Identity Linking");
+    expect(ROUTE_HANDLES.settingsOrganizationIdentityLinking.description).toBe(
+      "Configure the provider apps users will use to link their identities to Mistle.",
+    );
+
     expect(ROUTE_HANDLES.settingsOrganizationSandboxes.title).toBe("Sandboxes");
     expect(ROUTE_HANDLES.settingsOrganizationSandboxes.description).toBe(
       "Configure organization-wide sandbox settings.",

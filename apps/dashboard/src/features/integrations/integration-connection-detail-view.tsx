@@ -17,7 +17,7 @@ import {
 import { TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { JiraWebhookEventDisplayNameByType } from "../../../../../packages/integrations-definitions/src/jira-shared.js";
+import { JiraWebhookEventDisplayNameByType } from "../../../../../packages/integrations-definitions/src/jira/shared/webhook-events.js";
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { CopyableValue } from "../shared/copyable-value.js";
@@ -50,6 +50,7 @@ export type IntegrationConnectionDetailItem = {
   }[];
   displayName: string;
   id: string;
+  isIdentityLinked?: boolean;
   installation?:
     | {
         actionLabel?: string;
@@ -74,9 +75,11 @@ export type IntegrationConnectionDetailViewProps = {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditAuthentication?: (connectionId: string) => void;
+  onSelectedConnectionChange?: (connectionId: string | null) => void;
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<string, IntegrationResourceListItemData>;
+  selectedConnectionId?: string | null;
   titleEditor?:
     | {
         disabled: boolean;
@@ -166,17 +169,22 @@ function resolveConnectionDetailPaneViewState(input: {
 export function IntegrationConnectionDetailView(
   props: IntegrationConnectionDetailViewProps,
 ): React.JSX.Element {
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(
-    props.connections[0]?.id ?? null,
-  );
+  const [uncontrolledSelectedConnectionId, setUncontrolledSelectedConnectionId] = useState<
+    string | null
+  >(props.connections[0]?.id ?? null);
   const [isMobileConnectionSelectOpen, setIsMobileConnectionSelectOpen] = useState(false);
 
   if (props.connections.length === 0) {
     return <p className="text-muted-foreground text-sm">No connections found for this target.</p>;
   }
 
+  const resolvedSelectedConnectionId =
+    props.selectedConnectionId ??
+    uncontrolledSelectedConnectionId ??
+    props.connections[0]?.id ??
+    null;
   const selectedConnection =
-    props.connections.find((connection) => connection.id === selectedConnectionId) ??
+    props.connections.find((connection) => connection.id === resolvedSelectedConnectionId) ??
     props.connections[0];
 
   if (selectedConnection === undefined) {
@@ -193,7 +201,10 @@ export function IntegrationConnectionDetailView(
         <Select
           onOpenChange={setIsMobileConnectionSelectOpen}
           onValueChange={(nextConnectionId) => {
-            setSelectedConnectionId(nextConnectionId);
+            if (props.selectedConnectionId === undefined) {
+              setUncontrolledSelectedConnectionId(nextConnectionId);
+            }
+            props.onSelectedConnectionChange?.(nextConnectionId);
             setIsMobileConnectionSelectOpen(false);
           }}
           value={selectedConnection.id}
@@ -229,12 +240,25 @@ export function IntegrationConnectionDetailView(
                 }`}
                 key={connection.id}
                 onClick={() => {
-                  setSelectedConnectionId(connection.id);
+                  if (props.selectedConnectionId === undefined) {
+                    setUncontrolledSelectedConnectionId(connection.id);
+                  }
+                  props.onSelectedConnectionChange?.(connection.id);
                 }}
                 type="button"
               >
                 <span className="text-sm font-medium leading-tight">{connection.displayName}</span>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {connection.isIdentityLinked === true ? (
+                    <Tooltip delay={0}>
+                      <TooltipTrigger render={<span className="inline-flex" />}>
+                        <Badge variant="outline">IDENTITY</Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        This connection is configured for Identity Linking.
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   {connection.authMethodLabel === undefined ||
                   connection.authMethodLabel === null ? null : (
                     <span>{connection.authMethodLabel}</span>
@@ -318,9 +342,21 @@ function ConnectionDetailPane(input: {
                 titleEditor={input.titleEditor}
               />
             ) : (
-              <h2 className="text-base font-semibold leading-tight">
-                {input.connection.displayName}
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-semibold leading-tight">
+                  {input.connection.displayName}
+                </h2>
+                {input.connection.isIdentityLinked === true ? (
+                  <Tooltip delay={0}>
+                    <TooltipTrigger render={<span className="inline-flex" />}>
+                      <Badge variant="outline">IDENTITY</Badge>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      This connection is configured for Identity Linking.
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
             )}
             {input.connection.status === "active" ? null : (
               <div className="flex flex-wrap items-center gap-2">
@@ -415,6 +451,7 @@ function ConnectionDetailPane(input: {
         action={
           input.connection.authMethodId !== undefined &&
           input.connection.authMethodId !== null &&
+          input.connection.isIdentityLinked !== true &&
           input.onEditAuthentication !== undefined ? (
             <Button
               aria-label="Edit"
@@ -529,10 +566,17 @@ function ConnectionDetailPane(input: {
 }
 
 function resolveDeleteConnectionMessage(
-  connection: Pick<IntegrationConnectionDetailItem, "bindingCount" | "canDelete">,
+  connection: Pick<
+    IntegrationConnectionDetailItem,
+    "bindingCount" | "canDelete" | "isIdentityLinked"
+  >,
 ): string | null {
   if (connection.canDelete) {
     return null;
+  }
+
+  if (connection.isIdentityLinked === true) {
+    return "This connection can't be deleted while it is configured for Identity Linking.";
   }
 
   if (connection.bindingCount > 0) {

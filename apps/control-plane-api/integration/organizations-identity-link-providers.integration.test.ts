@@ -74,7 +74,7 @@ describe("organization identity-linking providers integration", () => {
     });
   });
 
-  it("configures a GitHub identity-linking provider from an eligible connection", async ({
+  it("saves a GitHub identity-linking provider connection without auto-enabling it", async ({
     fixture,
   }) => {
     const session = await fixture.authSession({
@@ -117,7 +117,7 @@ describe("organization identity-linking providers integration", () => {
       logoKey: "github",
       eligibleTargetKeys: ["github-cloud"],
       eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       selectedConnection: {
         id: "icn_identity_github_app",
         targetKey: "github-cloud",
@@ -141,12 +141,131 @@ describe("organization identity-linking providers integration", () => {
     expect(persistedConfig).toMatchObject({
       organizationId: session.organizationId,
       providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       integrationTargetKey: "github-cloud",
       integrationConnectionId: "icn_identity_github_app",
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
+  });
+
+  it("enables a saved identity-linking provider through the status endpoint", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "organization-identity-link-providers-enable@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_identity_enable",
+      organizationId: session.organizationId,
+      targetKey: "github-cloud",
+      displayName: "GitHub Identity Enable",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      },
+    });
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      integrationTargetKey: "github-cloud",
+      integrationConnectionId: "icn_identity_enable",
+      createdByUserId: session.userId,
+      updatedByUserId: session.userId,
+    });
+
+    const response = await fixture.request(
+      "/v1/organization/identity-linking/providers/github/status",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
+
+    expect(payload.configurationStatus).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
+    expect(payload.selectedConnection?.id).toBe("icn_identity_enable");
+
+    const persistedConfig =
+      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
+      });
+
+    expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
+  });
+
+  it("rejects enabling a saved provider when its connection is no longer valid", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "organization-identity-link-providers-enable-invalid@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_identity_revoked",
+      organizationId: session.organizationId,
+      targetKey: "github-cloud",
+      displayName: "GitHub Identity Revoked",
+      status: IntegrationConnectionStatuses.REVOKED,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      },
+    });
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      organizationId: session.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      integrationTargetKey: "github-cloud",
+      integrationConnectionId: "icn_identity_revoked",
+      createdByUserId: session.userId,
+      updatedByUserId: session.userId,
+    });
+
+    const response = await fixture.request(
+      "/v1/organization/identity-linking/providers/github/status",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+    });
+
+    const persistedConfig =
+      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
+      });
+
+    expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
   });
 
   it("rejects connections that use an ineligible connection method", async ({ fixture }) => {

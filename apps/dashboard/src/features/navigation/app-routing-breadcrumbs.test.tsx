@@ -87,6 +87,11 @@ describe("app routing breadcrumb integration", () => {
           />
           <Route
             element={<PageHarness />}
+            handle={ROUTE_HANDLES.settingsOrganizationIdentityLinking}
+            path="identity-linking"
+          />
+          <Route
+            element={<PageHarness />}
             handle={ROUTE_HANDLES.settingsOrganizationSandboxes}
             path="sandboxes"
           />
@@ -171,6 +176,17 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainHref(markup, "/settings/organization/general");
     expectMarkupToContainCurrentPageLabel(markup, "Members");
     expectMarkupToContainMetaTitle(markup, "Members");
+
+    await router.navigate("/settings/organization/identity-linking");
+    markup = renderRoutingMarkup(router);
+
+    expectMarkupToContainHref(markup, "/settings/organization/general");
+    expectMarkupToContainCurrentPageLabel(markup, "Identity Linking");
+    expectMarkupToContainMetaTitle(markup, "Identity Linking");
+    expectMarkupToContainMetaDescription(
+      markup,
+      "Configure the provider apps users will use to link their identities to Mistle.",
+    );
   });
 
   it("updates breadcrumbs across top-level integrations routes", async () => {
@@ -216,6 +232,7 @@ describe("app routing breadcrumb integration", () => {
       "/settings/personal",
       "/settings/organization/general",
       "/settings/organization/members",
+      "/settings/organization/identity-linking",
       "/settings/organization/sandboxes",
     ];
 

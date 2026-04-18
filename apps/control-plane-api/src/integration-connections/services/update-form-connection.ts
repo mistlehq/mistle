@@ -17,6 +17,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { assertIdentityLinkingAuthEditableOrThrow } from "./assert-identity-linking-auth-editable.js";
 import {
   parseFormConnectionConfigOrThrow,
   parseUpdateFormSecretsOrThrow,
@@ -66,6 +67,12 @@ export async function updateFormConnection(
       `Integration connection '${input.connectionId}' was not found.`,
     );
   }
+
+  await assertIdentityLinkingAuthEditableOrThrow({
+    db,
+    organizationId: input.organizationId,
+    connectionId: existingConnection.id,
+  });
 
   const connectionMethodIdValue = existingConnection.config?.["connection_method"];
   const existingConnectionMethodId =

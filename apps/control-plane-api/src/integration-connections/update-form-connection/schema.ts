@@ -6,6 +6,7 @@ import {
 
 import {
   IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
@@ -39,4 +40,8 @@ export const UpdateFormConnectionNotFoundResponseSchema = createCodeMessageError
     IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
     IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
   ]),
+);
+
+export const UpdateFormConnectionConflictResponseSchema = createCodeMessageErrorSchema(
+  z.enum([IntegrationConnectionsConflictCodes.CONNECTION_USED_BY_IDENTITY_LINKING]),
 );

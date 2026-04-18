@@ -12,6 +12,7 @@ import * as getOrganizationSandboxStorageSettings from "./get-organization-sandb
 import * as listIdentityLinkProviders from "./list-identity-link-providers/index.js";
 import * as listInvitations from "./list-invitations/index.js";
 import * as listMembers from "./list-members/index.js";
+import * as putIdentityLinkProviderStatus from "./put-identity-link-provider-status/index.js";
 import * as putIdentityLinkProvider from "./put-identity-link-provider/index.js";
 import * as putLogo from "./put-logo/index.js";
 import * as putOrganizationSandboxStorageSettings from "./put-organization-sandbox-storage-settings/index.js";
@@ -34,6 +35,7 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(listMembers.route, listMembers.handler);
   routes.openapi(listInvitations.route, listInvitations.handler);
   routes.openapi(putIdentityLinkProvider.route, putIdentityLinkProvider.handler);
+  routes.openapi(putIdentityLinkProviderStatus.route, putIdentityLinkProviderStatus.handler);
   routes.openapi(deleteIdentityLinkProvider.route, deleteIdentityLinkProvider.handler);
   routes.openapi(
     putOrganizationSandboxStorageSettings.route,

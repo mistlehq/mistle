@@ -21,6 +21,7 @@ import { IntegrationConnectionEditPage } from "./features/pages/integration-conn
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
+import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organization-identity-linking-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
 import { OrganizationSandboxStorageSettingsPage } from "./features/pages/organization-sandbox-storage-settings-page.js";
@@ -118,6 +119,7 @@ export const APP_ROUTES = createRoutesFromElements(
         {createSettingsRoutes({
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
+          organizationIdentityLinking: <OrganizationIdentityLinkingSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
           organizationSandboxes: <OrganizationSandboxStorageSettingsPage />,
         })}

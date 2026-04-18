@@ -272,6 +272,7 @@ describe("integrations page view model", () => {
           },
           connectionMethodId: "github-app-installation",
           connectionMethodLabel: "GitHub App installation",
+          isIdentityLinked: true,
           externalSubjectId: "mistle-labs",
           resources: [
             {
@@ -298,6 +299,8 @@ describe("integrations page view model", () => {
 
     expect(item?.authMethodLabel).toBe("GitHub App installation");
     expect(item?.authMethodId).toBe("github-app-installation");
+    expect(item?.isIdentityLinked).toBe(true);
+    expect(item?.canDelete).toBe(false);
     expect(item?.contextItems).toBeUndefined();
     expect(item?.installation).toEqual({
       actionLabel: "Manage installation",

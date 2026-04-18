@@ -3,30 +3,30 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import { OrganizationIdentityLinkProviderSchema } from "../schemas.js";
 import {
-  PutIdentityLinkProviderBadRequestResponseSchema,
-  PutIdentityLinkProviderBodySchema,
-  PutIdentityLinkProviderNotFoundResponseSchema,
-  PutIdentityLinkProviderParamsSchema,
+  PutIdentityLinkProviderStatusBadRequestResponseSchema,
+  PutIdentityLinkProviderStatusBodySchema,
+  PutIdentityLinkProviderStatusNotFoundResponseSchema,
+  PutIdentityLinkProviderStatusParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "put",
-  path: "/identity-linking/providers/:providerFamily",
+  path: "/identity-linking/providers/:providerFamily/status",
   tags: ["Organizations"],
   request: {
-    params: PutIdentityLinkProviderParamsSchema,
+    params: PutIdentityLinkProviderStatusParamsSchema,
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: PutIdentityLinkProviderBodySchema,
+          schema: PutIdentityLinkProviderStatusBodySchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Save the integration connection used for identity linking.",
+      description: "Update the identity-linking provider status.",
       content: {
         "application/json": {
           schema: OrganizationIdentityLinkProviderSchema,
@@ -37,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: PutIdentityLinkProviderBadRequestResponseSchema,
+          schema: PutIdentityLinkProviderStatusBadRequestResponseSchema,
         },
       },
     },
@@ -58,10 +58,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Identity-linking provider or connection was not found.",
+      description: "Identity-linking provider or configuration was not found.",
       content: {
         "application/json": {
-          schema: PutIdentityLinkProviderNotFoundResponseSchema,
+          schema: PutIdentityLinkProviderStatusNotFoundResponseSchema,
         },
       },
     },

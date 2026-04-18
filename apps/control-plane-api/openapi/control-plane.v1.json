@@ -1636,6 +1636,9 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "isIdentityLinked": {
+                            "type": "boolean"
+                          },
                           "externalSubjectId": {
                             "type": "string",
                             "minLength": 1
@@ -3176,6 +3179,9 @@
                       "type": "integer",
                       "minimum": 0
                     },
+                    "isIdentityLinked": {
+                      "type": "boolean"
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -3432,6 +3438,9 @@
                       "type": "integer",
                       "minimum": 0
                     },
+                    "isIdentityLinked": {
+                      "type": "boolean"
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -3606,6 +3615,28 @@
                     "code": {
                       "type": "string",
                       "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The integration connection cannot be edited in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_USED_BY_IDENTITY_LINKING"]
                     },
                     "message": {
                       "type": "string",
@@ -3851,6 +3882,9 @@
                       "type": "integer",
                       "minimum": 0
                     },
+                    "isIdentityLinked": {
+                      "type": "boolean"
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -4025,6 +4059,28 @@
                     "code": {
                       "type": "string",
                       "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The integration connection cannot be edited in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_USED_BY_IDENTITY_LINKING"]
                     },
                     "message": {
                       "type": "string",
@@ -7937,7 +7993,7 @@
         },
         "responses": {
           "200": {
-            "description": "Configure the integration connection used for identity linking.",
+            "description": "Save the integration connection used for identity linking.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8332,6 +8388,268 @@
           },
           "404": {
             "description": "Identity-linking provider or provider config was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROVIDER_NOT_FOUND", "PROVIDER_CONFIG_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organization/identity-linking/providers/:providerFamily/status": {
+      "put": {
+        "tags": ["Organizations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "providerFamily",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "disabled"]
+                  }
+                },
+                "required": ["status"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update the identity-linking provider status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providerFamily": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "logoKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "eligibleTargetKeys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "eligibleConnectionMethodIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "configurationStatus": {
+                      "type": "string",
+                      "enum": ["unconfigured", "active", "disabled"]
+                    },
+                    "selectedConnection": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "targetKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["active", "error", "revoked"]
+                        },
+                        "connectionMethodId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "connectionMethodLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "targetKey",
+                        "displayName",
+                        "status",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "configuredAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "providerFamily",
+                    "displayName",
+                    "logoKey",
+                    "eligibleTargetKeys",
+                    "eligibleConnectionMethodIds",
+                    "configurationStatus",
+                    "selectedConnection",
+                    "configuredAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_PROVIDER_CONFIG_INPUT"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identity-linking provider or configuration was not found.",
             "content": {
               "application/json": {
                 "schema": {

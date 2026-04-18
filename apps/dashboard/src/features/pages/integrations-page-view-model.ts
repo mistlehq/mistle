@@ -161,13 +161,15 @@ export function buildIntegrationConnectionDetailItems(input: {
     });
     const authSecretLabels =
       currentMethod?.kind === "form" ? currentMethod.secretFields.map((field) => field.label) : [];
+    const isIdentityLinked = connection.isIdentityLinked === true;
 
     return {
       id: connection.id,
       displayName: connection.displayName,
       status: connection.status,
+      ...(isIdentityLinked ? { isIdentityLinked: true } : {}),
       bindingCount,
-      canDelete: bindingCount === 0 && automationCount === 0,
+      canDelete: bindingCount === 0 && automationCount === 0 && !isIdentityLinked,
       ...(connection.connectionMethodId === undefined
         ? { authMethodId: null }
         : { authMethodId: connection.connectionMethodId }),

@@ -17,6 +17,7 @@ describe("useIntegrationDetailState", () => {
             connections: [createConnection({ id: "icn_error", status: "error" })],
           }),
         ],
+        detailConnectionId: null,
         detailTargetKey: "github",
       }),
     );
@@ -39,11 +40,32 @@ describe("useIntegrationDetailState", () => {
             ],
           }),
         ],
+        detailConnectionId: null,
         detailTargetKey: "github",
       }),
     );
 
     expect(result.current.activeDetailConnectionId).toBe("icn_active");
+  });
+
+  it("honors a route-selected connection when it exists", () => {
+    const { result } = renderHook(() =>
+      useIntegrationDetailState({
+        cards: [
+          createCard({
+            targetKey: "github",
+            connections: [
+              createConnection({ id: "icn_error", status: "error" }),
+              createConnection({ id: "icn_active", status: "active" }),
+            ],
+          }),
+        ],
+        detailConnectionId: "icn_error",
+        detailTargetKey: "github",
+      }),
+    );
+
+    expect(result.current.activeDetailConnectionId).toBe("icn_error");
   });
 
   it("falls back to the default connection when the selected connection disappears", () => {
@@ -60,6 +82,7 @@ describe("useIntegrationDetailState", () => {
       ({ nextCards }) =>
         useIntegrationDetailState({
           cards: nextCards,
+          detailConnectionId: null,
           detailTargetKey: "github",
         }),
       {
@@ -91,6 +114,7 @@ describe("useIntegrationDetailState", () => {
       ({ nextCards }) =>
         useIntegrationDetailState({
           cards: nextCards,
+          detailConnectionId: null,
           detailTargetKey: "github",
         }),
       {

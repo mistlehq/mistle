@@ -6,6 +6,7 @@ import { SETTINGS_DEFAULT_PATH } from "./model.js";
 export type SettingsRouteElements = {
   personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
+  organizationIdentityLinking: React.JSX.Element;
   organizationMembers: React.JSX.Element;
   organizationSandboxes: React.JSX.Element;
 };
@@ -33,6 +34,11 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
           element={elements.organizationMembers}
           handle={ROUTE_HANDLES.settingsOrganizationMembers}
           path="members"
+        />
+        <Route
+          element={elements.organizationIdentityLinking}
+          handle={ROUTE_HANDLES.settingsOrganizationIdentityLinking}
+          path="identity-linking"
         />
         <Route
           element={elements.organizationSandboxes}

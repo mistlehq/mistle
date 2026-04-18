@@ -20,6 +20,14 @@ export function IntegrationTile(props: IntegrationTileProps) {
       ? "border border-destructive/30 bg-destructive/10 text-destructive"
       : "border";
 
+  const statusBadge =
+    props.statusBadge === undefined ? null : (
+      <span
+        className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClassName}`}
+      >
+        {props.statusBadge}
+      </span>
+    );
   return (
     <ActionTile
       action={
@@ -33,15 +41,7 @@ export function IntegrationTile(props: IntegrationTileProps) {
         </Button>
       }
       actionContainerClassName="gap-2"
-      badge={
-        props.statusBadge === undefined ? null : (
-          <span
-            className={`rounded-sm px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusBadgeClassName}`}
-          >
-            {props.statusBadge}
-          </span>
-        )
-      }
+      badge={statusBadge}
       description={props.description}
       descriptionClassName="text-xs"
       leading={

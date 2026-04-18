@@ -5,14 +5,14 @@ import {
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { IdentityLinkingNotFoundCodes } from "../constants.js";
 import { listOrganizationIdentityLinkProviders } from "./list-organization-identity-link-providers.js";
 import { listIdentityLinkProviderMetadata } from "./provider-metadata.js";
 import { resolveValidatedProviderConnectionOrThrow } from "./resolve-validated-provider-connection.js";
 
-export async function putOrganizationIdentityLinkProvider(
+export async function putOrganizationIdentityLinkProviderStatus(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -21,7 +21,9 @@ export async function putOrganizationIdentityLinkProvider(
     organizationId: string;
     actorUserId: string;
     providerFamily: string;
-    integrationConnectionId: string;
+    status:
+      | typeof OrganizationIdentityLinkProviderConfigStatus.ACTIVE
+      | typeof OrganizationIdentityLinkProviderConfigStatus.DISABLED;
   },
 ) {
   const providers = await listIdentityLinkProviderMetadata(ctx);
@@ -34,20 +36,10 @@ export async function putOrganizationIdentityLinkProvider(
     );
   }
 
-  const connection = await resolveValidatedProviderConnectionOrThrow(
-    {
-      db: ctx.db,
-    },
-    {
-      organizationId: input.organizationId,
-      integrationConnectionId: input.integrationConnectionId,
-      provider,
-    },
-  );
-
   const existingConfig = await ctx.db.query.organizationIdentityLinkProviderConfigs.findFirst({
     columns: {
-      status: true,
+      providerFamily: true,
+      integrationConnectionId: true,
     },
     where: (table, { and, eq }) =>
       and(
@@ -56,33 +48,39 @@ export async function putOrganizationIdentityLinkProvider(
       ),
   });
 
-  const nextStatus =
-    existingConfig?.status ?? OrganizationIdentityLinkProviderConfigStatus.DISABLED;
+  if (existingConfig === undefined) {
+    throw new NotFoundError(
+      IdentityLinkingNotFoundCodes.PROVIDER_CONFIG_NOT_FOUND,
+      `Identity-linking provider '${input.providerFamily}' is not configured for this organization.`,
+    );
+  }
+
+  if (input.status === OrganizationIdentityLinkProviderConfigStatus.ACTIVE) {
+    await resolveValidatedProviderConnectionOrThrow(
+      {
+        db: ctx.db,
+      },
+      {
+        organizationId: input.organizationId,
+        integrationConnectionId: existingConfig.integrationConnectionId,
+        provider,
+      },
+    );
+  }
 
   await ctx.db
-    .insert(organizationIdentityLinkProviderConfigs)
-    .values({
-      organizationId: input.organizationId,
-      providerFamily: provider.providerFamily,
-      status: nextStatus,
-      integrationTargetKey: connection.targetKey,
-      integrationConnectionId: input.integrationConnectionId,
-      createdByUserId: input.actorUserId,
+    .update(organizationIdentityLinkProviderConfigs)
+    .set({
+      status: input.status,
       updatedByUserId: input.actorUserId,
+      updatedAt: sql`now()`,
     })
-    .onConflictDoUpdate({
-      target: [
-        organizationIdentityLinkProviderConfigs.organizationId,
-        organizationIdentityLinkProviderConfigs.providerFamily,
-      ],
-      set: {
-        status: nextStatus,
-        integrationTargetKey: connection.targetKey,
-        integrationConnectionId: input.integrationConnectionId,
-        updatedByUserId: input.actorUserId,
-        updatedAt: sql`now()`,
-      },
-    });
+    .where(
+      and(
+        eq(organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
+        eq(organizationIdentityLinkProviderConfigs.providerFamily, input.providerFamily),
+      ),
+    );
 
   const configuredProvider = (
     await listOrganizationIdentityLinkProviders(ctx, {
@@ -92,7 +90,7 @@ export async function putOrganizationIdentityLinkProvider(
 
   if (configuredProvider === undefined) {
     throw new Error(
-      `Failed to load organization identity-link provider '${input.providerFamily}' after upsert.`,
+      `Failed to load organization identity-link provider '${input.providerFamily}' after status update.`,
     );
   }
 

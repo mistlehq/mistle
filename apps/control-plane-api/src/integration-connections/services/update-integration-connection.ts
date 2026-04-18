@@ -8,6 +8,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { assertIdentityLinkingAuthEditableOrThrow } from "./assert-identity-linking-auth-editable.js";
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 
@@ -100,6 +101,12 @@ export async function updateIntegrationConnection(
   let nextConfig: Record<string, unknown> | undefined;
 
   if (input.config !== undefined) {
+    await assertIdentityLinkingAuthEditableOrThrow({
+      db,
+      organizationId: input.organizationId,
+      connectionId: existingConnection.id,
+    });
+
     const connectionMethodIdValue = existingConnection.config?.["connection_method"];
     const existingConnectionMethodId =
       typeof connectionMethodIdValue === "string" && connectionMethodIdValue.length > 0

@@ -31,6 +31,7 @@ import {
 } from "./use-integration-connection-editor-state-helpers.js";
 
 type IntegrationConnectionSubmitSuccessInput = {
+  connectionId: string | null;
   editor: IntegrationConnectionEditorState;
 };
 
@@ -248,6 +249,7 @@ export function useIntegrationConnectionEditorState(
               });
               if (!disposed) {
                 await handleSubmitSuccess({
+                  connectionId: null,
                   editor,
                 });
               }
@@ -327,30 +329,41 @@ export function useIntegrationConnectionEditorState(
       );
 
       if (editor.mode === "update") {
-        await updateFormMutation.mutateAsync({
+        const updatedConnection = await updateFormMutation.mutateAsync({
           connectionId: editor.connectionId,
           displayName: normalizedConnectionDisplayName,
           config: draft.configValue,
           ...(Object.keys(normalizedSecrets).length === 0 ? {} : { secrets: normalizedSecrets }),
         });
+
+        await queryClient.invalidateQueries({
+          queryKey: input.queryKey,
+        });
+
+        await handleSubmitSuccess({
+          connectionId: updatedConnection.id,
+          editor,
+        });
+        return;
       } else {
-        await createFormMutation.mutateAsync({
+        const createdConnection = await createFormMutation.mutateAsync({
           targetKey: editor.targetKey,
           displayName: normalizedConnectionDisplayName,
           methodId: draft.methodId,
           config: draft.configValue,
           secrets: normalizedSecrets,
         });
+
+        await queryClient.invalidateQueries({
+          queryKey: input.queryKey,
+        });
+
+        await handleSubmitSuccess({
+          connectionId: createdConnection.id,
+          editor,
+        });
+        return;
       }
-
-      await queryClient.invalidateQueries({
-        queryKey: input.queryKey,
-      });
-
-      await handleSubmitSuccess({
-        editor,
-      });
-      return;
     }
 
     if (editor.mode === "update") {
@@ -358,7 +371,7 @@ export function useIntegrationConnectionEditorState(
         configValue: draft.configValue,
         configForm,
       });
-      await updateConnectionMutation.mutateAsync({
+      const updatedConnection = await updateConnectionMutation.mutateAsync({
         connectionId: editor.connectionId,
         displayName: normalizedConnectionDisplayName,
         ...(editableConfigValue === undefined ? {} : { config: editableConfigValue }),
@@ -369,6 +382,7 @@ export function useIntegrationConnectionEditorState(
       });
 
       await handleSubmitSuccess({
+        connectionId: updatedConnection.id,
         editor,
       });
       return;

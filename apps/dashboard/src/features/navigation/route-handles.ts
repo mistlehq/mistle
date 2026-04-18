@@ -290,6 +290,11 @@ export const ROUTE_HANDLES = {
     title: "Members",
     description: "",
   },
+  settingsOrganizationIdentityLinking: {
+    breadcrumb: "Identity Linking",
+    title: "Identity Linking",
+    description: "Configure the provider apps users will use to link their identities to Mistle.",
+  },
   settingsOrganizationSandboxes: {
     breadcrumb: "Sandboxes",
     title: "Sandboxes",
@@ -314,6 +319,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsPersonal",
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
+  "settingsOrganizationIdentityLinking",
   "settingsOrganizationSandboxes",
   "settingsOrganizationIntegrations",
   "settingsOrganizationIntegrationDetail",
@@ -325,6 +331,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsPersonal: ROUTE_HANDLES.settingsPersonal,
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
+  settingsOrganizationIdentityLinking: ROUTE_HANDLES.settingsOrganizationIdentityLinking,
   settingsOrganizationSandboxes: ROUTE_HANDLES.settingsOrganizationSandboxes,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
   settingsOrganizationIntegrationDetail: ROUTE_HANDLES.settingsOrganizationIntegrationDetail,

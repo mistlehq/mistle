@@ -68,4 +68,26 @@ describe("settings model", () => {
       "/settings/organization/sandboxes",
     );
   });
+
+  it("shows identity linking settings only for owners and admins", () => {
+    const ownerOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "owner" }).find(
+      (group) => group.label === "Organization",
+    );
+    const adminOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "admin" }).find(
+      (group) => group.label === "Organization",
+    );
+    const memberOrganizationGroup = resolveSettingsNavGroups({ organizationRole: "member" }).find(
+      (group) => group.label === "Organization",
+    );
+
+    expect(ownerOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/identity-linking",
+    );
+    expect(adminOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/identity-linking",
+    );
+    expect(memberOrganizationGroup?.items.map((item) => item.to)).not.toContain(
+      "/settings/organization/identity-linking",
+    );
+  });
 });
