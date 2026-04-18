@@ -67,7 +67,7 @@ Local development for Mistle requires Nix and uses a multi-service environment w
 There are two distinct local workflows:
 
 - Use `pnpm dev` when you are contributing inside the monorepo and want the Nix-backed development harness.
-- Use `deploy/compose/local/` when you want the packaged standalone local product stack.
+- Use `deploy/compose/local/` when you want the single-node Docker Compose workflow.
 
 Repo runtime provided by `nix develop`:
 
@@ -269,36 +269,13 @@ At a minimum, operators should expect to reason about:
 
 Mistle should be treated as an integrated platform deployment rather than a single application process.
 
-### Current Deployment Artifacts
+### Deployment Options
 
-- **Kubernetes:** `deploy/helm/mistle/` is the current deployment artifact in this repository.
-- **Standalone local Compose:** `deploy/compose/local/` is the current single-node local testing artifact.
-- **Contributor dev harness:** `dev/docker-compose.yml` remains the dependency stack used by the `pnpm dev` workflow.
-- **Self-hosted Compose:** not implemented yet in this repository.
-
-### Standalone Local Compose
-
-The supported standalone local Compose flow lives under:
-
-- `deploy/compose/local/`
-
-Start there when you want the packaged local product stack instead of the Nix plus `pnpm dev` contributor workflow.
-
-The detailed operator guide is:
-
-- `deploy/compose/local/README.md`
-
-### Kubernetes Packaging
-
-Kubernetes application packaging for Mistle lives under:
-
-- `deploy/helm/mistle/`
-
-Use this chart as the starting point for Kubernetes-based deployment.
-
-For repo-local Helm smoke testing against OrbStack and the compose-backed development dependencies, start from:
-
-- `deploy/helm/mistle/values-local.yaml`
+| Option                     | Use this when...                                                             | Start here                                                                                                                                                              |
+| -------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single-node Docker Compose | You want to run Mistle on one machine with Docker Compose for local testing. | [deploy/compose/local/](deploy/compose/local/)                                                                                                                          |
+| Kubernetes                 | You want the main cluster-based deployment path in this repository.          | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
+| Self-hosted Compose        | You want a separate self-hosted Compose deployment artifact.                 | Not implemented yet in this repository.                                                                                                                                 |
 
 ## Releases
 

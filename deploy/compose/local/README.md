@@ -1,6 +1,6 @@
-# Local Compose
+# Single-node Docker Compose
 
-This is the supported local testing entrypoint for Mistle.
+This is the supported single-node Docker Compose workflow for Mistle.
 It runs the product on one machine with Mailpit-backed auth, Docker-backed sessions, and
 webhook-capable integration testing by default. It is not the production deployment artifact.
 `deploy/compose/local/compose.yaml` is the single local Compose source of truth.
@@ -62,7 +62,7 @@ Webhook-style integration callbacks derive from the control-plane auth/public ba
 - If `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set, `./up.sh` uses it.
 - If it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`.
 - The generated public URL is injected through `.generated/runtime.env` for the current run only.
-- `./down.sh` stops the stack and removes the wrapper-managed quick tunnel container and generated files.
+- `./down.sh` stops the stack, force-removes worker-created Docker sandbox runtime containers attached to the local sandbox network, and removes the wrapper-managed quick tunnel container and generated files.
 
 This default quick-tunnel flow is for server-to-server webhook delivery. It is not intended for
 browser callback flows such as Google sign-in or OAuth flows that start on `localhost` and return
