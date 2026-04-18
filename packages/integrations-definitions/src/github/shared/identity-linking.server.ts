@@ -271,6 +271,9 @@ async function exchangeAuthorizationCode(input: {
   pkceVerifier: string;
 }): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
   const tokenUrl = new URL("/login/oauth/access_token", input.webBaseUrl);
+  // GitHub's GitHub App user-token docs define these as query parameters on the POST
+  // request to /login/oauth/access_token, not as a form-encoded request body.
+  // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app
   tokenUrl.searchParams.set("client_id", input.clientId);
   tokenUrl.searchParams.set("client_secret", input.clientSecret);
   tokenUrl.searchParams.set("code", input.code);
@@ -424,6 +427,10 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
     apiBaseUrl: input.apiBaseUrl,
     accessToken: tokenResponse.access_token,
   });
+  // /user.email is only the user's publicly visible profile email. To resolve the
+  // actual primary email when GitHub makes it available, prefer /user/emails.
+  // https://docs.github.com/en/rest/users/users
+  // https://docs.github.com/en/rest/users/emails
   const primaryEmail = await fetchPrimaryEmail({
     apiBaseUrl: input.apiBaseUrl,
     accessToken: tokenResponse.access_token,
