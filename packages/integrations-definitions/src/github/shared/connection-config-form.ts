@@ -29,7 +29,9 @@ export const GitHubAppInstallationConnectionConfigForm: ResolvedIntegrationForm 
         title: "App slug",
       },
       client_id: {
-        title: "Client ID",
+        title: "Client ID (Linked User Auth)",
+        description:
+          "Required only for Identity Linking / linked user authorization. Not required for installation-only GitHub App usage.",
       },
     },
   },

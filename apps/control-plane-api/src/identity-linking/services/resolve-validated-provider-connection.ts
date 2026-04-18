@@ -102,7 +102,7 @@ export async function resolveValidatedProviderConnectionOrThrow(
   ) {
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
-      `Integration connection '${input.integrationConnectionId}' is missing required identity-linking auth configuration.`,
+      `Integration connection '${input.integrationConnectionId}' is missing required linked-user authorization configuration for identity linking.`,
     );
   }
 

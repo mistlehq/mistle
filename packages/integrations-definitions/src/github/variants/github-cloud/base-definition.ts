@@ -77,9 +77,10 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
         },
         {
           name: "clientSecret",
-          label: "Client secret",
+          label: "Client secret (Linked User Auth)",
           placeholder: "Enter client secret",
-          description: "Client secret from your GitHub App settings.",
+          description:
+            "Required only for Identity Linking / linked user authorization. Not required for installation-only GitHub App usage.",
           inputType: "password",
           secretType: "oauth2_client_secret",
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,

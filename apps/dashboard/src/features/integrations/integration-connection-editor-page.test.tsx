@@ -527,7 +527,7 @@ describe("IntegrationConnectionEditorPage", () => {
             },
             client_id: {
               type: "string",
-              title: "Client ID",
+              title: "Client ID (Linked User Auth)",
             },
           },
         },
@@ -547,7 +547,7 @@ describe("IntegrationConnectionEditorPage", () => {
 
     expect(screen.getByLabelText("App ID")).toBeTruthy();
     expect(screen.getByLabelText("App slug")).toBeTruthy();
-    expect(screen.getByLabelText("Client ID")).toBeTruthy();
+    expect(screen.getByLabelText("Client ID (Linked User Auth)")).toBeTruthy();
     const privateKeyField = screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----");
     expect(privateKeyField.tagName).toBe("TEXTAREA");
     expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
