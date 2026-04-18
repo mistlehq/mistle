@@ -16,10 +16,10 @@ const SandboxStartTimeoutMs = 5 * 60 * 1000;
 const SandboxStartPollIntervalMs = 1_000;
 
 export function createAutomationSandboxResumeIdempotencyKey(input: {
-  conversationId: string;
+  automationRunId: string;
   sandboxInstanceId: string;
 }): string {
-  return `automation-conversation-resume:${input.conversationId}:${input.sandboxInstanceId}`;
+  return `automation-run-resume:${input.automationRunId}:${input.sandboxInstanceId}`;
 }
 
 export async function acquireAutomationConnection(
@@ -67,7 +67,7 @@ export async function acquireAutomationConnection(
         organizationId: input.preparedAutomationRun.organizationId,
         instanceId: sandboxInstance.id,
         idempotencyKey: createAutomationSandboxResumeIdempotencyKey({
-          conversationId: input.preparedAutomationRun.conversationId,
+          automationRunId: input.preparedAutomationRun.automationRunId,
           sandboxInstanceId: sandboxInstance.id,
         }),
       });
