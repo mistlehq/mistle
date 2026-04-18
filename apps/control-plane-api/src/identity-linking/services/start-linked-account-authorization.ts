@@ -3,11 +3,11 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { type IntegrationRegistry } from "@mistle/integrations-core";
 
 import { resolveMasterEncryptionKeyMaterial } from "../../lib/crypto.js";
 import { IdentityLinkingBadRequestCodes } from "../constants.js";
-import { resolveIdentityLinkProviderAdapter } from "./provider-adapters.js";
+import { resolveIdentityLinkingRuntimeContextOrThrow } from "./identity-linking-definition.js";
 import {
   buildIdentityLinkCallbackUrl,
   createRedirectSessionExpiryTimestamp,
@@ -20,6 +20,15 @@ export type StartedLinkedAccountAuthorization = {
   authorizationUrl: string;
   expiresAt: string;
 };
+
+function resolveIdentityLinkingErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+
+  const { code } = error;
+  return typeof code === "string" ? code : undefined;
+}
 
 export async function startLinkedAccountAuthorization(
   ctx: {
@@ -43,8 +52,19 @@ export async function startLinkedAccountAuthorization(
     requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
   });
 
-  const providerAdapter = resolveIdentityLinkProviderAdapter(input.providerFamily);
-  if (providerAdapter === undefined) {
+  const identityLinkingRuntime = await resolveIdentityLinkingRuntimeContextOrThrow({
+    db: ctx.db,
+    integrationRegistry: ctx.integrationRegistry,
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: ctx.integrationsConfig.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
+    },
+    organizationId: input.organizationId,
+    integrationTarget: providerContext.integrationTarget,
+    integrationConnection: providerContext.integrationConnection,
+  });
+
+  if (identityLinkingRuntime.identityLinking.startAuthorization === undefined) {
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.PROVIDER_ADAPTER_NOT_IMPLEMENTED,
       `Identity-linking provider '${input.providerFamily}' does not yet support linked-account authorization.`,
@@ -56,20 +76,28 @@ export async function startLinkedAccountAuthorization(
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
     providerFamily: input.providerFamily,
   });
-  const startedAuthorization = await providerAdapter.startAuthorization({
-    db: ctx.db,
-    organizationId: input.organizationId,
-    userId: input.userId,
-    providerFamily: input.providerFamily,
-    organizationProviderConfig: providerContext.organizationProviderConfig,
-    integrationConnection: providerContext.integrationConnection,
-    integrationTarget: providerContext.integrationTarget,
-    state,
-    redirectUrl,
-    integrationsConfig: {
-      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
-    },
-  });
+  let startedAuthorization;
+  try {
+    startedAuthorization = await identityLinkingRuntime.identityLinking.startAuthorization({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      providerFamily: input.providerFamily,
+      target: identityLinkingRuntime.target,
+      connection: identityLinkingRuntime.connection,
+      state,
+      redirectUrl,
+      resolveConnectionSecret: identityLinkingRuntime.resolveConnectionSecret,
+    });
+  } catch (error) {
+    if (resolveIdentityLinkingErrorCode(error) === "IDENTITY_LINKING_INVALID_PROVIDER_CONFIG") {
+      throw new BadRequestError(
+        IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+        error instanceof Error ? error.message : "Identity-linking provider config is invalid.",
+      );
+    }
+
+    throw error;
+  }
 
   const expiresAt = createRedirectSessionExpiryTimestamp();
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({

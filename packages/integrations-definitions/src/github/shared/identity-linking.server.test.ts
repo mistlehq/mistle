@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   completeGitHubLinkedAccountAuthorization,
   createGitHubIdentityLinkPkceChallenge,
+  GitHubIdentityLinkingCapability,
   GitHubIdentityLinkingAuthorizationError,
   startGitHubLinkedAccountAuthorization,
 } from "./identity-linking.server.js";
+import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 
 async function startTestServer(input: {
   handler: (request: IncomingMessage, response: ServerResponse) => void;
@@ -48,6 +50,43 @@ async function startTestServer(input: {
 }
 
 describe("github identity linking", () => {
+  it("treats only GitHub App connections with client_id and clientSecret as link-ready", () => {
+    expect(
+      GitHubIdentityLinkingCapability.supportsConnection?.({
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle",
+            client_id: "Iv1.client123",
+          },
+        },
+        availableConnectionSecretSlotKeys: new Set([
+          GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+        ]),
+      }),
+    ).toBe(true);
+
+    expect(
+      GitHubIdentityLinkingCapability.supportsConnection?.({
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {
+            connection_method: "github-app-installation",
+            app_id: "123",
+            app_slug: "mistle",
+          },
+        },
+        availableConnectionSecretSlotKeys: new Set([
+          GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+        ]),
+      }),
+    ).toBe(false);
+  });
+
   it("builds a GitHub App user authorization URL with PKCE", () => {
     const result = startGitHubLinkedAccountAuthorization({
       webBaseUrl: "https://github.com",

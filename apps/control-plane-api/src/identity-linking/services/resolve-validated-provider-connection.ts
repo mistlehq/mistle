@@ -3,15 +3,20 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 
 import { IdentityLinkingBadRequestCodes, IdentityLinkingNotFoundCodes } from "../constants.js";
-import { isConnectionEligibleForIdentityLinkProvider } from "./provider-connection-eligibility.js";
+import {
+  resolveIdentityLinkingDefinitionOrThrow,
+  supportsIdentityLinkingConnection,
+} from "./identity-linking-definition.js";
 import type { IdentityLinkProviderMetadata } from "./provider-metadata.js";
 
 export async function resolveValidatedProviderConnectionOrThrow(
   ctx: {
     db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
   },
   input: {
     organizationId: string;
@@ -79,12 +84,21 @@ export async function resolveValidatedProviderConnectionOrThrow(
     credentialLinks.map((credentialLink) => credentialLink.slotKey),
   );
 
+  const definition = resolveIdentityLinkingDefinitionOrThrow({
+    integrationRegistry: ctx.integrationRegistry,
+    target: {
+      targetKey: connection.targetKey,
+      familyId: input.provider.familyId,
+      variantId: input.provider.variantId,
+    },
+  });
+
   if (
-    !isConnectionEligibleForIdentityLinkProvider({
-      provider: input.provider,
+    !(await supportsIdentityLinkingConnection({
+      definition,
       connection,
-      credentialSlotKeys,
-    })
+      availableConnectionSecretSlotKeys: credentialSlotKeys,
+    }))
   ) {
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,

@@ -299,7 +299,7 @@ describe("me linked accounts integration", () => {
     await expect(response.json()).resolves.toEqual({
       code: "INVALID_PROVIDER_CONFIG_INPUT",
       message:
-        "Integration connection 'icn_github_missing_client_secret' is missing GitHub App client secret.",
+        "Integration connection 'icn_github_missing_client_secret' is missing required identity-linking auth configuration.",
     });
 
     const persistedRedirectSession = await fixture.db.query.identityLinkRedirectSessions.findFirst({

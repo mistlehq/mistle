@@ -79,6 +79,7 @@ export async function resolveIdentityLinkProviderContextOrThrow(
   const validatedIntegrationConnection = await resolveValidatedProviderConnectionOrThrow(
     {
       db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
     },
     {
       organizationId: input.organizationId,

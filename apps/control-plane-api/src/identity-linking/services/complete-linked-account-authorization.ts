@@ -2,6 +2,8 @@ import {
   OrganizationIdentityLinkProviderConfigStatus,
   userExternalPrincipalCredentials,
   userExternalPrincipalCredentialSecrets,
+  type UserExternalPrincipalCredentialSecretKind,
+  UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   userExternalPrincipalKeys,
   UserExternalPrincipalKeyStatuses,
@@ -10,7 +12,10 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  type CompletedIdentityLinkingAuthorization,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
 import { and, eq, inArray, ne } from "drizzle-orm";
 
 import {
@@ -19,8 +24,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { IdentityLinkingBadRequestCodes } from "../constants.js";
-import type { CompletedLinkedAccountAuthorization } from "./provider-adapters.js";
-import { resolveIdentityLinkProviderAdapter } from "./provider-adapters.js";
+import { resolveIdentityLinkingRuntimeContextOrThrow } from "./identity-linking-definition.js";
 import {
   buildIdentityLinkCallbackUrl,
   buildIdentityLinkResultDashboardUrl,
@@ -31,6 +35,15 @@ import {
   resolveRedirectStateOrThrow,
 } from "./redirect-flow.js";
 import { resolveIdentityLinkProviderContextOrThrow } from "./resolve-identity-link-provider-context.js";
+
+function resolveIdentityLinkingErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+
+  const { code } = error;
+  return typeof code === "string" ? code : undefined;
+}
 
 function assertRedirectSessionNotUsedOrExpired(input: {
   redirectSession: {
@@ -132,9 +145,24 @@ async function unlinkPrincipals(input: {
   await revokePrincipalCredentials(input);
 }
 
+function resolvePrincipalCredentialSecretKindOrThrow(
+  secretKind: string,
+): UserExternalPrincipalCredentialSecretKind {
+  for (const candidate of Object.values(UserExternalPrincipalCredentialSecretKinds)) {
+    if (candidate === secretKind) {
+      return candidate;
+    }
+  }
+
+  throw new BadRequestError(
+    IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_CALLBACK_INPUT,
+    `Identity-link callback returned unsupported credential secret kind '${secretKind}'.`,
+  );
+}
+
 function normalizeCompletedLinkedAccountAuthorizationOrThrow(
-  completedAuthorization: CompletedLinkedAccountAuthorization,
-): CompletedLinkedAccountAuthorization {
+  completedAuthorization: CompletedIdentityLinkingAuthorization,
+): CompletedIdentityLinkingAuthorization {
   const providerSubjectId = completedAuthorization.providerSubjectId.trim();
   if (providerSubjectId.length === 0) {
     throw new BadRequestError(
@@ -192,13 +220,41 @@ function normalizeCompletedLinkedAccountAuthorizationOrThrow(
     );
   }
 
+  let normalizedCredentialSecrets;
+  if (credential !== undefined) {
+    normalizedCredentialSecrets = credential.secrets.map((secret) => {
+      const secretKind = secret.secretKind.trim();
+      if (secretKind.length === 0 || secret.plaintext.length === 0) {
+        throw new BadRequestError(
+          IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_CALLBACK_INPUT,
+          "Identity-link callback returned an invalid credential secret.",
+        );
+      }
+
+      return {
+        ...secret,
+        secretKind,
+      };
+    });
+  }
+
   return {
     providerSubjectId,
-    keys: normalizedKeys as CompletedLinkedAccountAuthorization["keys"],
+    keys: [normalizedKeys[0]!, ...normalizedKeys.slice(1)],
     ...(completedAuthorization.profile === undefined
       ? {}
       : { profile: completedAuthorization.profile }),
-    ...(credential === undefined ? {} : { credential }),
+    ...(credential === undefined
+      ? {}
+      : {
+          credential: {
+            ...credential,
+            secrets:
+              normalizedCredentialSecrets === undefined
+                ? credential.secrets
+                : [normalizedCredentialSecrets[0]!, ...normalizedCredentialSecrets.slice(1)],
+          },
+        }),
   };
 }
 
@@ -209,7 +265,7 @@ async function persistLinkedAccountAuthorization(input: {
   providerFamily: string;
   organizationProviderConfigId: string;
   integrationConnectionId: string;
-  completedAuthorization: CompletedLinkedAccountAuthorization;
+  completedAuthorization: CompletedIdentityLinkingAuthorization;
   integrationsConfig: {
     masterEncryptionKeys: Record<string, string>;
   };
@@ -405,7 +461,7 @@ async function persistLinkedAccountAuthorization(input: {
         return {
           organizationId: input.organizationId,
           credentialId: insertedCredential.id,
-          secretKind: secret.secretKind,
+          secretKind: resolvePrincipalCredentialSecretKindOrThrow(secret.secretKind),
           nonce: encryptedSecret.nonce,
           ciphertext: encryptedSecret.ciphertext,
           organizationCredentialKeyVersion: organizationCredentialKey.version,
@@ -425,6 +481,7 @@ export async function completeLinkedAccountAuthorization(
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
     integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
       masterEncryptionKeys: Record<string, string>;
     };
     controlPlaneBaseUrl: string;
@@ -462,8 +519,19 @@ export async function completeLinkedAccountAuthorization(
     integrationConnectionId: redirectSession.integrationConnectionId,
   });
 
-  const providerAdapter = resolveIdentityLinkProviderAdapter(input.providerFamily);
-  if (providerAdapter === undefined) {
+  const identityLinkingRuntime = await resolveIdentityLinkingRuntimeContextOrThrow({
+    db: ctx.db,
+    integrationRegistry: ctx.integrationRegistry,
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: ctx.integrationsConfig.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
+    },
+    organizationId: redirectSession.organizationId,
+    integrationTarget: providerContext.integrationTarget,
+    integrationConnection: providerContext.integrationConnection,
+  });
+
+  if (identityLinkingRuntime.identityLinking.completeAuthorization === undefined) {
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.PROVIDER_ADAPTER_NOT_IMPLEMENTED,
       `Identity-linking provider '${input.providerFamily}' does not yet support linked-account authorization.`,
@@ -488,22 +556,40 @@ export async function completeLinkedAccountAuthorization(
           redirectSession.providerStateEncrypted,
           ctx.integrationsConfig.masterEncryptionKeys,
         );
-  const completedAuthorization = await providerAdapter.completeAuthorization({
-    db: ctx.db,
-    organizationId: redirectSession.organizationId,
-    userId: redirectSession.userId,
-    providerFamily: input.providerFamily,
-    organizationProviderConfig: providerContext.organizationProviderConfig,
-    integrationConnection: providerContext.integrationConnection,
-    integrationTarget: providerContext.integrationTarget,
-    query: queryParams,
-    redirectUrl,
-    ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
-    ...(providerState === undefined ? {} : { providerState }),
-    integrationsConfig: {
-      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
-    },
-  });
+  let completedAuthorization;
+  try {
+    completedAuthorization = await identityLinkingRuntime.identityLinking.completeAuthorization({
+      organizationId: redirectSession.organizationId,
+      userId: redirectSession.userId,
+      providerFamily: input.providerFamily,
+      target: identityLinkingRuntime.target,
+      connection: identityLinkingRuntime.connection,
+      query: queryParams,
+      redirectUrl,
+      now: new Date().toISOString(),
+      ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
+      ...(providerState === undefined ? {} : { providerState }),
+      resolveConnectionSecret: identityLinkingRuntime.resolveConnectionSecret,
+    });
+  } catch (error) {
+    if (resolveIdentityLinkingErrorCode(error) === "IDENTITY_LINKING_INVALID_PROVIDER_CONFIG") {
+      throw new BadRequestError(
+        IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+        error instanceof Error ? error.message : "Identity-linking provider config is invalid.",
+      );
+    }
+
+    if (resolveIdentityLinkingErrorCode(error) === "IDENTITY_LINKING_AUTHORIZATION_FAILED") {
+      throw new BadRequestError(
+        IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_CALLBACK_INPUT,
+        error instanceof Error
+          ? error.message
+          : "Identity-linking authorization did not complete successfully.",
+      );
+    }
+
+    throw error;
+  }
 
   const timestamp = new Date().toISOString();
   await ctx.db.transaction(async (tx) => {

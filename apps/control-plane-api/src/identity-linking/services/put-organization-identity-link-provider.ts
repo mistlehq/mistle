@@ -37,6 +37,7 @@ export async function putOrganizationIdentityLinkProvider(
   const connection = await resolveValidatedProviderConnectionOrThrow(
     {
       db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
     },
     {
       organizationId: input.organizationId,

@@ -139,3 +139,25 @@ export class IntegrationWebhookError extends IntegrationsCoreError {
     this.name = "IntegrationWebhookError";
   }
 }
+
+export type IdentityLinkingErrorCode =
+  | "IDENTITY_LINKING_NOT_SUPPORTED"
+  | "IDENTITY_LINKING_INVALID_PROVIDER_CONFIG"
+  | "IDENTITY_LINKING_AUTHORIZATION_FAILED";
+
+export const IdentityLinkingErrorCodes: {
+  IDENTITY_LINKING_NOT_SUPPORTED: IdentityLinkingErrorCode;
+  IDENTITY_LINKING_INVALID_PROVIDER_CONFIG: IdentityLinkingErrorCode;
+  IDENTITY_LINKING_AUTHORIZATION_FAILED: IdentityLinkingErrorCode;
+} = {
+  IDENTITY_LINKING_NOT_SUPPORTED: "IDENTITY_LINKING_NOT_SUPPORTED",
+  IDENTITY_LINKING_INVALID_PROVIDER_CONFIG: "IDENTITY_LINKING_INVALID_PROVIDER_CONFIG",
+  IDENTITY_LINKING_AUTHORIZATION_FAILED: "IDENTITY_LINKING_AUTHORIZATION_FAILED",
+};
+
+export class IntegrationIdentityLinkingError extends IntegrationsCoreError {
+  constructor(code: IdentityLinkingErrorCode, message: string, options?: ErrorOptions) {
+    super(code, message, options);
+    this.name = "IntegrationIdentityLinkingError";
+  }
+}

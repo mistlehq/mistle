@@ -34,7 +34,12 @@ describe("normalizeCompletedLinkedAccountAuthorizationOrThrow", () => {
         ],
         credential: {
           credentialKind: " github_app_user_access_token ",
-          secrets: [],
+          secrets: [
+            {
+              secretKind: " oauth2_access_token ",
+              plaintext: " user-token ",
+            },
+          ],
         },
       }),
     ).toEqual({
@@ -50,7 +55,12 @@ describe("normalizeCompletedLinkedAccountAuthorizationOrThrow", () => {
       ],
       credential: {
         credentialKind: "github_app_user_access_token",
-        secrets: [],
+        secrets: [
+          {
+            secretKind: "oauth2_access_token",
+            plaintext: " user-token ",
+          },
+        ],
       },
     });
   });

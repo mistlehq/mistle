@@ -8,7 +8,10 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { inArray } from "drizzle-orm";
 
 import { buildIntegrationConnectionResponse } from "../../integration-connections/services/build-integration-connection-response.js";
-import { isConnectionEligibleForIdentityLinkProvider } from "./provider-connection-eligibility.js";
+import {
+  resolveIdentityLinkingDefinitionOrThrow,
+  supportsIdentityLinkingConnection,
+} from "./identity-linking-definition.js";
 import { listIdentityLinkProviderMetadata } from "./provider-metadata.js";
 
 export const IdentityLinkProviderConfigurationStatus = {
@@ -151,35 +154,28 @@ export async function listOrganizationIdentityLinkProviders(
     connectionCredentialSlotKeysByConnectionId.set(credentialLink.connectionId, slotKeys);
   }
 
-  return providers.map((provider) => {
-    const config = configsByProviderFamily.get(provider.providerFamily);
-    const eligibleConnections = connections
-      .filter((connection) => {
+  return Promise.all(
+    providers.map(async (provider) => {
+      const config = configsByProviderFamily.get(provider.providerFamily);
+      const eligibleConnections: IdentityLinkProviderConnectionSummary[] = [];
+      for (const connection of connections) {
         if (connection.status !== "active") {
-          return false;
+          continue;
         }
 
         if (!provider.eligibleTargetKeys.includes(connection.targetKey)) {
-          return false;
+          continue;
         }
 
         const rawConnectionMethodId = connection.config?.["connection_method"];
         if (typeof rawConnectionMethodId !== "string" || rawConnectionMethodId.length === 0) {
-          return false;
+          continue;
         }
 
         if (!provider.eligibleConnectionMethodIds.includes(rawConnectionMethodId)) {
-          return false;
+          continue;
         }
 
-        return isConnectionEligibleForIdentityLinkProvider({
-          provider,
-          connection,
-          credentialSlotKeys:
-            connectionCredentialSlotKeysByConnectionId.get(connection.id) ?? new Set<string>(),
-        });
-      })
-      .map((connection) => {
         const target = targetsByKey.get(connection.targetKey);
         if (target === undefined) {
           throw new Error(
@@ -187,14 +183,25 @@ export async function listOrganizationIdentityLinkProviders(
           );
         }
 
-        const definition = ctx.integrationRegistry.getDefinition({
-          familyId: target.familyId,
-          variantId: target.variantId,
+        const definition = resolveIdentityLinkingDefinitionOrThrow({
+          integrationRegistry: ctx.integrationRegistry,
+          target,
         });
-        if (definition === undefined) {
-          throw new Error(
-            `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
-          );
+
+        let supportsConnection: boolean;
+        try {
+          supportsConnection = await supportsIdentityLinkingConnection({
+            definition,
+            connection,
+            availableConnectionSecretSlotKeys:
+              connectionCredentialSlotKeysByConnectionId.get(connection.id) ?? new Set<string>(),
+          });
+        } catch {
+          continue;
+        }
+
+        if (!supportsConnection) {
+          continue;
         }
 
         const connectionSummary = buildIntegrationConnectionResponse({
@@ -205,7 +212,7 @@ export async function listOrganizationIdentityLinkProviders(
           })),
         });
 
-        return {
+        eligibleConnections.push({
           id: connectionSummary.id,
           targetKey: connectionSummary.targetKey,
           displayName: connectionSummary.displayName,
@@ -218,9 +225,9 @@ export async function listOrganizationIdentityLinkProviders(
             : { connectionMethodLabel: connectionSummary.connectionMethodLabel }),
           createdAt: connectionSummary.createdAt,
           updatedAt: connectionSummary.updatedAt,
-        };
-      })
-      .sort((left, right) => {
+        });
+      }
+      eligibleConnections.sort((left, right) => {
         const displayNameOrder = left.displayName.localeCompare(right.displayName);
         if (displayNameOrder !== 0) {
           return displayNameOrder;
@@ -229,7 +236,53 @@ export async function listOrganizationIdentityLinkProviders(
         return left.id.localeCompare(right.id);
       });
 
-    if (config === undefined) {
+      if (config === undefined) {
+        return {
+          providerFamily: provider.providerFamily,
+          displayName: provider.displayName,
+          logoKey: provider.logoKey,
+          eligibleTargetKeys: provider.eligibleTargetKeys,
+          eligibleConnectionMethodIds: provider.eligibleConnectionMethodIds,
+          eligibleConnections,
+          configurationStatus: IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
+          selectedConnection: null,
+          configuredAt: null,
+          updatedAt: null,
+        };
+      }
+
+      const connection = connectionsById.get(config.integrationConnectionId);
+      if (connection === undefined) {
+        throw new Error(
+          `Identity link provider config for '${provider.providerFamily}' references unknown connection '${config.integrationConnectionId}'.`,
+        );
+      }
+
+      const target = targetsByKey.get(connection.targetKey);
+      if (target === undefined) {
+        throw new Error(
+          `Identity link provider config for '${provider.providerFamily}' references unknown target '${connection.targetKey}'.`,
+        );
+      }
+
+      const definition = ctx.integrationRegistry.getDefinition({
+        familyId: target.familyId,
+        variantId: target.variantId,
+      });
+      if (definition === undefined) {
+        throw new Error(
+          `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
+        );
+      }
+
+      const connectionSummary = buildIntegrationConnectionResponse({
+        connection,
+        connectionMethods: definition.connectionMethods.map((method) => ({
+          id: method.id,
+          label: method.label,
+        })),
+      });
+
       return {
         providerFamily: provider.providerFamily,
         displayName: provider.displayName,
@@ -237,69 +290,24 @@ export async function listOrganizationIdentityLinkProviders(
         eligibleTargetKeys: provider.eligibleTargetKeys,
         eligibleConnectionMethodIds: provider.eligibleConnectionMethodIds,
         eligibleConnections,
-        configurationStatus: IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
-        selectedConnection: null,
-        configuredAt: null,
-        updatedAt: null,
+        configurationStatus: config.status,
+        selectedConnection: {
+          id: connectionSummary.id,
+          targetKey: connectionSummary.targetKey,
+          displayName: connectionSummary.displayName,
+          status: connectionSummary.status,
+          ...(connectionSummary.connectionMethodId === undefined
+            ? {}
+            : { connectionMethodId: connectionSummary.connectionMethodId }),
+          ...(connectionSummary.connectionMethodLabel === undefined
+            ? {}
+            : { connectionMethodLabel: connectionSummary.connectionMethodLabel }),
+          createdAt: connectionSummary.createdAt,
+          updatedAt: connectionSummary.updatedAt,
+        },
+        configuredAt: config.createdAt,
+        updatedAt: config.updatedAt,
       };
-    }
-
-    const connection = connectionsById.get(config.integrationConnectionId);
-    if (connection === undefined) {
-      throw new Error(
-        `Identity link provider config for '${provider.providerFamily}' references unknown connection '${config.integrationConnectionId}'.`,
-      );
-    }
-
-    const target = targetsByKey.get(connection.targetKey);
-    if (target === undefined) {
-      throw new Error(
-        `Identity link provider config for '${provider.providerFamily}' references unknown target '${connection.targetKey}'.`,
-      );
-    }
-
-    const definition = ctx.integrationRegistry.getDefinition({
-      familyId: target.familyId,
-      variantId: target.variantId,
-    });
-    if (definition === undefined) {
-      throw new Error(
-        `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
-      );
-    }
-
-    const connectionSummary = buildIntegrationConnectionResponse({
-      connection,
-      connectionMethods: definition.connectionMethods.map((method) => ({
-        id: method.id,
-        label: method.label,
-      })),
-    });
-
-    return {
-      providerFamily: provider.providerFamily,
-      displayName: provider.displayName,
-      logoKey: provider.logoKey,
-      eligibleTargetKeys: provider.eligibleTargetKeys,
-      eligibleConnectionMethodIds: provider.eligibleConnectionMethodIds,
-      eligibleConnections,
-      configurationStatus: config.status,
-      selectedConnection: {
-        id: connectionSummary.id,
-        targetKey: connectionSummary.targetKey,
-        displayName: connectionSummary.displayName,
-        status: connectionSummary.status,
-        ...(connectionSummary.connectionMethodId === undefined
-          ? {}
-          : { connectionMethodId: connectionSummary.connectionMethodId }),
-        ...(connectionSummary.connectionMethodLabel === undefined
-          ? {}
-          : { connectionMethodLabel: connectionSummary.connectionMethodLabel }),
-        createdAt: connectionSummary.createdAt,
-        updatedAt: connectionSummary.updatedAt,
-      },
-      configuredAt: config.createdAt,
-      updatedAt: config.updatedAt,
-    };
-  });
+    }),
+  );
 }

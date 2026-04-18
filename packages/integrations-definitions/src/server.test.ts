@@ -50,6 +50,9 @@ describe("integrations-definitions server", () => {
     expect(githubCloudDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
     });
+    expect(typeof githubCloudDefinition?.identityLinking?.supportsConnection).toBe("function");
+    expect(typeof githubCloudDefinition?.identityLinking?.startAuthorization).toBe("function");
+    expect(typeof githubCloudDefinition?.identityLinking?.completeAuthorization).toBe("function");
     expect(
       githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();

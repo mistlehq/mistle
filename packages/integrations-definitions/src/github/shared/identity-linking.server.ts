@@ -1,6 +1,16 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
+import {
+  IntegrationConnectionMethodIds,
+  type CompletedIdentityLinkingAuthorization,
+  type IntegrationIdentityLinkingCapability,
+} from "@mistle/integrations-core";
 import { z } from "zod";
+
+import type { GitHubConnectionConfig } from "./auth.js";
+import { parseGitHubAppInstallationConnectionConfig } from "./auth.js";
+import { GitHubCredentialSlotKeys } from "./slot-keys.js";
+import type { GitHubTargetConfig } from "./target-config-schema.js";
 
 const GitHubPkceChallengeMethod = "S256" as const;
 
@@ -45,9 +55,20 @@ const GitHubUserEmailResponseSchema = z
   .readonly();
 
 export class GitHubIdentityLinkingAuthorizationError extends Error {
+  readonly code = "IDENTITY_LINKING_AUTHORIZATION_FAILED";
+
   constructor(message: string) {
     super(message);
     this.name = "GitHubIdentityLinkingAuthorizationError";
+  }
+}
+
+export class GitHubIdentityLinkingConfigurationError extends Error {
+  readonly code = "IDENTITY_LINKING_INVALID_PROVIDER_CONFIG";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "GitHubIdentityLinkingConfigurationError";
   }
 }
 
@@ -77,6 +98,54 @@ export type GitHubLinkedAccountAuthorizationResult = {
     scopes?: string[];
   };
 };
+
+function toCompletedIdentityLinkingAuthorization(
+  input: GitHubLinkedAccountAuthorizationResult,
+): CompletedIdentityLinkingAuthorization {
+  return {
+    providerSubjectId: input.providerSubjectId,
+    profile: input.profile,
+    keys: input.keys,
+    credential: {
+      credentialKind: "github_app_user_access_token",
+      ...(input.credential.scopes === undefined ? {} : { scopes: input.credential.scopes }),
+      ...(input.credential.accessTokenExpiresAt === undefined
+        ? {}
+        : { accessTokenExpiresAt: input.credential.accessTokenExpiresAt }),
+      ...(input.credential.refreshTokenExpiresAt === undefined
+        ? {}
+        : { refreshTokenExpiresAt: input.credential.refreshTokenExpiresAt }),
+      secrets: [
+        {
+          secretKind: "oauth2_access_token",
+          plaintext: input.credential.accessToken,
+        },
+        {
+          secretKind: "oauth2_refresh_token",
+          plaintext: input.credential.refreshToken,
+        },
+      ],
+    },
+  };
+}
+
+function resolveGitHubClientIdOrThrow(input: {
+  connection: {
+    id: string;
+    config: Record<string, unknown>;
+  };
+}): string {
+  const connectionConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
+  const clientId = connectionConfig.client_id?.trim();
+
+  if (clientId === undefined || clientId.length === 0) {
+    throw new GitHubIdentityLinkingConfigurationError(
+      `Integration connection '${input.connection.id}' is missing GitHub App client_id.`,
+    );
+  }
+
+  return clientId;
+}
 
 function resolveFutureTimestamp(input: {
   now: string;
@@ -366,3 +435,97 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
     },
   };
 }
+
+export const GitHubIdentityLinkingCapability: IntegrationIdentityLinkingCapability<
+  GitHubTargetConfig,
+  Record<string, string>,
+  GitHubConnectionConfig
+> = {
+  eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+  supportsConnection(input) {
+    const connectionMethod = input.connection.config.connection_method;
+    if (connectionMethod !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
+      return false;
+    }
+
+    try {
+      resolveGitHubClientIdOrThrow({
+        connection: input.connection,
+      });
+    } catch (error) {
+      if (error instanceof GitHubIdentityLinkingConfigurationError) {
+        return false;
+      }
+
+      throw error;
+    }
+
+    return input.availableConnectionSecretSlotKeys.has(
+      GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+    );
+  },
+  async startAuthorization(input) {
+    const clientId = resolveGitHubClientIdOrThrow({
+      connection: input.connection,
+    });
+
+    try {
+      await input.resolveConnectionSecret({
+        slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+      });
+    } catch {
+      throw new GitHubIdentityLinkingConfigurationError(
+        `Integration connection '${input.connection.id}' is missing GitHub App client secret.`,
+      );
+    }
+
+    const pkceVerifier = randomBytes(32).toString("base64url");
+    const startedAuthorization = startGitHubLinkedAccountAuthorization({
+      webBaseUrl: input.target.config.webBaseUrl,
+      clientId,
+      state: input.state,
+      redirectUrl: input.redirectUrl,
+      pkceVerifier,
+    });
+
+    return {
+      authorizationUrl: startedAuthorization.authorizationUrl,
+      pkceVerifier,
+    };
+  },
+  async completeAuthorization(input) {
+    if (input.pkceVerifier === undefined) {
+      throw new GitHubIdentityLinkingAuthorizationError(
+        "GitHub linked-account callback is missing the PKCE verifier.",
+      );
+    }
+
+    const clientId = resolveGitHubClientIdOrThrow({
+      connection: input.connection,
+    });
+
+    let clientSecret: string;
+    try {
+      clientSecret = await input.resolveConnectionSecret({
+        slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+      });
+    } catch {
+      throw new GitHubIdentityLinkingConfigurationError(
+        `Integration connection '${input.connection.id}' is missing GitHub App client secret.`,
+      );
+    }
+
+    const completedAuthorization = await completeGitHubLinkedAccountAuthorization({
+      apiBaseUrl: input.target.config.apiBaseUrl,
+      webBaseUrl: input.target.config.webBaseUrl,
+      clientId,
+      clientSecret,
+      query: input.query,
+      redirectUrl: input.redirectUrl,
+      pkceVerifier: input.pkceVerifier,
+      now: input.now,
+    });
+
+    return toCompletedIdentityLinkingAuthorization(completedAuthorization);
+  },
+};

@@ -59,6 +59,7 @@ export async function putOrganizationIdentityLinkProviderStatus(
     await resolveValidatedProviderConnectionOrThrow(
       {
         db: ctx.db,
+        integrationRegistry: ctx.integrationRegistry,
       },
       {
         organizationId: input.organizationId,

@@ -102,8 +102,112 @@ export type IntegrationConnection = {
   config: Record<string, unknown>;
 };
 
-export type IntegrationIdentityLinkingCapability = {
+export type IdentityLinkingPrincipalKey = {
+  keyType: string;
+  keyValue: string;
+};
+
+export type IdentityLinkingCredentialSecret = {
+  secretKind: string;
+  plaintext: string;
+  metadata?: Record<string, unknown> | undefined;
+  expiresAt?: string | undefined;
+};
+
+export type CompletedIdentityLinkingAuthorization = {
+  providerSubjectId: string;
+  profile?: Record<string, unknown> | undefined;
+  keys: readonly [IdentityLinkingPrincipalKey, ...IdentityLinkingPrincipalKey[]];
+  credential?:
+    | {
+        credentialKind: string;
+        scopes?: string[] | undefined;
+        accessTokenExpiresAt?: string | undefined;
+        refreshTokenExpiresAt?: string | undefined;
+        secrets: readonly [IdentityLinkingCredentialSecret, ...IdentityLinkingCredentialSecret[]];
+      }
+    | undefined;
+};
+
+export type IdentityLinkingConnectionSecretResolver = (input: {
+  slotKey: string;
+}) => MaybePromise<string>;
+
+export type IntegrationIdentityLinkingConnectionSupportInput<
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  availableConnectionSecretSlotKeys: ReadonlySet<string>;
+};
+
+export type IntegrationIdentityLinkingStartAuthorizationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  userId: string;
+  providerFamily: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  state: string;
+  redirectUrl: string;
+  resolveConnectionSecret: IdentityLinkingConnectionSecretResolver;
+};
+
+export type StartedIdentityLinkingAuthorization = {
+  authorizationUrl: string;
+  pkceVerifier?: string | undefined;
+  providerState?: Record<string, unknown> | undefined;
+};
+
+export type IntegrationIdentityLinkingCompleteAuthorizationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  userId: string;
+  providerFamily: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  query: URLSearchParams;
+  redirectUrl: string;
+  now: string;
+  pkceVerifier?: string | undefined;
+  providerState?: Record<string, unknown> | undefined;
+  resolveConnectionSecret: IdentityLinkingConnectionSecretResolver;
+};
+
+export type IntegrationIdentityLinkingCapability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
   eligibleConnectionMethodIds: ReadonlyArray<IntegrationConnectionMethodId>;
+  supportsConnection?(
+    input: IntegrationIdentityLinkingConnectionSupportInput<TConnectionConfig>,
+  ): MaybePromise<boolean>;
+  startAuthorization?(
+    input: IntegrationIdentityLinkingStartAuthorizationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<StartedIdentityLinkingAuthorization>;
+  completeAuthorization?(
+    input: IntegrationIdentityLinkingCompleteAuthorizationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<CompletedIdentityLinkingAuthorization>;
 };
 
 export type IntegrationBinding = {
@@ -1678,7 +1782,11 @@ export type IntegrationDefinition<
       TConnectionConfig
     >
   >;
-  identityLinking?: IntegrationIdentityLinkingCapability;
+  identityLinking?: IntegrationIdentityLinkingCapability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
   credentialResolvers?: IntegrationCredentialResolvers;
   oauth2AuthorizationCode?: IntegrationOAuth2AuthorizationCodeCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
