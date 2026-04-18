@@ -97,10 +97,6 @@ Mistle should be treated as an integrated platform deployment rather than a sing
 | Kubernetes                 | You want the main cluster-based deployment path in this repository.          | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
 | Self-hosted Compose        | You want a separate self-hosted Compose deployment artifact.                 | Not implemented yet in this repository.                                                                                                                                 |
 
-## Contributing
-
-For monorepo contributor setup and the `pnpm dev` workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
 ## Releases
 
 - [Release process](docs/release-process.md)
