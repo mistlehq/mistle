@@ -37,6 +37,7 @@ export async function resumeSandboxRuntime(
     providerSandboxId: string;
     runtimeProvider: SandboxProvider;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
@@ -46,6 +47,7 @@ export async function resumeSandboxRuntime(
       runtimeProvider: input.runtimeProvider,
     }),
     runtimePlan: input.runtimePlan,
+    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   });
 
   await ctx.sandboxRuntimeControl.resume({

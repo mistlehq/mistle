@@ -28,6 +28,11 @@ export type StartSandboxInstanceWorkflowImageInput = Pick<
   "imageId" | "createdAt"
 >;
 
+export type SandboxWorkflowGitIdentityInput = {
+  name: string;
+  email: string;
+};
+
 export type StartSandboxInstanceWorkflowInput = {
   sandboxInstanceId: string;
   organizationId: string;
@@ -39,6 +44,7 @@ export type StartSandboxInstanceWorkflowInput = {
     kind: SandboxInstanceStarterKind;
     id: string;
   };
+  gitIdentity?: SandboxWorkflowGitIdentityInput;
   source: SandboxInstanceSource;
   image: StartSandboxInstanceWorkflowImageInput;
 };
@@ -58,6 +64,7 @@ export const StartSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 
 export type ResumeSandboxInstanceWorkflowInput = {
   sandboxInstanceId: string;
+  gitIdentity?: SandboxWorkflowGitIdentityInput;
 };
 
 export type ResumeSandboxInstanceWorkflowOutput = {

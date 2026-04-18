@@ -1445,6 +1445,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: std::collections::BTreeMap::new(),
+            git_identity: None,
         }
     }
 

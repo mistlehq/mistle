@@ -1548,6 +1548,7 @@ mod tests {
                 "egress-rule-1".to_string(),
                 "grant-1".to_string(),
             )]),
+            git_identity: None,
         }
     }
 

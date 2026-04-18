@@ -110,6 +110,10 @@ describe("StartSandboxInstanceInputSchema", () => {
         kind: "user",
         id: "usr_123",
       },
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+      },
       source: "dashboard",
       image: {
         imageId: "img_123",
@@ -180,6 +184,10 @@ describe("ResumeSandboxInstanceInputSchema", () => {
     const input = {
       organizationId: "org_123",
       instanceId: "sbi_123",
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+      },
       idempotencyKey: "req_456",
     };
 

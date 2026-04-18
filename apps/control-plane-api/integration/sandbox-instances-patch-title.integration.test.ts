@@ -54,6 +54,7 @@ describe("sandbox instance title patch integration", () => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
       databaseNamePrefix: "mistle_cp_patch_title",
       baseUrl: fixture.config.dataPlaneApi.baseUrl,
@@ -143,6 +144,7 @@ describe("sandbox instance title patch integration", () => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
       databaseNamePrefix: "mistle_cp_patch_title_not_found",
       baseUrl: fixture.config.dataPlaneApi.baseUrl,
@@ -229,6 +231,7 @@ describe("sandbox instance title patch integration", () => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
       databaseNamePrefix: "mistle_cp_patch_title_validation",
       baseUrl: fixture.config.dataPlaneApi.baseUrl,

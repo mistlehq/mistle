@@ -57,6 +57,24 @@ describe("startup contracts", () => {
     });
   });
 
+  it("accepts startup input with optional git identity", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
+        ...startupInputFixture,
+        gitIdentity: {
+          name: "Mistle User",
+          email: "mistle-user@example.com",
+        },
+      }),
+    ).toEqual({
+      ...startupInputFixture,
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+      },
+    });
+  });
+
   it("rejects init responses with an empty error message", () => {
     expect(() =>
       SandboxdInitResponseSchema.parse({

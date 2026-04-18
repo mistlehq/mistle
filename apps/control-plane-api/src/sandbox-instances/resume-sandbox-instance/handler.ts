@@ -8,7 +8,7 @@ import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
-  { session }: AppSession,
+  { user, session }: AppSession,
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
@@ -23,6 +23,9 @@ const routeHandler = async (
     {
       organizationId: session.activeOrganizationId,
       instanceId,
+      actingUser: {
+        userId: user.id,
+      },
       ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
     },
   );

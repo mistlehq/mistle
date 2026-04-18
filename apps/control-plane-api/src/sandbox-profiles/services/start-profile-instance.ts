@@ -7,6 +7,10 @@ import { compileProfileVersionRuntimePlan } from "../compile-profile-version-run
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
 import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "../errors.js";
 import { listProfileVersionRepositoryOptions } from "./repository-options.js";
+import {
+  resolveActingUserGitIdentity,
+  type SandboxActingUser,
+} from "./resolve-acting-user-git-identity.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileInstanceInput = {
@@ -19,6 +23,7 @@ type StartProfileInstanceInput = {
     kind: SandboxInstanceStarterKind;
     id: string;
   };
+  actingUser?: SandboxActingUser;
   source: SandboxInstanceSource;
   image: {
     imageId: string;
@@ -128,6 +133,10 @@ export async function startProfileInstance(
         : { primaryRepositoryId: serviceInput.primaryRepositoryId }),
     },
   );
+  const gitIdentity = await resolveActingUserGitIdentity(db, {
+    organizationId: serviceInput.organizationId,
+    ...(serviceInput.actingUser === undefined ? {} : { actingUser: serviceInput.actingUser }),
+  });
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: serviceInput.organizationId,
@@ -136,6 +145,7 @@ export async function startProfileInstance(
     idempotencyKey,
     runtimePlan,
     startedBy: serviceInput.startedBy,
+    ...(gitIdentity === undefined ? {} : { gitIdentity }),
     source: serviceInput.source,
     image: serviceInput.image,
   });

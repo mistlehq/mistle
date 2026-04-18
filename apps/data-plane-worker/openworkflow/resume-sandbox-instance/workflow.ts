@@ -205,6 +205,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   providerSandboxId: resumedRuntime.providerSandboxId,
                   runtimeProvider: resumedRuntime.runtimeProvider,
                   runtimePlan: resumableSandboxState.runtimePlan,
+                  ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
                 },
               );
             });
@@ -833,6 +834,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               providerSandboxId: replacementProviderSandboxId,
               startupMode: "new",
               runtimePlan: resumableSandboxState.runtimePlan,
+              ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
             },
           );
         });

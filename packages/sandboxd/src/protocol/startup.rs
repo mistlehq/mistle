@@ -11,6 +11,13 @@ pub enum StartupMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GitIdentity {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StartupInput {
     pub startup_mode: StartupMode,
     pub bootstrap_token: String,
@@ -18,6 +25,7 @@ pub struct StartupInput {
     pub tunnel_gateway_ws_url: String,
     pub runtime_plan: serde_json::Value,
     pub egress_grant_by_rule_id: BTreeMap<String, String>,
+    pub git_identity: Option<GitIdentity>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

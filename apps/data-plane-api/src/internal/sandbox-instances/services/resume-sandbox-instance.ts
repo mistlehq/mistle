@@ -32,6 +32,7 @@ export async function resumeSandboxInstance(
     ResumeSandboxInstanceWorkflowSpec,
     {
       sandboxInstanceId: input.instanceId,
+      ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
     },
     {
       idempotencyKey: createResumeSandboxIdempotencyKey(input),

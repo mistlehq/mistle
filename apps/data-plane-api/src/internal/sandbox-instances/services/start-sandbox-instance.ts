@@ -132,13 +132,22 @@ export async function startSandboxInstance(
     configuredStorageBackend: ctx.sandboxStorageBackend,
   });
 
+  const workflowInput = {
+    sandboxInstanceId: createSandboxInstanceId(),
+    organizationId: input.organizationId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    persistenceMode,
+    runtimePlan: input.runtimePlan,
+    startedBy: input.startedBy,
+    source: input.source,
+    image: input.image,
+    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+  };
+
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
     StartSandboxInstanceWorkflowSpec,
-    {
-      ...input,
-      sandboxInstanceId: createSandboxInstanceId(),
-      persistenceMode,
-    },
+    workflowInput,
     {
       idempotencyKey: createStartSandboxIdempotencyKey(input),
     },

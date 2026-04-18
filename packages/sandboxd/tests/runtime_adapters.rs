@@ -225,6 +225,7 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
             ]
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
     };
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));

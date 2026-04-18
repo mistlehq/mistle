@@ -245,6 +245,12 @@ const SandboxStartupInputSchema = z.object({
   tunnelGatewayWsUrl: z.string().min(1),
   runtimePlan: RuntimePlanSchema,
   egressGrantByRuleId: z.record(z.string(), z.string()),
+  gitIdentity: z
+    .object({
+      name: z.string().min(1),
+      email: z.email(),
+    })
+    .optional(),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
@@ -331,6 +337,27 @@ describe("encodeSandboxStartupInput", () => {
       egressGrantByRuleId: {
         egress_rule_1: "egress-grant-token-value",
       },
+    });
+  });
+
+  it("encodes optional git identity when present", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {},
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+      },
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.gitIdentity).toEqual({
+      name: "Mistle User",
+      email: "mistle-user@example.com",
     });
   });
 });

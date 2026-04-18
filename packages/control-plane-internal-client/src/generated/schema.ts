@@ -535,6 +535,9 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            actingUser?: {
+              userId: string;
+            };
             organizationId: string;
             profileId: string;
             profileVersion: number;

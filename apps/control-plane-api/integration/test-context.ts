@@ -185,13 +185,16 @@ export const it = vitestIt.extend<{
           port: sharedInfraConfig.databaseDirectPort,
           databaseName: runtimeDatabaseName,
         });
+        const controlPlaneHost = "127.0.0.1";
+        const controlPlanePort = await reserveAvailablePort({ host: controlPlaneHost });
+        const controlPlaneBaseUrl = `http://${controlPlaneHost}:${String(controlPlanePort)}`;
         const dataPlaneHost = "127.0.0.1";
         const dataPlanePort = await reserveAvailablePort({ host: dataPlaneHost });
 
         const config: ControlPlaneApiConfig = {
           server: {
-            host: "127.0.0.1",
-            port: 3000,
+            host: controlPlaneHost,
+            port: controlPlanePort,
           },
           database: {
             url: runtimeDatabaseUrl,
@@ -222,9 +225,9 @@ export const it = vitestIt.extend<{
             baseUrl: "http://localhost:5173",
           },
           auth: {
-            baseUrl: "http://localhost:3000",
+            baseUrl: controlPlaneBaseUrl,
             secret: "integration-auth-secret",
-            trustedOrigins: ["http://localhost:3000"],
+            trustedOrigins: [controlPlaneBaseUrl],
             otpLength: 6,
             otpExpiresInSeconds: 300,
             otpAllowedAttempts: 3,
@@ -256,6 +259,7 @@ export const it = vitestIt.extend<{
         cleanupTasks.unshift(async () => {
           await runtime.stop();
         });
+        await runtime.start();
         cleanupTasks.push(async () => {
           await dropDatabaseIfExists({
             username: sharedInfraConfig.databaseUsername,

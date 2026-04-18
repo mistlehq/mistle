@@ -6,6 +6,7 @@
 
 pub mod adapters;
 mod artifact_install;
+pub(crate) mod git_identity;
 mod plan;
 pub mod readiness;
 mod runtime_file;

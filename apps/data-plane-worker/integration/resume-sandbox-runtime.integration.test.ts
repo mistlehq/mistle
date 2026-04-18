@@ -179,6 +179,21 @@ function readSandboxFile(input: { id: string; path: string }): string {
   return result.output;
 }
 
+function readSandboxGitConfig(input: { id: string; key: string }): string {
+  const result = runContainerCommand({
+    id: input.id,
+    command: ["git", "config", "--global", input.key],
+  });
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `Failed to read global git config key ${input.key}. Exit code ${result.exitCode}. Output: ${result.output}`,
+    );
+  }
+
+  return result.output;
+}
+
 const describeIfDockerResumeIntegration = hasDockerResumeIntegrationRuntime()
   ? describe
   : describe.skip;
@@ -192,6 +207,113 @@ describeIfDockerResumeIntegration("resume sandbox runtime integration", () => {
     }
     createdVolumeNames.clear();
   });
+
+  it(
+    "initializes sandbox runtime with a global git identity",
+    async () => {
+      const sandboxAdapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: DockerSocketPath,
+        },
+      });
+      const sandboxRuntimeControl = createSandboxRuntimeControl({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: DockerSocketPath,
+        },
+      });
+      const sandboxInstanceId = `sbi_pr8_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+      const bootstrapPort = await reserveAvailablePort({
+        host: "127.0.0.1",
+      });
+      const bootstrapTunnelHost = resolveBootstrapTunnelHostForDockerContainer();
+      const bootstrapServer = new WebSocketServer({
+        host: "0.0.0.0",
+        port: bootstrapPort,
+      });
+      const bootstrapSockets = new Set<WebSocket>();
+      bootstrapServer.on("connection", (socket: WebSocket) => {
+        bootstrapSockets.add(socket);
+        socket.once("close", () => {
+          bootstrapSockets.delete(socket);
+        });
+      });
+      const runtimeConfig = createWorkerRuntimeConfig({
+        websocketBaseUrl: `ws://${bootstrapTunnelHost}:${String(bootstrapPort)}/tunnel/sandbox`,
+      });
+      let sandboxId: string | undefined;
+
+      try {
+        const sandbox = await sandboxAdapter.start({
+          image: {
+            provider: SandboxProvider.DOCKER,
+            imageId: SandboxBaseImageReference,
+            createdAt: new Date().toISOString(),
+          },
+          env: createSandboxRuntimeEnv({
+            config: runtimeConfig,
+            sandboxInstanceId,
+          }),
+        });
+        sandboxId = sandbox.id;
+
+        await initializeSandboxRuntime(
+          {
+            config: runtimeConfig,
+            sandboxRuntimeControl,
+          },
+          {
+            sandboxInstanceId,
+            providerSandboxId: sandbox.id,
+            startupMode: SandboxStartupModes.NEW,
+            runtimePlan: createRuntimePlan(),
+            gitIdentity: {
+              name: "Mistle User",
+              email: "mistle-user@example.com",
+            },
+          },
+        );
+
+        expect(
+          readSandboxGitConfig({
+            id: sandbox.id,
+            key: "user.name",
+          }),
+        ).toBe("Mistle User");
+        expect(
+          readSandboxGitConfig({
+            id: sandbox.id,
+            key: "user.email",
+          }),
+        ).toBe("mistle-user@example.com");
+      } finally {
+        for (const socket of bootstrapSockets) {
+          socket.terminate();
+        }
+
+        await new Promise<void>((resolve, reject) => {
+          bootstrapServer.close((error?: Error) => {
+            if (error !== undefined) {
+              reject(error);
+              return;
+            }
+
+            resolve();
+          });
+        });
+
+        if (sandboxId !== undefined) {
+          try {
+            await sandboxAdapter.destroy({
+              id: sandboxId,
+            });
+          } catch {}
+        }
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 
   it(
     "cold-initializes resumed persistent Docker sandboxes while preserving durable storage",
@@ -302,9 +424,25 @@ describeIfDockerResumeIntegration("resume sandbox runtime integration", () => {
             providerSandboxId: resumedSandbox.id,
             runtimeProvider: SandboxProvider.DOCKER,
             runtimePlan: createRuntimePlan(),
+            gitIdentity: {
+              name: "Mistle User",
+              email: "mistle-user@example.com",
+            },
           },
         );
 
+        expect(
+          readSandboxGitConfig({
+            id: resumedSandbox.id,
+            key: "user.name",
+          }),
+        ).toBe("Mistle User");
+        expect(
+          readSandboxGitConfig({
+            id: resumedSandbox.id,
+            key: "user.email",
+          }),
+        ).toBe("mistle-user@example.com");
         expect(
           readSandboxFile({
             id: resumedSandbox.id,

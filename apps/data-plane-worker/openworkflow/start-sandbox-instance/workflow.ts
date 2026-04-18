@@ -519,6 +519,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             providerSandboxId: startedSandbox.providerSandboxId,
             startupMode: SandboxStartupModes.NEW,
             runtimePlan: workflowInput.runtimePlan,
+            ...(workflowInput.gitIdentity === undefined
+              ? {}
+              : { gitIdentity: workflowInput.gitIdentity }),
           },
         );
       });

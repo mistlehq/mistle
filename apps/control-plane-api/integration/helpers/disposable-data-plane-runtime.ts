@@ -157,6 +157,7 @@ function createDatabaseUrl(input: {
 export async function createDisposableDataPlaneRuntime(input: {
   controlPlaneDatabaseUrl: string;
   internalAuthServiceToken: string;
+  controlPlaneBaseUrl: string;
   workflowNamespaceId: string;
   databaseNamePrefix: string;
   baseUrl: string;
@@ -230,7 +231,7 @@ export async function createDisposableDataPlaneRuntime(input: {
         gatewayBaseUrl: `http://${host}:${String(gatewayPort)}`,
       },
       controlPlaneApi: {
-        baseUrl: `http://${host}:5100`,
+        baseUrl: input.controlPlaneBaseUrl,
       },
       sandbox: {
         docker: {

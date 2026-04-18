@@ -5,6 +5,10 @@ import {
   SandboxProfilesCompileError,
   SandboxProfilesCompileErrorCodes,
 } from "../../../sandbox-profiles/errors.js";
+import {
+  resolveActingUserGitIdentity,
+  type SandboxActingUser,
+} from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
 import type { AppContext } from "../../../types.js";
 
 type StartProfileInstanceInput = {
@@ -15,6 +19,7 @@ type StartProfileInstanceInput = {
     kind: SandboxInstanceStarterKind;
     id: string;
   };
+  actingUser?: SandboxActingUser;
   source: SandboxInstanceSource;
 };
 
@@ -57,6 +62,10 @@ export async function startProfileInstance(
       `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
     );
   }
+  const gitIdentity = await resolveActingUserGitIdentity(db, {
+    organizationId: input.organizationId,
+    ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
+  });
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: input.organizationId,
@@ -64,6 +73,7 @@ export async function startProfileInstance(
     sandboxProfileVersion: input.profileVersion,
     runtimePlan,
     startedBy: input.startedBy,
+    ...(gitIdentity === undefined ? {} : { gitIdentity }),
     source: input.source,
     image: {
       imageId: defaultBaseImage,

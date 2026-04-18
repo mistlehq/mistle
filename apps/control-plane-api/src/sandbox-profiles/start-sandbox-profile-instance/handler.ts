@@ -31,6 +31,9 @@ const routeHandler = async (
         kind: "user",
         id: user.id,
       },
+      actingUser: {
+        userId: user.id,
+      },
       source: "dashboard",
       ...(body.primaryRepositoryId === undefined
         ? {}

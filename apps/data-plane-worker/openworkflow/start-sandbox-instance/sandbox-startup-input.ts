@@ -20,6 +20,7 @@ export type SandboxStartupInput = {
   tunnelGatewayWsUrl: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   egressGrantByRuleId: Record<string, string>;
+  gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
 };
 
 export function createSandboxTunnelGatewayWsUrl(input: {

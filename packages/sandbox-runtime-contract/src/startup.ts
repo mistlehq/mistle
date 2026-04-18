@@ -14,6 +14,15 @@ export const SandboxdStartupModeSchema = z.enum([
 
 export type SandboxdStartupMode = z.infer<typeof SandboxdStartupModeSchema>;
 
+export const SandboxdGitIdentitySchema = z
+  .object({
+    name: z.string().min(1),
+    email: z.email(),
+  })
+  .strict();
+
+export type SandboxdGitIdentity = z.infer<typeof SandboxdGitIdentitySchema>;
+
 export const SandboxdStartupInputSchema = z
   .object({
     startupMode: SandboxdStartupModeSchema,
@@ -22,6 +31,7 @@ export const SandboxdStartupInputSchema = z
     tunnelGatewayWsUrl: z.string().min(1),
     runtimePlan: CompiledRuntimePlanSchema,
     egressGrantByRuleId: z.record(z.string(), z.string().min(1)),
+    gitIdentity: SandboxdGitIdentitySchema.optional(),
   })
   .strict();
 

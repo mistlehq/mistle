@@ -32,6 +32,7 @@ describe("sandbox instances list integration", () => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
       databaseNamePrefix: "mistle_cp_sandbox_instances",
       baseUrl: fixture.config.dataPlaneApi.baseUrl,
@@ -229,6 +230,7 @@ describe("sandbox instances list integration", () => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
       databaseNamePrefix: "mistle_cp_sandbox_instances",
       baseUrl: fixture.config.dataPlaneApi.baseUrl,

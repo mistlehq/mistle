@@ -33,6 +33,10 @@ export type StartSandboxInstanceInput = {
     kind: SandboxInstanceStarterKind;
     id: string;
   };
+  gitIdentity?: {
+    name: string;
+    email: string;
+  };
   source: SandboxInstanceSource;
   image: Pick<SandboxImageHandle, "imageId" | "createdAt">;
   idempotencyKey?: string;
@@ -42,6 +46,10 @@ export type StartSandboxInstanceAcceptedResponse =
 export type ResumeSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
+  gitIdentity?: {
+    name: string;
+    email: string;
+  };
   idempotencyKey?: string;
 };
 export type ResumeSandboxInstanceAcceptedResponse =
@@ -326,6 +334,9 @@ export function createDataPlaneSandboxInstancesClient(
           headers: createAuthedJsonHeaders(internalClient.serviceToken),
           body: JSON.stringify({
             organizationId: resumeInput.organizationId,
+            ...(resumeInput.gitIdentity === undefined
+              ? {}
+              : { gitIdentity: resumeInput.gitIdentity }),
             ...(resumeInput.idempotencyKey === undefined
               ? {}
               : { idempotencyKey: resumeInput.idempotencyKey }),

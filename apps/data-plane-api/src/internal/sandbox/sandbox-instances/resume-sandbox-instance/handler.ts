@@ -16,6 +16,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
     {
       organizationId: body.organizationId,
       instanceId: params.id,
+      ...(body.gitIdentity === undefined ? {} : { gitIdentity: body.gitIdentity }),
       ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
     },
   );

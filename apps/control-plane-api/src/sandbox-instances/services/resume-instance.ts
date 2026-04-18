@@ -1,6 +1,10 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
+import {
+  resolveActingUserGitIdentity,
+  type SandboxActingUser,
+} from "../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
 import { SandboxInstancesConflictCodes, SandboxInstancesConflictError } from "../errors.js";
 import { getInstance } from "./get-instance.js";
 import type { SandboxInstanceStatus } from "./types.js";
@@ -19,6 +23,7 @@ export async function resumeInstance(
   input: {
     organizationId: string;
     instanceId: string;
+    actingUser?: SandboxActingUser;
     idempotencyKey?: string;
   },
 ): Promise<SandboxInstanceStatus> {
@@ -45,9 +50,15 @@ export async function resumeInstance(
     throw createResumeFailedError(sandboxInstance);
   }
 
+  const gitIdentity = await resolveActingUserGitIdentity(db, {
+    organizationId: input.organizationId,
+    ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
+  });
+
   await dataPlaneClient.resumeSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.instanceId,
+    ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
   });
 

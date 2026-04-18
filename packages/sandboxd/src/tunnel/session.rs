@@ -4479,6 +4479,7 @@ mod tests {
                 ]
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -4824,6 +4825,7 @@ mod tests {
                 ]
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -4993,6 +4995,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5089,6 +5092,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5175,6 +5179,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5354,6 +5359,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5600,6 +5606,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5705,6 +5712,7 @@ mod tests {
                     "agentRuntimes": []
                 }),
                 egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
             };
 
             let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -5910,6 +5918,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6051,6 +6060,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6202,6 +6212,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6403,6 +6414,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6525,6 +6537,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6720,6 +6733,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -6857,6 +6871,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7002,6 +7017,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7202,6 +7218,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7366,6 +7383,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7503,6 +7521,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7636,6 +7655,7 @@ mod tests {
                 "agentRuntimes": []
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
         };
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));

@@ -1132,6 +1132,21 @@
                     "required": ["kind", "id"],
                     "additionalProperties": false
                   },
+                  "gitIdentity": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "email": {
+                        "type": "string",
+                        "format": "email"
+                      }
+                    },
+                    "required": ["name", "email"],
+                    "additionalProperties": false
+                  },
                   "source": {
                     "type": "string",
                     "enum": ["dashboard", "webhook"]
@@ -3006,6 +3021,20 @@
                   "organizationId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "gitIdentity": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "email": {
+                        "type": "string",
+                        "format": "email"
+                      }
+                    },
+                    "required": ["name", "email"]
                   },
                   "idempotencyKey": {
                     "type": "string",

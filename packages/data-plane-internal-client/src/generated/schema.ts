@@ -118,6 +118,11 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            gitIdentity?: {
+              /** Format: email */
+              email: string;
+              name: string;
+            };
             idempotencyKey?: string;
             image: {
               createdAt: string;
@@ -1229,6 +1234,11 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            gitIdentity?: {
+              /** Format: email */
+              email: string;
+              name: string;
+            };
             idempotencyKey?: string;
             organizationId: string;
           };

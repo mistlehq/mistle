@@ -32,6 +32,7 @@ use crate::tunnel::session::{TunnelSession, derive_sandbox_instance_id};
 #[derive(Debug)]
 pub enum SandboxdStateError {
     ApplyRuntimePlan(String),
+    ApplyGitIdentity(String),
     StartEgressProxy(String),
     StartRuntimeProcesses(String),
     StartRuntimeAdapters(String),
@@ -45,6 +46,9 @@ impl fmt::Display for SandboxdStateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ApplyRuntimePlan(error) => write!(f, "failed to apply startup input: {error}"),
+            Self::ApplyGitIdentity(error) => {
+                write!(f, "failed to apply git identity from startup input: {error}")
+            }
             Self::StartEgressProxy(error) => {
                 write!(f, "failed to start local egress proxy: {error}")
             }
@@ -119,6 +123,8 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
+        runtime::git_identity::apply_git_identity(startup_input)
+            .map_err(SandboxdStateError::ApplyGitIdentity)?;
         runtime::apply_compiled_runtime_plan(&runtime_plan)
             .map_err(|error| SandboxdStateError::ApplyRuntimePlan(error.to_string()))?;
         let egress_proxy = EgressProxy::start(
@@ -258,6 +264,8 @@ impl SandboxdState {
 
     /// Reconnects the bootstrap tunnel for an already-initialized daemon.
     pub fn resume(&mut self, startup_input: &StartupInput) -> Result<(), SandboxdStateError> {
+        runtime::git_identity::apply_git_identity(startup_input)
+            .map_err(SandboxdStateError::ApplyGitIdentity)?;
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -991,6 +999,7 @@ supports_websockets = false
                     "signed-github-egress-grant".to_string(),
                 ),
             ]),
+            git_identity: None,
         };
         let original_config = runtime_plan
             .runtime_clients

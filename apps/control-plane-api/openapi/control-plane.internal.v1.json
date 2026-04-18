@@ -1123,6 +1123,17 @@
                     "required": ["kind", "id"],
                     "additionalProperties": false
                   },
+                  "actingUser": {
+                    "type": "object",
+                    "properties": {
+                      "userId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["userId"],
+                    "additionalProperties": false
+                  },
                   "source": {
                     "anyOf": [
                       {

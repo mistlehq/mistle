@@ -19,7 +19,14 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       dataPlaneClient,
       defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
-    body,
+    {
+      organizationId: body.organizationId,
+      profileId: body.profileId,
+      profileVersion: body.profileVersion,
+      startedBy: body.startedBy,
+      ...(body.actingUser === undefined ? {} : { actingUser: body.actingUser }),
+      source: body.source,
+    },
   );
 
   return ctx.json(startedSandboxInstance, 200);

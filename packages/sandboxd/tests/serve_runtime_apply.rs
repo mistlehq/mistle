@@ -63,6 +63,7 @@ fn daemon_applies_startup_input_after_init_submission() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
     };
 
     let server = control::start_control_server(

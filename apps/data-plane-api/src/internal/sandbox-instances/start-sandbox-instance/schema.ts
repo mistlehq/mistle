@@ -14,6 +14,13 @@ export const StartSandboxInstanceInputSchema = z
         id: z.string().min(1),
       })
       .strict(),
+    gitIdentity: z
+      .object({
+        name: z.string().min(1),
+        email: z.email(),
+      })
+      .strict()
+      .optional(),
     source: z.enum(["dashboard", "webhook"]),
     image: z
       .object({

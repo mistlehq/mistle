@@ -17,6 +17,7 @@ export async function createSandboxStartupInput(input: {
   sandboxInstanceId: string;
   startupMode: SandboxStartupInput["startupMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
 }): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
   const tunnelExchangeTokenJti = randomUUID();
@@ -62,6 +63,7 @@ export async function createSandboxStartupInput(input: {
     tunnelGatewayWsUrl,
     runtimePlan: input.runtimePlan,
     egressGrantByRuleId,
+    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   };
 }
 
@@ -75,6 +77,7 @@ export async function initializeSandboxRuntime(
     providerSandboxId: string;
     startupMode: SandboxStartupInput["startupMode"];
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
@@ -82,6 +85,7 @@ export async function initializeSandboxRuntime(
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: input.startupMode,
     runtimePlan: input.runtimePlan,
+    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   });
 
   await ctx.sandboxRuntimeControl.init({
