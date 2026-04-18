@@ -75,7 +75,7 @@ export async function resolveValidatedProviderConnectionOrThrow(
   }
 
   const credentialLinks = await ctx.db
-    .selectDistinct({
+    .select({
       slotKey: integrationConnectionCredentials.slotKey,
     })
     .from(integrationConnectionCredentials)
