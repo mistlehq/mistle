@@ -39,7 +39,7 @@ function resolveTargetDocument(input: {
     return resolveNestedRecord(input.requestBody, ["fields", "description"]);
   }
 
-  if (input.method === "POST" && /\/rest\/api\/3\/issue$/.test(input.pathname)) {
+  if (input.method === "POST" && input.pathname.endsWith("/rest/api/3/issue")) {
     return resolveNestedRecord(input.requestBody, ["fields", "description"]);
   }
 

@@ -651,7 +651,7 @@ describe("integration connections device authorization integration", () => {
         });
 
       expect(connectionCredentialLinks).toHaveLength(2);
-      expect([...connectionCredentialLinks.map((link) => link.slotKey)].sort()).toEqual(
+      expect(connectionCredentialLinks.map((link) => link.slotKey).sort()).toEqual(
         [
           createOAuth2AuthorizationCodeCredentialSlotKeys({
             familyId: "device-auth-test",
@@ -670,7 +670,7 @@ describe("integration connections device authorization integration", () => {
       });
 
       expect(storedCredentials).toHaveLength(2);
-      expect([...storedCredentials.map((credential) => credential.secretKind)].sort()).toEqual(
+      expect(storedCredentials.map((credential) => credential.secretKind).sort()).toEqual(
         [
           IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
           IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
