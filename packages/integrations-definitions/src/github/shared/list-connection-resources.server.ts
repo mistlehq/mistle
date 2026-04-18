@@ -7,6 +7,7 @@ import {
 import { Octokit } from "octokit";
 import { z } from "zod";
 
+import { GitHubApiVersion } from "./api-version.js";
 import { GitHubConnectionConfigSchema, type GitHubConnectionConfig } from "./auth.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
@@ -52,7 +53,6 @@ type GitHubListConnectionResourcesInput = ListConnectionResourcesInput<
   GitHubConnectionConfig
 >;
 
-const GitHubApiVersion = "2022-11-28";
 const GitHubRepositoryKind = "repository";
 const GitHubBranchKind = "branch";
 const GitHubUserKind = "user";

@@ -7,6 +7,7 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import { GitHubApiVersion } from "./api-version.js";
 import type { GitHubConnectionConfig } from "./auth.js";
 import { parseGitHubAppInstallationConnectionConfig } from "./auth.js";
 import { GitHubCredentialSlotKeys } from "./slot-keys.js";
@@ -317,7 +318,7 @@ async function fetchUserProfile(input: {
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${input.accessToken}`,
-      "x-github-api-version": "2022-11-28",
+      "x-github-api-version": GitHubApiVersion,
     },
   });
 
@@ -350,7 +351,7 @@ async function fetchPrimaryEmail(input: {
     headers: {
       accept: "application/vnd.github+json",
       authorization: `Bearer ${input.accessToken}`,
-      "x-github-api-version": "2022-11-28",
+      "x-github-api-version": GitHubApiVersion,
     },
   });
 
