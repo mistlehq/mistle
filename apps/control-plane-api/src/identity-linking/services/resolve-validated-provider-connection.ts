@@ -1,7 +1,12 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  integrationConnectionCredentials,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import { eq } from "drizzle-orm";
 
 import { IdentityLinkingBadRequestCodes, IdentityLinkingNotFoundCodes } from "../constants.js";
+import { isConnectionEligibleForIdentityLinkProvider } from "./provider-connection-eligibility.js";
 import type { IdentityLinkProviderMetadata } from "./provider-metadata.js";
 
 export async function resolveValidatedProviderConnectionOrThrow(
@@ -61,6 +66,29 @@ export async function resolveValidatedProviderConnectionOrThrow(
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
       `Integration connection '${input.integrationConnectionId}' uses connection method '${rawConnectionMethodId}', which is not eligible for identity linking provider '${input.provider.providerFamily}'.`,
+    );
+  }
+
+  const credentialLinks = await ctx.db
+    .select({
+      slotKey: integrationConnectionCredentials.slotKey,
+    })
+    .from(integrationConnectionCredentials)
+    .where(eq(integrationConnectionCredentials.connectionId, connection.id));
+  const credentialSlotKeys = new Set(
+    credentialLinks.map((credentialLink) => credentialLink.slotKey),
+  );
+
+  if (
+    !isConnectionEligibleForIdentityLinkProvider({
+      provider: input.provider,
+      connection,
+      credentialSlotKeys,
+    })
+  ) {
+    throw new BadRequestError(
+      IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+      `Integration connection '${input.integrationConnectionId}' is missing required identity-linking auth configuration.`,
     );
   }
 

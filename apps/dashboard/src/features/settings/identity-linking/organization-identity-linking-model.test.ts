@@ -17,46 +17,36 @@ describe("organization identity linking model", () => {
     expect(canManageOrganizationIdentityLinking({ actorRole: "member" })).toBe(false);
   });
 
-  it("filters eligible active connections by target and method", () => {
+  it("maps and sorts provider-supplied eligible connections", () => {
     const connections = listEligibleIdentityLinkConnections({
-      connections: [
-        {
-          id: "icn_2",
-          targetKey: "github-cloud",
-          displayName: "Archive GitHub",
-          status: "error",
-          connectionMethodId: "github-app-installation",
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: "2026-04-18T00:00:00.000Z",
-          updatedAt: "2026-04-18T00:00:00.000Z",
-        },
-        {
-          id: "icn_3",
-          targetKey: "slack-default",
-          displayName: "Slack App",
-          status: "active",
-          connectionMethodId: "slack-bot-token",
-          connectionMethodLabel: "Slack bot token",
-          createdAt: "2026-04-18T00:00:00.000Z",
-          updatedAt: "2026-04-18T00:00:00.000Z",
-        },
-        {
-          id: "icn_1",
-          targetKey: "github-cloud",
-          displayName: "Engineering GitHub",
-          status: "active",
-          connectionMethodId: "github-app-installation",
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: "2026-04-18T00:00:00.000Z",
-          updatedAt: "2026-04-18T00:00:00.000Z",
-        },
-      ],
       provider: {
         providerFamily: "github",
         displayName: "GitHub",
         logoKey: "github",
         eligibleTargetKeys: ["github-cloud"],
         eligibleConnectionMethodIds: ["github-app-installation"],
+        eligibleConnections: [
+          {
+            id: "icn_2",
+            targetKey: "github-cloud",
+            displayName: "Archive GitHub",
+            status: "active",
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-04-18T00:00:00.000Z",
+            updatedAt: "2026-04-18T00:00:00.000Z",
+          },
+          {
+            id: "icn_1",
+            targetKey: "github-cloud",
+            displayName: "Engineering GitHub",
+            status: "active",
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-04-18T00:00:00.000Z",
+            updatedAt: "2026-04-18T00:00:00.000Z",
+          },
+        ],
         configurationStatus: "unconfigured",
         selectedConnection: null,
         configuredAt: null,
@@ -66,6 +56,13 @@ describe("organization identity linking model", () => {
 
     expect(connections).toEqual([
       {
+        id: "icn_2",
+        targetKey: "github-cloud",
+        displayName: "Archive GitHub",
+        connectionMethodId: "github-app-installation",
+        connectionMethodLabel: "GitHub App installation",
+      },
+      {
         id: "icn_1",
         targetKey: "github-cloud",
         displayName: "Engineering GitHub",
@@ -74,7 +71,7 @@ describe("organization identity linking model", () => {
       },
     ]);
     expect(formatIdentityLinkEligibleConnectionLabel(connections[0]!)).toBe(
-      "Engineering GitHub · GitHub App installation",
+      "Archive GitHub · GitHub App installation",
     );
   });
 
@@ -118,18 +115,6 @@ describe("organization identity linking model", () => {
     expect(
       resolveReturnedIdentityLinkConnectionSelection({
         connectionId: "icn_1",
-        connections: [
-          {
-            id: "icn_1",
-            targetKey: "github-cloud",
-            displayName: "Engineering GitHub",
-            status: "active",
-            connectionMethodId: "github-app-installation",
-            connectionMethodLabel: "GitHub App installation",
-            createdAt: "2026-04-18T00:00:00.000Z",
-            updatedAt: "2026-04-18T00:00:00.000Z",
-          },
-        ],
         providers: [
           {
             providerFamily: "github",
@@ -137,6 +122,18 @@ describe("organization identity linking model", () => {
             logoKey: "github",
             eligibleTargetKeys: ["github-cloud"],
             eligibleConnectionMethodIds: ["github-app-installation"],
+            eligibleConnections: [
+              {
+                id: "icn_1",
+                targetKey: "github-cloud",
+                displayName: "Engineering GitHub",
+                status: "active",
+                connectionMethodId: "github-app-installation",
+                connectionMethodLabel: "GitHub App installation",
+                createdAt: "2026-04-18T00:00:00.000Z",
+                updatedAt: "2026-04-18T00:00:00.000Z",
+              },
+            ],
             configurationStatus: "active",
             selectedConnection: null,
             configuredAt: null,
@@ -152,18 +149,6 @@ describe("organization identity linking model", () => {
     expect(
       resolveReturnedIdentityLinkConnectionSelection({
         connectionId: "icn_2",
-        connections: [
-          {
-            id: "icn_2",
-            targetKey: "slack-default",
-            displayName: "Slack",
-            status: "active",
-            connectionMethodId: "slack-bot-token",
-            connectionMethodLabel: "Slack bot token",
-            createdAt: "2026-04-18T00:00:00.000Z",
-            updatedAt: "2026-04-18T00:00:00.000Z",
-          },
-        ],
         providers: [
           {
             providerFamily: "github",
@@ -171,6 +156,7 @@ describe("organization identity linking model", () => {
             logoKey: "github",
             eligibleTargetKeys: ["github-cloud"],
             eligibleConnectionMethodIds: ["github-app-installation"],
+            eligibleConnections: [],
             configurationStatus: "unconfigured",
             selectedConnection: null,
             configuredAt: null,

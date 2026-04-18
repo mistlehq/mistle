@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { data, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   canManageOrganizationIdentityLinking,
@@ -31,7 +30,6 @@ import {
   type OrganizationIdentityLinkingProviderCard,
   OrganizationIdentityLinkingSettingsPageView,
 } from "./organization-identity-linking-settings-page-view.js";
-import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
@@ -66,13 +64,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     enabled: canManage && !membershipCapabilitiesQuery.isPending,
     queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
     queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
-  });
-
-  const integrationsQuery = useQuery({
-    enabled: canManage && !membershipCapabilitiesQuery.isPending,
-    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    retry: false,
   });
 
   const configureMutation = useMutation({
@@ -136,7 +127,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   });
 
   const providers = providersQuery.data ?? [];
-  const connections = integrationsQuery.data?.connections ?? [];
   const createdConnectionId = searchParams.get("createdConnectionId");
 
   useEffect(() => {
@@ -144,14 +134,13 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       return;
     }
 
-    if (providersQuery.data === undefined || integrationsQuery.data === undefined) {
+    if (providersQuery.data === undefined) {
       return;
     }
 
     if (createdConnectionId !== null) {
       const selection = resolveReturnedIdentityLinkConnectionSelection({
         connectionId: createdConnectionId,
-        connections: integrationsQuery.data.connections,
         providers: providersQuery.data,
       });
 
@@ -166,13 +155,7 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.delete("createdConnectionId");
     setSearchParams(nextSearchParams, { replace: true });
-  }, [
-    createdConnectionId,
-    integrationsQuery.data,
-    providersQuery.data,
-    searchParams,
-    setSearchParams,
-  ]);
+  }, [createdConnectionId, providersQuery.data, searchParams, setSearchParams]);
 
   if (membershipCapabilitiesQuery.isError) {
     throw membershipCapabilitiesQuery.error;
@@ -195,13 +178,9 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   return (
     <PageFrame description={description} maxWidthClassName="max-w-5xl" title={title}>
       <OrganizationIdentityLinkingSettingsPageView
-        isLoading={
-          membershipCapabilitiesQuery.isPending ||
-          (canManage && (providersQuery.isPending || integrationsQuery.isPending))
-        }
+        isLoading={membershipCapabilitiesQuery.isPending || (canManage && providersQuery.isPending)}
         loadErrorMessage={resolveLoadErrorMessage({
           canManage,
-          integrationsError: integrationsQuery.isError ? integrationsQuery.error : null,
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
         onStatusAction={async ({ providerFamily, status }) => {
@@ -226,7 +205,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           buildProviderCard({
             actionErrorMessageByProviderFamily,
             configuringProviderFamily,
-            connections,
             statusUpdatingProviderFamily,
             provider,
             selectedConnectionIdByProviderFamily,
@@ -240,7 +218,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
 function resolveLoadErrorMessage(input: {
   canManage: boolean;
   providersError: unknown;
-  integrationsError: unknown;
 }): string | null {
   if (!input.canManage) {
     return null;
@@ -253,26 +230,17 @@ function resolveLoadErrorMessage(input: {
     });
   }
 
-  if (input.integrationsError !== null) {
-    return resolveApiErrorMessage({
-      error: input.integrationsError,
-      fallbackMessage: "Could not load integrations.",
-    });
-  }
-
   return null;
 }
 
 export function buildProviderCard(input: {
   actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>;
   configuringProviderFamily: string | null;
-  connections: Parameters<typeof listEligibleIdentityLinkConnections>[0]["connections"];
   statusUpdatingProviderFamily: string | null;
   provider: OrganizationIdentityLinkProvider;
   selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
 }): OrganizationIdentityLinkingProviderCard {
   const eligibleConnections = listEligibleIdentityLinkConnections({
-    connections: input.connections,
     provider: input.provider,
   });
   const draftSelectedConnectionId =

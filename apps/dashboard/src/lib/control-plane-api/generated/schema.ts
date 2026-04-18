@@ -3630,6 +3630,17 @@ export interface paths {
                 configuredAt: string | null;
                 displayName: string;
                 eligibleConnectionMethodIds: string[];
+                eligibleConnections: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                }[];
                 eligibleTargetKeys: string[];
                 logoKey: string;
                 providerFamily: string;
@@ -3731,6 +3742,17 @@ export interface paths {
               configuredAt: string | null;
               displayName: string;
               eligibleConnectionMethodIds: string[];
+              eligibleConnections: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              }[];
               eligibleTargetKeys: string[];
               logoKey: string;
               providerFamily: string;
@@ -3842,6 +3864,17 @@ export interface paths {
               configuredAt: string | null;
               displayName: string;
               eligibleConnectionMethodIds: string[];
+              eligibleConnections: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              }[];
               eligibleTargetKeys: string[];
               logoKey: string;
               providerFamily: string;
@@ -3953,6 +3986,17 @@ export interface paths {
               configuredAt: string | null;
               displayName: string;
               eligibleConnectionMethodIds: string[];
+              eligibleConnections: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              }[];
               eligibleTargetKeys: string[];
               logoKey: string;
               providerFamily: string;

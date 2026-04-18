@@ -54,6 +54,7 @@ describe("organization identity-linking providers integration", () => {
           logoKey: "github",
           eligibleTargetKeys: ["github-cloud"],
           eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+          eligibleConnections: [],
           configurationStatus: "unconfigured",
           selectedConnection: null,
           configuredAt: null,
@@ -65,6 +66,7 @@ describe("organization identity-linking providers integration", () => {
           logoKey: "slack",
           eligibleTargetKeys: ["slack-default"],
           eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_BOT_TOKEN],
+          eligibleConnections: [],
           configurationStatus: "unconfigured",
           selectedConnection: null,
           configuredAt: null,
@@ -85,16 +87,10 @@ describe("organization identity-linking providers integration", () => {
       fixture,
       targetKey: "github-cloud",
     });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_github_app",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
+    const connectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: session,
       displayName: "GitHub Identity App",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        app_id: "12345",
-      },
     });
 
     const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
@@ -104,7 +100,7 @@ describe("organization identity-linking providers integration", () => {
         cookie: session.cookie,
       },
       body: JSON.stringify({
-        integrationConnectionId: "icn_identity_github_app",
+        integrationConnectionId: connectionId,
       }),
     });
 
@@ -117,9 +113,21 @@ describe("organization identity-linking providers integration", () => {
       logoKey: "github",
       eligibleTargetKeys: ["github-cloud"],
       eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+      eligibleConnections: [
+        {
+          id: connectionId,
+          targetKey: "github-cloud",
+          displayName: "GitHub Identity App",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          connectionMethodLabel: "GitHub App installation",
+          createdAt: payload.eligibleConnections[0]?.createdAt ?? "",
+          updatedAt: payload.eligibleConnections[0]?.updatedAt ?? "",
+        },
+      ],
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       selectedConnection: {
-        id: "icn_identity_github_app",
+        id: connectionId,
         targetKey: "github-cloud",
         displayName: "GitHub Identity App",
         status: IntegrationConnectionStatuses.ACTIVE,
@@ -143,7 +151,7 @@ describe("organization identity-linking providers integration", () => {
       providerFamily: "github",
       status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       integrationTargetKey: "github-cloud",
-      integrationConnectionId: "icn_identity_github_app",
+      integrationConnectionId: connectionId,
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
@@ -160,22 +168,17 @@ describe("organization identity-linking providers integration", () => {
       fixture,
       targetKey: "github-cloud",
     });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_enable",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
+    const connectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: session,
       displayName: "GitHub Identity Enable",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      },
     });
     await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
       organizationId: session.organizationId,
       providerFamily: "github",
       status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       integrationTargetKey: "github-cloud",
-      integrationConnectionId: "icn_identity_enable",
+      integrationConnectionId: connectionId,
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
@@ -198,7 +201,7 @@ describe("organization identity-linking providers integration", () => {
     const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
 
     expect(payload.configurationStatus).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
-    expect(payload.selectedConnection?.id).toBe("icn_identity_enable");
+    expect(payload.selectedConnection?.id).toBe(connectionId);
 
     const persistedConfig =
       await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
@@ -307,6 +310,49 @@ describe("organization identity-linking providers integration", () => {
     });
   });
 
+  it("rejects GitHub App connections that are missing linked-account auth config", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "organization-identity-link-providers-missing-client-credentials@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_identity_github_missing_client_credentials",
+      organizationId: session.organizationId,
+      targetKey: "github-cloud",
+      displayName: "GitHub Missing Client Credentials",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "12345",
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        integrationConnectionId: "icn_identity_github_missing_client_credentials",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+      message:
+        "Integration connection 'icn_identity_github_missing_client_credentials' is missing required identity-linking auth configuration.",
+    });
+  });
+
   it("disables a configured identity-linking provider without deleting the row", async ({
     fixture,
   }) => {
@@ -318,22 +364,17 @@ describe("organization identity-linking providers integration", () => {
       fixture,
       targetKey: "github-cloud",
     });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_disable",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
+    const connectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: session,
       displayName: "GitHub Identity Disable",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      },
     });
     await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
       organizationId: session.organizationId,
       providerFamily: "github",
       status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
       integrationTargetKey: "github-cloud",
-      integrationConnectionId: "icn_identity_disable",
+      integrationConnectionId: connectionId,
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
@@ -354,9 +395,21 @@ describe("organization identity-linking providers integration", () => {
       logoKey: "github",
       eligibleTargetKeys: ["github-cloud"],
       eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+      eligibleConnections: [
+        {
+          id: connectionId,
+          targetKey: "github-cloud",
+          displayName: "GitHub Identity Disable",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          connectionMethodLabel: "GitHub App installation",
+          createdAt: payload.eligibleConnections[0]?.createdAt ?? "",
+          updatedAt: payload.eligibleConnections[0]?.updatedAt ?? "",
+        },
+      ],
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
       selectedConnection: {
-        id: "icn_identity_disable",
+        id: connectionId,
         targetKey: "github-cloud",
         displayName: "GitHub Identity Disable",
         status: IntegrationConnectionStatuses.ACTIVE,
@@ -376,7 +429,7 @@ describe("organization identity-linking providers integration", () => {
       });
 
     expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
-    expect(persistedConfig?.integrationConnectionId).toBe("icn_identity_disable");
+    expect(persistedConfig?.integrationConnectionId).toBe(connectionId);
   });
 
   it("returns forbidden when a member tries to list identity-linking providers", async ({
@@ -423,35 +476,27 @@ describe("organization identity-linking providers integration", () => {
       fixture,
       targetKey: "github-cloud",
     });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_delete_guard",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
+    const connectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: session,
       displayName: "GitHub Identity Guard",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      },
     });
     await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
       organizationId: session.organizationId,
       providerFamily: "github",
       status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
       integrationTargetKey: "github-cloud",
-      integrationConnectionId: "icn_identity_delete_guard",
+      integrationConnectionId: connectionId,
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
 
-    const response = await fixture.request(
-      "/v1/integration/connections/icn_identity_delete_guard",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
+    const response = await fixture.request(`/v1/integration/connections/${connectionId}`, {
+      method: "DELETE",
+      headers: {
+        cookie: session.cookie,
       },
-    );
+    });
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
@@ -461,9 +506,57 @@ describe("organization identity-linking providers integration", () => {
     });
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_identity_delete_guard"),
+      where: (table, { eq }) => eq(table.id, connectionId),
     });
     expect(persistedConnection).toBeDefined();
+  });
+
+  it("lists only GitHub connections that are actually ready for linked-account authorization", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "organization-identity-link-providers-ready-connections@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_github_missing_client_id",
+      organizationId: session.organizationId,
+      targetKey: "github-cloud",
+      displayName: "GitHub Missing Client ID",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "12345",
+        app_slug: "mistle-github-app",
+      },
+    });
+    const readyConnectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: session,
+      displayName: "GitHub Ready",
+    });
+
+    const response = await fixture.request("/v1/organization/identity-linking/providers", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(await response.json());
+    expect(payload.providers[0]).toMatchObject({
+      providerFamily: "github",
+      eligibleConnections: [
+        {
+          id: readyConnectionId,
+          displayName: "GitHub Ready",
+        },
+      ],
+    });
   });
 });
 
@@ -542,4 +635,46 @@ async function upsertSlackTarget(input: {
         },
       },
     });
+}
+
+async function createGitHubIdentityLinkReadyConnection(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
+  displayName: string;
+}): Promise<string> {
+  const response = await input.fixture.request("/v1/integration/connections/github-cloud/form", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.authenticatedSession.cookie,
+    },
+    body: JSON.stringify({
+      displayName: input.displayName,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        app_id: "12345",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+      },
+      secrets: {
+        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+        clientSecret: "github-client-secret",
+        webhookSecret: "github-webhook-secret",
+      },
+    }),
+  });
+
+  expect(response.status).toBe(201);
+  const createdConnection = await response.json();
+  if (typeof createdConnection !== "object" || createdConnection === null) {
+    throw new Error("Expected GitHub App connection create response object.");
+  }
+
+  const connectionId = createdConnection["id"];
+  if (typeof connectionId !== "string" || connectionId.length === 0) {
+    throw new Error("Expected GitHub App connection id.");
+  }
+
+  return connectionId;
 }

@@ -7,28 +7,6 @@ describe("buildProviderCard", () => {
     const providerCard = buildProviderCard({
       actionErrorMessageByProviderFamily: {},
       configuringProviderFamily: null,
-      connections: [
-        {
-          id: "icn_github_saved",
-          targetKey: "github-cloud",
-          displayName: "GitHub Saved",
-          status: "active",
-          connectionMethodId: "github-app-installation",
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z",
-        },
-        {
-          id: "icn_github_new",
-          targetKey: "github-cloud",
-          displayName: "GitHub New",
-          status: "active",
-          connectionMethodId: "github-app-installation",
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: "2026-01-01T00:00:00.000Z",
-          updatedAt: "2026-01-01T00:00:00.000Z",
-        },
-      ],
       statusUpdatingProviderFamily: null,
       provider: {
         providerFamily: "github",
@@ -36,6 +14,28 @@ describe("buildProviderCard", () => {
         logoKey: "github",
         eligibleTargetKeys: ["github-cloud"],
         eligibleConnectionMethodIds: ["github-app-installation"],
+        eligibleConnections: [
+          {
+            id: "icn_github_saved",
+            targetKey: "github-cloud",
+            displayName: "GitHub Saved",
+            status: "active",
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "icn_github_new",
+            targetKey: "github-cloud",
+            displayName: "GitHub New",
+            status: "active",
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
         configurationStatus: "disabled",
         selectedConnection: {
           id: "icn_github_saved",

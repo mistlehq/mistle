@@ -23,6 +23,7 @@ const OrganizationIdentityLinkProviderSchema = z
     logoKey: z.string().min(1),
     eligibleTargetKeys: z.array(z.string().min(1)),
     eligibleConnectionMethodIds: z.array(z.string().min(1)),
+    eligibleConnections: z.array(OrganizationIdentityLinkProviderConnectionSummarySchema),
     configurationStatus: z.enum(["unconfigured", "active", "disabled"]),
     selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema.nullable(),
     configuredAt: z.string().min(1).nullable(),

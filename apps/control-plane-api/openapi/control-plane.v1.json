@@ -7324,6 +7324,55 @@
                               "minLength": 1
                             }
                           },
+                          "eligibleConnections": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "targetKey": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": ["active", "error", "revoked"]
+                                },
+                                "connectionMethodId": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "connectionMethodLabel": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "updatedAt": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "targetKey",
+                                "displayName",
+                                "status",
+                                "createdAt",
+                                "updatedAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
                           "configurationStatus": {
                             "type": "string",
                             "enum": ["unconfigured", "active", "disabled"]
@@ -7389,6 +7438,7 @@
                           "logoKey",
                           "eligibleTargetKeys",
                           "eligibleConnectionMethodIds",
+                          "eligibleConnections",
                           "configurationStatus",
                           "selectedConnection",
                           "configuredAt",
@@ -8469,6 +8519,55 @@
                         "minLength": 1
                       }
                     },
+                    "eligibleConnections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "targetKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["active", "error", "revoked"]
+                          },
+                          "connectionMethodId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "connectionMethodLabel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "targetKey",
+                          "displayName",
+                          "status",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "configurationStatus": {
                       "type": "string",
                       "enum": ["unconfigured", "active", "disabled"]
@@ -8534,6 +8633,7 @@
                     "logoKey",
                     "eligibleTargetKeys",
                     "eligibleConnectionMethodIds",
+                    "eligibleConnections",
                     "configurationStatus",
                     "selectedConnection",
                     "configuredAt",
@@ -8711,6 +8811,55 @@
                         "minLength": 1
                       }
                     },
+                    "eligibleConnections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "targetKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["active", "error", "revoked"]
+                          },
+                          "connectionMethodId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "connectionMethodLabel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "targetKey",
+                          "displayName",
+                          "status",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "configurationStatus": {
                       "type": "string",
                       "enum": ["unconfigured", "active", "disabled"]
@@ -8776,6 +8925,7 @@
                     "logoKey",
                     "eligibleTargetKeys",
                     "eligibleConnectionMethodIds",
+                    "eligibleConnections",
                     "configurationStatus",
                     "selectedConnection",
                     "configuredAt",
@@ -8932,6 +9082,55 @@
                         "minLength": 1
                       }
                     },
+                    "eligibleConnections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "targetKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["active", "error", "revoked"]
+                          },
+                          "connectionMethodId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "connectionMethodLabel": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "targetKey",
+                          "displayName",
+                          "status",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "configurationStatus": {
                       "type": "string",
                       "enum": ["unconfigured", "active", "disabled"]
@@ -8997,6 +9196,7 @@
                     "logoKey",
                     "eligibleTargetKeys",
                     "eligibleConnectionMethodIds",
+                    "eligibleConnections",
                     "configurationStatus",
                     "selectedConnection",
                     "configuredAt",

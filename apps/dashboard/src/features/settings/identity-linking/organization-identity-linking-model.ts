@@ -1,4 +1,3 @@
-import type { IntegrationConnection } from "../../integrations/integrations-service.js";
 import type { OrganizationRole } from "../members/members-api-types.js";
 import type { OrganizationIdentityLinkProvider } from "./organization-identity-linking-service.js";
 
@@ -52,26 +51,9 @@ export function resolveIdentityLinkStatusActionLabel(input: {
 }
 
 export function listEligibleIdentityLinkConnections(input: {
-  connections: readonly IntegrationConnection[];
   provider: OrganizationIdentityLinkProvider;
 }): readonly IdentityLinkEligibleConnection[] {
-  return input.connections
-    .filter((connection) => {
-      if (connection.status !== "active") {
-        return false;
-      }
-
-      if (!input.provider.eligibleTargetKeys.includes(connection.targetKey)) {
-        return false;
-      }
-
-      const connectionMethodId = connection.connectionMethodId;
-      if (connectionMethodId === undefined) {
-        return false;
-      }
-
-      return input.provider.eligibleConnectionMethodIds.includes(connectionMethodId);
-    })
+  return input.provider.eligibleConnections
     .map((connection) => ({
       id: connection.id,
       targetKey: connection.targetKey,
@@ -105,14 +87,10 @@ export function formatIdentityLinkEligibleConnectionLabel(
 
 export function resolveReturnedIdentityLinkConnectionSelection(input: {
   connectionId: string;
-  connections: readonly IntegrationConnection[];
   providers: readonly OrganizationIdentityLinkProvider[];
 }): ReturnedIdentityLinkConnectionSelection | null {
   for (const provider of input.providers) {
-    const eligibleConnections = listEligibleIdentityLinkConnections({
-      connections: input.connections,
-      provider,
-    });
+    const eligibleConnections = listEligibleIdentityLinkConnections({ provider });
 
     if (eligibleConnections.some((connection) => connection.id === input.connectionId)) {
       return {
