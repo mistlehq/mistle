@@ -136,6 +136,8 @@ export function formatSandboxProfileBindingSummaryItems(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  maxItems?: number | undefined;
+  excludedPropertyKeys?: readonly string[] | undefined;
 }): SandboxProfileBindingSummaryItem[] {
   const items: SandboxProfileBindingSummaryItem[] = [];
   const configUiModel = resolveBindingConfigUiModel({
@@ -145,7 +147,12 @@ export function formatSandboxProfileBindingSummaryItems(input: {
   });
 
   if (configUiModel.mode === "form") {
-    for (const propertyKey of configUiModel.visiblePropertyKeys.slice(0, 2)) {
+    const excludedPropertyKeys = new Set(input.excludedPropertyKeys ?? []);
+    const visiblePropertyKeys = configUiModel.visiblePropertyKeys.filter(
+      (propertyKey) => !excludedPropertyKeys.has(propertyKey),
+    );
+
+    for (const propertyKey of visiblePropertyKeys.slice(0, input.maxItems ?? 2)) {
       const value = configUiModel.value[propertyKey];
       const label = resolvePropertyTitle({
         schema: configUiModel.schema,

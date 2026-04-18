@@ -7,6 +7,7 @@ import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { PageFrame } from "../shared/page-frame.js";
 import {
+  StoryAwsConnection,
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
   StoryGithubConnection,
@@ -48,6 +49,17 @@ const InitialRows: readonly SandboxProfileBindingEditorRow[] = [
     config: {
       repositories: ["mistle/main-app", "mistle/docs"],
       tools: ["github-cli"],
+    },
+  },
+  {
+    clientId: "row-aws-connector",
+    connectionId: StoryAwsConnection.id,
+    kind: "connector",
+    config: {
+      services: ["s3", "sts", "secretsmanager"],
+      regions: ["us-east-1", "us-west-2"],
+      defaultRegion: "us-east-1",
+      tools: ["aws-cli"],
     },
   },
   {

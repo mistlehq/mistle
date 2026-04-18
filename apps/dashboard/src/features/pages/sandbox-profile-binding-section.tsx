@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
@@ -21,6 +21,7 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import { resolveBindingToolToggleModel } from "./sandbox-profile-binding-config-editor.js";
+import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
 function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
@@ -77,12 +78,44 @@ function ConnectorBindingRows(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   rowErrorsByClientId: Readonly<Record<string, string>>;
+  onEdit: (row: SandboxProfileBindingEditorRow) => void;
   onChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemove: (clientId: string) => void;
 }): React.JSX.Element {
+  function resolveConfigSummaryItems(params: { row: SandboxProfileBindingEditorRow }) {
+    return formatSandboxProfileBindingSummaryItems({
+      row: params.row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+      excludedPropertyKeys: ["tools"],
+      maxItems: 3,
+    });
+  }
+
+  function renderConfigSummary(params: {
+    summaryItems: ReturnType<typeof resolveConfigSummaryItems>;
+  }): React.JSX.Element | null {
+    const summaryItems = params.summaryItems;
+
+    if (summaryItems.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className="flex min-w-0 flex-col gap-2">
+        {summaryItems.map((item) => (
+          <div className="min-w-0" key={item.label}>
+            <DetailLabel as="p">{item.label}</DetailLabel>
+            <p className="truncate text-sm">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   function renderToolContent(params: {
     row: SandboxProfileBindingEditorRow;
     toolToggleModel: ReturnType<typeof resolveBindingToolToggleModel>;
@@ -107,7 +140,7 @@ function ConnectorBindingRows(input: {
         ) : (
           <div className="flex flex-col gap-1.5">
             {supportedToolToggleModel.options.map((option) => (
-              <label className="flex items-center gap-1.5" key={option.value}>
+              <label className="flex items-center gap-1.5 select-none" key={option.value}>
                 <Checkbox
                   aria-label={option.label}
                   checked={option.checked}
@@ -133,7 +166,7 @@ function ConnectorBindingRows(input: {
                     });
                   }}
                 />
-                <span className="text-sm">{option.label}</span>
+                <span className="text-sm select-none">{option.label}</span>
               </label>
             ))}
           </div>
@@ -150,7 +183,7 @@ function ConnectorBindingRows(input: {
       <div className="text-muted-foreground hidden border-b py-2 text-xs uppercase tracking-wide md:grid md:grid-cols-[minmax(0,12rem)_minmax(0,14rem)_minmax(0,1fr)_auto] md:items-center md:gap-x-4">
         <p>Integration</p>
         <p>Connection</p>
-        <p>Tools</p>
+        <p>Configuration</p>
         <div />
       </div>
       <div className="hidden md:flex md:flex-col">
@@ -173,6 +206,13 @@ function ConnectorBindingRows(input: {
             targets: input.availableTargets,
           });
           const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
+          const summaryItems = resolveConfigSummaryItems({
+            row,
+          });
+          const configSummary = renderConfigSummary({
+            summaryItems,
+          });
+          const showEditAction = summaryItems.length > 0;
 
           return (
             <div
@@ -201,25 +241,43 @@ function ConnectorBindingRows(input: {
                 <p className="truncate">{connectionDisplayName ?? row.connectionId}</p>
               </div>
               <div>
-                {renderToolContent({
-                  row,
-                  toolToggleModel,
-                  rowErrorMessage,
-                  detailLabelClassName: "sr-only",
-                })}
+                <div className="flex min-w-0 flex-col gap-3">
+                  {configSummary}
+                  {renderToolContent({
+                    row,
+                    toolToggleModel,
+                    rowErrorMessage,
+                    showLabel: false,
+                  })}
+                </div>
               </div>
               <div className="flex justify-end">
-                <Button
-                  aria-label="Remove binding"
-                  className="h-7 w-7"
-                  onClick={() => {
-                    input.onRemove(row.clientId);
-                  }}
-                  type="button"
-                  variant="ghost"
-                >
-                  <TrashIcon aria-hidden className="size-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {showEditAction ? (
+                    <Button
+                      aria-label="Edit binding"
+                      className="h-7 w-7"
+                      onClick={() => {
+                        input.onEdit(row);
+                      }}
+                      type="button"
+                      variant="ghost"
+                    >
+                      <PencilSimpleIcon aria-hidden className="size-4" />
+                    </Button>
+                  ) : null}
+                  <Button
+                    aria-label="Remove binding"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      input.onRemove(row.clientId);
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    <TrashIcon aria-hidden className="size-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           );
@@ -245,9 +303,16 @@ function ConnectorBindingRows(input: {
             targets: input.availableTargets,
           });
           const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
+          const summaryItems = resolveConfigSummaryItems({
+            row,
+          });
+          const configSummary = renderConfigSummary({
+            summaryItems,
+          });
+          const showEditAction = summaryItems.length > 0;
 
           return (
-            <div className="relative grid gap-4 border-b py-4 pr-10" key={row.clientId}>
+            <div className="relative grid gap-4 border-b py-4 pr-20" key={row.clientId}>
               <div className="min-w-0 flex items-start gap-3">
                 {target?.logoKey ? (
                   <img
@@ -267,7 +332,8 @@ function ConnectorBindingRows(input: {
                   <p className="text-muted-foreground truncate text-sm">
                     {connectionDisplayName ?? row.connectionId}
                   </p>
-                  <div className="pt-4">
+                  <div className="flex min-w-0 flex-col gap-4 pt-4">
+                    {configSummary}
                     {renderToolContent({
                       row,
                       toolToggleModel,
@@ -277,7 +343,20 @@ function ConnectorBindingRows(input: {
                   </div>
                 </div>
               </div>
-              <div className="absolute top-4 right-0 self-start">
+              <div className="absolute top-4 right-0 flex items-center gap-1 self-start">
+                {showEditAction ? (
+                  <Button
+                    aria-label="Edit binding"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      input.onEdit(row);
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    <PencilSimpleIcon aria-hidden className="size-4" />
+                  </Button>
+                ) : null}
                 <Button
                   aria-label="Remove binding"
                   className="h-7 w-7"
@@ -358,6 +437,7 @@ export function SandboxProfileBindingSection(input: {
           <ConnectorBindingRows
             availableConnections={input.availableConnections}
             availableTargets={input.availableTargets}
+            onEdit={input.onEdit}
             onChange={input.onRowChange}
             onRemove={input.onRemove}
             rowErrorsByClientId={input.rowErrorsByClientId}
