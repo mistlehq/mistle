@@ -99,6 +99,91 @@ export const StoryGithubConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryGithubEnterpriseServerTarget: IntegrationTargetSummary = {
+  targetKey: "target-github-enterprise-server",
+  displayName: "GitHub Enterprise Server",
+  logoKey: "github",
+  familyId: "github",
+  variantId: "github-enterprise-server",
+  config: {
+    api_base_url: "https://github.acme.example/api/v3",
+    web_base_url: "https://github.acme.example",
+  },
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryGithubEnterpriseServerConnection: IntegrationConnectionSummary = {
+  id: "connection-github-enterprise-server",
+  displayName: "GitHub Enterprise Server Production",
+  targetKey: StoryGithubEnterpriseServerTarget.targetKey,
+  status: "active",
+  resources: [
+    {
+      kind: "repository",
+      selectionMode: "multi",
+      count: 12,
+      syncState: "ready",
+      lastSyncedAt: "2026-03-09T13:00:00.000Z",
+    },
+  ],
+  config: {
+    connection_method: "github-app-installation",
+    app_id: "88421",
+    app_slug: "mistle-ghes",
+    installation_id: "8842101",
+  },
+};
+
+export const StoryAwsTarget: IntegrationTargetSummary = {
+  targetKey: "target-aws",
+  displayName: "AWS",
+  logoKey: "aws",
+  familyId: "aws",
+  variantId: "aws-cli-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryAwsConnection: IntegrationConnectionSummary = {
+  id: "connection-aws",
+  displayName: "AWS Production",
+  targetKey: StoryAwsTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "aws-assume-role",
+    accessKeyId: "AKIASTORYACCESSKEY",
+    roleArn: "arn:aws:iam::123456789012:role/mistle-story-role",
+    externalId: "mistle-story-external-id",
+    durationSeconds: 3600,
+  },
+};
+
+export const StoryDatadogTarget: IntegrationTargetSummary = {
+  targetKey: "target-datadog",
+  displayName: "Datadog",
+  logoKey: "datadog",
+  familyId: "datadog",
+  variantId: "datadog-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryDatadogConnection: IntegrationConnectionSummary = {
+  id: "connection-datadog",
+  displayName: "Datadog Production",
+  targetKey: StoryDatadogTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
 export const StoryJiraTarget: IntegrationTargetSummary = {
   targetKey: "target-jira",
   displayName: "Jira",
@@ -168,24 +253,91 @@ export const StoryPlanetScaleConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StorySignozTarget: IntegrationTargetSummary = {
+  targetKey: "target-signoz",
+  displayName: "SigNoz",
+  logoKey: "signoz",
+  familyId: "signoz",
+  variantId: "signoz-mcp",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StorySignozConnection: IntegrationConnectionSummary = {
+  id: "connection-signoz",
+  displayName: "SigNoz Cloud",
+  targetKey: StorySignozTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "oauth2-authorization-code",
+    region: "us",
+    client_id: "signoz-story-client",
+  },
+};
+
+export const StorySlackTarget: IntegrationTargetSummary = {
+  targetKey: "target-slack",
+  displayName: "Slack",
+  logoKey: "slack",
+  familyId: "slack",
+  variantId: "slack-default",
+  config: {
+    api_base_url: "https://slack.com/api",
+  },
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StorySlackConnection: IntegrationConnectionSummary = {
+  id: "connection-slack",
+  displayName: "Slack Workspace",
+  targetKey: StorySlackTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "slack-bot-token",
+  },
+};
+
 export const StoryIntegrationTargets = [
   StoryOpenAiTarget,
   StoryGithubTarget,
+  StoryGithubEnterpriseServerTarget,
+  StoryAwsTarget,
+  StoryDatadogTarget,
   StoryJiraTarget,
   StoryLinearTarget,
   StoryPlanetScaleTarget,
+  StorySignozTarget,
+  StorySlackTarget,
 ] as const;
 export const StoryIntegrationConnections = [
   StoryOpenAiConnection,
   StoryGithubConnection,
+  StoryGithubEnterpriseServerConnection,
+  StoryAwsConnection,
+  StoryDatadogConnection,
   StoryJiraConnection,
   StoryLinearConnection,
   StoryPlanetScaleConnection,
+  StorySignozConnection,
+  StorySlackConnection,
 ] as const;
 
 export const StoryGithubResources = createGithubRepositoryResources({
   connectionId: StoryGithubConnection.id,
 });
+
+export const StoryGithubEnterpriseServerResources = createGithubRepositoryResources({
+  connectionId: StoryGithubEnterpriseServerConnection.id,
+});
+
+export const StoryIntegrationResources = [
+  StoryGithubResources,
+  StoryGithubEnterpriseServerResources,
+] as const;
 
 export const StoryPlanetScaleTools = [
   PlanetScaleToolIds.PLANETSCALE_MCP,

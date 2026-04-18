@@ -1,5 +1,14 @@
 import {
   Checkbox,
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
   Field,
   FieldContent,
   FieldDescription,
@@ -14,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  useComboboxAnchor,
   cn,
 } from "@mistle/ui";
 import { withTheme } from "@rjsf/core";
@@ -35,6 +45,7 @@ import {
   enumOptionsValueForIndex,
   optionId,
 } from "@rjsf/utils";
+import * as React from "react";
 
 import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
@@ -80,6 +91,101 @@ function resolveCommaSeparatedOptions(
   };
 }
 
+function resolveStringArrayEnumOptions(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): readonly { label: string; value: string }[] {
+  const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
+  if (itemsSchema === null) {
+    return [];
+  }
+
+  if (Array.isArray(itemsSchema.oneOf)) {
+    return itemsSchema.oneOf.flatMap((option) => {
+      if (
+        !isRecord(option) ||
+        typeof option.const !== "string" ||
+        typeof option.title !== "string"
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          label: option.title,
+          value: option.const,
+        },
+      ];
+    });
+  }
+
+  if (!Array.isArray(itemsSchema.enum)) {
+    return [];
+  }
+
+  const enumNames = Array.isArray(props.uiSchema?.["ui:enumNames"])
+    ? props.uiSchema["ui:enumNames"]
+    : [];
+
+  return itemsSchema.enum.flatMap((entry, index) => {
+    if (typeof entry !== "string") {
+      return [];
+    }
+
+    const candidateLabel = enumNames[index];
+    return [
+      {
+        label: typeof candidateLabel === "string" ? candidateLabel : entry,
+        value: entry,
+      },
+    ];
+  });
+}
+
+function resolveStringEnumOptions(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): readonly { label: string; value: string }[] {
+  if (Array.isArray(props.schema.oneOf)) {
+    return props.schema.oneOf.flatMap((option) => {
+      if (
+        !isRecord(option) ||
+        typeof option.const !== "string" ||
+        typeof option.title !== "string"
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          label: option.title,
+          value: option.const,
+        },
+      ];
+    });
+  }
+
+  if (!Array.isArray(props.schema.enum)) {
+    return [];
+  }
+
+  const enumNames = Array.isArray(props.uiSchema?.["ui:enumNames"])
+    ? props.uiSchema["ui:enumNames"]
+    : [];
+
+  return props.schema.enum.flatMap((entry, index) => {
+    if (typeof entry !== "string") {
+      return [];
+    }
+
+    const candidateLabel = enumNames[index];
+    return [
+      {
+        label: typeof candidateLabel === "string" ? candidateLabel : entry,
+        value: entry,
+      },
+    ];
+  });
+}
+
 function CommaSeparatedStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -87,6 +193,24 @@ function CommaSeparatedStringArrayWidget(
   const value = Array.isArray(props.value)
     ? props.value.filter((entry): entry is string => typeof entry === "string")
     : [];
+  const normalizedValue = value.join(`${delimiter} `);
+  const [draftValue, setDraftValue] = React.useState(() => normalizedValue);
+  const [isFocused, setIsFocused] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isFocused) {
+      return;
+    }
+
+    setDraftValue(normalizedValue);
+  }, [isFocused, normalizedValue]);
+
+  function parseDraftValue(input: string): string[] {
+    return input
+      .split(delimiter)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
 
   return (
     <Input
@@ -95,21 +219,230 @@ function CommaSeparatedStringArrayWidget(
       disabled={props.disabled || props.readonly}
       id={props.id}
       onBlur={() => {
-        props.onBlur(props.id, value);
+        const nextValue = parseDraftValue(draftValue);
+        const normalizedValue = nextValue.join(`${delimiter} `);
+        setIsFocused(false);
+        setDraftValue(normalizedValue);
+        props.onChange(nextValue);
+        props.onBlur(props.id, nextValue);
       }}
       onChange={(event) => {
-        const nextValue = event.currentTarget.value
-          .split(delimiter)
-          .map((entry) => entry.trim())
-          .filter((entry) => entry.length > 0);
-        props.onChange(nextValue);
+        const nextDraftValue = event.currentTarget.value;
+        setDraftValue(nextDraftValue);
       }}
       onFocus={() => {
+        setIsFocused(true);
         props.onFocus(props.id, value);
       }}
       placeholder={placeholder}
-      value={value.join(`${delimiter} `)}
+      value={draftValue}
     />
+  );
+}
+
+function MultiSelectStringArrayComboboxWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const selectedValues = Array.isArray(props.value)
+    ? props.value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const options = resolveStringArrayEnumOptions(props);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+  const anchorRef = useComboboxAnchor();
+  const placeholder = typeof props.placeholder === "string" ? props.placeholder : props.label;
+  const emptyMessage =
+    typeof props.options.emptyMessage === "string"
+      ? props.options.emptyMessage
+      : "No matching options.";
+  const selectedValueSet = new Set(selectedValues);
+  const filteredOptions = options.filter((option) => {
+    if (search.trim().length === 0) {
+      return true;
+    }
+
+    const normalizedSearch = search.trim().toLowerCase();
+    return (
+      option.label.toLowerCase().includes(normalizedSearch) ||
+      option.value.toLowerCase().includes(normalizedSearch)
+    );
+  });
+
+  if (props.disabled || props.readonly) {
+    const selectedLabels = selectedValues
+      .map(
+        (selectedValue) =>
+          options.find((option) => option.value === selectedValue)?.label ?? selectedValue,
+      )
+      .join(", ");
+
+    return (
+      <Input disabled={props.disabled || props.readonly} id={props.id} value={selectedLabels} />
+    );
+  }
+
+  return (
+    <Combobox<string, true>
+      autoHighlight
+      inputValue={search}
+      multiple
+      onInputValueChange={setSearch}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          setSearch("");
+          props.onBlur(props.id, selectedValues);
+        }
+      }}
+      onValueChange={(value) => {
+        props.onChange(value);
+      }}
+      open={isOpen}
+      value={selectedValues}
+    >
+      <div ref={anchorRef}>
+        <ComboboxChips
+          aria-invalid={
+            props.rawErrors !== undefined && props.rawErrors.length > 0 ? true : undefined
+          }
+          onClick={() => {
+            setIsOpen(true);
+          }}
+        >
+          {selectedValues.map((selectedValue) => {
+            const optionLabel =
+              options.find((option) => option.value === selectedValue)?.label ?? selectedValue;
+
+            return (
+              <ComboboxChip key={selectedValue} value={selectedValue}>
+                {optionLabel}
+              </ComboboxChip>
+            );
+          })}
+          <ComboboxChipsInput
+            aria-label={props.label}
+            className="min-w-28"
+            id={props.id}
+            onFocus={() => {
+              setIsOpen(true);
+              props.onFocus(props.id, selectedValues);
+            }}
+            placeholder={selectedValues.length === 0 ? placeholder : "Search"}
+          />
+        </ComboboxChips>
+      </div>
+
+      {isOpen ? (
+        <ComboboxContent anchor={anchorRef} className="p-0">
+          <ComboboxList>
+            {filteredOptions.map((option) => (
+              <ComboboxItem key={option.value} value={option.value}>
+                <span className="truncate">{option.label}</span>
+              </ComboboxItem>
+            ))}
+            <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
+          </ComboboxList>
+        </ComboboxContent>
+      ) : null}
+    </Combobox>
+  );
+}
+
+function SingleSelectStringComboboxWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const options = resolveStringEnumOptions(props);
+  const selectedValue = typeof props.value === "string" ? props.value : "";
+  const selectedOption = options.find((option) => option.value === selectedValue);
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [queryText, setQueryText] = React.useState(selectedOption?.label ?? "");
+  const anchorRef = useComboboxAnchor();
+  const placeholder =
+    typeof props.placeholder === "string"
+      ? props.placeholder
+      : typeof props.label === "string" && props.label.length > 0
+        ? `Select ${props.label.toLowerCase()}`
+        : "Select an option";
+  const emptyMessage =
+    typeof props.options.emptyMessage === "string"
+      ? props.options.emptyMessage
+      : "No matching options.";
+
+  React.useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    setQueryText(selectedOption?.label ?? "");
+  }, [isOpen, selectedOption?.label]);
+
+  const filteredOptions = options.filter((option) => {
+    if (queryText.trim().length === 0) {
+      return true;
+    }
+
+    const normalizedSearch = queryText.trim().toLowerCase();
+    return (
+      option.label.toLowerCase().includes(normalizedSearch) ||
+      option.value.toLowerCase().includes(normalizedSearch)
+    );
+  });
+
+  if (props.disabled || props.readonly) {
+    return (
+      <Input
+        disabled={props.disabled || props.readonly}
+        id={props.id}
+        value={selectedOption?.label ?? selectedValue}
+      />
+    );
+  }
+
+  return (
+    <Combobox<string>
+      autoHighlight
+      inputValue={queryText}
+      onInputValueChange={setQueryText}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          setQueryText(selectedOption?.label ?? "");
+          props.onBlur(props.id, selectedValue.length === 0 ? undefined : selectedValue);
+        }
+      }}
+      onValueChange={(value) => {
+        const nextSelectedOption = options.find((option) => option.value === value);
+        setQueryText(nextSelectedOption?.label ?? "");
+        props.onChange(value ?? undefined);
+      }}
+      value={selectedValue.length === 0 ? null : selectedValue}
+    >
+      <div className="w-full" ref={anchorRef}>
+        <ComboboxInput
+          aria-label={props.label}
+          className="w-full"
+          id={props.id}
+          onFocus={() => {
+            setIsOpen(true);
+            props.onFocus(props.id, selectedValue.length === 0 ? undefined : selectedValue);
+          }}
+          placeholder={placeholder}
+          showClear={selectedValue.length > 0}
+        />
+      </div>
+      {isOpen ? (
+        <ComboboxContent anchor={anchorRef} className="p-0">
+          <ComboboxList>
+            {filteredOptions.map((option) => (
+              <ComboboxItem key={option.value} value={option.value}>
+                <span className="truncate">{option.label}</span>
+              </ComboboxItem>
+            ))}
+            <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
+          </ComboboxList>
+        </ComboboxContent>
+      ) : null}
+    </Combobox>
   );
 }
 
@@ -684,6 +1017,8 @@ export const IntegrationFormWidgets = {
   checkboxes: CheckboxesWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
   "integration-resource-string-array": IntegrationResourceStringArrayWidget,
+  "multi-select-string-array-combobox": MultiSelectStringArrayComboboxWidget,
+  "single-select-string-combobox": SingleSelectStringComboboxWidget,
 };
 
 function HiddenSubmitButton(
