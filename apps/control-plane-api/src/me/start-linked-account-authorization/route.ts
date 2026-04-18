@@ -3,10 +3,10 @@ import { UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import { StartLinkedAccountAuthorizationResponseSchema } from "../schemas.js";
 import {
-  PostLinkedAccountBadRequestResponseSchema,
-  PostLinkedAccountNotFoundResponseSchema,
-  PostLinkedAccountParamsSchema,
-  PostLinkedAccountValidationErrorResponseSchema,
+  StartLinkedAccountAuthorizationBadRequestResponseSchema,
+  StartLinkedAccountAuthorizationNotFoundResponseSchema,
+  StartLinkedAccountAuthorizationParamsSchema,
+  StartLinkedAccountAuthorizationValidationErrorResponseSchema,
 } from "./schema.js";
 
 export const route = createRoute({
@@ -14,7 +14,7 @@ export const route = createRoute({
   path: "/linked-accounts/:providerFamily",
   tags: ["Me"],
   request: {
-    params: PostLinkedAccountParamsSchema,
+    params: StartLinkedAccountAuthorizationParamsSchema,
   },
   responses: {
     200: {
@@ -29,7 +29,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: PostLinkedAccountBadRequestResponseSchema,
+          schema: StartLinkedAccountAuthorizationBadRequestResponseSchema,
         },
       },
     },
@@ -45,7 +45,7 @@ export const route = createRoute({
       description: "Provider configuration was not found.",
       content: {
         "application/json": {
-          schema: PostLinkedAccountNotFoundResponseSchema,
+          schema: StartLinkedAccountAuthorizationNotFoundResponseSchema,
         },
       },
     },
@@ -53,7 +53,7 @@ export const route = createRoute({
       description: "Validation error.",
       content: {
         "application/json": {
-          schema: PostLinkedAccountValidationErrorResponseSchema,
+          schema: StartLinkedAccountAuthorizationValidationErrorResponseSchema,
         },
       },
     },
