@@ -8,6 +8,7 @@ import type { OpenWorkflow } from "openworkflow";
 import { createAuthRoutes } from "./auth/routes.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
 import { createHomeRoutes } from "./home/index.js";
+import { createIdentityLinkingCallbacksRoutes } from "./identity-linking-callbacks/index.js";
 import { createIntegrationCallbacksRoutes } from "./integration-callbacks/index.js";
 import { createIntegrationConnectionsRoutes } from "./integration-connections/index.js";
 import { createIntegrationTargetsRoutes } from "./integration-targets/index.js";
@@ -115,6 +116,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
   const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
   const homeRoutes = withActiveOrganizationAccess(createHomeRoutes());
+  const identityLinkingCallbacksRoutes = createIdentityLinkingCallbacksRoutes();
   const integrationCallbacksRoutes = createIntegrationCallbacksRoutes();
   const integrationConnectionsRoutes = withActiveOrganizationAccess(
     createIntegrationConnectionsRoutes(),
@@ -130,6 +132,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(authRoutes.basePath, authRoutes.routes);
   app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);
   app.route(homeRoutes.basePath, homeRoutes.routes);
+  app.route(identityLinkingCallbacksRoutes.basePath, identityLinkingCallbacksRoutes.routes);
   app.route(integrationCallbacksRoutes.basePath, integrationCallbacksRoutes.routes);
   app.route(integrationConnectionsRoutes.basePath, integrationConnectionsRoutes.routes);
   app.route(integrationTargetsRoutes.basePath, integrationTargetsRoutes.routes);

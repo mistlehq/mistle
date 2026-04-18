@@ -19,6 +19,11 @@ export {
   type AutomationTarget,
 } from "./automation-targets.js";
 export {
+  identityLinkRedirectSessions,
+  type InsertIdentityLinkRedirectSession,
+  type IdentityLinkRedirectSession,
+} from "./identity-link-redirect-sessions.js";
+export {
   integrationConnectionCredentials,
   type InsertIntegrationConnectionCredential,
   type IntegrationConnectionCredential,
