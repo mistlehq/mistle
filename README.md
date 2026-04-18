@@ -58,11 +58,22 @@ Mistle is built around isolated agent execution and explicit configuration.
 - **Integration boundaries:** Access to external systems is provided through configured integrations.
 - **Controlled outbound access:** External requests from runtime environments flow through the tokenizer proxy, which enforces egress grants, route policy, and credential injection before forwarding traffic upstream.
 
-## Local Development
+## Run Mistle Locally
 
-For monorepo contributor setup and the `pnpm dev` workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
+The easiest way to run Mistle on one machine for local testing is the single-node Docker Compose workflow in [deploy/compose/local/](deploy/compose/local/).
 
-If you want to run Mistle on one machine with Docker Compose instead, use [deploy/compose/local/](deploy/compose/local/).
+```bash
+git clone https://github.com/mistlehq/mistle.git
+
+# Start the single-node Docker Compose stack
+cd mistle/deploy/compose/local
+./up.sh
+
+# Stop the stack when you're done
+./down.sh
+```
+
+If you want the monorepo contributor workflow instead, see [CONTRIBUTING.md](CONTRIBUTING.md) for the `pnpm dev` setup.
 
 ## Deployment
 
@@ -85,6 +96,10 @@ Mistle should be treated as an integrated platform deployment rather than a sing
 | Single-node Docker Compose | You want to run Mistle on one machine with Docker Compose for local testing. | [deploy/compose/local/](deploy/compose/local/)                                                                                                                          |
 | Kubernetes                 | You want the main cluster-based deployment path in this repository.          | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
 | Self-hosted Compose        | You want a separate self-hosted Compose deployment artifact.                 | Not implemented yet in this repository.                                                                                                                                 |
+
+## Contributing
+
+For monorepo contributor setup and the `pnpm dev` workflow, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Releases
 
