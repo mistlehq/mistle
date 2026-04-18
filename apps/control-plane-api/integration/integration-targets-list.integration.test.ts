@@ -178,6 +178,13 @@ describe("integration targets discovery integration", () => {
               slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
             },
             {
+              name: "clientSecret",
+              label: "Client secret",
+              placeholder: "Enter client secret",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.client-secret",
+            },
+            {
               name: "webhookSecret",
               label: "Webhook secret",
               placeholder: "Enter webhook secret",
@@ -420,6 +427,12 @@ describe("integration targets discovery integration", () => {
               label: "App private key PEM",
               inputType: "textarea",
               slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
+            },
+            {
+              name: "clientSecret",
+              label: "Client secret",
+              inputType: "password",
+              slotKey: "github.github-cloud.github-app-installation.client-secret",
             },
             {
               name: "webhookSecret",

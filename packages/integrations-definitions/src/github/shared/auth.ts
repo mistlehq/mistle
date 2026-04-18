@@ -20,6 +20,7 @@ const GitHubAppInstallationConnectionConfigInputSchema = z
     connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
     app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
     app_slug: z.string().min(1),
+    client_id: z.string().min(1).optional(),
     installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]).optional(),
     setup_action: z.string().min(1).optional(),
   })
@@ -30,6 +31,7 @@ export const GitHubAppInstallationConnectionConfigSchema = z
     connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
     app_id: z.string().min(1),
     app_slug: z.string().min(1),
+    client_id: z.string().min(1).optional(),
     installation_id: z.string().min(1).optional(),
     setup_action: z.string().min(1).optional(),
   })
@@ -53,6 +55,7 @@ export function parseGitHubAppInstallationConnectionConfig(
     connection_method: parsedInput.connection_method,
     app_id: parsedInput.app_id.toString(),
     app_slug: parsedInput.app_slug,
+    ...(parsedInput.client_id === undefined ? {} : { client_id: parsedInput.client_id }),
     ...(parsedInput.installation_id === undefined
       ? {}
       : { installation_id: parsedInput.installation_id.toString() }),

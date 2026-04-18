@@ -57,6 +57,7 @@ export async function startLinkedAccountAuthorization(
     providerFamily: input.providerFamily,
   });
   const startedAuthorization = await providerAdapter.startAuthorization({
+    db: ctx.db,
     organizationId: input.organizationId,
     userId: input.userId,
     providerFamily: input.providerFamily,
@@ -65,6 +66,9 @@ export async function startLinkedAccountAuthorization(
     integrationTarget: providerContext.integrationTarget,
     state,
     redirectUrl,
+    integrationsConfig: {
+      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
+    },
   });
 
   const expiresAt = createRedirectSessionExpiryTimestamp();

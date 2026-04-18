@@ -1107,9 +1107,11 @@ describe("integration connections update form integration", () => {
           connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           app_id: "123",
           app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
         },
         secrets: {
           appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\noriginal\n-----END PRIVATE KEY-----",
+          clientSecret: "original-client-secret",
           webhookSecret: "original-webhook-secret",
         },
       }),
@@ -1122,7 +1124,7 @@ describe("integration connections update form integration", () => {
       where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
       orderBy: (table, { asc }) => [asc(table.slotKey)],
     });
-    expect(previousLinks).toHaveLength(2);
+    expect(previousLinks).toHaveLength(3);
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -1138,9 +1140,11 @@ describe("integration connections update form integration", () => {
             connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             app_id: "456",
             app_slug: "updated-github-app",
+            client_id: "Iv1.client456",
           },
           secrets: {
             appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nupdated\n-----END PRIVATE KEY-----",
+            clientSecret: "updated-client-secret",
             webhookSecret: "updated-webhook-secret",
           },
         }),
@@ -1154,6 +1158,7 @@ describe("integration connections update form integration", () => {
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       app_id: "456",
       app_slug: "updated-github-app",
+      client_id: "Iv1.client456",
     });
 
     const updatedLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
@@ -1161,13 +1166,15 @@ describe("integration connections update form integration", () => {
       orderBy: (table, { asc }) => [asc(table.slotKey)],
     });
 
-    expect(updatedLinks).toHaveLength(2);
+    expect(updatedLinks).toHaveLength(3);
     expect(updatedLinks.map((link) => link.slotKey)).toEqual([
       "github.github-cloud.github-app-installation.app-private-key-pem",
+      "github.github-cloud.github-app-installation.client-secret",
       "github.github-cloud.github-app-installation.webhook-secret",
     ]);
     expect(updatedLinks[0]?.credentialId).not.toBe(previousLinks[0]?.credentialId);
     expect(updatedLinks[1]?.credentialId).not.toBe(previousLinks[1]?.credentialId);
+    expect(updatedLinks[2]?.credentialId).not.toBe(previousLinks[2]?.credentialId);
 
     const updatedCredentials = await fixture.db.query.integrationCredentials.findMany({
       where: (table, { and, eq, inArray }) =>
@@ -1181,9 +1188,10 @@ describe("integration connections update form integration", () => {
       orderBy: (table, { asc }) => [asc(table.id)],
     });
 
-    expect(updatedCredentials).toHaveLength(2);
+    expect(updatedCredentials).toHaveLength(3);
     expect(updatedCredentials.map((credential) => credential.secretKind)).toEqual([
       IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
       IntegrationCredentialSecretKinds.API_KEY,
     ]);
   });

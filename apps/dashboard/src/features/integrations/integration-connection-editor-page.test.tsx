@@ -525,6 +525,10 @@ describe("IntegrationConnectionEditorPage", () => {
               type: "string",
               title: "App slug",
             },
+            client_id: {
+              type: "string",
+              title: "Client ID",
+            },
           },
         },
         uiSchema: {
@@ -535,7 +539,7 @@ describe("IntegrationConnectionEditorPage", () => {
         value: {
           connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         },
-        visiblePropertyKeys: ["app_id", "app_slug"],
+        visiblePropertyKeys: ["app_id", "app_slug", "client_id"],
       },
       connectionDisplayNamePlaceholder: "GitHub connection",
       methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -543,6 +547,7 @@ describe("IntegrationConnectionEditorPage", () => {
 
     expect(screen.getByLabelText("App ID")).toBeTruthy();
     expect(screen.getByLabelText("App slug")).toBeTruthy();
+    expect(screen.getByLabelText("Client ID")).toBeTruthy();
     const privateKeyField = screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----");
     expect(privateKeyField.tagName).toBe("TEXTAREA");
     expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
@@ -560,7 +565,7 @@ describe("IntegrationConnectionEditorPage", () => {
 
     expect(configForm).toMatchObject({
       mode: "form",
-      visiblePropertyKeys: ["app_id", "app_slug"],
+      visiblePropertyKeys: ["app_id", "app_slug", "client_id"],
     });
 
     if (configForm.mode !== "form") {

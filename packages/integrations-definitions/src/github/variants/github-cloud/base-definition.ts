@@ -76,6 +76,15 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM,
         },
         {
+          name: "clientSecret",
+          label: "Client secret",
+          placeholder: "Enter client secret",
+          description: "Client secret from your GitHub App settings.",
+          inputType: "password",
+          secretType: "oauth2_client_secret",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+        },
+        {
           name: "webhookSecret",
           label: "Webhook secret",
           placeholder: "Enter webhook secret",

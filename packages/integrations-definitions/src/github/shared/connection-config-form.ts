@@ -28,6 +28,9 @@ export const GitHubAppInstallationConnectionConfigForm: ResolvedIntegrationForm 
       app_slug: {
         title: "App slug",
       },
+      client_id: {
+        title: "Client ID",
+      },
     },
   },
   uiSchema: {

@@ -71,9 +71,11 @@ describe("integration connection webhook sources integration", () => {
             connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             app_id: "123",
             app_slug: "mistle-github-app",
+            client_id: "Iv1.client123",
           },
           secrets: {
             appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+            clientSecret: "github-client-secret",
             webhookSecret: "github-webhook-secret",
           },
         }),
@@ -235,9 +237,11 @@ describe("integration connection webhook sources integration", () => {
             connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
             app_id: "123",
             app_slug: "mistle-github-app",
+            client_id: "Iv1.client123",
           },
           secrets: {
             appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+            clientSecret: "github-client-secret",
             webhookSecret: "github-webhook-secret",
           },
         }),

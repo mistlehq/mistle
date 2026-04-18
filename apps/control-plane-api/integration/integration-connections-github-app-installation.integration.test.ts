@@ -558,9 +558,11 @@ async function createGitHubAppConnection(
         connection_method: "github-app-installation",
         app_id: "123",
         app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
       },
       secrets: {
         appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+        clientSecret: "github-client-secret",
         webhookSecret: "github-webhook-secret",
       },
     }),

@@ -44,6 +44,13 @@ const GitHubAppInstallationConnectionMethods = [
         slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
       },
       {
+        name: "clientSecret",
+        label: "Client secret",
+        inputType: "password",
+        secretType: "oauth2_client_secret",
+        slotKey: "github.github-cloud.github-app-installation.client-secret",
+      },
+      {
         name: "webhookSecret",
         label: "Webhook secret",
         inputType: "password",
@@ -56,6 +63,7 @@ const GitHubAppInstallationConnectionMethods = [
         connection_method: z.literal(IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION),
         app_id: z.string(),
         app_slug: z.string(),
+        client_id: z.string().optional(),
         installation_id: z.string().optional(),
         setup_action: z.string().optional(),
       })

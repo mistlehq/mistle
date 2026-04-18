@@ -489,6 +489,7 @@ export async function completeLinkedAccountAuthorization(
           ctx.integrationsConfig.masterEncryptionKeys,
         );
   const completedAuthorization = await providerAdapter.completeAuthorization({
+    db: ctx.db,
     organizationId: redirectSession.organizationId,
     userId: redirectSession.userId,
     providerFamily: input.providerFamily,
@@ -499,6 +500,9 @@ export async function completeLinkedAccountAuthorization(
     redirectUrl,
     ...(pkceVerifier === undefined ? {} : { pkceVerifier }),
     ...(providerState === undefined ? {} : { providerState }),
+    integrationsConfig: {
+      masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
+    },
   });
 
   const timestamp = new Date().toISOString();

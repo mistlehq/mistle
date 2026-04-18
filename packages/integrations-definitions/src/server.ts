@@ -23,6 +23,7 @@ export * from "./egress-request-middleware.server.js";
 export * from "./egress-telemetry.server.js";
 export * from "./jira/index.js";
 export * from "./github/index.js";
+export * from "./github/shared/identity-linking.server.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
 export * from "./planetscale/server.js";

@@ -671,9 +671,11 @@ describe("integration connections create form integration", () => {
           connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           app_id: "123",
           app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
         },
         secrets: {
           appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+          clientSecret: "github-client-secret",
           webhookSecret: "github-webhook-secret",
         },
       }),
@@ -685,6 +687,7 @@ describe("integration connections create form integration", () => {
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       app_id: "123",
       app_slug: "mistle-github-app",
+      client_id: "Iv1.client123",
     });
     expect(responseBody.targetSnapshotConfig).toEqual({
       api_base_url: "https://api.github.com",
@@ -698,6 +701,7 @@ describe("integration connections create form integration", () => {
 
     expect(createdLinks.map((link) => link.slotKey)).toEqual([
       "github.github-cloud.github-app-installation.app-private-key-pem",
+      "github.github-cloud.github-app-installation.client-secret",
       "github.github-cloud.github-app-installation.webhook-secret",
     ]);
 
@@ -713,9 +717,10 @@ describe("integration connections create form integration", () => {
       orderBy: (table, { asc }) => [asc(table.id)],
     });
 
-    expect(createdCredentials).toHaveLength(2);
+    expect(createdCredentials).toHaveLength(3);
     expect(createdCredentials.map((credential) => credential.secretKind)).toEqual([
       IntegrationCredentialSecretKinds.API_KEY,
+      IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
       IntegrationCredentialSecretKinds.API_KEY,
     ]);
 

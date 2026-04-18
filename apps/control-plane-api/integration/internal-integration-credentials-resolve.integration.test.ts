@@ -320,10 +320,12 @@ async function insertGitHubBindingFixture(input: {
           connection_method: "github-app-installation",
           app_id: "123",
           app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
           installation_id: "12345",
         },
         secrets: {
           appPrivateKeyPem: privateKey,
+          clientSecret: "github-client-secret",
           webhookSecret: "github-webhook-secret",
         },
       }),
