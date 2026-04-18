@@ -271,19 +271,17 @@ async function exchangeAuthorizationCode(input: {
   pkceVerifier: string;
 }): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
   const tokenUrl = new URL("/login/oauth/access_token", input.webBaseUrl);
+  tokenUrl.searchParams.set("client_id", input.clientId);
+  tokenUrl.searchParams.set("client_secret", input.clientSecret);
+  tokenUrl.searchParams.set("code", input.code);
+  tokenUrl.searchParams.set("redirect_uri", input.redirectUrl);
+  tokenUrl.searchParams.set("code_verifier", input.pkceVerifier);
+
   const response = await fetch(tokenUrl, {
     method: "POST",
     headers: {
       accept: "application/json",
-      "content-type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({
-      client_id: input.clientId,
-      client_secret: input.clientSecret,
-      code: input.code,
-      redirect_uri: input.redirectUrl,
-      code_verifier: input.pkceVerifier,
-    }),
   });
 
   if (!response.ok) {

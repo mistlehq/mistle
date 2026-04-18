@@ -443,6 +443,7 @@ describe("me linked accounts integration", () => {
     const seenRequests: Array<{
       method: string;
       pathname: string;
+      search: string;
       body: string;
       authorization?: string;
     }> = [];
@@ -456,6 +457,7 @@ describe("me linked accounts integration", () => {
         seenRequests.push({
           method: request.method ?? "GET",
           pathname: requestUrl.pathname,
+          search: requestUrl.search,
           body,
           ...(typeof request.headers.authorization === "string"
             ? { authorization: request.headers.authorization }
@@ -584,17 +586,20 @@ describe("me linked accounts integration", () => {
         {
           method: "POST",
           pathname: "/login/oauth/access_token",
-          body: `client_id=Iv1.client123&client_secret=github-client-secret&code=code_123&redirect_uri=${encodeURIComponent(`${fixture.config.auth.baseUrl}/p/identity-linking/callbacks/github`)}&code_verifier=${encodeURIComponent(pkceVerifier ?? "")}`,
+          search: `?client_id=Iv1.client123&client_secret=github-client-secret&code=code_123&redirect_uri=${encodeURIComponent(`${fixture.config.auth.baseUrl}/p/identity-linking/callbacks/github`)}&code_verifier=${encodeURIComponent(pkceVerifier ?? "")}`,
+          body: "",
         },
         {
           method: "GET",
           pathname: "/user",
+          search: "",
           body: "",
           authorization: "Bearer ghu_user_token",
         },
         {
           method: "GET",
           pathname: "/user/emails",
+          search: "",
           body: "",
           authorization: "Bearer ghu_user_token",
         },
