@@ -83,6 +83,7 @@ describe("createEgressGrantByRuleId", () => {
       },
       organizationId: "org_123",
       sandboxInstanceId: "sbi_123",
+      actingUserId: "usr_123",
       runtimePlan: {
         sandboxProfileId: "sbp_runtime_plan_001",
         version: 1,
@@ -157,6 +158,7 @@ describe("createEgressGrantByRuleId", () => {
       bindingId: "ibd_github",
       familyId: "github",
       variantId: "github-cloud",
+      actingUserId: "usr_123",
       requestMiddleware: ["append-session-link-to-github-markdown"],
       credentialResolverKind: "integration_connection",
       connectionId: "icn_github",

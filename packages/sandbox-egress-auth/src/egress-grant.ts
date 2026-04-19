@@ -60,6 +60,7 @@ export async function mintEgressGrant(input: {
       organizationId: claims.organizationId,
       familyId: claims.familyId,
       variantId: claims.variantId,
+      ...(claims.actingUserId === undefined ? {} : { actingUserId: claims.actingUserId }),
       credentialResolverKind: claims.credentialResolverKind,
       ...(claims.credentialResolverKind === "integration_connection"
         ? {
@@ -71,7 +72,6 @@ export async function mintEgressGrant(input: {
         : {
             providerFamily: claims.providerFamily,
             actingUserRequired: claims.actingUserRequired,
-            ...(claims.actingUserId === undefined ? {} : { actingUserId: claims.actingUserId }),
             ...(claims.credentialKind === undefined
               ? {}
               : { credentialKind: claims.credentialKind }),

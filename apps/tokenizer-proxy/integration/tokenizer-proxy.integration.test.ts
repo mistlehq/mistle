@@ -64,6 +64,8 @@ async function mintIntegrationEgressGrant(
     egressRuleId: string;
     upstreamBaseUrl: string;
     bindingId: string;
+    organizationId?: string;
+    actingUserId?: string;
     familyId?: string;
     variantId?: string;
     connectionId: string;
@@ -103,9 +105,10 @@ async function mintIntegrationEgressGrant(
       sub: "sandbox_123",
       jti: input.egressRuleId,
       bindingId: input.bindingId,
-      organizationId: "org_123",
+      organizationId: input.organizationId ?? "org_123",
       familyId: input.familyId ?? "test",
       variantId: input.variantId ?? "test-default",
+      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
       credentialResolverKind: "integration_connection",
       connectionId: input.connectionId,
       secretType: input.secretType,
@@ -1571,6 +1574,169 @@ describe("tokenizer proxy integration", () => {
           organizationId: "org_123",
           actingUserId: "usr_123",
           providerFamily: "github",
+        },
+      ]);
+      expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("selects linked-principal credentials for github pull request creation", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      principalCredentialValue: "ghu_user_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_create_pr",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      organizationId: "org_123",
+      actingUserId: "usr_123",
+      familyId: "github",
+      variantId: "github-cloud",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed response headers.");
+      }
+
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghu_user_token");
+      expect(controlPlaneServer.principalCredentialRequests).toEqual([
+        {
+          organizationId: "org_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+          credentialKind: "github_app_user_access_token",
+        },
+      ]);
+      expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("fails github pull request creation without falling back to installation credentials", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_installation_token",
+      principalStatusCode: 500,
+      principalResponseBody: {
+        code: "CREDENTIAL_REFRESH_FAILED",
+        message: "Failed to refresh linked principal credential.",
+      },
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_create_pr_no_fallback",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      organizationId: "org_123",
+      actingUserId: "usr_123",
+      familyId: "github",
+      variantId: "github-cloud",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({
+        code: "CREDENTIAL_RESOLUTION_FAILED",
+        message: "Failed to resolve outbound credential.",
+      });
+      expect(controlPlaneServer.principalCredentialRequests).toEqual([
+        {
+          organizationId: "org_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+          credentialKind: "github_app_user_access_token",
         },
       ]);
       expect(controlPlaneServer.requests).toEqual([]);

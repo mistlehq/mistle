@@ -8,6 +8,7 @@ import {
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
+import { resolveGitHubUserAttributedEgressCredentialResolver } from "../../shared/user-attributed-egress.server.js";
 import { GitHubWebhookSourceCapability } from "../../shared/webhook-source.server.js";
 import {
   GitHubCloudBaseDefinition,
@@ -19,6 +20,7 @@ export const GitHubCloudDefinition: GitHubCloudBaseIntegrationDefinition = {
   ...GitHubCloudBaseDefinition,
   identityLinking: GitHubIdentityLinkingCapability,
   egressRequestMiddleware: [AppendSessionLinkToGitHubMarkdownRequestMiddleware],
+  resolveEgressCredentialResolver: resolveGitHubUserAttributedEgressCredentialResolver,
   credentialResolvers: {
     custom: {
       [GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN]:

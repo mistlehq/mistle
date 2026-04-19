@@ -13,6 +13,7 @@ type AuthorizedEgressGrantBase = {
   organizationId: string;
   familyId: string;
   variantId: string;
+  actingUserId?: string;
   upstreamBaseUrl: string;
   additionalHeaders?: Readonly<Record<string, string>>;
   additionalCredentialHeaders?: ReadonlyArray<{
@@ -51,7 +52,6 @@ type AuthorizedLinkedPrincipalResolver = {
   credentialResolverKind: "linked_principal";
   providerFamily: string;
   actingUserRequired: boolean;
-  actingUserId?: string;
   credentialKind?: string;
 };
 
@@ -139,9 +139,6 @@ function toAuthorizedResolver(
     credentialResolverKind: "linked_principal",
     providerFamily: verifiedGrant.providerFamily,
     actingUserRequired: verifiedGrant.actingUserRequired,
-    ...(verifiedGrant.actingUserId === undefined
-      ? {}
-      : { actingUserId: verifiedGrant.actingUserId }),
     ...(verifiedGrant.credentialKind === undefined
       ? {}
       : { credentialKind: verifiedGrant.credentialKind }),
@@ -236,6 +233,9 @@ export async function authorizeEgressGrant(input: {
       organizationId: verifiedGrant.organizationId,
       familyId: verifiedGrant.familyId,
       variantId: verifiedGrant.variantId,
+      ...(verifiedGrant.actingUserId === undefined
+        ? {}
+        : { actingUserId: verifiedGrant.actingUserId }),
       upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
       ...toAuthorizedResolver(verifiedGrant),
       authInjectionType: verifiedGrant.authInjectionType,
@@ -271,6 +271,9 @@ export async function authorizeEgressGrant(input: {
     organizationId: verifiedGrant.organizationId,
     familyId: verifiedGrant.familyId,
     variantId: verifiedGrant.variantId,
+    ...(verifiedGrant.actingUserId === undefined
+      ? {}
+      : { actingUserId: verifiedGrant.actingUserId }),
     upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
     ...toAuthorizedResolver(verifiedGrant),
     authInjectionType: verifiedGrant.authInjectionType,

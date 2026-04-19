@@ -1,4 +1,5 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { resolveIntegrationEgressCredentialResolver } from "@mistle/integrations-definitions/server";
 import { Hono } from "hono";
 
 import {
@@ -46,6 +47,7 @@ export function createAppComponents(
     controlPlaneInternalClient,
     credentialCache,
     egressGrantConfig,
+    resolveEgressCredentialResolver: resolveIntegrationEgressCredentialResolver,
   });
   const egressProxyUpgradeHandler = createEgressProxyUpgradeHandler({
     controlPlaneInternalClient,

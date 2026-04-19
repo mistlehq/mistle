@@ -1,5 +1,6 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  resolveIntegrationEgressCredentialResolver,
   resolveIntegrationEgressRequestMiddleware,
   resolveProviderEgressTelemetryHandler,
 } from "@mistle/integrations-definitions/server";
@@ -31,6 +32,7 @@ type CreateEgressProxyHandlerInput = {
   credentialCache: CredentialCache;
   egressGrantConfig: EgressGrantConfig;
   resolveRequestMiddleware?: RequestMiddlewareResolver;
+  resolveEgressCredentialResolver?: EgressCredentialResolverSelector;
 };
 
 type CredentialResolverInput =
@@ -67,6 +69,22 @@ type ProxyMutableRequest = {
   body: Uint8Array | undefined;
 };
 type RequestMiddlewareResolver = typeof resolveIntegrationEgressRequestMiddleware;
+type EgressCredentialResolverSelector = typeof resolveIntegrationEgressCredentialResolver;
+type CredentialResolverRef =
+  | {
+      kind: "integration_connection";
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    }
+  | {
+      kind: "linked_principal";
+      providerFamily: string;
+      actingUserRequired: boolean;
+      actingUserId?: string;
+      credentialKind?: string;
+    };
 
 const EgressTracer = trace.getTracer("@mistle/tokenizer-proxy");
 
@@ -304,12 +322,12 @@ function createCredentialCacheKey(input: {
   };
 }
 
-function toCredentialResolverInputFromGrant(input: {
+function toCredentialResolverRefFromGrant(input: {
   grant: AuthorizedEgressGrant;
-}): CredentialResolverInput {
+}): CredentialResolverRef {
   if (input.grant.credentialResolverKind === "integration_connection") {
     return {
-      credentialResolverKind: "integration_connection",
+      kind: "integration_connection",
       connectionId: input.grant.connectionId,
       secretType: input.grant.secretType,
       ...(input.grant.slotKey === undefined ? {} : { slotKey: input.grant.slotKey }),
@@ -318,22 +336,19 @@ function toCredentialResolverInputFromGrant(input: {
   }
 
   return {
-    credentialResolverKind: "linked_principal",
-    organizationId: input.grant.organizationId,
+    kind: "linked_principal",
     providerFamily: input.grant.providerFamily,
     actingUserRequired: input.grant.actingUserRequired,
-    ...(input.grant.actingUserId === undefined ? {} : { actingUserId: input.grant.actingUserId }),
     ...(input.grant.credentialKind === undefined
       ? {}
       : { credentialKind: input.grant.credentialKind }),
   };
 }
 
-function toCredentialResolverInputFromHeader(input: {
+function toCredentialResolverInputFromRef(input: {
   organizationId: string;
-  credentialResolver: NonNullable<
-    AuthorizedEgressGrant["additionalCredentialHeaders"]
-  >[number]["credentialResolver"];
+  actingUserId?: string;
+  credentialResolver: CredentialResolverRef;
 }): CredentialResolverInput {
   if (input.credentialResolver.kind === "integration_connection") {
     return {
@@ -349,33 +364,68 @@ function toCredentialResolverInputFromHeader(input: {
     };
   }
 
+  const actingUserId = input.credentialResolver.actingUserId ?? input.actingUserId;
+  if (input.credentialResolver.actingUserRequired && actingUserId === undefined) {
+    throw new Error("Linked-principal credential resolver is missing actingUserId.");
+  }
+
   return {
     credentialResolverKind: "linked_principal",
     organizationId: input.organizationId,
     providerFamily: input.credentialResolver.providerFamily,
     actingUserRequired: input.credentialResolver.actingUserRequired,
-    ...(input.credentialResolver.actingUserId === undefined
-      ? {}
-      : { actingUserId: input.credentialResolver.actingUserId }),
+    ...(actingUserId === undefined ? {} : { actingUserId }),
     ...(input.credentialResolver.credentialKind === undefined
       ? {}
       : { credentialKind: input.credentialResolver.credentialKind }),
   };
 }
 
-function createGrantResolverLogFields(input: {
-  grant: AuthorizedEgressGrant;
+function createResolverLogFields(input: {
+  resolver: CredentialResolverInput;
 }): Record<string, string> {
-  if (input.grant.credentialResolverKind === "integration_connection") {
+  if (input.resolver.credentialResolverKind === "integration_connection") {
     return {
-      connectionId: input.grant.connectionId,
+      connectionId: input.resolver.connectionId,
     };
   }
 
   return {
-    providerFamily: input.grant.providerFamily,
-    ...(input.grant.actingUserId === undefined ? {} : { actingUserId: input.grant.actingUserId }),
+    providerFamily: input.resolver.providerFamily,
+    ...(input.resolver.actingUserId === undefined
+      ? {}
+      : { actingUserId: input.resolver.actingUserId }),
   };
+}
+
+async function selectCredentialResolverForRequest(input: {
+  egressGrant: AuthorizedEgressGrant;
+  request: ProxyMutableRequest;
+  resolveEgressCredentialResolver: EgressCredentialResolverSelector;
+}): Promise<CredentialResolverInput> {
+  const defaultCredentialResolver = toCredentialResolverRefFromGrant({
+    grant: input.egressGrant,
+  });
+  const selectedCredentialResolver = await input.resolveEgressCredentialResolver({
+    familyId: input.egressGrant.familyId,
+    variantId: input.egressGrant.variantId,
+    selection: {
+      organizationId: input.egressGrant.organizationId,
+      ...(input.egressGrant.actingUserId === undefined
+        ? {}
+        : { actingUserId: input.egressGrant.actingUserId }),
+      request: cloneProxyMutableRequest(input.request),
+      defaultCredentialResolver,
+    },
+  });
+
+  return toCredentialResolverInputFromRef({
+    organizationId: input.egressGrant.organizationId,
+    ...(input.egressGrant.actingUserId === undefined
+      ? {}
+      : { actingUserId: input.egressGrant.actingUserId }),
+    credentialResolver: selectedCredentialResolver,
+  });
 }
 
 async function resolveCredentialWithCache(input: {
@@ -436,7 +486,7 @@ async function applyAdditionalCredentialHeaders(input: {
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       credentialCache: input.credentialCache,
       bindingId: input.bindingId,
-      resolver: toCredentialResolverInputFromHeader({
+      resolver: toCredentialResolverInputFromRef({
         organizationId: input.organizationId,
         credentialResolver: header.credentialResolver,
       }),
@@ -860,22 +910,95 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             method: ctx.req.method,
             requestPath: ctx.req.path,
             bindingId: egressGrant.bindingId,
-            ...(egressGrant.credentialResolverKind === "integration_connection"
-              ? { connectionId: egressGrant.connectionId }
-              : { providerFamily: egressGrant.providerFamily }),
           }),
         );
         span.setAttribute("mistle.auth.injection.type", egressGrant.authInjectionType);
-        if (
-          egressGrant.credentialResolverKind === "integration_connection" &&
-          egressGrant.resolverKey !== undefined
-        ) {
-          span.setAttribute("mistle.credential.resolver_key", egressGrant.resolverKey);
+
+        const upstreamUrl = createUpstreamUrl({
+          requestUrl: ctx.req.url,
+          targetPath,
+          upstreamBaseUrl: egressGrant.upstreamBaseUrl,
+        });
+        span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
+        let outgoingRequest: ProxyMutableRequest = {
+          method: ctx.req.method,
+          url: upstreamUrl,
+          headers: buildOutgoingRequestHeaders(ctx),
+          body: await readOutgoingRequestBody(ctx),
+        };
+
+        if ((egressGrant.requestMiddleware?.length ?? 0) > 0) {
+          outgoingRequest = await applyRequestMiddleware({
+            egressGrant,
+            requestContext: {
+              sandboxInstanceId: egressGrant.sub,
+              sessionUrl: createSessionLinkUrl({
+                controlPlanePublicBaseUrl: ctx.get("config").controlPlaneApi.publicBaseUrl,
+                sandboxInstanceId: egressGrant.sub,
+              }),
+            },
+            request: outgoingRequest,
+            resolveRequestMiddleware:
+              input.resolveRequestMiddleware ?? resolveIntegrationEgressRequestMiddleware,
+            requestPath: ctx.req.path,
+          });
         }
 
-        const primaryResolver = toCredentialResolverInputFromGrant({
-          grant: egressGrant,
-        });
+        let primaryResolver: CredentialResolverInput;
+        try {
+          primaryResolver = await selectCredentialResolverForRequest({
+            egressGrant,
+            request: outgoingRequest,
+            resolveEgressCredentialResolver:
+              input.resolveEgressCredentialResolver ?? resolveIntegrationEgressCredentialResolver,
+          });
+        } catch (error) {
+          logger.error(
+            {
+              err: error,
+              egressRuleId: egressGrant.egressRuleId,
+              bindingId: egressGrant.bindingId,
+              familyId: egressGrant.familyId,
+              variantId: egressGrant.variantId,
+            },
+            "Failed to select request egress credential resolver",
+          );
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "credential resolver selection failed",
+          });
+          return ctx.json(
+            createErrorResponse({
+              code: "CREDENTIAL_RESOLUTION_FAILED",
+              message: "Failed to resolve outbound credential.",
+            }),
+            502,
+          );
+        }
+
+        span.setAttribute(
+          "mistle.credential.resolver.kind",
+          primaryResolver.credentialResolverKind,
+        );
+        span.setAttributes(
+          createEgressTelemetryBaseAttributes({
+            egressRuleId: egressGrant.egressRuleId,
+            method: ctx.req.method,
+            requestPath: ctx.req.path,
+            bindingId: egressGrant.bindingId,
+            ...(primaryResolver.credentialResolverKind === "integration_connection"
+              ? { connectionId: primaryResolver.connectionId }
+              : { providerFamily: primaryResolver.providerFamily }),
+          }),
+        );
+        if (
+          primaryResolver.credentialResolverKind === "integration_connection" &&
+          primaryResolver.resolverKey !== undefined
+        ) {
+          span.setAttribute("mistle.credential.resolver_key", primaryResolver.resolverKey);
+        }
+
         const cacheKey = createCredentialCacheKey({
           bindingId: egressGrant.bindingId,
           resolver: primaryResolver,
@@ -901,8 +1024,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     method: ctx.req.method,
                     requestPath: ctx.req.path,
                     bindingId: egressGrant.bindingId,
-                    ...createGrantResolverLogFields({
-                      grant: egressGrant,
+                    ...createResolverLogFields({
+                      resolver: primaryResolver,
                     }),
                   }),
                 );
@@ -940,22 +1063,19 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 err: error,
                 egressRuleId: egressGrant.egressRuleId,
                 bindingId: egressGrant.bindingId,
-                ...(egressGrant.credentialResolverKind === "integration_connection"
-                  ? {
-                      connectionId: egressGrant.connectionId,
-                      secretType: egressGrant.secretType,
-                      ...(egressGrant.resolverKey === undefined
-                        ? {}
-                        : { resolverKey: egressGrant.resolverKey }),
-                    }
-                  : {
-                      providerFamily: egressGrant.providerFamily,
-                      ...(egressGrant.credentialKind === undefined
-                        ? {}
-                        : { credentialKind: egressGrant.credentialKind }),
-                    }),
+                ...createResolverLogFields({
+                  resolver: primaryResolver,
+                }),
+                ...(primaryResolver.credentialResolverKind !== "linked_principal" ||
+                primaryResolver.credentialKind === undefined
+                  ? {}
+                  : { credentialKind: primaryResolver.credentialKind }),
+                ...(primaryResolver.credentialResolverKind !== "integration_connection" ||
+                primaryResolver.resolverKey === undefined
+                  ? {}
+                  : { resolverKey: primaryResolver.resolverKey }),
               },
-              "Failed to resolve integration credential from control-plane-api",
+              "Failed to resolve outbound credential from control-plane-api",
             );
             span.recordException(error instanceof Error ? error : new Error(String(error)));
             span.setStatus({
@@ -965,7 +1085,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             return ctx.json(
               createErrorResponse({
                 code: "CREDENTIAL_RESOLUTION_FAILED",
-                message: "Failed to resolve integration credential.",
+                message: "Failed to resolve outbound credential.",
               }),
               502,
             );
@@ -976,36 +1096,6 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           throw new Error("Expected integration credential to be resolved.");
         }
         span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
-
-        const upstreamUrl = createUpstreamUrl({
-          requestUrl: ctx.req.url,
-          targetPath,
-          upstreamBaseUrl: egressGrant.upstreamBaseUrl,
-        });
-        span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
-        let outgoingRequest: ProxyMutableRequest = {
-          method: ctx.req.method,
-          url: upstreamUrl,
-          headers: buildOutgoingRequestHeaders(ctx),
-          body: await readOutgoingRequestBody(ctx),
-        };
-
-        if ((egressGrant.requestMiddleware?.length ?? 0) > 0) {
-          outgoingRequest = await applyRequestMiddleware({
-            egressGrant,
-            requestContext: {
-              sandboxInstanceId: egressGrant.sub,
-              sessionUrl: createSessionLinkUrl({
-                controlPlanePublicBaseUrl: ctx.get("config").controlPlaneApi.publicBaseUrl,
-                sandboxInstanceId: egressGrant.sub,
-              }),
-            },
-            request: outgoingRequest,
-            resolveRequestMiddleware:
-              input.resolveRequestMiddleware ?? resolveIntegrationEgressRequestMiddleware,
-            requestPath: ctx.req.path,
-          });
-        }
 
         if (egressGrant.additionalHeaders !== undefined) {
           applyAdditionalHeaders({
@@ -1040,7 +1130,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             return ctx.json(
               createErrorResponse({
                 code: "CREDENTIAL_RESOLUTION_FAILED",
-                message: "Failed to resolve integration credential.",
+                message: "Failed to resolve outbound credential.",
               }),
               502,
             );
@@ -1105,8 +1195,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 err: error,
                 egressRuleId: egressGrant.egressRuleId,
                 bindingId: egressGrant.bindingId,
-                ...createGrantResolverLogFields({
-                  grant: egressGrant,
+                ...createResolverLogFields({
+                  resolver: primaryResolver,
                 }),
                 awsService: egressGrant.authInjectionService,
                 awsRegion: egressGrant.authInjectionRegion,
@@ -1227,8 +1317,8 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               upstreamResponseBody,
               egressRuleId: egressGrant.egressRuleId,
               bindingId: egressGrant.bindingId,
-              ...createGrantResolverLogFields({
-                grant: egressGrant,
+              ...createResolverLogFields({
+                resolver: primaryResolver,
               }),
               ...(egressGrant.authInjectionType !== "aws_sigv4"
                 ? {}

@@ -320,6 +320,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
 
   const slotKey = toNonEmptyString(input.slotKey);
   const resolverKey = toNonEmptyString(input.resolverKey);
+  const actingUserId = toNonEmptyString(input.actingUserId);
   const credentialResolverKind = parseCredentialResolverKind(input.credentialResolverKind);
   if (credentialResolverKind === undefined) {
     throw missingClaimError(
@@ -340,7 +341,6 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
         credentialResolverKind: "linked_principal";
         providerFamily: string;
         actingUserRequired: boolean;
-        actingUserId?: string;
         credentialKind?: string;
       };
   if (credentialResolverKind === "integration_connection") {
@@ -365,7 +365,6 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       EgressGrantErrorCode.PROVIDER_FAMILY_REQUIRED,
       "providerFamily",
     );
-    const actingUserId = toNonEmptyString(input.actingUserId);
     const credentialKind = toNonEmptyString(input.credentialKind);
 
     if (typeof input.actingUserRequired !== "boolean") {
@@ -380,7 +379,6 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       credentialResolverKind: "linked_principal",
       providerFamily,
       actingUserRequired: input.actingUserRequired,
-      ...(actingUserId === undefined ? {} : { actingUserId }),
       ...(credentialKind === undefined ? {} : { credentialKind }),
     };
   }
@@ -396,6 +394,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
     ),
     familyId: requireClaim(input.familyId, EgressGrantErrorCode.FAMILY_ID_REQUIRED, "familyId"),
     variantId: requireClaim(input.variantId, EgressGrantErrorCode.VARIANT_ID_REQUIRED, "variantId"),
+    ...(actingUserId === undefined ? {} : { actingUserId }),
     upstreamBaseUrl: requireClaim(
       input.upstreamBaseUrl,
       EgressGrantErrorCode.UPSTREAM_BASE_URL_REQUIRED,

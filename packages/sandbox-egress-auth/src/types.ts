@@ -32,6 +32,7 @@ type EgressGrantClaimsBase = {
   organizationId: string;
   familyId: string;
   variantId: string;
+  actingUserId?: string;
   upstreamBaseUrl: string;
   additionalHeaders?: Readonly<Record<string, string>>;
   additionalCredentialHeaders?: ReadonlyArray<EgressGrantCredentialHeaderInjection>;
@@ -52,7 +53,6 @@ type LinkedPrincipalCredentialResolverClaims = {
   credentialResolverKind: "linked_principal";
   providerFamily: string;
   actingUserRequired: boolean;
-  actingUserId?: string;
   credentialKind?: string;
 };
 

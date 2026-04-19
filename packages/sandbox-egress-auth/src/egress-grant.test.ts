@@ -165,6 +165,26 @@ describe("egress-grant", () => {
     ).resolves.toEqual(linkedPrincipalClaims);
   });
 
+  it("round-trips actingUserId on integration-connection grants", async () => {
+    const claims = {
+      ...defaultClaims,
+      actingUserId: "usr_123",
+    } satisfies EgressGrantClaims;
+
+    const token = await mintEgressGrant({
+      config: defaultConfig,
+      claims,
+      ttlSeconds: 60,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).resolves.toEqual(claims);
+  });
+
   it("allows basic auth grants to carry authInjectionUsername", async () => {
     const token = await mintEgressGrant({
       config: defaultConfig,

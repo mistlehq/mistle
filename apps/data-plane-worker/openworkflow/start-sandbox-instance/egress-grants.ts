@@ -74,6 +74,7 @@ export async function createEgressGrantByRuleId(input: {
             resolver: route.credentialResolver,
             ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
           }),
+          ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
           upstreamBaseUrl: route.upstream.baseUrl,
           authInjectionType: route.authInjection.type,
           ...(route.additionalHeaders === undefined
