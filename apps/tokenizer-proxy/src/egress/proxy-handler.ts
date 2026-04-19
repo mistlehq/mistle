@@ -48,6 +48,7 @@ type CredentialResolverInput =
       organizationId: string;
       providerFamily: string;
       actingUserRequired: boolean;
+      resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
     };
@@ -82,6 +83,7 @@ type CredentialResolverRef =
       kind: "linked_principal";
       providerFamily: string;
       actingUserRequired: boolean;
+      resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
     };
@@ -339,6 +341,7 @@ function toCredentialResolverRefFromGrant(input: {
     kind: "linked_principal",
     providerFamily: input.grant.providerFamily,
     actingUserRequired: input.grant.actingUserRequired,
+    resolutionMode: input.grant.resolutionMode,
     ...(input.grant.credentialKind === undefined
       ? {}
       : { credentialKind: input.grant.credentialKind }),
@@ -374,6 +377,7 @@ function toCredentialResolverInputFromRef(input: {
     organizationId: input.organizationId,
     providerFamily: input.credentialResolver.providerFamily,
     actingUserRequired: input.credentialResolver.actingUserRequired,
+    resolutionMode: input.credentialResolver.resolutionMode,
     ...(actingUserId === undefined ? {} : { actingUserId }),
     ...(input.credentialResolver.credentialKind === undefined
       ? {}
@@ -402,7 +406,10 @@ async function selectCredentialResolverForRequest(input: {
   egressGrant: AuthorizedEgressGrant;
   request: ProxyMutableRequest;
   resolveEgressCredentialResolver: EgressCredentialResolverSelector;
-}): Promise<CredentialResolverInput> {
+}): Promise<{
+  primaryResolver: CredentialResolverInput;
+  fallbackResolver?: CredentialResolverInput;
+}> {
   const defaultCredentialResolver = toCredentialResolverRefFromGrant({
     grant: input.egressGrant,
   });
@@ -419,13 +426,56 @@ async function selectCredentialResolverForRequest(input: {
     },
   });
 
-  return toCredentialResolverInputFromRef({
-    organizationId: input.egressGrant.organizationId,
-    ...(input.egressGrant.actingUserId === undefined
-      ? {}
-      : { actingUserId: input.egressGrant.actingUserId }),
-    credentialResolver: selectedCredentialResolver,
-  });
+  const defaultIntegrationConnectionFallback =
+    defaultCredentialResolver.kind !== "integration_connection"
+      ? undefined
+      : toCredentialResolverInputFromRef({
+          organizationId: input.egressGrant.organizationId,
+          ...(input.egressGrant.actingUserId === undefined
+            ? {}
+            : { actingUserId: input.egressGrant.actingUserId }),
+          credentialResolver: defaultCredentialResolver,
+        });
+
+  if (
+    selectedCredentialResolver.kind === "linked_principal" &&
+    selectedCredentialResolver.resolutionMode === "preferred" &&
+    defaultIntegrationConnectionFallback !== undefined
+  ) {
+    try {
+      return {
+        primaryResolver: toCredentialResolverInputFromRef({
+          organizationId: input.egressGrant.organizationId,
+          ...(input.egressGrant.actingUserId === undefined
+            ? {}
+            : { actingUserId: input.egressGrant.actingUserId }),
+          credentialResolver: selectedCredentialResolver,
+        }),
+        fallbackResolver: defaultIntegrationConnectionFallback,
+      };
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message === "Linked-principal credential resolver is missing actingUserId."
+      ) {
+        return {
+          primaryResolver: defaultIntegrationConnectionFallback,
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  return {
+    primaryResolver: toCredentialResolverInputFromRef({
+      organizationId: input.egressGrant.organizationId,
+      ...(input.egressGrant.actingUserId === undefined
+        ? {}
+        : { actingUserId: input.egressGrant.actingUserId }),
+      credentialResolver: selectedCredentialResolver,
+    }),
+  };
 }
 
 async function resolveCredentialWithCache(input: {
@@ -945,13 +995,16 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         }
 
         let primaryResolver: CredentialResolverInput;
+        let fallbackResolver: CredentialResolverInput | undefined;
         try {
-          primaryResolver = await selectCredentialResolverForRequest({
+          const selectedCredentialResolvers = await selectCredentialResolverForRequest({
             egressGrant,
             request: outgoingRequest,
             resolveEgressCredentialResolver:
               input.resolveEgressCredentialResolver ?? resolveIntegrationEgressCredentialResolver,
           });
+          primaryResolver = selectedCredentialResolvers.primaryResolver;
+          fallbackResolver = selectedCredentialResolvers.fallbackResolver;
         } catch (error) {
           logger.error(
             {
@@ -977,28 +1030,6 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           );
         }
 
-        span.setAttribute(
-          "mistle.credential.resolver.kind",
-          primaryResolver.credentialResolverKind,
-        );
-        span.setAttributes(
-          createEgressTelemetryBaseAttributes({
-            egressRuleId: egressGrant.egressRuleId,
-            method: ctx.req.method,
-            requestPath: ctx.req.path,
-            bindingId: egressGrant.bindingId,
-            ...(primaryResolver.credentialResolverKind === "integration_connection"
-              ? { connectionId: primaryResolver.connectionId }
-              : { providerFamily: primaryResolver.providerFamily }),
-          }),
-        );
-        if (
-          primaryResolver.credentialResolverKind === "integration_connection" &&
-          primaryResolver.resolverKey !== undefined
-        ) {
-          span.setAttribute("mistle.credential.resolver_key", primaryResolver.resolverKey);
-        }
-
         const cacheKey = createCredentialCacheKey({
           bindingId: egressGrant.bindingId,
           resolver: primaryResolver,
@@ -1014,8 +1045,10 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         span.setAttribute("mistle.credential.cache_hit", resolvedCredential !== undefined);
 
         if (resolvedCredential === undefined) {
-          try {
-            const resolvedCredentialFromControlPlane = await EgressTracer.startActiveSpan(
+          const resolveCredentialFromControlPlane = async (
+            resolver: CredentialResolverInput,
+          ): Promise<CachedCredential> =>
+            await EgressTracer.startActiveSpan(
               "tokenizer_proxy.egress.resolve_credential",
               async (credentialSpan) => {
                 credentialSpan.setAttributes(
@@ -1025,7 +1058,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     requestPath: ctx.req.path,
                     bindingId: egressGrant.bindingId,
                     ...createResolverLogFields({
-                      resolver: primaryResolver,
+                      resolver,
                     }),
                   }),
                 );
@@ -1034,7 +1067,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     controlPlaneInternalClient: input.controlPlaneInternalClient,
                     credentialCache: input.credentialCache,
                     bindingId: egressGrant.bindingId,
-                    resolver: primaryResolver,
+                    resolver,
                   });
 
                   credentialSpan.setAttribute(
@@ -1056,9 +1089,45 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 }
               },
             );
-            resolvedCredential = resolvedCredentialFromControlPlane;
+
+          try {
+            resolvedCredential = await resolveCredentialFromControlPlane(primaryResolver);
           } catch (error) {
-            logger.error(
+            if (fallbackResolver === undefined) {
+              logger.error(
+                {
+                  err: error,
+                  egressRuleId: egressGrant.egressRuleId,
+                  bindingId: egressGrant.bindingId,
+                  ...createResolverLogFields({
+                    resolver: primaryResolver,
+                  }),
+                  ...(primaryResolver.credentialResolverKind !== "linked_principal" ||
+                  primaryResolver.credentialKind === undefined
+                    ? {}
+                    : { credentialKind: primaryResolver.credentialKind }),
+                  ...(primaryResolver.credentialResolverKind !== "integration_connection" ||
+                  primaryResolver.resolverKey === undefined
+                    ? {}
+                    : { resolverKey: primaryResolver.resolverKey }),
+                },
+                "Failed to resolve outbound credential from control-plane-api",
+              );
+              span.recordException(error instanceof Error ? error : new Error(String(error)));
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: "credential resolution failed",
+              });
+              return ctx.json(
+                createErrorResponse({
+                  code: "CREDENTIAL_RESOLUTION_FAILED",
+                  message: "Failed to resolve outbound credential.",
+                }),
+                502,
+              );
+            }
+
+            logger.warn(
               {
                 err: error,
                 egressRuleId: egressGrant.egressRuleId,
@@ -1066,34 +1135,72 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 ...createResolverLogFields({
                   resolver: primaryResolver,
                 }),
-                ...(primaryResolver.credentialResolverKind !== "linked_principal" ||
-                primaryResolver.credentialKind === undefined
-                  ? {}
-                  : { credentialKind: primaryResolver.credentialKind }),
-                ...(primaryResolver.credentialResolverKind !== "integration_connection" ||
-                primaryResolver.resolverKey === undefined
-                  ? {}
-                  : { resolverKey: primaryResolver.resolverKey }),
+                fallbackConnectionId:
+                  fallbackResolver.credentialResolverKind === "integration_connection"
+                    ? fallbackResolver.connectionId
+                    : undefined,
               },
-              "Failed to resolve outbound credential from control-plane-api",
+              "Failed to resolve preferred linked-principal credential; falling back to default outbound credential",
             );
-            span.recordException(error instanceof Error ? error : new Error(String(error)));
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: "credential resolution failed",
-            });
-            return ctx.json(
-              createErrorResponse({
-                code: "CREDENTIAL_RESOLUTION_FAILED",
-                message: "Failed to resolve outbound credential.",
-              }),
-              502,
-            );
+            span.addEvent("mistle.credential.resolver.fallback");
+            span.setAttribute("mistle.credential.resolver.fallback_used", true);
+
+            try {
+              resolvedCredential = await resolveCredentialFromControlPlane(fallbackResolver);
+              primaryResolver = fallbackResolver;
+            } catch (fallbackError) {
+              logger.error(
+                {
+                  err: fallbackError,
+                  egressRuleId: egressGrant.egressRuleId,
+                  bindingId: egressGrant.bindingId,
+                  ...createResolverLogFields({
+                    resolver: fallbackResolver,
+                  }),
+                },
+                "Failed to resolve fallback outbound credential from control-plane-api",
+              );
+              span.recordException(
+                fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError)),
+              );
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: "credential resolution failed",
+              });
+              return ctx.json(
+                createErrorResponse({
+                  code: "CREDENTIAL_RESOLUTION_FAILED",
+                  message: "Failed to resolve outbound credential.",
+                }),
+                502,
+              );
+            }
           }
         }
 
         if (resolvedCredential === undefined) {
           throw new Error("Expected integration credential to be resolved.");
+        }
+        span.setAttribute(
+          "mistle.credential.resolver.kind",
+          primaryResolver.credentialResolverKind,
+        );
+        span.setAttributes(
+          createEgressTelemetryBaseAttributes({
+            egressRuleId: egressGrant.egressRuleId,
+            method: ctx.req.method,
+            requestPath: ctx.req.path,
+            bindingId: egressGrant.bindingId,
+            ...(primaryResolver.credentialResolverKind === "integration_connection"
+              ? { connectionId: primaryResolver.connectionId }
+              : { providerFamily: primaryResolver.providerFamily }),
+          }),
+        );
+        if (
+          primaryResolver.credentialResolverKind === "integration_connection" &&
+          primaryResolver.resolverKey !== undefined
+        ) {
+          span.setAttribute("mistle.credential.resolver_key", primaryResolver.resolverKey);
         }
         span.setAttribute("mistle.integration.credential.result_kind", resolvedCredential.kind);
 

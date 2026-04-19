@@ -39,6 +39,7 @@ const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
       providerFamily: z.string().min(1),
       credentialKind: z.string().min(1).optional(),
       actingUserRequired: z.boolean(),
+      resolutionMode: z.enum(["required", "preferred"]),
     })
     .strict(),
 ]);
@@ -522,6 +523,7 @@ function normalizeCredentialResolver(
     kind: "linked_principal",
     providerFamily: resolver.providerFamily,
     actingUserRequired: resolver.actingUserRequired,
+    resolutionMode: resolver.resolutionMode,
     ...(resolver.credentialKind === undefined ? {} : { credentialKind: resolver.credentialKind }),
   };
 }
@@ -560,6 +562,10 @@ function compareCredentialResolvers(
 
   if (left.credentialKind !== right.credentialKind) {
     return (left.credentialKind ?? "").localeCompare(right.credentialKind ?? "");
+  }
+
+  if (left.resolutionMode !== right.resolutionMode) {
+    return left.resolutionMode.localeCompare(right.resolutionMode);
   }
 
   return Number(left.actingUserRequired) - Number(right.actingUserRequired);

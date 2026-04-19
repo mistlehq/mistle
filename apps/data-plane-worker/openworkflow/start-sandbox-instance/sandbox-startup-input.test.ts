@@ -75,6 +75,7 @@ const RuntimePlanSchema = z.object({
           kind: z.literal("linked_principal"),
           providerFamily: z.string().min(1),
           actingUserRequired: z.boolean(),
+          resolutionMode: z.enum(["required", "preferred"]),
           credentialKind: z.string().min(1).optional(),
         }),
       ]),
@@ -400,6 +401,7 @@ describe("encodeSandboxStartupInput", () => {
               kind: "linked_principal",
               providerFamily: "github",
               actingUserRequired: true,
+              resolutionMode: "required",
               credentialKind: "github_app_user_access_token",
             },
           },
@@ -413,6 +415,7 @@ describe("encodeSandboxStartupInput", () => {
       kind: "linked_principal",
       providerFamily: "github",
       actingUserRequired: true,
+      resolutionMode: "required",
       credentialKind: "github_app_user_access_token",
     });
   });

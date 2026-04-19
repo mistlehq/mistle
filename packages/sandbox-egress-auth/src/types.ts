@@ -20,6 +20,7 @@ export type EgressGrantCredentialHeaderInjection = {
         kind: "linked_principal";
         providerFamily: string;
         actingUserRequired: boolean;
+        resolutionMode: "required" | "preferred";
         actingUserId?: string;
         credentialKind?: string;
       };
@@ -53,6 +54,7 @@ type LinkedPrincipalCredentialResolverClaims = {
   credentialResolverKind: "linked_principal";
   providerFamily: string;
   actingUserRequired: boolean;
+  resolutionMode: "required" | "preferred";
   credentialKind?: string;
 };
 
@@ -87,6 +89,7 @@ type EgressGrantClaimsInputBase = {
   secretType?: string | undefined;
   providerFamily?: string | undefined;
   actingUserRequired?: boolean | undefined;
+  resolutionMode?: "required" | "preferred" | undefined;
   actingUserId?: string | undefined;
   credentialKind?: string | undefined;
   upstreamBaseUrl: string | undefined;

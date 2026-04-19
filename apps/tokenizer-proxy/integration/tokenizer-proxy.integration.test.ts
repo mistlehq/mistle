@@ -178,6 +178,7 @@ async function mintLinkedPrincipalEgressGrant(
       credentialResolverKind: "linked_principal",
       providerFamily: input.providerFamily,
       actingUserRequired: true,
+      resolutionMode: "required",
       actingUserId: input.actingUserId,
       upstreamBaseUrl: input.upstreamBaseUrl,
       authInjectionType: input.authInjectionType,
@@ -1662,7 +1663,7 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
-  it("fails github pull request creation without falling back to installation credentials", async () => {
+  it("falls back to installation credentials when github linked-principal resolution fails", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -1726,11 +1727,9 @@ describe("tokenizer proxy integration", () => {
         },
       );
 
-      expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({
-        code: "CREDENTIAL_RESOLUTION_FAILED",
-        message: "Failed to resolve outbound credential.",
-      });
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghs_installation_token");
       expect(controlPlaneServer.principalCredentialRequests).toEqual([
         {
           organizationId: "org_123",
@@ -1739,7 +1738,88 @@ describe("tokenizer proxy integration", () => {
           credentialKind: "github_app_user_access_token",
         },
       ]);
-      expect(controlPlaneServer.requests).toEqual([]);
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          connectionId: "icn_github",
+          secretType: "github_app_installation_token",
+          resolverKey: "github_app_installation_token",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("falls back to installation credentials when github linked-principal selection lacks acting user context", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_installation_token",
+      principalCredentialValue: "ghu_user_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_github_create_pr_missing_actor",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      organizationId: "org_123",
+      familyId: "github",
+      variantId: "github-cloud",
+      connectionId: "icn_github",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghs_installation_token");
+      expect(controlPlaneServer.principalCredentialRequests).toEqual([]);
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          connectionId: "icn_github",
+          secretType: "github_app_installation_token",
+          resolverKey: "github_app_installation_token",
+        },
+      ]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
     }

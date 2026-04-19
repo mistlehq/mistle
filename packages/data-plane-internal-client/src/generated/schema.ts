@@ -296,6 +296,8 @@ export interface paths {
                         /** @enum {string} */
                         kind: "linked_principal";
                         providerFamily: string;
+                        /** @enum {string} */
+                        resolutionMode: "required" | "preferred";
                       };
                   header: string;
                 }[];
@@ -346,6 +348,8 @@ export interface paths {
                       /** @enum {string} */
                       kind: "linked_principal";
                       providerFamily: string;
+                      /** @enum {string} */
+                      resolutionMode: "required" | "preferred";
                     };
                 egressRuleId: string;
                 familyId: string;
@@ -725,6 +729,8 @@ export interface paths {
                           /** @enum {string} */
                           kind: "linked_principal";
                           providerFamily: string;
+                          /** @enum {string} */
+                          resolutionMode: "required" | "preferred";
                         };
                     header: string;
                   }[];
@@ -775,6 +781,8 @@ export interface paths {
                         /** @enum {string} */
                         kind: "linked_principal";
                         providerFamily: string;
+                        /** @enum {string} */
+                        resolutionMode: "required" | "preferred";
                       };
                   egressRuleId: string;
                   familyId: string;

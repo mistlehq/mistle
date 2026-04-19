@@ -20,6 +20,7 @@ function toGrantCredentialResolver(input: {
       kind: "linked_principal";
       providerFamily: string;
       actingUserRequired: boolean;
+      resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
     } {
@@ -39,6 +40,7 @@ function toGrantCredentialResolver(input: {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
     actingUserRequired: input.resolver.actingUserRequired,
+    resolutionMode: input.resolver.resolutionMode,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.resolver.credentialKind === undefined
       ? {}

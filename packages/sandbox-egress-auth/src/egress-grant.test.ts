@@ -76,6 +76,7 @@ const linkedPrincipalClaims = {
   credentialResolverKind: "linked_principal",
   providerFamily: "github",
   actingUserRequired: true,
+  resolutionMode: "required",
   actingUserId: "usr_123",
   credentialKind: "github_app_user_access_token",
   upstreamBaseUrl: "https://api.github.com",

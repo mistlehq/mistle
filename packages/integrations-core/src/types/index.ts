@@ -1163,11 +1163,14 @@ export type IntegrationConnectionEgressCredentialResolverRef = {
   resolverKey?: string;
 };
 
+export type LinkedPrincipalEgressCredentialResolutionMode = "required" | "preferred";
+
 export type LinkedPrincipalEgressCredentialResolverRef = {
   kind: "linked_principal";
   providerFamily: string;
   credentialKind?: string;
   actingUserRequired: boolean;
+  resolutionMode: LinkedPrincipalEgressCredentialResolutionMode;
 };
 
 export type EgressCredentialResolverRef =

@@ -95,6 +95,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
       providerFamily: GitHubFamilyId,
       credentialKind: "github_app_user_access_token",
       actingUserRequired: true,
+      resolutionMode: "preferred",
     });
   });
 
@@ -115,6 +116,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
           providerFamily: GitHubFamilyId,
           credentialKind: "github_app_user_access_token",
           actingUserRequired: true,
+          resolutionMode: "required",
         },
       }),
     ).toEqual({
@@ -122,6 +124,7 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
       providerFamily: GitHubFamilyId,
       credentialKind: "github_app_user_access_token",
       actingUserRequired: true,
+      resolutionMode: "required",
     });
   });
 });

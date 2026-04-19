@@ -178,6 +178,7 @@ function normalizeAdditionalCredentialHeaderResolver(
     kind: "linked_principal",
     providerFamily,
     actingUserRequired: resolver.actingUserRequired,
+    resolutionMode: resolver.resolutionMode,
     ...(actingUserId === undefined ? {} : { actingUserId }),
     ...(credentialKind === undefined ? {} : { credentialKind }),
   };
@@ -217,6 +218,10 @@ function compareAdditionalCredentialHeaderResolvers(
 
   if (left.credentialKind !== right.credentialKind) {
     return (left.credentialKind ?? "").localeCompare(right.credentialKind ?? "");
+  }
+
+  if (left.resolutionMode !== right.resolutionMode) {
+    return left.resolutionMode.localeCompare(right.resolutionMode);
   }
 
   if (left.actingUserRequired !== right.actingUserRequired) {
@@ -341,6 +346,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
         credentialResolverKind: "linked_principal";
         providerFamily: string;
         actingUserRequired: boolean;
+        resolutionMode: "required" | "preferred";
         credentialKind?: string;
       };
   if (credentialResolverKind === "integration_connection") {
@@ -366,6 +372,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       "providerFamily",
     );
     const credentialKind = toNonEmptyString(input.credentialKind);
+    const resolutionMode = input.resolutionMode ?? "required";
 
     if (typeof input.actingUserRequired !== "boolean") {
       throw missingClaimError(EgressGrantErrorCode.ACTING_USER_ID_REQUIRED, "actingUserRequired");
@@ -379,6 +386,7 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
       credentialResolverKind: "linked_principal",
       providerFamily,
       actingUserRequired: input.actingUserRequired,
+      resolutionMode,
       ...(credentialKind === undefined ? {} : { credentialKind }),
     };
   }

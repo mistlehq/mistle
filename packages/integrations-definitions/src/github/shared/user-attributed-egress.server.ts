@@ -67,5 +67,6 @@ export function resolveGitHubUserAttributedEgressCredentialResolver(
     providerFamily: GitHubFamilyId,
     credentialKind: GitHubLinkedUserCredentialKind,
     actingUserRequired: true,
+    resolutionMode: "preferred",
   };
 }

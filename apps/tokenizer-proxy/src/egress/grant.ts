@@ -30,6 +30,7 @@ type AuthorizedEgressGrantBase = {
           kind: "linked_principal";
           providerFamily: string;
           actingUserRequired: boolean;
+          resolutionMode: "required" | "preferred";
           actingUserId?: string;
           credentialKind?: string;
         };
@@ -52,6 +53,7 @@ type AuthorizedLinkedPrincipalResolver = {
   credentialResolverKind: "linked_principal";
   providerFamily: string;
   actingUserRequired: boolean;
+  resolutionMode: "required" | "preferred";
   credentialKind?: string;
 };
 
@@ -139,6 +141,7 @@ function toAuthorizedResolver(
     credentialResolverKind: "linked_principal",
     providerFamily: verifiedGrant.providerFamily,
     actingUserRequired: verifiedGrant.actingUserRequired,
+    resolutionMode: verifiedGrant.resolutionMode,
     ...(verifiedGrant.credentialKind === undefined
       ? {}
       : { credentialKind: verifiedGrant.credentialKind }),
@@ -167,6 +170,7 @@ function toAuthorizedAdditionalCredentialHeaders(
             kind: "linked_principal",
             providerFamily: header.credentialResolver.providerFamily,
             actingUserRequired: header.credentialResolver.actingUserRequired,
+            resolutionMode: header.credentialResolver.resolutionMode,
             ...(header.credentialResolver.actingUserId === undefined
               ? {}
               : { actingUserId: header.credentialResolver.actingUserId }),

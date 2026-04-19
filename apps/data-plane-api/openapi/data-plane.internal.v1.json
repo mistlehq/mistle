@@ -297,12 +297,17 @@
                                           },
                                           "actingUserRequired": {
                                             "type": "boolean"
+                                          },
+                                          "resolutionMode": {
+                                            "type": "string",
+                                            "enum": ["required", "preferred"]
                                           }
                                         },
                                         "required": [
                                           "kind",
                                           "providerFamily",
-                                          "actingUserRequired"
+                                          "actingUserRequired",
+                                          "resolutionMode"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -359,9 +364,18 @@
                                     },
                                     "actingUserRequired": {
                                       "type": "boolean"
+                                    },
+                                    "resolutionMode": {
+                                      "type": "string",
+                                      "enum": ["required", "preferred"]
                                     }
                                   },
-                                  "required": ["kind", "providerFamily", "actingUserRequired"],
+                                  "required": [
+                                    "kind",
+                                    "providerFamily",
+                                    "actingUserRequired",
+                                    "resolutionMode"
+                                  ],
                                   "additionalProperties": false
                                 }
                               ]
@@ -1899,12 +1913,17 @@
                                             },
                                             "actingUserRequired": {
                                               "type": "boolean"
+                                            },
+                                            "resolutionMode": {
+                                              "type": "string",
+                                              "enum": ["required", "preferred"]
                                             }
                                           },
                                           "required": [
                                             "kind",
                                             "providerFamily",
-                                            "actingUserRequired"
+                                            "actingUserRequired",
+                                            "resolutionMode"
                                           ],
                                           "additionalProperties": false
                                         }
@@ -1961,9 +1980,18 @@
                                       },
                                       "actingUserRequired": {
                                         "type": "boolean"
+                                      },
+                                      "resolutionMode": {
+                                        "type": "string",
+                                        "enum": ["required", "preferred"]
                                       }
                                     },
-                                    "required": ["kind", "providerFamily", "actingUserRequired"],
+                                    "required": [
+                                      "kind",
+                                      "providerFamily",
+                                      "actingUserRequired",
+                                      "resolutionMode"
+                                    ],
                                     "additionalProperties": false
                                   }
                                 ]

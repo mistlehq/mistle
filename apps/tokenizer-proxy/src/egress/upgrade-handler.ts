@@ -35,6 +35,7 @@ type CredentialResolverInput =
       organizationId: string;
       providerFamily: string;
       actingUserRequired: boolean;
+      resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
     };
@@ -262,6 +263,7 @@ function toCredentialResolverInputFromGrant(input: {
     organizationId: input.grant.organizationId,
     providerFamily: input.grant.providerFamily,
     actingUserRequired: input.grant.actingUserRequired,
+    resolutionMode: input.grant.resolutionMode,
     ...(input.grant.actingUserId === undefined ? {} : { actingUserId: input.grant.actingUserId }),
     ...(input.grant.credentialKind === undefined
       ? {}
@@ -294,6 +296,7 @@ function toCredentialResolverInputFromHeader(input: {
     organizationId: input.organizationId,
     providerFamily: input.credentialResolver.providerFamily,
     actingUserRequired: input.credentialResolver.actingUserRequired,
+    resolutionMode: input.credentialResolver.resolutionMode,
     ...(input.credentialResolver.actingUserId === undefined
       ? {}
       : { actingUserId: input.credentialResolver.actingUserId }),
