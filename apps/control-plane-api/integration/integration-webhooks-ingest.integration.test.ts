@@ -9,8 +9,14 @@ import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   integrationTargets,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
   integrationWebhookSources,
   IntegrationWebhookSourceStatuses,
+  userExternalPrincipalKeys,
+  UserExternalPrincipalKeyStatuses,
+  userExternalPrincipals,
+  UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
@@ -252,6 +258,99 @@ function signSlackWebhookPayload(input: {
     .update(`v0:${input.timestamp}:${input.payload}`, "utf8")
     .digest("hex");
   return `v0=${digest}`;
+}
+
+async function createSlackAppOAuthConnection(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  cookie: string;
+  displayName: string;
+}): Promise<string> {
+  const createConnectionResponse = await input.fixture.request(
+    "/v1/integration/connections/slack-default/form",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: "slack-app-oauth",
+        config: {
+          connection_method: "slack-app-oauth",
+          client_id: "123.456",
+        },
+        secrets: {
+          botToken: "xoxb-test-bot-token",
+          signingSecret: "slack-signing-secret",
+          clientSecret: "slack-client-secret",
+        },
+      }),
+    },
+  );
+
+  expect(createConnectionResponse.status).toBe(201);
+  const connection = IntegrationConnectionSchema.parse(await createConnectionResponse.json());
+  return connection.id;
+}
+
+async function insertSlackLinkedPrincipal(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  userId: string;
+  connectionId: string;
+}): Promise<{ principalId: string }> {
+  const providerConfigId = `ilp_${input.connectionId}`;
+  const principalId = `uep_${input.connectionId}`;
+
+  await input.fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+    id: providerConfigId,
+    organizationId: input.organizationId,
+    providerFamily: "slack",
+    integrationTargetKey: "slack-default",
+    integrationConnectionId: input.connectionId,
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    createdByUserId: input.userId,
+    updatedByUserId: input.userId,
+  });
+  await input.fixture.db.insert(userExternalPrincipals).values({
+    id: principalId,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    providerFamily: "slack",
+    providerSubjectId: "T123:U123",
+    organizationProviderConfigId: providerConfigId,
+    integrationConnectionId: input.connectionId,
+    status: UserExternalPrincipalStatuses.ACTIVE,
+    profile: {
+      workspaceId: "T123",
+      displayName: "Webhook User",
+    },
+  });
+  await input.fixture.db.insert(userExternalPrincipalKeys).values([
+    {
+      id: `upk_workspace_${input.connectionId}`,
+      organizationId: input.organizationId,
+      principalId,
+      providerFamily: "slack",
+      keyType: "workspace_id",
+      keyValue: "T123",
+      status: UserExternalPrincipalKeyStatuses.ACTIVE,
+    },
+    {
+      id: `upk_user_${input.connectionId}`,
+      organizationId: input.organizationId,
+      principalId,
+      providerFamily: "slack",
+      keyType: "user_id",
+      keyValue: "U123",
+      status: UserExternalPrincipalKeyStatuses.ACTIVE,
+    },
+  ]);
+
+  return {
+    principalId,
+  };
 }
 
 async function createWebhookSecretCredential(input: {
@@ -806,6 +905,205 @@ describe("integration webhooks ingest integration", () => {
       "2024-03-09T16:00:00.000Z",
     );
     expect(persistedEvent.sourceOrderKey).toBe("2024-03-09T16:00:00.000Z#1710000000.000100");
+    expect(persistedEvent.resolvedUserId).toBeNull();
+    expect(persistedEvent.resolvedPrincipalId).toBeNull();
+  });
+
+  it("resolves a linked Slack webhook sender to a Mistle user during ingest", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-linked@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        },
+      });
+
+    const connectionId = await createSlackAppOAuthConnection({
+      fixture,
+      cookie: authenticatedSession.cookie,
+      displayName: "Slack Linked Webhooks",
+    });
+    const linkedPrincipal = await insertSlackLinkedPrincipal({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      userId: authenticatedSession.userId,
+      connectionId,
+    });
+
+    const createdSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, connectionId),
+          eq(table.targetKey, targetKey),
+        ),
+    });
+    expect(createdSource?.endpointKey).toBeTruthy();
+
+    const payload = JSON.stringify({
+      ...createSlackMessageWebhookPayload(),
+      event_id: "Ev126",
+    });
+    const response = await fixture.request(
+      `/p/integration/webhooks/${targetKey}/${createdSource?.endpointKey ?? "__missing__"}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signSlackWebhookPayload({
+            secret: "slack-signing-secret",
+            payload,
+            timestamp,
+          }),
+        },
+        body: payload,
+      },
+    );
+
+    expect(response.status).toBe(202);
+
+    const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, "Ev126")),
+    });
+
+    expect(persistedEvent?.resolvedUserId).toBe(authenticatedSession.userId);
+    expect(persistedEvent?.resolvedPrincipalId).toBe(linkedPrincipal.principalId);
+  });
+
+  it("does not resolve a Slack webhook sender when the webhook uses a different Slack connection than identity linking", async ({
+    fixture,
+  }) => {
+    const targetKey = "slack-default";
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-webhooks-ingest-slack-mismatch@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey,
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://slack.com/api",
+          },
+        },
+      });
+
+    const identityConnectionId = await createSlackAppOAuthConnection({
+      fixture,
+      cookie: authenticatedSession.cookie,
+      displayName: "Slack Identity Linking",
+    });
+    await insertSlackLinkedPrincipal({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      userId: authenticatedSession.userId,
+      connectionId: identityConnectionId,
+    });
+
+    const createWebhookConnectionResponse = await fixture.request(
+      "/v1/integration/connections/slack-default/form",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "Slack Webhooks Only",
+          methodId: "slack-bot-token",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+          secrets: {
+            botToken: "xoxb-test-bot-token",
+            signingSecret: "slack-signing-secret",
+          },
+        }),
+      },
+    );
+
+    expect(createWebhookConnectionResponse.status).toBe(201);
+    const webhookConnection = IntegrationConnectionSchema.parse(
+      await createWebhookConnectionResponse.json(),
+    );
+    const webhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, webhookConnection.id),
+          eq(table.targetKey, targetKey),
+        ),
+    });
+    expect(webhookSource?.endpointKey).toBeTruthy();
+
+    const payload = JSON.stringify({
+      ...createSlackMessageWebhookPayload(),
+      event_id: "Ev127",
+    });
+    const response = await fixture.request(
+      `/p/integration/webhooks/${targetKey}/${webhookSource?.endpointKey ?? "__missing__"}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signSlackWebhookPayload({
+            secret: "slack-signing-secret",
+            payload,
+            timestamp,
+          }),
+        },
+        body: payload,
+      },
+    );
+
+    expect(response.status).toBe(202);
+
+    const persistedEvent = await fixture.db.query.integrationWebhookEvents.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.targetKey, targetKey), eq(table.externalEventId, "Ev127")),
+    });
+    expect(persistedEvent?.resolvedUserId).toBeNull();
+    expect(persistedEvent?.resolvedPrincipalId).toBeNull();
   });
 
   it("enriches Slack reaction webhooks with thread metadata before storing them", async ({

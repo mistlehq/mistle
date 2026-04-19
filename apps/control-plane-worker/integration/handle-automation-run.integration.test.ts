@@ -22,6 +22,7 @@ import {
   sandboxProfileVersions,
   sandboxProfileVersionIntegrationBindings,
   CONTROL_PLANE_SCHEMA_NAME,
+  users,
   webhookAutomations,
 } from "@mistle/db/control-plane";
 import {
@@ -427,6 +428,12 @@ describe("handleAutomationRun integration", () => {
           name: "Worker Automation Prepare",
           slug: "worker-automation-prepare",
         });
+        await database.db.insert(users).values({
+          id: "usr_automation_actor",
+          name: "Automation Actor",
+          email: "automation-actor@example.com",
+          emailVerified: true,
+        });
         await database.db.insert(sandboxProfiles).values({
           id: sandboxProfileId,
           organizationId,
@@ -509,6 +516,7 @@ describe("handleAutomationRun integration", () => {
               body: "@mistlebot prepare",
             },
           },
+          resolvedUserId: "usr_automation_actor",
           status: IntegrationWebhookEventStatuses.PROCESSED,
         });
         await database.db.insert(automationRuns).values({
@@ -549,6 +557,7 @@ describe("handleAutomationRun integration", () => {
           webhookExternalEventId: "evt_prepare",
           webhookExternalDeliveryId: "delivery_prepare",
           webhookSourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          actingUserId: "usr_automation_actor",
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",

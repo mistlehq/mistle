@@ -1,6 +1,8 @@
 import {
   type CompletedIdentityLinkingAuthorization,
+  type IdentityLinkingPrincipalKey,
   type IntegrationIdentityLinkingCapability,
+  type IntegrationWebhookEvent,
   type RefreshedIdentityLinkingCredential,
 } from "@mistle/integrations-core";
 import { z } from "zod";
@@ -94,6 +96,22 @@ export class SlackIdentityLinkingConfigurationError extends Error {
   }
 }
 
+function cloneSlackRecord(input: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input));
+}
+
+function resolveOptionalSlackStringField(
+  input: Readonly<Record<string, unknown>>,
+  key: string,
+): string | undefined {
+  const value = input[key];
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length === 0 ? undefined : trimmedValue;
+}
 function resolveFutureTimestamp(input: {
   now: string;
   expiresInSeconds: number | undefined;
@@ -164,6 +182,32 @@ function resolveScopes(scope: string | undefined): string[] | undefined {
   }
 
   return [...new Set(normalizedScopes)];
+}
+
+function resolveSlackWebhookActorKeys(
+  event: IntegrationWebhookEvent,
+): readonly [IdentityLinkingPrincipalKey, ...IdentityLinkingPrincipalKey[]] | null {
+  const teamId = resolveOptionalSlackStringField(event.payload, "team_id");
+  const rawEvent = event.payload["event"];
+  if (typeof rawEvent !== "object" || rawEvent === null || Array.isArray(rawEvent)) {
+    return null;
+  }
+
+  const userId = resolveOptionalSlackStringField(cloneSlackRecord(rawEvent), "user");
+  if (teamId === undefined || userId === undefined) {
+    return null;
+  }
+
+  return [
+    {
+      keyType: "workspace_id",
+      keyValue: teamId,
+    },
+    {
+      keyType: "user_id",
+      keyValue: userId,
+    },
+  ];
 }
 
 function toCompletedIdentityLinkingAuthorization(
@@ -681,5 +725,8 @@ export const SlackIdentityLinkingCapability: IntegrationIdentityLinkingCapabilit
       refreshToken,
       now: input.now,
     });
+  },
+  resolveWebhookActor(input) {
+    return resolveSlackWebhookActorKeys(input.event);
   },
 };

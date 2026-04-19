@@ -216,6 +216,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     externalDeliveryId: string | null;
     sourceOrderKey: string | null;
     payload: Record<string, unknown>;
+    resolvedUserId: string | null;
   };
 }): PreparedAutomationRun | null {
   const hasPersistedSnapshot =
@@ -254,6 +255,9 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     webhookExternalDeliveryId: input.webhookEvent.externalDeliveryId,
     webhookSourceOrderKey: input.webhookEvent.sourceOrderKey ?? "",
     webhookPayload: input.webhookEvent.payload,
+    ...(input.webhookEvent.resolvedUserId === null
+      ? {}
+      : { actingUserId: input.webhookEvent.resolvedUserId }),
     renderedInput: input.automationRun.renderedInput,
     renderedConversationKey: input.automationRun.renderedConversationKey,
     renderedIdempotencyKey: input.automationRun.renderedIdempotencyKey,
@@ -492,6 +496,7 @@ export async function prepareAutomationRun(
       externalDeliveryId: webhookEvent.externalDeliveryId,
       sourceOrderKey: webhookEvent.sourceOrderKey,
       payload: webhookEvent.payload,
+      resolvedUserId: webhookEvent.resolvedUserId,
     },
   });
   if (persistedSnapshot !== null) {
@@ -612,6 +617,7 @@ export async function prepareAutomationRun(
     webhookExternalDeliveryId: webhookEvent.externalDeliveryId,
     webhookSourceOrderKey,
     webhookPayload: webhookEvent.payload,
+    ...(webhookEvent.resolvedUserId === null ? {} : { actingUserId: webhookEvent.resolvedUserId }),
     renderedInput: compiledTemplates.renderedInput,
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
@@ -654,6 +660,13 @@ export async function ensureAutomationSandbox(
       id: input.preparedAutomationRun.automationRunId,
     },
     source: "webhook",
+    ...(input.preparedAutomationRun.actingUserId === undefined
+      ? {}
+      : {
+          actingUser: {
+            userId: input.preparedAutomationRun.actingUserId,
+          },
+        }),
   });
 
   return {

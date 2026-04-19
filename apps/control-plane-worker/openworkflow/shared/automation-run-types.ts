@@ -16,6 +16,7 @@ export type PreparedAutomationRun = {
   webhookExternalDeliveryId: string | null;
   webhookSourceOrderKey: string;
   webhookPayload: Record<string, unknown>;
+  actingUserId?: string;
   renderedInput: string;
   renderedConversationKey: string;
   renderedIdempotencyKey: string | null;

@@ -100,6 +100,44 @@ describe("slack identity linking", () => {
     expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
   });
 
+  it("extracts Slack webhook actor keys from normalized event payloads", () => {
+    expect(
+      SlackIdentityLinkingCapability.resolveWebhookActor?.({
+        organizationId: "org_123",
+        providerFamily: "slack",
+        target: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            apiBaseUrl: "https://slack.com/api",
+          },
+          secrets: {},
+        },
+        event: {
+          externalEventId: "Ev123",
+          providerEventType: "message",
+          eventType: "slack:message",
+          payload: {
+            team_id: "T12345",
+            event: {
+              user: "U12345",
+            },
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        keyType: "workspace_id",
+        keyValue: "T12345",
+      },
+      {
+        keyType: "user_id",
+        keyValue: "U12345",
+      },
+    ]);
+  });
+
   it("exchanges a code, fetches the Slack user profile, and succeeds without a refresh token", async () => {
     const seenRequests: Array<{
       method: string;

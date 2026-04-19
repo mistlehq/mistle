@@ -6,6 +6,8 @@ import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { integrationWebhookSources } from "./integration-webhook-sources.js";
+import { userExternalPrincipals } from "./user-external-principals.js";
+import { users } from "./users.js";
 
 export const integrationConnectionsRelations = relations(
   integrationConnections,
@@ -51,6 +53,14 @@ export const integrationWebhookEventsRelations = relations(integrationWebhookEve
   connection: one(integrationConnections, {
     fields: [integrationWebhookEvents.integrationConnectionId],
     references: [integrationConnections.id],
+  }),
+  resolvedPrincipal: one(userExternalPrincipals, {
+    fields: [integrationWebhookEvents.resolvedPrincipalId],
+    references: [userExternalPrincipals.id],
+  }),
+  resolvedUser: one(users, {
+    fields: [integrationWebhookEvents.resolvedUserId],
+    references: [users.id],
   }),
   source: one(integrationWebhookSources, {
     fields: [integrationWebhookEvents.integrationWebhookSourceId],

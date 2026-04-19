@@ -6,6 +6,8 @@ import { integrationTargets } from "./integration-targets.js";
 import { integrationWebhookSources } from "./integration-webhook-sources.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
+import { userExternalPrincipals } from "./user-external-principals.js";
+import { users } from "./users.js";
 
 export const IntegrationWebhookEventStatuses = {
   RECEIVED: "received",
@@ -48,6 +50,12 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
       .notNull()
       .$type<IntegrationWebhookEventStatus>()
       .default(IntegrationWebhookEventStatuses.RECEIVED),
+    resolvedUserId: text("resolved_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    resolvedPrincipalId: text("resolved_principal_id").references(() => userExternalPrincipals.id, {
+      onDelete: "set null",
+    }),
     finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
@@ -67,6 +75,8 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     index("integration_webhook_events_event_type_idx").on(table.eventType),
     index("integration_webhook_events_external_delivery_id_idx").on(table.externalDeliveryId),
     index("integration_webhook_events_source_order_key_idx").on(table.sourceOrderKey),
+    index("integration_webhook_events_resolved_user_id_idx").on(table.resolvedUserId),
+    index("integration_webhook_events_resolved_principal_id_idx").on(table.resolvedPrincipalId),
   ],
 );
 

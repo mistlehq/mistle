@@ -1,0 +1,6 @@
+ALTER TABLE "control_plane"."integration_webhook_events" ADD COLUMN "resolved_user_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_webhook_events" ADD COLUMN "resolved_principal_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_resolved_user_id_users_id_fk" FOREIGN KEY ("resolved_user_id") REFERENCES "control_plane"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_resolved_principal_id_user_external_principals_id_fk" FOREIGN KEY ("resolved_principal_id") REFERENCES "control_plane"."user_external_principals"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "integration_webhook_events_resolved_user_id_idx" ON "control_plane"."integration_webhook_events" USING btree ("resolved_user_id");--> statement-breakpoint
+CREATE INDEX "integration_webhook_events_resolved_principal_id_idx" ON "control_plane"."integration_webhook_events" USING btree ("resolved_principal_id");

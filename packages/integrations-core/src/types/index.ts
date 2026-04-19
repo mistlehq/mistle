@@ -223,6 +223,16 @@ export type IntegrationIdentityLinkingRefreshCredentialInput<
   resolveCredentialSecret: IdentityLinkingCredentialSecretResolver;
 };
 
+export type IntegrationIdentityLinkingResolveWebhookActorInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  providerFamily: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  event: IntegrationWebhookEvent;
+};
+
 export type IntegrationIdentityLinkingCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -253,6 +263,9 @@ export type IntegrationIdentityLinkingCapability<
       TConnectionConfig
     >,
   ): MaybePromise<RefreshedIdentityLinkingCredential>;
+  resolveWebhookActor?(
+    input: IntegrationIdentityLinkingResolveWebhookActorInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<readonly [IdentityLinkingPrincipalKey, ...IdentityLinkingPrincipalKey[]] | null>;
 };
 
 export type IntegrationBinding = {

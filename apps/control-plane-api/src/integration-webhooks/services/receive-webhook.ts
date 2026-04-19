@@ -36,6 +36,7 @@ import {
   IntegrationWebhooksBadRequestCodes,
   IntegrationWebhooksNotFoundCodes,
 } from "../constants.js";
+import { resolveWebhookActingUser } from "./resolve-webhook-acting-user.js";
 
 export type ReceiveIntegrationWebhookInput = {
   targetKey: string;
@@ -418,6 +419,20 @@ export async function receiveIntegrationWebhook(
     );
   }
 
+  const resolvedActingUser = await resolveWebhookActingUser(
+    {
+      db,
+    },
+    {
+      organizationId: resolvedConnection.organizationId,
+      webhookConnectionId: resolvedConnection.id,
+      providerFamily: target.familyId,
+      definition,
+      target: resolvedTarget,
+      event: resolvedWebhookRequest.event,
+    },
+  );
+
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
@@ -433,6 +448,12 @@ export async function receiveIntegrationWebhook(
       sourceOccurredAt: resolvedWebhookRequest.event.occurredAt,
       sourceOrderKey: resolvedWebhookRequest.event.sourceOrderKey,
       status: IntegrationWebhookEventStatuses.RECEIVED,
+      ...(resolvedActingUser === null
+        ? {}
+        : {
+            resolvedUserId: resolvedActingUser.userId,
+            resolvedPrincipalId: resolvedActingUser.principalId,
+          }),
     })
     .onConflictDoNothing({
       target: [
