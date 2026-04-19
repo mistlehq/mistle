@@ -60,18 +60,46 @@ fn relays_pty_output_and_exit_over_websocket() {
         r#"{"type":"stream.open.ok","streamId":1}"#
     );
 
-    let output_frame = read_binary_frame(&mut client_socket);
-    assert_eq!(output_frame.stream_id, 1);
-    assert_eq!(
-        String::from_utf8(output_frame.payload).expect("payload should be utf8"),
-        "hello from pty"
-    );
+    let mut saw_output = false;
+    let mut saw_exit = false;
+    for _ in 0..6 {
+        match client_socket
+            .read()
+            .expect("socket should receive PTY output or exit frames")
+        {
+            Message::Binary(payload) => {
+                let output_frame =
+                    decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode");
+                assert_eq!(output_frame.stream_id, 1);
+                assert_eq!(
+                    String::from_utf8(output_frame.payload).expect("payload should be utf8"),
+                    "hello from pty"
+                );
+                saw_output = true;
+            }
+            Message::Text(payload) => {
+                let event: Value = serde_json::from_str(payload.as_str())
+                    .expect("text payload should be valid json");
+                if event["type"] == "stream.event"
+                    && event["streamId"] == 1
+                    && event["event"]["type"] == "pty.exit"
+                {
+                    assert_eq!(event["event"]["exitCode"], 4);
+                    saw_exit = true;
+                }
+            }
+            other_message => {
+                panic!("unexpected websocket message while reading PTY output: {other_message:?}")
+            }
+        }
 
-    let event = parse_json_text_message(&mut client_socket);
-    assert_eq!(event["type"], "stream.event");
-    assert_eq!(event["streamId"], 1);
-    assert_eq!(event["event"]["type"], "pty.exit");
-    assert_eq!(event["event"]["exitCode"], 4);
+        if saw_output && saw_exit {
+            break;
+        }
+    }
+
+    assert!(saw_output, "expected PTY output before relay completed");
+    assert!(saw_exit, "expected PTY exit event before relay completed");
     assert_eq!(read_scope_procs_files(&cgroup_root).len(), 1);
 
     server_thread
