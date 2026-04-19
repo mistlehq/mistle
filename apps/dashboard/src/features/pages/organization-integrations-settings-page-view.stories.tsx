@@ -48,12 +48,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const Loading: Story = {
-  args: {
-    isLoading: true,
-  },
-};
-
 export const LoadError: Story = {
   args: {
     loadErrorMessage: "Could not load integrations.",

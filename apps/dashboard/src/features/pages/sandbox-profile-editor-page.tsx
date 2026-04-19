@@ -7,7 +7,6 @@ import {
   FieldLabel,
   Input,
   Notice,
-  Skeleton,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SyntheticEvent } from "react";
@@ -138,24 +137,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
   });
 
   if (profileQuery.isPending) {
-    return (
-      <PageFrame title="">
-        <div className="gap-4 flex flex-col">
-          <h1 className="text-xl font-semibold">Edit profile</h1>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="gap-3 flex flex-col">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-48" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </PageFrame>
-    );
+    return <PageFrame title="">{null}</PageFrame>;
   }
 
   if (profileQuery.isError || profileQuery.data === undefined) {

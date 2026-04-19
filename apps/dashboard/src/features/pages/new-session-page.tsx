@@ -276,9 +276,6 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
                 </div>
               )}
 
-              {selectableProfilesQuery.isPending ? (
-                <p className="text-muted-foreground text-sm">Loading sandbox profiles...</p>
-              ) : null}
               {selectableProfilesErrorMessage ? (
                 <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
               ) : null}

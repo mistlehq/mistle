@@ -1,4 +1,4 @@
-import { Skeleton, Notice } from "@mistle/ui";
+import { Notice } from "@mistle/ui";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
@@ -26,17 +26,11 @@ export type OrganizationIntegrationsSettingsPageViewProps = {
 
 export function OrganizationIntegrationsSettingsPageView(
   props: OrganizationIntegrationsSettingsPageViewProps,
-): React.JSX.Element {
+): React.JSX.Element | null {
   const isDetailFocused = props.detailSurface !== undefined && props.detailSurface !== null;
 
   if (props.isLoading) {
-    return (
-      <div className="gap-3 flex flex-col">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    );
+    return null;
   }
 
   if (props.loadErrorMessage !== null) {

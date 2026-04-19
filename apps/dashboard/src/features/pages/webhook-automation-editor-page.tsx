@@ -72,19 +72,9 @@ function renderWebhookAutomationEditorError(input: {
   );
 }
 
-function renderWebhookAutomationEditorLoading(): React.JSX.Element {
-  return (
-    <>
-      <FormPageSection>
-        <div className="p-4">Loading automation…</div>
-      </FormPageSection>
-    </>
-  );
-}
-
 function CreateWebhookAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const prerequisites = useWebhookAutomationPrerequisites();
 
   if (prerequisites.errorMessage !== null) {
@@ -98,7 +88,7 @@ function CreateWebhookAutomationEditor(input: {
   }
 
   if (prerequisites.isPending || prerequisites.directoryData === undefined) {
-    return renderWebhookAutomationEditorLoading();
+    return null;
   }
 
   return (
@@ -118,7 +108,7 @@ function CreateWebhookAutomationEditor(input: {
 function EditWebhookAutomationEditor(input: {
   automationId: string;
   navigate: (to: string) => void | Promise<void>;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const automationQuery = useQuery({
     queryKey: webhookAutomationDetailQueryKey(input.automationId),
     queryFn: async ({ signal }) =>
@@ -155,7 +145,7 @@ function EditWebhookAutomationEditor(input: {
     automationQuery.data === undefined ||
     prerequisites.directoryData === undefined
   ) {
-    return renderWebhookAutomationEditorLoading();
+    return null;
   }
 
   let initialValues: ReturnType<typeof toWebhookAutomationFormValues>;

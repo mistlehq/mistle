@@ -76,9 +76,7 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
       >
-        <FormPageSection>
-          <div className="p-4">Loading integration…</div>
-        </FormPageSection>
+        {null}
       </FormPageFrame>
     );
   }

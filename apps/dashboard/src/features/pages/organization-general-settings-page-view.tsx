@@ -1,4 +1,4 @@
-import { Notice, Skeleton } from "@mistle/ui";
+import { Notice } from "@mistle/ui";
 
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -19,25 +19,9 @@ export type OrganizationGeneralSettingsPageViewProps = {
 
 export function OrganizationGeneralSettingsPageView(
   props: OrganizationGeneralSettingsPageViewProps,
-): React.JSX.Element {
+): React.JSX.Element | null {
   if (props.isLoading) {
-    return (
-      <FormPageStack>
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-          </div>
-        </FormPageSection>
-      </FormPageStack>
-    );
+    return null;
   }
 
   if (props.loadErrorMessage) {

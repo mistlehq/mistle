@@ -12,7 +12,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Skeleton,
   Switch,
 } from "@mistle/ui";
 
@@ -45,7 +44,7 @@ export type OrganizationSandboxStorageSettingsPageViewProps = {
 
 export function OrganizationSandboxStorageSettingsPageView(
   input: OrganizationSandboxStorageSettingsPageViewProps,
-): React.JSX.Element {
+): React.JSX.Element | null {
   const showConfigurationSource = false;
   const selectedRegionLabel =
     input.state.region.length === 0
@@ -54,18 +53,7 @@ export function OrganizationSandboxStorageSettingsPageView(
         input.state.region);
 
   if (input.isLoading) {
-    return (
-      <FormPageStack>
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </FormPageSection>
-      </FormPageStack>
-    );
+    return null;
   }
 
   if (input.loadErrorMessage !== null) {

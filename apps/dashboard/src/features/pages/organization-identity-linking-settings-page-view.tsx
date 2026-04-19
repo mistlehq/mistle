@@ -59,17 +59,9 @@ export type OrganizationIdentityLinkingSettingsPageViewProps = {
 
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
-): React.JSX.Element {
+): React.JSX.Element | null {
   if (props.isLoading) {
-    return (
-      <FormPageStack>
-        <FormPageSection>
-          <div className="p-4 text-sm text-muted-foreground">
-            Loading identity-linking providers…
-          </div>
-        </FormPageSection>
-      </FormPageStack>
-    );
+    return null;
   }
 
   if (props.loadErrorMessage !== null) {

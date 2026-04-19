@@ -1,7 +1,5 @@
 import {
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -13,7 +11,6 @@ import {
   FieldLabel,
   Input,
   Notice,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -284,19 +281,6 @@ export function SandboxProfilesPage(): React.JSX.Element {
             fallbackMessage: "Could not load sandbox profiles.",
           })}
         </Notice>
-      ) : null}
-
-      {listQuery.isPending ? (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="gap-3 flex flex-col">
-              <Skeleton className="h-5 w-56" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
       ) : null}
 
       {!listQuery.isPending && !listQuery.isError ? (

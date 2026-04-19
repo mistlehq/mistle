@@ -6,6 +6,10 @@
 - Shared dashboard test fixtures and test-only setup helpers should live under `apps/dashboard/src/test-support/`, not inside production feature folders.
 - Prefer feature-local test helpers only when they are truly private to one feature's tests; move reusable auth/session/query fixtures into `src/test-support/`.
 
+## Loading UI
+
+- The dashboard uses a shared top loading bar. Do not create loading UI for pages.
+
 ## React Effects
 
 - Do not add `useEffect` for app-internal state flow.

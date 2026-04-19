@@ -190,14 +190,6 @@ function renderInteractiveStory(
   );
 }
 
-export const Loading: Story = {
-  args: {
-    viewModelOverrides: {
-      isLoading: true,
-    },
-  },
-};
-
 export const LoadError: Story = {
   args: {
     viewModelOverrides: {

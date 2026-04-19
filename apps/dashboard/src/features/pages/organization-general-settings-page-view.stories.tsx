@@ -45,12 +45,6 @@ export const LogoError: Story = {
   },
 };
 
-export const Loading: Story = {
-  args: {
-    isLoading: true,
-  },
-};
-
 export const LoadError: Story = {
   args: {
     loadErrorMessage: "Could not load organization settings.",

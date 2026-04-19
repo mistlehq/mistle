@@ -25,11 +25,7 @@ export function HomePage(): React.JSX.Element {
   }
 
   if (homeSummaryQuery.isPending || homeSummaryQuery.data === undefined) {
-    return (
-      <HomePageShell>
-        <p className="text-muted-foreground text-sm">Loading…</p>
-      </HomePageShell>
-    );
+    return <HomePageShell>{null}</HomePageShell>;
   }
 
   return (
