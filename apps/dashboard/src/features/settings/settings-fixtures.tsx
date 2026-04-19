@@ -27,7 +27,7 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       imageUrl={null}
       linkedAccountActionPending={false}
       linkedAccountCallbackNotice={null}
-      linkedAccountCard={null}
+      linkedAccountCards={[]}
       linkedAccountErrorMessage={null}
       linkedAccountsEmptyStateMessage={null}
       linkedAccountsLoading={false}

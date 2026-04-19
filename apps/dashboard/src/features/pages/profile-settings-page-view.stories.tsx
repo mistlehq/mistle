@@ -12,7 +12,7 @@ const DefaultProps: ComponentProps<typeof ProfileSettingsPageView> = {
   imageUrl: null,
   linkedAccountActionPending: false,
   linkedAccountCallbackNotice: null,
-  linkedAccountCard: null,
+  linkedAccountCards: [],
   linkedAccountErrorMessage: null,
   linkedAccountsEmptyStateMessage: null,
   linkedAccountsLoading: false,
@@ -46,17 +46,19 @@ export const Default: Story = {};
 
 export const WithGitHubLinkedAccount: Story = {
   args: {
-    linkedAccountCard: {
-      providerFamily: "github",
-      displayName: "GitHub",
-      logoKey: "github",
-      statusLabel: "Linked",
-      statusTone: "active",
-      accountLabel: "@mistle-user",
-      linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-      helperMessage: null,
-      primaryActionLabel: "Relink",
-      secondaryActionLabel: "Unlink",
-    },
+    linkedAccountCards: [
+      {
+        providerFamily: "github",
+        displayName: "GitHub",
+        logoKey: "github",
+        statusLabel: "Linked",
+        statusTone: "active",
+        accountLabel: "@mistle-user",
+        linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+        helperMessage: null,
+        primaryActionLabel: "Relink",
+        secondaryActionLabel: "Unlink",
+      },
+    ],
   },
 };

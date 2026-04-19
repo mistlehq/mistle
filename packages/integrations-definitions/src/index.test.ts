@@ -397,12 +397,37 @@ describe("integrations-definitions index", () => {
             },
           ],
         },
+        {
+          id: "slack-app-oauth",
+          label: "Slack app OAuth",
+          kind: "form",
+          secretFields: [
+            {
+              name: "botToken",
+              label: "Bot token",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-bot-token.bot-token",
+            },
+            {
+              name: "signingSecret",
+              label: "Signing secret",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-bot-token.signing-secret",
+            },
+            {
+              name: "clientSecret",
+              label: "Client secret (Linked User Auth)",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-app-oauth.client-secret",
+            },
+          ],
+        },
       ],
     });
     expect(slackDefinition?.webhookSource).toBeUndefined();
     expect(slackDefinition?.webhookHandler).toBeUndefined();
     expect(slackDefinition?.identityLinking).toEqual({
-      eligibleConnectionMethodIds: ["slack-bot-token"],
+      eligibleConnectionMethodIds: ["slack-app-oauth"],
     });
     expect(slackDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([

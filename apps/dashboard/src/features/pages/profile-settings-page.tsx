@@ -6,9 +6,8 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   clearLinkedAccountCallbackSearchParams,
-  findLinkedAccount,
   resolveLinkedAccountCallbackNotice,
-  resolveLinkedAccountCardViewModel,
+  resolveLinkedAccountCardViewModels,
   type LinkedAccountCallbackNotice,
 } from "../settings/identity-linking/linked-accounts-model.js";
 import {
@@ -182,17 +181,10 @@ export function ProfileSettingsPage(): React.JSX.Element {
           fallbackMessage: "Could not load profile image.",
         })
       : null);
-  const githubLinkedAccount =
+  const linkedAccountCards =
     linkedAccountsQuery.data === undefined
-      ? null
-      : findLinkedAccount({
-          linkedAccounts: linkedAccountsQuery.data,
-          providerFamily: "github",
-        });
-  const githubLinkedAccountCard =
-    githubLinkedAccount === null || githubLinkedAccount.configurationStatus === "disabled"
-      ? null
-      : resolveLinkedAccountCardViewModel(githubLinkedAccount);
+      ? []
+      : resolveLinkedAccountCardViewModels(linkedAccountsQuery.data);
   const linkedAccountsLoadErrorMessage = linkedAccountsQuery.isError
     ? resolveApiErrorMessage({
         error: linkedAccountsQuery.error,
@@ -202,7 +194,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const linkedAccountsEmptyStateMessage =
     linkedAccountsQuery.data !== undefined &&
     linkedAccountsLoadErrorMessage === null &&
-    githubLinkedAccountCard === null
+    linkedAccountCards.length === 0
       ? "Your organization has not enabled any linked account providers right now."
       : null;
 
@@ -213,7 +205,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         email={session.user.email}
         imageUrl={imageUrl}
         linkedAccountCallbackNotice={callbackNotice}
-        linkedAccountCard={githubLinkedAccountCard}
+        linkedAccountCards={linkedAccountCards}
         linkedAccountErrorMessage={linkedAccountOperationErrorMessage}
         linkedAccountsEmptyStateMessage={linkedAccountsEmptyStateMessage}
         linkedAccountsLoading={linkedAccountsQuery.isPending}

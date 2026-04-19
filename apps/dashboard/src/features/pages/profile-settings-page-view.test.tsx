@@ -13,7 +13,7 @@ const baseProps = {
   imageUrl: null,
   linkedAccountActionPending: false,
   linkedAccountCallbackNotice: null,
-  linkedAccountCard: null,
+  linkedAccountCards: [],
   linkedAccountErrorMessage: null,
   linkedAccountsEmptyStateMessage: null,
   linkedAccountsLoading: false,
@@ -129,18 +129,20 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCard={{
-          providerFamily: "github",
-          displayName: "GitHub",
-          logoKey: "github",
-          statusLabel: "Not linked",
-          statusTone: "warning",
-          accountLabel: "No linked account yet",
-          linkedAtLabel: null,
-          helperMessage: null,
-          primaryActionLabel: "Link account",
-          secondaryActionLabel: null,
-        }}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            linkedAtLabel: null,
+            helperMessage: null,
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          },
+        ]}
       />,
     );
 
@@ -154,18 +156,20 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCard={{
-          providerFamily: "github",
-          displayName: "GitHub",
-          logoKey: "github",
-          statusLabel: "Linked",
-          statusTone: "active",
-          accountLabel: "@mistle-user",
-          linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-          helperMessage: null,
-          primaryActionLabel: "Relink",
-          secondaryActionLabel: "Unlink",
-        }}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            primaryActionLabel: "Relink",
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
       />,
     );
 
@@ -207,6 +211,45 @@ describe("ProfileSettingsPageView", () => {
     ).toBeTruthy();
   });
 
+  it("renders multiple linked-account cards when more than one provider is configured", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            primaryActionLabel: "Relink",
+            secondaryActionLabel: "Unlink",
+          },
+          {
+            providerFamily: "slack",
+            displayName: "Slack",
+            logoKey: "slack",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            linkedAtLabel: null,
+            helperMessage: null,
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("GitHub")).toBeTruthy();
+    expect(screen.getByText("Slack")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Relink" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Link account" })).toBeTruthy();
+  });
+
   it("triggers link and unlink handlers through the linked-account actions", async () => {
     let linkCount = 0;
     let unlinkCount = 0;
@@ -214,18 +257,20 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCard={{
-          providerFamily: "github",
-          displayName: "GitHub",
-          logoKey: "github",
-          statusLabel: "Relink required",
-          statusTone: "warning",
-          accountLabel: "@mistle-user",
-          linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-          helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
-          primaryActionLabel: "Relink",
-          secondaryActionLabel: "Unlink",
-        }}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Relink required",
+            statusTone: "warning",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+            primaryActionLabel: "Relink",
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
         onLinkLinkedAccount={async () => {
           linkCount += 1;
         }}

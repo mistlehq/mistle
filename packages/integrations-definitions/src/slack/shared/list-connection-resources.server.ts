@@ -6,7 +6,7 @@ import type {
 import { z } from "zod";
 
 import {
-  SlackBotTokenConnectionConfigSchema,
+  SlackConnectionConfigSchema,
   type SlackConnectionConfig,
 } from "../variants/slack-default/auth.js";
 import type { SlackTargetConfig } from "../variants/slack-default/target-config-schema.js";
@@ -154,7 +154,7 @@ export async function listSlackConnectionResources(
     throw new Error(`Slack ${input.kind} resource listing requires a string credential value.`);
   }
 
-  SlackBotTokenConnectionConfigSchema.parse(input.connection.config);
+  SlackConnectionConfigSchema.parse(input.connection.config);
 
   if (input.kind === SlackChannelKind) {
     return {

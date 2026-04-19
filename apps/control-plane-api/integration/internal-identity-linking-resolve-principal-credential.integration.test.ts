@@ -537,7 +537,7 @@ async function insertIdentityLinkProviderConfig(input: {
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         connection_method: input.connectionMethodId,
-        ...(input.connectionConfig ?? {}),
+        ...input.connectionConfig,
       },
     });
   }

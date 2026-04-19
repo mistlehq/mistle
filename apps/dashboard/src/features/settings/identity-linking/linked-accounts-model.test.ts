@@ -6,6 +6,7 @@ import {
   findLinkedAccount,
   resolveLinkedAccountCallbackNotice,
   resolveLinkedAccountCardViewModel,
+  resolveLinkedAccountCardViewModels,
 } from "./linked-accounts-model.js";
 import type { LinkedAccount } from "./linked-accounts-service.js";
 
@@ -38,17 +39,44 @@ function createGitHubLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAc
   };
 }
 
+function createSlackLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAccount {
+  return {
+    providerFamily: "slack",
+    displayName: "Slack",
+    logoKey: "slack",
+    configurationStatus: "active",
+    principal: {
+      id: "uep_slack",
+      status: "active",
+      providerSubjectId: "T12345:U12345",
+      profile: {
+        workspaceName: "Mistle Engineering",
+        displayName: "Mistle Slack User",
+      },
+      linkedAt: "2026-04-19T10:15:00.000Z",
+      updatedAt: "2026-04-19T10:15:00.000Z",
+    },
+    credential: {
+      id: "upc_slack",
+      credentialKind: "slack_user_token",
+      status: "active",
+      accessTokenExpiresAt: "2026-04-19T12:15:00.000Z",
+      refreshTokenExpiresAt: null,
+      lastValidatedAt: "2026-04-19T10:15:00.000Z",
+      updatedAt: "2026-04-19T10:15:00.000Z",
+    },
+    ...overrides,
+  };
+}
+
 describe("linked-accounts-model", () => {
   it("finds the linked account for a provider family", () => {
     const github = createGitHubLinkedAccount();
-    const slack: LinkedAccount = {
-      providerFamily: "slack",
-      displayName: "Slack",
-      logoKey: "slack",
+    const slack = createSlackLinkedAccount({
       configurationStatus: "disabled",
       principal: null,
       credential: null,
-    };
+    });
 
     expect(
       findLinkedAccount({
@@ -143,6 +171,28 @@ describe("linked-accounts-model", () => {
     });
   });
 
+  it("keeps disabled linked accounts visible so they can be unlinked", () => {
+    expect(
+      resolveLinkedAccountCardViewModels([
+        createGitHubLinkedAccount({
+          configurationStatus: "disabled",
+        }),
+      ]),
+    ).toHaveLength(1);
+  });
+
+  it("hides disabled providers that have no linked account", () => {
+    expect(
+      resolveLinkedAccountCardViewModels([
+        createSlackLinkedAccount({
+          configurationStatus: "disabled",
+          principal: null,
+          credential: null,
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
   it("resolves a success callback notice", () => {
     expect(
       resolveLinkedAccountCallbackNotice({
@@ -178,7 +228,32 @@ describe("linked-accounts-model", () => {
         result: "success",
         code: null,
       }),
-    ).toBeNull();
+    ).toEqual({
+      title: "Slack linked",
+      message: "Your Slack account is now linked to Mistle.",
+      variant: "default",
+    });
+  });
+
+  it("uses workspace name as a fallback linked-account label", () => {
+    expect(
+      resolveLinkedAccountCardViewModel(
+        createSlackLinkedAccount({
+          principal: {
+            id: "uep_slack",
+            status: "active",
+            providerSubjectId: "T12345:U12345",
+            profile: {
+              workspaceName: "Mistle Engineering",
+            },
+            linkedAt: "2026-04-19T10:15:00.000Z",
+            updatedAt: "2026-04-19T10:15:00.000Z",
+          },
+        }),
+      ),
+    ).toMatchObject({
+      accountLabel: "Mistle Engineering",
+    });
   });
 
   it("clears linked-account callback params while preserving unrelated search params", () => {

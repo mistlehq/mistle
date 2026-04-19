@@ -24,7 +24,7 @@ export type ProfileSettingsPageViewProps = {
   imageUrl: string | null;
   linkedAccountActionPending: boolean;
   linkedAccountCallbackNotice: LinkedAccountCallbackNotice | null;
-  linkedAccountCard: LinkedAccountCardViewModel | null;
+  linkedAccountCards: readonly LinkedAccountCardViewModel[];
   linkedAccountErrorMessage: string | null;
   linkedAccountsEmptyStateMessage: string | null;
   linkedAccountsLoading: boolean;
@@ -40,8 +40,6 @@ export type ProfileSettingsPageViewProps = {
 };
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
-  const linkedAccountCard = props.linkedAccountCard;
-
   return (
     <FormPageStack>
       <FormPageSection>
@@ -103,67 +101,72 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
               </Notice>
             ) : props.linkedAccountsEmptyStateMessage !== null ? (
               <Notice>{props.linkedAccountsEmptyStateMessage}</Notice>
-            ) : linkedAccountCard === null ? null : (
-              <div className="rounded border bg-background p-4">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <img
-                      alt={`${linkedAccountCard.displayName} logo`}
-                      className="h-10 w-10 rounded-md border bg-background p-1.5"
-                      src={resolveIntegrationLogoPath({ logoKey: linkedAccountCard.logoKey })}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold">{linkedAccountCard.displayName}</h3>
-                        <LinkedAccountStatusBadge tone={linkedAccountCard.statusTone}>
-                          {linkedAccountCard.statusLabel}
-                        </LinkedAccountStatusBadge>
+            ) : props.linkedAccountCards.length === 0 ? null : (
+              props.linkedAccountCards.map((linkedAccountCard) => (
+                <div
+                  className="rounded border bg-background p-4"
+                  key={linkedAccountCard.providerFamily}
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img
+                        alt={`${linkedAccountCard.displayName} logo`}
+                        className="h-10 w-10 rounded-md border bg-background p-1.5"
+                        src={resolveIntegrationLogoPath({ logoKey: linkedAccountCard.logoKey })}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-semibold">{linkedAccountCard.displayName}</h3>
+                          <LinkedAccountStatusBadge tone={linkedAccountCard.statusTone}>
+                            {linkedAccountCard.statusLabel}
+                          </LinkedAccountStatusBadge>
+                        </div>
+                        <p className="text-sm">{linkedAccountCard.accountLabel}</p>
+                        {linkedAccountCard.linkedAtLabel === null ? null : (
+                          <p className="text-xs text-muted-foreground">
+                            {linkedAccountCard.linkedAtLabel}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm">{linkedAccountCard.accountLabel}</p>
-                      {linkedAccountCard.linkedAtLabel === null ? null : (
-                        <p className="text-xs text-muted-foreground">
-                          {linkedAccountCard.linkedAtLabel}
-                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {linkedAccountCard.primaryActionLabel === null ? null : (
+                        <Button
+                          disabled={props.linkedAccountActionPending}
+                          onClick={() => {
+                            void props.onLinkLinkedAccount(linkedAccountCard.providerFamily);
+                          }}
+                          type="button"
+                        >
+                          {props.linkedAccountActionPending
+                            ? "Working..."
+                            : linkedAccountCard.primaryActionLabel}
+                        </Button>
+                      )}
+                      {linkedAccountCard.secondaryActionLabel === null ? null : (
+                        <Button
+                          disabled={props.linkedAccountActionPending}
+                          onClick={() => {
+                            void props.onUnlinkLinkedAccount(linkedAccountCard.providerFamily);
+                          }}
+                          type="button"
+                          variant="outline"
+                        >
+                          {props.linkedAccountActionPending
+                            ? "Working..."
+                            : linkedAccountCard.secondaryActionLabel}
+                        </Button>
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {linkedAccountCard.primaryActionLabel === null ? null : (
-                      <Button
-                        disabled={props.linkedAccountActionPending}
-                        onClick={() => {
-                          void props.onLinkLinkedAccount(linkedAccountCard.providerFamily);
-                        }}
-                        type="button"
-                      >
-                        {props.linkedAccountActionPending
-                          ? "Working..."
-                          : linkedAccountCard.primaryActionLabel}
-                      </Button>
-                    )}
-                    {linkedAccountCard.secondaryActionLabel === null ? null : (
-                      <Button
-                        disabled={props.linkedAccountActionPending}
-                        onClick={() => {
-                          void props.onUnlinkLinkedAccount(linkedAccountCard.providerFamily);
-                        }}
-                        type="button"
-                        variant="outline"
-                      >
-                        {props.linkedAccountActionPending
-                          ? "Working..."
-                          : linkedAccountCard.secondaryActionLabel}
-                      </Button>
-                    )}
-                  </div>
-                </div>
 
-                {linkedAccountCard.helperMessage === null ? null : (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    {linkedAccountCard.helperMessage}
-                  </p>
-                )}
-              </div>
+                  {linkedAccountCard.helperMessage === null ? null : (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {linkedAccountCard.helperMessage}
+                    </p>
+                  )}
+                </div>
+              ))
             )}
 
             {props.linkedAccountErrorMessage === null ? null : (
@@ -180,7 +183,7 @@ function shouldRenderLinkedAccountsSection(
   props: Pick<
     ProfileSettingsPageViewProps,
     | "linkedAccountCallbackNotice"
-    | "linkedAccountCard"
+    | "linkedAccountCards"
     | "linkedAccountErrorMessage"
     | "linkedAccountsEmptyStateMessage"
     | "linkedAccountsLoading"
@@ -191,7 +194,7 @@ function shouldRenderLinkedAccountsSection(
     props.linkedAccountsLoading ||
     props.linkedAccountsLoadErrorMessage !== null ||
     props.linkedAccountsEmptyStateMessage !== null ||
-    props.linkedAccountCard !== null ||
+    props.linkedAccountCards.length > 0 ||
     props.linkedAccountCallbackNotice !== null ||
     props.linkedAccountErrorMessage !== null
   );

@@ -71,7 +71,7 @@ describe("me linked accounts integration", () => {
       targetKey: "slack-default",
       connectionId: "icn_slack_identity",
       connectionDisplayName: "Slack Identity",
-      connectionMethodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+      connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
     });
     await fixture.db.insert(userExternalPrincipals).values({
@@ -308,16 +308,21 @@ describe("me linked accounts integration", () => {
     expect(persistedRedirectSession).toBeUndefined();
   });
 
-  it("fails explicitly when the provider adapter is not implemented and does not persist a redirect session", async ({
+  it("starts Slack linked-account authorization and persists redirect session state", async ({
     fixture,
   }) => {
     const session = await fixture.authSession({
-      email: "me-linked-accounts-start-unimplemented@example.com",
+      email: "me-linked-accounts-start-slack@example.com",
     });
 
     await upsertSlackTarget({
       fixture,
       targetKey: "slack-default",
+    });
+    const connectionId = await createSlackAppOAuthConnection({
+      fixture,
+      authenticatedSession: session,
+      displayName: "Slack Identity",
     });
     await insertIdentityLinkProviderConfig({
       fixture,
@@ -326,10 +331,11 @@ describe("me linked accounts integration", () => {
       configId: "ilp_slack_start",
       providerFamily: "slack",
       targetKey: "slack-default",
-      connectionId: "icn_slack_start",
-      connectionDisplayName: "Slack Start",
-      connectionMethodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+      connectionId,
+      connectionDisplayName: "Slack Identity",
+      connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      createConnection: false,
     });
 
     const response = await fixture.request("/v1/me/linked-accounts/slack", {
@@ -339,17 +345,32 @@ describe("me linked accounts integration", () => {
       },
     });
 
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "PROVIDER_ADAPTER_NOT_IMPLEMENTED",
-      message:
-        "Identity-linking provider 'slack' does not yet support linked-account authorization.",
-    });
+    expect(response.status).toBe(200);
+    const payload = StartLinkedAccountAuthorizationResponseSchema.parse(await response.json());
+    const authorizationUrl = new URL(payload.authorizationUrl);
+
+    expect(authorizationUrl.origin).toBe("https://slack.com");
+    expect(authorizationUrl.pathname).toBe("/oauth/v2/authorize");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("123.456");
+    expect(authorizationUrl.searchParams.get("user_scope")).toBe(
+      "users.profile:read,users:read.email",
+    );
+    expect(authorizationUrl.searchParams.get("state")).toBeTruthy();
+    expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+      `${fixture.config.auth.baseUrl}/p/identity-linking/callbacks/slack`,
+    );
+    expect(payload.expiresAt).toBeTruthy();
 
     const persistedRedirectSession = await fixture.db.query.identityLinkRedirectSessions.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
+      where: (table, { eq }) =>
+        eq(table.state, authorizationUrl.searchParams.get("state") ?? "__missing__"),
     });
-    expect(persistedRedirectSession).toBeUndefined();
+    expect(persistedRedirectSession?.organizationId).toBe(session.organizationId);
+    expect(persistedRedirectSession?.userId).toBe(session.userId);
+    expect(persistedRedirectSession?.providerFamily).toBe("slack");
+    expect(persistedRedirectSession?.integrationConnectionId).toBe(connectionId);
+    expect(persistedRedirectSession?.pkceVerifierEncrypted).toBeNull();
+    expect(persistedRedirectSession?.usedAt).toBeNull();
   });
 
   it("persists encrypted linked-account redirect session state", async ({ fixture }) => {
@@ -731,6 +752,254 @@ describe("me linked accounts integration", () => {
     }
   });
 
+  it("completes the Slack linked-account callback and persists the principal and user token when no refresh token is returned", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-callback-slack-success@example.com",
+    });
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const seenRequests: Array<{
+      method: string;
+      pathname: string;
+      search: string;
+      body: string;
+      authorization?: string;
+    }> = [];
+    const server = createServer((request, response) => {
+      const requestUrl = new URL(request.url ?? "/", `http://${host}:${String(port)}`);
+      let body = "";
+      request.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      request.on("end", () => {
+        seenRequests.push({
+          method: request.method ?? "GET",
+          pathname: requestUrl.pathname,
+          search: requestUrl.search,
+          body,
+          ...(typeof request.headers.authorization === "string"
+            ? { authorization: request.headers.authorization }
+            : {}),
+        });
+
+        response.setHeader("content-type", "application/json");
+
+        if (requestUrl.pathname === "/api/oauth.v2.access") {
+          response.end(
+            JSON.stringify({
+              ok: true,
+              team: {
+                id: "T12345",
+                name: "Mistle Engineering",
+              },
+              authed_user: {
+                id: "U12345",
+                scope: "users.profile:read,users:read.email",
+                access_token: "xoxe.xoxp-slack-user-token",
+                expires_in: 43200,
+                token_type: "user",
+              },
+            }),
+          );
+          return;
+        }
+
+        if (requestUrl.pathname === "/api/users.profile.get") {
+          response.end(
+            JSON.stringify({
+              ok: true,
+              profile: {
+                display_name: "Mistle Slack User",
+                real_name: "Mistle Slack User Real",
+                image_192: "https://avatars.slack-edge.com/u12345.png",
+                email: "mistle-slack-user@example.com",
+              },
+            }),
+          );
+          return;
+        }
+
+        response.statusCode = 404;
+        response.end(JSON.stringify({ ok: false, error: "not_found" }));
+      });
+    });
+    server.listen(port, host);
+    await once(server, "listening");
+
+    try {
+      const apiBaseUrl = `http://${host}:${String(port)}/api`;
+      await upsertSlackTarget({
+        fixture,
+        targetKey: "slack-default",
+        apiBaseUrl,
+      });
+      const connectionId = await createSlackAppOAuthConnection({
+        fixture,
+        authenticatedSession: session,
+        displayName: "Slack Identity",
+      });
+      await insertIdentityLinkProviderConfig({
+        fixture,
+        organizationId: session.organizationId,
+        userId: session.userId,
+        configId: "ilp_slack_callback_success",
+        providerFamily: "slack",
+        targetKey: "slack-default",
+        connectionId,
+        connectionDisplayName: "Slack Identity",
+        connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+        configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        createConnection: false,
+      });
+
+      const startResponse = await fixture.request("/v1/me/linked-accounts/slack", {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      });
+
+      expect(startResponse.status).toBe(200);
+      const startPayload = StartLinkedAccountAuthorizationResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const authorizationUrl = new URL(startPayload.authorizationUrl);
+      const state = authorizationUrl.searchParams.get("state");
+      expect(state).toBeTruthy();
+
+      const callbackResponse = await fixture.request(
+        `/p/identity-linking/callbacks/slack?state=${encodeURIComponent(state ?? "__missing__")}&code=code_123`,
+        {
+          redirect: "manual",
+        },
+      );
+
+      expect(callbackResponse.status).toBe(302);
+      expect(callbackResponse.headers.get("location")).toBe(
+        "http://localhost:5173/settings/account/profile?linkedAccountProvider=slack&linkedAccountResult=success",
+      );
+
+      expect(seenRequests).toEqual([
+        {
+          method: "POST",
+          pathname: "/api/oauth.v2.access",
+          search: "",
+          body: `client_id=123.456&client_secret=slack-client-secret&code=code_123&redirect_uri=${encodeURIComponent(`${fixture.config.auth.baseUrl}/p/identity-linking/callbacks/slack`)}`,
+        },
+        {
+          method: "GET",
+          pathname: "/api/users.profile.get",
+          search: "?user=U12345",
+          body: "",
+          authorization: "Bearer xoxe.xoxp-slack-user-token",
+        },
+      ]);
+
+      const principal = await fixture.db.query.userExternalPrincipals.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.userId, session.userId),
+            eq(table.providerFamily, "slack"),
+          ),
+      });
+      expect(principal).toMatchObject({
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerFamily: "slack",
+        providerSubjectId: "T12345:U12345",
+        organizationProviderConfigId: "ilp_slack_callback_success",
+        integrationConnectionId: connectionId,
+        status: UserExternalPrincipalStatuses.ACTIVE,
+        profile: {
+          workspaceId: "T12345",
+          workspaceName: "Mistle Engineering",
+          displayName: "Mistle Slack User",
+          avatarUrl: "https://avatars.slack-edge.com/u12345.png",
+          email: "mistle-slack-user@example.com",
+        },
+      });
+
+      const keys = await fixture.db.query.userExternalPrincipalKeys.findMany({
+        columns: {
+          keyType: true,
+          keyValue: true,
+          status: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.principalId, principal?.id ?? "__missing__"),
+          ),
+        orderBy: (table, { asc }) => [asc(table.keyType)],
+      });
+      expect(keys).toEqual([
+        {
+          keyType: "user_id",
+          keyValue: "U12345",
+          status: UserExternalPrincipalKeyStatuses.ACTIVE,
+        },
+        {
+          keyType: "workspace_id",
+          keyValue: "T12345",
+          status: UserExternalPrincipalKeyStatuses.ACTIVE,
+        },
+      ]);
+
+      const credential = await fixture.db.query.userExternalPrincipalCredentials.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.principalId, principal?.id ?? "__missing__"),
+          ),
+      });
+      expect(credential).toMatchObject({
+        organizationId: session.organizationId,
+        principalId: principal?.id,
+        providerFamily: "slack",
+        credentialKind: "slack_user_token",
+        status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+        scopes: ["users.profile:read", "users:read.email"],
+      });
+      expect(credential?.accessTokenExpiresAt).toBeTruthy();
+      expect(credential?.refreshTokenExpiresAt).toBeNull();
+
+      const credentialSecrets =
+        await fixture.db.query.userExternalPrincipalCredentialSecrets.findMany({
+          columns: {
+            secretKind: true,
+            nonce: true,
+            ciphertext: true,
+            organizationCredentialKeyVersion: true,
+          },
+          where: (table, { and, eq }) =>
+            and(
+              eq(table.organizationId, session.organizationId),
+              eq(table.credentialId, credential?.id ?? "__missing__"),
+            ),
+          orderBy: (table, { asc }) => [asc(table.secretKind)],
+        });
+      expect(credentialSecrets.map((secret) => secret.secretKind)).toEqual([
+        UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      ]);
+      expect(
+        await decryptUserExternalPrincipalCredentialSecret({
+          fixture,
+          organizationCredentialKeyVersion:
+            credentialSecrets[0]?.organizationCredentialKeyVersion ?? -1,
+          nonce: credentialSecrets[0]?.nonce ?? "__missing__",
+          ciphertext: credentialSecrets[0]?.ciphertext ?? "__missing__",
+          organizationId: session.organizationId,
+        }),
+      ).toBe("xoxe.xoxp-slack-user-token");
+    } finally {
+      server.close();
+      await once(server, "close");
+    }
+  });
+
   it("redirects with failure details when the linked-account callback state does not exist", async ({
     fixture,
   }) => {
@@ -955,7 +1224,10 @@ async function upsertGitHubTarget(input: {
 async function upsertSlackTarget(input: {
   fixture: ControlPlaneApiIntegrationFixture;
   targetKey: string;
+  apiBaseUrl?: string;
 }): Promise<void> {
+  const apiBaseUrl = input.apiBaseUrl ?? "https://slack.com/api";
+
   await input.fixture.db
     .insert(integrationTargets)
     .values({
@@ -964,7 +1236,7 @@ async function upsertSlackTarget(input: {
       variantId: "slack-default",
       enabled: true,
       config: {
-        api_base_url: "https://slack.com/api",
+        api_base_url: apiBaseUrl,
       },
     })
     .onConflictDoUpdate({
@@ -974,7 +1246,7 @@ async function upsertSlackTarget(input: {
         variantId: "slack-default",
         enabled: true,
         config: {
-          api_base_url: "https://slack.com/api",
+          api_base_url: apiBaseUrl,
         },
       },
     });
@@ -1057,6 +1329,46 @@ async function createGitHubAppConnection(input: {
   const connectionId = createdConnection["id"];
   if (typeof connectionId !== "string" || connectionId.length === 0) {
     throw new Error("Expected GitHub App connection id.");
+  }
+
+  return connectionId;
+}
+
+async function createSlackAppOAuthConnection(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
+  displayName: string;
+}): Promise<string> {
+  const response = await input.fixture.request("/v1/integration/connections/slack-default/form", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.authenticatedSession.cookie,
+    },
+    body: JSON.stringify({
+      displayName: input.displayName,
+      methodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+      config: {
+        connection_method: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+        client_id: "123.456",
+      },
+      secrets: {
+        botToken: "xoxb-slack-bot-token",
+        signingSecret: "slack-signing-secret",
+        clientSecret: "slack-client-secret",
+      },
+    }),
+  });
+
+  expect(response.status).toBe(201);
+  const createdConnection = await response.json();
+  if (typeof createdConnection !== "object" || createdConnection === null) {
+    throw new Error("Expected Slack App OAuth connection create response object.");
+  }
+
+  const connectionId = createdConnection["id"];
+  if (typeof connectionId !== "string" || connectionId.length === 0) {
+    throw new Error("Expected Slack App OAuth connection id.");
   }
 
   return connectionId;

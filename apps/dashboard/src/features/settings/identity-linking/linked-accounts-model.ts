@@ -22,6 +22,17 @@ export type LinkedAccountCardViewModel = {
   secondaryActionLabel: string | null;
 };
 
+function resolveProviderDisplayName(providerFamily: string | null): string | null {
+  switch (providerFamily) {
+    case "github":
+      return "GitHub";
+    case "slack":
+      return "Slack";
+    default:
+      return null;
+  }
+}
+
 const LinkedAccountCallbackSearchParamKeys = [
   "linkedAccountProvider",
   "linkedAccountResult",
@@ -113,6 +124,17 @@ export function resolveLinkedAccountCardViewModel(
   };
 }
 
+export function resolveLinkedAccountCardViewModels(
+  linkedAccounts: readonly LinkedAccount[],
+): LinkedAccountCardViewModel[] {
+  return linkedAccounts
+    .filter(
+      (linkedAccount) =>
+        linkedAccount.configurationStatus !== "disabled" || linkedAccount.principal !== null,
+    )
+    .map((linkedAccount) => resolveLinkedAccountCardViewModel(linkedAccount));
+}
+
 function resolveLinkedAccountLabel(linkedAccount: LinkedAccount): string {
   const profile = linkedAccount.principal?.profile;
   const login = profile?.["login"];
@@ -123,6 +145,11 @@ function resolveLinkedAccountLabel(linkedAccount: LinkedAccount): string {
   const displayName = profile?.["displayName"];
   if (typeof displayName === "string" && displayName.length > 0) {
     return displayName;
+  }
+
+  const workspaceName = profile?.["workspaceName"];
+  if (typeof workspaceName === "string" && workspaceName.length > 0) {
+    return workspaceName;
   }
 
   const email = profile?.["email"];
@@ -147,14 +174,15 @@ export function resolveLinkedAccountCallbackNotice(input: {
   result: string | null;
   code: string | null;
 }): LinkedAccountCallbackNotice | null {
-  if (input.providerFamily !== "github") {
+  const providerDisplayName = resolveProviderDisplayName(input.providerFamily);
+  if (providerDisplayName === null) {
     return null;
   }
 
   if (input.result === "success") {
     return {
-      title: "GitHub linked",
-      message: "Your GitHub account is now linked to Mistle.",
+      title: `${providerDisplayName} linked`,
+      message: `Your ${providerDisplayName} account is now linked to Mistle.`,
       variant: "default",
     };
   }
@@ -164,8 +192,11 @@ export function resolveLinkedAccountCallbackNotice(input: {
   }
 
   return {
-    title: "GitHub link failed",
-    message: resolveLinkedAccountCallbackFailureMessage(input.code),
+    title: `${providerDisplayName} link failed`,
+    message: resolveLinkedAccountCallbackFailureMessage({
+      providerDisplayName,
+      code: input.code,
+    }),
     variant: "alert",
   };
 }
@@ -181,18 +212,21 @@ export function clearLinkedAccountCallbackSearchParams(
   return nextSearchParams;
 }
 
-function resolveLinkedAccountCallbackFailureMessage(code: string | null): string {
-  switch (code) {
+function resolveLinkedAccountCallbackFailureMessage(input: {
+  providerDisplayName: string;
+  code: string | null;
+}): string {
+  switch (input.code) {
     case "REDIRECT_STATE_EXPIRED":
-      return "This GitHub linking attempt expired. Start the link again.";
+      return `This ${input.providerDisplayName} linking attempt expired. Start the link again.`;
     case "REDIRECT_STATE_ALREADY_USED":
-      return "This GitHub linking attempt has already been used. Start the link again.";
+      return `This ${input.providerDisplayName} linking attempt has already been used. Start the link again.`;
     case "PROVIDER_SUBJECT_ALREADY_LINKED":
-      return "That GitHub account is already linked to another Mistle user in this organization.";
+      return `That ${input.providerDisplayName} account is already linked to another Mistle user in this organization.`;
     case "REDIRECT_STATE_INVALID":
     case "INVALID_LINKED_ACCOUNT_CALLBACK_INPUT":
-      return "GitHub linking could not be completed. Start the link again.";
+      return `${input.providerDisplayName} linking could not be completed. Start the link again.`;
     default:
-      return "GitHub linking could not be completed. Please try again.";
+      return `${input.providerDisplayName} linking could not be completed. Please try again.`;
   }
 }
