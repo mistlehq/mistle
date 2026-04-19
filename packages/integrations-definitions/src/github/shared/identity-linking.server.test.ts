@@ -167,6 +167,8 @@ describe("github identity linking", () => {
                 name: "Mistle User",
                 email: null,
                 avatar_url: "https://avatars.example.com/u/12345",
+                node_id: "MDQ6VXNlcjEyMzQ1",
+                html_url: "https://github.com/mistle-user",
               }),
             );
             return;
@@ -179,6 +181,7 @@ describe("github identity linking", () => {
                   email: "mistle-user@example.com",
                   primary: true,
                   verified: true,
+                  visibility: "private",
                 },
               ]),
             );
@@ -297,6 +300,7 @@ describe("github identity linking", () => {
               name: "Mistle User",
               email: "public-profile@example.com",
               avatar_url: "https://avatars.example.com/u/12345",
+              node_id: "MDQ6VXNlcjEyMzQ1",
             }),
           );
           return;
@@ -309,6 +313,7 @@ describe("github identity linking", () => {
                 email: "primary@example.com",
                 primary: true,
                 verified: true,
+                visibility: "private",
               },
             ]),
           );
@@ -454,6 +459,42 @@ describe("github identity linking", () => {
           now: "2026-04-18T10:00:00.000Z",
         }),
       ).rejects.toThrow("did not return a refresh token");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("preserves GitHub token exchange error details when the token endpoint returns an OAuth error payload", async () => {
+    const server = await startTestServer({
+      handler(_request, response) {
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            error: "bad_verification_code",
+            error_description: "The code passed is incorrect or expired.",
+          }),
+        );
+      },
+    });
+
+    try {
+      await expect(
+        completeGitHubLinkedAccountAuthorization({
+          apiBaseUrl: server.baseUrl,
+          webBaseUrl: server.baseUrl,
+          clientId: "Iv1.client123",
+          clientSecret: "github-client-secret",
+          query: new URLSearchParams({
+            code: "code_123",
+            state: "state_123",
+          }),
+          redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/github",
+          pkceVerifier: "verifier_123",
+          now: "2026-04-18T10:00:00.000Z",
+        }),
+      ).rejects.toThrow(
+        "GitHub authorization code exchange failed: bad_verification_code: The code passed is incorrect or expired.",
+      );
     } finally {
       await server.stop();
     }

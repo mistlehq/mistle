@@ -34,6 +34,14 @@ const GitHubUserAccessTokenResponseSchema = z
   })
   .strict();
 
+const GitHubUserAccessTokenErrorResponseSchema = z
+  .object({
+    error: z.string().min(1),
+    error_description: z.string().min(1).optional(),
+    error_uri: z.string().min(1).optional(),
+  })
+  .strict();
+
 const GitHubUserProfileResponseSchema = z
   .object({
     id: z.number().int().nonnegative(),
@@ -42,7 +50,7 @@ const GitHubUserProfileResponseSchema = z
     email: z.email().nullable().optional(),
     avatar_url: z.url().optional(),
   })
-  .strict();
+  .loose();
 
 const GitHubUserEmailResponseSchema = z
   .array(
@@ -52,7 +60,7 @@ const GitHubUserEmailResponseSchema = z
         primary: z.boolean(),
         verified: z.boolean(),
       })
-      .strict(),
+      .loose(),
   )
   .readonly();
 
@@ -179,6 +187,35 @@ async function readJsonResponseOrThrow<T>(input: {
   return input.schema.parse(parsedJson);
 }
 
+async function readGitHubUserAccessTokenResponseOrThrow(input: {
+  response: Response;
+  errorLabel: string;
+}): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
+  const contentType = input.response.headers.get("content-type");
+  if (contentType === null || !contentType.includes("application/json")) {
+    throw new GitHubIdentityLinkingAuthorizationError(`${input.errorLabel} did not return JSON.`);
+  }
+
+  const parsedJson: unknown = await input.response.json();
+  const parsedError = GitHubUserAccessTokenErrorResponseSchema.safeParse(parsedJson);
+  if (parsedError.success) {
+    const description =
+      parsedError.data.error_description === undefined
+        ? parsedError.data.error
+        : `${parsedError.data.error}: ${parsedError.data.error_description}`;
+    throw new GitHubIdentityLinkingAuthorizationError(`${input.errorLabel} failed: ${description}`);
+  }
+
+  const parsedTokenResponse = GitHubUserAccessTokenResponseSchema.safeParse(parsedJson);
+  if (parsedTokenResponse.success) {
+    return parsedTokenResponse.data;
+  }
+
+  throw new GitHubIdentityLinkingAuthorizationError(
+    `${input.errorLabel} returned an invalid response.`,
+  );
+}
+
 function toGitHubAuthorizationFailure(input: {
   errorLabel: string;
   error: unknown;
@@ -296,18 +333,10 @@ async function exchangeAuthorizationCode(input: {
     );
   }
 
-  try {
-    return await readJsonResponseOrThrow({
-      response,
-      schema: GitHubUserAccessTokenResponseSchema,
-      errorLabel: "GitHub authorization code exchange",
-    });
-  } catch (error) {
-    throw toGitHubAuthorizationFailure({
-      errorLabel: "GitHub authorization code exchange",
-      error,
-    });
-  }
+  return await readGitHubUserAccessTokenResponseOrThrow({
+    response,
+    errorLabel: "GitHub authorization code exchange",
+  });
 }
 
 async function refreshUserAccessToken(input: {
@@ -340,18 +369,10 @@ async function refreshUserAccessToken(input: {
     );
   }
 
-  try {
-    return await readJsonResponseOrThrow({
-      response,
-      schema: GitHubUserAccessTokenResponseSchema,
-      errorLabel: "GitHub refresh token exchange",
-    });
-  } catch (error) {
-    throw toGitHubAuthorizationFailure({
-      errorLabel: "GitHub refresh token exchange",
-      error,
-    });
-  }
+  return await readGitHubUserAccessTokenResponseOrThrow({
+    response,
+    errorLabel: "GitHub refresh token exchange",
+  });
 }
 
 async function fetchUserProfile(input: {

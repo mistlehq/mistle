@@ -425,7 +425,7 @@ mod tests {
 
     use crate::pty::{
         DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
-        PtySpawnRequest, start_pty_session, start_scoped_pty_session,
+        PtySpawnRequest, resolve_pty_environment, start_pty_session, start_scoped_pty_session,
     };
     use crate::time::{Duration, SystemClock, ThreadSleeper};
 
@@ -527,6 +527,20 @@ mod tests {
             String::from_utf8(output).expect("output should be utf8"),
             "from-request"
         );
+    }
+
+    #[test]
+    fn resolve_pty_environment_prefers_requested_path_value() {
+        let requested_path = "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+        let mut env = BTreeMap::new();
+        env.insert("PATH".to_string(), requested_path.to_string());
+        let environment = resolve_pty_environment(&env);
+        let path_entry = environment
+            .iter()
+            .find(|entry| entry.name == "PATH")
+            .expect("PATH should be present");
+
+        assert_eq!(path_entry.value, requested_path);
     }
 
     #[test]

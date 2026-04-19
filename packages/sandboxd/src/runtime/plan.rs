@@ -88,12 +88,36 @@ pub struct CompiledEgressRouteCredentialHeaderInjection {
 
 /// The credential source that backs one mediated egress route.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct CompiledEgressRouteCredentialResolver {
-    pub connection_id: String,
-    pub secret_type: String,
-    pub slot_key: Option<String>,
-    pub resolver_key: Option<String>,
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum CompiledEgressRouteCredentialResolver {
+    IntegrationConnection {
+        #[serde(rename = "connectionId")]
+        connection_id: String,
+        #[serde(rename = "secretType")]
+        secret_type: String,
+        #[serde(rename = "slotKey")]
+        slot_key: Option<String>,
+        #[serde(rename = "resolverKey")]
+        resolver_key: Option<String>,
+    },
+    LinkedPrincipal {
+        #[serde(rename = "providerFamily")]
+        provider_family: String,
+        #[serde(rename = "credentialKind")]
+        credential_kind: Option<String>,
+        #[serde(rename = "actingUserRequired")]
+        acting_user_required: bool,
+        #[serde(rename = "resolutionMode")]
+        resolution_mode: CompiledLinkedPrincipalEgressCredentialResolutionMode,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum CompiledLinkedPrincipalEgressCredentialResolutionMode {
+    #[serde(rename = "required")]
+    Required,
+    #[serde(rename = "preferred")]
+    Preferred,
 }
 
 /// One subprocess command used by runtime client processes and exec artifact installs.
@@ -590,6 +614,8 @@ pub enum WorkspaceSourceResourceKind {
 mod tests {
     use super::{
         CompiledEgressRoute, CompiledEgressRouteAuthInjectionType,
+        CompiledEgressRouteCredentialResolver,
+        CompiledLinkedPrincipalEgressCredentialResolutionMode,
         RuntimeArtifactGitHubReleaseInstallAsset, RuntimeArtifactGitHubReleaseSelector,
         RuntimeArtifactInstallStep,
     };
@@ -693,6 +719,7 @@ mod tests {
             {
               "header": "x-extra-token",
               "credentialResolver": {
+                "kind": "integration_connection",
                 "connectionId": "icn_extra",
                 "secretType": "api_key",
                 "slotKey": "extra"
@@ -700,6 +727,7 @@ mod tests {
             }
           ],
           "credentialResolver": {
+            "kind": "integration_connection",
             "connectionId": "icn_github",
             "secretType": "github_app_installation_token",
             "resolverKey": "github_app_installation_token"
@@ -748,6 +776,7 @@ mod tests {
             "region": "us-east-1"
           },
           "credentialResolver": {
+            "kind": "integration_connection",
             "connectionId": "icn_aws",
             "secretType": "aws_access_key"
           }
@@ -761,5 +790,54 @@ mod tests {
         assert_eq!(route.auth_injection.service.as_deref(), Some("s3"));
         assert_eq!(route.auth_injection.region.as_deref(), Some("us-east-1"));
         assert_eq!(route.auth_injection.target, None);
+    }
+
+    #[test]
+    fn decodes_linked_principal_credential_resolver_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_bind_github_user",
+          "bindingId": "bind_github_user",
+          "familyId": "github",
+          "variantId": "github-cloud",
+          "match": {
+            "hosts": ["api.github.com"]
+          },
+          "upstream": {
+            "baseUrl": "https://api.github.com"
+          },
+          "authInjection": {
+            "type": "bearer",
+            "target": "authorization"
+          },
+          "credentialResolver": {
+            "kind": "linked_principal",
+            "providerFamily": "github",
+            "credentialKind": "github_app_user_access_token",
+            "actingUserRequired": true,
+            "resolutionMode": "preferred"
+          }
+        }))
+        .expect("linked principal egress route should decode");
+
+        match route.credential_resolver {
+            CompiledEgressRouteCredentialResolver::LinkedPrincipal {
+                provider_family,
+                credential_kind,
+                acting_user_required,
+                resolution_mode,
+            } => {
+                assert_eq!(provider_family, "github");
+                assert_eq!(
+                    credential_kind,
+                    Some("github_app_user_access_token".to_string())
+                );
+                assert!(acting_user_required);
+                assert_eq!(
+                    resolution_mode,
+                    CompiledLinkedPrincipalEgressCredentialResolutionMode::Preferred
+                );
+            }
+            other => panic!("expected linked principal resolver, got {other:?}"),
+        }
     }
 }

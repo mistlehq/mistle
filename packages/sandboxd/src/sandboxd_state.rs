@@ -77,6 +77,9 @@ impl fmt::Display for SandboxdStateError {
 impl std::error::Error for SandboxdStateError {}
 
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+const MANAGED_RUNTIME_PATH_ENV: &str = "PATH";
+const MANAGED_RUNTIME_PATH_VALUE: &str =
+    "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
@@ -137,10 +140,7 @@ impl SandboxdState {
         .map_err(|error| SandboxdStateError::StartEgressProxy(error.to_string()))?;
         let runtime_env = collect_runtime_environment(&runtime_plan)
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
-        let runtime_env = merge_managed_runtime_environment(
-            runtime_env,
-            egress_proxy.as_ref().map(EgressProxy::runtime_env),
-        )
+        let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
         .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
@@ -586,22 +586,28 @@ fn collect_runtime_environment(
 
 fn merge_managed_runtime_environment(
     mut runtime_env: BTreeMap<String, String>,
-    managed_env: Option<&BTreeMap<String, String>>,
+    egress_proxy: Option<&EgressProxy>,
 ) -> Result<BTreeMap<String, String>, String> {
-    let Some(managed_env) = managed_env else {
-        return Ok(runtime_env);
-    };
+    let mut managed_env = BTreeMap::from([(
+        MANAGED_RUNTIME_PATH_ENV.to_string(),
+        MANAGED_RUNTIME_PATH_VALUE.to_string(),
+    )]);
+    if let Some(egress_proxy) = egress_proxy {
+        for (name, value) in egress_proxy.runtime_env() {
+            managed_env.insert(name.clone(), value.clone());
+        }
+    }
 
     for (name, value) in managed_env {
-        match runtime_env.get(name) {
-            Some(existing_value) if existing_value != value => {
+        match runtime_env.get(&name) {
+            Some(existing_value) if existing_value != &value => {
                 return Err(format!(
                     "runtime plan artifacts define managed env '{name}', which sandboxd reserves"
                 ));
             }
             Some(_) => {}
             None => {
-                runtime_env.insert(name.clone(), value.clone());
+                runtime_env.insert(name, value);
             }
         }
     }
@@ -759,7 +765,8 @@ mod tests {
         RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        apply_runtime_startup_overrides, collect_runtime_environment,
+        MANAGED_RUNTIME_PATH_ENV, MANAGED_RUNTIME_PATH_VALUE, apply_runtime_startup_overrides,
+        collect_runtime_environment, merge_managed_runtime_environment,
         spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
@@ -791,7 +798,8 @@ mod tests {
                     },
                     additional_headers: None,
                     additional_credential_headers: None,
-                    credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
+                    credential_resolver:
+                        crate::runtime::CompiledEgressRouteCredentialResolver::IntegrationConnection {
                         connection_id: "icn_test".to_string(),
                         secret_type: "api_key".to_string(),
                         slot_key: None,
@@ -821,7 +829,8 @@ mod tests {
                     },
                     additional_headers: None,
                     additional_credential_headers: None,
-                    credential_resolver: crate::runtime::CompiledEgressRouteCredentialResolver {
+                    credential_resolver:
+                        crate::runtime::CompiledEgressRouteCredentialResolver::IntegrationConnection {
                         connection_id: "icn_github".to_string(),
                         secret_type: "github_app_installation_token".to_string(),
                         slot_key: None,
@@ -1149,6 +1158,34 @@ supports_websockets = false
         assert_eq!(
             error,
             "runtime plan artifacts define conflicting values for env 'GH_TOKEN'"
+        );
+    }
+
+    #[test]
+    fn merges_managed_runtime_path_into_runtime_environment() {
+        let runtime_env = merge_managed_runtime_environment(BTreeMap::new(), None)
+            .expect("managed runtime env should merge");
+
+        assert_eq!(
+            runtime_env.get(MANAGED_RUNTIME_PATH_ENV),
+            Some(&MANAGED_RUNTIME_PATH_VALUE.to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_conflicting_managed_runtime_path_values() {
+        let error = merge_managed_runtime_environment(
+            BTreeMap::from([(
+                MANAGED_RUNTIME_PATH_ENV.to_string(),
+                "/usr/local/bin:/usr/bin:/bin".to_string(),
+            )]),
+            None,
+        )
+        .expect_err("conflicting managed path should fail fast");
+
+        assert_eq!(
+            error,
+            "runtime plan artifacts define managed env 'PATH', which sandboxd reserves"
         );
     }
 

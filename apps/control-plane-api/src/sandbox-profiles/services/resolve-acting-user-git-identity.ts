@@ -13,7 +13,7 @@ const GitHubPrincipalProfileSchema = z
     displayName: z.string().min(1).optional(),
     email: z.email().optional(),
   })
-  .strict();
+  .loose();
 
 export type SandboxActingUser = {
   userId: string;

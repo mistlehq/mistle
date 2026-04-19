@@ -701,6 +701,7 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
                 "chatgpt-account-id": "acct_123"
               },
               "credentialResolver": {
+                "kind": "integration_connection",
                 "connectionId": "icn_test",
                 "secretType": "api_key",
                 "slotKey": "openai.openai-default.api-key.api-key"

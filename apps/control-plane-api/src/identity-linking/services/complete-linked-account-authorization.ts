@@ -23,6 +23,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
+import { logger } from "../../logger.js";
 import { IdentityLinkingBadRequestCodes } from "../constants.js";
 import { resolveIdentityLinkingRuntimeContextOrThrow } from "./identity-linking-definition.js";
 import {
@@ -573,6 +574,17 @@ export async function completeLinkedAccountAuthorization(
     }
 
     if (resolveIdentityLinkingErrorCode(error) === "IDENTITY_LINKING_AUTHORIZATION_FAILED") {
+      logger.warn(
+        {
+          err: error,
+          providerFamily: input.providerFamily,
+          organizationId: redirectSession.organizationId,
+          userId: redirectSession.userId,
+          redirectSessionId: redirectSession.id,
+        },
+        "Identity-linking authorization callback failed",
+      );
+
       throw new BadRequestError(
         IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_CALLBACK_INPUT,
         error instanceof Error

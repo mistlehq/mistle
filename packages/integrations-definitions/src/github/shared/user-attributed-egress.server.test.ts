@@ -27,6 +27,10 @@ function createSelectionInput(url: string, method: string) {
   };
 }
 
+function encodeRequestBodyJson(value: unknown): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(value));
+}
+
 describe("shouldUseGitHubLinkedPrincipalCredential", () => {
   it("matches pull request creation requests", () => {
     expect(
@@ -72,6 +76,22 @@ describe("shouldUseGitHubLinkedPrincipalCredential", () => {
     ).toBe(true);
   });
 
+  it("matches graphql create pull request mutations", () => {
+    expect(
+      shouldUseGitHubLinkedPrincipalCredential({
+        request: {
+          method: "POST",
+          url: new URL("https://api.github.com/graphql"),
+          body: encodeRequestBodyJson({
+            operationName: "CreatePullRequest",
+            query:
+              "mutation CreatePullRequest($input: CreatePullRequestInput!) { createPullRequest(input: $input) { pullRequest { id } } }",
+          }),
+        },
+      }),
+    ).toBe(true);
+  });
+
   it("does not match unrelated github requests", () => {
     expect(
       shouldUseGitHubLinkedPrincipalCredential({
@@ -90,6 +110,30 @@ describe("resolveGitHubUserAttributedEgressCredentialResolver", () => {
       resolveGitHubUserAttributedEgressCredentialResolver(
         createSelectionInput("https://api.github.com/repos/mistlehq/mistle/pulls", "POST"),
       ),
+    ).toEqual({
+      kind: "linked_principal",
+      providerFamily: GitHubFamilyId,
+      credentialKind: "github_app_user_access_token",
+      actingUserRequired: true,
+      resolutionMode: "preferred",
+    });
+  });
+
+  it("returns a linked-principal resolver for graphql pull request mutations", () => {
+    expect(
+      resolveGitHubUserAttributedEgressCredentialResolver({
+        ...createSelectionInput("https://api.github.com/graphql", "POST"),
+        request: {
+          method: "POST",
+          url: new URL("https://api.github.com/graphql"),
+          headers: new Headers(),
+          body: encodeRequestBodyJson({
+            operationName: "CreatePullRequest",
+            query:
+              "mutation CreatePullRequest($input: CreatePullRequestInput!) { createPullRequest(input: $input) { pullRequest { id } } }",
+          }),
+        },
+      }),
     ).toEqual({
       kind: "linked_principal",
       providerFamily: GitHubFamilyId,

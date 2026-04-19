@@ -1522,7 +1522,7 @@ mod tests {
                 },
                 additional_headers: None,
                 additional_credential_headers: None,
-                credential_resolver: CompiledEgressRouteCredentialResolver {
+                credential_resolver: CompiledEgressRouteCredentialResolver::IntegrationConnection {
                     connection_id: "connection-1".to_string(),
                     secret_type: "token".to_string(),
                     slot_key: None,

@@ -583,6 +583,7 @@ describe("sandbox profile version start instance integration", () => {
         login: "mistle-user",
         displayName: "Mistle User",
         email: "mistle-user@example.com",
+        avatarUrl: "https://avatars.example.com/u/12345",
       },
     });
 
