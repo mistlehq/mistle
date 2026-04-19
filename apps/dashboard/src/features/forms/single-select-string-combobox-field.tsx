@@ -5,6 +5,7 @@ import {
   ComboboxItem,
   ComboboxList,
   Input,
+  cn,
   useComboboxAnchor,
 } from "@mistle/ui";
 import * as React from "react";
@@ -16,9 +17,12 @@ import {
 } from "./string-combobox-options.js";
 
 type SingleSelectStringComboboxFieldProps = {
+  contentClassName?: string;
+  disabled?: boolean;
   emptyMessage?: string;
   inputId: string;
   inputLabel?: string;
+  inputWrapperClassName?: string;
   invalid?: boolean;
   onBlur?: (value: string | undefined) => void;
   onChange: (value: string | undefined) => void;
@@ -26,6 +30,7 @@ type SingleSelectStringComboboxFieldProps = {
   options: readonly StringComboboxOption[];
   placeholder: string;
   readonly?: boolean | undefined;
+  showClear?: boolean;
   value: string | undefined;
 };
 
@@ -38,6 +43,8 @@ export function SingleSelectStringComboboxField(
   const [queryText, setQueryText] = React.useState(selectedOption?.label ?? "");
   const anchorRef = useComboboxAnchor();
   const emptyMessage = props.emptyMessage ?? "No matching options.";
+  const disabled = props.disabled ?? false;
+  const showClear = props.showClear ?? selectedValue.length > 0;
 
   React.useEffect(() => {
     if (isOpen) {
@@ -56,6 +63,7 @@ export function SingleSelectStringComboboxField(
   return (
     <Combobox<string>
       autoHighlight
+      disabled={disabled}
       inputValue={queryText}
       onInputValueChange={setQueryText}
       onOpenChange={(open) => {
@@ -75,11 +83,12 @@ export function SingleSelectStringComboboxField(
       open={isOpen}
       value={selectedValue.length === 0 ? null : selectedValue}
     >
-      <div className="w-full" ref={anchorRef}>
+      <div className={cn("w-full", props.inputWrapperClassName)} ref={anchorRef}>
         <ComboboxInput
           aria-invalid={props.invalid ? true : undefined}
           aria-label={props.inputLabel}
           className="w-full"
+          disabled={disabled}
           id={props.inputId}
           onBlur={() => {
             setIsOpen(false);
@@ -91,11 +100,11 @@ export function SingleSelectStringComboboxField(
             props.onFocus?.(selectedValue.length === 0 ? undefined : selectedValue);
           }}
           placeholder={props.placeholder}
-          showClear={selectedValue.length > 0}
+          showClear={showClear}
         />
       </div>
       {isOpen ? (
-        <ComboboxContent anchor={anchorRef} className="p-0">
+        <ComboboxContent anchor={anchorRef} className={cn("p-0", props.contentClassName)}>
           <ComboboxList>
             {filteredOptions.map((option) => (
               <ComboboxItem key={option.value} value={option.value}>

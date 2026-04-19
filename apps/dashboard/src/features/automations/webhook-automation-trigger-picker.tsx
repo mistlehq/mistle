@@ -23,6 +23,7 @@ import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
+import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
@@ -432,7 +433,6 @@ function TriggerParameterField(input: {
   return (
     <ResourceSelectParameterField
       key={`${input.connectionId}:${input.value}:${resolvedSelectedResourceOption?.displayName ?? ""}`}
-      eventType={input.eventType}
       onValueChange={input.onValueChange}
       parameter={input.parameter}
       placeholder={placeholder}
@@ -444,7 +444,6 @@ function TriggerParameterField(input: {
 }
 
 function ResourceSelectParameterField(input: {
-  eventType: string;
   parameter: Extract<
     NonNullable<WebhookAutomationEventOption["parameters"]>[number],
     { kind: "resource-select" }
@@ -459,59 +458,28 @@ function ResourceSelectParameterField(input: {
   }>;
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
-  const resourceAnchorRef = useComboboxAnchor();
-  const [resourceQueryText, setResourceQueryText] = useState(input.selectedDisplayName);
+  const inputId = useId();
 
   return (
     <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
       <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
         {input.parameter.prefix ?? input.parameter.label}
       </span>
-      <Combobox<string>
-        autoHighlight
-        items={input.resourceOptions.map((option) => ({
+      <SingleSelectStringComboboxField
+        contentClassName="w-[min(22rem,calc(100vw-2rem))]"
+        inputId={inputId}
+        inputLabel={input.parameter.label}
+        inputWrapperClassName="min-w-0 flex-1 md:min-w-44 md:flex-none"
+        onChange={(value) => {
+          input.onValueChange(value ?? "");
+        }}
+        options={input.resourceOptions.map((option) => ({
           value: option.handle,
           label: option.displayName,
         }))}
-        inputValue={resourceQueryText}
-        onInputValueChange={setResourceQueryText}
-        onOpenChange={(open) => {
-          if (!open) {
-            setResourceQueryText(input.selectedDisplayName);
-          }
-        }}
-        onValueChange={(value) => {
-          const nextSelectedResourceOption = input.resourceOptions.find(
-            (option) => option.handle === value,
-          );
-          setResourceQueryText(nextSelectedResourceOption?.displayName ?? "");
-          input.onValueChange(value ?? "");
-        }}
-        value={input.value.length === 0 ? null : input.value}
-      >
-        <div className="min-w-0 flex-1 md:min-w-44 md:flex-none" ref={resourceAnchorRef}>
-          <ComboboxInput
-            className="w-full"
-            placeholder={
-              input.value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder
-            }
-            showClear={input.value.length > 0}
-          />
-        </div>
-        <ComboboxContent
-          align="start"
-          anchor={resourceAnchorRef}
-          className="w-[min(22rem,calc(100vw-2rem))] p-0"
-        >
-          <ComboboxList className="max-h-64">
-            {input.resourceOptions.map((option) => (
-              <ComboboxItem key={`${input.eventType}:${option.id}`} value={option.handle}>
-                <span className="truncate">{option.displayName}</span>
-              </ComboboxItem>
-            ))}
-          </ComboboxList>
-        </ComboboxContent>
-      </Combobox>
+        placeholder={input.value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder}
+        value={input.value.length === 0 ? undefined : input.value}
+      />
     </span>
   );
 }

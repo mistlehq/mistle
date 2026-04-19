@@ -1,11 +1,5 @@
 import {
   Button,
-  Combobox,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
   Field,
   FieldContent,
   FieldError,
@@ -19,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
@@ -43,7 +38,6 @@ const WorkspaceRootOption: NewSessionPageRepositoryOption = {
 export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [profileQueryText, setProfileQueryText] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     input?.initialSelectedProfileId ?? null,
   );
@@ -139,16 +133,11 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
         isSelectableProfilesPending: selectableProfilesQuery.isPending,
       })
     ) {
-      setProfileQueryText("");
       setSelectedProfileId(null);
       setSelectedRepositoryValue(null);
       setStartErrorMessage(null);
     }
   }, [selectableProfiles, selectableProfilesQuery.isPending, selectedProfile]);
-
-  useEffect(() => {
-    setProfileQueryText(selectedProfile?.displayName ?? "");
-  }, [selectedProfile]);
 
   useEffect(() => {
     if (repositoryOptions.length === 0) {
@@ -217,55 +206,23 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
                       </FieldLabel>
                     </FieldHeader>
                     <FieldContent>
-                      <Combobox<{ value: string; label: string }>
-                        autoHighlight
+                      <SingleSelectStringComboboxField
                         disabled={
                           selectableProfilesQuery.isPending || startSessionMutation.isPending
                         }
-                        inputValue={profileQueryText}
-                        items={profileOptions}
-                        isItemEqualToValue={(item, value) => item.value === value.value}
-                        onInputValueChange={setProfileQueryText}
-                        onOpenChange={(open) => {
-                          if (!open) {
-                            setProfileQueryText(selectedProfile?.displayName ?? "");
-                          }
-                        }}
-                        onValueChange={(value) => {
+                        emptyMessage="No matching sandbox profiles."
+                        inputId="new-session-profile-combobox"
+                        inputLabel="Sandbox profile"
+                        onChange={(value) => {
                           setStartErrorMessage(null);
-                          if (value === null) {
-                            setProfileQueryText("");
-                            setSelectedProfileId(null);
-                            setSelectedRepositoryValue(null);
-                            return;
-                          }
-
-                          setProfileQueryText(value.label);
-                          setSelectedProfileId(value.value);
+                          setSelectedProfileId(value ?? null);
                           setSelectedRepositoryValue(null);
                         }}
-                        value={selectedProfileOption}
-                      >
-                        <ComboboxInput
-                          className="w-full"
-                          disabled={
-                            selectableProfilesQuery.isPending || startSessionMutation.isPending
-                          }
-                          id="new-session-profile-combobox"
-                          placeholder="Select a sandbox profile"
-                          showClear={false}
-                        />
-                        <ComboboxContent className="p-0">
-                          <ComboboxList className="max-h-64">
-                            {profileOptions.map((option) => (
-                              <ComboboxItem key={option.value} value={option}>
-                                <span className="truncate">{option.label}</span>
-                              </ComboboxItem>
-                            ))}
-                            <ComboboxEmpty>No matching sandbox profiles.</ComboboxEmpty>
-                          </ComboboxList>
-                        </ComboboxContent>
-                      </Combobox>
+                        options={profileOptions}
+                        placeholder="Select a sandbox profile"
+                        showClear={false}
+                        value={selectedProfileOption?.value}
+                      />
                     </FieldContent>
                   </Field>
 
@@ -277,39 +234,22 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
                         </FieldLabel>
                       </FieldHeader>
                       <FieldContent>
-                        <Combobox<NewSessionPageRepositoryOption>
-                          autoHighlight
+                        <SingleSelectStringComboboxField
                           disabled={
                             selectableProfilesQuery.isPending || startSessionMutation.isPending
                           }
-                          items={repositoryOptions}
-                          isItemEqualToValue={(item, value) => item.value === value.value}
-                          onValueChange={(value) => {
+                          emptyMessage="No matching repositories."
+                          inputId="new-session-repository-combobox"
+                          inputLabel="Primary repository"
+                          onChange={(value) => {
                             setStartErrorMessage(null);
-                            setSelectedRepositoryValue(value?.value ?? null);
+                            setSelectedRepositoryValue(value ?? null);
                           }}
-                          value={selectedRepositoryOption}
-                        >
-                          <ComboboxInput
-                            className="w-full"
-                            disabled={
-                              selectableProfilesQuery.isPending || startSessionMutation.isPending
-                            }
-                            id="new-session-repository-combobox"
-                            placeholder="Select a repository"
-                            showClear={false}
-                          />
-                          <ComboboxContent className="p-0">
-                            <ComboboxList className="max-h-64">
-                              {repositoryOptions.map((option) => (
-                                <ComboboxItem key={option.value} value={option}>
-                                  <span className="truncate">{option.label}</span>
-                                </ComboboxItem>
-                              ))}
-                              <ComboboxEmpty>No matching repositories.</ComboboxEmpty>
-                            </ComboboxList>
-                          </ComboboxContent>
-                        </Combobox>
+                          options={repositoryOptions}
+                          placeholder="Select a repository"
+                          showClear={false}
+                          value={selectedRepositoryOption?.value}
+                        />
                       </FieldContent>
                     </Field>
                   ) : null}

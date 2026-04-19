@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { SingleSelectStringComboboxField } from "./single-select-string-combobox-field.js";
 import type { StringComboboxOption } from "./string-combobox-options.js";
@@ -31,6 +31,10 @@ function renderField(input?: { value?: string }): ReturnType<typeof render> {
 }
 
 describe("SingleSelectStringComboboxField", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("updates the visible label after a focus-blur cycle and later prop change", async () => {
     const rendered = renderField({ value: "us-east-1" });
 
@@ -81,5 +85,37 @@ describe("SingleSelectStringComboboxField", () => {
     expect(within(listbox).queryByText("us-east-1")).toBeNull();
     expect(within(listbox).queryByText("us-west-2")).toBeNull();
     expect(within(listbox).getByText("No matching options.")).toBeDefined();
+  });
+
+  it("hides the clear control when showClear is false", () => {
+    const rendered = render(
+      <SingleSelectStringComboboxField
+        inputId="default-region"
+        inputLabel="Default region"
+        onChange={() => {}}
+        options={Options}
+        placeholder="Select default region"
+        showClear={false}
+        value="us-east-1"
+      />,
+    );
+
+    expect(rendered.container.querySelector('[data-slot="combobox-clear"]')).toBeNull();
+  });
+
+  it("disables the input when disabled", () => {
+    render(
+      <SingleSelectStringComboboxField
+        disabled={true}
+        inputId="default-region"
+        inputLabel="Default region"
+        onChange={() => {}}
+        options={Options}
+        placeholder="Select default region"
+        value="us-east-1"
+      />,
+    );
+
+    expect(screen.getByLabelText("Default region")).toHaveProperty("disabled", true);
   });
 });
