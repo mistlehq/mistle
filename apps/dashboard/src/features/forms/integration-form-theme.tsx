@@ -1,14 +1,5 @@
 import {
   Checkbox,
-  Combobox,
-  ComboboxChip,
-  ComboboxChips,
-  ComboboxChipsInput,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxList,
   Field,
   FieldContent,
   FieldDescription,
@@ -23,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
-  useComboboxAnchor,
   cn,
 } from "@mistle/ui";
 import { withTheme } from "@rjsf/core";
@@ -50,6 +40,8 @@ import * as React from "react";
 import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
+import { MultiSelectStringArrayComboboxField } from "./multi-select-string-array-combobox-field.js";
+import { SingleSelectStringComboboxField } from "./single-select-string-combobox-field.js";
 
 type JsonObject = Record<string, unknown>;
 type IntegrationFieldLayout = "horizontal" | "vertical";
@@ -91,7 +83,7 @@ function resolveCommaSeparatedOptions(
   };
 }
 
-function resolveStringArrayEnumOptions(
+function resolveMultiSelectStringComboboxOptions(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): readonly { label: string; value: string }[] {
   const itemsSchema = isRecord(props.schema.items) ? props.schema.items : null;
@@ -141,7 +133,7 @@ function resolveStringArrayEnumOptions(
   });
 }
 
-function resolveStringEnumOptions(
+function resolveSingleSelectStringComboboxOptions(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): readonly { label: string; value: string }[] {
   if (Array.isArray(props.schema.oneOf)) {
@@ -184,6 +176,20 @@ function resolveStringEnumOptions(
       },
     ];
   });
+}
+
+function forwardWidgetBlur<TValue>(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  value: TValue,
+): void {
+  props.onBlur(props.id, value);
+}
+
+function forwardWidgetFocus<TValue>(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  value: TValue,
+): void {
+  props.onFocus(props.id, value);
 }
 
 function CommaSeparatedStringArrayWidget(
@@ -246,205 +252,70 @@ function MultiSelectStringArrayComboboxWidget(
   const selectedValues = Array.isArray(props.value)
     ? props.value.filter((entry): entry is string => typeof entry === "string")
     : [];
-  const options = resolveStringArrayEnumOptions(props);
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [search, setSearch] = React.useState("");
-  const anchorRef = useComboboxAnchor();
-  const placeholder = typeof props.placeholder === "string" ? props.placeholder : props.label;
-  const emptyMessage =
-    typeof props.options.emptyMessage === "string"
-      ? props.options.emptyMessage
-      : "No matching options.";
-  const filteredOptions = options.filter((option) => {
-    if (search.trim().length === 0) {
-      return true;
-    }
-
-    const normalizedSearch = search.trim().toLowerCase();
-    return (
-      option.label.toLowerCase().includes(normalizedSearch) ||
-      option.value.toLowerCase().includes(normalizedSearch)
-    );
-  });
-
-  if (props.disabled || props.readonly) {
-    const selectedLabels = selectedValues
-      .map(
-        (selectedValue) =>
-          options.find((option) => option.value === selectedValue)?.label ?? selectedValue,
-      )
-      .join(", ");
-
-    return (
-      <Input disabled={props.disabled || props.readonly} id={props.id} value={selectedLabels} />
-    );
-  }
-
+  const options = resolveMultiSelectStringComboboxOptions(props);
   return (
-    <Combobox<string, true>
-      autoHighlight
-      inputValue={search}
-      multiple
-      onInputValueChange={setSearch}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (!open) {
-          setSearch("");
-          props.onBlur(props.id, selectedValues);
-        }
+    <MultiSelectStringArrayComboboxField
+      emptyMessage={
+        typeof props.options.emptyMessage === "string"
+          ? props.options.emptyMessage
+          : "No matching options."
+      }
+      inputId={props.id}
+      inputLabel={props.label}
+      invalid={props.rawErrors !== undefined && props.rawErrors.length > 0}
+      onBlur={(value) => {
+        forwardWidgetBlur(props, value);
       }}
-      onValueChange={(value) => {
+      onChange={(value) => {
         props.onChange(value);
       }}
-      open={isOpen}
+      onFocus={(value) => {
+        forwardWidgetFocus(props, value);
+      }}
+      options={options}
+      placeholder={typeof props.placeholder === "string" ? props.placeholder : props.label}
+      readonly={props.disabled || props.readonly}
       value={selectedValues}
-    >
-      <div ref={anchorRef}>
-        <ComboboxChips
-          aria-invalid={
-            props.rawErrors !== undefined && props.rawErrors.length > 0 ? true : undefined
-          }
-          onClick={() => {
-            setIsOpen(true);
-          }}
-        >
-          {selectedValues.map((selectedValue) => {
-            const optionLabel =
-              options.find((option) => option.value === selectedValue)?.label ?? selectedValue;
-
-            return <ComboboxChip key={selectedValue}>{optionLabel}</ComboboxChip>;
-          })}
-          <ComboboxChipsInput
-            aria-label={props.label}
-            className="min-w-28"
-            id={props.id}
-            onFocus={() => {
-              setIsOpen(true);
-              props.onFocus(props.id, selectedValues);
-            }}
-            placeholder={selectedValues.length === 0 ? placeholder : "Search"}
-          />
-        </ComboboxChips>
-      </div>
-
-      {isOpen ? (
-        <ComboboxContent anchor={anchorRef} className="p-0">
-          <ComboboxList>
-            {filteredOptions.map((option) => (
-              <ComboboxItem key={option.value} value={option.value}>
-                <span className="truncate">{option.label}</span>
-              </ComboboxItem>
-            ))}
-            <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
-          </ComboboxList>
-        </ComboboxContent>
-      ) : null}
-    </Combobox>
+    />
   );
 }
 
 function SingleSelectStringComboboxWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
-  const options = resolveStringEnumOptions(props);
+  const options = resolveSingleSelectStringComboboxOptions(props);
   const selectedValue = typeof props.value === "string" ? props.value : "";
-  const selectedOption = options.find((option) => option.value === selectedValue);
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [queryText, setQueryText] = React.useState(selectedOption?.label ?? "");
-  const anchorRef = useComboboxAnchor();
   const placeholder =
     typeof props.placeholder === "string"
       ? props.placeholder
       : typeof props.label === "string" && props.label.length > 0
         ? `Select ${props.label.toLowerCase()}`
         : "Select an option";
-  const emptyMessage =
-    typeof props.options.emptyMessage === "string"
-      ? props.options.emptyMessage
-      : "No matching options.";
-
-  React.useEffect(() => {
-    if (isOpen) {
-      return;
-    }
-
-    setQueryText(selectedOption?.label ?? "");
-  }, [isOpen, selectedOption?.label]);
-
-  const filteredOptions = options.filter((option) => {
-    if (queryText.trim().length === 0) {
-      return true;
-    }
-
-    const normalizedSearch = queryText.trim().toLowerCase();
-    return (
-      option.label.toLowerCase().includes(normalizedSearch) ||
-      option.value.toLowerCase().includes(normalizedSearch)
-    );
-  });
-
-  if (props.disabled || props.readonly) {
-    return (
-      <Input
-        disabled={props.disabled || props.readonly}
-        id={props.id}
-        value={selectedOption?.label ?? selectedValue}
-      />
-    );
-  }
 
   return (
-    <Combobox<string>
-      autoHighlight
-      inputValue={queryText}
-      onInputValueChange={setQueryText}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (open) {
-          setQueryText("");
-        } else {
-          setQueryText(selectedOption?.label ?? "");
-        }
+    <SingleSelectStringComboboxField
+      emptyMessage={
+        typeof props.options.emptyMessage === "string"
+          ? props.options.emptyMessage
+          : "No matching options."
+      }
+      inputId={props.id}
+      inputLabel={props.label}
+      invalid={props.rawErrors !== undefined && props.rawErrors.length > 0}
+      onBlur={(value) => {
+        forwardWidgetBlur(props, value);
       }}
-      onValueChange={(value) => {
-        const nextSelectedOption = options.find((option) => option.value === value);
-        setQueryText(nextSelectedOption?.label ?? "");
-        props.onChange(value ?? undefined);
+      onChange={(value) => {
+        props.onChange(value);
       }}
-      open={isOpen}
-      value={selectedValue.length === 0 ? null : selectedValue}
-    >
-      <div className="w-full" ref={anchorRef}>
-        <ComboboxInput
-          aria-label={props.label}
-          className="w-full"
-          id={props.id}
-          onBlur={() => {
-            setIsOpen(false);
-            props.onBlur(props.id, selectedValue.length === 0 ? undefined : selectedValue);
-          }}
-          onFocus={() => {
-            setQueryText("");
-            setIsOpen(true);
-            props.onFocus(props.id, selectedValue.length === 0 ? undefined : selectedValue);
-          }}
-          placeholder={placeholder}
-          showClear={selectedValue.length > 0}
-        />
-      </div>
-      {isOpen ? (
-        <ComboboxContent anchor={anchorRef} className="p-0">
-          <ComboboxList>
-            {filteredOptions.map((option) => (
-              <ComboboxItem key={option.value} value={option.value}>
-                <span className="truncate">{option.label}</span>
-              </ComboboxItem>
-            ))}
-            <ComboboxEmpty>{emptyMessage}</ComboboxEmpty>
-          </ComboboxList>
-        </ComboboxContent>
-      ) : null}
-    </Combobox>
+      onFocus={(value) => {
+        forwardWidgetFocus(props, value);
+      }}
+      options={options}
+      placeholder={placeholder}
+      readonly={props.disabled || props.readonly}
+      value={selectedValue.length === 0 ? undefined : selectedValue}
+    />
   );
 }
 

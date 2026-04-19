@@ -53,34 +53,7 @@ function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element
 }
 
 describe("IntegrationFormWithoutSubmit", () => {
-  it("updates the single-select combobox label after a focus-blur cycle and later prop change", async () => {
-    const rendered = render(
-      <SingleSelectHarness
-        formData={{
-          defaultRegion: "us-east-1",
-        }}
-      />,
-    );
-
-    const input = screen.getByLabelText("Default region");
-    expect(input).toHaveProperty("value", "us-east-1");
-
-    fireEvent.focus(input);
-    fireEvent.blur(input);
-    rendered.rerender(
-      <SingleSelectHarness
-        formData={{
-          defaultRegion: "us-west-2",
-        }}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Default region")).toHaveProperty("value", "us-west-2");
-    });
-  });
-
-  it("shows the full option list when reopening a single-select combobox with an existing selection", async () => {
+  it("wires the single-select combobox widget through the form theme", async () => {
     render(
       <SingleSelectHarness
         formData={{
@@ -98,5 +71,11 @@ describe("IntegrationFormWithoutSubmit", () => {
 
     expect(within(listbox).getByText("us-east-1")).toBeDefined();
     expect(within(listbox).getByText("us-west-2")).toBeDefined();
+
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Default region")).toHaveProperty("value", "us-east-1");
+    });
   });
 });
