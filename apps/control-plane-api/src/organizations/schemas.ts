@@ -174,3 +174,29 @@ export const OrganizationIdentityLinkProvidersResponseSchema = z
     providers: z.array(OrganizationIdentityLinkProviderSchema),
   })
   .strict();
+
+export const OrganizationIdentityLinkProviderPrincipalSummarySchema = z
+  .object({
+    providerSubjectId: z.string().min(1).nullable(),
+    login: z.string().min(1).nullable(),
+    displayName: z.string().min(1).nullable(),
+    email: z.email().nullable(),
+  })
+  .strict();
+
+export const OrganizationIdentityLinkProviderLinkSchema = z
+  .object({
+    userId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.email(),
+    linked: z.boolean(),
+    principalSummary: OrganizationIdentityLinkProviderPrincipalSummarySchema.nullable(),
+    updatedAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const OrganizationIdentityLinkProviderLinksResponseSchema = z
+  .object({
+    links: z.array(OrganizationIdentityLinkProviderLinkSchema),
+  })
+  .strict();

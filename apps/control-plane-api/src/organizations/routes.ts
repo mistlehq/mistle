@@ -9,6 +9,7 @@ import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
 import * as getOrganizationSandboxStorageSettings from "./get-organization-sandbox-storage-settings/index.js";
+import * as listIdentityLinkProviderLinks from "./list-identity-link-provider-links/index.js";
 import * as listIdentityLinkProviders from "./list-identity-link-providers/index.js";
 import * as listInvitations from "./list-invitations/index.js";
 import * as listMembers from "./list-members/index.js";
@@ -28,6 +29,7 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(deleteLogo.route, deleteLogo.handler);
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
   routes.openapi(listIdentityLinkProviders.route, listIdentityLinkProviders.handler);
+  routes.openapi(listIdentityLinkProviderLinks.route, listIdentityLinkProviderLinks.handler);
   routes.openapi(
     getOrganizationSandboxStorageSettings.route,
     getOrganizationSandboxStorageSettings.handler,

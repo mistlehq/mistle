@@ -1,5 +1,8 @@
 import type { OrganizationRole } from "../members/members-api-types.js";
-import type { OrganizationIdentityLinkProvider } from "./organization-identity-linking-service.js";
+import type {
+  OrganizationIdentityLinkProvider,
+  OrganizationIdentityLinkProviderLink,
+} from "./organization-identity-linking-service.js";
 
 export type IdentityLinkEligibleConnection = {
   id: string;
@@ -101,4 +104,23 @@ export function resolveReturnedIdentityLinkConnectionSelection(input: {
   }
 
   return null;
+}
+
+export function formatIdentityLinkProviderMemberStatus(input: { linked: boolean }): string {
+  return input.linked ? "Linked" : "Not linked";
+}
+
+export function formatIdentityLinkProviderPrincipalSummary(input: {
+  link: OrganizationIdentityLinkProviderLink;
+}): string | null {
+  if (input.link.principalSummary === null) {
+    return null;
+  }
+
+  return (
+    input.link.principalSummary.displayName ??
+    input.link.principalSummary.login ??
+    input.link.principalSummary.email ??
+    input.link.principalSummary.providerSubjectId
+  );
 }

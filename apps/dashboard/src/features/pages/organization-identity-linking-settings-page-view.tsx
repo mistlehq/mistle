@@ -36,6 +36,16 @@ export type OrganizationIdentityLinkingProviderCard = {
   saveActionDisabled: boolean;
   saveActionPending: boolean;
   statusActionPending: boolean;
+  memberLinksLoading: boolean;
+  memberLinksErrorMessage: string | null;
+  memberLinks: readonly {
+    userId: string;
+    name: string;
+    email: string;
+    statusLabel: string;
+    principalSummary: string | null;
+    updatedAt: string | null;
+  }[];
   errorMessage?: string;
 };
 
@@ -197,6 +207,46 @@ export function OrganizationIdentityLinkingSettingsPageView(
                   {provider.statusActionPending ? "Saving..." : provider.statusActionLabel}
                 </Button>
               ) : null}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t pt-4">
+              <h3 className="text-sm font-medium">Members</h3>
+              {provider.memberLinksLoading ? (
+                <div className="text-sm text-muted-foreground">Loading member visibility…</div>
+              ) : provider.memberLinksErrorMessage !== null ? (
+                <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
+              ) : provider.memberLinks.length === 0 ? (
+                <Notice>No organization members available to display yet.</Notice>
+              ) : (
+                <div className="flex flex-col divide-y rounded-md border">
+                  {provider.memberLinks.map((memberLink) => (
+                    <div
+                      key={memberLink.userId}
+                      className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-medium">{memberLink.name}</div>
+                        <div className="text-sm text-muted-foreground">{memberLink.email}</div>
+                        {memberLink.principalSummary === null ? null : (
+                          <div className="text-sm text-muted-foreground">
+                            {memberLink.principalSummary}
+                          </div>
+                        )}
+                        {memberLink.updatedAt === null ? null : (
+                          <div className="text-sm text-muted-foreground">
+                            Updated {memberLink.updatedAt}
+                          </div>
+                        )}
+                      </div>
+                      <StatusBadge
+                        tone={memberLink.statusLabel === "Linked" ? "active" : "unconfigured"}
+                      >
+                        {memberLink.statusLabel}
+                      </StatusBadge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </FormPageSection>

@@ -4040,6 +4040,94 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/organization/identity-linking/providers/:providerFamily/links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          providerFamily: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Organization member identity-linking visibility for a provider family. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              links: {
+                /** Format: email */
+                email: string;
+                linked: boolean;
+                name: string;
+                principalSummary: {
+                  displayName: string | null;
+                  /** Format: email */
+                  email: string | null;
+                  login: string | null;
+                  providerSubjectId: string | null;
+                } | null;
+                updatedAt: string | null;
+                userId: string;
+              }[];
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/organization/identity-linking/providers/:providerFamily/status": {
     parameters: {
       query?: never;

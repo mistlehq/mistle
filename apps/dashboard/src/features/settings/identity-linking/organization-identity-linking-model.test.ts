@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   canManageOrganizationIdentityLinking,
   formatIdentityLinkEligibleConnectionLabel,
+  formatIdentityLinkProviderMemberStatus,
+  formatIdentityLinkProviderPrincipalSummary,
   formatIdentityLinkProviderConfigurationStatus,
   listEligibleIdentityLinkConnections,
   resolveIdentityLinkConfigureActionLabel,
@@ -163,6 +165,50 @@ describe("organization identity linking model", () => {
             updatedAt: null,
           },
         ],
+      }),
+    ).toBeNull();
+  });
+
+  it("formats provider member visibility rows", () => {
+    expect(
+      formatIdentityLinkProviderMemberStatus({
+        linked: true,
+      }),
+    ).toBe("Linked");
+    expect(
+      formatIdentityLinkProviderMemberStatus({
+        linked: false,
+      }),
+    ).toBe("Not linked");
+
+    expect(
+      formatIdentityLinkProviderPrincipalSummary({
+        link: {
+          userId: "usr_123",
+          name: "Owner User",
+          email: "owner@example.com",
+          linked: true,
+          principalSummary: {
+            providerSubjectId: "github-owner-123",
+            login: "owner-github",
+            displayName: "Owner GitHub",
+            email: "owner@example.com",
+          },
+          updatedAt: "2026-04-20T00:00:00.000Z",
+        },
+      }),
+    ).toBe("Owner GitHub");
+
+    expect(
+      formatIdentityLinkProviderPrincipalSummary({
+        link: {
+          userId: "usr_124",
+          name: "Member User",
+          email: "member@example.com",
+          linked: false,
+          principalSummary: null,
+          updatedAt: null,
+        },
       }),
     ).toBeNull();
   });

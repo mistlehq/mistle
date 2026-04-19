@@ -7628,6 +7628,152 @@
         }
       }
     },
+    "/v1/organization/identity-linking/providers/:providerFamily/links": {
+      "get": {
+        "tags": ["Organizations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "providerFamily",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Organization member identity-linking visibility for a provider family.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "email": {
+                            "type": "string",
+                            "format": "email"
+                          },
+                          "linked": {
+                            "type": "boolean"
+                          },
+                          "principalSummary": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "providerSubjectId": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "login": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "displayName": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "email": {
+                                "type": ["string", "null"],
+                                "format": "email"
+                              }
+                            },
+                            "required": ["providerSubjectId", "login", "displayName", "email"],
+                            "additionalProperties": false
+                          },
+                          "updatedAt": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "name",
+                          "email",
+                          "linked",
+                          "principalSummary",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["links"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/organization/sandbox-storage-settings": {
       "get": {
         "tags": ["Organizations"],

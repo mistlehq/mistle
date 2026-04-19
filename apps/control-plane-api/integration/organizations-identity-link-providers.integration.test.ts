@@ -7,6 +7,8 @@ import {
   OrganizationIdentityLinkProviderConfigStatus,
   IntegrationConnectionStatuses,
   sessions,
+  userExternalPrincipals,
+  UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
@@ -14,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
+  OrganizationIdentityLinkProviderLinksResponseSchema,
   OrganizationIdentityLinkProviderSchema,
   OrganizationIdentityLinkProvidersResponseSchema,
 } from "../src/organizations/schemas.js";
@@ -558,6 +561,170 @@ describe("organization identity-linking providers integration", () => {
       ],
     });
   });
+
+  it("lists member link visibility for an identity-linking provider to owners and admins", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "organization-identity-link-provider-links-owner@example.com",
+    });
+    const ownerEmail = "organization-identity-link-provider-links-owner@example.com";
+    const adminSession = await fixture.authSession({
+      email: "organization-identity-link-provider-links-admin@example.com",
+    });
+    const adminEmail = "organization-identity-link-provider-links-admin@example.com";
+    const memberSession = await fixture.authSession({
+      email: "organization-identity-link-provider-links-member@example.com",
+    });
+    const memberEmail = "organization-identity-link-provider-links-member@example.com";
+
+    await addMemberToOrganization({
+      fixture,
+      organizationId: ownerSession.organizationId,
+      userId: adminSession.userId,
+      role: MemberRoles.ADMIN,
+    });
+    await addMemberToOrganization({
+      fixture,
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+      role: MemberRoles.MEMBER,
+    });
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    const connectionId = await createGitHubIdentityLinkReadyConnection({
+      fixture,
+      authenticatedSession: ownerSession,
+      displayName: "GitHub Identity Visibility",
+    });
+    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+      id: "ilp_github_links_visibility",
+      organizationId: ownerSession.organizationId,
+      providerFamily: "github",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      integrationTargetKey: "github-cloud",
+      integrationConnectionId: connectionId,
+      createdByUserId: ownerSession.userId,
+      updatedByUserId: ownerSession.userId,
+    });
+    await fixture.db.insert(userExternalPrincipals).values([
+      {
+        id: "uep_github_links_visibility_owner",
+        organizationId: ownerSession.organizationId,
+        userId: ownerSession.userId,
+        providerFamily: "github",
+        providerSubjectId: "github-owner-123",
+        organizationProviderConfigId: "ilp_github_links_visibility",
+        integrationConnectionId: connectionId,
+        status: UserExternalPrincipalStatuses.ACTIVE,
+        profile: {
+          login: "owner-github",
+          displayName: "Owner GitHub",
+          email: ownerEmail,
+        },
+      },
+      {
+        id: "uep_github_links_visibility_admin",
+        organizationId: ownerSession.organizationId,
+        userId: adminSession.userId,
+        providerFamily: "github",
+        providerSubjectId: "github-admin-456",
+        organizationProviderConfigId: "ilp_github_links_visibility",
+        integrationConnectionId: connectionId,
+        status: UserExternalPrincipalStatuses.ACTIVE,
+        profile: {
+          login: "admin-github",
+          displayName: "Admin GitHub",
+          email: adminEmail,
+        },
+      },
+    ]);
+
+    for (const session of [ownerSession, adminSession]) {
+      const response = await fixture.request(
+        "/v1/organization/identity-linking/providers/github/links",
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const payload = OrganizationIdentityLinkProviderLinksResponseSchema.parse(
+        await response.json(),
+      );
+      expect(payload.links).toHaveLength(3);
+      expect(payload.links).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            userId: ownerSession.userId,
+            email: ownerEmail,
+            linked: true,
+            principalSummary: {
+              providerSubjectId: "github-owner-123",
+              login: "owner-github",
+              displayName: "Owner GitHub",
+              email: ownerEmail,
+            },
+          }),
+          expect.objectContaining({
+            userId: adminSession.userId,
+            email: adminEmail,
+            linked: true,
+            principalSummary: {
+              providerSubjectId: "github-admin-456",
+              login: "admin-github",
+              displayName: "Admin GitHub",
+              email: adminEmail,
+            },
+          }),
+          expect.objectContaining({
+            userId: memberSession.userId,
+            email: memberEmail,
+            linked: false,
+            principalSummary: null,
+            updatedAt: null,
+          }),
+        ]),
+      );
+    }
+  });
+
+  it("returns forbidden when a member tries to list provider link visibility", async ({
+    fixture,
+  }) => {
+    const ownerSession = await fixture.authSession({
+      email: "organization-identity-link-provider-links-forbidden-owner@example.com",
+    });
+    const memberSession = await fixture.authSession({
+      email: "organization-identity-link-provider-links-forbidden-member@example.com",
+    });
+
+    await addMemberToOrganization({
+      fixture,
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+      role: MemberRoles.MEMBER,
+    });
+
+    const response = await fixture.request(
+      "/v1/organization/identity-linking/providers/github/links",
+      {
+        headers: {
+          cookie: memberSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+  });
 });
 
 async function addMemberToActiveOrganization(input: {
@@ -565,10 +732,22 @@ async function addMemberToActiveOrganization(input: {
   organizationId: string;
   userId: string;
 }): Promise<void> {
+  await addMemberToOrganization({
+    ...input,
+    role: MemberRoles.MEMBER,
+  });
+}
+
+async function addMemberToOrganization(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  userId: string;
+  role: (typeof MemberRoles)[keyof typeof MemberRoles];
+}): Promise<void> {
   await input.fixture.db.insert(members).values({
     organizationId: input.organizationId,
     userId: input.userId,
-    role: MemberRoles.MEMBER,
+    role: input.role,
   });
 
   await input.fixture.db

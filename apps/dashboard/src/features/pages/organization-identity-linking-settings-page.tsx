@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { data, useSearchParams } from "react-router";
 
@@ -7,6 +7,8 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   canManageOrganizationIdentityLinking,
   formatIdentityLinkEligibleConnectionLabel,
+  formatIdentityLinkProviderMemberStatus,
+  formatIdentityLinkProviderPrincipalSummary,
   formatIdentityLinkProviderConfigurationStatus,
   listEligibleIdentityLinkConnections,
   resolveIdentityLinkConfigureActionLabel,
@@ -15,8 +17,11 @@ import {
 } from "../settings/identity-linking/organization-identity-linking-model.js";
 import {
   configureOrganizationIdentityLinkProvider,
+  listOrganizationIdentityLinkProviderLinks,
   listOrganizationIdentityLinkProviders,
+  organizationIdentityLinkProviderLinksQueryKey,
   organizationIdentityLinkProvidersQueryKey,
+  type OrganizationIdentityLinkProviderLink,
   putOrganizationIdentityLinkProviderStatus,
   type OrganizationIdentityLinkProvider,
 } from "../settings/identity-linking/organization-identity-linking-service.js";
@@ -127,6 +132,39 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   });
 
   const providers = providersQuery.data ?? [];
+  const providerLinksQueries = useQueries({
+    queries: providers.map((provider) => ({
+      enabled: canManage && !providersQuery.isPending,
+      queryKey: organizationIdentityLinkProviderLinksQueryKey({
+        activeOrganizationId,
+        providerFamily: provider.providerFamily,
+      }),
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        listOrganizationIdentityLinkProviderLinks({
+          providerFamily: provider.providerFamily,
+          signal,
+        }),
+    })),
+  });
+  const providerLinksByProviderFamily = new Map<
+    string,
+    {
+      data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
+      isPending: boolean;
+      isError: boolean;
+      error: unknown;
+    }
+  >(
+    providers.map((provider, index) => [
+      provider.providerFamily,
+      {
+        data: providerLinksQueries[index]?.data,
+        isPending: providerLinksQueries[index]?.isPending ?? false,
+        isError: providerLinksQueries[index]?.isError ?? false,
+        error: providerLinksQueries[index]?.error,
+      },
+    ]),
+  );
   const createdConnectionId = searchParams.get("createdConnectionId");
 
   useEffect(() => {
@@ -214,6 +252,7 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
             configuringProviderFamily,
             statusUpdatingProviderFamily,
             provider,
+            providerLinksQuery: providerLinksByProviderFamily.get(provider.providerFamily) ?? null,
             selectedConnectionIdByProviderFamily,
           }),
         )}
@@ -245,6 +284,12 @@ export function buildProviderCard(input: {
   configuringProviderFamily: string | null;
   statusUpdatingProviderFamily: string | null;
   provider: OrganizationIdentityLinkProvider;
+  providerLinksQuery: {
+    data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
+    isPending: boolean;
+    isError: boolean;
+    error: unknown;
+  } | null;
   selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
 }): OrganizationIdentityLinkingProviderCard {
   const eligibleConnections = listEligibleIdentityLinkConnections({
@@ -289,6 +334,27 @@ export function buildProviderCard(input: {
     saveActionPending: input.configuringProviderFamily === input.provider.providerFamily,
     statusActionPending: input.statusUpdatingProviderFamily === input.provider.providerFamily,
     statusActionNextStatus: input.provider.configurationStatus === "active" ? "disabled" : "active",
+    memberLinksLoading: input.providerLinksQuery?.isPending ?? false,
+    memberLinksErrorMessage:
+      input.providerLinksQuery !== null && input.providerLinksQuery.isError
+        ? resolveApiErrorMessage({
+            error: input.providerLinksQuery.error,
+            fallbackMessage: "Could not load linked-member visibility.",
+          })
+        : null,
+    memberLinks:
+      input.providerLinksQuery?.data?.map((link) => ({
+        userId: link.userId,
+        name: link.name,
+        email: link.email,
+        statusLabel: formatIdentityLinkProviderMemberStatus({
+          linked: link.linked,
+        }),
+        principalSummary: formatIdentityLinkProviderPrincipalSummary({
+          link,
+        }),
+        updatedAt: link.updatedAt,
+      })) ?? [],
   };
 
   const errorMessage = input.actionErrorMessageByProviderFamily[input.provider.providerFamily];

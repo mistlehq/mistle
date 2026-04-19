@@ -37,14 +37,55 @@ const OrganizationIdentityLinkProvidersResponseSchema = z
   })
   .strict();
 
+const OrganizationIdentityLinkProviderPrincipalSummarySchema = z
+  .object({
+    providerSubjectId: z.string().min(1).nullable(),
+    login: z.string().min(1).nullable(),
+    displayName: z.string().min(1).nullable(),
+    email: z.email().nullable(),
+  })
+  .strict();
+
+const OrganizationIdentityLinkProviderLinkSchema = z
+  .object({
+    userId: z.string().min(1),
+    name: z.string().min(1),
+    email: z.email(),
+    linked: z.boolean(),
+    principalSummary: OrganizationIdentityLinkProviderPrincipalSummarySchema.nullable(),
+    updatedAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const OrganizationIdentityLinkProviderLinksResponseSchema = z
+  .object({
+    links: z.array(OrganizationIdentityLinkProviderLinkSchema),
+  })
+  .strict();
+
 export type OrganizationIdentityLinkProvider = z.infer<
   typeof OrganizationIdentityLinkProviderSchema
+>;
+export type OrganizationIdentityLinkProviderLink = z.infer<
+  typeof OrganizationIdentityLinkProviderLinkSchema
 >;
 
 export function organizationIdentityLinkProvidersQueryKey(
   activeOrganizationId: string,
 ): readonly ["settings", "organization-identity-linking", string] {
   return ["settings", "organization-identity-linking", activeOrganizationId];
+}
+
+export function organizationIdentityLinkProviderLinksQueryKey(input: {
+  activeOrganizationId: string;
+  providerFamily: string;
+}): readonly ["settings", "organization-identity-linking-links", string, string] {
+  return [
+    "settings",
+    "organization-identity-linking-links",
+    input.activeOrganizationId,
+    input.providerFamily,
+  ];
 }
 
 export class OrganizationIdentityLinkingApiError extends Error {
@@ -154,6 +195,35 @@ export async function configureOrganizationIdentityLinkProvider(input: {
       operation: "configureOrganizationIdentityLinkProvider",
       error,
       fallbackMessage: "Could not save identity-linking provider configuration.",
+    });
+  }
+}
+
+export async function listOrganizationIdentityLinkProviderLinks(input: {
+  providerFamily: string;
+  signal?: AbortSignal;
+}): Promise<readonly OrganizationIdentityLinkProviderLink[]> {
+  try {
+    const response = await requestControlPlane({
+      operation: "listOrganizationIdentityLinkProviderLinks",
+      method: "GET",
+      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/links`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load linked-provider visibility.",
+    });
+
+    const data = await readJsonWithSchema({
+      response,
+      schema: OrganizationIdentityLinkProviderLinksResponseSchema,
+      operation: "listOrganizationIdentityLinkProviderLinks",
+    });
+
+    return data.links;
+  } catch (error) {
+    throw wrapOrganizationIdentityLinkingApiError({
+      operation: "listOrganizationIdentityLinkProviderLinks",
+      error,
+      fallbackMessage: "Could not load linked-provider visibility.",
     });
   }
 }

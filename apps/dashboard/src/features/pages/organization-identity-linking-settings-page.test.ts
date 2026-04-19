@@ -50,6 +50,26 @@ describe("buildProviderCard", () => {
         configuredAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
       },
+      providerLinksQuery: {
+        data: [
+          {
+            userId: "usr_github_saved",
+            name: "GitHub Saved User",
+            email: "saved@example.com",
+            linked: true,
+            principalSummary: {
+              providerSubjectId: "github_saved_123",
+              login: "saved-github",
+              displayName: "Saved GitHub",
+              email: "saved@example.com",
+            },
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+        isPending: false,
+        isError: false,
+        error: null,
+      },
       selectedConnectionIdByProviderFamily: {
         github: "icn_github_new",
       },
@@ -57,5 +77,15 @@ describe("buildProviderCard", () => {
 
     expect(providerCard.selectedConnectionId).toBe("icn_github_new");
     expect(providerCard.statusActionVisible).toBe(false);
+    expect(providerCard.memberLinks).toEqual([
+      {
+        userId: "usr_github_saved",
+        name: "GitHub Saved User",
+        email: "saved@example.com",
+        statusLabel: "Linked",
+        principalSummary: "Saved GitHub",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
   });
 });
