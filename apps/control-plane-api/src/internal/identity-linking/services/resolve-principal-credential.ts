@@ -13,7 +13,7 @@ import type {
   IntegrationRegistry,
   RefreshedIdentityLinkingCredential,
 } from "@mistle/integrations-core";
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, not, sql } from "drizzle-orm";
 
 import { resolveIdentityLinkingRuntimeContextOrThrow } from "../../../identity-linking/services/identity-linking-definition.js";
 import { resolveIdentityLinkProviderContextOrThrow } from "../../../identity-linking/services/resolve-identity-link-provider-context.js";
@@ -350,8 +350,8 @@ async function upsertRefreshedCredential(input: {
       })
       .where(eq(userExternalPrincipalCredentials.id, input.credentialId));
 
-    const refreshedSecretKinds = input.refreshedCredential.secrets.map(
-      (secret) => secret.secretKind,
+    const refreshedSecretKinds = input.refreshedCredential.secrets.map((secret) =>
+      resolvePrincipalCredentialSecretKindOrThrow(secret.secretKind),
     );
 
     if (refreshedSecretKinds.length > 0) {
@@ -364,10 +364,7 @@ async function upsertRefreshedCredential(input: {
         .where(
           and(
             eq(userExternalPrincipalCredentialSecrets.credentialId, input.credentialId),
-            sql`${userExternalPrincipalCredentialSecrets.secretKind} not in (${sql.join(
-              refreshedSecretKinds.map((secretKind) => sql`${secretKind}`),
-              sql`, `,
-            )})`,
+            not(inArray(userExternalPrincipalCredentialSecrets.secretKind, refreshedSecretKinds)),
             sql`${userExternalPrincipalCredentialSecrets.revokedAt} is null`,
           ),
         );
