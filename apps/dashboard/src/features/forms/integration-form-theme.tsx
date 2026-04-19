@@ -312,11 +312,7 @@ function MultiSelectStringArrayComboboxWidget(
             const optionLabel =
               options.find((option) => option.value === selectedValue)?.label ?? selectedValue;
 
-            return (
-              <ComboboxChip key={selectedValue} value={selectedValue}>
-                {optionLabel}
-              </ComboboxChip>
-            );
+            return <ComboboxChip key={selectedValue}>{optionLabel}</ComboboxChip>;
           })}
           <ComboboxChipsInput
             aria-label={props.label}
@@ -404,9 +400,10 @@ function SingleSelectStringComboboxWidget(
       onInputValueChange={setQueryText}
       onOpenChange={(open) => {
         setIsOpen(open);
-        if (!open) {
+        if (open) {
+          setQueryText("");
+        } else {
           setQueryText(selectedOption?.label ?? "");
-          props.onBlur(props.id, selectedValue.length === 0 ? undefined : selectedValue);
         }
       }}
       onValueChange={(value) => {
@@ -414,6 +411,7 @@ function SingleSelectStringComboboxWidget(
         setQueryText(nextSelectedOption?.label ?? "");
         props.onChange(value ?? undefined);
       }}
+      open={isOpen}
       value={selectedValue.length === 0 ? null : selectedValue}
     >
       <div className="w-full" ref={anchorRef}>
@@ -421,7 +419,12 @@ function SingleSelectStringComboboxWidget(
           aria-label={props.label}
           className="w-full"
           id={props.id}
+          onBlur={() => {
+            setIsOpen(false);
+            props.onBlur(props.id, selectedValue.length === 0 ? undefined : selectedValue);
+          }}
           onFocus={() => {
+            setQueryText("");
             setIsOpen(true);
             props.onFocus(props.id, selectedValue.length === 0 ? undefined : selectedValue);
           }}

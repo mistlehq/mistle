@@ -3,22 +3,20 @@ import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/in
 import {
   AwsEndpointServiceDefinitions,
   AwsSupportedRegionIds,
+  isAwsSupportedRegionId,
 } from "../../shared/endpoint-catalog.js";
 import { AwsToolIds } from "./tool-ids.js";
 
 type AwsBindingFormContext = IntegrationFormContext;
 
-function resolveSelectedRegions(
-  input: AwsBindingFormContext,
-): readonly (typeof AwsSupportedRegionIds)[number][] {
+function resolveSelectedRegions(input: AwsBindingFormContext): readonly string[] {
   const regions = input.currentValue?.regions;
   if (!Array.isArray(regions)) {
     return [];
   }
 
   return regions.filter(
-    (region): region is (typeof AwsSupportedRegionIds)[number] =>
-      typeof region === "string" && AwsSupportedRegionIds.includes(region),
+    (region): region is string => typeof region === "string" && isAwsSupportedRegionId(region),
   );
 }
 

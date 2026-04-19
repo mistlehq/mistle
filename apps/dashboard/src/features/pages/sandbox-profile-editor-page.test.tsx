@@ -171,6 +171,10 @@ function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
   return within(getSectionContainer(sectionTitle)).getByRole("button", { name: "Add" });
 }
 
+function getOpenDialog(): HTMLElement {
+  return screen.getByRole("dialog");
+}
+
 describe("IntegrationsEditorSection", () => {
   it("adds a binding into the selected section via dialog", async () => {
     const queryClient = createTestQueryClient();
@@ -185,16 +189,18 @@ describe("IntegrationsEditorSection", () => {
 
     expect(screen.getByRole("heading", { name: "Add agent harness" })).toBeDefined();
 
-    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+    const dialog = getOpenDialog();
+    fireEvent.click(within(dialog).getByRole("combobox", { name: "Add binding connection" }));
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText("Primary OpenAI Workspace"));
 
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
-      expect(screen.getByText("target-agent")).toBeDefined();
-      expect(screen.getByText("Primary OpenAI Workspace")).toBeDefined();
+      const agentSection = getSectionContainer("Agent Harness");
+      expect(within(agentSection).getByRole("button", { name: "Edit binding" })).toBeDefined();
+      expect(within(agentSection).getByText("target-agent")).toBeDefined();
+      expect(within(agentSection).getByText("Primary OpenAI Workspace")).toBeDefined();
     });
   }, 10000);
 
@@ -208,7 +214,7 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Agent Harness"));
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     expect(screen.getByText("Select a connection to add this binding.")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Edit binding" })).toBeNull();
@@ -224,11 +230,14 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Git Providers"));
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
-      expect(screen.getByText("target-git")).toBeDefined();
+      const gitProvidersSection = getSectionContainer("Git Providers");
+      expect(
+        within(gitProvidersSection).getByRole("button", { name: "Edit binding" }),
+      ).toBeDefined();
+      expect(within(gitProvidersSection).getByText("target-git")).toBeDefined();
     });
   });
 
@@ -242,7 +251,9 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Agent Harness"));
-    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
 
     const listbox = await screen.findByRole("listbox");
 
@@ -260,7 +271,7 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Connectors"));
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog", { name: "Add connector" })).toBeNull();
@@ -299,10 +310,11 @@ describe("IntegrationsEditorSection", () => {
     );
 
     fireEvent.click(getSectionAddButton("Agent Harness"));
-    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+    const dialog = getOpenDialog();
+    fireEvent.click(within(dialog).getByRole("combobox", { name: "Add binding connection" }));
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText("Primary OpenAI Workspace"));
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(getSectionAddButton("Agent Harness").hasAttribute("disabled")).toBe(true);
