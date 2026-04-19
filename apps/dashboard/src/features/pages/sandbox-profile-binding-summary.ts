@@ -11,6 +11,18 @@ export type SandboxProfileBindingSummaryItem = {
   value: string;
 };
 
+function createPropertyPath(parentPath: string, propertyKey: string): string {
+  return parentPath.length === 0 ? propertyKey : `${parentPath}.${propertyKey}`;
+}
+
+function hasExcludedPropertyKey(
+  excludedPropertyKeys: ReadonlySet<string>,
+  propertyPath: string,
+  propertyKey: string,
+): boolean {
+  return excludedPropertyKeys.has(propertyPath) || excludedPropertyKeys.has(propertyKey);
+}
+
 function resolvePropertyTitle(input: {
   schema: Record<string, unknown>;
   uiSchema: Record<string, unknown>;
@@ -148,42 +160,105 @@ export function formatSandboxProfileBindingSummaryItems(input: {
 
   if (configUiModel.mode === "form") {
     const excludedPropertyKeys = new Set(input.excludedPropertyKeys ?? []);
-    const visiblePropertyKeys = configUiModel.visiblePropertyKeys.filter(
-      (propertyKey) => !excludedPropertyKeys.has(propertyKey),
-    );
 
-    for (const propertyKey of visiblePropertyKeys.slice(0, input.maxItems ?? 2)) {
-      const value = configUiModel.value[propertyKey];
-      const label = resolvePropertyTitle({
-        schema: configUiModel.schema,
-        uiSchema: configUiModel.uiSchema,
-        propertyKey,
-      });
+    function appendSummaryItems(params: {
+      schema: Record<string, unknown>;
+      uiSchema: Record<string, unknown>;
+      value: Record<string, unknown>;
+      visiblePropertyKeys: readonly string[];
+      propertyPath: string;
+    }): void {
+      for (const propertyKey of params.visiblePropertyKeys) {
+        if (
+          input.maxItems !== undefined &&
+          Number.isFinite(input.maxItems) &&
+          items.length >= input.maxItems
+        ) {
+          return;
+        }
 
-      if (Array.isArray(value)) {
-        items.push({
-          label,
-          value: resolveArraySummaryValue({
-            schema: configUiModel.schema,
-            uiSchema: configUiModel.uiSchema,
-            propertyKey,
-            value,
-          }),
+        const nextPropertyPath = createPropertyPath(params.propertyPath, propertyKey);
+        if (hasExcludedPropertyKey(excludedPropertyKeys, nextPropertyPath, propertyKey)) {
+          continue;
+        }
+
+        const value = params.value[propertyKey];
+        const label = resolvePropertyTitle({
+          schema: params.schema,
+          uiSchema: params.uiSchema,
+          propertyKey,
         });
-        continue;
-      }
 
-      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-        items.push({
-          label,
-          value: resolveScalarSummaryValue({
-            schema: configUiModel.schema,
-            propertyKey,
-            value,
-          }),
+        if (Array.isArray(value)) {
+          items.push({
+            label,
+            value: resolveArraySummaryValue({
+              schema: params.schema,
+              uiSchema: params.uiSchema,
+              propertyKey,
+              value,
+            }),
+          });
+          continue;
+        }
+
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          items.push({
+            label,
+            value: resolveScalarSummaryValue({
+              schema: params.schema,
+              propertyKey,
+              value,
+            }),
+          });
+          continue;
+        }
+
+        const properties = params.schema.properties;
+        const propertySchema = isRecord(properties) ? properties[propertyKey] : undefined;
+        const propertyUiSchema = params.uiSchema[propertyKey];
+
+        if (!isRecord(value) || !isRecord(propertySchema)) {
+          continue;
+        }
+
+        const nestedProperties = propertySchema.properties;
+        if (!isRecord(nestedProperties)) {
+          continue;
+        }
+
+        const nestedVisiblePropertyKeys = Object.keys(nestedProperties).filter(
+          (nestedPropertyKey) => {
+            if (!isRecord(propertyUiSchema)) {
+              return true;
+            }
+
+            const nestedPropertyUiSchema = propertyUiSchema[nestedPropertyKey];
+            if (!isRecord(nestedPropertyUiSchema)) {
+              return true;
+            }
+
+            return nestedPropertyUiSchema["ui:widget"] !== "hidden";
+          },
+        );
+
+        appendSummaryItems({
+          schema: propertySchema,
+          uiSchema: isRecord(propertyUiSchema) ? propertyUiSchema : {},
+          value,
+          visiblePropertyKeys: nestedVisiblePropertyKeys,
+          propertyPath: nextPropertyPath,
         });
       }
     }
+
+    appendSummaryItems({
+      schema: configUiModel.schema,
+      uiSchema: configUiModel.uiSchema,
+      value: configUiModel.value,
+      visiblePropertyKeys: configUiModel.visiblePropertyKeys,
+      propertyPath: "",
+    });
 
     return items;
   }

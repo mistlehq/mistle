@@ -41,6 +41,7 @@ export function seedStoryIntegrationResources(input: {
 export const StoryOpenAiTarget: IntegrationTargetSummary = {
   targetKey: "target-openai",
   displayName: "OpenAI",
+  logoKey: "openai",
   familyId: "openai",
   variantId: "openai-default",
   config: {
@@ -66,6 +67,7 @@ export const StoryOpenAiConnection: IntegrationConnectionSummary = {
 export const StoryGithubTarget: IntegrationTargetSummary = {
   targetKey: "target-github",
   displayName: "GitHub",
+  logoKey: "github",
   familyId: "github",
   variantId: "github-cloud",
   config: {

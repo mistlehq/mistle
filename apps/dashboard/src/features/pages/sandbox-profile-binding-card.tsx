@@ -10,6 +10,12 @@ import type {
 } from "./sandbox-profile-binding-config-editor.js";
 import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
+const DefaultSummaryItemCount = 2;
+
+function shouldRenderAllSummaryItems(kind: SandboxProfileBindingEditorRow["kind"]): boolean {
+  return kind === "agent" || kind === "git";
+}
+
 function resolveRowBindingMetadata(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -51,6 +57,9 @@ export function SandboxProfileBindingCard(input: {
     row: input.row,
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    maxItems: shouldRenderAllSummaryItems(input.row.kind)
+      ? Number.POSITIVE_INFINITY
+      : DefaultSummaryItemCount,
   });
   const connectionDisplayName =
     rowMetadata === null

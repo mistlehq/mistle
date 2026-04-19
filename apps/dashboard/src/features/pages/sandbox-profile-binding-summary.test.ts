@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions/openai";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -10,6 +11,72 @@ import type {
 import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
 describe("formatSandboxProfileBindingSummaryItems", () => {
+  it("flattens nested agent harness config fields into summary items", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-openai",
+      displayName: "OpenAI",
+      familyId: "openai",
+      variantId: "openai-default",
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+      },
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-openai",
+      displayName: "Primary OpenAI Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        connection_method: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-openai",
+      connectionId: connection.id,
+      kind: "agent",
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+            additionalInstructions: "Prefer concise answers.",
+          },
+        },
+      },
+    };
+
+    expect(
+      formatSandboxProfileBindingSummaryItems({
+        row,
+        availableConnections: [connection],
+        availableTargets: [target],
+        maxItems: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual([
+      {
+        label: "Default model",
+        value: "gpt-5.3-codex",
+      },
+      {
+        label: "Reasoning effort",
+        value: "Medium",
+      },
+      {
+        label: "Agent Instructions",
+        value: "Prefer concise answers.",
+      },
+    ]);
+  });
+
   it("renders array-backed tool selections with human-readable labels", () => {
     const target: IntegrationTargetSummary = {
       targetKey: "target-github",
