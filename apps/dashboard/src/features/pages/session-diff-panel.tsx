@@ -1,6 +1,14 @@
-import { Notice, Spinner } from "@mistle/ui";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Notice,
+  OverflowTooltipText,
+  Spinner,
+} from "@mistle/ui";
+import { CaretDownIcon } from "@phosphor-icons/react";
 import { FileDiff, type FileDiffMetadata } from "@pierre/diffs/react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 
@@ -63,6 +71,11 @@ export function SessionDiffPanel({
 }: SessionDiffPanelProps): React.JSX.Element {
   const parsedPatch = useMemo(() => parseSessionDiffPatch(patch), [patch]);
   const files = parsedPatch.kind === "parsed" ? parsedPatch.files : [];
+  const [openFiles, setOpenFiles] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setOpenFiles(Object.fromEntries(files.map((fileDiff) => [buildFileDiffKey(fileDiff), true])));
+  }, [files]);
 
   return (
     <section className="bg-background flex h-full min-h-0 flex-col">
@@ -99,37 +112,69 @@ export function SessionDiffPanel({
       ) : files.length === 0 ? (
         <div className="text-muted-foreground p-3 text-sm">No changes detected.</div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto p-2">
-          <div className="flex flex-col gap-2">
+        <div className="min-h-0 flex-1 overflow-auto">
+          <div className="flex flex-col divide-y">
             {files.map((fileDiff) => {
+              const fileKey = buildFileDiffKey(fileDiff);
               const stats = getFileDiffLineStats(fileDiff);
+              const isOpen = openFiles[fileKey] ?? true;
               return (
-                <section
-                  className="overflow-hidden rounded-md border"
-                  key={buildFileDiffKey(fileDiff)}
+                <Collapsible
+                  key={fileKey}
+                  onOpenChange={(open) => {
+                    setOpenFiles((currentOpenFiles) => ({
+                      ...currentOpenFiles,
+                      [fileKey]: open,
+                    }));
+                  }}
+                  open={isOpen}
                 >
-                  <div className="bg-background/95 flex items-center justify-between border-b px-3 py-2 backdrop-blur-sm">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {resolveFileDiffPath(fileDiff)}
-                      </p>
-                      {fileDiff.prevName === undefined ? null : (
-                        <p className="text-muted-foreground truncate text-xs">
-                          renamed from {resolveRawDiffPath(fileDiff.prevName)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="ml-4 flex flex-none items-center gap-3 text-xs">
-                      <span className="text-emerald-700">+{stats.additions}</span>
-                      <span className="text-rose-700">-{stats.deletions}</span>
-                    </div>
-                  </div>
-                  <FileDiff
-                    className="overflow-hidden"
-                    fileDiff={fileDiff}
-                    options={SessionDiffPanelOptions}
-                  />
-                </section>
+                  <section className="overflow-hidden">
+                    <CollapsibleTrigger
+                      aria-label={`${isOpen ? "Collapse" : "Expand"} ${resolveFileDiffPath(fileDiff)}`}
+                      render={
+                        <button
+                          className="group bg-background/95 flex w-full items-center justify-between gap-3 px-3 py-2 text-left backdrop-blur-sm"
+                          type="button"
+                        />
+                      }
+                    >
+                      <div className="min-w-0">
+                        <OverflowTooltipText
+                          className="text-sm font-medium decoration-current/15 underline-offset-2 group-hover:underline"
+                          containerClassName="block"
+                          text={resolveFileDiffPath(fileDiff)}
+                          tooltipClassName="max-w-96 whitespace-pre-wrap text-left"
+                          truncatePosition="start"
+                        />
+                        {fileDiff.prevName === undefined ? null : (
+                          <p className="text-muted-foreground truncate text-xs">
+                            renamed from {resolveRawDiffPath(fileDiff.prevName)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="ml-3 flex flex-none items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-sm tabular-nums">
+                          <span className="text-emerald-700">+{stats.additions}</span>
+                          <span className="text-rose-700">-{stats.deletions}</span>
+                        </div>
+                        <CaretDownIcon
+                          aria-hidden
+                          className={`size-4 text-muted-foreground transition-transform ${
+                            isOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <FileDiff
+                        className="overflow-hidden"
+                        fileDiff={fileDiff}
+                        options={SessionDiffPanelOptions}
+                      />
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
               );
             })}
           </div>

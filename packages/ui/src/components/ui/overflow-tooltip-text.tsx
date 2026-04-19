@@ -8,6 +8,7 @@ type OverflowTooltipTextProps = {
   text: string;
   className?: string;
   containerClassName?: string;
+  truncatePosition?: "end" | "start";
   tooltipClassName?: string;
   tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
   tooltipVariant?: React.ComponentProps<typeof TooltipContent>["variant"];
@@ -19,6 +20,7 @@ function OverflowTooltipText({
   text,
   className,
   containerClassName,
+  truncatePosition = "end",
   tooltipClassName,
   tooltipSide = "top",
   tooltipVariant = "light",
@@ -59,7 +61,14 @@ function OverflowTooltipText({
             aria-label={ariaLabel}
             className={cn("block min-w-0 max-w-full", containerClassName)}
           >
-            <span className={cn("block truncate", className)} ref={setTextElement}>
+            <span
+              className={cn(
+                "block truncate",
+                truncatePosition === "start" ? "text-left [direction:rtl]" : null,
+                className,
+              )}
+              ref={setTextElement}
+            >
               {text}
             </span>
           </span>

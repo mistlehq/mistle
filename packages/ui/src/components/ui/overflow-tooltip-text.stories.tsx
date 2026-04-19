@@ -58,3 +58,11 @@ export const BottomTooltip: Story = {
     tooltipSide: "bottom",
   },
 };
+
+export const StartTruncation: Story = {
+  args: {
+    text: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    truncatePosition: "start",
+    widthClassName: "max-w-[16rem]",
+  },
+};
