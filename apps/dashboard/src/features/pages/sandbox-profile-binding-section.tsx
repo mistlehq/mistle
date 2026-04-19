@@ -50,6 +50,13 @@ function formatBindingSectionConstraint(kind: SandboxIntegrationBindingKind): st
   return null;
 }
 
+function shouldHideBindingSectionAddAction(input: {
+  kind: SandboxIntegrationBindingKind;
+  rowCount: number;
+}): boolean {
+  return (input.kind === "agent" || input.kind === "git") && input.rowCount > 0;
+}
+
 function resolveRowBindingMetadata(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -394,6 +401,10 @@ export function SandboxProfileBindingSection(input: {
 }): React.JSX.Element {
   const addConstraintMessage =
     input.rows.length > 0 && input.addDisabled ? formatBindingSectionConstraint(input.kind) : null;
+  const hideAddAction = shouldHideBindingSectionAddAction({
+    kind: input.kind,
+    rowCount: input.rows.length,
+  });
   const addButton = (
     <Button disabled={input.addDisabled} onClick={input.onAdd} type="button" variant="outline">
       <PlusIcon />
@@ -405,7 +416,7 @@ export function SandboxProfileBindingSection(input: {
     return (
       <SectionBlock
         action={
-          addConstraintMessage === null ? (
+          hideAddAction ? null : addConstraintMessage === null ? (
             addButton
           ) : (
             <Tooltip delay={0}>
@@ -423,7 +434,7 @@ export function SandboxProfileBindingSection(input: {
   return (
     <SectionBlock
       action={
-        addConstraintMessage === null ? (
+        hideAddAction ? null : addConstraintMessage === null ? (
           addButton
         ) : (
           <Tooltip delay={0}>
@@ -444,21 +455,23 @@ export function SandboxProfileBindingSection(input: {
             rows={input.rows}
           />
         ) : (
-          input.rows.map((row) => (
-            <SandboxProfileBindingCard
-              availableConnections={input.availableConnections}
-              availableTargets={input.availableTargets}
-              errorMessage={input.rowErrorsByClientId[row.clientId]}
-              key={row.clientId}
-              onEdit={() => {
-                input.onEdit(row);
-              }}
-              onRemove={() => {
-                input.onRemove(row.clientId);
-              }}
-              row={row}
-            />
-          ))
+          <div className="flex flex-col divide-y">
+            {input.rows.map((row) => (
+              <SandboxProfileBindingCard
+                availableConnections={input.availableConnections}
+                availableTargets={input.availableTargets}
+                errorMessage={input.rowErrorsByClientId[row.clientId]}
+                key={row.clientId}
+                onEdit={() => {
+                  input.onEdit(row);
+                }}
+                onRemove={() => {
+                  input.onRemove(row.clientId);
+                }}
+                row={row}
+              />
+            ))}
+          </div>
         )
       }
       title={formatBindingSectionTitle(input.kind)}

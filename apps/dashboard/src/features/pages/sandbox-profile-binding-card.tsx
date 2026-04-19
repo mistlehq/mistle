@@ -69,7 +69,7 @@ export function SandboxProfileBindingCard(input: {
         });
 
   return (
-    <div className="gap-4 rounded-md border p-4 flex flex-col">
+    <div className="flex flex-col gap-3 py-2">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0 flex items-center gap-2">
           {target?.logoKey ? (
@@ -90,22 +90,22 @@ export function SandboxProfileBindingCard(input: {
             )}
           </div>
         </div>
-        <div className="gap-2 flex">
+        <div className="flex gap-1">
           <Button
             aria-label="Edit binding"
+            className="h-7 w-7"
             onClick={input.onEdit}
-            size="icon-sm"
             type="button"
-            variant="outline"
+            variant="ghost"
           >
             <PencilSimpleIcon aria-hidden className="size-4" />
           </Button>
           <Button
             aria-label="Remove binding"
+            className="h-7 w-7"
             onClick={input.onRemove}
-            size="icon-sm"
             type="button"
-            variant="outline"
+            variant="ghost"
           >
             <TrashIcon aria-hidden className="size-4" />
           </Button>
@@ -113,7 +113,7 @@ export function SandboxProfileBindingCard(input: {
       </div>
 
       {summaryItems.length > 0 ? (
-        <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <dl className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
           {summaryItems.map((item) => (
             <div className="gap-1 flex flex-col" key={item.label}>
               <DetailLabel>{item.label}</DetailLabel>
