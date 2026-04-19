@@ -119,6 +119,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
             target: "authorization",
           },
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: input.providerAccess.credentialResolver.connectionId,
             secretType: input.providerAccess.credentialResolver.secretType,
           },
@@ -430,7 +431,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
 > {
   function createLinearMcpRoute(input: {
     connectionId: string;
-  }): CompileBindingResult["egressRoutes"][number] {
+  }): NonNullable<CompileBindingResult["egressRoutes"][number]> {
     return {
       match: {
         hosts: ["linear.app"],
@@ -445,6 +446,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
         target: "authorization",
       },
       credentialResolver: {
+        kind: "integration_connection",
         connectionId: input.connectionId,
         secretType: "api_key",
       },
@@ -488,6 +490,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
             target: "authorization",
           },
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: input.connection.id,
             secretType: "api_key",
           },
@@ -969,6 +972,7 @@ describe("compileRuntimePlan", () => {
               target: "authorization",
             },
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: input.connection.id,
               secretType: "api_key",
             },

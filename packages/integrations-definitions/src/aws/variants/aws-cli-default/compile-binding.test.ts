@@ -136,6 +136,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -155,6 +156,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -174,6 +176,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -193,6 +196,7 @@ describe("compileAwsBinding", () => {
           region: "us-west-2",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -212,6 +216,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -231,6 +236,7 @@ describe("compileAwsBinding", () => {
           region: "us-west-2",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -250,6 +256,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -269,6 +276,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -288,6 +296,7 @@ describe("compileAwsBinding", () => {
           region: "us-west-2",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
@@ -413,6 +422,7 @@ describe("compileAwsBinding", () => {
           region: "us-east-1",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_aws",
           secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
           slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,

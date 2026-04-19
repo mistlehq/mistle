@@ -33,6 +33,7 @@ const StartWorkflowName = "data-plane.sandbox-instances.start";
 
 const WorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
+  actingUserId: z.string().min(1).optional(),
   runtimePlan: CompiledRuntimePlanSchema,
   gitIdentity: z
     .object({
@@ -608,6 +609,7 @@ describe("sandbox profile version start instance integration", () => {
         name: "Mistle User",
         email: "mistle-user@example.com",
       });
+      expect(queuedWorkflowInput.actingUserId).toBe(authenticatedSession.userId);
     } finally {
       await dataPlaneFixture.stop();
     }

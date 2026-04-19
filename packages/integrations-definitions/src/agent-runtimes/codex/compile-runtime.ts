@@ -156,6 +156,7 @@ export function compileCodexRuntime(
           ? {}
           : { additionalHeaders: input.providerAccess.additionalHeaders }),
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: input.providerAccess.credentialResolver.connectionId,
           secretType: input.providerAccess.credentialResolver.secretType,
           ...(input.providerAccess.credentialResolver.slotKey === undefined

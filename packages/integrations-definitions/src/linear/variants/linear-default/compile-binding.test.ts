@@ -60,6 +60,7 @@ describe("compileLinearBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: LinearCredentialSlotKeys.API_KEY,
@@ -124,6 +125,7 @@ describe("compileLinearBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: LinearCredentialSlotKeys.API_KEY,
@@ -141,6 +143,7 @@ describe("compileLinearBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: LinearCredentialSlotKeys.API_KEY,

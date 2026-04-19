@@ -5,10 +5,53 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
 const SandboxStartupGrantTtlSeconds = 60 * 60 * 24;
 
+function toGrantCredentialResolver(input: {
+  resolver: StartSandboxInstanceWorkflowInput["runtimePlan"]["egressRoutes"][number]["credentialResolver"];
+  actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
+}):
+  | {
+      kind: "integration_connection";
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    }
+  | {
+      kind: "linked_principal";
+      providerFamily: string;
+      actingUserRequired: boolean;
+      actingUserId?: string;
+      credentialKind?: string;
+    } {
+  if (input.resolver.kind === "integration_connection") {
+    return {
+      kind: "integration_connection",
+      connectionId: input.resolver.connectionId,
+      secretType: input.resolver.secretType,
+      ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+      ...(input.resolver.resolverKey === undefined
+        ? {}
+        : { resolverKey: input.resolver.resolverKey }),
+    };
+  }
+
+  return {
+    kind: "linked_principal",
+    providerFamily: input.resolver.providerFamily,
+    actingUserRequired: input.resolver.actingUserRequired,
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+    ...(input.resolver.credentialKind === undefined
+      ? {}
+      : { credentialKind: input.resolver.credentialKind }),
+  };
+}
+
 export async function createEgressGrantByRuleId(input: {
   config: DataPlaneWorkerRuntimeConfig;
+  organizationId: string;
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
 }): Promise<Record<string, string>> {
   const entries = await Promise.all(
     input.runtimePlan.egressRoutes.map(async (route) => [
@@ -23,10 +66,14 @@ export async function createEgressGrantByRuleId(input: {
           sub: input.sandboxInstanceId,
           jti: route.egressRuleId,
           bindingId: route.bindingId,
+          organizationId: input.organizationId,
           familyId: route.familyId,
           variantId: route.variantId,
-          connectionId: route.credentialResolver.connectionId,
-          secretType: route.credentialResolver.secretType,
+          credentialResolverKind: route.credentialResolver.kind,
+          ...toGrantCredentialResolver({
+            resolver: route.credentialResolver,
+            ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+          }),
           upstreamBaseUrl: route.upstream.baseUrl,
           authInjectionType: route.authInjection.type,
           ...(route.additionalHeaders === undefined
@@ -37,14 +84,12 @@ export async function createEgressGrantByRuleId(input: {
             : {
                 additionalCredentialHeaders: route.additionalCredentialHeaders.map((header) => ({
                   header: header.header,
-                  connectionId: header.credentialResolver.connectionId,
-                  secretType: header.credentialResolver.secretType,
-                  ...(header.credentialResolver.slotKey === undefined
-                    ? {}
-                    : { slotKey: header.credentialResolver.slotKey }),
-                  ...(header.credentialResolver.resolverKey === undefined
-                    ? {}
-                    : { resolverKey: header.credentialResolver.resolverKey }),
+                  credentialResolver: toGrantCredentialResolver({
+                    resolver: header.credentialResolver,
+                    ...(input.actingUserId === undefined
+                      ? {}
+                      : { actingUserId: input.actingUserId }),
+                  }),
                 })),
               }),
           ...(route.authInjection.type === "aws_sigv4"
@@ -59,12 +104,6 @@ export async function createEgressGrantByRuleId(input: {
                   ? {}
                   : { authInjectionUsername: route.authInjection.username }),
               }),
-          ...(route.credentialResolver.slotKey === undefined
-            ? {}
-            : { slotKey: route.credentialResolver.slotKey }),
-          ...(route.credentialResolver.resolverKey === undefined
-            ? {}
-            : { resolverKey: route.credentialResolver.resolverKey }),
           ...(route.match.methods === undefined ? {} : { allowedMethods: route.match.methods }),
           ...(route.match.pathPrefixes === undefined
             ? {}

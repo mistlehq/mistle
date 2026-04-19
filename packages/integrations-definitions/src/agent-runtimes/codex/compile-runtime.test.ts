@@ -132,6 +132,7 @@ describe("compileCodexRuntime", () => {
           "ChatGPT-Account-ID": "acct_123",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "conn_openai_org_123",
           secretType: "api_key",
         },
@@ -348,6 +349,7 @@ describe("compileCodexRuntime", () => {
           "ChatGPT-Account-ID": "acct_123",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "conn_openai_org_123",
           secretType: "chatgpt_access_token",
         },

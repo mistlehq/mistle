@@ -92,6 +92,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
             username: parsedConnectionConfig.email,
           },
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: input.connection.id,
             secretType: credentialSecretType,
             slotKey: JiraCredentialSlotKeys.PERSONAL_API_TOKEN_API_KEY,
@@ -122,6 +123,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
             target: "authorization",
           },
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: input.connection.id,
             secretType: JiraCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
             slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN,
@@ -146,6 +148,7 @@ export function compileJiraBinding(input: JiraCompileBindingInput): CompileBindi
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: input.connection.id,
           secretType: credentialSecretType,
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_API_TOKEN_API_KEY,

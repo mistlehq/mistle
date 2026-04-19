@@ -493,6 +493,183 @@
         }
       }
     },
+    "/internal/identity-linking/resolve-principal-credential": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "actingUserId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "providerFamily": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "credentialKind": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId", "actingUserId", "providerFamily"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve linked-principal credential for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["value"]
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": ["kind", "value"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["aws_session"]
+                        },
+                        "accessKeyId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "secretAccessKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sessionToken": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "accessKeyId",
+                        "secretAccessKey",
+                        "sessionToken",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid linked-principal credential resolve request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Linked-principal credential dependency was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox-storage/resolve-persistence-mode": {
       "post": {
         "tags": ["Internal"],

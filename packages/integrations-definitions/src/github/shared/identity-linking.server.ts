@@ -4,6 +4,7 @@ import {
   IntegrationConnectionMethodIds,
   type CompletedIdentityLinkingAuthorization,
   type IntegrationIdentityLinkingCapability,
+  type RefreshedIdentityLinkingCredential,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -309,6 +310,50 @@ async function exchangeAuthorizationCode(input: {
   }
 }
 
+async function refreshUserAccessToken(input: {
+  webBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
+  const tokenUrl = new URL("/login/oauth/access_token", input.webBaseUrl);
+  // GitHub documents refresh-token exchange for GitHub App user tokens as a POST
+  // to /login/oauth/access_token with query parameters, including grant_type and
+  // refresh_token.
+  // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens
+  tokenUrl.searchParams.set("client_id", input.clientId);
+  tokenUrl.searchParams.set("client_secret", input.clientSecret);
+  tokenUrl.searchParams.set("grant_type", "refresh_token");
+  tokenUrl.searchParams.set("refresh_token", input.refreshToken);
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const responseText = await response.text();
+    throw new GitHubIdentityLinkingAuthorizationError(
+      `GitHub refresh token exchange failed (${response.status} ${response.statusText}): ${responseText}`,
+    );
+  }
+
+  try {
+    return await readJsonResponseOrThrow({
+      response,
+      schema: GitHubUserAccessTokenResponseSchema,
+      errorLabel: "GitHub refresh token exchange",
+    });
+  } catch (error) {
+    throw toGitHubAuthorizationFailure({
+      errorLabel: "GitHub refresh token exchange",
+      error,
+    });
+  }
+}
+
 async function fetchUserProfile(input: {
   apiBaseUrl: string;
   accessToken: string;
@@ -477,6 +522,54 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
   };
 }
 
+export async function refreshGitHubLinkedAccountCredential(input: {
+  webBaseUrl: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  now: string;
+}): Promise<RefreshedIdentityLinkingCredential> {
+  const tokenResponse = await refreshUserAccessToken({
+    webBaseUrl: input.webBaseUrl,
+    clientId: input.clientId,
+    clientSecret: input.clientSecret,
+    refreshToken: input.refreshToken,
+  });
+
+  if (tokenResponse.refresh_token === undefined) {
+    throw new GitHubIdentityLinkingAuthorizationError(
+      "GitHub refresh token exchange did not return a refresh token.",
+    );
+  }
+
+  const accessTokenExpiresAt = resolveFutureTimestamp({
+    now: input.now,
+    expiresInSeconds: tokenResponse.expires_in,
+  });
+  const refreshTokenExpiresAt = resolveFutureTimestamp({
+    now: input.now,
+    expiresInSeconds: tokenResponse.refresh_token_expires_in,
+  });
+  const scopes = resolveScopes(tokenResponse.scope);
+
+  return {
+    credentialKind: "github_app_user_access_token",
+    ...(scopes === undefined ? {} : { scopes }),
+    ...(accessTokenExpiresAt === undefined ? {} : { accessTokenExpiresAt }),
+    ...(refreshTokenExpiresAt === undefined ? {} : { refreshTokenExpiresAt }),
+    secrets: [
+      {
+        secretKind: "oauth2_access_token",
+        plaintext: tokenResponse.access_token,
+      },
+      {
+        secretKind: "oauth2_refresh_token",
+        plaintext: tokenResponse.refresh_token,
+      },
+    ],
+  };
+}
+
 export const GitHubIdentityLinkingCapability: IntegrationIdentityLinkingCapability<
   GitHubTargetConfig,
   Record<string, string>,
@@ -568,5 +661,33 @@ export const GitHubIdentityLinkingCapability: IntegrationIdentityLinkingCapabili
     });
 
     return toCompletedIdentityLinkingAuthorization(completedAuthorization);
+  },
+  async refreshCredential(input): Promise<RefreshedIdentityLinkingCredential> {
+    const clientId = resolveGitHubClientIdOrThrow({
+      connection: input.connection,
+    });
+
+    let clientSecret: string;
+    try {
+      clientSecret = await input.resolveConnectionSecret({
+        slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+      });
+    } catch {
+      throw new GitHubIdentityLinkingConfigurationError(
+        `Integration connection '${input.connection.id}' is missing GitHub App client secret.`,
+      );
+    }
+
+    const refreshToken = await input.resolveCredentialSecret({
+      secretKind: "oauth2_refresh_token",
+    });
+
+    return await refreshGitHubLinkedAccountCredential({
+      webBaseUrl: input.target.config.webBaseUrl,
+      clientId,
+      clientSecret,
+      refreshToken,
+      now: input.now,
+    });
   },
 };

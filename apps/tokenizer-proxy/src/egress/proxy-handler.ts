@@ -33,12 +33,22 @@ type CreateEgressProxyHandlerInput = {
   resolveRequestMiddleware?: RequestMiddlewareResolver;
 };
 
-type CredentialResolverInput = {
-  connectionId: string;
-  secretType: string;
-  slotKey?: string;
-  resolverKey?: string;
-};
+type CredentialResolverInput =
+  | {
+      credentialResolverKind: "integration_connection";
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    }
+  | {
+      credentialResolverKind: "linked_principal";
+      organizationId: string;
+      providerFamily: string;
+      actingUserRequired: boolean;
+      actingUserId?: string;
+      credentialKind?: string;
+    };
 
 type ErrorResponse = {
   code: string;
@@ -266,14 +276,105 @@ function createCredentialCacheKey(input: {
   bindingId: string;
   resolver: CredentialResolverInput;
 }): Parameters<CredentialCache["get"]>[0] {
+  if (input.resolver.credentialResolverKind === "integration_connection") {
+    return {
+      bindingId: input.bindingId,
+      credentialResolverKind: "integration_connection",
+      connectionId: input.resolver.connectionId,
+      secretType: input.resolver.secretType,
+      ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+      ...(input.resolver.resolverKey === undefined
+        ? {}
+        : { resolverKey: input.resolver.resolverKey }),
+    };
+  }
+
   return {
     bindingId: input.bindingId,
-    connectionId: input.resolver.connectionId,
-    secretType: input.resolver.secretType,
-    ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
-    ...(input.resolver.resolverKey === undefined
+    credentialResolverKind: "linked_principal",
+    organizationId: input.resolver.organizationId,
+    providerFamily: input.resolver.providerFamily,
+    actingUserRequired: input.resolver.actingUserRequired,
+    ...(input.resolver.actingUserId === undefined
       ? {}
-      : { resolverKey: input.resolver.resolverKey }),
+      : { actingUserId: input.resolver.actingUserId }),
+    ...(input.resolver.credentialKind === undefined
+      ? {}
+      : { credentialKind: input.resolver.credentialKind }),
+  };
+}
+
+function toCredentialResolverInputFromGrant(input: {
+  grant: AuthorizedEgressGrant;
+}): CredentialResolverInput {
+  if (input.grant.credentialResolverKind === "integration_connection") {
+    return {
+      credentialResolverKind: "integration_connection",
+      connectionId: input.grant.connectionId,
+      secretType: input.grant.secretType,
+      ...(input.grant.slotKey === undefined ? {} : { slotKey: input.grant.slotKey }),
+      ...(input.grant.resolverKey === undefined ? {} : { resolverKey: input.grant.resolverKey }),
+    };
+  }
+
+  return {
+    credentialResolverKind: "linked_principal",
+    organizationId: input.grant.organizationId,
+    providerFamily: input.grant.providerFamily,
+    actingUserRequired: input.grant.actingUserRequired,
+    ...(input.grant.actingUserId === undefined ? {} : { actingUserId: input.grant.actingUserId }),
+    ...(input.grant.credentialKind === undefined
+      ? {}
+      : { credentialKind: input.grant.credentialKind }),
+  };
+}
+
+function toCredentialResolverInputFromHeader(input: {
+  organizationId: string;
+  credentialResolver: NonNullable<
+    AuthorizedEgressGrant["additionalCredentialHeaders"]
+  >[number]["credentialResolver"];
+}): CredentialResolverInput {
+  if (input.credentialResolver.kind === "integration_connection") {
+    return {
+      credentialResolverKind: "integration_connection",
+      connectionId: input.credentialResolver.connectionId,
+      secretType: input.credentialResolver.secretType,
+      ...(input.credentialResolver.slotKey === undefined
+        ? {}
+        : { slotKey: input.credentialResolver.slotKey }),
+      ...(input.credentialResolver.resolverKey === undefined
+        ? {}
+        : { resolverKey: input.credentialResolver.resolverKey }),
+    };
+  }
+
+  return {
+    credentialResolverKind: "linked_principal",
+    organizationId: input.organizationId,
+    providerFamily: input.credentialResolver.providerFamily,
+    actingUserRequired: input.credentialResolver.actingUserRequired,
+    ...(input.credentialResolver.actingUserId === undefined
+      ? {}
+      : { actingUserId: input.credentialResolver.actingUserId }),
+    ...(input.credentialResolver.credentialKind === undefined
+      ? {}
+      : { credentialKind: input.credentialResolver.credentialKind }),
+  };
+}
+
+function createGrantResolverLogFields(input: {
+  grant: AuthorizedEgressGrant;
+}): Record<string, string> {
+  if (input.grant.credentialResolverKind === "integration_connection") {
+    return {
+      connectionId: input.grant.connectionId,
+    };
+  }
+
+  return {
+    providerFamily: input.grant.providerFamily,
+    ...(input.grant.actingUserId === undefined ? {} : { actingUserId: input.grant.actingUserId }),
   };
 }
 
@@ -295,15 +396,28 @@ async function resolveCredentialWithCache(input: {
   }
 
   const resolvedCredentialFromControlPlane =
-    await input.controlPlaneInternalClient.resolveIntegrationCredential({
-      connectionId: input.resolver.connectionId,
-      bindingId: input.bindingId,
-      secretType: input.resolver.secretType,
-      ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
-      ...(input.resolver.resolverKey === undefined
-        ? {}
-        : { resolverKey: input.resolver.resolverKey }),
-    });
+    input.resolver.credentialResolverKind === "integration_connection"
+      ? await input.controlPlaneInternalClient.resolveIntegrationCredential({
+          connectionId: input.resolver.connectionId,
+          bindingId: input.bindingId,
+          secretType: input.resolver.secretType,
+          ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+          ...(input.resolver.resolverKey === undefined
+            ? {}
+            : { resolverKey: input.resolver.resolverKey }),
+        })
+      : await input.controlPlaneInternalClient.resolveIdentityLinkPrincipalCredential({
+          organizationId: input.resolver.organizationId,
+          actingUserId:
+            input.resolver.actingUserId ??
+            (() => {
+              throw new Error("Linked-principal credential resolver is missing actingUserId.");
+            })(),
+          providerFamily: input.resolver.providerFamily,
+          ...(input.resolver.credentialKind === undefined
+            ? {}
+            : { credentialKind: input.resolver.credentialKind }),
+        });
 
   input.credentialCache.set(cacheKey, resolvedCredentialFromControlPlane);
   return resolvedCredentialFromControlPlane;
@@ -313,6 +427,7 @@ async function applyAdditionalCredentialHeaders(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   bindingId: string;
+  organizationId: string;
   outgoingHeaders: Headers;
   additionalCredentialHeaders: NonNullable<AuthorizedEgressGrant["additionalCredentialHeaders"]>;
 }): Promise<void> {
@@ -321,12 +436,10 @@ async function applyAdditionalCredentialHeaders(input: {
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       credentialCache: input.credentialCache,
       bindingId: input.bindingId,
-      resolver: {
-        connectionId: header.connectionId,
-        secretType: header.secretType,
-        ...(header.slotKey === undefined ? {} : { slotKey: header.slotKey }),
-        ...(header.resolverKey === undefined ? {} : { resolverKey: header.resolverKey }),
-      },
+      resolver: toCredentialResolverInputFromHeader({
+        organizationId: input.organizationId,
+        credentialResolver: header.credentialResolver,
+      }),
     });
 
     input.outgoingHeaders.set(
@@ -747,22 +860,22 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             method: ctx.req.method,
             requestPath: ctx.req.path,
             bindingId: egressGrant.bindingId,
-            connectionId: egressGrant.connectionId,
+            ...(egressGrant.credentialResolverKind === "integration_connection"
+              ? { connectionId: egressGrant.connectionId }
+              : { providerFamily: egressGrant.providerFamily }),
           }),
         );
         span.setAttribute("mistle.auth.injection.type", egressGrant.authInjectionType);
-        if (egressGrant.resolverKey !== undefined) {
+        if (
+          egressGrant.credentialResolverKind === "integration_connection" &&
+          egressGrant.resolverKey !== undefined
+        ) {
           span.setAttribute("mistle.credential.resolver_key", egressGrant.resolverKey);
         }
 
-        const primaryResolver = {
-          connectionId: egressGrant.connectionId,
-          secretType: egressGrant.secretType,
-          ...(egressGrant.slotKey === undefined ? {} : { slotKey: egressGrant.slotKey }),
-          ...(egressGrant.resolverKey === undefined
-            ? {}
-            : { resolverKey: egressGrant.resolverKey }),
-        };
+        const primaryResolver = toCredentialResolverInputFromGrant({
+          grant: egressGrant,
+        });
         const cacheKey = createCredentialCacheKey({
           bindingId: egressGrant.bindingId,
           resolver: primaryResolver,
@@ -788,24 +901,19 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     method: ctx.req.method,
                     requestPath: ctx.req.path,
                     bindingId: egressGrant.bindingId,
-                    connectionId: egressGrant.connectionId,
+                    ...createGrantResolverLogFields({
+                      grant: egressGrant,
+                    }),
                   }),
                 );
                 try {
-                  const resolvedCredential =
-                    await input.controlPlaneInternalClient.resolveIntegrationCredential({
-                      connectionId: primaryResolver.connectionId,
-                      bindingId: egressGrant.bindingId,
-                      secretType: primaryResolver.secretType,
-                      ...(primaryResolver.slotKey === undefined
-                        ? {}
-                        : { slotKey: primaryResolver.slotKey }),
-                      ...(primaryResolver.resolverKey === undefined
-                        ? {}
-                        : { resolverKey: primaryResolver.resolverKey }),
-                    });
+                  const resolvedCredential = await resolveCredentialWithCache({
+                    controlPlaneInternalClient: input.controlPlaneInternalClient,
+                    credentialCache: input.credentialCache,
+                    bindingId: egressGrant.bindingId,
+                    resolver: primaryResolver,
+                  });
 
-                  input.credentialCache.set(cacheKey, resolvedCredential);
                   credentialSpan.setAttribute(
                     "mistle.integration.credential.result_kind",
                     resolvedCredential.kind,
@@ -832,11 +940,20 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 err: error,
                 egressRuleId: egressGrant.egressRuleId,
                 bindingId: egressGrant.bindingId,
-                connectionId: egressGrant.connectionId,
-                secretType: egressGrant.secretType,
-                ...(egressGrant.resolverKey === undefined
-                  ? {}
-                  : { resolverKey: egressGrant.resolverKey }),
+                ...(egressGrant.credentialResolverKind === "integration_connection"
+                  ? {
+                      connectionId: egressGrant.connectionId,
+                      secretType: egressGrant.secretType,
+                      ...(egressGrant.resolverKey === undefined
+                        ? {}
+                        : { resolverKey: egressGrant.resolverKey }),
+                    }
+                  : {
+                      providerFamily: egressGrant.providerFamily,
+                      ...(egressGrant.credentialKind === undefined
+                        ? {}
+                        : { credentialKind: egressGrant.credentialKind }),
+                    }),
               },
               "Failed to resolve integration credential from control-plane-api",
             );
@@ -902,6 +1019,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               controlPlaneInternalClient: input.controlPlaneInternalClient,
               credentialCache: input.credentialCache,
               bindingId: egressGrant.bindingId,
+              organizationId: egressGrant.organizationId,
               outgoingHeaders: outgoingRequest.headers,
               additionalCredentialHeaders: egressGrant.additionalCredentialHeaders,
             });
@@ -987,7 +1105,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 err: error,
                 egressRuleId: egressGrant.egressRuleId,
                 bindingId: egressGrant.bindingId,
-                connectionId: egressGrant.connectionId,
+                ...createGrantResolverLogFields({
+                  grant: egressGrant,
+                }),
                 awsService: egressGrant.authInjectionService,
                 awsRegion: egressGrant.authInjectionRegion,
                 upstreamHost: upstreamUrl.host,
@@ -1107,7 +1227,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               upstreamResponseBody,
               egressRuleId: egressGrant.egressRuleId,
               bindingId: egressGrant.bindingId,
-              connectionId: egressGrant.connectionId,
+              ...createGrantResolverLogFields({
+                grant: egressGrant,
+              }),
               ...(egressGrant.authInjectionType !== "aws_sigv4"
                 ? {}
                 : {

@@ -126,6 +126,7 @@ describe("compileJiraBinding", () => {
           username: "user@example.com",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_personal",
           secretType: "api_key",
           slotKey: JiraCredentialSlotKeys.PERSONAL_API_TOKEN_API_KEY,
@@ -214,6 +215,7 @@ describe("compileJiraBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_service_account",
           secretType: "api_key",
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_API_TOKEN_API_KEY,
@@ -277,6 +279,7 @@ describe("compileJiraBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_service_account_oauth",
           secretType: "oauth2_access_token",
           slotKey: JiraCredentialSlotKeys.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS_ACCESS_TOKEN,

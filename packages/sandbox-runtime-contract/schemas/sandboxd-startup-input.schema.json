@@ -244,27 +244,57 @@
                       "minLength": 1
                     },
                     "credentialResolver": {
-                      "type": "object",
-                      "properties": {
-                        "connectionId": {
-                          "type": "string",
-                          "minLength": 1
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "integration_connection"
+                            },
+                            "connectionId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "secretType": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "slotKey": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "resolverKey": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "connectionId", "secretType"],
+                          "additionalProperties": false
                         },
-                        "secretType": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "slotKey": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "resolverKey": {
-                          "type": "string",
-                          "minLength": 1
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "linked_principal"
+                            },
+                            "providerFamily": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "credentialKind": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "actingUserRequired": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": ["kind", "providerFamily", "actingUserRequired"],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": ["connectionId", "secretType"],
-                      "additionalProperties": false
+                      ]
                     }
                   },
                   "required": ["header", "credentialResolver"],
@@ -272,27 +302,57 @@
                 }
               },
               "credentialResolver": {
-                "type": "object",
-                "properties": {
-                  "connectionId": {
-                    "type": "string",
-                    "minLength": 1
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "integration_connection"
+                      },
+                      "connectionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "secretType": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "slotKey": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "resolverKey": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "connectionId", "secretType"],
+                    "additionalProperties": false
                   },
-                  "secretType": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "slotKey": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "resolverKey": {
-                    "type": "string",
-                    "minLength": 1
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "linked_principal"
+                      },
+                      "providerFamily": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "credentialKind": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "actingUserRequired": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": ["kind", "providerFamily", "actingUserRequired"],
+                    "additionalProperties": false
                   }
-                },
-                "required": ["connectionId", "secretType"],
-                "additionalProperties": false
+                ]
               },
               "requestMiddleware": {
                 "readOnly": true,

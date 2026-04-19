@@ -185,6 +185,43 @@ export type IntegrationIdentityLinkingCompleteAuthorizationInput<
   resolveConnectionSecret: IdentityLinkingConnectionSecretResolver;
 };
 
+export type IntegrationIdentityLinkingStoredCredential = {
+  credentialKind: string;
+  scopes?: string[] | undefined;
+  accessTokenExpiresAt?: string | undefined;
+  refreshTokenExpiresAt?: string | undefined;
+};
+
+export type IdentityLinkingCredentialSecretResolver = (input: {
+  secretKind: string;
+}) => MaybePromise<string>;
+
+export type RefreshedIdentityLinkingCredential = {
+  credentialKind: string;
+  scopes?: string[] | undefined;
+  accessTokenExpiresAt?: string | undefined;
+  refreshTokenExpiresAt?: string | undefined;
+  secrets: readonly [IdentityLinkingCredentialSecret, ...IdentityLinkingCredentialSecret[]];
+};
+
+export type IntegrationIdentityLinkingRefreshCredentialInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  userId: string;
+  providerFamily: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  credential: IntegrationIdentityLinkingStoredCredential;
+  now: string;
+  resolveConnectionSecret: IdentityLinkingConnectionSecretResolver;
+  resolveCredentialSecret: IdentityLinkingCredentialSecretResolver;
+};
+
 export type IntegrationIdentityLinkingCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -208,6 +245,13 @@ export type IntegrationIdentityLinkingCapability<
       TConnectionConfig
     >,
   ): MaybePromise<CompletedIdentityLinkingAuthorization>;
+  refreshCredential?(
+    input: IntegrationIdentityLinkingRefreshCredentialInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<RefreshedIdentityLinkingCredential>;
 };
 
 export type IntegrationBinding = {
@@ -1111,12 +1155,24 @@ export type IntegrationWebhookHandler<
   ): MaybePromise<IntegrationWebhookEvent>;
 };
 
-export type EgressCredentialResolverRef = {
+export type IntegrationConnectionEgressCredentialResolverRef = {
+  kind: "integration_connection";
   connectionId: string;
   secretType: string;
   slotKey?: string;
   resolverKey?: string;
 };
+
+export type LinkedPrincipalEgressCredentialResolverRef = {
+  kind: "linked_principal";
+  providerFamily: string;
+  credentialKind?: string;
+  actingUserRequired: boolean;
+};
+
+export type EgressCredentialResolverRef =
+  | IntegrationConnectionEgressCredentialResolverRef
+  | LinkedPrincipalEgressCredentialResolverRef;
 
 export type EgressCredentialHeaderInjection = {
   header: string;

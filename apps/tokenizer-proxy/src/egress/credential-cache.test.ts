@@ -14,6 +14,7 @@ describe("CredentialCache", () => {
     cache.set(
       {
         bindingId: "ibd_openai",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_openai",
         secretType: "api_key",
       },
@@ -26,6 +27,7 @@ describe("CredentialCache", () => {
     expect(
       cache.get({
         bindingId: "ibd_openai",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_openai",
         secretType: "api_key",
       }),
@@ -37,6 +39,7 @@ describe("CredentialCache", () => {
     expect(
       cache.getWithResult({
         bindingId: "ibd_openai",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_openai",
         secretType: "api_key",
       }),
@@ -61,6 +64,7 @@ describe("CredentialCache", () => {
     cache.set(
       {
         bindingId: "ibd_aws",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_aws",
         secretType: "aws_secret_access_key",
         resolverKey: "assume-role-session",
@@ -78,6 +82,7 @@ describe("CredentialCache", () => {
     expect(
       cache.get({
         bindingId: "ibd_aws",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_aws",
         secretType: "aws_secret_access_key",
         resolverKey: "assume-role-session",
@@ -94,6 +99,7 @@ describe("CredentialCache", () => {
     expect(
       cache.getWithResult({
         bindingId: "ibd_aws",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_aws",
         secretType: "aws_secret_access_key",
         resolverKey: "assume-role-session",
@@ -114,6 +120,7 @@ describe("CredentialCache", () => {
     expect(
       cache.getWithResult({
         bindingId: "ibd_missing",
+        credentialResolverKind: "integration_connection",
         connectionId: "icn_missing",
         secretType: "api_key",
       }),

@@ -1,10 +1,21 @@
-export type CredentialCacheKeyInput = {
-  bindingId: string;
-  connectionId: string;
-  secretType: string;
-  slotKey?: string;
-  resolverKey?: string;
-};
+export type CredentialCacheKeyInput =
+  | {
+      bindingId: string;
+      credentialResolverKind: "integration_connection";
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    }
+  | {
+      bindingId: string;
+      credentialResolverKind: "linked_principal";
+      organizationId: string;
+      providerFamily: string;
+      actingUserRequired: boolean;
+      actingUserId?: string;
+      credentialKind?: string;
+    };
 
 export type CachedCredential =
   | {
@@ -38,12 +49,25 @@ type CredentialCacheInput = {
 };
 
 function toCacheKey(input: CredentialCacheKeyInput): string {
+  if (input.credentialResolverKind === "integration_connection") {
+    return [
+      input.bindingId,
+      input.credentialResolverKind,
+      input.connectionId,
+      input.secretType,
+      input.slotKey ?? "",
+      input.resolverKey ?? "",
+    ].join(":");
+  }
+
   return [
     input.bindingId,
-    input.connectionId,
-    input.secretType,
-    input.slotKey ?? "",
-    input.resolverKey ?? "",
+    input.credentialResolverKind,
+    input.organizationId,
+    input.providerFamily,
+    String(input.actingUserRequired),
+    input.actingUserId ?? "",
+    input.credentialKind ?? "",
   ].join(":");
 }
 

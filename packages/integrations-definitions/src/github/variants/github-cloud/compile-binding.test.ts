@@ -133,6 +133,7 @@ describe("compileGitHubCloudBinding", () => {
           username: "x-access-token",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
@@ -152,6 +153,7 @@ describe("compileGitHubCloudBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
@@ -172,6 +174,7 @@ describe("compileGitHubCloudBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "api_key",
           slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
@@ -400,27 +403,24 @@ describe("compileGitHubCloudBinding", () => {
       },
     });
 
-    expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe(
-      "github_app_installation_token",
-    );
-    expect(compiled.egressRoutes[0]?.credentialResolver.resolverKey).toBe(
-      "github_app_installation_token",
-    );
-    expect(compiled.egressRoutes[1]?.credentialResolver.secretType).toBe(
-      "github_app_installation_token",
-    );
-    expect(compiled.egressRoutes[1]?.credentialResolver.resolverKey).toBe(
-      "github_app_installation_token",
-    );
+    expect(compiled.egressRoutes[0]?.credentialResolver).toMatchObject({
+      kind: "integration_connection",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+    });
+    expect(compiled.egressRoutes[1]?.credentialResolver).toMatchObject({
+      kind: "integration_connection",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+    });
     expect(compiled.egressRoutes[1]?.requestMiddleware).toEqual([
       GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN,
     ]);
-    expect(compiled.egressRoutes[2]?.credentialResolver.secretType).toBe(
-      "github_app_installation_token",
-    );
-    expect(compiled.egressRoutes[2]?.credentialResolver.resolverKey).toBe(
-      "github_app_installation_token",
-    );
+    expect(compiled.egressRoutes[2]?.credentialResolver).toMatchObject({
+      kind: "integration_connection",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+    });
   });
 
   it("fails fast when connection connection_method is missing", () => {

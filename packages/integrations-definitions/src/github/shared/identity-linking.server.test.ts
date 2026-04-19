@@ -7,6 +7,7 @@ import {
   createGitHubIdentityLinkPkceChallenge,
   GitHubIdentityLinkingCapability,
   GitHubIdentityLinkingAuthorizationError,
+  refreshGitHubLinkedAccountCredential,
   startGitHubLinkedAccountAuthorization,
 } from "./identity-linking.server.js";
 import { GitHubCredentialSlotKeys } from "./slot-keys.js";
@@ -450,6 +451,116 @@ describe("github identity linking", () => {
           }),
           redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/github",
           pkceVerifier: "verifier_123",
+          now: "2026-04-18T10:00:00.000Z",
+        }),
+      ).rejects.toThrow("did not return a refresh token");
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("refreshes a GitHub linked-account credential using the documented query-parameter flow", async () => {
+    const seenRequests: Array<{
+      method: string;
+      pathname: string;
+      search: string;
+      body: string;
+    }> = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        let body = "";
+        request.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        request.on("end", () => {
+          seenRequests.push({
+            method: request.method ?? "GET",
+            pathname: requestUrl.pathname,
+            search: requestUrl.search,
+            body,
+          });
+          response.setHeader("content-type", "application/json");
+          response.end(
+            JSON.stringify({
+              access_token: "ghu_refreshed_token",
+              expires_in: 3600,
+              refresh_token: "ghr_refreshed_token",
+              refresh_token_expires_in: 7200,
+              scope: "",
+              token_type: "bearer",
+            }),
+          );
+        });
+      },
+    });
+
+    try {
+      const refreshedCredential = await refreshGitHubLinkedAccountCredential({
+        webBaseUrl: server.baseUrl,
+        clientId: "Iv1.client123",
+        clientSecret: "github-client-secret",
+        refreshToken: "ghr_existing_token",
+        now: "2026-04-18T10:00:00.000Z",
+      });
+
+      expect(seenRequests).toEqual([
+        {
+          method: "POST",
+          pathname: "/login/oauth/access_token",
+          search:
+            "?client_id=Iv1.client123&client_secret=github-client-secret&grant_type=refresh_token&refresh_token=ghr_existing_token",
+          body: "",
+        },
+      ]);
+      expect(refreshedCredential).toEqual({
+        credentialKind: "github_app_user_access_token",
+        accessTokenExpiresAt: "2026-04-18T11:00:00.000Z",
+        refreshTokenExpiresAt: "2026-04-18T12:00:00.000Z",
+        secrets: [
+          {
+            secretKind: "oauth2_access_token",
+            plaintext: "ghu_refreshed_token",
+          },
+          {
+            secretKind: "oauth2_refresh_token",
+            plaintext: "ghr_refreshed_token",
+          },
+        ],
+      });
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it("fails when GitHub refresh does not return a replacement refresh token", async () => {
+    const server = await startTestServer({
+      handler(_request, response) {
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            access_token: "ghu_refreshed_token",
+            expires_in: 3600,
+            scope: "",
+            token_type: "bearer",
+          }),
+        );
+      },
+    });
+
+    try {
+      await expect(
+        refreshGitHubLinkedAccountCredential({
+          webBaseUrl: server.baseUrl,
+          clientId: "Iv1.client123",
+          clientSecret: "github-client-secret",
+          refreshToken: "ghr_existing_token",
           now: "2026-04-18T10:00:00.000Z",
         }),
       ).rejects.toThrow("did not return a refresh token");

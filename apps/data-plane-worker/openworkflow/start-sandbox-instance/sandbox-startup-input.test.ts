@@ -63,12 +63,21 @@ const RuntimePlanSchema = z.object({
           region: z.string().min(1),
         }),
       ]),
-      credentialResolver: z.object({
-        connectionId: z.string().min(1),
-        secretType: z.string().min(1),
-        slotKey: z.string().min(1).optional(),
-        resolverKey: z.string().min(1).optional(),
-      }),
+      credentialResolver: z.discriminatedUnion("kind", [
+        z.object({
+          kind: z.literal("integration_connection"),
+          connectionId: z.string().min(1),
+          secretType: z.string().min(1),
+          slotKey: z.string().min(1).optional(),
+          resolverKey: z.string().min(1).optional(),
+        }),
+        z.object({
+          kind: z.literal("linked_principal"),
+          providerFamily: z.string().min(1),
+          actingUserRequired: z.boolean(),
+          credentialKind: z.string().min(1).optional(),
+        }),
+      ]),
       requestMiddleware: z.array(z.string().min(1)).optional(),
     }),
   ),
@@ -280,6 +289,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_123",
           secretType: "github_app_installation_token",
           resolverKey: "github_app_installation_token",
@@ -358,6 +368,52 @@ describe("encodeSandboxStartupInput", () => {
     expect(decoded.gitIdentity).toEqual({
       name: "Mistle User",
       email: "mistle-user@example.com",
+    });
+  });
+
+  it("preserves linked-principal credential resolvers in the encoded runtime plan", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: {
+        ...createRuntimePlan(),
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_github",
+            bindingId: "binding_github",
+            familyId: "github",
+            variantId: "github-cloud",
+            match: {
+              hosts: ["api.github.com"],
+              methods: ["POST"],
+            },
+            upstream: {
+              baseUrl: "https://api.github.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              kind: "linked_principal",
+              providerFamily: "github",
+              actingUserRequired: true,
+              credentialKind: "github_app_user_access_token",
+            },
+          },
+        ],
+      },
+      egressGrantByRuleId: {},
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.runtimePlan.egressRoutes[0]?.credentialResolver).toEqual({
+      kind: "linked_principal",
+      providerFamily: "github",
+      actingUserRequired: true,
+      credentialKind: "github_app_user_access_token",
     });
   });
 });

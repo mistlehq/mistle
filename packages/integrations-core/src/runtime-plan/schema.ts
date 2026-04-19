@@ -23,6 +23,26 @@ const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
     .strict(),
 ]);
 
+const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("integration_connection"),
+      connectionId: z.string().min(1),
+      secretType: z.string().min(1),
+      slotKey: z.string().min(1).optional(),
+      resolverKey: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("linked_principal"),
+      providerFamily: z.string().min(1),
+      credentialKind: z.string().min(1).optional(),
+      actingUserRequired: z.boolean(),
+    })
+    .strict(),
+]);
+
 const EgressCredentialRouteSchema = z
   .object({
     egressRuleId: z.string().min(1),
@@ -81,27 +101,13 @@ const EgressCredentialRouteSchema = z
         z
           .object({
             header: z.string().min(1),
-            credentialResolver: z
-              .object({
-                connectionId: z.string().min(1),
-                secretType: z.string().min(1),
-                slotKey: z.string().min(1).optional(),
-                resolverKey: z.string().min(1).optional(),
-              })
-              .strict(),
+            credentialResolver: EgressCredentialResolverSchema,
           })
           .strict(),
       )
       .readonly()
       .optional(),
-    credentialResolver: z
-      .object({
-        connectionId: z.string().min(1),
-        secretType: z.string().min(1),
-        slotKey: z.string().min(1).optional(),
-        resolverKey: z.string().min(1).optional(),
-      })
-      .strict(),
+    credentialResolver: EgressCredentialResolverSchema,
     requestMiddleware: z.array(z.string().min(1)).readonly().optional(),
   })
   .strict();
@@ -486,16 +492,7 @@ function normalizeAdditionalCredentialHeaders(input: {
 
     return {
       header: normalizedHeaderName,
-      credentialResolver: {
-        connectionId: headerInjection.credentialResolver.connectionId,
-        secretType: headerInjection.credentialResolver.secretType,
-        ...(headerInjection.credentialResolver.slotKey === undefined
-          ? {}
-          : { slotKey: headerInjection.credentialResolver.slotKey }),
-        ...(headerInjection.credentialResolver.resolverKey === undefined
-          ? {}
-          : { resolverKey: headerInjection.credentialResolver.resolverKey }),
-      },
+      credentialResolver: normalizeCredentialResolver(headerInjection.credentialResolver),
     };
   });
 
@@ -504,26 +501,68 @@ function normalizeAdditionalCredentialHeaders(input: {
       return left.header.localeCompare(right.header);
     }
 
-    if (left.credentialResolver.connectionId !== right.credentialResolver.connectionId) {
-      return left.credentialResolver.connectionId.localeCompare(
-        right.credentialResolver.connectionId,
-      );
-    }
-
-    if (left.credentialResolver.secretType !== right.credentialResolver.secretType) {
-      return left.credentialResolver.secretType.localeCompare(right.credentialResolver.secretType);
-    }
-
-    if (left.credentialResolver.slotKey !== right.credentialResolver.slotKey) {
-      return (left.credentialResolver.slotKey ?? "").localeCompare(
-        right.credentialResolver.slotKey ?? "",
-      );
-    }
-
-    return (left.credentialResolver.resolverKey ?? "").localeCompare(
-      right.credentialResolver.resolverKey ?? "",
-    );
+    return compareCredentialResolvers(left.credentialResolver, right.credentialResolver);
   });
+}
+
+function normalizeCredentialResolver(
+  resolver: z.output<typeof EgressCredentialResolverSchema>,
+): RuntimePlanRoute["credentialResolver"] {
+  if (resolver.kind === "integration_connection") {
+    return {
+      kind: "integration_connection",
+      connectionId: resolver.connectionId,
+      secretType: resolver.secretType,
+      ...(resolver.slotKey === undefined ? {} : { slotKey: resolver.slotKey }),
+      ...(resolver.resolverKey === undefined ? {} : { resolverKey: resolver.resolverKey }),
+    };
+  }
+
+  return {
+    kind: "linked_principal",
+    providerFamily: resolver.providerFamily,
+    actingUserRequired: resolver.actingUserRequired,
+    ...(resolver.credentialKind === undefined ? {} : { credentialKind: resolver.credentialKind }),
+  };
+}
+
+function compareCredentialResolvers(
+  left: RuntimePlanRoute["credentialResolver"],
+  right: RuntimePlanRoute["credentialResolver"],
+): number {
+  if (left.kind !== right.kind) {
+    return left.kind.localeCompare(right.kind);
+  }
+
+  if (left.kind === "integration_connection" && right.kind === "integration_connection") {
+    if (left.connectionId !== right.connectionId) {
+      return left.connectionId.localeCompare(right.connectionId);
+    }
+
+    if (left.secretType !== right.secretType) {
+      return left.secretType.localeCompare(right.secretType);
+    }
+
+    if (left.slotKey !== right.slotKey) {
+      return (left.slotKey ?? "").localeCompare(right.slotKey ?? "");
+    }
+
+    return (left.resolverKey ?? "").localeCompare(right.resolverKey ?? "");
+  }
+
+  if (left.kind !== "linked_principal" || right.kind !== "linked_principal") {
+    throw new Error("Expected runtime-plan credential resolvers to share the same kind.");
+  }
+
+  if (left.providerFamily !== right.providerFamily) {
+    return left.providerFamily.localeCompare(right.providerFamily);
+  }
+
+  if (left.credentialKind !== right.credentialKind) {
+    return (left.credentialKind ?? "").localeCompare(right.credentialKind ?? "");
+  }
+
+  return Number(left.actingUserRequired) - Number(right.actingUserRequired);
 }
 
 function normalizeRuntimeExecCommand(
@@ -653,16 +692,7 @@ function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): Ru
     authInjection,
     ...(additionalHeaders === undefined ? {} : { additionalHeaders }),
     ...(additionalCredentialHeaders === undefined ? {} : { additionalCredentialHeaders }),
-    credentialResolver: {
-      connectionId: route.credentialResolver.connectionId,
-      secretType: route.credentialResolver.secretType,
-      ...(route.credentialResolver.slotKey === undefined
-        ? {}
-        : { slotKey: route.credentialResolver.slotKey }),
-      ...(route.credentialResolver.resolverKey === undefined
-        ? {}
-        : { resolverKey: route.credentialResolver.resolverKey }),
-    },
+    credentialResolver: normalizeCredentialResolver(route.credentialResolver),
     ...(route.requestMiddleware === undefined
       ? {}
       : { requestMiddleware: route.requestMiddleware }),

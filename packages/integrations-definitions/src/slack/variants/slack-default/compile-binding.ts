@@ -82,6 +82,7 @@ export function compileSlackBinding(input: SlackCompileBindingInput): CompileBin
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: input.connection.id,
           secretType: SlackCredentialSecretTypes.API_KEY,
           slotKey: SlackCredentialSlotKeys.BOT_TOKEN,

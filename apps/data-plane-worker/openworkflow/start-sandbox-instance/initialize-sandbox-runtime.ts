@@ -14,9 +14,11 @@ import {
 
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
+  organizationId: string;
   sandboxInstanceId: string;
   startupMode: SandboxStartupInput["startupMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
   gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
 }): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
@@ -51,8 +53,10 @@ export async function createSandboxStartupInput(input: {
     }),
     createEgressGrantByRuleId({
       config: input.config,
+      organizationId: input.organizationId,
       sandboxInstanceId: input.sandboxInstanceId,
       runtimePlan: input.runtimePlan,
+      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     }),
   ]);
 
@@ -73,18 +77,22 @@ export async function initializeSandboxRuntime(
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
+    organizationId: string;
     sandboxInstanceId: string;
     providerSandboxId: string;
     startupMode: SandboxStartupInput["startupMode"];
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
+    organizationId: input.organizationId,
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: input.startupMode,
     runtimePlan: input.runtimePlan,
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   });
 

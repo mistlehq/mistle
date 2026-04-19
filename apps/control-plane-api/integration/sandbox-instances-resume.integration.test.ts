@@ -34,6 +34,7 @@ type WorkflowRunRow = {
 const WorkflowRunInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
+    actingUserId: z.string().min(1).optional(),
   })
   .loose();
 
@@ -262,7 +263,10 @@ describe("sandbox instance resume integration", () => {
         connectable: false,
         failureCode: null,
         failureMessage: null,
-        runtimeContext: null,
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
+        },
         automationConversation: null,
       });
 
@@ -273,9 +277,9 @@ describe("sandbox instance resume integration", () => {
       });
       expect(queuedRun.workflow_name).toBe(ResumeWorkflowName);
       expect(queuedRun.status).toBe("pending");
-      expect(WorkflowRunInputSchema.parse(queuedRun.input).sandboxInstanceId).toBe(
-        sandboxInstanceId,
-      );
+      const workflowInput = WorkflowRunInputSchema.parse(queuedRun.input);
+      expect(workflowInput.sandboxInstanceId).toBe(sandboxInstanceId);
+      expect(workflowInput.actingUserId).toBe(authSession.userId);
     } finally {
       await controlPlaneRuntime.stop();
     }
@@ -428,7 +432,10 @@ describe("sandbox instance resume integration", () => {
         connectable: false,
         failureCode: null,
         failureMessage: null,
-        runtimeContext: null,
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
+        },
         automationConversation: null,
       });
 

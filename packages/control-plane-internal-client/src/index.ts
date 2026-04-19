@@ -28,6 +28,10 @@ export type ResolveIntegrationTargetSecretsInput =
   paths["/internal/integration-credentials/resolve-target-secrets"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveIntegrationTargetSecretsOutput =
   paths["/internal/integration-credentials/resolve-target-secrets"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResolveIdentityLinkPrincipalCredentialInput =
+  paths["/internal/identity-linking/resolve-principal-credential"]["post"]["requestBody"]["content"]["application/json"];
+export type ResolveIdentityLinkPrincipalCredentialOutput =
+  paths["/internal/identity-linking/resolve-principal-credential"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export type StartSandboxProfileInstanceInput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["requestBody"]["content"]["application/json"];
@@ -129,6 +133,26 @@ export class ControlPlaneInternalClient {
 
     throw new Error(
       `Control-plane internal target secret resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    );
+  }
+
+  async resolveIdentityLinkPrincipalCredential(
+    input: ResolveIdentityLinkPrincipalCredentialInput,
+  ): Promise<ResolveIdentityLinkPrincipalCredentialOutput> {
+    const result = await this.#client.POST(
+      "/internal/identity-linking/resolve-principal-credential",
+      {
+        body: input,
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new Error(
+      `Control-plane internal linked-principal credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
   }
 

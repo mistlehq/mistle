@@ -15,10 +15,13 @@ async function createGrant(input?: {
   requestMiddleware?: ReadonlyArray<string>;
   additionalCredentialHeaders?: ReadonlyArray<{
     header: string;
-    connectionId: string;
-    secretType: string;
-    slotKey?: string;
-    resolverKey?: string;
+    credentialResolver: {
+      kind: "integration_connection";
+      connectionId: string;
+      secretType: string;
+      slotKey?: string;
+      resolverKey?: string;
+    };
   }>;
 }): Promise<string> {
   return await mintEgressGrant({
@@ -27,8 +30,10 @@ async function createGrant(input?: {
       sub: "sandbox_123",
       jti: "egress_rule_openai",
       bindingId: "ibd_openai",
+      organizationId: "org_123",
       familyId: "openai",
       variantId: "openai-default",
+      credentialResolverKind: "integration_connection",
       connectionId: "icn_openai",
       secretType: "api_key",
       upstreamBaseUrl: "https://api.openai.com/v1",
@@ -56,8 +61,10 @@ async function createAwsGrant(): Promise<string> {
       sub: "sandbox_aws_123",
       jti: "egress_rule_aws",
       bindingId: "ibd_aws",
+      organizationId: "org_123",
       familyId: "aws",
       variantId: "aws-cli-default",
+      credentialResolverKind: "integration_connection",
       connectionId: "icn_aws",
       secretType: "aws_secret_access_key",
       upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
@@ -86,8 +93,10 @@ describe("authorizeEgressGrant", () => {
     ).resolves.toMatchObject({
       egressRuleId: "egress_rule_openai",
       bindingId: "ibd_openai",
+      organizationId: "org_123",
       familyId: "openai",
       variantId: "openai-default",
+      credentialResolverKind: "integration_connection",
       connectionId: "icn_openai",
       upstreamBaseUrl: "https://api.openai.com/v1",
     });
@@ -98,9 +107,12 @@ describe("authorizeEgressGrant", () => {
       additionalCredentialHeaders: [
         {
           header: "dd_application_key",
-          connectionId: "icn_openai",
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.secondary",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_openai",
+            secretType: "api_key",
+            slotKey: "openai.openai-default.api-key.secondary",
+          },
         },
       ],
     });
@@ -116,9 +128,12 @@ describe("authorizeEgressGrant", () => {
       additionalCredentialHeaders: [
         {
           header: "dd_application_key",
-          connectionId: "icn_openai",
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.secondary",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_openai",
+            secretType: "api_key",
+            slotKey: "openai.openai-default.api-key.secondary",
+          },
         },
       ],
     });

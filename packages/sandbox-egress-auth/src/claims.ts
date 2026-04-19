@@ -90,16 +90,14 @@ function normalizeAdditionalCredentialHeaders(
   const occupiedHeaderNames = new Set<string>();
   const normalizedHeaders = value.map((entry) => {
     const normalizedHeaderName = toNonEmptyString(entry.header)?.toLowerCase();
-    const connectionId = toNonEmptyString(entry.connectionId);
-    const secretType = toNonEmptyString(entry.secretType);
-    const slotKey = toNonEmptyString(entry.slotKey);
-    const resolverKey = toNonEmptyString(entry.resolverKey);
+    const credentialResolver = normalizeAdditionalCredentialHeaderResolver(
+      entry.credentialResolver,
+    );
 
     if (
       normalizedHeaderName === undefined ||
       !HeaderNamePattern.test(normalizedHeaderName) ||
-      connectionId === undefined ||
-      secretType === undefined
+      credentialResolver === undefined
     ) {
       return undefined;
     }
@@ -112,10 +110,7 @@ function normalizeAdditionalCredentialHeaders(
 
     return {
       header: normalizedHeaderName,
-      connectionId,
-      secretType,
-      ...(slotKey === undefined ? {} : { slotKey }),
-      ...(resolverKey === undefined ? {} : { resolverKey }),
+      credentialResolver,
     };
   });
 
@@ -132,6 +127,71 @@ function normalizeAdditionalCredentialHeaders(
       return left.header.localeCompare(right.header);
     }
 
+    return compareAdditionalCredentialHeaderResolvers(
+      left.credentialResolver,
+      right.credentialResolver,
+    );
+  });
+}
+
+function parseCredentialResolverKind(
+  value: unknown,
+): "integration_connection" | "linked_principal" | undefined {
+  if (value === "integration_connection" || value === "linked_principal") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function normalizeAdditionalCredentialHeaderResolver(
+  resolver: EgressGrantCredentialHeaderInjection["credentialResolver"],
+): EgressGrantCredentialHeaderInjection["credentialResolver"] | undefined {
+  if (resolver.kind === "integration_connection") {
+    const connectionId = toNonEmptyString(resolver.connectionId);
+    const secretType = toNonEmptyString(resolver.secretType);
+    const slotKey = toNonEmptyString(resolver.slotKey);
+    const resolverKey = toNonEmptyString(resolver.resolverKey);
+
+    if (connectionId === undefined || secretType === undefined) {
+      return undefined;
+    }
+
+    return {
+      kind: "integration_connection",
+      connectionId,
+      secretType,
+      ...(slotKey === undefined ? {} : { slotKey }),
+      ...(resolverKey === undefined ? {} : { resolverKey }),
+    };
+  }
+
+  const providerFamily = toNonEmptyString(resolver.providerFamily);
+  const actingUserId = toNonEmptyString(resolver.actingUserId);
+  const credentialKind = toNonEmptyString(resolver.credentialKind);
+
+  if (providerFamily === undefined || (resolver.actingUserRequired && actingUserId === undefined)) {
+    return undefined;
+  }
+
+  return {
+    kind: "linked_principal",
+    providerFamily,
+    actingUserRequired: resolver.actingUserRequired,
+    ...(actingUserId === undefined ? {} : { actingUserId }),
+    ...(credentialKind === undefined ? {} : { credentialKind }),
+  };
+}
+
+function compareAdditionalCredentialHeaderResolvers(
+  left: EgressGrantCredentialHeaderInjection["credentialResolver"],
+  right: EgressGrantCredentialHeaderInjection["credentialResolver"],
+): number {
+  if (left.kind !== right.kind) {
+    return left.kind.localeCompare(right.kind);
+  }
+
+  if (left.kind === "integration_connection" && right.kind === "integration_connection") {
     if (left.connectionId !== right.connectionId) {
       return left.connectionId.localeCompare(right.connectionId);
     }
@@ -145,7 +205,25 @@ function normalizeAdditionalCredentialHeaders(
     }
 
     return (left.resolverKey ?? "").localeCompare(right.resolverKey ?? "");
-  });
+  }
+
+  if (left.kind !== "linked_principal" || right.kind !== "linked_principal") {
+    throw new Error("Expected credential header resolvers to share the same kind.");
+  }
+
+  if (left.providerFamily !== right.providerFamily) {
+    return left.providerFamily.localeCompare(right.providerFamily);
+  }
+
+  if (left.credentialKind !== right.credentialKind) {
+    return (left.credentialKind ?? "").localeCompare(right.credentialKind ?? "");
+  }
+
+  if (left.actingUserRequired !== right.actingUserRequired) {
+    return Number(left.actingUserRequired) - Number(right.actingUserRequired);
+  }
+
+  return (left.actingUserId ?? "").localeCompare(right.actingUserId ?? "");
 }
 
 export function parseAuthInjectionType(value: unknown): EgressGrantAuthInjectionType | undefined {
@@ -242,29 +320,88 @@ export function normalizeClaims(input: EgressGrantClaimsInput): EgressGrantClaim
 
   const slotKey = toNonEmptyString(input.slotKey);
   const resolverKey = toNonEmptyString(input.resolverKey);
+  const credentialResolverKind = parseCredentialResolverKind(input.credentialResolverKind);
+  if (credentialResolverKind === undefined) {
+    throw missingClaimError(
+      EgressGrantErrorCode.CREDENTIAL_RESOLVER_KIND_REQUIRED,
+      "credentialResolverKind",
+    );
+  }
+
+  let credentialResolverClaims:
+    | {
+        credentialResolverKind: "integration_connection";
+        connectionId: string;
+        secretType: string;
+        slotKey?: string;
+        resolverKey?: string;
+      }
+    | {
+        credentialResolverKind: "linked_principal";
+        providerFamily: string;
+        actingUserRequired: boolean;
+        actingUserId?: string;
+        credentialKind?: string;
+      };
+  if (credentialResolverKind === "integration_connection") {
+    credentialResolverClaims = {
+      credentialResolverKind: "integration_connection",
+      connectionId: requireClaim(
+        input.connectionId,
+        EgressGrantErrorCode.CONNECTION_ID_REQUIRED,
+        "connectionId",
+      ),
+      secretType: requireClaim(
+        input.secretType,
+        EgressGrantErrorCode.SECRET_TYPE_REQUIRED,
+        "secretType",
+      ),
+      ...(slotKey === undefined ? {} : { slotKey }),
+      ...(resolverKey === undefined ? {} : { resolverKey }),
+    };
+  } else {
+    const providerFamily = requireClaim(
+      input.providerFamily,
+      EgressGrantErrorCode.PROVIDER_FAMILY_REQUIRED,
+      "providerFamily",
+    );
+    const actingUserId = toNonEmptyString(input.actingUserId);
+    const credentialKind = toNonEmptyString(input.credentialKind);
+
+    if (typeof input.actingUserRequired !== "boolean") {
+      throw missingClaimError(EgressGrantErrorCode.ACTING_USER_ID_REQUIRED, "actingUserRequired");
+    }
+
+    if (input.actingUserRequired && actingUserId === undefined) {
+      throw missingClaimError(EgressGrantErrorCode.ACTING_USER_ID_REQUIRED, "actingUserId");
+    }
+
+    credentialResolverClaims = {
+      credentialResolverKind: "linked_principal",
+      providerFamily,
+      actingUserRequired: input.actingUserRequired,
+      ...(actingUserId === undefined ? {} : { actingUserId }),
+      ...(credentialKind === undefined ? {} : { credentialKind }),
+    };
+  }
+
   const baseClaims = {
     sub: requireClaim(input.sub, EgressGrantErrorCode.SUBJECT_REQUIRED, "sub"),
     jti: requireClaim(input.jti, EgressGrantErrorCode.JTI_REQUIRED, "jti"),
     bindingId: requireClaim(input.bindingId, EgressGrantErrorCode.BINDING_ID_REQUIRED, "bindingId"),
+    organizationId: requireClaim(
+      input.organizationId,
+      EgressGrantErrorCode.ORGANIZATION_ID_REQUIRED,
+      "organizationId",
+    ),
     familyId: requireClaim(input.familyId, EgressGrantErrorCode.FAMILY_ID_REQUIRED, "familyId"),
     variantId: requireClaim(input.variantId, EgressGrantErrorCode.VARIANT_ID_REQUIRED, "variantId"),
-    connectionId: requireClaim(
-      input.connectionId,
-      EgressGrantErrorCode.CONNECTION_ID_REQUIRED,
-      "connectionId",
-    ),
-    secretType: requireClaim(
-      input.secretType,
-      EgressGrantErrorCode.SECRET_TYPE_REQUIRED,
-      "secretType",
-    ),
     upstreamBaseUrl: requireClaim(
       input.upstreamBaseUrl,
       EgressGrantErrorCode.UPSTREAM_BASE_URL_REQUIRED,
       "upstreamBaseUrl",
     ),
-    ...(slotKey === undefined ? {} : { slotKey }),
-    ...(resolverKey === undefined ? {} : { resolverKey }),
+    ...credentialResolverClaims,
     ...(allowedMethods === undefined ? {} : { allowedMethods }),
     ...(allowedPathPrefixes === undefined ? {} : { allowedPathPrefixes }),
     ...(requestMiddleware === undefined ? {} : { requestMiddleware }),

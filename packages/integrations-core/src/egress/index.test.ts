@@ -45,6 +45,7 @@ function createRoute(input: {
       target: "authorization",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: "conn_123",
       secretType: "api_key",
     },

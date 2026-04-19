@@ -71,6 +71,7 @@ function createRoute(input: {
       target: "authorization",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: "conn_123",
       secretType: "api_key",
     },
@@ -108,6 +109,7 @@ function createAwsRoute(input: {
       region: "us-east-1",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: "conn_aws",
       secretType: "aws_secret_access_key",
       resolverKey: "assume-role-session",

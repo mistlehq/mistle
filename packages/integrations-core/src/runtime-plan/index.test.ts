@@ -72,6 +72,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 region: "us-east-1",
               },
               credentialResolver: {
+                kind: "integration_connection",
                 connectionId: "icn_aws",
                 secretType: "aws_secret_access_key",
                 resolverKey: "assume-role-session",
@@ -185,6 +186,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 target: "authorization",
               },
               credentialResolver: {
+                kind: "integration_connection",
                 connectionId: "conn_b",
                 secretType: "github_app_installation_token",
               },
@@ -280,6 +282,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 target: "authorization",
               },
               credentialResolver: {
+                kind: "integration_connection",
                 connectionId: "conn_a",
                 secretType: "api_key",
               },
@@ -781,6 +784,7 @@ describe("assembleCompiledRuntimePlan", () => {
             " ChatGPT-Account-ID ": " acct_123 ",
           },
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: "conn_openai",
             secretType: "oauth2_access_token",
           },
@@ -829,6 +833,7 @@ describe("assembleCompiledRuntimePlan", () => {
               "chatgpt-account-id": "acct_456",
             },
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "conn_openai",
               secretType: "oauth2_access_token",
             },
@@ -870,6 +875,7 @@ describe("assembleCompiledRuntimePlan", () => {
             {
               header: " DD_APPLICATION_KEY ",
               credentialResolver: {
+                kind: "integration_connection",
                 connectionId: "conn_datadog",
                 secretType: "api_key",
                 slotKey: "datadog.datadog-default.api-key.application-key",
@@ -877,6 +883,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: "conn_datadog",
             secretType: "api_key",
             slotKey: "datadog.datadog-default.api-key.api-key",
@@ -893,6 +900,7 @@ describe("assembleCompiledRuntimePlan", () => {
       {
         header: "dd_application_key",
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "conn_datadog",
           secretType: "api_key",
           slotKey: "datadog.datadog-default.api-key.application-key",
@@ -930,6 +938,7 @@ describe("assembleCompiledRuntimePlan", () => {
               {
                 header: " DD_APPLICATION_KEY ",
                 credentialResolver: {
+                  kind: "integration_connection",
                   connectionId: "conn_datadog",
                   secretType: "api_key",
                 },
@@ -937,12 +946,14 @@ describe("assembleCompiledRuntimePlan", () => {
               {
                 header: "dd_application_key",
                 credentialResolver: {
+                  kind: "integration_connection",
                   connectionId: "conn_datadog",
                   secretType: "api_key",
                 },
               },
             ],
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "conn_datadog",
               secretType: "api_key",
             },
@@ -986,12 +997,14 @@ describe("assembleCompiledRuntimePlan", () => {
               {
                 header: "x-api-key",
                 credentialResolver: {
+                  kind: "integration_connection",
                   connectionId: "conn_aws",
                   secretType: "api_key",
                 },
               },
             ],
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "conn_aws",
               secretType: "aws_secret_access_key",
             },

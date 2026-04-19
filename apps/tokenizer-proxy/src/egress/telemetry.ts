@@ -3,7 +3,8 @@ export type EgressTelemetryBaseAttributesInput = {
   method: string;
   requestPath: string;
   bindingId: string;
-  connectionId: string;
+  connectionId?: string;
+  providerFamily?: string;
 };
 
 export type CredentialCacheTelemetryResult = "hit" | "miss" | "refresh_skew_expired";
@@ -14,7 +15,12 @@ export function createEgressTelemetryBaseAttributes(
   return {
     ...(input.egressRuleId === undefined ? {} : { "mistle.egress.rule_id": input.egressRuleId }),
     "mistle.integration.binding_id": input.bindingId,
-    "mistle.integration.connection_id": input.connectionId,
+    ...(input.connectionId === undefined
+      ? {}
+      : { "mistle.integration.connection_id": input.connectionId }),
+    ...(input.providerFamily === undefined
+      ? {}
+      : { "mistle.identity_linking.provider_family": input.providerFamily }),
     "http.request.method": input.method,
     "url.path": input.requestPath,
   };

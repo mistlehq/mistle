@@ -141,6 +141,7 @@ function buildAwsRegionalRoute(input: {
       region: input.region,
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: input.connectionId,
       secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
       slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,

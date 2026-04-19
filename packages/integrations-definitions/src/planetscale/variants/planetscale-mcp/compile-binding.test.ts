@@ -64,6 +64,7 @@ describe("compilePlanetScaleBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_planetscale",
           secretType: "oauth2_access_token",
           slotKey: PlanetScaleCredentialSlotKeys.accessToken,
@@ -122,6 +123,7 @@ describe("compilePlanetScaleBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_planetscale",
           secretType: "oauth2_access_token",
           slotKey: PlanetScaleCredentialSlotKeys.accessToken,

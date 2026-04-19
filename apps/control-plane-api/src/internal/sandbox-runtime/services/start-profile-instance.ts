@@ -73,6 +73,7 @@ export async function startProfileInstance(
     sandboxProfileVersion: input.profileVersion,
     runtimePlan,
     startedBy: input.startedBy,
+    ...(input.actingUser === undefined ? {} : { actingUserId: input.actingUser.userId }),
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     source: input.source,
     image: {

@@ -4,46 +4,75 @@ import {
   type EgressGrantConfig,
 } from "@mistle/sandbox-egress-auth";
 
+type VerifiedEgressGrant = Awaited<ReturnType<typeof verifyEgressGrant>>;
+
 type AuthorizedEgressGrantBase = {
   sub: string;
   jti: string;
   bindingId: string;
+  organizationId: string;
   familyId: string;
   variantId: string;
-  connectionId: string;
-  secretType: string;
   upstreamBaseUrl: string;
   additionalHeaders?: Readonly<Record<string, string>>;
   additionalCredentialHeaders?: ReadonlyArray<{
     header: string;
-    connectionId: string;
-    secretType: string;
-    slotKey?: string;
-    resolverKey?: string;
+    credentialResolver:
+      | {
+          kind: "integration_connection";
+          connectionId: string;
+          secretType: string;
+          slotKey?: string;
+          resolverKey?: string;
+        }
+      | {
+          kind: "linked_principal";
+          providerFamily: string;
+          actingUserRequired: boolean;
+          actingUserId?: string;
+          credentialKind?: string;
+        };
   }>;
-  slotKey?: string;
-  resolverKey?: string;
   allowedMethods?: ReadonlyArray<string>;
   allowedPathPrefixes?: ReadonlyArray<string>;
   requestMiddleware?: ReadonlyArray<string>;
   egressRuleId: string;
 };
 
+type AuthorizedIntegrationConnectionResolver = {
+  credentialResolverKind: "integration_connection";
+  connectionId: string;
+  secretType: string;
+  slotKey?: string;
+  resolverKey?: string;
+};
+
+type AuthorizedLinkedPrincipalResolver = {
+  credentialResolverKind: "linked_principal";
+  providerFamily: string;
+  actingUserRequired: boolean;
+  actingUserId?: string;
+  credentialKind?: string;
+};
+
 export type AuthorizedEgressGrant =
-  | (AuthorizedEgressGrantBase & {
-      authInjectionType: "bearer" | "header" | "query";
-      authInjectionTarget: string;
-    })
-  | (AuthorizedEgressGrantBase & {
-      authInjectionType: "basic";
-      authInjectionTarget: string;
-      authInjectionUsername?: string;
-    })
-  | (AuthorizedEgressGrantBase & {
-      authInjectionType: "aws_sigv4";
-      authInjectionService: string;
-      authInjectionRegion: string;
-    });
+  | (AuthorizedEgressGrantBase &
+      (AuthorizedIntegrationConnectionResolver | AuthorizedLinkedPrincipalResolver) & {
+        authInjectionType: "bearer" | "header" | "query";
+        authInjectionTarget: string;
+      })
+  | (AuthorizedEgressGrantBase &
+      (AuthorizedIntegrationConnectionResolver | AuthorizedLinkedPrincipalResolver) & {
+        authInjectionType: "basic";
+        authInjectionTarget: string;
+        authInjectionUsername?: string;
+      })
+  | (AuthorizedEgressGrantBase &
+      (AuthorizedIntegrationConnectionResolver | AuthorizedLinkedPrincipalResolver) & {
+        authInjectionType: "aws_sigv4";
+        authInjectionService: string;
+        authInjectionRegion: string;
+      });
 
 export type StaticAuthorizedEgressGrant = Exclude<
   AuthorizedEgressGrant,
@@ -89,6 +118,66 @@ function pathAllowed(allowedPathPrefixes: ReadonlyArray<string>, targetPath: str
   return allowedPathPrefixes.some((pathPrefix) =>
     normalizedTargetPath.startsWith(normalizePath(pathPrefix)),
   );
+}
+
+function toAuthorizedResolver(
+  verifiedGrant: VerifiedEgressGrant,
+): AuthorizedIntegrationConnectionResolver | AuthorizedLinkedPrincipalResolver {
+  if (verifiedGrant.credentialResolverKind === "integration_connection") {
+    return {
+      credentialResolverKind: "integration_connection",
+      connectionId: verifiedGrant.connectionId,
+      secretType: verifiedGrant.secretType,
+      ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
+      ...(verifiedGrant.resolverKey === undefined
+        ? {}
+        : { resolverKey: verifiedGrant.resolverKey }),
+    };
+  }
+
+  return {
+    credentialResolverKind: "linked_principal",
+    providerFamily: verifiedGrant.providerFamily,
+    actingUserRequired: verifiedGrant.actingUserRequired,
+    ...(verifiedGrant.actingUserId === undefined
+      ? {}
+      : { actingUserId: verifiedGrant.actingUserId }),
+    ...(verifiedGrant.credentialKind === undefined
+      ? {}
+      : { credentialKind: verifiedGrant.credentialKind }),
+  };
+}
+
+function toAuthorizedAdditionalCredentialHeaders(
+  headers: NonNullable<VerifiedEgressGrant["additionalCredentialHeaders"]>,
+): NonNullable<AuthorizedEgressGrantBase["additionalCredentialHeaders"]> {
+  return headers.map((header) => ({
+    header: header.header,
+    credentialResolver:
+      header.credentialResolver.kind === "integration_connection"
+        ? {
+            kind: "integration_connection",
+            connectionId: header.credentialResolver.connectionId,
+            secretType: header.credentialResolver.secretType,
+            ...(header.credentialResolver.slotKey === undefined
+              ? {}
+              : { slotKey: header.credentialResolver.slotKey }),
+            ...(header.credentialResolver.resolverKey === undefined
+              ? {}
+              : { resolverKey: header.credentialResolver.resolverKey }),
+          }
+        : {
+            kind: "linked_principal",
+            providerFamily: header.credentialResolver.providerFamily,
+            actingUserRequired: header.credentialResolver.actingUserRequired,
+            ...(header.credentialResolver.actingUserId === undefined
+              ? {}
+              : { actingUserId: header.credentialResolver.actingUserId }),
+            ...(header.credentialResolver.credentialKind === undefined
+              ? {}
+              : { credentialKind: header.credentialResolver.credentialKind }),
+          },
+  }));
 }
 
 export async function authorizeEgressGrant(input: {
@@ -144,11 +233,11 @@ export async function authorizeEgressGrant(input: {
       sub: verifiedGrant.sub,
       jti: verifiedGrant.jti,
       bindingId: verifiedGrant.bindingId,
+      organizationId: verifiedGrant.organizationId,
       familyId: verifiedGrant.familyId,
       variantId: verifiedGrant.variantId,
-      connectionId: verifiedGrant.connectionId,
-      secretType: verifiedGrant.secretType,
       upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
+      ...toAuthorizedResolver(verifiedGrant),
       authInjectionType: verifiedGrant.authInjectionType,
       authInjectionService: verifiedGrant.authInjectionService,
       authInjectionRegion: verifiedGrant.authInjectionRegion,
@@ -157,11 +246,11 @@ export async function authorizeEgressGrant(input: {
         : { additionalHeaders: verifiedGrant.additionalHeaders }),
       ...(verifiedGrant.additionalCredentialHeaders === undefined
         ? {}
-        : { additionalCredentialHeaders: verifiedGrant.additionalCredentialHeaders }),
-      ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
-      ...(verifiedGrant.resolverKey === undefined
-        ? {}
-        : { resolverKey: verifiedGrant.resolverKey }),
+        : {
+            additionalCredentialHeaders: toAuthorizedAdditionalCredentialHeaders(
+              verifiedGrant.additionalCredentialHeaders,
+            ),
+          }),
       ...(verifiedGrant.allowedMethods === undefined
         ? {}
         : { allowedMethods: verifiedGrant.allowedMethods }),
@@ -179,11 +268,11 @@ export async function authorizeEgressGrant(input: {
     sub: verifiedGrant.sub,
     jti: verifiedGrant.jti,
     bindingId: verifiedGrant.bindingId,
+    organizationId: verifiedGrant.organizationId,
     familyId: verifiedGrant.familyId,
     variantId: verifiedGrant.variantId,
-    connectionId: verifiedGrant.connectionId,
-    secretType: verifiedGrant.secretType,
     upstreamBaseUrl: verifiedGrant.upstreamBaseUrl,
+    ...toAuthorizedResolver(verifiedGrant),
     authInjectionType: verifiedGrant.authInjectionType,
     authInjectionTarget: verifiedGrant.authInjectionTarget,
     ...(verifiedGrant.additionalHeaders === undefined
@@ -195,9 +284,11 @@ export async function authorizeEgressGrant(input: {
       : { authInjectionUsername: verifiedGrant.authInjectionUsername }),
     ...(verifiedGrant.additionalCredentialHeaders === undefined
       ? {}
-      : { additionalCredentialHeaders: verifiedGrant.additionalCredentialHeaders }),
-    ...(verifiedGrant.slotKey === undefined ? {} : { slotKey: verifiedGrant.slotKey }),
-    ...(verifiedGrant.resolverKey === undefined ? {} : { resolverKey: verifiedGrant.resolverKey }),
+      : {
+          additionalCredentialHeaders: toAuthorizedAdditionalCredentialHeaders(
+            verifiedGrant.additionalCredentialHeaders,
+          ),
+        }),
     ...(verifiedGrant.allowedMethods === undefined
       ? {}
       : { allowedMethods: verifiedGrant.allowedMethods }),

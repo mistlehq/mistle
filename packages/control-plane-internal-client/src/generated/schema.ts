@@ -4,6 +4,112 @@
  */
 
 export interface paths {
+  "/internal/identity-linking/resolve-principal-credential": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            actingUserId: string;
+            credentialKind?: string;
+            organizationId: string;
+            providerFamily: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve linked-principal credential for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** Format: date-time */
+                  expiresAt?: string;
+                  /** @enum {string} */
+                  kind: "value";
+                  value: string;
+                }
+              | {
+                  accessKeyId: string;
+                  /** Format: date-time */
+                  expiresAt: string;
+                  /** @enum {string} */
+                  kind: "aws_session";
+                  secretAccessKey: string;
+                  sessionToken: string;
+                };
+          };
+        };
+        /** @description Invalid linked-principal credential resolve request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Linked-principal credential dependency was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/integration-connections/refresh-resource": {
     parameters: {
       query?: never;

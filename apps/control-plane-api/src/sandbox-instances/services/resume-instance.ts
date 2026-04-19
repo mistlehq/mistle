@@ -58,6 +58,7 @@ export async function resumeInstance(
   await dataPlaneClient.resumeSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.instanceId,
+    ...(input.actingUser === undefined ? {} : { actingUserId: input.actingUser.userId }),
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
   });

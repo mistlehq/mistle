@@ -140,6 +140,7 @@ export async function startSandboxInstance(
     persistenceMode,
     runtimePlan: input.runtimePlan,
     startedBy: input.startedBy,
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     source: input.source,
     image: input.image,
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),

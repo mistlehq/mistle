@@ -32,6 +32,7 @@ function createSignozMcpRoute(input: {
       target: "authorization",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: input.connectionId,
       secretType: SignozCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
       slotKey: SignozCredentialSlotKeys.accessToken,

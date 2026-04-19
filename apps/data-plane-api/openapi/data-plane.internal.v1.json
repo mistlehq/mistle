@@ -252,27 +252,61 @@
                                     "minLength": 1
                                   },
                                   "credentialResolver": {
-                                    "type": "object",
-                                    "properties": {
-                                      "connectionId": {
-                                        "type": "string",
-                                        "minLength": 1
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["integration_connection"]
+                                          },
+                                          "connectionId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "secretType": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "slotKey": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "resolverKey": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "connectionId", "secretType"],
+                                        "additionalProperties": false
                                       },
-                                      "secretType": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "slotKey": {
-                                        "type": "string",
-                                        "minLength": 1
-                                      },
-                                      "resolverKey": {
-                                        "type": "string",
-                                        "minLength": 1
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["linked_principal"]
+                                          },
+                                          "providerFamily": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "credentialKind": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "actingUserRequired": {
+                                            "type": "boolean"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "providerFamily",
+                                          "actingUserRequired"
+                                        ],
+                                        "additionalProperties": false
                                       }
-                                    },
-                                    "required": ["connectionId", "secretType"],
-                                    "additionalProperties": false
+                                    ]
                                   }
                                 },
                                 "required": ["header", "credentialResolver"],
@@ -280,27 +314,57 @@
                               }
                             },
                             "credentialResolver": {
-                              "type": "object",
-                              "properties": {
-                                "connectionId": {
-                                  "type": "string",
-                                  "minLength": 1
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["integration_connection"]
+                                    },
+                                    "connectionId": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "secretType": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "slotKey": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "resolverKey": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "connectionId", "secretType"],
+                                  "additionalProperties": false
                                 },
-                                "secretType": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "slotKey": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "resolverKey": {
-                                  "type": "string",
-                                  "minLength": 1
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["linked_principal"]
+                                    },
+                                    "providerFamily": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "credentialKind": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "actingUserRequired": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": ["kind", "providerFamily", "actingUserRequired"],
+                                  "additionalProperties": false
                                 }
-                              },
-                              "required": ["connectionId", "secretType"],
-                              "additionalProperties": false
+                              ]
                             },
                             "requestMiddleware": {
                               "type": "array",
@@ -1132,6 +1196,10 @@
                     "required": ["kind", "id"],
                     "additionalProperties": false
                   },
+                  "actingUserId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "gitIdentity": {
                     "type": "object",
                     "properties": {
@@ -1786,27 +1854,61 @@
                                       "minLength": 1
                                     },
                                     "credentialResolver": {
-                                      "type": "object",
-                                      "properties": {
-                                        "connectionId": {
-                                          "type": "string",
-                                          "minLength": 1
+                                      "oneOf": [
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["integration_connection"]
+                                            },
+                                            "connectionId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "secretType": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "slotKey": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "resolverKey": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["kind", "connectionId", "secretType"],
+                                          "additionalProperties": false
                                         },
-                                        "secretType": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "slotKey": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "resolverKey": {
-                                          "type": "string",
-                                          "minLength": 1
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["linked_principal"]
+                                            },
+                                            "providerFamily": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "credentialKind": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "actingUserRequired": {
+                                              "type": "boolean"
+                                            }
+                                          },
+                                          "required": [
+                                            "kind",
+                                            "providerFamily",
+                                            "actingUserRequired"
+                                          ],
+                                          "additionalProperties": false
                                         }
-                                      },
-                                      "required": ["connectionId", "secretType"],
-                                      "additionalProperties": false
+                                      ]
                                     }
                                   },
                                   "required": ["header", "credentialResolver"],
@@ -1814,27 +1916,57 @@
                                 }
                               },
                               "credentialResolver": {
-                                "type": "object",
-                                "properties": {
-                                  "connectionId": {
-                                    "type": "string",
-                                    "minLength": 1
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["integration_connection"]
+                                      },
+                                      "connectionId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "secretType": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "slotKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "resolverKey": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "connectionId", "secretType"],
+                                    "additionalProperties": false
                                   },
-                                  "secretType": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "slotKey": {
-                                    "type": "string",
-                                    "minLength": 1
-                                  },
-                                  "resolverKey": {
-                                    "type": "string",
-                                    "minLength": 1
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["linked_principal"]
+                                      },
+                                      "providerFamily": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "credentialKind": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "actingUserRequired": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": ["kind", "providerFamily", "actingUserRequired"],
+                                    "additionalProperties": false
                                   }
-                                },
-                                "required": ["connectionId", "secretType"],
-                                "additionalProperties": false
+                                ]
                               },
                               "requestMiddleware": {
                                 "type": "array",
@@ -3019,6 +3151,10 @@
                 "type": "object",
                 "properties": {
                   "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "actingUserId": {
                     "type": "string",
                     "minLength": 1
                   },

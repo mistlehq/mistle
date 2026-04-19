@@ -57,10 +57,25 @@ export async function mintEgressGrant(input: {
   try {
     return await new SignJWT({
       bindingId: claims.bindingId,
+      organizationId: claims.organizationId,
       familyId: claims.familyId,
       variantId: claims.variantId,
-      connectionId: claims.connectionId,
-      secretType: claims.secretType,
+      credentialResolverKind: claims.credentialResolverKind,
+      ...(claims.credentialResolverKind === "integration_connection"
+        ? {
+            connectionId: claims.connectionId,
+            secretType: claims.secretType,
+            ...(claims.slotKey === undefined ? {} : { slotKey: claims.slotKey }),
+            ...(claims.resolverKey === undefined ? {} : { resolverKey: claims.resolverKey }),
+          }
+        : {
+            providerFamily: claims.providerFamily,
+            actingUserRequired: claims.actingUserRequired,
+            ...(claims.actingUserId === undefined ? {} : { actingUserId: claims.actingUserId }),
+            ...(claims.credentialKind === undefined
+              ? {}
+              : { credentialKind: claims.credentialKind }),
+          }),
       upstreamBaseUrl: claims.upstreamBaseUrl,
       authInjectionType: claims.authInjectionType,
       ...("authInjectionTarget" in claims
@@ -81,8 +96,6 @@ export async function mintEgressGrant(input: {
       ...(claims.additionalCredentialHeaders === undefined
         ? {}
         : { additionalCredentialHeaders: claims.additionalCredentialHeaders }),
-      ...(claims.slotKey === undefined ? {} : { slotKey: claims.slotKey }),
-      ...(claims.resolverKey === undefined ? {} : { resolverKey: claims.resolverKey }),
       ...(claims.allowedMethods === undefined ? {} : { allowedMethods: claims.allowedMethods }),
       ...(claims.allowedPathPrefixes === undefined
         ? {}
@@ -139,6 +152,10 @@ export async function verifyEgressGrant(input: {
         typeof verificationResult.payload.bindingId === "string"
           ? verificationResult.payload.bindingId
           : "",
+      organizationId:
+        typeof verificationResult.payload.organizationId === "string"
+          ? verificationResult.payload.organizationId
+          : "",
       familyId:
         typeof verificationResult.payload.familyId === "string"
           ? verificationResult.payload.familyId
@@ -147,14 +164,25 @@ export async function verifyEgressGrant(input: {
         typeof verificationResult.payload.variantId === "string"
           ? verificationResult.payload.variantId
           : "",
-      connectionId:
-        typeof verificationResult.payload.connectionId === "string"
-          ? verificationResult.payload.connectionId
-          : "",
-      secretType:
-        typeof verificationResult.payload.secretType === "string"
-          ? verificationResult.payload.secretType
-          : "",
+      credentialResolverKind: verificationResult.payload.credentialResolverKind,
+      ...(typeof verificationResult.payload.connectionId === "string"
+        ? { connectionId: verificationResult.payload.connectionId }
+        : {}),
+      ...(typeof verificationResult.payload.secretType === "string"
+        ? { secretType: verificationResult.payload.secretType }
+        : {}),
+      ...(typeof verificationResult.payload.providerFamily === "string"
+        ? { providerFamily: verificationResult.payload.providerFamily }
+        : {}),
+      ...(typeof verificationResult.payload.actingUserRequired === "boolean"
+        ? { actingUserRequired: verificationResult.payload.actingUserRequired }
+        : {}),
+      ...(typeof verificationResult.payload.actingUserId === "string"
+        ? { actingUserId: verificationResult.payload.actingUserId }
+        : {}),
+      ...(typeof verificationResult.payload.credentialKind === "string"
+        ? { credentialKind: verificationResult.payload.credentialKind }
+        : {}),
       upstreamBaseUrl:
         typeof verificationResult.payload.upstreamBaseUrl === "string"
           ? verificationResult.payload.upstreamBaseUrl

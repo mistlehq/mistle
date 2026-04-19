@@ -39,6 +39,7 @@ const PublicControlPlaneBaseUrl = "https://public-control-plane.example.test";
 type StartedControlPlaneCredentialServer = {
   baseUrl: string;
   requests: ReadonlyArray<unknown>;
+  principalCredentialRequests: ReadonlyArray<unknown>;
   stop: () => Promise<void>;
 };
 
@@ -70,10 +71,13 @@ async function mintIntegrationEgressGrant(
     additionalHeaders?: Readonly<Record<string, string>>;
     additionalCredentialHeaders?: ReadonlyArray<{
       header: string;
-      connectionId: string;
-      secretType: string;
-      slotKey?: string;
-      resolverKey?: string;
+      credentialResolver: {
+        kind: "integration_connection";
+        connectionId: string;
+        secretType: string;
+        slotKey?: string;
+        resolverKey?: string;
+      };
     }>;
     slotKey?: string;
     resolverKey?: string;
@@ -99,8 +103,10 @@ async function mintIntegrationEgressGrant(
       sub: "sandbox_123",
       jti: input.egressRuleId,
       bindingId: input.bindingId,
+      organizationId: "org_123",
       familyId: input.familyId ?? "test",
       variantId: input.variantId ?? "test-default",
+      credentialResolverKind: "integration_connection",
       connectionId: input.connectionId,
       secretType: input.secretType,
       upstreamBaseUrl: input.upstreamBaseUrl,
@@ -131,6 +137,58 @@ async function mintIntegrationEgressGrant(
       ...(input.allowedPathPrefixes === undefined
         ? {}
         : { allowedPathPrefixes: input.allowedPathPrefixes }),
+    },
+    ttlSeconds: 60,
+  });
+}
+
+async function mintLinkedPrincipalEgressGrant(
+  input: {
+    egressRuleId: string;
+    upstreamBaseUrl: string;
+    bindingId: string;
+    organizationId: string;
+    actingUserId: string;
+    providerFamily: string;
+  } & (
+    | {
+        authInjectionType: "bearer" | "basic" | "header" | "query";
+        authInjectionTarget: string;
+        authInjectionUsername?: string;
+      }
+    | {
+        authInjectionType: "aws_sigv4";
+        authInjectionService: string;
+        authInjectionRegion: string;
+      }
+  ),
+): Promise<string> {
+  return await mintEgressGrant({
+    config: IntegrationEgressGrantConfig,
+    claims: {
+      sub: "sandbox_123",
+      jti: input.egressRuleId,
+      bindingId: input.bindingId,
+      organizationId: input.organizationId,
+      familyId: input.providerFamily,
+      variantId: "test-default",
+      credentialResolverKind: "linked_principal",
+      providerFamily: input.providerFamily,
+      actingUserRequired: true,
+      actingUserId: input.actingUserId,
+      upstreamBaseUrl: input.upstreamBaseUrl,
+      authInjectionType: input.authInjectionType,
+      ...("authInjectionTarget" in input
+        ? {
+            authInjectionTarget: input.authInjectionTarget,
+            ...(input.authInjectionUsername === undefined
+              ? {}
+              : { authInjectionUsername: input.authInjectionUsername }),
+          }
+        : {
+            authInjectionService: input.authInjectionService,
+            authInjectionRegion: input.authInjectionRegion,
+          }),
     },
     ttlSeconds: 60,
   });
@@ -240,12 +298,20 @@ async function startControlPlaneCredentialServer(input: {
   credentialValue?: string;
   statusCode?: number;
   responseBody?: unknown;
+  principalCredentialValue?: string;
+  principalStatusCode?: number;
+  principalResponseBody?: unknown;
 }): Promise<StartedControlPlaneCredentialServer> {
   const port = await reserveAvailablePort({ host: input.host });
   const requests: unknown[] = [];
+  const principalCredentialRequests: unknown[] = [];
 
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
-    if (request.method !== "POST" || request.url !== "/internal/integration-credentials/resolve") {
+    if (
+      request.method !== "POST" ||
+      (request.url !== "/internal/integration-credentials/resolve" &&
+        request.url !== "/internal/identity-linking/resolve-principal-credential")
+    ) {
       response.statusCode = 404;
       response.end("not found");
       return;
@@ -270,8 +336,22 @@ async function startControlPlaneCredentialServer(input: {
     }
 
     const bodyText = Buffer.concat(chunks).toString("utf8");
-    requests.push(bodyText.length === 0 ? undefined : JSON.parse(bodyText));
+    const parsedBody = bodyText.length === 0 ? undefined : JSON.parse(bodyText);
 
+    if (request.url === "/internal/identity-linking/resolve-principal-credential") {
+      principalCredentialRequests.push(parsedBody);
+      writeJson(
+        response,
+        input.principalStatusCode ?? 200,
+        input.principalResponseBody ?? {
+          kind: "value",
+          value: input.principalCredentialValue ?? "test-linked-principal-secret",
+        },
+      );
+      return;
+    }
+
+    requests.push(parsedBody);
     writeJson(
       response,
       input.statusCode ?? 200,
@@ -293,6 +373,7 @@ async function startControlPlaneCredentialServer(input: {
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
     requests,
+    principalCredentialRequests,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -1374,9 +1455,12 @@ describe("tokenizer proxy integration", () => {
       additionalCredentialHeaders: [
         {
           header: "dd_application_key",
-          connectionId: "icn_datadog",
-          secretType: "api_key",
-          slotKey: "datadog.datadog-default.api-key.application-key",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_datadog",
+            secretType: "api_key",
+            slotKey: "datadog.datadog-default.api-key.application-key",
+          },
         },
       ],
       allowedMethods: ["GET"],
@@ -1429,6 +1513,132 @@ describe("tokenizer proxy integration", () => {
       ]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("supports linked-principal credential resolution for HTTP egress", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      principalCredentialValue: "ghu_user_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintLinkedPrincipalEgressGrant({
+      egressRuleId: "egress_rule_github",
+      upstreamBaseUrl: upstreamEchoService.baseUrl,
+      bindingId: "ibd_github",
+      organizationId: "org_123",
+      actingUserId: "usr_123",
+      providerFamily: "github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(`http://${host}:${String(port)}/tokenizer-proxy/egress/linked`, {
+        method: "GET",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed response headers.");
+      }
+      expect(readHeaderValue(body.headers, "authorization")).toBe("Bearer ghu_user_token");
+      expect(controlPlaneServer.principalCredentialRequests).toEqual([
+        {
+          organizationId: "org_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+        },
+      ]);
+      expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("supports linked-principal credential resolution for websocket egress", async () => {
+    const upstreamService = await startWebSocketUpstream({
+      host: "127.0.0.1",
+      path: "/linked",
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      principalCredentialValue: "ghu_user_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintLinkedPrincipalEgressGrant({
+      egressRuleId: "egress_rule_github_ws",
+      upstreamBaseUrl: upstreamService.baseUrl,
+      bindingId: "ibd_github",
+      organizationId: "org_123",
+      actingUserId: "usr_123",
+      providerFamily: "github",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const message = await performUpgradeRequest({
+        baseUrl: `http://${host}:${String(port)}`,
+        path: "/tokenizer-proxy/egress/linked",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+
+      expect(message).toBe("pong\n");
+      expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer ghu_user_token");
+      expect(controlPlaneServer.principalCredentialRequests).toEqual([
+        {
+          organizationId: "org_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+        },
+      ]);
+      expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }
   });
 
@@ -1782,9 +1992,12 @@ describe("tokenizer proxy integration", () => {
       additionalCredentialHeaders: [
         {
           header: "dd_application_key",
-          connectionId: "icn_datadog",
-          secretType: "api_key",
-          slotKey: "datadog.datadog-default.api-key.application-key",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_datadog",
+            secretType: "api_key",
+            slotKey: "datadog.datadog-default.api-key.application-key",
+          },
         },
       ],
       allowedMethods: ["GET"],

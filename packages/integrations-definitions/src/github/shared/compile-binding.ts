@@ -20,7 +20,7 @@ export type GitHubCompileBindingInput = CompileBindingInput<
   GitHubTargetConfig,
   GitHubBindingConfig
 >;
-type GitHubCompiledRoute = CompileBindingResult["egressRoutes"][number];
+type GitHubCompiledRoute = NonNullable<CompileBindingResult["egressRoutes"][number]>;
 
 const GitHubCliArtifactKey = "gh-cli";
 const GitHubCliArtifactName = "GitHub CLI";
@@ -229,6 +229,7 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
     joinRoutePathPrefixes(gitPathPrefix, `/${repository}.git`),
   );
   const credentialResolver = {
+    kind: "integration_connection" as const,
     connectionId: input.connection.id,
     secretType: credentialSecretType,
     ...(parsedConnectionConfig.connection_method === IntegrationConnectionMethodIds.API_KEY

@@ -201,10 +201,12 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   sandboxRuntimeControl: ctx.sandboxRuntimeControl,
                 },
                 {
+                  organizationId: resumableSandboxState.organizationId,
                   sandboxInstanceId: resumedRuntime.sandboxInstanceId,
                   providerSandboxId: resumedRuntime.providerSandboxId,
                   runtimeProvider: resumedRuntime.runtimeProvider,
                   runtimePlan: resumableSandboxState.runtimePlan,
+                  ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
                   ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
                 },
               );
@@ -830,10 +832,12 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               sandboxRuntimeControl: ctx.sandboxRuntimeControl,
             },
             {
+              organizationId: resumableSandboxState.organizationId,
               sandboxInstanceId: replacementSandboxInstanceId,
               providerSandboxId: replacementProviderSandboxId,
               startupMode: "new",
               runtimePlan: resumableSandboxState.runtimePlan,
+              ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
               ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
             },
           );

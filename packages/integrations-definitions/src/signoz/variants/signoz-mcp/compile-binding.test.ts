@@ -65,6 +65,7 @@ describe("compileSignozBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_signoz",
           secretType: "oauth2_access_token",
           slotKey: SignozCredentialSlotKeys.accessToken,

@@ -33,20 +33,24 @@ export async function resumeSandboxRuntime(
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
+    organizationId: string;
     sandboxInstanceId: string;
     providerSandboxId: string;
     runtimeProvider: SandboxProvider;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
+    organizationId: input.organizationId,
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: resolveResumeStartupMode({
       runtimeProvider: input.runtimeProvider,
     }),
     runtimePlan: input.runtimePlan,
+    ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   });
 

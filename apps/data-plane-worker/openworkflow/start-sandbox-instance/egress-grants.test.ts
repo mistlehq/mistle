@@ -81,6 +81,7 @@ describe("createEgressGrantByRuleId", () => {
           debug: false,
         },
       },
+      organizationId: "org_123",
       sandboxInstanceId: "sbi_123",
       runtimePlan: {
         sandboxProfileId: "sbp_runtime_plan_001",
@@ -115,6 +116,7 @@ describe("createEgressGrantByRuleId", () => {
               {
                 header: "dd_application_key",
                 credentialResolver: {
+                  kind: "integration_connection",
                   connectionId: "icn_github_secondary",
                   secretType: "api_key",
                   slotKey: "github.github-cloud.api-key.application-key",
@@ -122,6 +124,7 @@ describe("createEgressGrantByRuleId", () => {
               },
             ],
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "icn_github",
               secretType: "github_app_installation_token",
               slotKey: "github.github-cloud.github-app-installation.installation-token",
@@ -150,10 +153,12 @@ describe("createEgressGrantByRuleId", () => {
     ).resolves.toEqual({
       sub: "sbi_123",
       jti: "egress_rule_github",
+      organizationId: "org_123",
       bindingId: "ibd_github",
       familyId: "github",
       variantId: "github-cloud",
       requestMiddleware: ["append-session-link-to-github-markdown"],
+      credentialResolverKind: "integration_connection",
       connectionId: "icn_github",
       secretType: "github_app_installation_token",
       upstreamBaseUrl: "https://api.github.com",
@@ -165,9 +170,12 @@ describe("createEgressGrantByRuleId", () => {
       additionalCredentialHeaders: [
         {
           header: "dd_application_key",
-          connectionId: "icn_github_secondary",
-          secretType: "api_key",
-          slotKey: "github.github-cloud.api-key.application-key",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_github_secondary",
+            secretType: "api_key",
+            slotKey: "github.github-cloud.api-key.application-key",
+          },
         },
       ],
       slotKey: "github.github-cloud.github-app-installation.installation-token",
@@ -185,9 +193,12 @@ describe("createEgressGrantByRuleId", () => {
     expect(decodedGrant.additionalCredentialHeaders).toEqual([
       {
         header: "dd_application_key",
-        connectionId: "icn_github_secondary",
-        secretType: "api_key",
-        slotKey: "github.github-cloud.api-key.application-key",
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_github_secondary",
+          secretType: "api_key",
+          slotKey: "github.github-cloud.api-key.application-key",
+        },
       },
     ]);
     expect(Number(decodedGrant.exp) - Number(decodedGrant.iat)).toBe(60 * 60 * 24);
@@ -261,6 +272,7 @@ describe("createEgressGrantByRuleId", () => {
           debug: false,
         },
       },
+      organizationId: "org_123",
       sandboxInstanceId: "sbi_aws_123",
       runtimePlan: {
         sandboxProfileId: "sbp_runtime_plan_aws",
@@ -288,6 +300,7 @@ describe("createEgressGrantByRuleId", () => {
               region: "us-east-1",
             },
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "icn_aws",
               secretType: "aws_secret_access_key",
               slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
@@ -314,9 +327,11 @@ describe("createEgressGrantByRuleId", () => {
     ).resolves.toEqual({
       sub: "sbi_aws_123",
       jti: "egress_rule_aws",
+      organizationId: "org_123",
       bindingId: "ibd_aws",
       familyId: "aws",
       variantId: "aws-cli-default",
+      credentialResolverKind: "integration_connection",
       connectionId: "icn_aws",
       secretType: "aws_secret_access_key",
       upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
@@ -325,6 +340,144 @@ describe("createEgressGrantByRuleId", () => {
       authInjectionRegion: "us-east-1",
       slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
       resolverKey: "assume-role-session",
+      allowedMethods: ["POST"],
+    });
+  });
+
+  it("mints linked-principal grants with acting-user identity claims", async () => {
+    const egressGrantByRuleId = await createEgressGrantByRuleId({
+      config: {
+        app: {
+          database: {
+            url: "postgresql://unused",
+          },
+          workflow: {
+            databaseUrl: "postgresql://unused",
+            namespaceId: "development",
+            runMigrations: false,
+            concurrency: 1,
+          },
+          tunnel: {
+            bootstrapTokenTtlSeconds: 120,
+            exchangeTokenTtlSeconds: 3600,
+          },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5003",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
+          sandbox: {
+            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+            docker: {
+              socketPath: "/var/run/docker.sock",
+              networkName: "mistle-sandbox-dev",
+            },
+          },
+        },
+        sandbox: {
+          provider: "docker",
+          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+          internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+          publish: {
+            baseDomain: "mistle.example.test",
+            access: {
+              tokenSecret: "integration-publish-token-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+            session: {
+              cookieSigningSecret: "integration-publish-cookie-secret",
+            },
+          },
+          connect: {
+            tokenSecret: "integration-connect-secret",
+            tokenIssuer: "integration-control-plane-api",
+            tokenAudience: "integration-data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "integration-bootstrap-secret",
+            tokenIssuer: "integration-data-plane-worker",
+            tokenAudience: "integration-data-plane-gateway",
+          },
+          egress: {
+            tokenSecret: "integration-egress-secret",
+            tokenIssuer: "integration-data-plane-worker",
+            tokenAudience: "integration-tokenizer-proxy",
+          },
+        },
+        telemetry: {
+          enabled: false,
+          debug: false,
+        },
+      },
+      organizationId: "org_123",
+      sandboxInstanceId: "sbi_github_123",
+      actingUserId: "usr_123",
+      runtimePlan: {
+        sandboxProfileId: "sbp_runtime_plan_linked_principal",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "registry:3",
+        },
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_github_linked",
+            bindingId: "ibd_github",
+            familyId: "github",
+            variantId: "github-cloud",
+            match: {
+              hosts: ["api.github.com"],
+              methods: ["POST"],
+            },
+            upstream: {
+              baseUrl: "https://api.github.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              kind: "linked_principal",
+              providerFamily: "github",
+              actingUserRequired: true,
+              credentialKind: "github_app_user_access_token",
+            },
+          },
+        ],
+        artifacts: [],
+        workspaceSources: [],
+        runtimeClients: [],
+        agentRuntimes: [],
+      },
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: {
+          tokenSecret: "integration-egress-secret",
+          tokenIssuer: "integration-data-plane-worker",
+          tokenAudience: "integration-tokenizer-proxy",
+        },
+        token: egressGrantByRuleId.egress_rule_github_linked ?? "",
+      }),
+    ).resolves.toEqual({
+      sub: "sbi_github_123",
+      jti: "egress_rule_github_linked",
+      organizationId: "org_123",
+      bindingId: "ibd_github",
+      familyId: "github",
+      variantId: "github-cloud",
+      credentialResolverKind: "linked_principal",
+      providerFamily: "github",
+      actingUserRequired: true,
+      actingUserId: "usr_123",
+      credentialKind: "github_app_user_access_token",
+      upstreamBaseUrl: "https://api.github.com",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
       allowedMethods: ["POST"],
     });
   });

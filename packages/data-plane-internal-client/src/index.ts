@@ -33,6 +33,7 @@ export type StartSandboxInstanceInput = {
     kind: SandboxInstanceStarterKind;
     id: string;
   };
+  actingUserId?: string;
   gitIdentity?: {
     name: string;
     email: string;
@@ -46,6 +47,7 @@ export type StartSandboxInstanceAcceptedResponse =
 export type ResumeSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
+  actingUserId?: string;
   gitIdentity?: {
     name: string;
     email: string;
@@ -303,7 +305,12 @@ export function createDataPlaneSandboxInstancesClient(
       const response = await fetch(new URL("/internal/sandbox/instances", internalClient.baseUrl), {
         method: "POST",
         headers: createAuthedJsonHeaders(internalClient.serviceToken),
-        body: JSON.stringify(startInput),
+        body: JSON.stringify({
+          ...startInput,
+          ...(startInput.actingUserId === undefined
+            ? {}
+            : { actingUserId: startInput.actingUserId }),
+        }),
         signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
       });
 
@@ -334,6 +341,9 @@ export function createDataPlaneSandboxInstancesClient(
           headers: createAuthedJsonHeaders(internalClient.serviceToken),
           body: JSON.stringify({
             organizationId: resumeInput.organizationId,
+            ...(resumeInput.actingUserId === undefined
+              ? {}
+              : { actingUserId: resumeInput.actingUserId }),
             ...(resumeInput.gitIdentity === undefined
               ? {}
               : { gitIdentity: resumeInput.gitIdentity }),

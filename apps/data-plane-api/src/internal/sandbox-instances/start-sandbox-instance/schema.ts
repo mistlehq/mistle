@@ -14,6 +14,7 @@ export const StartSandboxInstanceInputSchema = z
         id: z.string().min(1),
       })
       .strict(),
+    actingUserId: z.string().min(1).optional(),
     gitIdentity: z
       .object({
         name: z.string().min(1),

@@ -63,6 +63,7 @@ describe("compileDatadogBinding", () => {
           target: "dd_api_key",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_datadog",
           secretType: "api_key",
           slotKey: DatadogCredentialSlotKeys.API_KEY,
@@ -71,6 +72,7 @@ describe("compileDatadogBinding", () => {
           {
             header: "dd_application_key",
             credentialResolver: {
+              kind: "integration_connection",
               connectionId: "icn_datadog",
               secretType: "api_key",
               slotKey: DatadogCredentialSlotKeys.APPLICATION_KEY,

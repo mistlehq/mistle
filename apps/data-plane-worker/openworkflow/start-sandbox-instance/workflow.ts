@@ -515,10 +515,14 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxRuntimeControl: ctx.sandboxRuntimeControl,
           },
           {
+            organizationId: workflowInput.organizationId,
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
             providerSandboxId: startedSandbox.providerSandboxId,
             startupMode: SandboxStartupModes.NEW,
             runtimePlan: workflowInput.runtimePlan,
+            ...(workflowInput.actingUserId === undefined
+              ? {}
+              : { actingUserId: workflowInput.actingUserId }),
             ...(workflowInput.gitIdentity === undefined
               ? {}
               : { gitIdentity: workflowInput.gitIdentity }),

@@ -118,6 +118,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            actingUserId?: string;
             gitIdentity?: {
               /** Format: email */
               email: string;
@@ -280,12 +281,22 @@ export interface paths {
               }[];
               egressRoutes: {
                 additionalCredentialHeaders?: {
-                  credentialResolver: {
-                    connectionId: string;
-                    resolverKey?: string;
-                    secretType: string;
-                    slotKey?: string;
-                  };
+                  credentialResolver:
+                    | {
+                        connectionId: string;
+                        /** @enum {string} */
+                        kind: "integration_connection";
+                        resolverKey?: string;
+                        secretType: string;
+                        slotKey?: string;
+                      }
+                    | {
+                        actingUserRequired: boolean;
+                        credentialKind?: string;
+                        /** @enum {string} */
+                        kind: "linked_principal";
+                        providerFamily: string;
+                      };
                   header: string;
                 }[];
                 additionalHeaders?: {
@@ -320,12 +331,22 @@ export interface paths {
                       type: "aws_sigv4";
                     };
                 bindingId: string;
-                credentialResolver: {
-                  connectionId: string;
-                  resolverKey?: string;
-                  secretType: string;
-                  slotKey?: string;
-                };
+                credentialResolver:
+                  | {
+                      connectionId: string;
+                      /** @enum {string} */
+                      kind: "integration_connection";
+                      resolverKey?: string;
+                      secretType: string;
+                      slotKey?: string;
+                    }
+                  | {
+                      actingUserRequired: boolean;
+                      credentialKind?: string;
+                      /** @enum {string} */
+                      kind: "linked_principal";
+                      providerFamily: string;
+                    };
                 egressRuleId: string;
                 familyId: string;
                 match: {
@@ -689,12 +710,22 @@ export interface paths {
                 }[];
                 egressRoutes: {
                   additionalCredentialHeaders?: {
-                    credentialResolver: {
-                      connectionId: string;
-                      resolverKey?: string;
-                      secretType: string;
-                      slotKey?: string;
-                    };
+                    credentialResolver:
+                      | {
+                          connectionId: string;
+                          /** @enum {string} */
+                          kind: "integration_connection";
+                          resolverKey?: string;
+                          secretType: string;
+                          slotKey?: string;
+                        }
+                      | {
+                          actingUserRequired: boolean;
+                          credentialKind?: string;
+                          /** @enum {string} */
+                          kind: "linked_principal";
+                          providerFamily: string;
+                        };
                     header: string;
                   }[];
                   additionalHeaders?: {
@@ -729,12 +760,22 @@ export interface paths {
                         type: "aws_sigv4";
                       };
                   bindingId: string;
-                  credentialResolver: {
-                    connectionId: string;
-                    resolverKey?: string;
-                    secretType: string;
-                    slotKey?: string;
-                  };
+                  credentialResolver:
+                    | {
+                        connectionId: string;
+                        /** @enum {string} */
+                        kind: "integration_connection";
+                        resolverKey?: string;
+                        secretType: string;
+                        slotKey?: string;
+                      }
+                    | {
+                        actingUserRequired: boolean;
+                        credentialKind?: string;
+                        /** @enum {string} */
+                        kind: "linked_principal";
+                        providerFamily: string;
+                      };
                   egressRuleId: string;
                   familyId: string;
                   match: {
@@ -1234,6 +1275,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            actingUserId?: string;
             gitIdentity?: {
               /** Format: email */
               email: string;

@@ -20,7 +20,7 @@ const LinearMcpBaseUrl = "https://mcp.linear.app/mcp";
 function createLinearMcpRoute(input: {
   connectionId: string;
   credentialSecretType: "api_key";
-}): CompileBindingResult["egressRoutes"][number] {
+}): NonNullable<CompileBindingResult["egressRoutes"][number]> {
   return {
     match: {
       hosts: [LinearMcpHost],
@@ -33,6 +33,7 @@ function createLinearMcpRoute(input: {
       target: "authorization",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: input.connectionId,
       secretType: input.credentialSecretType,
       slotKey: LinearCredentialSlotKeys.API_KEY,
@@ -61,6 +62,7 @@ export function compileLinearBinding(input: LinearCompileBindingInput): CompileB
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: input.connection.id,
           secretType: credentialSecretType,
           slotKey: LinearCredentialSlotKeys.API_KEY,

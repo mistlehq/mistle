@@ -33,6 +33,7 @@ function createDatadogMcpRoute(input: {
       target: DatadogHeaderNames.API_KEY,
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: input.connectionId,
       secretType: DatadogCredentialSecretTypes.API_KEY,
       slotKey: DatadogCredentialSlotKeys.API_KEY,
@@ -41,6 +42,7 @@ function createDatadogMcpRoute(input: {
       {
         header: DatadogHeaderNames.APPLICATION_KEY,
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: input.connectionId,
           secretType: DatadogCredentialSecretTypes.API_KEY,
           slotKey: DatadogCredentialSlotKeys.APPLICATION_KEY,

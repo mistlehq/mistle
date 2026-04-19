@@ -32,6 +32,7 @@ export async function resumeSandboxInstance(
     ResumeSandboxInstanceWorkflowSpec,
     {
       sandboxInstanceId: input.instanceId,
+      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
       ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
     },
     {

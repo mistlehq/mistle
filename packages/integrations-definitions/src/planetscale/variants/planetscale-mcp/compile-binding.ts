@@ -32,6 +32,7 @@ function createPlanetScaleMcpRoute(input: {
       target: "authorization",
     },
     credentialResolver: {
+      kind: "integration_connection",
       connectionId: input.connectionId,
       secretType: PlanetScaleCredentialSecretTypes.OAUTH2_ACCESS_TOKEN,
       slotKey: PlanetScaleCredentialSlotKeys.accessToken,

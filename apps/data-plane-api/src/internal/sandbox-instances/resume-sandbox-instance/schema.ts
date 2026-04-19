@@ -4,6 +4,7 @@ export const ResumeSandboxInstanceInputSchema = z
   .object({
     organizationId: z.string().min(1),
     instanceId: z.string().min(1),
+    actingUserId: z.string().min(1).optional(),
     gitIdentity: z
       .object({
         name: z.string().min(1),

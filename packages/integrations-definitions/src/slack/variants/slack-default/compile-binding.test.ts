@@ -132,6 +132,7 @@ describe("compileSlackBinding", () => {
           target: "authorization",
         },
         credentialResolver: {
+          kind: "integration_connection",
           connectionId: "icn_slack",
           secretType: SlackCredentialSecretTypes.API_KEY,
           slotKey: SlackBotTokenSlotKey,

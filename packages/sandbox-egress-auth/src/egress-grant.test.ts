@@ -16,12 +16,14 @@ const defaultConfig = {
   tokenAudience: "tokenizer-proxy",
 };
 
-const defaultClaims: EgressGrantClaims = {
+const defaultClaims = {
   sub: "sbi_123",
   jti: "egress_rule_openai",
   bindingId: "ibd_openai",
+  organizationId: "org_123",
   familyId: "openai",
   variantId: "openai-default",
+  credentialResolverKind: "integration_connection",
   connectionId: "icn_openai",
   secretType: "api_key",
   upstreamBaseUrl: "https://api.openai.com/v1",
@@ -33,9 +35,12 @@ const defaultClaims: EgressGrantClaims = {
   additionalCredentialHeaders: [
     {
       header: "dd-application-key",
-      connectionId: "icn_openai",
-      secretType: "api_key",
-      slotKey: "openai.openai-default.api-key.secondary",
+      credentialResolver: {
+        kind: "integration_connection",
+        connectionId: "icn_openai",
+        secretType: "api_key",
+        slotKey: "openai.openai-default.api-key.secondary",
+      },
     },
   ],
   slotKey: "openai.openai-default.api-key.api-key",
@@ -43,21 +48,40 @@ const defaultClaims: EgressGrantClaims = {
   allowedMethods: ["GET", "POST"],
   allowedPathPrefixes: ["/v1"],
   requestMiddleware: ["append-session-link-to-openai-response"],
-};
+} satisfies EgressGrantClaims;
 
-const awsClaims: EgressGrantClaims = {
+const awsClaims = {
   sub: "sbi_aws_123",
   jti: "egress_rule_aws",
   bindingId: "ibd_aws",
+  organizationId: "org_123",
   familyId: "aws",
   variantId: "aws-cli-default",
+  credentialResolverKind: "integration_connection",
   connectionId: "icn_aws",
   secretType: "aws_secret_access_key",
   upstreamBaseUrl: "https://sts.us-east-1.amazonaws.com",
   authInjectionType: "aws_sigv4",
   authInjectionService: "sts",
   authInjectionRegion: "us-east-1",
-};
+} satisfies EgressGrantClaims;
+
+const linkedPrincipalClaims = {
+  sub: "sbi_github_123",
+  jti: "egress_rule_github",
+  bindingId: "ibd_github",
+  organizationId: "org_123",
+  familyId: "github",
+  variantId: "github-cloud",
+  credentialResolverKind: "linked_principal",
+  providerFamily: "github",
+  actingUserRequired: true,
+  actingUserId: "usr_123",
+  credentialKind: "github_app_user_access_token",
+  upstreamBaseUrl: "https://api.github.com",
+  authInjectionType: "bearer",
+  authInjectionTarget: "authorization",
+} satisfies EgressGrantClaims;
 
 async function signGrantPayload(input: {
   payload: Record<string, unknown>;
@@ -97,18 +121,20 @@ describe("egress-grant", () => {
   });
 
   it("round-trips a signed egress grant without optional claims", async () => {
-    const claims: EgressGrantClaims = {
+    const claims = {
       sub: defaultClaims.sub,
       jti: defaultClaims.jti,
       bindingId: defaultClaims.bindingId,
+      organizationId: defaultClaims.organizationId,
       familyId: defaultClaims.familyId,
       variantId: defaultClaims.variantId,
+      credentialResolverKind: "integration_connection",
       connectionId: defaultClaims.connectionId,
       secretType: defaultClaims.secretType,
       upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
       authInjectionType: defaultClaims.authInjectionType,
       authInjectionTarget: defaultClaims.authInjectionTarget,
-    };
+    } satisfies EgressGrantClaims;
 
     const token = await mintEgressGrant({
       config: defaultConfig,
@@ -122,6 +148,21 @@ describe("egress-grant", () => {
         token,
       }),
     ).resolves.toEqual(claims);
+  });
+
+  it("round-trips a linked-principal egress grant", async () => {
+    const token = await mintEgressGrant({
+      config: defaultConfig,
+      claims: linkedPrincipalClaims,
+      ttlSeconds: 60,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).resolves.toEqual(linkedPrincipalClaims);
   });
 
   it("allows basic auth grants to carry authInjectionUsername", async () => {
@@ -342,9 +383,12 @@ describe("egress-grant", () => {
         additionalCredentialHeaders: [
           {
             header: " DD-APPLICATION-KEY ",
-            connectionId: " icn_openai ",
-            secretType: " api_key ",
-            slotKey: " openai.openai-default.api-key.secondary ",
+            credentialResolver: {
+              kind: "integration_connection",
+              connectionId: " icn_openai ",
+              secretType: " api_key ",
+              slotKey: " openai.openai-default.api-key.secondary ",
+            },
           },
         ],
       },
@@ -360,9 +404,12 @@ describe("egress-grant", () => {
       additionalCredentialHeaders: [
         {
           header: "dd-application-key",
-          connectionId: "icn_openai",
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.secondary",
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: "icn_openai",
+            secretType: "api_key",
+            slotKey: "openai.openai-default.api-key.secondary",
+          },
         },
       ],
     });
@@ -377,13 +424,19 @@ describe("egress-grant", () => {
           additionalCredentialHeaders: [
             {
               header: " DD-APPLICATION-KEY ",
-              connectionId: "icn_openai",
-              secretType: "api_key",
+              credentialResolver: {
+                kind: "integration_connection",
+                connectionId: "icn_openai",
+                secretType: "api_key",
+              },
             },
             {
               header: "dd-application-key",
-              connectionId: "icn_openai",
-              secretType: "api_key",
+              credentialResolver: {
+                kind: "integration_connection",
+                connectionId: "icn_openai",
+                secretType: "api_key",
+              },
             },
           ],
         },
@@ -403,8 +456,11 @@ describe("egress-grant", () => {
           additionalCredentialHeaders: [
             {
               header: "x-api-key",
-              connectionId: "icn_aws",
-              secretType: "api_key",
+              credentialResolver: {
+                kind: "integration_connection",
+                connectionId: "icn_aws",
+                secretType: "api_key",
+              },
             },
           ],
         },
@@ -482,8 +538,10 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: defaultClaims.bindingId,
+        organizationId: defaultClaims.organizationId,
         familyId: defaultClaims.familyId,
         variantId: defaultClaims.variantId,
+        credentialResolverKind: "integration_connection",
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -518,8 +576,10 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: defaultClaims.bindingId,
+        organizationId: defaultClaims.organizationId,
         familyId: defaultClaims.familyId,
         variantId: defaultClaims.variantId,
+        credentialResolverKind: "integration_connection",
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -542,8 +602,10 @@ describe("egress-grant", () => {
     const token = await signGrantPayload({
       payload: {
         bindingId: "   ",
+        organizationId: defaultClaims.organizationId,
         familyId: defaultClaims.familyId,
         variantId: defaultClaims.variantId,
+        credentialResolverKind: "integration_connection",
         connectionId: defaultClaims.connectionId,
         secretType: defaultClaims.secretType,
         upstreamBaseUrl: defaultClaims.upstreamBaseUrl,
@@ -559,6 +621,89 @@ describe("egress-grant", () => {
       }),
     ).rejects.toMatchObject({
       code: EgressGrantErrorCode.BINDING_ID_REQUIRED,
+    });
+  });
+
+  it("rejects linked-principal grants without providerFamily during verification", async () => {
+    const token = await signGrantPayload({
+      payload: {
+        bindingId: linkedPrincipalClaims.bindingId,
+        organizationId: linkedPrincipalClaims.organizationId,
+        familyId: linkedPrincipalClaims.familyId,
+        variantId: linkedPrincipalClaims.variantId,
+        credentialResolverKind: "linked_principal",
+        providerFamily: "   ",
+        actingUserRequired: false,
+        upstreamBaseUrl: linkedPrincipalClaims.upstreamBaseUrl,
+        authInjectionType: linkedPrincipalClaims.authInjectionType,
+        authInjectionTarget: linkedPrincipalClaims.authInjectionTarget,
+      },
+      subject: linkedPrincipalClaims.sub,
+      jti: linkedPrincipalClaims.jti,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.PROVIDER_FAMILY_REQUIRED,
+    });
+  });
+
+  it("rejects linked-principal grants without actingUserRequired during verification", async () => {
+    const token = await signGrantPayload({
+      payload: {
+        bindingId: linkedPrincipalClaims.bindingId,
+        organizationId: linkedPrincipalClaims.organizationId,
+        familyId: linkedPrincipalClaims.familyId,
+        variantId: linkedPrincipalClaims.variantId,
+        credentialResolverKind: "linked_principal",
+        providerFamily: linkedPrincipalClaims.providerFamily,
+        upstreamBaseUrl: linkedPrincipalClaims.upstreamBaseUrl,
+        authInjectionType: linkedPrincipalClaims.authInjectionType,
+        authInjectionTarget: linkedPrincipalClaims.authInjectionTarget,
+      },
+      subject: linkedPrincipalClaims.sub,
+      jti: linkedPrincipalClaims.jti,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.ACTING_USER_ID_REQUIRED,
+    });
+  });
+
+  it("rejects linked-principal grants requiring an acting user without actingUserId", async () => {
+    const token = await signGrantPayload({
+      payload: {
+        bindingId: linkedPrincipalClaims.bindingId,
+        organizationId: linkedPrincipalClaims.organizationId,
+        familyId: linkedPrincipalClaims.familyId,
+        variantId: linkedPrincipalClaims.variantId,
+        credentialResolverKind: "linked_principal",
+        providerFamily: linkedPrincipalClaims.providerFamily,
+        actingUserRequired: true,
+        upstreamBaseUrl: linkedPrincipalClaims.upstreamBaseUrl,
+        authInjectionType: linkedPrincipalClaims.authInjectionType,
+        authInjectionTarget: linkedPrincipalClaims.authInjectionTarget,
+      },
+      subject: linkedPrincipalClaims.sub,
+      jti: linkedPrincipalClaims.jti,
+    });
+
+    await expect(
+      verifyEgressGrant({
+        config: defaultConfig,
+        token,
+      }),
+    ).rejects.toMatchObject({
+      code: EgressGrantErrorCode.ACTING_USER_ID_REQUIRED,
     });
   });
 });

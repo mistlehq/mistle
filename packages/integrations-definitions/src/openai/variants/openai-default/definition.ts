@@ -122,6 +122,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           }),
           authScheme: "bearer",
           credentialResolver: {
+            kind: "integration_connection",
             connectionId: input.connection.id,
             secretType: resolveOpenAiCredentialSecretType(input.connection.config),
             slotKey: resolveOpenAiCredentialSlotKey({

@@ -145,6 +145,9 @@ export async function startProfileInstance(
     idempotencyKey,
     runtimePlan,
     startedBy: serviceInput.startedBy,
+    ...(serviceInput.actingUser === undefined
+      ? {}
+      : { actingUserId: serviceInput.actingUser.userId }),
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     source: serviceInput.source,
     image: serviceInput.image,

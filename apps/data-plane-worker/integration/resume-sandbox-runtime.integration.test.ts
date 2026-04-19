@@ -27,6 +27,7 @@ import { createSandboxRuntimeEnv } from "../openworkflow/start-sandbox-instance/
 
 const DockerSocketPath = "/var/run/docker.sock";
 const IntegrationTestTimeoutMs = 300_000;
+const OrganizationId = "org_resume_runtime_integration";
 const SandboxBaseImageReference =
   "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
 
@@ -264,6 +265,7 @@ describeIfDockerResumeIntegration("resume sandbox runtime integration", () => {
             sandboxRuntimeControl,
           },
           {
+            organizationId: OrganizationId,
             sandboxInstanceId,
             providerSandboxId: sandbox.id,
             startupMode: SandboxStartupModes.NEW,
@@ -393,6 +395,7 @@ describeIfDockerResumeIntegration("resume sandbox runtime integration", () => {
             sandboxRuntimeControl,
           },
           {
+            organizationId: OrganizationId,
             sandboxInstanceId,
             providerSandboxId: sandbox.id,
             startupMode: SandboxStartupModes.NEW,
@@ -420,6 +423,7 @@ describeIfDockerResumeIntegration("resume sandbox runtime integration", () => {
             sandboxRuntimeControl,
           },
           {
+            organizationId: OrganizationId,
             sandboxInstanceId,
             providerSandboxId: resumedSandbox.id,
             runtimeProvider: SandboxProvider.DOCKER,

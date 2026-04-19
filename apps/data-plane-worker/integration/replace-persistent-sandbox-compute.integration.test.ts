@@ -470,6 +470,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
           sandboxRuntimeControl,
         },
         {
+          organizationId,
           sandboxInstanceId,
           providerSandboxId: replacedSandbox.providerSandboxId,
           startupMode: "new",
@@ -652,6 +653,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
               sandboxRuntimeControl,
             },
             {
+              organizationId,
               sandboxInstanceId,
               providerSandboxId: replacementSandbox.providerSandboxId,
               startupMode: "new",
