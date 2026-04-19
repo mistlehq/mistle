@@ -15,6 +15,10 @@ copy_optional_local_bootstrap_file() {
   source_path="$repo_root/$relative_path"
   target_path="$worktree_path/$relative_path"
 
+  if [ -e "$target_path" ]; then
+    return
+  fi
+
   if [ ! -f "$source_path" ]; then
     return
   fi
@@ -47,9 +51,21 @@ copy_optional_local_bootstrap_file "integration-targets.provision.json"
 cd "$worktree_path"
 direnv exec "$worktree_path" pnpm install
 
-if [ -f "$repo_root/config/config.development.toml" ]; then
+if [ -f "$worktree_path/config/config.development.toml" ]; then
+  :
+elif [ -f "$repo_root/config/config.development.toml" ]; then
   copy_optional_local_bootstrap_file "config/config.development.toml"
 else
   direnv exec "$worktree_path" pnpm config:init:dev
 fi
 '''
+
+[[actions]]
+name = "storybook"
+icon = "tool"
+command = "pnpm storybook"
+
+[[actions]]
+name = "dev"
+icon = "tool"
+command = "pnpm dev"
