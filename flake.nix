@@ -89,7 +89,7 @@
           packages = [nodejs codexPinned] ++ commonPackages;
           shellHook = ''
             ${commonShellHook}
-            export PATH=${codexPinned}/bin:${nodejs}/bin:$PATH
+            export PATH=${codexPinned}/bin:$PATH
           '';
         };
 
