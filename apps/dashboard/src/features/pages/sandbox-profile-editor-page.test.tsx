@@ -202,9 +202,12 @@ describe("IntegrationsEditorSection", () => {
 
     await waitFor(() => {
       const agentSection = getSectionContainer("Agent Harness");
-      expect(within(agentSection).getByRole("button", { name: "Edit binding" })).toBeDefined();
-      expect(within(agentSection).getByText("target-agent")).toBeDefined();
-      expect(within(agentSection).getByText("Primary OpenAI Workspace")).toBeDefined();
+      expect(within(agentSection).queryByRole("button", { name: "Edit binding" })).toBeNull();
+      expect(within(agentSection).getByRole("combobox", { name: "Connection" })).toBeDefined();
+      expect(within(agentSection).getAllByText("Primary OpenAI Workspace").length).toBeGreaterThan(
+        0,
+      );
+      expect(within(agentSection).getByRole("button", { name: "Remove binding" })).toBeDefined();
     });
   }, 10000);
 
@@ -322,7 +325,8 @@ describe("IntegrationsEditorSection", () => {
 
     await waitFor(() => {
       const agentSection = getSectionContainer("Agent Harness");
-      expect(within(agentSection).getByRole("button", { name: "Edit binding" })).toBeDefined();
+      expect(within(agentSection).getByRole("combobox", { name: "Connection" })).toBeDefined();
+      expect(within(agentSection).queryByRole("button", { name: "Edit binding" })).toBeNull();
     });
 
     expect(

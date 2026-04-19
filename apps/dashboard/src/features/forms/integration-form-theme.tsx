@@ -1,5 +1,6 @@
 import {
   Checkbox,
+  DetailLabel,
   Field,
   FieldContent,
   FieldDescription,
@@ -660,6 +661,23 @@ function resolveFormLayout(input: IntegrationFormContext | undefined): "vertical
   return input?.layout === "horizontal" ? "horizontal" : "vertical";
 }
 
+function resolveFormColumns(input: IntegrationFormContext | undefined): 1 | 2 {
+  return input?.columns === 2 ? 2 : 1;
+}
+
+function resolveLabelTone(input: IntegrationFormContext | undefined): "default" | "detail" {
+  return input?.labelTone === "detail" ? "detail" : "default";
+}
+
+function resolveUiWidget(uiSchema: unknown): string | undefined {
+  if (!isRecord(uiSchema)) {
+    return undefined;
+  }
+
+  const widget = uiSchema["ui:widget"];
+  return typeof widget === "string" ? widget : undefined;
+}
+
 function IntegrationDescriptionFieldTemplate(
   props: DescriptionFieldProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element | null {
@@ -720,12 +738,12 @@ function resolveFieldLayout(
   return options.layout === "stacked" ? "vertical" : "horizontal";
 }
 
-function isObjectSchema(schema: RJSFSchema): boolean {
-  if (schema.type === "object") {
+function isObjectSchema(schema: unknown): boolean {
+  if (isRecord(schema) && schema.type === "object") {
     return true;
   }
 
-  return isRecord(schema.properties);
+  return isRecord(schema) && isRecord(schema.properties);
 }
 
 function resolveSchemaProperties(schema: unknown): Record<string, unknown> {
@@ -768,6 +786,42 @@ function hasRenderableSchemaContent(input: { schema: unknown; uiSchema: unknown 
   );
 }
 
+function shouldSpanFullWidth(input: {
+  layout: IntegrationFieldLayout;
+  formContext: IntegrationFormContext | undefined;
+  schema: unknown;
+  uiSchema: unknown;
+}): boolean {
+  if (input.layout !== "vertical" || resolveFormColumns(input.formContext) !== 2) {
+    return false;
+  }
+
+  const widget = resolveUiWidget(input.uiSchema);
+  if (widget === "textarea" || widget === "integration-resource-string-array") {
+    return true;
+  }
+
+  return isRecord(input.schema) && input.schema.type === "array";
+}
+
+function shouldPropertyWrapperSpanFullWidth(input: {
+  layout: IntegrationFieldLayout;
+  formContext: IntegrationFormContext | undefined;
+  propertyName: string;
+  schema: unknown;
+  uiSchema: unknown;
+}): boolean {
+  if (
+    input.propertyName.toLowerCase().includes("instructions") &&
+    resolveFormColumns(input.formContext) === 2 &&
+    input.layout === "vertical"
+  ) {
+    return true;
+  }
+
+  return shouldSpanFullWidth(input);
+}
+
 function IntegrationFieldTemplate(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -783,10 +837,22 @@ function IntegrationFieldTemplate(
 
   const layout = resolveFieldLayout(props);
   const hasErrors = (props.rawErrors ?? []).length > 0;
+  const labelTone = resolveLabelTone(props.registry.formContext);
+  const useDetailLabel = labelTone === "detail" && layout === "vertical";
+  const useFullWidth = shouldSpanFullWidth({
+    layout,
+    formContext: props.registry.formContext,
+    schema: props.schema,
+    uiSchema: props.uiSchema,
+  });
 
   return (
     <Field
-      className={cn(props.classNames, layout === "horizontal" ? "gap-2" : undefined)}
+      className={cn(
+        props.classNames,
+        layout === "horizontal" ? "gap-2" : undefined,
+        useFullWidth ? "md:col-span-2" : undefined,
+      )}
       contentWidth={layout === "horizontal" ? "fill" : undefined}
       data-invalid={hasErrors || undefined}
       orientation={layout}
@@ -794,7 +860,11 @@ function IntegrationFieldTemplate(
     >
       {props.displayLabel && props.label.length > 0 ? (
         <FieldHeader>
-          <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
+          {useDetailLabel ? (
+            <DetailLabel as="p">{props.label}</DetailLabel>
+          ) : (
+            <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
+          )}
           {props.description}
         </FieldHeader>
       ) : null}
@@ -811,6 +881,7 @@ function IntegrationObjectFieldTemplate(
   props: ObjectFieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   const layout = resolveFormLayout(props.registry.formContext);
+  const columns = resolveFormColumns(props.registry.formContext);
   const visibleProperties = props.properties.filter((property) => !property.hidden);
   const hiddenProperties = props.properties.filter((property) => property.hidden);
   const schemaProperties = resolveSchemaProperties(props.schema);
@@ -851,17 +922,36 @@ function IntegrationObjectFieldTemplate(
         className={cn(
           props.className,
           IntegrationVerticalFieldGroupClassName,
-          layout === "horizontal" ? IntegrationHorizontalFieldGroupClassName : undefined,
+          layout === "horizontal"
+            ? IntegrationHorizontalFieldGroupClassName
+            : columns === 2
+              ? "grid gap-x-6 gap-y-4 md:grid-cols-2"
+              : undefined,
         )}
       >
         {title.length > 0 || description !== undefined ? (
-          <FieldHeader>
+          <FieldHeader className={columns === 2 ? "md:col-span-2" : undefined}>
             {title.length > 0 ? <FieldTitle>{title}</FieldTitle> : null}
             {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
           </FieldHeader>
         ) : null}
         {visibleRenderableProperties.map((property) => (
-          <div key={property.name}>{property.content}</div>
+          <div
+            className={
+              shouldPropertyWrapperSpanFullWidth({
+                layout,
+                formContext: props.registry.formContext,
+                propertyName: property.name,
+                schema: schemaProperties[property.name],
+                uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+              })
+                ? "md:col-span-2"
+                : undefined
+            }
+            key={property.name}
+          >
+            {property.content}
+          </div>
         ))}
         {props.optionalDataControl}
       </div>

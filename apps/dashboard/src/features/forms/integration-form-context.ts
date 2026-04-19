@@ -8,6 +8,7 @@
  *   `ui:options.layout` to `"stacked"` in their uiSchema.
  */
 export type IntegrationFormLayout = "vertical" | "horizontal";
+export type IntegrationFormLabelTone = "default" | "detail";
 
 export type IntegrationFormContext = {
   /**
@@ -20,4 +21,15 @@ export type IntegrationFormContext = {
    *   should remain vertical inside an otherwise horizontal form
    */
   layout?: IntegrationFormLayout;
+  /**
+   * Optional label presentation for compact read/write surfaces that should
+   * visually match summary metadata labels.
+   */
+  labelTone?: IntegrationFormLabelTone;
+  /**
+   * Optional column count for vertical object layouts. Use this to render
+   * compact side-by-side field groups while keeping each field internally
+   * vertical.
+   */
+  columns?: 1 | 2;
 };
