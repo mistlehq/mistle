@@ -95,7 +95,8 @@
   "packageManager": "pnpm@10.30.2",
   "pnpm": {
     "overrides": {
-      "axios": "1.13.6"
+      "axios": "1.13.6",
+      "protobufjs": "7.5.5"
     }
   }
 }
