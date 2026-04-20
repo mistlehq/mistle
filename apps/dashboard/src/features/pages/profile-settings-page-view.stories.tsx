@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ComponentProps } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
+import {
+  ProfileSettingsPageView,
+  type ProfileSettingsPageViewProps,
+} from "./profile-settings-page-view.js";
 
-type ProfileSettingsPageViewStoryArgs = Partial<ComponentProps<typeof ProfileSettingsPageView>>;
-
-const DefaultProps: ComponentProps<typeof ProfileSettingsPageView> = {
+const DefaultProps: ProfileSettingsPageViewProps = {
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
@@ -32,12 +32,9 @@ const meta = {
   title: "Dashboard/Settings/Profile/PageView",
   component: ProfileSettingsPageView,
   decorators: [withDashboardPageStory],
-  render: (args) => <ProfileSettingsPageView {...DefaultProps} {...args} />,
-  args: {
-    displayName: "Mistle Developer",
-    email: "developer@mistle.so",
-  },
-} satisfies Meta<ProfileSettingsPageViewStoryArgs>;
+  render: (args) => <ProfileSettingsPageView {...args} />,
+  args: DefaultProps,
+} satisfies Meta<ProfileSettingsPageViewProps>;
 
 export default meta;
 
