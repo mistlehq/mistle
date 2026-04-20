@@ -1,6 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useEffect, useRef, useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
+import { SessionComposerFixturePropsWithPendingDiffComments } from "../session-agents/codex/fixtures/session-fixtures.js";
+import type {
+  PendingSessionDiffComment,
+  PendingSessionDiffCommentInput,
+} from "./session-diff-comment.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import {
   createStorySessionBottomPanel,
@@ -68,32 +74,125 @@ const StoryBranchPatch = [
 ].join("\n");
 
 type StoryDiffWorkbenchProps = {
+  autoOpenLocalComment?: boolean;
   errorNotice?: {
     message: string;
     title: string;
     variant: "alert" | "default";
   } | null;
+  initialPendingComments?: readonly PendingSessionDiffComment[];
   patch: string;
 };
 
 function StoryDiffWorkbench({
+  autoOpenLocalComment = false,
   errorNotice = null,
+  initialPendingComments = [],
   patch,
 }: StoryDiffWorkbenchProps): React.JSX.Element {
-  return renderSessionWorkbenchContentStory({
-    isSecondaryPanelVisible: true,
-    mainContent: createStorySessionMainContent(),
-    primaryBottomPanel: createStorySessionBottomPanel(),
-    secondaryPanel: (
-      <SessionDiffPanel
-        errorNotice={errorNotice}
-        patch={patch}
-        summaryLabel="Compared with main"
-        title="Current changes"
-      />
-    ),
-    secondaryPanelSize: 42,
-  });
+  const [pendingComments, setPendingComments] =
+    useState<readonly PendingSessionDiffComment[]>(initialPendingComments);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const hasAutoOpenedCommentRef = useRef(false);
+
+  function addComment(comment: PendingSessionDiffCommentInput): void {
+    setPendingComments((currentComments) => [
+      ...currentComments,
+      {
+        ...comment,
+        id: `${comment.filePath}:${comment.side}:${comment.lineNumber}:${currentComments.length}`,
+      },
+    ]);
+  }
+
+  useEffect(() => {
+    if (!autoOpenLocalComment || hasAutoOpenedCommentRef.current) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let attempts = 0;
+
+    function tryOpenComment(): void {
+      attempts += 1;
+
+      const rootElement = rootRef.current;
+      const diffContainer = rootElement?.querySelector("diffs-container");
+      const shadowRoot = diffContainer?.shadowRoot;
+      const hoveredLine =
+        shadowRoot?.querySelector<HTMLElement>('[data-line-type="change-addition"]') ??
+        shadowRoot?.querySelector<HTMLElement>("[data-line]");
+      if (hoveredLine === null || hoveredLine === undefined) {
+        if (attempts < 6) {
+          animationFrameId = requestAnimationFrame(tryOpenComment);
+        }
+        return;
+      }
+
+      hoveredLine.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: 12,
+          clientY: 12,
+          composed: true,
+          pointerId: 1,
+          pointerType: "mouse",
+        }),
+      );
+
+      const commentButton = diffContainer?.querySelector<HTMLButtonElement>(
+        'button[aria-label="Add comment"]',
+      );
+      if (commentButton === null || commentButton === undefined) {
+        if (attempts < 6) {
+          animationFrameId = requestAnimationFrame(tryOpenComment);
+        }
+        return;
+      }
+
+      hasAutoOpenedCommentRef.current = true;
+      commentButton.click();
+    }
+
+    animationFrameId = requestAnimationFrame(tryOpenComment);
+
+    return () => {
+      if (animationFrameId !== 0) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [autoOpenLocalComment, patch]);
+
+  return (
+    <div ref={rootRef}>
+      {renderSessionWorkbenchContentStory({
+        isSecondaryPanelVisible: true,
+        mainContent: createStorySessionMainContent(),
+        primaryBottomPanel: createStorySessionBottomPanel({
+          composerViewModel: {
+            ...SessionComposerFixturePropsWithPendingDiffComments,
+            pendingDiffComments: pendingComments.map((comment) => ({
+              id: comment.id,
+              label: `${comment.filePath.split("/").at(-1) ?? comment.filePath}:${
+                comment.side === "additions" ? "R" : "L"
+              }${comment.lineNumber}`,
+              title: [comment.filePath, "", comment.body].join("\n"),
+            })),
+          },
+        }),
+        secondaryPanel: (
+          <SessionDiffPanel
+            errorNotice={errorNotice}
+            patch={patch}
+            summaryLabel="Compared with main"
+            title="Current changes"
+            onAddComment={addComment}
+          />
+        ),
+        secondaryPanelSize: 42,
+      })}
+    </div>
+  );
 }
 
 const meta = {
@@ -114,6 +213,33 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AgainstMain: Story = {};
+
+export const WithPendingDiffCommentBadges: Story = {
+  args: {
+    initialPendingComments: [
+      {
+        id: "comment-story-1",
+        body: "Request change",
+        filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+        lineNumber: 10,
+        side: "additions",
+      },
+      {
+        id: "comment-story-2",
+        body: "Use the shared overflow tooltip here.",
+        filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
+        lineNumber: 24,
+        side: "additions",
+      },
+    ],
+  },
+};
+
+export const WithOpenLocalComment: Story = {
+  args: {
+    autoOpenLocalComment: true,
+  },
+};
 
 export const EmptyState: Story = {
   args: {

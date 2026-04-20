@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import {
   SessionComposerFixtureProps,
+  SessionComposerFixturePropsWithPendingDiffComments,
   SessionComposerFixturePropsWithPendingImageAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
@@ -17,6 +18,7 @@ function InteractiveChatComposerStory(
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(
     props.selectedReasoningEffort,
   );
+  const [pendingDiffComments, setPendingDiffComments] = useState(props.pendingDiffComments);
   const [pendingAttachments, setPendingAttachments] = useState(props.pendingAttachments);
 
   return (
@@ -35,11 +37,17 @@ function InteractiveChatComposerStory(
         ]);
       }}
       onReasoningEffortChange={setSelectedReasoningEffort}
+      onRemovePendingDiffComment={(commentId) => {
+        setPendingDiffComments((currentComments) =>
+          currentComments.filter((comment) => comment.id !== commentId),
+        );
+      }}
       onRemovePendingAttachment={(attachmentId) => {
         setPendingAttachments((currentAttachments) =>
           currentAttachments.filter((attachment) => attachment.id !== attachmentId),
         );
       }}
+      pendingDiffComments={pendingDiffComments}
       pendingAttachments={pendingAttachments}
       selectedModel={selectedModel}
       selectedReasoningEffort={selectedReasoningEffort}
@@ -91,6 +99,12 @@ export const InterruptOnly: Story = {
 export const WithPendingImageAttachments: Story = {
   args: {
     ...SessionComposerFixturePropsWithPendingImageAttachments,
+  },
+};
+
+export const WithPendingDiffComments: Story = {
+  args: {
+    ...SessionComposerFixturePropsWithPendingDiffComments,
   },
 };
 

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
@@ -10,6 +10,10 @@ import {
   SessionConversationBottomPanelController,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
+import type {
+  PendingSessionDiffComment,
+  PendingSessionDiffCommentInput,
+} from "./session-diff-comment.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover } from "./session-port-access-popover.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
@@ -36,6 +40,30 @@ function SessionWorkbenchPageContent(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const [composerText, setComposerText] = useState("");
+  const [pendingDiffComments, setPendingDiffComments] = useState<
+    readonly PendingSessionDiffComment[]
+  >([]);
+  const handleAddPendingDiffComment = useCallback(
+    (comment: PendingSessionDiffCommentInput): void => {
+      setPendingDiffComments((currentComments) => [
+        ...currentComments,
+        {
+          ...comment,
+          id: crypto.randomUUID(),
+        },
+      ]);
+    },
+    [],
+  );
+  const handleClearPendingDiffComments = useCallback((): void => {
+    setPendingDiffComments([]);
+  }, []);
+  const handleRemovePendingDiffComment = useCallback((commentId: string): void => {
+    setPendingDiffComments((currentComments) =>
+      currentComments.filter((comment) => comment.id !== commentId),
+    );
+  }, []);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
@@ -356,6 +384,13 @@ function SessionWorkbenchPageContent(input: {
           <SessionConversationBottomPanelController
             chatEntries={conversationPane.chatState.entries}
             composerStateInput={conversationPane.composerStateInput}
+            draftState={{
+              composerText,
+              pendingDiffComments,
+              clearPendingDiffComments: handleClearPendingDiffComments,
+              removePendingDiffComment: handleRemovePendingDiffComment,
+              setComposerText,
+            }}
             isRespondingToServerRequest={
               conversationPane.serverRequestsState.isRespondingToServerRequest
             }
@@ -373,6 +408,7 @@ function SessionWorkbenchPageContent(input: {
         <SessionDiffPanel
           errorNotice={diffPanelErrorNotice}
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
+          onAddComment={handleAddPendingDiffComment}
           patch={diffPanelPatch}
           summaryLabel="Compared with main"
           title="Current changes"
@@ -428,6 +464,7 @@ function renderPrimaryPanelMainContent(input: {
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
+    pendingDiffComments: [],
     isSubmitPending: false,
     pendingAttachments: [],
     modelOptions: [],
@@ -445,6 +482,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     onModelChange: function onModelChange() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},
     onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
+    onRemovePendingDiffComment: function onRemovePendingDiffComment() {},
     onRemovePendingAttachment: function onRemovePendingAttachment() {},
   };
 }

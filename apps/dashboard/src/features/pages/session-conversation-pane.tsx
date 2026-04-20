@@ -13,6 +13,7 @@ import {
   ComposerStatusBanner,
   SessionComposerActivityRow,
   useSessionComposerState,
+  type SessionComposerDraftState,
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import {
@@ -47,6 +48,7 @@ type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps &
 };
 
 type SessionConversationBottomPanelControllerProps = SessionConversationSharedPanelProps & {
+  draftState: SessionComposerDraftState;
   composerStateInput: SessionComposerStateInput;
   showWorkingIndicator?: boolean;
 };
@@ -125,11 +127,15 @@ export function SessionConversationBottomPanel({
 }
 
 export function SessionConversationBottomPanelController({
+  draftState,
   composerStateInput,
   showWorkingIndicator,
   ...bottomPanelProps
 }: SessionConversationBottomPanelControllerProps): React.JSX.Element {
-  const composerUiState = useSessionComposerState(composerStateInput);
+  const composerUiState = useSessionComposerState({
+    composerStateInput,
+    draftState,
+  });
 
   return (
     <SessionConversationBottomPanel

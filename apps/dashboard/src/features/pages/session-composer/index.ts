@@ -1,5 +1,6 @@
 export {
   useSessionComposerState,
+  type SessionComposerDraftState,
   type SessionComposerStateInput,
   type SessionComposerUiState,
 } from "./use-session-composer-state.js";

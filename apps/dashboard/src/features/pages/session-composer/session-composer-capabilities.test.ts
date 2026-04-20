@@ -8,7 +8,7 @@ describe("resolveComposerSubmitAction", () => {
       resolveComposerSubmitAction({
         composerText: "  hello world  ",
         hasActiveTurn: false,
-        hasPendingAttachments: false,
+        hasPendingInput: false,
       }),
     ).toEqual({
       type: "start_turn",
@@ -23,7 +23,7 @@ describe("resolveComposerSubmitAction", () => {
       resolveComposerSubmitAction({
         composerText: "   ",
         hasActiveTurn: true,
-        hasPendingAttachments: false,
+        hasPendingInput: false,
       }),
     ).toEqual({
       type: "interrupt_turn",
@@ -37,7 +37,7 @@ describe("resolveComposerSubmitAction", () => {
       resolveComposerSubmitAction({
         composerText: "  refine this  ",
         hasActiveTurn: true,
-        hasPendingAttachments: false,
+        hasPendingInput: false,
       }),
     ).toEqual({
       type: "steer_turn",

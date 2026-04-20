@@ -14,10 +14,10 @@ export type ComposerSubmitAction =
 export function resolveComposerSubmitAction(input: {
   composerText: string;
   hasActiveTurn: boolean;
-  hasPendingAttachments: boolean;
+  hasPendingInput: boolean;
 }): ComposerSubmitAction {
   const trimmedComposerText = input.composerText.trim();
-  const hasSubmissionContent = trimmedComposerText.length > 0 || input.hasPendingAttachments;
+  const hasSubmissionContent = trimmedComposerText.length > 0 || input.hasPendingInput;
 
   if (!input.hasActiveTurn) {
     return {

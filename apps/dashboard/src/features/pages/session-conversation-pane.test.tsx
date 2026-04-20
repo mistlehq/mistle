@@ -130,6 +130,19 @@ function RenderedComposerPaneHarness(input: {
           },
         },
       }}
+      draftState={{
+        composerText: "",
+        pendingDiffComments: [],
+        clearPendingDiffComments: () => {
+          return;
+        },
+        removePendingDiffComment: () => {
+          return;
+        },
+        setComposerText: () => {
+          return;
+        },
+      }}
       isRespondingToServerRequest={false}
       onRespondToServerRequest={function onRespondToServerRequest() {}}
       serverRequestPanelEntries={[]}
