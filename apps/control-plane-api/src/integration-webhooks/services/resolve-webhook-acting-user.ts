@@ -1,4 +1,5 @@
 import {
+  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
   userExternalPrincipalKeys,
   UserExternalPrincipalKeyStatuses,
@@ -46,22 +47,6 @@ export async function resolveWebhookActingUser(
     return null;
   }
 
-  const activeProviderConfig = await db.query.organizationIdentityLinkProviderConfigs.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.organizationId, input.organizationId),
-        whereEq(table.providerFamily, input.providerFamily),
-        whereEq(table.integrationConnectionId, input.webhookConnectionId),
-        whereEq(table.status, OrganizationIdentityLinkProviderConfigStatus.ACTIVE),
-      ),
-  });
-  if (activeProviderConfig === undefined) {
-    return null;
-  }
-
   const matchedKeyRows = await db
     .select({
       principalId: userExternalPrincipals.id,
@@ -74,12 +59,36 @@ export async function resolveWebhookActingUser(
       userExternalPrincipals,
       eq(userExternalPrincipals.id, userExternalPrincipalKeys.principalId),
     )
+    .innerJoin(
+      organizationIdentityLinkProviderConfigs,
+      and(
+        eq(
+          organizationIdentityLinkProviderConfigs.organizationId,
+          userExternalPrincipals.organizationId,
+        ),
+        eq(
+          organizationIdentityLinkProviderConfigs.providerFamily,
+          userExternalPrincipals.providerFamily,
+        ),
+        eq(
+          organizationIdentityLinkProviderConfigs.id,
+          userExternalPrincipals.organizationProviderConfigId,
+        ),
+      ),
+    )
     .where(
       and(
         eq(userExternalPrincipals.organizationId, input.organizationId),
         eq(userExternalPrincipals.providerFamily, input.providerFamily),
-        eq(userExternalPrincipals.organizationProviderConfigId, activeProviderConfig.id),
         eq(userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
+        eq(
+          organizationIdentityLinkProviderConfigs.integrationConnectionId,
+          input.webhookConnectionId,
+        ),
+        eq(
+          organizationIdentityLinkProviderConfigs.status,
+          OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        ),
         eq(userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
         or(...keys.map((key) => toPrincipalKeyMatchClause(key))),
       ),

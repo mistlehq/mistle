@@ -275,9 +275,9 @@ async function createSlackAppOAuthConnection(input: {
       },
       body: JSON.stringify({
         displayName: input.displayName,
-        methodId: "slack-app-oauth",
+        methodId: "slack-bot-token",
         config: {
-          connection_method: "slack-app-oauth",
+          connection_method: "slack-bot-token",
           client_id: "123.456",
         },
         secrets: {
