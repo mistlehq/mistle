@@ -96,10 +96,10 @@ export const SessionComposerFixturePropsWithPendingDiffComments: ChatComposerVie
     count: 2,
     label: "2 comments",
     title: [
-      "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
+      "apps/dashboard/src/features/pages/session-workbench-page.tsx R140",
       "Request change",
       "",
-      "apps/dashboard/src/features/pages/session-diff-panel.tsx R24",
+      "apps/dashboard/src/features/pages/session-diff-panel.tsx R4",
       "Use the shared overflow tooltip here.",
     ].join("\n"),
   },
