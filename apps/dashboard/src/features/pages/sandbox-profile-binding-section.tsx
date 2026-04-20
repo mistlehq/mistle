@@ -32,8 +32,8 @@ import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
   resolveBindingConfigUiModel,
-  SandboxProfileBindingConfigEditor,
   resolveBindingToolToggleModel,
+  SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
 import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
@@ -653,11 +653,6 @@ function AgentHarnessRows(input: {
                   <p className="truncate text-sm font-medium">
                     {target?.displayName ?? "Integration"}
                   </p>
-                  {connectionDisplayName === undefined ? null : (
-                    <p className="text-muted-foreground truncate text-xs">
-                      {connectionDisplayName}
-                    </p>
-                  )}
                 </div>
               </div>
               <Button
@@ -897,7 +892,6 @@ function GitProviderRows(input: {
                 connection: rowMetadata.connection,
               });
         const fieldId = `git-binding-connection-${row.clientId}`;
-
         return (
           <div className="flex flex-col gap-4 py-2" key={row.clientId}>
             <div className="flex items-center justify-between gap-4">
@@ -917,11 +911,6 @@ function GitProviderRows(input: {
                   <p className="truncate text-sm font-medium">
                     {target?.displayName ?? "Integration"}
                   </p>
-                  {connectionDisplayName === undefined ? null : (
-                    <p className="text-muted-foreground truncate text-xs">
-                      {connectionDisplayName}
-                    </p>
-                  )}
                 </div>
               </div>
               <Button
