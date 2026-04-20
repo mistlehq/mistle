@@ -3,6 +3,7 @@ import { Button, Spinner } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import "dockview/dist/styles/dockview.css";
+import "./session-terminal-dockview-workspace.css";
 import {
   DockviewReact,
   type DockviewApi,
@@ -13,7 +14,6 @@ import {
 import {
   createContext,
   forwardRef,
-  type CSSProperties,
   type FunctionComponent,
   type ReactElement,
   useCallback,
@@ -88,172 +88,6 @@ type SessionTerminalWorkspaceContextValue = {
 type SessionDockviewTerminalPanelProps = IDockviewPanelProps<SessionTerminalDockviewParams>;
 
 const TerminalWorkspaceContext = createContext<SessionTerminalWorkspaceContextValue | null>(null);
-const SessionTerminalDockviewStyles = `
-.session-terminal-dockview {
-  background: #ffffff;
-}
-
-.session-terminal-dockview .dv-groupview {
-  border: none;
-  border-radius: 0;
-  overflow: hidden;
-}
-
-.session-terminal-dockview .dv-tabs-and-actions-container {
-  padding: 0;
-  background: #f5f5f4;
-  position: relative;
-}
-
-.session-terminal-dockview .dv-tabs-and-actions-container::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: transparent;
-  pointer-events: none;
-}
-
-.session-terminal-dockview .dv-tab {
-  border-radius: 0;
-  margin: 0;
-  padding: 0.3rem 0.625rem 0.35rem;
-  color: #57534e;
-  background: #ece9e4;
-  border: none;
-  cursor: default;
-  position: relative;
-  z-index: 1;
-}
-
-.session-terminal-dockview .dv-left-actions-container {
-  display: flex;
-  align-items: center;
-  padding: 0;
-  position: relative;
-}
-
-.session-terminal-dockview .dv-tab:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.375rem;
-  bottom: 0.375rem;
-  width: 1px;
-  background: #d6d3d1;
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-.session-terminal-dockview .dv-default-tab .dv-default-tab-action {
-  color: #57534e;
-}
-
-.session-terminal-dockview .dv-default-tab .dv-default-tab-action:hover {
-  background-color: rgba(28, 25, 23, 0.08);
-}
-
-.session-terminal-dockview .dv-tab.dv-active-tab {
-  color: #1c1917;
-  background: #ffffff;
-}
-
-.session-terminal-dockview .dv-tab.dv-active-tab::before {
-  background: transparent;
-}
-
-.session-terminal-dockview .dv-tab.dv-active-tab + .dv-tab::before {
-  background: transparent;
-}
-
-.session-terminal-dockview .dv-tab.dv-inactive-tab {
-  color: #57534e;
-}
-
-.session-terminal-dockview .dv-tab.dv-inactive-tab:hover {
-  color: #1c1917;
-  background: #e7e2db;
-}
-
-.session-terminal-dockview .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab,
-.session-terminal-dockview .dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab,
-.session-terminal-dockview .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab,
-.session-terminal-dockview .dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab {
-  background: transparent;
-}
-
-.session-terminal-dockview .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab {
-  background: #ffffff;
-  color: #1c1917;
-  box-shadow: none;
-  margin-bottom: -1px;
-}
-
-.session-terminal-dockview .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab,
-.session-terminal-dockview .dv-groupview.dv-inactive-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab {
-  color: #57534e;
-  background: #ece9e4;
-}
-
-.session-terminal-dockview .dv-tab .dv-default-tab {
-  cursor: default;
-  gap: 0.25rem;
-  padding-left: 1.25rem;
-}
-
-.session-terminal-dockview .dv-tab .dv-default-tab-content {
-  cursor: default;
-  font-weight: 500;
-}
-
-.session-terminal-dockview .dv-tab .dv-default-tab .dv-default-tab-action {
-  cursor: default;
-  margin-left: 0.125rem;
-  opacity: 0;
-  pointer-events: none;
-  padding: 2px;
-  transition: opacity 120ms ease;
-  width: 1.25rem;
-  min-width: 1.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.session-terminal-dockview .dv-tab:hover .dv-default-tab .dv-default-tab-action {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.session-terminal-dockview .dv-tab:focus,
-.session-terminal-dockview .dv-tab:focus-within,
-.session-terminal-dockview .dv-tab:focus-visible {
-  outline: none;
-}
-
-.session-terminal-dockview .dv-tab:focus::after,
-.session-terminal-dockview .dv-tab:focus-within::after,
-.session-terminal-dockview .dv-tab:focus-visible::after {
-  display: none;
-}
-
-.session-terminal-dockview .dv-tabs-container {
-  gap: 0;
-  padding-top: 0;
-}
-
-.session-terminal-dockview .dv-left-actions-container button {
-  border-radius: 0;
-  color: #57534e;
-}
-
-.session-terminal-dockview .dv-left-actions-container button:hover {
-  background: #e7e2db;
-  color: #1c1917;
-}
-`;
 
 function useTerminalWorkspaceContext(): SessionTerminalWorkspaceContextValue {
   const context = useContext(TerminalWorkspaceContext);
@@ -309,16 +143,16 @@ function DockviewTerminalNewTabAction(input: IDockviewHeaderActionsProps): React
   const { createTerminal } = useTerminalWorkspaceContext();
 
   return (
-    <div className="flex items-center">
+    <div className="flex h-full items-stretch">
       <Button
         aria-label="Open terminal tab"
-        className="text-stone-500 hover:bg-stone-200 hover:text-stone-950"
+        className="session-terminal-dockview-new-tab-trigger h-full rounded-none px-3"
         onClick={() => {
           createTerminal({
             referenceGroup: input.group,
           });
         }}
-        size="icon-sm"
+        size="sm"
         title="Open terminal tab"
         type="button"
         variant="ghost"
@@ -676,41 +510,11 @@ export const SessionTerminalDockviewWorkspaceView = forwardRef<
     }),
     [createTerminal, renderTerminalPanel],
   );
-  const dockviewThemeStyle = useMemo((): CSSProperties => {
-    return {
-      "--dv-tabs-and-actions-container-height": "36px",
-      "--dv-tabs-and-actions-container-font-size": "12px",
-      "--dv-tab-font-size": "12px",
-      "--dv-tab-margin": "0",
-      "--dv-group-view-background-color": "#ffffff",
-      "--dv-tabs-and-actions-container-background-color": "#ffffff",
-      "--dv-activegroup-visiblepanel-tab-background-color": "transparent",
-      "--dv-activegroup-hiddenpanel-tab-background-color": "transparent",
-      "--dv-inactivegroup-visiblepanel-tab-background-color": "transparent",
-      "--dv-inactivegroup-hiddenpanel-tab-background-color": "transparent",
-      "--dv-activegroup-visiblepanel-tab-color": "#1c1917",
-      "--dv-activegroup-hiddenpanel-tab-color": "#78716c",
-      "--dv-inactivegroup-visiblepanel-tab-color": "#57534e",
-      "--dv-inactivegroup-hiddenpanel-tab-color": "#78716c",
-      "--dv-tab-divider-color": "transparent",
-      "--dv-separator-border": "#e7e5e4",
-      "--dv-icon-hover-background-color": "rgba(28, 25, 23, 0.08)",
-      "--dv-sash-color": "#d6d3d1",
-      "--dv-active-sash-color": "#a8a29e",
-      "--dv-floating-box-shadow": "0 10px 30px rgba(28, 25, 23, 0.08)",
-      "--dv-border-radius": "0px",
-      "--dv-scrollbar-background-color": "rgba(28, 25, 23, 0.18)",
-    } as CSSProperties;
-  }, []);
 
   return (
     <div className="h-full min-h-0 border-t border-stone-300 bg-white">
       <TerminalWorkspaceContext.Provider value={contextValue}>
-        <style>{SessionTerminalDockviewStyles}</style>
-        <div
-          className="session-terminal-dockview dockview-theme-light h-full min-h-0"
-          style={dockviewThemeStyle}
-        >
+        <div className="session-terminal-dockview dockview-theme-light h-full min-h-0">
           <DockviewReact
             className="h-full"
             components={DockviewTerminalComponents}
