@@ -32,12 +32,17 @@ const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
 
-export function resolveSandboxStatusRefetchInterval(input: {
+type SessionWorkbenchSandboxStatusSnapshot = {
   automationConversation: SandboxInstanceStatusResult["automationConversation"];
-  connectable: boolean | null;
-  isAutoResumingStoppedSandbox: boolean;
-  status: "pending" | "starting" | "running" | "stopped" | "failed" | null;
-}): false | number {
+  connectable: SandboxInstanceStatusResult["connectable"] | null;
+  status: SandboxInstanceStatusResult["status"] | null;
+};
+
+export function resolveSandboxStatusRefetchInterval(
+  input: SessionWorkbenchSandboxStatusSnapshot & {
+    isAutoResumingStoppedSandbox: boolean;
+  },
+): false | number {
   if (
     shouldWaitForAutomationSessionThread({
       sandboxStatus: input.status,

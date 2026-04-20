@@ -5,17 +5,9 @@ import type {
 } from "@mistle/sandbox-session-client";
 
 import { INITIAL_PTY_DIMENSIONS } from "./session-terminal-surface.js";
+import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 
 const MaxTerminalReconnectAttempts = 3;
-
-export type SessionTerminalSandboxStatus =
-  | "pending"
-  | "starting"
-  | "running"
-  | "resuming"
-  | "stopped"
-  | "failed"
-  | null;
 
 export type TerminalRecoveryState =
   | {
@@ -45,7 +37,7 @@ type TerminalRecoveryEvent =
       type: "sync_observed";
       isReconnectAttemptInFlight: boolean;
       lifecycleState: SandboxPtyState;
-      sandboxStatus: SessionTerminalSandboxStatus;
+      sandboxStatus: WorkbenchSandboxLifecycleStatus;
     };
 
 function shouldOpenPtyForRecovery(input: {
@@ -53,7 +45,7 @@ function shouldOpenPtyForRecovery(input: {
   errorMessage: string | null;
   isReconnectAttemptInFlight: boolean;
   lifecycleState: SandboxPtyState;
-  sandboxStatus: SessionTerminalSandboxStatus;
+  sandboxStatus: WorkbenchSandboxLifecycleStatus;
 }): boolean {
   if (
     input.errorMessage !== null ||
@@ -239,7 +231,7 @@ export function shouldAttemptTerminalReconnect(input: {
 
 export function resolveTerminalRecoveryMessage(input: {
   recovery: TerminalRecoveryState;
-  sandboxStatus: SessionTerminalSandboxStatus;
+  sandboxStatus: WorkbenchSandboxLifecycleStatus;
 }): string | null {
   if (input.recovery.kind !== "recovering") {
     return null;

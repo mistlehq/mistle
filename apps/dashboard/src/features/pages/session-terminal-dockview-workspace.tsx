@@ -34,10 +34,10 @@ import {
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
   shouldObserveTerminalReset,
-  type SessionTerminalSandboxStatus,
   type TerminalRecoveryState,
 } from "./session-terminal-runtime.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
+import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 
 type SessionTerminalDockviewWorkspaceProps = {
   cwd: string | null;
@@ -50,7 +50,7 @@ type SessionTerminalDockviewWorkspaceProps = {
   onTerminalReset?: (input: { panelId: string }) => void;
   onWorkspaceEmpty: () => void;
   sandboxInstanceId: string;
-  sandboxStatus: SessionTerminalSandboxStatus;
+  sandboxStatus: WorkbenchSandboxLifecycleStatus;
 };
 
 type SessionTerminalDockviewWorkspaceViewProps = {
@@ -216,7 +216,7 @@ function PtyBackedDockviewTerminalPanel(input: {
   onTerminalReset?: SessionTerminalDockviewWorkspaceProps["onTerminalReset"];
   panelId: string;
   sandboxInstanceId: string;
-  sandboxStatus: SessionTerminalSandboxStatus;
+  sandboxStatus: WorkbenchSandboxLifecycleStatus;
 }): ReactElement {
   const ptyState = useSandboxPtyState({
     ensureTransportConnected: input.ensureTransportConnected,
