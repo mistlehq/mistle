@@ -646,7 +646,14 @@ describe("me linked accounts integration", () => {
           login: "mistle-user",
           displayName: "Mistle User",
           avatarUrl: "https://avatars.example.com/u/12345",
-          email: "mistle-user@example.com",
+          preferredEmail: "mistle-user@example.com",
+          availableEmails: [
+            {
+              email: "mistle-user@example.com",
+              primary: true,
+              verified: true,
+            },
+          ],
         },
       });
       expect(principal?.linkedAt).toBeTruthy();
@@ -750,6 +757,145 @@ describe("me linked accounts integration", () => {
       server.close();
       await once(server, "close");
     }
+  });
+
+  it("updates the preferred email for an existing GitHub linked account", async ({ fixture }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-update-preferred-email@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_preferred_email",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_preferred_email",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_preferred_email",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_preferred_email",
+      integrationConnectionId: "icn_github_preferred_email",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [
+          {
+            email: "mistle-user@example.com",
+            primary: true,
+            verified: true,
+          },
+          {
+            email: "engineering@example.com",
+            primary: false,
+            verified: true,
+          },
+        ],
+      },
+    });
+
+    const response = await fixture.request("/v1/me/linked-accounts/github/preferred-email", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        preferredEmail: "engineering@example.com",
+      }),
+    });
+
+    expect(response.status).toBe(204);
+
+    const updatedPrincipal = await fixture.db.query.userExternalPrincipals.findFirst({
+      where: (table, { eq }) => eq(table.id, "uep_github_preferred_email"),
+    });
+    expect(updatedPrincipal?.profile).toEqual({
+      login: "mistle-user",
+      preferredEmail: "engineering@example.com",
+      availableEmails: [
+        {
+          email: "mistle-user@example.com",
+          primary: true,
+          verified: true,
+        },
+        {
+          email: "engineering@example.com",
+          primary: false,
+          verified: true,
+        },
+      ],
+    });
+  });
+
+  it("fails explicitly when a GitHub linked account has no selectable emails yet", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-update-preferred-email-unselectable@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_preferred_email_legacy",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_preferred_email_legacy",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_preferred_email_legacy",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_preferred_email_legacy",
+      integrationConnectionId: "icn_github_preferred_email_legacy",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [],
+      },
+    });
+
+    const response = await fixture.request("/v1/me/linked-accounts/github/preferred-email", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        preferredEmail: "engineering@example.com",
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT",
+      message: "GitHub linked account does not have selectable emails.",
+    });
   });
 
   it("completes the Slack linked-account callback and persists the principal and user token when no refresh token is returned", async ({

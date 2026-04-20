@@ -50,6 +50,12 @@ const StartLinkedAccountAuthorizationResponseSchema = z
   })
   .strict();
 
+const UpdateGitHubLinkedAccountPreferredEmailBodySchema = z
+  .object({
+    preferredEmail: z.email(),
+  })
+  .strict();
+
 export type LinkedAccount = z.infer<typeof LinkedAccountSchema>;
 export type StartLinkedAccountAuthorizationResult = z.infer<
   typeof StartLinkedAccountAuthorizationResponseSchema
@@ -183,6 +189,30 @@ export async function unlinkLinkedAccount(input: { providerFamily: string }): Pr
       operation: "unlinkLinkedAccount",
       error,
       fallbackMessage: "Could not unlink linked account.",
+    });
+  }
+}
+
+export async function updateGitHubLinkedAccountPreferredEmail(input: {
+  preferredEmail: string;
+}): Promise<void> {
+  const body = UpdateGitHubLinkedAccountPreferredEmailBodySchema.parse(input);
+
+  try {
+    const response = await requestControlPlane({
+      operation: "updateGitHubLinkedAccountPreferredEmail",
+      method: "PUT",
+      pathname: "/v1/me/linked-accounts/github/preferred-email",
+      body,
+      fallbackMessage: "Could not update GitHub preferred email.",
+    });
+
+    await response.text();
+  } catch (error) {
+    throw wrapLinkedAccountsApiError({
+      operation: "updateGitHubLinkedAccountPreferredEmail",
+      error,
+      fallbackMessage: "Could not update GitHub preferred email.",
     });
   }
 }

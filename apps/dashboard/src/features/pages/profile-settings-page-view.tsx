@@ -1,13 +1,19 @@
 import {
   Badge,
   Button,
-  Input,
   Field,
   FieldContent,
   FieldHeader,
   FieldLabel,
+  Input,
   Notice,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@mistle/ui";
+import { useEffect, useState } from "react";
 
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -33,6 +39,10 @@ export type ProfileSettingsPageViewProps = {
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onSaveChanges: (displayName: string) => Promise<void>;
   onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onUpdateLinkedAccountPreferredEmail: (
+    providerFamily: string,
+    preferredEmail: string,
+  ) => Promise<void>;
   onUploadProfileImage: (file: File) => Promise<void>;
   profileImageBusy: boolean;
   profileImageErrorMessage: string | null;
@@ -103,69 +113,14 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
               <Notice>{props.linkedAccountsEmptyStateMessage}</Notice>
             ) : props.linkedAccountCards.length === 0 ? null : (
               props.linkedAccountCards.map((linkedAccountCard) => (
-                <div
-                  className="rounded border bg-background p-4"
+                <LinkedAccountCard
                   key={linkedAccountCard.providerFamily}
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <img
-                        alt={`${linkedAccountCard.displayName} logo`}
-                        className="h-10 w-10 rounded-md border bg-background p-1.5"
-                        src={resolveIntegrationLogoPath({ logoKey: linkedAccountCard.logoKey })}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-sm font-semibold">{linkedAccountCard.displayName}</h3>
-                          <LinkedAccountStatusBadge tone={linkedAccountCard.statusTone}>
-                            {linkedAccountCard.statusLabel}
-                          </LinkedAccountStatusBadge>
-                        </div>
-                        <p className="text-sm">{linkedAccountCard.accountLabel}</p>
-                        {linkedAccountCard.linkedAtLabel === null ? null : (
-                          <p className="text-xs text-muted-foreground">
-                            {linkedAccountCard.linkedAtLabel}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {linkedAccountCard.primaryActionLabel === null ? null : (
-                        <Button
-                          disabled={props.linkedAccountActionPending}
-                          onClick={() => {
-                            void props.onLinkLinkedAccount(linkedAccountCard.providerFamily);
-                          }}
-                          type="button"
-                        >
-                          {props.linkedAccountActionPending
-                            ? "Working..."
-                            : linkedAccountCard.primaryActionLabel}
-                        </Button>
-                      )}
-                      {linkedAccountCard.secondaryActionLabel === null ? null : (
-                        <Button
-                          disabled={props.linkedAccountActionPending}
-                          onClick={() => {
-                            void props.onUnlinkLinkedAccount(linkedAccountCard.providerFamily);
-                          }}
-                          type="button"
-                          variant="outline"
-                        >
-                          {props.linkedAccountActionPending
-                            ? "Working..."
-                            : linkedAccountCard.secondaryActionLabel}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {linkedAccountCard.helperMessage === null ? null : (
-                    <p className="mt-3 text-sm text-muted-foreground">
-                      {linkedAccountCard.helperMessage}
-                    </p>
-                  )}
-                </div>
+                  linkedAccountActionPending={props.linkedAccountActionPending}
+                  linkedAccountCard={linkedAccountCard}
+                  onLinkLinkedAccount={props.onLinkLinkedAccount}
+                  onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
+                  onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
+                />
               ))
             )}
 
@@ -176,6 +131,145 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
         </FormPageSection>
       ) : null}
     </FormPageStack>
+  );
+}
+
+function LinkedAccountCard(input: {
+  linkedAccountActionPending: boolean;
+  linkedAccountCard: LinkedAccountCardViewModel;
+  onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onUpdateLinkedAccountPreferredEmail: (
+    providerFamily: string,
+    preferredEmail: string,
+  ) => Promise<void>;
+}): React.JSX.Element {
+  const emailPreference = input.linkedAccountCard.emailPreference;
+  const [selectedEmail, setSelectedEmail] = useState(emailPreference?.selectedEmail ?? "");
+  const selectedOptionLabel = emailPreference?.options.find(
+    (option) => option.value === selectedEmail,
+  )?.label;
+
+  useEffect(() => {
+    setSelectedEmail(emailPreference?.selectedEmail ?? "");
+  }, [emailPreference?.selectedEmail, input.linkedAccountCard.providerFamily]);
+
+  return (
+    <div className="rounded border bg-background p-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <img
+            alt={`${input.linkedAccountCard.displayName} logo`}
+            className="h-10 w-10 rounded-md border bg-background p-1.5"
+            src={resolveIntegrationLogoPath({ logoKey: input.linkedAccountCard.logoKey })}
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">{input.linkedAccountCard.displayName}</h3>
+              <LinkedAccountStatusBadge tone={input.linkedAccountCard.statusTone}>
+                {input.linkedAccountCard.statusLabel}
+              </LinkedAccountStatusBadge>
+            </div>
+            <p className="text-sm">{input.linkedAccountCard.accountLabel}</p>
+            {input.linkedAccountCard.linkedAtLabel === null ? null : (
+              <p className="text-xs text-muted-foreground">
+                {input.linkedAccountCard.linkedAtLabel}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {input.linkedAccountCard.primaryActionLabel === null ? null : (
+            <Button
+              disabled={input.linkedAccountActionPending}
+              onClick={() => {
+                void input.onLinkLinkedAccount(input.linkedAccountCard.providerFamily);
+              }}
+              type="button"
+            >
+              {input.linkedAccountActionPending
+                ? "Working..."
+                : input.linkedAccountCard.primaryActionLabel}
+            </Button>
+          )}
+          {input.linkedAccountCard.secondaryActionLabel === null ? null : (
+            <Button
+              disabled={input.linkedAccountActionPending}
+              onClick={() => {
+                void input.onUnlinkLinkedAccount(input.linkedAccountCard.providerFamily);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {input.linkedAccountActionPending
+                ? "Working..."
+                : input.linkedAccountCard.secondaryActionLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {emailPreference === null ? null : (
+        <div className="mt-4">
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel>Commit email</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Select
+                  onValueChange={(nextValue) => {
+                    setSelectedEmail(nextValue ?? "");
+                  }}
+                  value={selectedEmail}
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    id={`linked-account-preferred-email-${input.linkedAccountCard.providerFamily}`}
+                    style={{ width: "100%", maxWidth: "32rem" }}
+                  >
+                    <SelectValue placeholder="Select commit email">
+                      {selectedOptionLabel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {emailPreference.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  disabled={
+                    input.linkedAccountActionPending ||
+                    selectedEmail.length === 0 ||
+                    selectedEmail === emailPreference.selectedEmail
+                  }
+                  onClick={() => {
+                    void input.onUpdateLinkedAccountPreferredEmail(
+                      input.linkedAccountCard.providerFamily,
+                      selectedEmail,
+                    );
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  {input.linkedAccountActionPending ? "Working..." : "Save"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{emailPreference.helperText}</p>
+            </FieldContent>
+          </Field>
+        </div>
+      )}
+
+      {input.linkedAccountCard.helperMessage === null ? null : (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {input.linkedAccountCard.helperMessage}
+        </p>
+      )}
+    </div>
   );
 }
 

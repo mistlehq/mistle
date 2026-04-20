@@ -11,7 +11,7 @@ const GitHubPrincipalProfileSchema = z
   .object({
     login: z.string().min(1),
     displayName: z.string().min(1).optional(),
-    email: z.email().optional(),
+    preferredEmail: z.email().optional(),
   })
   .loose();
 
@@ -75,7 +75,7 @@ export async function resolveActingUserGitIdentity(
     return undefined;
   }
 
-  const email = parsedProfile.data.email?.trim();
+  const email = parsedProfile.data.preferredEmail?.trim();
   if (email === undefined || email.length === 0) {
     return undefined;
   }

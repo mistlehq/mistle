@@ -36,6 +36,7 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       onLinkLinkedAccount={async () => {}}
       onSaveChanges={async () => {}}
       onUnlinkLinkedAccount={async () => {}}
+      onUpdateLinkedAccountPreferredEmail={async () => {}}
       onUploadProfileImage={async () => {}}
       profileImageBusy={false}
       profileImageErrorMessage={null}

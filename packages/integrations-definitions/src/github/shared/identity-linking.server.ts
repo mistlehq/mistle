@@ -82,13 +82,20 @@ export class GitHubIdentityLinkingConfigurationError extends Error {
   }
 }
 
+export type GitHubLinkedEmail = {
+  email: string;
+  primary: boolean;
+  verified: true;
+};
+
 export type GitHubLinkedAccountAuthorizationResult = {
   providerSubjectId: string;
   profile: {
     login: string;
     displayName?: string;
     avatarUrl?: string;
-    email?: string;
+    preferredEmail?: string;
+    availableEmails?: readonly GitHubLinkedEmail[];
   };
   keys: readonly [
     {
@@ -408,10 +415,10 @@ async function fetchUserProfile(input: {
   }
 }
 
-async function fetchPrimaryEmail(input: {
+async function fetchAvailableEmails(input: {
   apiBaseUrl: string;
   accessToken: string;
-}): Promise<string | undefined> {
+}): Promise<readonly GitHubLinkedEmail[] | undefined> {
   const emailsUrl = new URL("/user/emails", input.apiBaseUrl);
   const response = await fetch(emailsUrl, {
     headers: {
@@ -422,7 +429,9 @@ async function fetchPrimaryEmail(input: {
   });
 
   if (!response.ok) {
-    return undefined;
+    throw new GitHubIdentityLinkingAuthorizationError(
+      `GitHub user emails request failed (${response.status} ${response.statusText}).`,
+    );
   }
 
   let emails: z.infer<typeof GitHubUserEmailResponseSchema>;
@@ -439,7 +448,13 @@ async function fetchPrimaryEmail(input: {
     });
   }
 
-  return emails.find((email) => email.primary && email.verified)?.email;
+  return emails
+    .filter((email) => email.verified)
+    .map((email) => ({
+      email: email.email,
+      primary: email.primary,
+      verified: true,
+    }));
 }
 
 export function createGitHubIdentityLinkPkceChallenge(verifier: string): string {
@@ -498,11 +513,12 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
   // actual primary email when GitHub makes it available, prefer /user/emails.
   // https://docs.github.com/en/rest/users/users
   // https://docs.github.com/en/rest/users/emails
-  const primaryEmail = await fetchPrimaryEmail({
+  const availableEmails = await fetchAvailableEmails({
     apiBaseUrl: input.apiBaseUrl,
     accessToken: tokenResponse.access_token,
   });
-  const resolvedEmail = primaryEmail ?? userProfile.email ?? undefined;
+  const primaryEmail = availableEmails?.find((email) => email.primary)?.email;
+  const preferredEmail = primaryEmail ?? userProfile.email ?? undefined;
   const accessTokenExpiresAt = resolveFutureTimestamp({
     now: input.now,
     expiresInSeconds: tokenResponse.expires_in,
@@ -521,7 +537,8 @@ export async function completeGitHubLinkedAccountAuthorization(input: {
         ? {}
         : { displayName: userProfile.name }),
       ...(userProfile.avatar_url === undefined ? {} : { avatarUrl: userProfile.avatar_url }),
-      ...(resolvedEmail === undefined ? {} : { email: resolvedEmail }),
+      ...(preferredEmail === undefined ? {} : { preferredEmail }),
+      ...(availableEmails === undefined ? {} : { availableEmails }),
     },
     keys: [
       {

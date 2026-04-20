@@ -21,6 +21,7 @@ const DefaultProps: ComponentProps<typeof ProfileSettingsPageView> = {
   onLinkLinkedAccount: async () => {},
   onSaveChanges: async () => {},
   onUnlinkLinkedAccount: async () => {},
+  onUpdateLinkedAccountPreferredEmail: async () => {},
   onUploadProfileImage: async () => {},
   profileImageBusy: false,
   profileImageErrorMessage: null,
@@ -56,6 +57,20 @@ export const WithGitHubLinkedAccount: Story = {
         accountLabel: "@mistle-user",
         linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
         helperMessage: null,
+        emailPreference: {
+          selectedEmail: "mistle-user@example.com",
+          options: [
+            {
+              value: "mistle-user@example.com",
+              label: "mistle-user@example.com (Primary)",
+            },
+            {
+              value: "engineering@example.com",
+              label: "engineering@example.com",
+            },
+          ],
+          helperText: "Used for sandbox Git identity and commit signing.",
+        },
         primaryActionLabel: "Relink",
         secondaryActionLabel: "Unlink",
       },

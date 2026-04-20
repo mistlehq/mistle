@@ -240,7 +240,14 @@ describe("github identity linking", () => {
           login: "mistle-user",
           displayName: "Mistle User",
           avatarUrl: "https://avatars.example.com/u/12345",
-          email: "mistle-user@example.com",
+          preferredEmail: "mistle-user@example.com",
+          availableEmails: [
+            {
+              email: "mistle-user@example.com",
+              primary: true,
+              verified: true,
+            },
+          ],
         },
         keys: [
           {
@@ -341,7 +348,14 @@ describe("github identity linking", () => {
       });
 
       expect(seenRequests).toEqual(["/login/oauth/access_token", "/user", "/user/emails"]);
-      expect(result.profile.email).toBe("primary@example.com");
+      expect(result.profile.preferredEmail).toBe("primary@example.com");
+      expect(result.profile.availableEmails).toEqual([
+        {
+          email: "primary@example.com",
+          primary: true,
+          verified: true,
+        },
+      ]);
     } finally {
       await server.stop();
     }

@@ -15,6 +15,7 @@ import {
   listLinkedAccounts,
   startLinkedAccountAuthorization,
   unlinkLinkedAccount,
+  updateGitHubLinkedAccountPreferredEmail,
 } from "../settings/identity-linking/linked-accounts-service.js";
 import {
   deleteProfileImage,
@@ -151,6 +152,26 @@ export function ProfileSettingsPage(): React.JSX.Element {
       );
     },
   });
+  const updateGitHubLinkedAccountPreferredEmailMutation = useMutation({
+    mutationFn: async (preferredEmail: string) =>
+      updateGitHubLinkedAccountPreferredEmail({ preferredEmail }),
+    onMutate: async () => {
+      setLinkedAccountOperationErrorMessage(null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: linkedAccountsQueryKey(activeOrganizationId),
+      });
+    },
+    onError: (error) => {
+      setLinkedAccountOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not update GitHub preferred email.",
+        }),
+      );
+    },
+  });
 
   useEffect(() => {
     const resolvedNotice = resolveLinkedAccountCallbackNotice({
@@ -226,11 +247,16 @@ export function ProfileSettingsPage(): React.JSX.Element {
         onUnlinkLinkedAccount={async (providerFamily) => {
           await unlinkLinkedAccountMutation.mutateAsync(providerFamily);
         }}
+        onUpdateLinkedAccountPreferredEmail={async (_providerFamily, preferredEmail) => {
+          await updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync(preferredEmail);
+        }}
         onUploadProfileImage={async (file) => {
           await uploadProfileImageMutation.mutateAsync(file);
         }}
         linkedAccountActionPending={
-          startLinkedAccountAuthorizationMutation.isPending || unlinkLinkedAccountMutation.isPending
+          startLinkedAccountAuthorizationMutation.isPending ||
+          unlinkLinkedAccountMutation.isPending ||
+          updateGitHubLinkedAccountPreferredEmailMutation.isPending
         }
         saving={saveMutation.isPending}
       />

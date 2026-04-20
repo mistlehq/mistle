@@ -22,6 +22,7 @@ const baseProps = {
   onLinkLinkedAccount: async () => {},
   onSaveChanges: async () => {},
   onUnlinkLinkedAccount: async () => {},
+  onUpdateLinkedAccountPreferredEmail: async () => {},
   onUploadProfileImage: async () => {},
   profileImageBusy: false,
   profileImageErrorMessage: null,
@@ -139,6 +140,7 @@ describe("ProfileSettingsPageView", () => {
             accountLabel: "No linked account yet",
             linkedAtLabel: null,
             helperMessage: null,
+            emailPreference: null,
             primaryActionLabel: "Link account",
             secondaryActionLabel: null,
           },
@@ -166,6 +168,20 @@ describe("ProfileSettingsPageView", () => {
             accountLabel: "@mistle-user",
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
+            emailPreference: {
+              selectedEmail: "mistle-user@example.com",
+              options: [
+                {
+                  value: "mistle-user@example.com",
+                  label: "mistle-user@example.com (Primary)",
+                },
+                {
+                  value: "engineering@example.com",
+                  label: "engineering@example.com",
+                },
+              ],
+              helperText: "Used for sandbox Git identity and commit signing.",
+            },
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -225,6 +241,7 @@ describe("ProfileSettingsPageView", () => {
             accountLabel: "@mistle-user",
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
+            emailPreference: null,
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -237,6 +254,7 @@ describe("ProfileSettingsPageView", () => {
             accountLabel: "No linked account yet",
             linkedAtLabel: null,
             helperMessage: null,
+            emailPreference: null,
             primaryActionLabel: "Link account",
             secondaryActionLabel: null,
           },
@@ -267,6 +285,7 @@ describe("ProfileSettingsPageView", () => {
             accountLabel: "@mistle-user",
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+            emailPreference: null,
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -287,5 +306,46 @@ describe("ProfileSettingsPageView", () => {
       expect(linkCount).toBe(1);
       expect(unlinkCount).toBe(1);
     });
+  });
+
+  it("renders GitHub commit email controls when selectable emails are available", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: {
+              selectedEmail: "mistle-user@example.com",
+              options: [
+                {
+                  value: "mistle-user@example.com",
+                  label: "mistle-user@example.com (Primary)",
+                },
+                {
+                  value: "engineering@example.com",
+                  label: "engineering@example.com",
+                },
+              ],
+              helperText: "Used for sandbox Git identity and commit signing.",
+            },
+            primaryActionLabel: "Relink",
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Commit email")).toBeTruthy();
+    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+    expect(screen.getByText("Used for sandbox Git identity and commit signing.")).toBeTruthy();
   });
 });

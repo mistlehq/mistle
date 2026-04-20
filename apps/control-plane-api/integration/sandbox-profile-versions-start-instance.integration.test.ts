@@ -582,7 +582,7 @@ describe("sandbox profile version start instance integration", () => {
       profile: {
         login: "mistle-user",
         displayName: "Mistle User",
-        email: "mistle-user@example.com",
+        preferredEmail: "mistle-user@example.com",
         avatarUrl: "https://avatars.example.com/u/12345",
       },
     });

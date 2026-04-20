@@ -103,7 +103,8 @@ describe("linked-accounts-model", () => {
       statusTone: "active",
       accountLabel: "@mistle-user",
       linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
-      helperMessage: null,
+      helperMessage: "GitHub has not provided selectable commit emails for this link.",
+      emailPreference: null,
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     });
@@ -124,6 +125,7 @@ describe("linked-accounts-model", () => {
       accountLabel: "No linked account yet",
       linkedAtLabel: null,
       helperMessage: null,
+      emailPreference: null,
       primaryActionLabel: "Link account",
       secondaryActionLabel: null,
     });
@@ -146,6 +148,7 @@ describe("linked-accounts-model", () => {
       statusLabel: "Relink required",
       statusTone: "warning",
       helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+      emailPreference: null,
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     });
@@ -166,6 +169,7 @@ describe("linked-accounts-model", () => {
       linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
       helperMessage:
         "Your organization has disabled GitHub identity linking. You can still unlink this account.",
+      emailPreference: null,
       primaryActionLabel: null,
       secondaryActionLabel: "Unlink",
     });
@@ -253,6 +257,53 @@ describe("linked-accounts-model", () => {
       ),
     ).toMatchObject({
       accountLabel: "Mistle Engineering",
+    });
+  });
+
+  it("builds a GitHub email preference view model when selectable emails are available", () => {
+    expect(
+      resolveLinkedAccountCardViewModel(
+        createGitHubLinkedAccount({
+          principal: {
+            id: "uep_github",
+            status: "active",
+            providerSubjectId: "12345",
+            profile: {
+              login: "mistle-user",
+              preferredEmail: "mistle-user@example.com",
+              availableEmails: [
+                {
+                  email: "mistle-user@example.com",
+                  primary: true,
+                  verified: true,
+                },
+                {
+                  email: "engineering@example.com",
+                  primary: false,
+                  verified: true,
+                },
+              ],
+            },
+            linkedAt: "2026-04-19T10:15:00.000Z",
+            updatedAt: "2026-04-19T10:15:00.000Z",
+          },
+        }),
+      ),
+    ).toMatchObject({
+      emailPreference: {
+        selectedEmail: "mistle-user@example.com",
+        options: [
+          {
+            value: "mistle-user@example.com",
+            label: "mistle-user@example.com (Primary)",
+          },
+          {
+            value: "engineering@example.com",
+            label: "engineering@example.com",
+          },
+        ],
+        helperText: "Used for sandbox Git identity and commit signing.",
+      },
     });
   });
 

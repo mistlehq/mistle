@@ -292,7 +292,7 @@ describe("internal sandbox runtime", () => {
       profile: {
         login: "mistle-user",
         displayName: "Mistle User",
-        email: "mistle-user@example.com",
+        preferredEmail: "mistle-user@example.com",
       },
     });
 

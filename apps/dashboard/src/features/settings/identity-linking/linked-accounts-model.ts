@@ -9,6 +9,17 @@ export type LinkedAccountCallbackNotice = {
   variant: "default" | "alert";
 };
 
+export type LinkedAccountEmailOptionViewModel = {
+  value: string;
+  label: string;
+};
+
+export type LinkedAccountEmailPreferenceViewModel = {
+  selectedEmail: string;
+  options: readonly LinkedAccountEmailOptionViewModel[];
+  helperText: string;
+};
+
 export type LinkedAccountCardViewModel = {
   providerFamily: string;
   displayName: string;
@@ -18,6 +29,7 @@ export type LinkedAccountCardViewModel = {
   accountLabel: string;
   linkedAtLabel: string | null;
   helperMessage: string | null;
+  emailPreference: LinkedAccountEmailPreferenceViewModel | null;
   primaryActionLabel: string | null;
   secondaryActionLabel: string | null;
 };
@@ -58,6 +70,7 @@ export function resolveLinkedAccountCardViewModel(
     linkedAccount.principal?.status === "reauthorization_required" ||
     linkedAccount.credential?.status === "expired" ||
     linkedAccount.credential?.status === "reauthorization_required";
+  const emailPreference = resolveLinkedAccountEmailPreferenceViewModel(linkedAccount);
 
   if (linkedAccount.configurationStatus === "disabled") {
     return {
@@ -75,6 +88,7 @@ export function resolveLinkedAccountCardViewModel(
         linkedAccount.principal === null
           ? `Your organization has disabled ${providerDisplayName} identity linking.`
           : `Your organization has disabled ${providerDisplayName} identity linking. You can still unlink this account.`,
+      emailPreference: null,
       primaryActionLabel: null,
       secondaryActionLabel: linkedAccount.principal === null ? null : "Unlink",
     };
@@ -90,6 +104,7 @@ export function resolveLinkedAccountCardViewModel(
       accountLabel: "No linked account yet",
       linkedAtLabel: null,
       helperMessage: null,
+      emailPreference: null,
       primaryActionLabel: "Link account",
       secondaryActionLabel: null,
     };
@@ -105,6 +120,7 @@ export function resolveLinkedAccountCardViewModel(
       accountLabel: resolveLinkedAccountLabel(linkedAccount),
       linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
       helperMessage: `${providerDisplayName} needs to be linked again before Mistle can act as you.`,
+      emailPreference: null,
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     };
@@ -118,7 +134,11 @@ export function resolveLinkedAccountCardViewModel(
     statusTone: "active",
     accountLabel: resolveLinkedAccountLabel(linkedAccount),
     linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
-    helperMessage: null,
+    helperMessage:
+      linkedAccount.providerFamily === "github" && emailPreference === null
+        ? "GitHub has not provided selectable commit emails for this link."
+        : null,
+    emailPreference,
     primaryActionLabel: "Relink",
     secondaryActionLabel: "Unlink",
   };
@@ -152,7 +172,7 @@ function resolveLinkedAccountLabel(linkedAccount: LinkedAccount): string {
     return workspaceName;
   }
 
-  const email = profile?.["email"];
+  const email = profile?.["preferredEmail"];
   if (typeof email === "string" && email.length > 0) {
     return email;
   }
@@ -167,6 +187,70 @@ function resolveLinkedAccountLabel(linkedAccount: LinkedAccount): string {
   }
 
   return "Linked";
+}
+
+function resolveLinkedAccountEmailPreferenceViewModel(
+  linkedAccount: LinkedAccount,
+): LinkedAccountEmailPreferenceViewModel | null {
+  if (
+    linkedAccount.providerFamily !== "github" ||
+    linkedAccount.configurationStatus !== "active" ||
+    linkedAccount.principal?.status !== "active" ||
+    linkedAccount.credential?.status !== "active"
+  ) {
+    return null;
+  }
+
+  const profile = linkedAccount.principal.profile;
+  if (profile === null) {
+    return null;
+  }
+
+  const preferredEmail = profile["preferredEmail"];
+  const availableEmails = profile["availableEmails"];
+  if (typeof preferredEmail !== "string" || !Array.isArray(availableEmails)) {
+    return null;
+  }
+
+  const options: LinkedAccountEmailOptionViewModel[] = [];
+  for (const availableEmail of availableEmails) {
+    if (
+      typeof availableEmail !== "object" ||
+      availableEmail === null ||
+      !("email" in availableEmail) ||
+      !("primary" in availableEmail) ||
+      !("verified" in availableEmail)
+    ) {
+      continue;
+    }
+
+    const email = availableEmail.email;
+    const primary = availableEmail.primary;
+    const verified = availableEmail.verified;
+    if (
+      typeof email !== "string" ||
+      email.length === 0 ||
+      typeof primary !== "boolean" ||
+      verified !== true
+    ) {
+      continue;
+    }
+
+    options.push({
+      value: email,
+      label: primary ? `${email} (Primary)` : email,
+    });
+  }
+
+  if (options.length === 0 || !options.some((option) => option.value === preferredEmail)) {
+    return null;
+  }
+
+  return {
+    selectedEmail: preferredEmail,
+    options,
+    helperText: "Used for sandbox Git identity and commit signing.",
+  };
 }
 
 export function resolveLinkedAccountCallbackNotice(input: {
