@@ -276,7 +276,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <MemoryRouter>
         <OrganizationIdentityLinkingSettingsPageView
-          isLoading={false}
           loadErrorMessage={null}
           onProviderConnectionChange={() => {}}
           onSaveProvider={async () => {}}
