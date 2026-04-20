@@ -242,9 +242,16 @@ describe("IntegrationsEditorSection", () => {
     await waitFor(() => {
       const gitProvidersSection = getSectionContainer("Git Providers");
       expect(
-        within(gitProvidersSection).getByRole("button", { name: "Edit binding" }),
+        within(gitProvidersSection).queryByRole("button", { name: "Edit binding" }),
+      ).toBeNull();
+      expect(
+        within(gitProvidersSection).getByRole("combobox", { name: "Connection" }),
       ).toBeDefined();
-      expect(within(gitProvidersSection).getByText("target-git")).toBeDefined();
+      expect(within(gitProvidersSection).getAllByText("GitHub Production").length).toBeGreaterThan(
+        0,
+      );
+      expect(within(gitProvidersSection).getByText("Repositories")).toBeDefined();
+      expect(within(gitProvidersSection).getByText("GitHub CLI")).toBeDefined();
     });
   });
 
@@ -349,7 +356,10 @@ describe("IntegrationsEditorSection", () => {
     await waitFor(() => {
       const gitProvidersSection = getSectionContainer("Git Providers");
       expect(
-        within(gitProvidersSection).getByRole("button", { name: "Edit binding" }),
+        within(gitProvidersSection).queryByRole("button", { name: "Edit binding" }),
+      ).toBeNull();
+      expect(
+        within(gitProvidersSection).getByRole("combobox", { name: "Connection" }),
       ).toBeDefined();
     });
 

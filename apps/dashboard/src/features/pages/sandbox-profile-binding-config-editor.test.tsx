@@ -231,6 +231,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
             connectionId: "connection-github",
             kind: "repository",
             title: "Repositories",
+            variant: "combobox",
             searchPlaceholder: "Search repositories",
             emptyMessage: "No repositories available for this connection.",
             refreshLabel: "Refresh repositories",

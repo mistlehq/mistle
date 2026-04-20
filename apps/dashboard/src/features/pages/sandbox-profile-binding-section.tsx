@@ -863,6 +863,154 @@ function AgentHarnessRows(input: {
   );
 }
 
+function GitProviderRows(input: {
+  rows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowErrorsByClientId: Readonly<Record<string, string>>;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onRemove: (clientId: string) => void;
+}): React.JSX.Element {
+  const availableGitConnections = input.availableConnections.filter((connection) => {
+    const target = input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    return resolveBindingKindFromTarget(target) === "git";
+  });
+
+  return (
+    <div className="flex flex-col divide-y">
+      {input.rows.map((row) => {
+        const rowMetadata = resolveRowBindingMetadata({
+          row,
+          availableConnections: input.availableConnections,
+          availableTargets: input.availableTargets,
+        });
+        const target = rowMetadata?.target;
+        const connectionDisplayName =
+          rowMetadata === null
+            ? undefined
+            : formatConnectionDisplayName({
+                connection: rowMetadata.connection,
+              });
+        const fieldId = `git-binding-connection-${row.clientId}`;
+
+        return (
+          <div className="flex flex-col gap-4 py-2" key={row.clientId}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex items-center gap-2">
+                {target?.logoKey ? (
+                  <img
+                    alt={`${target.displayName} logo`}
+                    className="h-5 w-5 rounded-sm"
+                    src={resolveIntegrationLogoPath({ logoKey: target.logoKey })}
+                  />
+                ) : (
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-muted text-muted-foreground text-[10px] font-semibold">
+                    {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <div className="min-w-0 gap-0.5 flex flex-col">
+                  <p className="truncate text-sm font-medium">
+                    {target?.displayName ?? "Integration"}
+                  </p>
+                  {connectionDisplayName === undefined ? null : (
+                    <p className="text-muted-foreground truncate text-xs">
+                      {connectionDisplayName}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                aria-label="Remove binding"
+                className="h-7 w-7"
+                onClick={() => {
+                  input.onRemove(row.clientId);
+                }}
+                type="button"
+                variant="ghost"
+              >
+                <TrashIcon aria-hidden className="size-4" />
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <div className="min-w-0 flex flex-col gap-1.5">
+                <DetailLabel as="p">Connection</DetailLabel>
+                <Select
+                  onValueChange={(nextValue) => {
+                    if (nextValue === null) {
+                      return;
+                    }
+
+                    const nextConnection = availableGitConnections.find(
+                      (connection) => connection.id === nextValue,
+                    );
+                    const nextTarget = input.availableTargets.find(
+                      (candidate) => candidate.targetKey === nextConnection?.targetKey,
+                    );
+
+                    input.onChange(row.clientId, {
+                      connectionId: nextValue,
+                      config:
+                        nextConnection === undefined || nextTarget === undefined
+                          ? {}
+                          : createDefaultBindingConfig({
+                              connection: nextConnection,
+                              target: nextTarget,
+                            }),
+                    });
+                  }}
+                  value={resolveSelectableValue({
+                    selectedValue: row.connectionId,
+                    optionValues: availableGitConnections.map((connection) => connection.id),
+                  })}
+                >
+                  <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
+                    <SelectValue placeholder="Select integration connection">
+                      {connectionDisplayName}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent
+                    align="end"
+                    alignItemWithTrigger={false}
+                    className={IntegrationSelectContentClassName}
+                  >
+                    {availableGitConnections.map((connection) => (
+                      <SelectItem key={connection.id} value={connection.id}>
+                        {formatConnectionDisplayName({ connection })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <SandboxProfileBindingConfigEditor
+                availableConnections={input.availableConnections}
+                availableTargets={input.availableTargets}
+                formContext={{
+                  columns: 2,
+                  labelTone: "detail",
+                  layout: "vertical",
+                }}
+                onIntegrationBindingRowChange={input.onChange}
+                row={row}
+              />
+
+              {input.rowErrorsByClientId[row.clientId] === undefined ? null : (
+                <Notice variant="alert">{input.rowErrorsByClientId[row.clientId]}</Notice>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SandboxProfileBindingSection(input: {
   kind: SandboxIntegrationBindingKind;
   rows: readonly SandboxProfileBindingEditorRow[];
@@ -935,6 +1083,15 @@ export function SandboxProfileBindingSection(input: {
           />
         ) : input.kind === "agent" ? (
           <AgentHarnessRows
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            onChange={input.onRowChange}
+            onRemove={input.onRemove}
+            rowErrorsByClientId={input.rowErrorsByClientId}
+            rows={input.rows}
+          />
+        ) : input.kind === "git" ? (
+          <GitProviderRows
             availableConnections={input.availableConnections}
             availableTargets={input.availableTargets}
             onChange={input.onRowChange}

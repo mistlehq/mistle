@@ -24,6 +24,7 @@ const meta = {
   args: {
     id: "storybook-repositories",
     label: "Repositories",
+    layoutVariant: "panel",
     search: "",
     searchPlaceholder: "Search 24 repositories",
     refreshLabel: "Refresh repositories",
@@ -36,7 +37,7 @@ const meta = {
     refreshErrorMessage: null,
     emptyMessage: "No repositories available for this connection.",
     onSearchChange: () => {},
-    onToggleHandle: () => {},
+    onSelectionChange: () => {},
     onToggleAll: () => {},
     onRefresh: () => {},
     onBlur: () => {},
@@ -66,9 +67,42 @@ export const InteractiveSelection: Story = {
         {...args}
         emptyMessage={storyState.viewModel.emptyMessage}
         listState={createReadyState(storyState.visibleItems)}
+        layoutVariant="panel"
+        onSelectionChange={storyState.setSelectedHandles}
         onSearchChange={storyState.setSearch}
         onToggleAll={storyState.toggleAll}
-        onToggleHandle={storyState.toggleHandle}
+        search={storyState.search}
+        searchPlaceholder={storyState.viewModel.searchPlaceholder}
+        selectedHandles={storyState.selectedHandles}
+        visibleItems={storyState.visibleItems}
+        refreshTooltip={storyState.viewModel.refreshTooltip}
+      />
+    );
+  },
+};
+
+export const Combobox: Story = {
+  args: {
+    layoutVariant: "combobox",
+  },
+  render: function RenderStory(args): React.JSX.Element {
+    const storyState = useIntegrationResourceStringArrayWidgetStoryState({
+      items: RepositoryItems,
+      title: "Repositories",
+      refreshLabel: args.refreshLabel,
+      syncMetadata: "Last synced Mar 9, 2026, 12:00 PM",
+      emptyMessage: "No repositories available for this connection.",
+      initialSelectedHandles: ["mistle/main-dashboard", "mistle/control-plane-api"],
+    });
+
+    return (
+      <IntegrationResourceStringArrayWidgetView
+        {...args}
+        emptyMessage={storyState.viewModel.emptyMessage}
+        listState={createReadyState(storyState.visibleItems)}
+        onSearchChange={storyState.setSearch}
+        onSelectionChange={storyState.setSelectedHandles}
+        onToggleAll={storyState.toggleAll}
         search={storyState.search}
         searchPlaceholder={storyState.viewModel.searchPlaceholder}
         selectedHandles={storyState.selectedHandles}

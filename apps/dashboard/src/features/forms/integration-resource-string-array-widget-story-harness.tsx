@@ -36,14 +36,6 @@ export function useIntegrationResourceStringArrayWidgetStoryState(input: {
     visibleItemsCount: visibleItems.length,
   });
 
-  function toggleHandle(handle: string): void {
-    setSelectedHandles((current) =>
-      current.includes(handle)
-        ? current.filter((selectedHandle) => selectedHandle !== handle)
-        : [...current, handle],
-    );
-  }
-
   function toggleAll(): void {
     const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
     const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
@@ -63,7 +55,7 @@ export function useIntegrationResourceStringArrayWidgetStoryState(input: {
     search,
     setSearch,
     selectedHandles,
-    toggleHandle,
+    setSelectedHandles,
     toggleAll,
     visibleItems,
     viewModel,

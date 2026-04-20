@@ -32,6 +32,7 @@ const IntegrationResourceStringArrayWidgetOptionsSchema = z
     connectionId: z.string().min(1),
     kind: z.string().min(1),
     title: z.string().min(1).optional(),
+    variant: z.enum(["panel", "combobox"]).optional(),
     searchPlaceholder: z.string().min(1).optional(),
     emptyMessage: z.string().min(1).optional(),
     refreshLabel: z.string().min(1).optional(),
@@ -141,13 +142,6 @@ export function IntegrationResourceStringArrayWidget(
       ? []
       : selectedHandles.filter((handle) => !availableHandles.has(handle));
 
-  function toggleHandle(handle: string): void {
-    const nextSelection = selectedHandles.includes(handle)
-      ? selectedHandles.filter((selectedHandle) => selectedHandle !== handle)
-      : [...selectedHandles, handle];
-    props.onChange(nextSelection);
-  }
-
   function toggleAll(): void {
     const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
     const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
@@ -241,6 +235,7 @@ export function IntegrationResourceStringArrayWidget(
       id={props.id}
       isRefreshing={refreshMutation.isPending}
       label={props.label}
+      layoutVariant={options.variant ?? "panel"}
       listState={
         resourceQuery.isPending
           ? {
@@ -264,9 +259,9 @@ export function IntegrationResourceStringArrayWidget(
         props.onFocus(props.id, selectedHandles);
       }}
       onRefresh={triggerRefresh}
+      onSelectionChange={props.onChange}
       onSearchChange={setSearch}
       onToggleAll={toggleAll}
-      onToggleHandle={toggleHandle}
       refreshErrorMessage={refreshErrorMessage}
       refreshLabel={refreshLabel}
       refreshTooltip={widgetViewModel.refreshTooltip}

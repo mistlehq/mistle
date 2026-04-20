@@ -40,6 +40,26 @@ export const RepositoryItems = [
     handle: "mistle/codex-bridge",
     displayName: "codex-bridge",
   }),
+  createRepositoryResource({
+    id: "repo_5",
+    handle: "mistle/session-workbench",
+    displayName: "session-workbench",
+  }),
+  createRepositoryResource({
+    id: "repo_6",
+    handle: "mistle/integration-runtime",
+    displayName: "integration-runtime",
+  }),
+  createRepositoryResource({
+    id: "repo_7",
+    handle: "mistle/sandbox-profiles-ui",
+    displayName: "sandbox-profiles-ui",
+  }),
+  createRepositoryResource({
+    id: "repo_8",
+    handle: "mistle/connector-orchestrator",
+    displayName: "connector-orchestrator",
+  }),
 ] as const satisfies readonly IntegrationConnectionResource[];
 
 export function filterRepositoryItems(

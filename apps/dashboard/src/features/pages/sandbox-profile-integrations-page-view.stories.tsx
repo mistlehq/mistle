@@ -47,7 +47,14 @@ const InitialRows: readonly SandboxProfileBindingEditorRow[] = [
     connectionId: StoryGithubConnection.id,
     kind: "git",
     config: {
-      repositories: ["mistle/main-app", "mistle/docs"],
+      repositories: [
+        "mistle/main-dashboard",
+        "mistle/control-plane-api",
+        "mistle/sandbox-runtime",
+        "mistle/codex-bridge",
+        "mistle/session-workbench",
+        "mistle/integration-runtime",
+      ],
       tools: ["github-cli"],
     },
   },

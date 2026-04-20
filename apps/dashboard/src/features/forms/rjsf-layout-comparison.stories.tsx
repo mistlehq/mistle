@@ -210,14 +210,15 @@ function ManualResourcePicker(): React.JSX.Element {
       emptyMessage="No repositories available for this connection."
       id="manual-repositories"
       isRefreshing={false}
+      layoutVariant="panel"
       label="Repositories"
       listState={createReadyState(RepositoryItems)}
       onBlur={() => {}}
       onFocus={() => {}}
       onRefresh={() => {}}
+      onSelectionChange={() => {}}
       onSearchChange={() => {}}
       onToggleAll={() => {}}
-      onToggleHandle={() => {}}
       refreshErrorMessage={null}
       refreshLabel="Refresh repositories"
       refreshTooltip="Refresh repositories\nLast synced Mar 9, 2026, 12:00 PM"
