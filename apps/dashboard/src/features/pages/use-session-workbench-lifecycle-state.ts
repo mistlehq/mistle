@@ -10,7 +10,6 @@ import {
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
@@ -75,7 +74,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     | "sessionSnapshot"
     | "sessionConnectionState"
   >;
-  ptyState: ReturnType<typeof useSandboxPtyState>;
   queryClient: QueryClient;
 }) {
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
@@ -90,6 +88,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   // Recovery must not trust a cached pre-reset "running" read. Each reset/disconnect
   // records the latest query timestamp and blocks reconnect logic until a newer read lands.
   const recoveryStatusBoundaryDataUpdatedAtRef = useRef<number | null>(null);
+  const terminalResetRefreshStateRef = useRef({
+    inFlight: false,
+    queued: false,
+  });
 
   const {
     clearLifecycleErrorMessage,
@@ -102,7 +104,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     recoverableDisconnect,
     sessionConnectionState,
   } = input.lifecycle;
-  const { disconnectPty } = input.ptyState.actions;
   const sandboxStatusQuery = useQuery({
     queryKey:
       input.sandboxInstanceId === null
@@ -135,6 +136,35 @@ export function useSessionWorkbenchLifecycleState(input: {
   const markRecoveryBoundary = useCallback(() => {
     recoveryStatusBoundaryDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
   }, [sandboxStatusQuery.dataUpdatedAt]);
+
+  const handleTerminalWorkspaceReset = useCallback((): void => {
+    markRecoveryBoundary();
+
+    const refreshState = terminalResetRefreshStateRef.current;
+    if (refreshState.inFlight) {
+      refreshState.queued = true;
+      return;
+    }
+
+    refreshState.inFlight = true;
+
+    const refetchTerminalWorkspaceStatus = (): void => {
+      void sandboxStatusQuery
+        .refetch()
+        .catch(() => {})
+        .finally(() => {
+          if (refreshState.queued) {
+            refreshState.queued = false;
+            refetchTerminalWorkspaceStatus();
+            return;
+          }
+
+          refreshState.inFlight = false;
+        });
+    };
+
+    refetchTerminalWorkspaceStatus();
+  }, [markRecoveryBoundary, sandboxStatusQuery.refetch]);
 
   if (initialSandboxStatusDataUpdatedAtRef.current === null) {
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
@@ -190,9 +220,8 @@ export function useSessionWorkbenchLifecycleState(input: {
     return () => {
       clearLifecycleErrorMessage();
       disconnectSession();
-      void disconnectPty();
     };
-  }, [clearLifecycleErrorMessage, disconnectPty, disconnectSession]);
+  }, [clearLifecycleErrorMessage, disconnectSession]);
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -203,6 +232,10 @@ export function useSessionWorkbenchLifecycleState(input: {
     setAutomationPendingErrorMessage(null);
     initialSandboxStatusDataUpdatedAtRef.current = null;
     recoveryStatusBoundaryDataUpdatedAtRef.current = null;
+    terminalResetRefreshStateRef.current = {
+      inFlight: false,
+      queued: false,
+    };
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
@@ -318,7 +351,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     isWaitingForAutomationThread,
     mainPanelTransitionState: input.mainPanelTransitionState,
     markRecoveryBoundary,
-    ptyResetInfo: input.ptyState.lifecycle.resetInfo,
     recoverSession,
     recoverableDisconnect,
     refetchSandboxStatus: sandboxStatusQuery.refetch,
@@ -406,6 +438,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
 
   return {
+    handleTerminalWorkspaceReset,
     sessionSnapshot,
     sandboxStatusReadState,
     connectionReadiness,

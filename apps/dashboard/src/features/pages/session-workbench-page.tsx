@@ -372,6 +372,7 @@ function SessionWorkbenchPageContent(input: {
           ensureTransportConnected={workbench.ensureTransportConnected}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
+          onTerminalReset={workbench.handleTerminalWorkspaceReset}
           onWorkspaceEmpty={() => {
             workbench.terminalPanelState.closePanel();
           }}

@@ -70,14 +70,12 @@ describe("useSessionWorkbenchController", () => {
       canConnect: false,
       reason: "missing-session",
     });
+    expect(typeof result.current.workbench.handleTerminalWorkspaceReset).toBe("function");
     expect(result.current.workbench.stoppedSessionMessage).toBeNull();
     expect(result.current.workbench.workbenchStatus).toEqual({
       kind: "not_connected",
       alert: null,
     });
-    expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
-    expect(result.current.workbench.ptyState.lifecycle.state).toBe("idle");
-    expect(result.current.workbench.ptyState.output.chunks).toEqual([]);
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
     expect(result.current.workbench.diffPanelState.isVisible).toBe(false);

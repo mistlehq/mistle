@@ -57,9 +57,9 @@ type SessionWorkbenchState = {
       | "stopped"
       | "unknown";
   };
+  handleTerminalWorkspaceReset: () => void;
   stoppedSessionMessage: string | null;
   workbenchStatus: SessionWorkbenchStatus;
-  ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxLifecycleStatus: ReturnType<
     typeof useSessionWorkbenchLifecycleState
   >["sandboxLifecycleStatus"];
@@ -158,9 +158,6 @@ export function useSessionWorkbenchController(input: {
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
-  const ptyState = useSandboxPtyState({
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-  });
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
@@ -189,7 +186,6 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
     lifecycle,
-    ptyState,
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
@@ -264,9 +260,9 @@ export function useSessionWorkbenchController(input: {
     workbench: {
       ensureTransportConnected: transportManager.ensureTransportConnected,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
+      handleTerminalWorkspaceReset: workbenchLifecycleState.handleTerminalWorkspaceReset,
       stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
       workbenchStatus: workbenchLifecycleState.workbenchStatus,
-      ptyState,
       cliPtyState,
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,

@@ -1,4 +1,6 @@
+import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
@@ -13,18 +15,50 @@ import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   createStoryLongCliOutput,
+  createStoryPtyChunks,
   createStoryWorkbenchCliPtyState,
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   SessionWorkbenchStoryChrome,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
-import { SessionTerminalPanel } from "./session-terminal-panel.js";
+import { SessionTerminalDockviewWorkspaceView } from "./session-terminal-dockview-workspace.js";
+import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
   headerStatusUi: SandboxStatusBadgeUi;
 };
+
+function StoryPageViewTerminalBody(input: {
+  cwd: string | null;
+  isPanelVisible: boolean;
+  panelId: string;
+}): React.JSX.Element {
+  const [outputText, setOutputText] = useState(
+    [
+      "root@sandbox:~# pwd",
+      input.cwd ?? "/root",
+      "root@sandbox:~# ls",
+      "apps  packages  README.md",
+      "",
+    ].join("\n"),
+  );
+
+  return (
+    <SessionTerminalSurface
+      isVisible={input.isPanelVisible}
+      lifecycleState={SandboxPtyStates.OPEN}
+      onResize={async () => {
+        return;
+      }}
+      onWriteInput={async (nextInput) => {
+        setOutputText((currentOutput) => `${currentOutput}${nextInput}`);
+      }}
+      outputChunks={createStoryPtyChunks(outputText)}
+    />
+  );
+}
 
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/PageView",
@@ -170,23 +204,11 @@ export const CliSplitWithTerminal: Story = {
     mainContentLayout: { scroll: "contained", width: "full" },
     primaryBottomPanel: null,
     bottomPanel: (
-      <SessionTerminalPanel
+      <SessionTerminalDockviewWorkspaceView
         cwd={null}
-        isConnectionReady={true}
         isVisible={true}
-        onDisconnectTerminal={noop}
-        onHide={noop}
-        ptyState={createStoryWorkbenchCliPtyState(
-          [
-            "root@sandbox:~# pwd",
-            "/root",
-            "root@sandbox:~# ls",
-            "apps  packages  README.md",
-            "",
-          ].join("\n"),
-        )}
-        sandboxInstanceId={StorySandboxInstanceId}
-        sandboxStatus="running"
+        onWorkspaceEmpty={noop}
+        renderTerminalPanel={(panelInput) => <StoryPageViewTerminalBody {...panelInput} />}
       />
     ),
     bottomPanelSize: 32,

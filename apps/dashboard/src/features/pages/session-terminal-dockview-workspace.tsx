@@ -34,7 +34,7 @@ import {
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
   type TerminalRecoveryState,
-} from "./session-terminal-panel.js";
+} from "./session-terminal-runtime.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
 
 type SessionTerminalRecoverySandboxStatus =
@@ -54,6 +54,7 @@ type SessionTerminalDockviewWorkspaceProps = {
   }>;
   isConnectionReady: boolean;
   isVisible: boolean;
+  onTerminalReset?: (input: { panelId: string }) => void;
   onWorkspaceEmpty: () => void;
   sandboxInstanceId: string;
   sandboxStatus: SessionTerminalRecoverySandboxStatus;
@@ -219,6 +220,7 @@ function PtyBackedDockviewTerminalPanel(input: {
   isConnectionReady: boolean;
   isPanelVisible: boolean;
   isWorkspaceVisible: boolean;
+  onTerminalReset?: SessionTerminalDockviewWorkspaceProps["onTerminalReset"];
   panelId: string;
   sandboxInstanceId: string;
   sandboxStatus: SessionTerminalRecoverySandboxStatus;
@@ -245,6 +247,9 @@ function PtyBackedDockviewTerminalPanel(input: {
 
     lastHandledResetRef.current = resetInfo;
     isReconnectAttemptInFlightRef.current = false;
+    input.onTerminalReset?.({
+      panelId: input.panelId,
+    });
     setRecovery((currentState) =>
       reduceTerminalRecoveryState(currentState, {
         type: "reset_seen",
@@ -413,6 +418,7 @@ export const SessionTerminalDockviewWorkspace = forwardRef<
           isConnectionReady={props.isConnectionReady}
           isPanelVisible={isPanelVisible}
           isWorkspaceVisible={props.isVisible}
+          onTerminalReset={props.onTerminalReset}
           panelId={panelId}
           sandboxInstanceId={props.sandboxInstanceId}
           sandboxStatus={props.sandboxStatus}
