@@ -325,17 +325,16 @@ function SessionDiffPanelFileSection({
                       }
 
                       return (
-                        <div className="mx-4 my-3 overflow-hidden rounded-[20px] border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-                          <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
-                            <p className="text-foreground text-sm font-semibold">Local comment</p>
-                            <p className="text-muted-foreground text-xs">
-                              Comment on line{" "}
+                        <div className="m-1 max-w-2xl overflow-hidden rounded-md border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+                          <div className="border-b p-3">
+                            <p className="text-foreground text-sm font-semibold">
+                              Add comment on line{" "}
                               {formatPendingSessionDiffCommentLineLabel(activeCommentDraft)}
                             </p>
                           </div>
-                          <div className="px-5 py-4">
+                          <div className="p-3">
                             <Textarea
-                              className="min-h-28 resize-y rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                              className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
                               onChange={(event) => {
                                 setActiveCommentDraft((currentDraft) =>
                                   currentDraft === null
@@ -346,7 +345,7 @@ function SessionDiffPanelFileSection({
                                       },
                                 );
                               }}
-                              placeholder="Add a comment"
+                              placeholder="Add comment"
                               value={activeCommentDraft.body}
                             />
                             <div className="mt-4 flex items-center justify-end gap-2">
@@ -377,7 +376,7 @@ function SessionDiffPanelFileSection({
                                 }}
                                 type="button"
                               >
-                                Add to chat
+                                Add comment
                               </Button>
                             </div>
                           </div>
