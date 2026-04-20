@@ -96,10 +96,6 @@ export class SlackIdentityLinkingConfigurationError extends Error {
   }
 }
 
-function cloneSlackRecord(input: object): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(input));
-}
-
 function resolveOptionalSlackStringField(
   input: Readonly<Record<string, unknown>>,
   key: string,
@@ -193,7 +189,10 @@ function resolveSlackWebhookActorKeys(
     return null;
   }
 
-  const userId = resolveOptionalSlackStringField(cloneSlackRecord(rawEvent), "user");
+  const userId = resolveOptionalSlackStringField(
+    Object.fromEntries(Object.entries(rawEvent)),
+    "user",
+  );
   if (teamId === undefined || userId === undefined) {
     return null;
   }

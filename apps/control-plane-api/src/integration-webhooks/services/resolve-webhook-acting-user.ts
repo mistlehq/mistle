@@ -90,7 +90,14 @@ export async function resolveWebhookActingUser(
           OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
         ),
         eq(userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
-        or(...keys.map((key) => toPrincipalKeyMatchClause(key))),
+        or(
+          ...keys.map((key) =>
+            and(
+              eq(userExternalPrincipalKeys.keyType, key.keyType),
+              eq(userExternalPrincipalKeys.keyValue, key.keyValue),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -98,13 +105,6 @@ export async function resolveWebhookActingUser(
     keys,
     matchedKeyRows,
   });
-}
-
-function toPrincipalKeyMatchClause(input: IdentityLinkingPrincipalKey) {
-  return and(
-    eq(userExternalPrincipalKeys.keyType, input.keyType),
-    eq(userExternalPrincipalKeys.keyValue, input.keyValue),
-  );
 }
 
 function resolveMatchedWebhookPrincipalOrThrow(input: {
