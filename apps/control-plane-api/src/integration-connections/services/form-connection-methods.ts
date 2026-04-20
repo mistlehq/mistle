@@ -193,7 +193,7 @@ export function parseCreateFormSecretsOrThrow(input: {
     const normalizedValue = typeof rawValue === "string" ? rawValue.trim() : "";
 
     if (normalizedValue.length === 0) {
-      if (field.optional === true) {
+      if (field.optional) {
         return [];
       }
 

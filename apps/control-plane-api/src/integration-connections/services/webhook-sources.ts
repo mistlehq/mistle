@@ -210,7 +210,7 @@ export async function resolveConnectionSecretsOrThrow(input: {
         );
       } catch (error) {
         if (
-          field.optional === true &&
+          field.optional &&
           error instanceof InternalIntegrationCredentialsError &&
           error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
         ) {
