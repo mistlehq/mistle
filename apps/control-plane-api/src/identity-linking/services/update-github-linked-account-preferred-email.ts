@@ -96,7 +96,7 @@ export async function updateGitHubLinkedAccountPreferredEmail(
     );
   }
 
-  await ctx.db
+  const [updatedPrincipal] = await ctx.db
     .update(userExternalPrincipals)
     .set({
       profile: {
@@ -105,5 +105,15 @@ export async function updateGitHubLinkedAccountPreferredEmail(
       },
       updatedAt: sql`now()`,
     })
-    .where(eq(userExternalPrincipals.id, githubLinkedAccount.principal.id));
+    .where(eq(userExternalPrincipals.id, githubLinkedAccount.principal.id))
+    .returning({
+      id: userExternalPrincipals.id,
+    });
+
+  if (updatedPrincipal === undefined) {
+    throw new NotFoundError(
+      IdentityLinkingNotFoundCodes.LINKED_ACCOUNT_NOT_FOUND,
+      "GitHub linked account was not found for the authenticated user.",
+    );
+  }
 }
