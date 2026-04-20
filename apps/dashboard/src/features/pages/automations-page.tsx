@@ -86,40 +86,42 @@ export function AutomationsPage(): React.JSX.Element {
         </Button>
       </div>
 
-      <WebhookAutomationListView
-        errorMessage={errorMessage}
-        hasNextPage={automationsQuery.data?.nextPage != null}
-        hasPreviousPage={automationsQuery.data?.previousPage != null}
-        items={items}
-        nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-        onNextPage={() => {
-          const nextPage = automationsQuery.data?.nextPage;
-          if (nextPage === null || nextPage === undefined) {
-            return;
-          }
+      {automationsQuery.isPending ? null : (
+        <WebhookAutomationListView
+          errorMessage={errorMessage}
+          hasNextPage={automationsQuery.data?.nextPage != null}
+          hasPreviousPage={automationsQuery.data?.previousPage != null}
+          items={items}
+          nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+          onNextPage={() => {
+            const nextPage = automationsQuery.data?.nextPage;
+            if (nextPage === null || nextPage === undefined) {
+              return;
+            }
 
-          updatePagination({
-            nextAfter: nextPage.after,
-            nextBefore: null,
-          });
-        }}
-        onOpenAutomation={(automationId) => {
-          void navigate(`/automations/${automationId}`);
-        }}
-        onPreviousPage={() => {
-          const previousPage = automationsQuery.data?.previousPage;
-          if (previousPage === null || previousPage === undefined) {
-            return;
-          }
+            updatePagination({
+              nextAfter: nextPage.after,
+              nextBefore: null,
+            });
+          }}
+          onOpenAutomation={(automationId) => {
+            void navigate(`/automations/${automationId}`);
+          }}
+          onPreviousPage={() => {
+            const previousPage = automationsQuery.data?.previousPage;
+            if (previousPage === null || previousPage === undefined) {
+              return;
+            }
 
-          updatePagination({
-            nextAfter: null,
-            nextBefore: previousPage.before,
-          });
-        }}
-        previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-        totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
-      />
+            updatePagination({
+              nextAfter: null,
+              nextBefore: previousPage.before,
+            });
+          }}
+          previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+          totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
+        />
+      )}
     </div>
   );
 }

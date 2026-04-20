@@ -1,33 +1,42 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
+
+type ProfileSettingsPageViewStoryArgs = Partial<ComponentProps<typeof ProfileSettingsPageView>>;
+
+const DefaultProps: ComponentProps<typeof ProfileSettingsPageView> = {
+  displayName: "Mistle Developer",
+  email: "developer@mistle.so",
+  imageUrl: null,
+  linkedAccountActionPending: false,
+  linkedAccountCallbackNotice: null,
+  linkedAccountCard: null,
+  linkedAccountErrorMessage: null,
+  linkedAccountsEmptyStateMessage: null,
+  linkedAccountsLoading: false,
+  linkedAccountsLoadErrorMessage: null,
+  onDeleteProfileImage: async () => {},
+  onLinkLinkedAccount: async () => {},
+  onSaveChanges: async () => {},
+  onUnlinkLinkedAccount: async () => {},
+  onUploadProfileImage: async () => {},
+  profileImageBusy: false,
+  profileImageErrorMessage: null,
+  saving: false,
+};
 
 const meta = {
   title: "Dashboard/Settings/Profile/PageView",
   component: ProfileSettingsPageView,
   decorators: [withDashboardPageStory],
+  render: (args) => <ProfileSettingsPageView {...DefaultProps} {...args} />,
   args: {
     displayName: "Mistle Developer",
     email: "developer@mistle.so",
-    imageUrl: null,
-    linkedAccountActionPending: false,
-    linkedAccountCallbackNotice: null,
-    linkedAccountCard: null,
-    linkedAccountErrorMessage: null,
-    linkedAccountsEmptyStateMessage: null,
-    linkedAccountsLoading: false,
-    linkedAccountsLoadErrorMessage: null,
-    onDeleteProfileImage: async () => {},
-    onLinkLinkedAccount: async () => {},
-    onSaveChanges: async () => {},
-    onUnlinkLinkedAccount: async () => {},
-    onUploadProfileImage: async () => {},
-    profileImageBusy: false,
-    profileImageErrorMessage: null,
-    saving: false,
   },
-} satisfies Meta<typeof ProfileSettingsPageView>;
+} satisfies Meta<ProfileSettingsPageViewStoryArgs>;
 
 export default meta;
 
