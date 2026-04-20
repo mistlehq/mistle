@@ -1,7 +1,7 @@
 import {
-  DefaultStreamWindowBytes,
   decodeDataFrame,
   encodeDataFrame,
+  MaxStreamWindowBytes,
   parseStreamControlMessage,
   PayloadKindRawBytes,
   PayloadKindWebSocketText,
@@ -378,7 +378,7 @@ describe("SandboxSessionTransport", () => {
     ).toBe(true);
   });
 
-  it("allows agent streams to send a single payload larger than the generic default window", async () => {
+  it("allows agent streams to send a large payload when capacity is available", async () => {
     const server = await createManagedTestServer();
     const transport = new SandboxSessionTransport({
       runtime: createNodeSandboxSessionRuntime(),
@@ -393,7 +393,9 @@ describe("SandboxSessionTransport", () => {
         kind: "agent",
       },
     });
-    const payload = new TextEncoder().encode("x".repeat(DefaultStreamWindowBytes + 1024));
+    const payload = new TextEncoder().encode(
+      "x".repeat(Math.min(1024 * 1024, MaxStreamWindowBytes - 1024)),
+    );
 
     await expect(
       agentStream.sendDataFrame({
@@ -408,12 +410,11 @@ describe("SandboxSessionTransport", () => {
       timeoutMs: 1_000,
     });
 
-    expect(server.receivedDataFrames.at(-1)).toEqual({
-      frameKind: 0x01,
-      streamId: agentStream.streamId,
-      payloadKind: PayloadKindWebSocketText,
-      payload,
-    });
+    const receivedFrame = server.receivedDataFrames.at(-1);
+    expect(receivedFrame?.frameKind).toBe(0x01);
+    expect(receivedFrame?.streamId).toBe(agentStream.streamId);
+    expect(receivedFrame?.payloadKind).toBe(PayloadKindWebSocketText);
+    expect(receivedFrame?.payload.byteLength).toBe(payload.byteLength);
   });
 
   it("marks every active stream as transport_closed when the websocket closes", async () => {

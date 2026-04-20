@@ -1,3 +1,4 @@
+import { DefaultStreamWindowBytes } from "@mistle/sandbox-session-protocol";
 import { describe, expect, it } from "vitest";
 
 import { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
@@ -29,7 +30,7 @@ describe("SandboxTelemetryIngressService", () => {
       {
         type: "telemetry.open.ok",
         streamId: 41,
-        initialWindowBytes: 65536,
+        initialWindowBytes: DefaultStreamWindowBytes,
       },
     ]);
   });
@@ -59,7 +60,7 @@ describe("SandboxTelemetryIngressService", () => {
       {
         type: "telemetry.open.ok",
         streamId: 42,
-        initialWindowBytes: 65536,
+        initialWindowBytes: DefaultStreamWindowBytes,
       },
     ]);
   });

@@ -4,8 +4,8 @@ export const PayloadKindRawBytes = 0x01;
 export const PayloadKindWebSocketText = 0x02;
 export const PayloadKindWebSocketBinary = 0x03;
 export const MaxStreamId = 0xffff_ffff;
-export const DefaultStreamWindowBytes = 64 * 1024;
-export const MaxStreamWindowBytes = 1024 * 1024;
+export const DefaultStreamWindowBytes = 16 * 1024 * 1024;
+export const MaxStreamWindowBytes = 16 * 1024 * 1024;
 
 export interface StreamDataFrame {
   frameKind: number;

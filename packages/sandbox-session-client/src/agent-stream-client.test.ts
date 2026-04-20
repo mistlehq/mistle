@@ -604,10 +604,12 @@ describe("agent stream client", () => {
 
     let exhaustionError: Error | null = null;
     let successfulSendCount = 0;
+    const largePayloadTextBytes = Math.min(2 * 1024 * 1024, Math.floor(MaxStreamWindowBytes / 4));
     const largePayload = {
-      payload: "x".repeat(1024),
+      payload: "x".repeat(largePayloadTextBytes),
     };
     const largePayloadBytes = Buffer.byteLength(JSON.stringify(largePayload));
+    expect(largePayloadBytes).toBeLessThan(MaxStreamWindowBytes);
     for (
       let sentBytes = 0;
       sentBytes <= MaxStreamWindowBytes + largePayloadBytes;

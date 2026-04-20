@@ -97,7 +97,7 @@ pub const DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT: Duration = Duration::from_sec
 pub const DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Maximum time to wait for the bootstrap websocket handshake.
 pub const DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
-const MAX_UPLOAD_SIZE_BYTES: usize = 10 * 1024 * 1024;
+const MAX_UPLOAD_SIZE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_UPLOAD_THREAD_ID_LENGTH: usize = 128;
 const PNG_SIGNATURE: &[u8] = &[0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG_SIGNATURE: &[u8] = &[0xff, 0xd8, 0xff];
@@ -107,7 +107,7 @@ const WEBP_RIFF_SIGNATURE: &[u8] = &[0x52, 0x49, 0x46, 0x46];
 const WEBP_BRAND_SIGNATURE: &[u8] = &[0x57, 0x45, 0x42, 0x50];
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
-const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 256 * 1024;
+const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -3923,9 +3923,8 @@ mod tests {
     use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::protocol::{
-        AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
-        PAYLOAD_KIND_WEBSOCKET_TEXT, StreamSendWindow, decode_stream_data_frame,
-        encode_stream_data_frame,
+        AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
+        StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
     };
     use crate::tunnel::session::{TunnelSession, decode_bounded_output};
     use crate::tunnel::telemetry::{
@@ -4519,8 +4518,10 @@ mod tests {
     }
 
     #[test]
-    fn keeps_large_agent_responses_open_without_stream_window_exhaustion() {
-        let large_response_payload = "x".repeat(DEFAULT_STREAM_WINDOW_BYTES + 2048);
+    fn keeps_large_agent_responses_open_when_the_response_fits_within_the_stream_window() {
+        let large_response_payload =
+            "x".repeat(std::cmp::min(1024 * 1024, AGENT_STREAM_WINDOW_BYTES.saturating_sub(2048)));
+        let large_response_payload_len = large_response_payload.len();
 
         let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
         let raw_url = format!(
@@ -4721,7 +4722,7 @@ mod tests {
                     .as_str()
                     .expect("agent response should include the large string")
                     .len(),
-                DEFAULT_STREAM_WINDOW_BYTES + 2048
+                large_response_payload_len
             );
 
             websocket

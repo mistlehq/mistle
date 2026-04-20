@@ -1,7 +1,7 @@
 import { SandboxTelemetryResetError } from "./errors.js";
 
 const LineDelimiterByte = 0x0a;
-const MaxTelemetryLineBytes = 64 * 1024;
+const MaxTelemetryLineBytes = 16 * 1024 * 1024;
 
 function concatenateBytes(parts: readonly Uint8Array[]): Uint8Array {
   const totalLength = parts.reduce((sum, part) => sum + part.byteLength, 0);

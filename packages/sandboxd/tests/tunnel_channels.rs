@@ -14,8 +14,8 @@ use sandboxd::time::{Clock, SystemClock, ThreadSleeper};
 use sandboxd::tunnel::agent_stream::{DEFAULT_AGENT_STREAM_POLL_INTERVAL, relay_agent_stream};
 use sandboxd::tunnel::file_upload::relay_file_upload_stream;
 use sandboxd::tunnel::protocol::{
-    AGENT_STREAM_WINDOW_BYTES, DEFAULT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_TEXT, decode_stream_data_frame, encode_stream_data_frame,
+    AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    decode_stream_data_frame, encode_stream_data_frame,
 };
 use sandboxd::tunnel::telemetry::{
     SANDBOX_TELEMETRY_LOG_STREAM_ID, SandboxTelemetryLogLevel, TelemetryRelay,
@@ -136,13 +136,17 @@ fn relays_agent_channel_frames_between_tunnel_and_runtime_endpoint() {
 }
 
 #[test]
-fn relays_large_agent_websocket_messages_without_exhausting_the_send_window() {
+fn relays_large_agent_websocket_messages_when_the_payload_fits_within_the_stream_window() {
     let runtime_listener = TcpListener::bind("127.0.0.1:0").expect("runtime listener should bind");
     let runtime_address = runtime_listener
         .local_addr()
         .expect("runtime listener should expose its address");
     let runtime_url = format!("ws://127.0.0.1:{}/runtime", runtime_address.port());
-    let large_payload = "x".repeat(DEFAULT_STREAM_WINDOW_BYTES + 1024);
+    let large_payload = "x".repeat(std::cmp::min(
+        64 * 1024,
+        AGENT_STREAM_WINDOW_BYTES.saturating_sub(1024),
+    ));
+    let large_payload_len = large_payload.len();
 
     let runtime_thread = thread::spawn(move || {
         let (stream, _) = runtime_listener
@@ -203,10 +207,7 @@ fn relays_large_agent_websocket_messages_without_exhausting_the_send_window() {
     let output_frame = read_binary_frame(&mut client_socket);
     assert_eq!(output_frame.stream_id, 17);
     assert_eq!(output_frame.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
-    assert_eq!(
-        output_frame.payload.len(),
-        DEFAULT_STREAM_WINDOW_BYTES + 1024
-    );
+    assert_eq!(output_frame.payload.len(), large_payload_len);
 
     runtime_thread
         .join()
@@ -217,13 +218,15 @@ fn relays_large_agent_websocket_messages_without_exhausting_the_send_window() {
 }
 
 #[test]
-fn resets_agent_stream_when_runtime_message_exceeds_the_agent_window() {
+fn resets_agent_stream_when_runtime_messages_exceed_the_agent_window() {
     let runtime_listener = TcpListener::bind("127.0.0.1:0").expect("runtime listener should bind");
     let runtime_address = runtime_listener
         .local_addr()
         .expect("runtime listener should expose its address");
     let runtime_url = format!("ws://127.0.0.1:{}/runtime", runtime_address.port());
-    let oversized_payload = "x".repeat(AGENT_STREAM_WINDOW_BYTES + 1);
+    let first_payload = "x".repeat(64 * 1024);
+    let second_payload =
+        "x".repeat(AGENT_STREAM_WINDOW_BYTES.saturating_sub(first_payload.len()) + 1);
 
     let runtime_thread = thread::spawn(move || {
         let (stream, _) = runtime_listener
@@ -232,8 +235,11 @@ fn resets_agent_stream_when_runtime_message_exceeds_the_agent_window() {
         let mut websocket = accept(stream).expect("runtime websocket handshake should succeed");
 
         websocket
-            .send(Message::Text(oversized_payload.into()))
-            .expect("runtime endpoint should send an oversized websocket text response");
+            .send(Message::Text(first_payload.into()))
+            .expect("runtime endpoint should send the first websocket text response");
+        websocket
+            .send(Message::Text(second_payload.into()))
+            .expect("runtime endpoint should send the second websocket text response");
         websocket
             .close(None)
             .expect("runtime endpoint should close cleanly");
@@ -280,6 +286,11 @@ fn resets_agent_stream_when_runtime_message_exceeds_the_agent_window() {
         read_text_message(&mut client_socket),
         r#"{"type":"stream.open.ok","streamId":23}"#
     );
+
+    let first_frame = read_binary_frame(&mut client_socket);
+    assert_eq!(first_frame.stream_id, 23);
+    assert_eq!(first_frame.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
+    assert_eq!(first_frame.payload.len(), 64 * 1024);
 
     let reset_message = parse_json_text_message(&mut client_socket);
     assert_eq!(reset_message["type"], "stream.reset");
