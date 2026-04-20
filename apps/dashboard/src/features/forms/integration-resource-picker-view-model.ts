@@ -11,7 +11,7 @@ export type IntegrationResourceListViewState =
       items?: readonly unknown[];
     };
 
-export type IntegrationResourceWidgetViewModel = {
+export type IntegrationResourcePickerViewModel = {
   searchPlaceholder: string;
   refreshTooltip: string;
   emptyMessage: string;
@@ -115,7 +115,7 @@ function resolveSyncFailureState(input: {
   };
 }
 
-export function buildIntegrationResourceWidgetViewModel(input: {
+export function buildIntegrationResourcePickerViewModel(input: {
   title: string | undefined;
   availableCount: number | undefined;
   refreshLabel: string;
@@ -129,7 +129,7 @@ export function buildIntegrationResourceWidgetViewModel(input: {
   unavailableSelectedHandlesCount: number;
   listState: IntegrationResourceListViewState;
   visibleItemsCount: number;
-}): IntegrationResourceWidgetViewModel {
+}): IntegrationResourcePickerViewModel {
   const hasVisibleItems = input.visibleItemsCount > 0;
   const syncFailureState = resolveSyncFailureState({
     listState: input.listState,

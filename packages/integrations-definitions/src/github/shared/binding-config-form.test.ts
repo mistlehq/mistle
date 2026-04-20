@@ -56,7 +56,6 @@ describe("github binding config forms", () => {
           connectionId: "icn_github_form_test_001",
           kind: "repository",
           title: "Repositories",
-          variant: "combobox",
           searchPlaceholder: "Search repositories",
           emptyMessage: "No repositories available for this connection.",
           refreshLabel: "Refresh repositories",

@@ -12,8 +12,8 @@ import {
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
-import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
-import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
+import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
+import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 
 type JsonObject = Record<string, unknown>;
 const SearchDebounceMs = 300;
@@ -32,7 +32,6 @@ const IntegrationResourceStringArrayWidgetOptionsSchema = z
     connectionId: z.string().min(1),
     kind: z.string().min(1),
     title: z.string().min(1).optional(),
-    variant: z.enum(["panel", "combobox"]).optional(),
     searchPlaceholder: z.string().min(1).optional(),
     emptyMessage: z.string().min(1).optional(),
     refreshLabel: z.string().min(1).optional(),
@@ -202,7 +201,7 @@ export function IntegrationResourceStringArrayWidget(
         fallbackMessage: "Could not load resources for this connection.",
       });
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
-  const widgetViewModel = buildIntegrationResourceWidgetViewModel({
+  const widgetViewModel = buildIntegrationResourcePickerViewModel({
     title: options.title,
     availableCount,
     refreshLabel,
@@ -230,12 +229,11 @@ export function IntegrationResourceStringArrayWidget(
   });
 
   return (
-    <IntegrationResourceStringArrayWidgetView
+    <IntegrationResourcePickerView
       emptyMessage={widgetViewModel.emptyMessage}
       id={props.id}
       isRefreshing={refreshMutation.isPending}
       label={props.label}
-      layoutVariant={options.variant ?? "panel"}
       listState={
         resourceQuery.isPending
           ? {

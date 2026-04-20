@@ -47,7 +47,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Forms/AutoSaveTextField",
+  title: "Dashboard/Forms/Autosave Text Field",
   component: StoryHarness,
   decorators: [withDashboardCenteredStory],
   parameters: {

@@ -26,9 +26,9 @@ import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
 import {
   createGithubRepositoryResources,
   RepositoryItems,
-} from "./integration-resource-string-array-widget-story-support.js";
-import type { IntegrationResourceListViewState } from "./integration-resource-string-array-widget-view-model.js";
-import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
+} from "./integration-resource-picker-story-support.js";
+import type { IntegrationResourceListViewState } from "./integration-resource-picker-view-model.js";
+import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -206,11 +206,10 @@ function ManualCheckboxGroup(): React.JSX.Element {
 
 function ManualResourcePicker(): React.JSX.Element {
   return (
-    <IntegrationResourceStringArrayWidgetView
+    <IntegrationResourcePickerView
       emptyMessage="No repositories available for this connection."
       id="manual-repositories"
       isRefreshing={false}
-      layoutVariant="panel"
       label="Repositories"
       listState={createReadyState(RepositoryItems)}
       onBlur={() => {}}
@@ -617,7 +616,7 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
 }
 
 const meta = {
-  title: "Dashboard/Forms/RjsfLayoutComparison",
+  title: "Dashboard/Forms/Form Layout Comparison",
   component: RjsfLayoutComparisonStory,
   decorators: [withDashboardCenteredStory],
   parameters: {

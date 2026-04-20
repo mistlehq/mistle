@@ -4,7 +4,7 @@ import {
 } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
-import { createGithubRepositoryResources } from "../forms/integration-resource-string-array-widget-story-support.js";
+import { createGithubRepositoryResources } from "../forms/integration-resource-picker-story-support.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import type {
   IntegrationConnectionSummary,
