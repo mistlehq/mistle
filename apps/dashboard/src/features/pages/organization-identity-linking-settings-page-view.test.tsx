@@ -123,13 +123,13 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     expect(saveButtons).toHaveLength(2);
     expect(saveButtons[1]?.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Members/ })[0]!);
+    fireEvent.click(screen.getAllByRole("button", { name: /Linked users/ })[0]!);
 
     expect(screen.getByText("Owner User")).toBeTruthy();
     expect(screen.getByText("owner-github")).toBeTruthy();
     expect(screen.getByText("Updated 2026-04-20T00:00:00.000Z")).toBeTruthy();
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Members/ })[1]!);
+    fireEvent.click(screen.getAllByRole("button", { name: /Linked users/ })[1]!);
 
     expect(screen.getByText("Member User")).toBeTruthy();
     expect(screen.getByText("Not linked")).toBeTruthy();
@@ -320,7 +320,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Members/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Linked users/ }));
 
     expect(screen.getByText("Could not load linked-member visibility.")).toBeTruthy();
   });

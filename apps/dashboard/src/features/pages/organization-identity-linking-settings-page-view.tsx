@@ -219,7 +219,7 @@ export function OrganizationIdentityLinkingSettingsPageView(
                 <AccordionItem value={`${provider.providerFamily}-members`}>
                   <AccordionTrigger>
                     <div className="flex items-center gap-2">
-                      <span>Members</span>
+                      <span>Linked users</span>
                       <span className="text-muted-foreground text-xs font-normal">
                         ({provider.memberLinks.length})
                       </span>
