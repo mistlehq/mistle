@@ -1,7 +1,8 @@
 # Single-node Docker Compose
 
 This is the supported single-node Docker Compose workflow for Mistle.
-It runs the product on one machine with Mailpit-backed auth, Docker-backed sessions, and
+It builds the dashboard locally, pulls published backend and sandbox images, and runs the product
+on one machine with Mailpit-backed auth, Docker-backed sessions, and
 webhook-capable integration testing by default. It is not the production deployment artifact.
 `deploy/compose/local/compose.yaml` is the single local Compose source of truth.
 
@@ -23,9 +24,10 @@ webhook-capable integration testing by default. It is not the production deploym
    ./up.sh
    ```
 
-   `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet, pushes
-   the local sandbox base image into the bundled registry, provisions the default integration
-   targets, and ensures the control plane has a public webhook URL for the current run.
+   `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet, builds the
+   dashboard image locally, pulls the published backend and sandbox images for `MISTLE_IMAGE_TAG`,
+   provisions the default integration targets, and ensures the control plane has a public webhook
+   URL for the current run.
 
 3. Open the product:
 
@@ -33,10 +35,6 @@ webhook-capable integration testing by default. It is not the production deploym
 - Control Plane API: `http://localhost:8080`
 - Data Plane Gateway: `http://localhost:8084`
 - Mailpit UI: `http://localhost:8025`
-
-The local registry at `http://localhost:5001` is only an internal runtime dependency. It remains
-host-exposed because the host Docker daemon both pushes and later pulls the sandbox base image
-through that registry when local sandbox instances start.
 
 4. Run the acceptance smoke test from the repo root:
 
@@ -48,7 +46,12 @@ through that registry when local sandbox instances start.
 
 Most users do not need to edit `.env`.
 
-The main optional override is `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`:
+The main optional overrides are:
+
+- `MISTLE_IMAGE_TAG` to choose which published backend and sandbox images to pull
+- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
+
+For `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`:
 
 - leave it blank for the default quick-tunnel flow
 - set it only when you want a stable public webhook URL instead

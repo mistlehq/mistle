@@ -60,7 +60,14 @@ Mistle is built around isolated agent execution and explicit configuration.
 
 ## Run Mistle Locally
 
-The easiest way to run Mistle on one machine for local testing is the single-node Docker Compose workflow in [deploy/compose/local/](deploy/compose/local/).
+There are two supported ways to run Mistle locally:
+
+| Option                     | Use this when...                                                            | Start here                                     |
+| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
+| Contributor workflow       | You are developing inside the monorepo and want the normal local dev setup. | [CONTRIBUTING.md](CONTRIBUTING.md)             |
+| Single-node Docker Compose | You want to run Mistle on one machine for local testing.                    | [deploy/compose/local/](deploy/compose/local/) |
+
+Single-node Docker Compose is the easiest way to run Mistle on one machine for local testing:
 
 ```bash
 git clone https://github.com/mistlehq/mistle.git
@@ -73,9 +80,7 @@ cd mistle/deploy/compose/local
 ./down.sh
 ```
 
-If you want the monorepo contributor workflow instead, see [CONTRIBUTING.md](CONTRIBUTING.md) for the `pnpm dev` setup.
-
-## Deployment
+## Deploy Mistle
 
 Mistle is deployed as a multi-service system. The repository includes Kubernetes packaging, but deployment still requires environment-specific decisions about infrastructure, networking, secrets, and exposure.
 
@@ -91,11 +96,10 @@ Mistle should be treated as an integrated platform deployment rather than a sing
 
 ### Deployment Options
 
-| Option                     | Use this when...                                                             | Start here                                                                                                                                                              |
-| -------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Single-node Docker Compose | You want to run Mistle on one machine with Docker Compose for local testing. | [deploy/compose/local/](deploy/compose/local/)                                                                                                                          |
-| Kubernetes                 | You want the main cluster-based deployment path in this repository.          | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
-| Self-hosted Compose        | You want a separate self-hosted Compose deployment artifact.                 | Not implemented yet in this repository.                                                                                                                                 |
+| Option              | Use this when...                                                    | Start here                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kubernetes          | You want the main cluster-based deployment path in this repository. | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
+| Self-hosted Compose | You want a separate self-hosted Compose deployment artifact.        | Not implemented yet in this repository.                                                                                                                                 |
 
 ## Releases
 
