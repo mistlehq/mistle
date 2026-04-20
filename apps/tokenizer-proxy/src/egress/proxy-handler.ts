@@ -5,7 +5,7 @@ import {
   resolveProviderEgressTelemetryHandler,
 } from "@mistle/integrations-definitions/server";
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
-import { context, SpanStatusCode, trace } from "@opentelemetry/api";
+import { context, SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import { Hash } from "@smithy/hash-node";
 import { HttpRequest as SmithyHttpRequest } from "@smithy/protocol-http";
 import { SignatureV4 } from "@smithy/signature-v4";
@@ -56,6 +56,7 @@ type CredentialResolverInput =
 type ErrorResponse = {
   code: string;
   message: string;
+  traceId?: string;
 };
 
 type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
@@ -89,12 +90,40 @@ type CredentialResolverRef =
     };
 
 const EgressTracer = trace.getTracer("@mistle/tokenizer-proxy");
+const ProxyTraceIdHeaderName = "x-mistle-trace-id";
+const ProxyUpstreamStatusHeaderName = "x-mistle-upstream-status";
+const ProxyBodyStreamStateHeaderName = "x-mistle-upstream-body-stream-state";
 
 function createErrorResponse(input: ErrorResponse): ErrorResponse {
   return {
     code: input.code,
     message: input.message,
+    ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
   };
+}
+
+function createErrorJsonResponse(input: {
+  status: number;
+  error: ErrorResponse;
+  traceId?: string;
+  upstreamStatus?: number;
+  bodyStreamState?: "streaming" | "completed" | "errored" | "cancelled";
+}): Response {
+  const headers = new Headers({
+    "content-type": "application/json; charset=utf-8",
+  });
+  if (input.traceId !== undefined) {
+    setProxyDebugHeaders(headers, {
+      traceId: input.traceId,
+      ...(input.upstreamStatus === undefined ? {} : { upstreamStatus: input.upstreamStatus }),
+      ...(input.bodyStreamState === undefined ? {} : { bodyStreamState: input.bodyStreamState }),
+    });
+  }
+
+  return new Response(JSON.stringify(createErrorResponse(input.error)), {
+    status: input.status,
+    headers,
+  });
 }
 
 function readOptionalHeader(headers: Headers, headerName: string): string | undefined {
@@ -714,6 +743,299 @@ function copyResponseHeaders(source: Headers): Headers {
   return copiedHeaders;
 }
 
+function setProxyDebugHeaders(
+  headers: Headers,
+  input: {
+    traceId: string;
+    upstreamStatus?: number;
+    bodyStreamState?: "streaming" | "completed" | "errored" | "cancelled";
+  },
+): Headers {
+  headers.set(ProxyTraceIdHeaderName, input.traceId);
+  if (input.upstreamStatus !== undefined) {
+    headers.set(ProxyUpstreamStatusHeaderName, String(input.upstreamStatus));
+  }
+  if (input.bodyStreamState !== undefined) {
+    headers.set(ProxyBodyStreamStateHeaderName, input.bodyStreamState);
+  }
+  return headers;
+}
+
+function getSpanTraceId(span: Span): string {
+  return span.spanContext().traceId;
+}
+
+function readOptionalResponseHeader(headers: Headers, headerName: string): string | undefined {
+  const headerValue = headers.get(headerName);
+  if (headerValue === null) {
+    return undefined;
+  }
+  const trimmedHeaderValue = headerValue.trim();
+  return trimmedHeaderValue.length === 0 ? undefined : trimmedHeaderValue;
+}
+
+function describeUnknownValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    typeof value === "symbol"
+  ) {
+    return String(value);
+  }
+  if (value === undefined) {
+    return "undefined";
+  }
+  if (value === null) {
+    return "null";
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return Object.prototype.toString.call(value);
+  }
+}
+
+function createUpstreamResponseTelemetryAttributes(input: {
+  headers: Headers;
+  status: number;
+}): Record<string, string | number> {
+  return {
+    "http.response.status_code": input.status,
+    ...(readOptionalResponseHeader(input.headers, "content-type") === undefined
+      ? {}
+      : {
+          "mistle.upstream.response.content_type": readOptionalResponseHeader(
+            input.headers,
+            "content-type",
+          )!,
+        }),
+    ...(readOptionalResponseHeader(input.headers, "cf-ray") === undefined
+      ? {}
+      : {
+          "mistle.upstream.response.cf_ray": readOptionalResponseHeader(input.headers, "cf-ray")!,
+        }),
+    ...(readOptionalResponseHeader(input.headers, "x-request-id") === undefined
+      ? {}
+      : {
+          "mistle.upstream.response.request_id": readOptionalResponseHeader(
+            input.headers,
+            "x-request-id",
+          )!,
+        }),
+    ...(readOptionalResponseHeader(input.headers, "openai-model") === undefined
+      ? {}
+      : {
+          "mistle.upstream.response.openai_model": readOptionalResponseHeader(
+            input.headers,
+            "openai-model",
+          )!,
+        }),
+    ...(readOptionalResponseHeader(input.headers, "x-codex-turn-state") === undefined
+      ? {}
+      : {
+          "mistle.upstream.response.codex_turn_state": readOptionalResponseHeader(
+            input.headers,
+            "x-codex-turn-state",
+          )!,
+        }),
+  };
+}
+
+function createErrorTelemetryFields(error: unknown): Record<string, string | boolean> {
+  if (!(error instanceof Error)) {
+    return {
+      errorType: typeof error,
+      errorMessage: String(error),
+      isAbortError: false,
+    };
+  }
+
+  const cause =
+    error.cause instanceof Error
+      ? error.cause.message
+      : error.cause === undefined
+        ? undefined
+        : describeUnknownValue(error.cause);
+
+  return {
+    errorType: error.name,
+    errorMessage: error.message,
+    ...(cause === undefined ? {} : { errorCauseMessage: cause }),
+    isAbortError: error.name === "AbortError" || error.message.includes("aborted"),
+  };
+}
+
+function instrumentUpstreamResponseBody(input: {
+  upstreamResponse: Response;
+  proxySpan: Span;
+  traceId: string;
+  requestPath: string;
+  outgoingRequest: ProxyMutableRequest;
+  egressGrant: AuthorizedEgressGrant;
+  bindingId: string;
+}): Response {
+  const responseHeaders = setProxyDebugHeaders(
+    copyResponseHeaders(input.upstreamResponse.headers),
+    {
+      traceId: input.traceId,
+      upstreamStatus: input.upstreamResponse.status,
+      bodyStreamState: "streaming",
+    },
+  );
+  const upstreamBody = input.upstreamResponse.body;
+
+  if (upstreamBody === null) {
+    return new Response(null, {
+      status: input.upstreamResponse.status,
+      headers: responseHeaders,
+    });
+  }
+
+  const streamSpan = EgressTracer.startSpan("tokenizer_proxy.egress.forward_response_body", {
+    attributes: {
+      ...createUpstreamTelemetryAttributes({ upstreamUrl: input.outgoingRequest.url }),
+      ...createUpstreamResponseTelemetryAttributes({
+        headers: input.upstreamResponse.headers,
+        status: input.upstreamResponse.status,
+      }),
+      "http.request.method": input.outgoingRequest.method,
+      "mistle.egress.rule_id": input.egressGrant.egressRuleId,
+      "mistle.integration.binding_id": input.bindingId,
+      "mistle.proxy.trace_id": input.traceId,
+      "mistle.proxy.response.path": input.requestPath,
+    },
+  });
+  const reader = upstreamBody.getReader();
+  const startedAtMs = Date.now();
+  let chunkCount = 0;
+  let forwardedBytes = 0;
+  let firstChunkAtMs: number | undefined;
+  let ended = false;
+
+  function finalizeStream(
+    inputState: "completed" | "errored" | "cancelled",
+    error?: unknown,
+  ): void {
+    if (ended) {
+      return;
+    }
+    ended = true;
+    const durationMs = Date.now() - startedAtMs;
+    streamSpan.setAttribute("mistle.upstream.response.chunk_count", chunkCount);
+    streamSpan.setAttribute("mistle.upstream.response.forwarded_bytes", forwardedBytes);
+    streamSpan.setAttribute("mistle.upstream.response.stream_duration_ms", durationMs);
+    streamSpan.setAttribute("mistle.upstream.response.stream_state", inputState);
+    streamSpan.setAttribute(
+      "mistle.upstream.response.first_chunk_received",
+      firstChunkAtMs !== undefined,
+    );
+    if (firstChunkAtMs !== undefined) {
+      streamSpan.setAttribute(
+        "mistle.upstream.response.first_chunk_latency_ms",
+        firstChunkAtMs - startedAtMs,
+      );
+    }
+    input.proxySpan.addEvent(`upstream_response_body_${inputState}`, {
+      "mistle.upstream.response.chunk_count": chunkCount,
+      "mistle.upstream.response.forwarded_bytes": forwardedBytes,
+      "mistle.upstream.response.stream_duration_ms": durationMs,
+    });
+    if (error !== undefined) {
+      const wrappedError = error instanceof Error ? error : new Error(describeUnknownValue(error));
+      streamSpan.recordException(wrappedError);
+      streamSpan.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: wrappedError.message,
+      });
+    }
+    streamSpan.end();
+  }
+
+  const instrumentedBody = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const result = await reader.read();
+        if (result.done) {
+          finalizeStream("completed");
+          controller.close();
+          return;
+        }
+
+        chunkCount += 1;
+        forwardedBytes += result.value.byteLength;
+        if (firstChunkAtMs === undefined) {
+          firstChunkAtMs = Date.now();
+          streamSpan.addEvent("upstream_response_body_first_chunk", {
+            "mistle.upstream.response.first_chunk_latency_ms": firstChunkAtMs - startedAtMs,
+          });
+        }
+
+        controller.enqueue(result.value);
+      } catch (error) {
+        logger.error(
+          {
+            err: error,
+            proxyTraceId: input.traceId,
+            egressRuleId: input.egressGrant.egressRuleId,
+            bindingId: input.bindingId,
+            requestPath: input.requestPath,
+            upstreamUrl: input.outgoingRequest.url.toString(),
+            upstreamStatusCode: input.upstreamResponse.status,
+            chunkCount,
+            forwardedBytes,
+            firstChunkLatencyMs:
+              firstChunkAtMs === undefined ? undefined : firstChunkAtMs - startedAtMs,
+            streamDurationMs: Date.now() - startedAtMs,
+            ...createErrorTelemetryFields(error),
+          },
+          "Upstream egress response body stream failed",
+        );
+        finalizeStream("errored", error);
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      logger.warn(
+        {
+          proxyTraceId: input.traceId,
+          egressRuleId: input.egressGrant.egressRuleId,
+          bindingId: input.bindingId,
+          requestPath: input.requestPath,
+          upstreamUrl: input.outgoingRequest.url.toString(),
+          upstreamStatusCode: input.upstreamResponse.status,
+          chunkCount,
+          forwardedBytes,
+          firstChunkLatencyMs:
+            firstChunkAtMs === undefined ? undefined : firstChunkAtMs - startedAtMs,
+          streamDurationMs: Date.now() - startedAtMs,
+          cancelReason:
+            reason instanceof Error
+              ? reason.message
+              : reason === undefined
+                ? undefined
+                : String(reason),
+        },
+        "Downstream consumer cancelled proxied response body stream",
+      );
+      try {
+        await reader.cancel(reason);
+      } finally {
+        finalizeStream("cancelled");
+      }
+    },
+  });
+
+  return new Response(instrumentedBody, {
+    status: input.upstreamResponse.status,
+    headers: responseHeaders,
+  });
+}
+
 function extractDebugHeaders(headers: Headers): Record<string, string> {
   const allowedHeaderNames = [
     "authorization",
@@ -898,6 +1220,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         "url.path": ctx.req.path,
       },
     });
+    const traceId = getSpanTraceId(span);
 
     return await context.with(trace.setSpan(context.active(), span), async () => {
       try {
@@ -910,13 +1233,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             code: SpanStatusCode.ERROR,
             message: "invalid egress target path",
           });
-          return ctx.json(
-            createErrorResponse({
+          return createErrorJsonResponse({
+            status: 400,
+            traceId,
+            error: {
               code: "INVALID_EGRESS_TARGET_PATH",
               message: error instanceof Error ? error.message : "Egress target path is invalid.",
-            }),
-            400,
-          );
+              traceId,
+            },
+          });
         }
 
         let egressGrant: AuthorizedEgressGrant;
@@ -936,22 +1261,26 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           });
 
           if (error instanceof EgressGrantRequestError) {
-            ctx.status(error.statusCode);
-            return ctx.json(
-              createErrorResponse({
+            return createErrorJsonResponse({
+              status: error.statusCode,
+              traceId,
+              error: {
                 code: error.responseCode,
                 message: error.message,
-              }),
-            );
+                traceId,
+              },
+            });
           }
 
-          return ctx.json(
-            createErrorResponse({
+          return createErrorJsonResponse({
+            status: 401,
+            traceId,
+            error: {
               code: "INVALID_EGRESS_GRANT",
               message: error instanceof Error ? error.message : "Egress grant is invalid.",
-            }),
-            401,
-          );
+              traceId,
+            },
+          });
         }
 
         span.setAttributes(
@@ -1021,13 +1350,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             code: SpanStatusCode.ERROR,
             message: "credential resolver selection failed",
           });
-          return ctx.json(
-            createErrorResponse({
+          return createErrorJsonResponse({
+            status: 502,
+            traceId,
+            error: {
               code: "CREDENTIAL_RESOLUTION_FAILED",
               message: "Failed to resolve outbound credential.",
-            }),
-            502,
-          );
+              traceId,
+            },
+          });
         }
 
         const cacheKey = createCredentialCacheKey({
@@ -1118,13 +1449,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 code: SpanStatusCode.ERROR,
                 message: "credential resolution failed",
               });
-              return ctx.json(
-                createErrorResponse({
+              return createErrorJsonResponse({
+                status: 502,
+                traceId,
+                error: {
                   code: "CREDENTIAL_RESOLUTION_FAILED",
                   message: "Failed to resolve outbound credential.",
-                }),
-                502,
-              );
+                  traceId,
+                },
+              });
             }
 
             logger.warn(
@@ -1167,13 +1500,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                 code: SpanStatusCode.ERROR,
                 message: "credential resolution failed",
               });
-              return ctx.json(
-                createErrorResponse({
+              return createErrorJsonResponse({
+                status: 502,
+                traceId,
+                error: {
                   code: "CREDENTIAL_RESOLUTION_FAILED",
                   message: "Failed to resolve outbound credential.",
-                }),
-                502,
-              );
+                  traceId,
+                },
+              });
             }
           }
         }
@@ -1234,13 +1569,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               code: SpanStatusCode.ERROR,
               message: "credential resolution failed",
             });
-            return ctx.json(
-              createErrorResponse({
+            return createErrorJsonResponse({
+              status: 502,
+              traceId,
+              error: {
                 code: "CREDENTIAL_RESOLUTION_FAILED",
                 message: "Failed to resolve outbound credential.",
-              }),
-              502,
-            );
+                traceId,
+              },
+            });
           }
         }
 
@@ -1367,12 +1704,20 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
               }
             },
           );
+          span.addEvent("upstream_response_headers_received", {
+            ...createUpstreamResponseTelemetryAttributes({
+              headers: upstreamResponse.headers,
+              status: upstreamResponse.status,
+            }),
+          });
         } catch (error) {
           logger.error(
             {
               err: error,
+              proxyTraceId: traceId,
               egressRuleId: egressGrant.egressRuleId,
               upstreamBaseUrl: outgoingRequest.url.toString(),
+              ...createErrorTelemetryFields(error),
             },
             "Failed to forward egress request to upstream",
           );
@@ -1381,16 +1726,24 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             code: SpanStatusCode.ERROR,
             message: "upstream request failed",
           });
-          return ctx.json(
-            createErrorResponse({
+          return createErrorJsonResponse({
+            status: 502,
+            traceId,
+            bodyStreamState: "errored",
+            error: {
               code: "UPSTREAM_REQUEST_FAILED",
               message: "Failed to forward request to upstream.",
-            }),
-            502,
-          );
+              traceId,
+            },
+          });
         }
 
-        span.setAttribute("http.response.status_code", upstreamResponse.status);
+        span.setAttributes(
+          createUpstreamResponseTelemetryAttributes({
+            headers: upstreamResponse.headers,
+            status: upstreamResponse.status,
+          }),
+        );
         if (egressGrant.authInjectionType === "aws_sigv4") {
           const telemetryHandler = resolveProviderEgressTelemetryHandler(
             egressGrant.authInjectionType,
@@ -1418,6 +1771,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           logger.warn(
             {
               statusCode: upstreamResponse.status,
+              proxyTraceId: traceId,
               upstreamUrl: outgoingRequest.url.toString(),
               outgoingHeaders: extractDebugHeaders(outgoingRequest.headers),
               outgoingBody: outgoingBodyText,
@@ -1443,9 +1797,14 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           );
         }
 
-        return new Response(upstreamResponse.body, {
-          status: upstreamResponse.status,
-          headers: copyResponseHeaders(upstreamResponse.headers),
+        return instrumentUpstreamResponseBody({
+          upstreamResponse,
+          proxySpan: span,
+          traceId,
+          requestPath: ctx.req.path,
+          outgoingRequest,
+          egressGrant,
+          bindingId: egressGrant.bindingId,
         });
       } finally {
         span.end();

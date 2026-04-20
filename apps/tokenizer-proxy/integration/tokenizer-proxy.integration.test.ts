@@ -296,6 +296,35 @@ function writeJson(response: ServerResponse, statusCode: number, body: unknown):
   response.end(JSON.stringify(body));
 }
 
+async function expectProxyErrorResponse(
+  response: Response,
+  input: {
+    status: number;
+    code: string;
+    message: string;
+    bodyStreamState?: string;
+  },
+): Promise<void> {
+  const body: unknown = await response.json();
+
+  expect(response.status).toBe(input.status);
+  expect(body).toMatchObject({
+    code: input.code,
+    message: input.message,
+  });
+  if (typeof body !== "object" || body === null || !("traceId" in body)) {
+    throw new Error("Expected proxy error body to include traceId.");
+  }
+
+  const bodyTraceId = body.traceId;
+  expect(typeof bodyTraceId).toBe("string");
+  expect(bodyTraceId).toMatch(/^[0-9a-f]{32}$/);
+  expect(response.headers.get("x-mistle-trace-id")).toBe(bodyTraceId);
+  expect(response.headers.get("x-mistle-upstream-body-stream-state")).toBe(
+    input.bodyStreamState ?? null,
+  );
+}
+
 async function startControlPlaneCredentialServer(input: {
   host: string;
   serviceToken: string;
@@ -413,6 +442,58 @@ async function startGzipUpstream(input: {
     response.setHeader("content-encoding", "gzip");
     response.setHeader("content-length", String(gzippedBody.byteLength));
     response.end(gzippedBody);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, input.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  return {
+    baseUrl: `http://${input.host}:${String(port)}`,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
+  };
+}
+
+async function startStreamingUpstream(input: {
+  host: string;
+  path: string;
+  chunks: ReadonlyArray<string>;
+  headers?: Readonly<Record<string, string>>;
+}): Promise<{ baseUrl: string; stop: () => Promise<void> }> {
+  const port = await reserveAvailablePort({ host: input.host });
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url !== input.path) {
+      response.statusCode = 404;
+      response.end("not found");
+      return;
+    }
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "text/event-stream");
+    for (const [headerName, headerValue] of Object.entries(input.headers ?? {})) {
+      response.setHeader(headerName, headerValue);
+    }
+
+    for (const chunk of input.chunks) {
+      response.write(chunk);
+    }
+    response.end();
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -593,10 +674,8 @@ describe("tokenizer proxy integration", () => {
     const response = await fetch(`${fixture.baseUrl}/tokenizer-proxy/egress/v1/responses`, {
       method: "POST",
     });
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toEqual({
+    await expectProxyErrorResponse(response, {
+      status: 401,
       code: "INVALID_EGRESS_GRANT",
       message: "Egress grant token is required.",
     });
@@ -613,10 +692,8 @@ describe("tokenizer proxy integration", () => {
         "X-Mistle-Egress-Upstream-Base-Url": "https://attacker.invalid",
       },
     });
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body).toEqual({
+    await expectProxyErrorResponse(response, {
+      status: 401,
       code: "INVALID_EGRESS_GRANT",
       message: "Egress grant token is required.",
     });
@@ -673,12 +750,10 @@ describe("tokenizer proxy integration", () => {
           },
         },
       );
-      const body = await response.json();
-
-      expect(response.status).toBe(502);
-      expect(body).toEqual({
+      await expectProxyErrorResponse(response, {
+        status: 502,
         code: "CREDENTIAL_RESOLUTION_FAILED",
-        message: "Failed to resolve integration credential.",
+        message: "Failed to resolve outbound credential.",
       });
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
@@ -731,10 +806,8 @@ describe("tokenizer proxy integration", () => {
           },
         },
       );
-      const body = await response.json();
-
-      expect(response.status).toBe(403);
-      expect(body).toEqual({
+      await expectProxyErrorResponse(response, {
+        status: 403,
         code: "EGRESS_GRANT_SCOPE_VIOLATION",
         message: "Egress grant does not allow method 'GET'.",
       });
@@ -790,14 +863,75 @@ describe("tokenizer proxy integration", () => {
           },
         },
       );
-      const body = await response.json();
-
-      expect(response.status).toBe(403);
-      expect(body).toEqual({
+      await expectProxyErrorResponse(response, {
+        status: 403,
         code: "EGRESS_GRANT_SCOPE_VIOLATION",
         message: "Egress grant does not allow path '/graphql'.",
       });
       expect(controlPlaneServer.requests).toEqual([]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
+    }
+  });
+
+  it("returns a trace-correlated 502 when upstream connection setup fails", async () => {
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "sk-live-proxy",
+    });
+    const host = "127.0.0.1";
+    const upstreamPort = await reserveAvailablePort({ host });
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_upstream_connection_failure",
+      upstreamBaseUrl: `http://${host}:${String(upstreamPort)}`,
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/backend-api/codex"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/backend-api/codex/responses`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ model: "gpt-5", input: "hello" }),
+        },
+      );
+
+      await expectProxyErrorResponse(response, {
+        status: 502,
+        code: "UPSTREAM_REQUEST_FAILED",
+        message: "Failed to forward request to upstream.",
+        bodyStreamState: "errored",
+      });
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop()]);
     }
@@ -1740,6 +1874,7 @@ describe("tokenizer proxy integration", () => {
       ]);
       expect(controlPlaneServer.requests).toEqual([
         {
+          bindingId: "ibd_github",
           connectionId: "icn_github",
           secretType: "github_app_installation_token",
           resolverKey: "github_app_installation_token",
@@ -1815,6 +1950,7 @@ describe("tokenizer proxy integration", () => {
       expect(controlPlaneServer.principalCredentialRequests).toEqual([]);
       expect(controlPlaneServer.requests).toEqual([
         {
+          bindingId: "ibd_github",
           connectionId: "icn_github",
           secretType: "github_app_installation_token",
           resolverKey: "github_app_installation_token",
@@ -2030,6 +2166,80 @@ describe("tokenizer proxy integration", () => {
           },
         },
       });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
+    }
+  });
+
+  it("adds proxy correlation headers while forwarding streamed upstream responses", async () => {
+    const upstreamService = await startStreamingUpstream({
+      host: "127.0.0.1",
+      path: "/backend-api/codex/responses",
+      chunks: ["data: first\n\n", "data: second\n\n"],
+      headers: {
+        "x-request-id": "req_test_stream",
+        "openai-model": "gpt-5",
+      },
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "sk-live-proxy",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const egressGrant = await mintIntegrationEgressGrant({
+      egressRuleId: "egress_rule_streaming_headers",
+      upstreamBaseUrl: upstreamService.baseUrl,
+      bindingId: "ibd_openai",
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      additionalHeaders: {
+        "chatgpt-account-id": "acct_from_grant",
+      },
+      connectionId: "icn_openai",
+      secretType: "api_key",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/backend-api/codex"],
+    });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+          publicBaseUrl: PublicControlPlaneBaseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+      egressGrantConfig: IntegrationEgressGrantConfig,
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/backend-api/codex/responses`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ model: "gpt-5", stream: true, input: "hello" }),
+        },
+      );
+      const body = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(body).toBe("data: first\n\ndata: second\n\n");
+      expect(response.headers.get("x-mistle-trace-id")).toMatch(/^[0-9a-f]{32}$/);
+      expect(response.headers.get("x-mistle-upstream-status")).toBe("200");
+      expect(response.headers.get("x-mistle-upstream-body-stream-state")).toBe("streaming");
+      expect(response.headers.get("x-request-id")).toBe("req_test_stream");
+      expect(response.headers.get("openai-model")).toBe("gpt-5");
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }
