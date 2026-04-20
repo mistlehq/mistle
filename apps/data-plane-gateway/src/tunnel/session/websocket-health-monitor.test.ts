@@ -134,12 +134,14 @@ async function createWebSocketPair(): Promise<WebSocketPair> {
 
   const closeAll = async (): Promise<void> => {
     if (clientSocket.readyState === WebSocket.OPEN) {
+      const clientClosePromise = waitForWebSocketClose(clientSocket);
       clientSocket.close();
-      await waitForWebSocketClose(clientSocket);
+      await clientClosePromise;
     }
     if (serverSocket.readyState === WebSocket.OPEN) {
+      const serverClosePromise = waitForWebSocketClose(serverSocket);
       serverSocket.close();
-      await waitForWebSocketClose(serverSocket);
+      await serverClosePromise;
     }
     await new Promise<void>((resolve, reject) => {
       webSocketServer.close((error) => {
@@ -218,9 +220,10 @@ describe("startWebSocketHealthMonitor", () => {
       },
     });
 
-    pair.clientSocket.close();
-    await waitForWebSocketClose(pair.clientSocket);
-    await waitForWebSocketClose(pair.serverSocket);
+    const clientClosePromise = waitForWebSocketClose(pair.clientSocket);
+    const serverClosePromise = waitForWebSocketClose(pair.serverSocket);
+    pair.clientSocket.terminate();
+    await Promise.all([clientClosePromise, serverClosePromise]);
 
     clock.advanceMs(10);
     scheduler.runDue();
