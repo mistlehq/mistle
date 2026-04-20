@@ -262,7 +262,8 @@ services:
       AWS_SECRET_ACCESS_KEY: mistle-secret-key
     command:
       - server
-      - -ip=0.0.0.0
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
       - -dir=/data
       - -s3
     restart: unless-stopped
@@ -279,24 +280,21 @@ services:
       - app
 
   object-store-bootstrap:
-    <<: *mistle-local-bootstrap
-    image: ghcr.io/mistlehq/control-plane-api:${MISTLE_IMAGE_TAG}
+    image: chrislusf/seaweedfs:4.17_full
     pull_policy: always
     depends_on:
       seaweedfs:
         condition: service_healthy
     entrypoint:
-      - pnpm
-      - tsx
-      - scripts/dev/ensure-object-store-bucket.ts
-    environment:
-      DEV_OBJECT_STORE_ACCESS_KEY_ID: mistle-access-key
-      DEV_OBJECT_STORE_SECRET_ACCESS_KEY: mistle-secret-key
-      DEV_OBJECT_STORE_ENDPOINT: http://seaweedfs:8333
-      DEV_OBJECT_STORE_BUCKET_NAME: mistle-assets
-      DEV_OBJECT_STORE_PORT: "8333"
+      - sh
+      - -lc
+    command:
+      - >
+        printf 's3.bucket.create -name mistle-assets\nexit\n' |
+        weed shell -master=seaweedfs:9333
     networks:
       - app
+    restart: "no"
 
   control-plane-db-migrate:
     <<: *mistle-local-migration-job
