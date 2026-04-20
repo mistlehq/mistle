@@ -18,7 +18,10 @@ import { reconcilePendingSessionDiffComments } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover } from "./session-port-access-popover.js";
-import { SessionTerminalPanel } from "./session-terminal-panel.js";
+import {
+  SessionTerminalWorkspace,
+  type SessionTerminalWorkspaceHandle,
+} from "./session-terminal-workspace.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import {
   SessionWorkbenchPageView,
@@ -81,6 +84,7 @@ function SessionWorkbenchPageContent(input: {
       currentComments.filter((comment) => comment.id !== commentId),
     );
   }, []);
+  const terminalWorkspaceRef = useRef<SessionTerminalWorkspaceHandle | null>(null);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
@@ -188,11 +192,12 @@ function SessionWorkbenchPageContent(input: {
           onClick: () => {
             if (workbench.terminalPanelState.isVisible) {
               workbench.terminalPanelState.closePanel();
-              void workbench.ptyState.actions.disconnectPty();
+              void terminalWorkspaceRef.current?.disconnectAllTerminals();
               return;
             }
 
             workbench.terminalPanelState.openPanel();
+            terminalWorkspaceRef.current?.ensureTerminalWorkspace();
           },
           pressed: workbench.terminalPanelState.isVisible,
           title: terminalButtonTitle,
@@ -228,7 +233,6 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryPanelState.enterCliMode,
       workbench.primaryPanelState.exitCliMode,
       workbench.primaryPanelState.isCliToggleActive,
-      workbench.ptyState.actions.disconnectPty,
       workbench.stoppedSessionMessage,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
@@ -259,10 +263,7 @@ function SessionWorkbenchPageContent(input: {
       return !chatItemIds.has(entry.itemId);
     },
   );
-  const terminalPanelKey = [
-    input.sandboxInstanceId,
-    workbench.terminalPanelState.isVisible ? "visible" : "hidden",
-  ].join(":");
+  const terminalPanelKey = input.sandboxInstanceId ?? "missing-session";
   const diffPanelErrorNotice = !workbench.connectionReadiness.canConnect
     ? {
         message:
@@ -365,17 +366,16 @@ function SessionWorkbenchPageContent(input: {
         workbench.primaryPanelState.transitionState === "restoring_chat"
       }
       bottomPanel={
-        <SessionTerminalPanel
+        <SessionTerminalWorkspace
           key={terminalPanelKey}
           cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
+          ensureTransportConnected={workbench.ensureTransportConnected}
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
-          onHide={workbench.terminalPanelState.closePanel}
-          onDisconnectTerminal={async (): Promise<void> => {
+          onWorkspaceEmpty={() => {
             workbench.terminalPanelState.closePanel();
-            await workbench.ptyState.actions.disconnectPty();
           }}
-          ptyState={workbench.ptyState}
+          ref={terminalWorkspaceRef}
           sandboxStatus={workbench.sandboxLifecycleStatus}
           sandboxInstanceId={input.sandboxInstanceId}
         />

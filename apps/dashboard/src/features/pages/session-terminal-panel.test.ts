@@ -44,6 +44,21 @@ describe("buildTerminalPtyOpenInput", () => {
       sandboxInstanceId: "sandbox_123",
     });
   });
+
+  it("uses a custom PTY session id when one is provided", () => {
+    expect(
+      buildTerminalPtyOpenInput({
+        cwd: null,
+        ptySessionId: "terminal-2",
+        sandboxInstanceId: "sandbox_123",
+      }),
+    ).toEqual({
+      cols: 120,
+      ptySessionId: "terminal-2",
+      rows: 20,
+      sandboxInstanceId: "sandbox_123",
+    });
+  });
 });
 
 describe("shouldAutoOpenTerminal", () => {

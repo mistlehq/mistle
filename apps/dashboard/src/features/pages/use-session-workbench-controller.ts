@@ -2,6 +2,7 @@ import type {
   CodexJsonRpcClient,
   AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 
@@ -40,6 +41,10 @@ import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifec
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
   connectionReadiness: {
     canConnect: boolean;
     reason:
@@ -257,6 +262,7 @@ export function useSessionWorkbenchController(input: {
 
   return {
     workbench: {
+      ensureTransportConnected: transportManager.ensureTransportConnected,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
       workbenchStatus: workbenchLifecycleState.workbenchStatus,

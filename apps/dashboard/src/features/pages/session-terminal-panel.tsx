@@ -288,17 +288,18 @@ export function resolveTerminalRecoveryMessage(input: {
 
 export function buildTerminalPtyOpenInput(input: {
   cwd: string | null;
+  ptySessionId?: string;
   sandboxInstanceId: string;
 }): {
   sandboxInstanceId: string;
-  ptySessionId: "terminal";
+  ptySessionId: string;
   cols: number;
   rows: number;
   cwd?: string;
 } {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    ptySessionId: "terminal",
+    ptySessionId: input.ptySessionId ?? "terminal",
     ...INITIAL_PTY_DIMENSIONS,
     ...(input.cwd === null ? {} : { cwd: input.cwd }),
   };

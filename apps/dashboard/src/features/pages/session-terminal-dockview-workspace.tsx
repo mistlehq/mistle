@@ -1,0 +1,607 @@
+import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import { Button, Spinner } from "@mistle/ui";
+import { PlusIcon } from "@phosphor-icons/react";
+
+import "dockview/dist/styles/dockview.css";
+import {
+  DockviewReact,
+  type DockviewApi,
+  type DockviewGroupPanel,
+  type IDockviewHeaderActionsProps,
+  type IDockviewPanelProps,
+} from "dockview";
+import {
+  createContext,
+  forwardRef,
+  type CSSProperties,
+  type FunctionComponent,
+  type ReactElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import {
+  buildTerminalPtyOpenInput,
+  reduceTerminalRecoveryState,
+  resolveTerminalRecoveryMessage,
+  shouldAttemptTerminalReconnect,
+  shouldAutoOpenTerminal,
+  shouldHandleTerminalExit,
+  type TerminalRecoveryState,
+} from "./session-terminal-panel.js";
+import { SessionTerminalSurface } from "./session-terminal-surface.js";
+
+type SessionTerminalRecoverySandboxStatus =
+  | "pending"
+  | "starting"
+  | "running"
+  | "resuming"
+  | "stopped"
+  | "failed"
+  | null;
+
+type SessionTerminalDockviewWorkspaceProps = {
+  cwd: string | null;
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
+  isConnectionReady: boolean;
+  isVisible: boolean;
+  onWorkspaceEmpty: () => void;
+  sandboxInstanceId: string;
+  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+};
+
+type SessionTerminalDockviewWorkspaceViewProps = {
+  cwd: string | null;
+  isVisible: boolean;
+  onWorkspaceEmpty: () => void;
+  renderTerminalPanel: (input: {
+    closePanel: () => void;
+    cwd: string | null;
+    isPanelVisible: boolean;
+    panelId: string;
+  }) => ReactElement;
+};
+
+export type SessionTerminalDockviewWorkspaceHandle = {
+  disconnectAllTerminals: () => Promise<void>;
+  ensureTerminalWorkspace: () => void;
+};
+
+type SessionTerminalDockviewParams = {
+  cwd: string | null;
+};
+
+type SessionTerminalWorkspaceContextValue = {
+  createTerminal: (input: { referenceGroup?: DockviewGroupPanel }) => void;
+  renderTerminalPanel: SessionTerminalDockviewWorkspaceViewProps["renderTerminalPanel"];
+};
+
+type SessionDockviewTerminalPanelProps = IDockviewPanelProps<SessionTerminalDockviewParams>;
+
+const TerminalWorkspaceContext = createContext<SessionTerminalWorkspaceContextValue | null>(null);
+const SessionTerminalDockviewStyles = `
+.session-terminal-dockview {
+  background: #ffffff;
+}
+
+.session-terminal-dockview .dv-groupview {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.session-terminal-dockview .dv-tabs-and-actions-container {
+  border-bottom: 1px solid #e7e5e4;
+  padding: 0;
+}
+
+.session-terminal-dockview .dv-tab {
+  border-radius: 8px;
+  margin: 4px 2px;
+  padding: 0.35rem 0.625rem;
+}
+
+.session-terminal-dockview .dv-left-actions-container {
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+}
+
+.session-terminal-dockview .dv-default-tab .dv-default-tab-action {
+  color: #78716c;
+}
+
+.session-terminal-dockview .dv-default-tab .dv-default-tab-action:hover {
+  background-color: rgba(28, 25, 23, 0.08);
+}
+`;
+
+function useTerminalWorkspaceContext(): SessionTerminalWorkspaceContextValue {
+  const context = useContext(TerminalWorkspaceContext);
+  if (context === null) {
+    throw new Error("Terminal workspace context is required.");
+  }
+
+  return context;
+}
+
+function parseTerminalSequenceNumber(id: string): number | null {
+  if (id === "terminal") {
+    return 1;
+  }
+
+  const match = /^terminal-(\d+)$/.exec(id);
+  if (match === null) {
+    return null;
+  }
+
+  const sequenceNumber = Number(match[1]);
+  return Number.isInteger(sequenceNumber) && sequenceNumber > 1 ? sequenceNumber : null;
+}
+
+export function buildNextTerminalPanelDefinition(existingPanelIds: readonly string[]): {
+  id: string;
+  title: string;
+} {
+  let highestSequenceNumber = 0;
+
+  for (const id of existingPanelIds) {
+    const sequenceNumber = parseTerminalSequenceNumber(id);
+    if (sequenceNumber !== null) {
+      highestSequenceNumber = Math.max(highestSequenceNumber, sequenceNumber);
+    }
+  }
+
+  const nextSequenceNumber = highestSequenceNumber + 1;
+  if (nextSequenceNumber === 1) {
+    return {
+      id: "terminal",
+      title: "Terminal",
+    };
+  }
+
+  return {
+    id: `terminal-${String(nextSequenceNumber)}`,
+    title: `Terminal ${String(nextSequenceNumber)}`,
+  };
+}
+
+function DockviewTerminalNewTabAction(input: IDockviewHeaderActionsProps): ReactElement | null {
+  const { createTerminal } = useTerminalWorkspaceContext();
+
+  return (
+    <div className="flex items-center">
+      <Button
+        aria-label="Open terminal tab"
+        className="text-stone-500 hover:bg-stone-200 hover:text-stone-950"
+        onClick={() => {
+          createTerminal({
+            referenceGroup: input.group,
+          });
+        }}
+        size="icon-sm"
+        title="Open terminal tab"
+        type="button"
+        variant="ghost"
+      >
+        <PlusIcon className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
+function DockviewTerminalPanel(input: SessionDockviewTerminalPanelProps): ReactElement {
+  const { renderTerminalPanel } = useTerminalWorkspaceContext();
+  const initialParameters = input.api.getParameters<SessionTerminalDockviewParams>();
+  const [cwd, setCwd] = useState<string | null>(
+    typeof initialParameters.cwd === "string" ? initialParameters.cwd : null,
+  );
+  const [isPanelVisible, setIsPanelVisible] = useState(input.api.isVisible);
+
+  useEffect(() => {
+    const disposable = input.api.onDidParametersChange((nextParameters) => {
+      if (
+        typeof nextParameters !== "object" ||
+        nextParameters === null ||
+        Array.isArray(nextParameters)
+      ) {
+        setCwd(null);
+        return;
+      }
+
+      const nextCwd = Reflect.get(nextParameters, "cwd");
+      setCwd(typeof nextCwd === "string" ? nextCwd : null);
+    });
+
+    return () => {
+      disposable.dispose();
+    };
+  }, [input.api]);
+
+  useEffect(() => {
+    const disposable = input.api.onDidVisibilityChange((event) => {
+      setIsPanelVisible(event.isVisible);
+    });
+
+    return () => {
+      disposable.dispose();
+    };
+  }, [input.api]);
+
+  return renderTerminalPanel({
+    closePanel: () => {
+      input.api.close();
+    },
+    cwd,
+    isPanelVisible,
+    panelId: input.api.id,
+  });
+}
+
+function PtyBackedDockviewTerminalPanel(input: {
+  closePanel: () => void;
+  cwd: string | null;
+  ensureTransportConnected: SessionTerminalDockviewWorkspaceProps["ensureTransportConnected"];
+  isConnectionReady: boolean;
+  isPanelVisible: boolean;
+  isWorkspaceVisible: boolean;
+  panelId: string;
+  sandboxInstanceId: string;
+  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+}): ReactElement {
+  const ptyState = useSandboxPtyState({
+    ensureTransportConnected: input.ensureTransportConnected,
+  });
+  const { lifecycle, output, actions } = ptyState;
+  const { openPty, resizePty, writeInput } = actions;
+  const hasAttemptedAutoOpenRef = useRef(false);
+  const hasHandledExitRef = useRef(false);
+  const isReconnectAttemptInFlightRef = useRef(false);
+  const lastHandledResetRef = useRef(lifecycle.resetInfo);
+  const [recovery, setRecovery] = useState<TerminalRecoveryState>({
+    kind: "idle",
+  });
+  const isTerminalVisible = input.isWorkspaceVisible && input.isPanelVisible;
+
+  useEffect(() => {
+    const resetInfo = lifecycle.resetInfo;
+    if (!isTerminalVisible || resetInfo === null || lastHandledResetRef.current === resetInfo) {
+      return;
+    }
+
+    lastHandledResetRef.current = resetInfo;
+    isReconnectAttemptInFlightRef.current = false;
+    setRecovery((currentState) =>
+      reduceTerminalRecoveryState(currentState, {
+        type: "reset_seen",
+        resetInfo,
+      }),
+    );
+  }, [isTerminalVisible, lifecycle.resetInfo]);
+
+  useEffect(() => {
+    setRecovery((currentState) =>
+      reduceTerminalRecoveryState(currentState, {
+        type: "sync_observed",
+        isReconnectAttemptInFlight: isReconnectAttemptInFlightRef.current,
+        lifecycleState: lifecycle.state,
+        sandboxStatus: input.sandboxStatus,
+      }),
+    );
+  }, [input.sandboxStatus, lifecycle.state]);
+
+  useEffect(() => {
+    if (!shouldAttemptTerminalReconnect({ recovery })) {
+      return;
+    }
+
+    isReconnectAttemptInFlightRef.current = true;
+    setRecovery((currentState) =>
+      reduceTerminalRecoveryState(currentState, {
+        type: "reopen_requested",
+      }),
+    );
+
+    void openPty(
+      buildTerminalPtyOpenInput({
+        cwd: input.cwd,
+        ptySessionId: input.panelId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+    )
+      .catch((error) => {
+        setRecovery((currentState) =>
+          reduceTerminalRecoveryState(currentState, {
+            type: "reopen_failed",
+            message: error instanceof Error ? error.message : "Could not reopen sandbox terminal.",
+          }),
+        );
+      })
+      .finally(() => {
+        isReconnectAttemptInFlightRef.current = false;
+        setRecovery((currentState) =>
+          reduceTerminalRecoveryState(currentState, {
+            type: "sync_observed",
+            isReconnectAttemptInFlight: false,
+            lifecycleState: lifecycle.state,
+            sandboxStatus: input.sandboxStatus,
+          }),
+        );
+      });
+  }, [
+    input.cwd,
+    input.panelId,
+    input.sandboxInstanceId,
+    input.sandboxStatus,
+    lifecycle.state,
+    openPty,
+    recovery,
+  ]);
+
+  useEffect(() => {
+    if (lifecycle.exitInfo === null) {
+      hasHandledExitRef.current = false;
+      return;
+    }
+
+    if (
+      !shouldHandleTerminalExit({
+        exitInfo: lifecycle.exitInfo,
+        hasHandledExit: hasHandledExitRef.current,
+      })
+    ) {
+      return;
+    }
+
+    hasHandledExitRef.current = true;
+    input.closePanel();
+  }, [input.closePanel, lifecycle.exitInfo]);
+
+  useEffect(() => {
+    if (
+      !shouldAutoOpenTerminal({
+        isVisible: isTerminalVisible,
+        isConnectionReady: input.isConnectionReady,
+        lifecycleState: lifecycle.state,
+        hasAttemptedAutoOpen: hasAttemptedAutoOpenRef.current,
+      })
+    ) {
+      return;
+    }
+
+    hasAttemptedAutoOpenRef.current = true;
+    void openPty(
+      buildTerminalPtyOpenInput({
+        cwd: input.cwd,
+        ptySessionId: input.panelId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+    ).catch(() => {
+      // Error state is surfaced through the panel message.
+    });
+  }, [
+    input.cwd,
+    input.isConnectionReady,
+    input.panelId,
+    input.sandboxInstanceId,
+    isTerminalVisible,
+    lifecycle.state,
+    openPty,
+  ]);
+
+  const terminalRecoveryMessage = resolveTerminalRecoveryMessage({
+    recovery,
+    sandboxStatus: input.sandboxStatus,
+  });
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-white">
+      {terminalRecoveryMessage === null ? null : (
+        <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+          <div className="flex items-center gap-2">
+            {recovery.kind === "recovering" && recovery.errorMessage === null ? (
+              <Spinner className="size-4 shrink-0 text-stone-500" />
+            ) : null}
+            <span>{terminalRecoveryMessage}</span>
+          </div>
+        </div>
+      )}
+      <SessionTerminalSurface
+        isVisible={isTerminalVisible}
+        lifecycleState={lifecycle.state}
+        onResize={resizePty}
+        onWriteInput={writeInput}
+        outputChunks={output.chunks}
+      />
+    </div>
+  );
+}
+
+const DockviewTerminalComponents = {
+  terminal: DockviewTerminalPanel,
+} satisfies Record<string, FunctionComponent<SessionDockviewTerminalPanelProps>>;
+
+export const SessionTerminalDockviewWorkspace = forwardRef<
+  SessionTerminalDockviewWorkspaceHandle,
+  SessionTerminalDockviewWorkspaceProps
+>(function SessionTerminalDockviewWorkspaceInner(props, forwardedRef): ReactElement {
+  return (
+    <SessionTerminalDockviewWorkspaceView
+      cwd={props.cwd}
+      isVisible={props.isVisible}
+      onWorkspaceEmpty={props.onWorkspaceEmpty}
+      ref={forwardedRef}
+      renderTerminalPanel={({ closePanel, cwd, isPanelVisible, panelId }) => (
+        <PtyBackedDockviewTerminalPanel
+          closePanel={closePanel}
+          cwd={cwd}
+          ensureTransportConnected={props.ensureTransportConnected}
+          isConnectionReady={props.isConnectionReady}
+          isPanelVisible={isPanelVisible}
+          isWorkspaceVisible={props.isVisible}
+          panelId={panelId}
+          sandboxInstanceId={props.sandboxInstanceId}
+          sandboxStatus={props.sandboxStatus}
+        />
+      )}
+    />
+  );
+});
+
+export const SessionTerminalDockviewWorkspaceView = forwardRef<
+  SessionTerminalDockviewWorkspaceHandle,
+  SessionTerminalDockviewWorkspaceViewProps
+>(function SessionTerminalDockviewWorkspaceView(
+  { cwd, isVisible, onWorkspaceEmpty, renderTerminalPanel },
+  forwardedRef,
+): ReactElement {
+  const apiRef = useRef<DockviewApi | null>(null);
+  const [readyApi, setReadyApi] = useState<DockviewApi | null>(null);
+  const shouldEnsureWorkspaceRef = useRef(false);
+
+  const createTerminal = useCallback(
+    (input: { referenceGroup?: DockviewGroupPanel }): void => {
+      const api = apiRef.current;
+      if (api === null) {
+        shouldEnsureWorkspaceRef.current = true;
+        return;
+      }
+
+      const nextTerminal = buildNextTerminalPanelDefinition(api.panels.map((panel) => panel.id));
+
+      api.addPanel({
+        id: nextTerminal.id,
+        title: nextTerminal.title,
+        component: "terminal",
+        params: {
+          cwd,
+        },
+        renderer: "always",
+        ...(input.referenceGroup === undefined
+          ? {}
+          : { position: { referenceGroup: input.referenceGroup } }),
+      });
+    },
+    [cwd],
+  );
+
+  useImperativeHandle(
+    forwardedRef,
+    () => ({
+      disconnectAllTerminals: async (): Promise<void> => {
+        const api = apiRef.current;
+        if (api === null) {
+          shouldEnsureWorkspaceRef.current = false;
+          return;
+        }
+
+        api.closeAllGroups();
+      },
+      ensureTerminalWorkspace: (): void => {
+        const api = apiRef.current;
+        if (api === null) {
+          shouldEnsureWorkspaceRef.current = true;
+          return;
+        }
+
+        if (api.totalPanels === 0) {
+          createTerminal({
+            ...(api.activeGroup === undefined ? {} : { referenceGroup: api.activeGroup }),
+          });
+        }
+      },
+    }),
+    [createTerminal],
+  );
+
+  useEffect(() => {
+    if (readyApi === null) {
+      return;
+    }
+
+    const layoutChangeDisposable = readyApi.onDidLayoutChange(() => {
+      if (readyApi.totalPanels === 0) {
+        onWorkspaceEmpty();
+      }
+    });
+
+    return () => {
+      layoutChangeDisposable.dispose();
+    };
+  }, [onWorkspaceEmpty, readyApi]);
+
+  const contextValue = useMemo<SessionTerminalWorkspaceContextValue>(
+    () => ({
+      createTerminal,
+      renderTerminalPanel,
+    }),
+    [createTerminal, renderTerminalPanel],
+  );
+  const dockviewThemeStyle = useMemo((): CSSProperties => {
+    return {
+      "--dv-tabs-and-actions-container-height": "36px",
+      "--dv-tabs-and-actions-container-font-size": "12px",
+      "--dv-tab-font-size": "12px",
+      "--dv-tab-margin": "0",
+      "--dv-group-view-background-color": "#ffffff",
+      "--dv-tabs-and-actions-container-background-color": "#fafaf9",
+      "--dv-activegroup-visiblepanel-tab-background-color": "#ffffff",
+      "--dv-activegroup-hiddenpanel-tab-background-color": "#f5f5f4",
+      "--dv-inactivegroup-visiblepanel-tab-background-color": "#ffffff",
+      "--dv-inactivegroup-hiddenpanel-tab-background-color": "#f5f5f4",
+      "--dv-activegroup-visiblepanel-tab-color": "#1c1917",
+      "--dv-activegroup-hiddenpanel-tab-color": "#57534e",
+      "--dv-inactivegroup-visiblepanel-tab-color": "#44403c",
+      "--dv-inactivegroup-hiddenpanel-tab-color": "#78716c",
+      "--dv-tab-divider-color": "transparent",
+      "--dv-separator-border": "#e7e5e4",
+      "--dv-icon-hover-background-color": "rgba(28, 25, 23, 0.08)",
+      "--dv-sash-color": "#d6d3d1",
+      "--dv-active-sash-color": "#a8a29e",
+      "--dv-floating-box-shadow": "0 10px 30px rgba(28, 25, 23, 0.08)",
+      "--dv-border-radius": "0px",
+      "--dv-scrollbar-background-color": "rgba(28, 25, 23, 0.18)",
+    } as CSSProperties;
+  }, []);
+
+  return (
+    <div className="h-full min-h-0 border-t border-stone-300 bg-white">
+      <TerminalWorkspaceContext.Provider value={contextValue}>
+        <style>{SessionTerminalDockviewStyles}</style>
+        <div
+          className="session-terminal-dockview dockview-theme-light h-full min-h-0"
+          style={dockviewThemeStyle}
+        >
+          <DockviewReact
+            className="h-full"
+            components={DockviewTerminalComponents}
+            onReady={(event) => {
+              apiRef.current = event.api;
+              setReadyApi(event.api);
+
+              if (shouldEnsureWorkspaceRef.current || (isVisible && event.api.totalPanels === 0)) {
+                shouldEnsureWorkspaceRef.current = false;
+                createTerminal({
+                  ...(event.api.activeGroup === undefined
+                    ? {}
+                    : { referenceGroup: event.api.activeGroup }),
+                });
+              }
+            }}
+            leftHeaderActionsComponent={DockviewTerminalNewTabAction}
+            tabAnimation="smooth"
+          />
+        </div>
+      </TerminalWorkspaceContext.Provider>
+    </div>
+  );
+});
