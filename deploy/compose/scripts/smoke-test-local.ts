@@ -840,8 +840,9 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
         rows: 40,
         cwd: "/root",
         command: "sh",
-        args: ["-lc", `printf '%s\\n' ${shellQuote(marker)}`],
       });
+
+      await ptyClient.write(`printf '%s\\n' ${shellQuote(marker)}\nexit\n`);
 
       await waitForPtyExit;
     } catch (error) {

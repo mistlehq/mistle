@@ -1,16 +1,19 @@
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 
 import type { SandboxRuntimeStateSnapshot } from "../../runtime-state/sandbox-runtime-state-reader.js";
-import { isSandboxRuntimeReady } from "../../runtime-state/sandbox-runtime-state-readiness.js";
+import {
+  isSandboxRuntimeAttached,
+  isSandboxRuntimeReady,
+} from "../../runtime-state/sandbox-runtime-state-readiness.js";
 import { DataPlaneSandboxInstanceStatuses, type GetSandboxInstanceResponse } from "./schemas.js";
 
 /**
  * Composes the effective user-facing sandbox status from durable lifecycle
  * state and live gateway attachment state.
  *
- * Durable `pending`, `failed`, and `stopped` states always win. For durable `starting` and
- * `running`, gateway attachment determines whether the sandbox is effectively
- * `running` or still `starting`.
+ * Durable `pending` and `failed` states always win. For durable `stopped`,
+ * `starting`, and `running`, gateway attachment determines whether the sandbox
+ * is effectively still `stopped`, `starting`, or `running`.
  */
 export function resolveEffectiveSandboxInstanceStatus(input: {
   persistedStatus: string;
@@ -24,11 +27,8 @@ export function resolveEffectiveSandboxInstanceStatus(input: {
     return DataPlaneSandboxInstanceStatuses.FAILED;
   }
 
-  if (input.persistedStatus === SandboxInstanceStatuses.STOPPED) {
-    return DataPlaneSandboxInstanceStatuses.STOPPED;
-  }
-
   if (
+    input.persistedStatus !== SandboxInstanceStatuses.STOPPED &&
     input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
     input.persistedStatus !== SandboxInstanceStatuses.RUNNING
   ) {
@@ -37,6 +37,14 @@ export function resolveEffectiveSandboxInstanceStatus(input: {
 
   if (input.runtimeStateSnapshot !== null && isSandboxRuntimeReady(input.runtimeStateSnapshot)) {
     return DataPlaneSandboxInstanceStatuses.RUNNING;
+  }
+
+  if (input.runtimeStateSnapshot !== null && isSandboxRuntimeAttached(input.runtimeStateSnapshot)) {
+    return DataPlaneSandboxInstanceStatuses.STARTING;
+  }
+
+  if (input.persistedStatus === SandboxInstanceStatuses.STOPPED) {
+    return DataPlaneSandboxInstanceStatuses.STOPPED;
   }
 
   return DataPlaneSandboxInstanceStatuses.STARTING;
