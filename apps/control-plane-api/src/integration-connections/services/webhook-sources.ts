@@ -16,6 +16,10 @@ import {
 } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 
+import {
+  InternalIntegrationCredentialsError,
+  InternalIntegrationCredentialsErrorCodes,
+} from "../../internal/integration-credentials/services/errors.js";
 import { resolveIntegrationCredential } from "../../internal/integration-credentials/services/resolve-credential.js";
 import {
   encryptCredentialUtf8,
@@ -190,18 +194,31 @@ export async function resolveConnectionSecretsOrThrow(input: {
 
   const resolvedFieldSecrets = await Promise.all(
     connectionMethod.secretFields.map(async (field) => {
-      const resolvedCredential = await resolveIntegrationCredential(
-        {
-          db: input.db,
-          integrationRegistry: input.integrationRegistry,
-          integrationsConfig: input.integrationsConfig,
-        },
-        {
-          connectionId: input.connection.id,
-          secretType: field.secretType,
-          slotKey: field.slotKey,
-        },
-      );
+      let resolvedCredential;
+      try {
+        resolvedCredential = await resolveIntegrationCredential(
+          {
+            db: input.db,
+            integrationRegistry: input.integrationRegistry,
+            integrationsConfig: input.integrationsConfig,
+          },
+          {
+            connectionId: input.connection.id,
+            secretType: field.secretType,
+            slotKey: field.slotKey,
+          },
+        );
+      } catch (error) {
+        if (
+          field.optional === true &&
+          error instanceof InternalIntegrationCredentialsError &&
+          error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
+        ) {
+          return undefined;
+        }
+
+        throw error;
+      }
 
       return [
         field.name,
@@ -213,7 +230,9 @@ export async function resolveConnectionSecretsOrThrow(input: {
     }),
   );
 
-  return Object.fromEntries(resolvedFieldSecrets);
+  return Object.fromEntries(
+    resolvedFieldSecrets.filter((entry): entry is readonly [string, string] => entry !== undefined),
+  );
 }
 
 export function resolveWebhookSourceCapabilityOrThrow(input: {

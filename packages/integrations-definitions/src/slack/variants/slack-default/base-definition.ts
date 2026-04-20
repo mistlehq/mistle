@@ -1,9 +1,8 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import {
-  SlackAppOAuthConnectionConfigSchema,
+  SlackAppConnectionConfigSchema,
   type SlackConnectionConfig,
-  SlackBotTokenConnectionConfigSchema,
   SlackConnectionMethodIds,
   SlackCredentialSecretTypes,
   SlackCredentialSlotKeys,
@@ -11,13 +10,42 @@ import {
 import { resolveSlackBindingConfigForm } from "./binding-config-form.js";
 import { SlackBindingConfigSchema } from "./binding-config-schema.js";
 import { compileSlackBinding } from "./compile-binding.js";
-import {
-  SlackAppOAuthConnectionConfigForm,
-  SlackBotTokenConnectionConfigForm,
-} from "./connection-config-form.js";
+import { SlackAppConnectionConfigForm } from "./connection-config-form.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SlackTargetConfigSchema } from "./target-config-schema.js";
 import { SlackTargetSecretSchema } from "./target-secret-schema.js";
+
+const SlackAppBaseSecretFields = [
+  {
+    name: "botToken",
+    label: "Bot token",
+    placeholder: "xoxb-...",
+    description: "Bot user OAuth token from your Slack app installation.",
+    inputType: "password",
+    secretType: SlackCredentialSecretTypes.API_KEY,
+    slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
+  },
+  {
+    name: "signingSecret",
+    label: "Signing secret",
+    placeholder: "Slack signing secret",
+    description: "Signing secret from your Slack app's Basic Information page.",
+    inputType: "password",
+    secretType: SlackCredentialSecretTypes.API_KEY,
+    slotKey: SlackCredentialSlotKeys.SIGNING_SECRET,
+  },
+  {
+    name: "clientSecret",
+    label: "Client secret (Linked User Auth)",
+    placeholder: "Slack app client secret",
+    description:
+      "Required only for Identity Linking / linked user authorization. Not required for standard Slack app bot-token usage.",
+    inputType: "password",
+    secretType: SlackCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
+    slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
+    optional: true,
+  },
+] as const;
 
 export type SlackBaseIntegrationDefinition = IntegrationDefinition<
   typeof SlackTargetConfigSchema,
@@ -38,72 +66,16 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
   bindingConfigSchema: SlackBindingConfigSchema,
   bindingConfigForm: resolveSlackBindingConfigForm,
   identityLinking: {
-    eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP_OAUTH],
+    eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP],
   },
   connectionMethods: [
     {
-      id: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
-      label: "Bot token",
+      id: SlackConnectionMethodIds.SLACK_APP,
+      label: "Slack app",
       kind: "form",
-      secretFields: [
-        {
-          name: "botToken",
-          label: "Bot token",
-          placeholder: "xoxb-...",
-          description: "Bot user OAuth token from your Slack app installation.",
-          inputType: "password",
-          secretType: SlackCredentialSecretTypes.API_KEY,
-          slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
-        },
-        {
-          name: "signingSecret",
-          label: "Signing secret",
-          placeholder: "Slack signing secret",
-          description: "Signing secret from your Slack app's Basic Information page.",
-          inputType: "password",
-          secretType: SlackCredentialSecretTypes.API_KEY,
-          slotKey: SlackCredentialSlotKeys.SIGNING_SECRET,
-        },
-      ],
-      configSchema: SlackBotTokenConnectionConfigSchema,
-      configForm: SlackBotTokenConnectionConfigForm,
-    },
-    {
-      id: SlackConnectionMethodIds.SLACK_APP_OAUTH,
-      label: "Slack app OAuth",
-      kind: "form",
-      secretFields: [
-        {
-          name: "botToken",
-          label: "Bot token",
-          placeholder: "xoxb-...",
-          description: "Bot user OAuth token from your Slack app installation.",
-          inputType: "password",
-          secretType: SlackCredentialSecretTypes.API_KEY,
-          slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
-        },
-        {
-          name: "signingSecret",
-          label: "Signing secret",
-          placeholder: "Slack signing secret",
-          description: "Signing secret from your Slack app's Basic Information page.",
-          inputType: "password",
-          secretType: SlackCredentialSecretTypes.API_KEY,
-          slotKey: SlackCredentialSlotKeys.SIGNING_SECRET,
-        },
-        {
-          name: "clientSecret",
-          label: "Client secret (Linked User Auth)",
-          placeholder: "Slack app client secret",
-          description:
-            "Required only for Identity Linking / linked user authorization. Not required for bot-token-only Slack usage.",
-          inputType: "password",
-          secretType: SlackCredentialSecretTypes.OAUTH2_CLIENT_SECRET,
-          slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
-        },
-      ],
-      configSchema: SlackAppOAuthConnectionConfigSchema,
-      configForm: SlackAppOAuthConnectionConfigForm,
+      secretFields: SlackAppBaseSecretFields,
+      configSchema: SlackAppConnectionConfigSchema,
+      configForm: SlackAppConnectionConfigForm,
     },
   ],
   supportedWebhookEvents: SlackSupportedWebhookEvents,

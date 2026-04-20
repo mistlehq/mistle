@@ -380,26 +380,7 @@ describe("integrations-definitions index", () => {
       connectionMethods: [
         {
           id: "slack-bot-token",
-          label: "Bot token",
-          kind: "form",
-          secretFields: [
-            {
-              name: "botToken",
-              label: "Bot token",
-              inputType: "password",
-              slotKey: "slack.slack-default.slack-bot-token.bot-token",
-            },
-            {
-              name: "signingSecret",
-              label: "Signing secret",
-              inputType: "password",
-              slotKey: "slack.slack-default.slack-bot-token.signing-secret",
-            },
-          ],
-        },
-        {
-          id: "slack-app-oauth",
-          label: "Slack app OAuth",
+          label: "Slack app",
           kind: "form",
           secretFields: [
             {
@@ -417,8 +398,11 @@ describe("integrations-definitions index", () => {
             {
               name: "clientSecret",
               label: "Client secret (Linked User Auth)",
+              description:
+                "Required only for Identity Linking / linked user authorization. Not required for standard Slack app bot-token usage.",
               inputType: "password",
-              slotKey: "slack.slack-default.slack-app-oauth.client-secret",
+              optional: true,
+              slotKey: "slack.slack-default.slack-bot-token.client-secret",
             },
           ],
         },
@@ -427,7 +411,7 @@ describe("integrations-definitions index", () => {
     expect(slackDefinition?.webhookSource).toBeUndefined();
     expect(slackDefinition?.webhookHandler).toBeUndefined();
     expect(slackDefinition?.identityLinking).toEqual({
-      eligibleConnectionMethodIds: ["slack-app-oauth"],
+      eligibleConnectionMethodIds: ["slack-bot-token"],
     });
     expect(slackDefinition?.supportedWebhookEvents).toEqual(
       expect.arrayContaining([

@@ -71,7 +71,7 @@ describe("me linked accounts integration", () => {
       targetKey: "slack-default",
       connectionId: "icn_slack_identity",
       connectionDisplayName: "Slack Identity",
-      connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+      connectionMethodId: SlackConnectionMethodIds.SLACK_APP,
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
     });
     await fixture.db.insert(userExternalPrincipals).values({
@@ -333,7 +333,7 @@ describe("me linked accounts integration", () => {
       targetKey: "slack-default",
       connectionId,
       connectionDisplayName: "Slack Identity",
-      connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+      connectionMethodId: SlackConnectionMethodIds.SLACK_APP,
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
       createConnection: false,
     });
@@ -849,7 +849,7 @@ describe("me linked accounts integration", () => {
         targetKey: "slack-default",
         connectionId,
         connectionDisplayName: "Slack Identity",
-        connectionMethodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+        connectionMethodId: SlackConnectionMethodIds.SLACK_APP,
         configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
         createConnection: false,
       });
@@ -1347,9 +1347,9 @@ async function createSlackAppOAuthConnection(input: {
     },
     body: JSON.stringify({
       displayName: input.displayName,
-      methodId: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+      methodId: SlackConnectionMethodIds.SLACK_APP,
       config: {
-        connection_method: SlackConnectionMethodIds.SLACK_APP_OAUTH,
+        connection_method: SlackConnectionMethodIds.SLACK_APP,
         client_id: "123.456",
       },
       secrets: {

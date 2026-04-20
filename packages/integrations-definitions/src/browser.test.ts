@@ -62,7 +62,7 @@ describe("browser definitions", () => {
     expect(SlackBrowserDefinition.webhookHandler).toBeUndefined();
     expect(SlackBrowserDefinition.webhookSource).toBeUndefined();
     expect(SlackBrowserDefinition.identityLinking).toEqual({
-      eligibleConnectionMethodIds: ["slack-app-oauth"],
+      eligibleConnectionMethodIds: ["slack-bot-token"],
     });
   });
 

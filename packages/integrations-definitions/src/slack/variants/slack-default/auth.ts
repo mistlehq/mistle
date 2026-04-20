@@ -1,16 +1,16 @@
 import { z } from "zod";
 
-export const SlackBotTokenConnectionMethodId = "slack-bot-token";
-export const SlackAppOAuthConnectionMethodId = "slack-app-oauth";
+export const SlackAppConnectionMethodId = "slack-bot-token";
+export const SlackBotTokenConnectionMethodId = SlackAppConnectionMethodId;
+export const SlackAppOAuthConnectionMethodId = SlackAppConnectionMethodId;
 export const SlackApiKeySecretType = "api_key";
 export const SlackBotTokenSlotKey = "slack.slack-default.slack-bot-token.bot-token";
 export const SlackSigningSecretSlotKey = "slack.slack-default.slack-bot-token.signing-secret";
-export const SlackClientSecretSlotKey = "slack.slack-default.slack-app-oauth.client-secret";
+export const SlackClientSecretSlotKey = "slack.slack-default.slack-bot-token.client-secret";
 export const SlackOAuthClientSecretType = "oauth2_client_secret";
 
 export const SlackConnectionMethodIds = {
-  SLACK_BOT_TOKEN: SlackBotTokenConnectionMethodId,
-  SLACK_APP_OAUTH: SlackAppOAuthConnectionMethodId,
+  SLACK_APP: SlackAppConnectionMethodId,
 };
 
 export const SlackCredentialSecretTypes = {
@@ -24,26 +24,15 @@ export const SlackCredentialSlotKeys = {
   CLIENT_SECRET: SlackClientSecretSlotKey,
 };
 
-export const SlackBotTokenConnectionConfigSchema = z
+export const SlackAppConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(SlackBotTokenConnectionMethodId),
+    connection_method: z.literal(SlackAppConnectionMethodId),
+    client_id: z.string().min(1).optional(),
   })
   .strict();
 
-export const SlackAppOAuthConnectionConfigSchema = z
-  .object({
-    connection_method: z.literal(SlackAppOAuthConnectionMethodId),
-    client_id: z.string().min(1),
-  })
-  .strict();
-
-export const SlackConnectionConfigSchema = z.discriminatedUnion("connection_method", [
-  SlackBotTokenConnectionConfigSchema,
-  SlackAppOAuthConnectionConfigSchema,
-]);
+export const SlackConnectionConfigSchema = SlackAppConnectionConfigSchema;
+export const SlackBotTokenConnectionConfigSchema = SlackAppConnectionConfigSchema;
+export const SlackAppOAuthConnectionConfigSchema = SlackAppConnectionConfigSchema;
 
 export type SlackConnectionConfig = z.output<typeof SlackConnectionConfigSchema>;
-
-export function parseSlackConnectionConfig(input: Record<string, unknown>): SlackConnectionConfig {
-  return SlackConnectionConfigSchema.parse(input);
-}

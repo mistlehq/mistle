@@ -337,7 +337,7 @@ describe("integrations page view model", () => {
             connection_method: "slack-bot-token",
           },
           connectionMethodId: "slack-bot-token",
-          connectionMethodLabel: "Bot token",
+          connectionMethodLabel: "Slack app",
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -346,7 +346,7 @@ describe("integrations page view model", () => {
       targetConnectionMethods: [
         {
           id: "slack-bot-token",
-          label: "Bot token",
+          label: "Slack app",
           kind: "form",
           secretFields: [
             {
@@ -368,7 +368,7 @@ describe("integrations page view model", () => {
     });
 
     expect(item?.authMethodId).toBe("slack-bot-token");
-    expect(item?.authMethodLabel).toBe("Bot token");
+    expect(item?.authMethodLabel).toBe("Slack app");
     expect(item?.authSecretLabels).toEqual(["Bot token", "Signing secret"]);
   });
 

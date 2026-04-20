@@ -303,6 +303,56 @@ describe("parseCreateFormSecretsOrThrow", () => {
       },
     ]);
   });
+
+  it("allows optional secret fields to be omitted during create", () => {
+    const parsedSecrets = parseCreateFormSecretsOrThrow({
+      targetKey: "slack-default",
+      method: {
+        id: "slack-bot-token",
+        label: "Slack app",
+        kind: "form",
+        secretFields: [
+          {
+            name: "botToken",
+            label: "Bot token",
+            inputType: "password",
+            secretType: IntegrationCredentialSecretKinds.API_KEY,
+            slotKey: "slack.slack-default.slack-bot-token.bot-token",
+          },
+          {
+            name: "clientSecret",
+            label: "Client secret (Linked User Auth)",
+            inputType: "password",
+            optional: true,
+            secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+            slotKey: "slack.slack-default.slack-bot-token.client-secret",
+          },
+        ],
+        configSchema: z.object({}).loose(),
+      },
+      secrets: {
+        botToken: "xoxb-slack-bot-token",
+      },
+      invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+    });
+
+    expect(parsedSecrets).toEqual([
+      {
+        field: {
+          name: "botToken",
+          label: "Bot token",
+          inputType: "password",
+          secretType: IntegrationCredentialSecretKinds.API_KEY,
+          slotKey: "slack.slack-default.slack-bot-token.bot-token",
+        },
+        normalizedValue: "xoxb-slack-bot-token",
+        persistedSecretRef: {
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          slotKey: "slack.slack-default.slack-bot-token.bot-token",
+        },
+      },
+    ]);
+  });
 });
 
 describe("parseUpdateFormSecretsOrThrow", () => {

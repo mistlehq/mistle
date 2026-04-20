@@ -65,6 +65,7 @@ export type IntegrationConnectionMethodSecretField = {
   label: string;
   placeholder?: string;
   description?: string;
+  optional?: boolean;
   inputType: "password" | "text" | "textarea";
   secretType: string;
   slotKey: string;

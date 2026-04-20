@@ -160,7 +160,11 @@ export function buildIntegrationConnectionDetailItems(input: {
       ...(input.targetVariantId === undefined ? {} : { targetVariantId: input.targetVariantId }),
     });
     const authSecretLabels =
-      currentMethod?.kind === "form" ? currentMethod.secretFields.map((field) => field.label) : [];
+      currentMethod?.kind === "form"
+        ? currentMethod.secretFields
+            .filter((field) => field.optional !== true)
+            .map((field) => field.label)
+        : [];
     const isIdentityLinked = connection.isIdentityLinked === true;
 
     return {

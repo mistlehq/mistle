@@ -205,6 +205,7 @@ async function resolveResolverContextConnectionSecrets(input: {
     kind: "form";
     secretFields: readonly {
       name: string;
+      optional?: boolean;
       secretType: string;
       slotKey: string;
     }[];
@@ -216,14 +217,27 @@ async function resolveResolverContextConnectionSecrets(input: {
 
   const resolvedSecrets = await Promise.all(
     input.connectionMethod.secretFields.map(async (field) => {
-      const credential = await resolvePersistedCredential({
-        db: input.db,
-        integrationsConfig: input.integrationsConfig,
-        organizationId: input.organizationId,
-        connectionId: input.connectionId,
-        secretType: field.secretType,
-        slotKey: field.slotKey,
-      });
+      let credential;
+      try {
+        credential = await resolvePersistedCredential({
+          db: input.db,
+          integrationsConfig: input.integrationsConfig,
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          secretType: field.secretType,
+          slotKey: field.slotKey,
+        });
+      } catch (error) {
+        if (
+          field.optional === true &&
+          error instanceof InternalIntegrationCredentialsError &&
+          error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
+        ) {
+          return undefined;
+        }
+
+        throw error;
+      }
 
       return [
         field.name,
@@ -232,7 +246,9 @@ async function resolveResolverContextConnectionSecrets(input: {
     }),
   );
 
-  return Object.fromEntries(resolvedSecrets);
+  return Object.fromEntries(
+    resolvedSecrets.filter((entry): entry is readonly [string, string] => entry !== undefined),
+  );
 }
 
 function resolveResolverContextTarget(input: {

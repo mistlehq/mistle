@@ -523,9 +523,9 @@ describe("integration connections create form integration", () => {
       },
       body: JSON.stringify({
         displayName: "Slack bot token",
-        methodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
-          connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+          connection_method: SlackConnectionMethodIds.SLACK_APP,
         },
         secrets: {
           botToken: "xoxb-test-bot-token",
@@ -537,7 +537,7 @@ describe("integration connections create form integration", () => {
     expect(response.status).toBe(201);
     const responseBody = IntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
-      connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+      connection_method: SlackConnectionMethodIds.SLACK_APP,
     });
     expect(responseBody.targetSnapshotConfig).toEqual({
       api_base_url: "https://slack.com/api",

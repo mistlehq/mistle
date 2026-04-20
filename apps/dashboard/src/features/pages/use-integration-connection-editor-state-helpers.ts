@@ -462,7 +462,9 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
 
   if (input.editor.mode === "create") {
     const missingSecretField = selectedMethod.secretFields.find(
-      (secretField) => (input.secrets[secretField.name] ?? "").trim().length === 0,
+      (secretField) =>
+        secretField.optional !== true &&
+        (input.secrets[secretField.name] ?? "").trim().length === 0,
     );
 
     if (missingSecretField !== undefined) {

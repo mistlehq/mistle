@@ -73,7 +73,10 @@ function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuth
     authMethodLabel: method.label,
     definition,
     normalizedMethod: normalizeStoryConnectionMethod(method),
-    secretLabels: method.kind === "form" ? method.secretFields.map((field) => field.label) : [],
+    secretLabels:
+      method.kind === "form"
+        ? method.secretFields.filter((field) => field.optional !== true).map((field) => field.label)
+        : [],
   };
 }
 

@@ -6,8 +6,8 @@ import {
 import { z } from "zod";
 
 import {
-  parseSlackConnectionConfig,
-  SlackAppOAuthConnectionMethodId,
+  SlackAppConnectionMethodId,
+  SlackConnectionConfigSchema,
   type SlackConnectionConfig,
   SlackCredentialSlotKeys,
 } from "./auth.js";
@@ -160,15 +160,15 @@ function resolveSlackClientIdOrThrow(input: {
     config: Record<string, unknown>;
   };
 }): string {
-  const connectionConfig = parseSlackConnectionConfig(input.connection.config);
-  if (connectionConfig.connection_method !== SlackAppOAuthConnectionMethodId) {
+  const connectionConfig = SlackConnectionConfigSchema.parse(input.connection.config);
+  if (connectionConfig.connection_method !== SlackAppConnectionMethodId) {
     throw new SlackIdentityLinkingConfigurationError(
-      `Integration connection '${input.connection.id}' does not use the Slack app OAuth connection method required for identity linking.`,
+      `Integration connection '${input.connection.id}' does not use the Slack app connection method required for identity linking.`,
     );
   }
 
-  const clientId = connectionConfig.client_id.trim();
-  if (clientId.length === 0) {
+  const clientId = connectionConfig.client_id?.trim();
+  if (clientId === undefined || clientId.length === 0) {
     throw new SlackIdentityLinkingConfigurationError(
       `Integration connection '${input.connection.id}' is missing Slack app client_id.`,
     );
@@ -194,7 +194,7 @@ function resolveScopes(scope: string | undefined): string[] | undefined {
 }
 
 function toCompletedIdentityLinkingAuthorization(
-  input: SlackLinkedAccountAuthorizationResult,
+  input: Awaited<ReturnType<typeof completeSlackLinkedAccountAuthorization>>,
 ): CompletedIdentityLinkingAuthorization {
   return {
     providerSubjectId: input.providerSubjectId,
@@ -470,7 +470,32 @@ export async function completeSlackLinkedAccountAuthorization(input: {
   query: URLSearchParams;
   redirectUrl: string;
   now: string;
-}): Promise<SlackLinkedAccountAuthorizationResult> {
+}): Promise<{
+  providerSubjectId: string;
+  profile: {
+    workspaceId: string;
+    workspaceName?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    email?: string;
+  };
+  keys: readonly [
+    {
+      keyType: "workspace_id";
+      keyValue: string;
+    },
+    {
+      keyType: "user_id";
+      keyValue: string;
+    },
+  ];
+  credential: {
+    accessToken: string;
+    refreshToken?: string;
+    accessTokenExpiresAt?: string;
+    scopes?: string[];
+  };
+}> {
   const authorizationCode = resolveAuthorizationCodeOrThrow(input.query);
   const tokenResponse = await exchangeAuthorizationCode({
     apiBaseUrl: input.apiBaseUrl,
@@ -579,7 +604,7 @@ export const SlackIdentityLinkingCapability: IntegrationIdentityLinkingCapabilit
   Record<string, string>,
   SlackConnectionConfig
 > = {
-  eligibleConnectionMethodIds: [SlackAppOAuthConnectionMethodId],
+  eligibleConnectionMethodIds: [SlackAppConnectionMethodId],
   supportsConnection(input) {
     let clientId: string;
     try {
@@ -637,7 +662,7 @@ export const SlackIdentityLinkingCapability: IntegrationIdentityLinkingCapabilit
       );
     }
 
-    let completedAuthorization: SlackLinkedAccountAuthorizationResult;
+    let completedAuthorization: Awaited<ReturnType<typeof completeSlackLinkedAccountAuthorization>>;
     try {
       completedAuthorization = await completeSlackLinkedAccountAuthorization({
         apiBaseUrl: input.target.config.apiBaseUrl,

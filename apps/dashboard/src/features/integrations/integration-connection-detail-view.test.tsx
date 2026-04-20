@@ -908,7 +908,7 @@ describe("IntegrationConnectionDetailView", () => {
             authSecretLabels: ["Bot token", "Signing secret"],
             displayName: "Slack Engineering",
             authMethodId: "slack-bot-token",
-            authMethodLabel: "Bot token",
+            authMethodLabel: "Slack app",
             status: "active",
             resources: [],
           },
@@ -918,7 +918,8 @@ describe("IntegrationConnectionDetailView", () => {
 
     const authSection = screen.getByLabelText("Connection authentication");
     expect(authSection.getAttribute("data-auth-method-id")).toBe("slack-bot-token");
-    expect(within(authSection).getAllByText("Bot token")).toHaveLength(2);
+    expect(within(authSection).getByText("Slack app")).toBeTruthy();
+    expect(within(authSection).getByText("Bot token")).toBeTruthy();
     expect(within(authSection).getByText("Signing secret")).toBeTruthy();
     expect(within(authSection).getAllByText("**********")).toHaveLength(2);
   });

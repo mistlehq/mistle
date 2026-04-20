@@ -909,9 +909,9 @@ describe("integration connections update form integration", () => {
       },
       body: JSON.stringify({
         displayName: "Slack bot token",
-        methodId: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+        methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
-          connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+          connection_method: SlackConnectionMethodIds.SLACK_APP,
         },
         secrets: {
           botToken: "xoxb-original-bot-token",
@@ -940,7 +940,7 @@ describe("integration connections update form integration", () => {
         body: JSON.stringify({
           displayName: "Slack bot token rotated",
           config: {
-            connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+            connection_method: SlackConnectionMethodIds.SLACK_APP,
           },
           secrets: {
             botToken: "xoxb-rotated-bot-token",
@@ -954,7 +954,7 @@ describe("integration connections update form integration", () => {
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
     expect(updatedConnection.displayName).toBe("Slack bot token rotated");
     expect(updatedConnection.config).toEqual({
-      connection_method: SlackConnectionMethodIds.SLACK_BOT_TOKEN,
+      connection_method: SlackConnectionMethodIds.SLACK_APP,
     });
 
     const updatedLinks = await fixture.db.query.integrationConnectionCredentials.findMany({

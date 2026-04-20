@@ -49,6 +49,7 @@ export const IntegrationTargetSchema = z
                       label: z.string().min(1),
                       placeholder: z.string().min(1).optional(),
                       description: z.string().min(1).optional(),
+                      optional: z.boolean().optional(),
                       inputType: z.enum(["password", "text", "textarea"]),
                       slotKey: z.string().min(1).optional(),
                     })

@@ -188,11 +188,15 @@ export function parseCreateFormSecretsOrThrow(input: {
     }
   }
 
-  return input.method.secretFields.map((field) => {
+  return input.method.secretFields.flatMap((field) => {
     const rawValue = input.secrets[field.name];
     const normalizedValue = typeof rawValue === "string" ? rawValue.trim() : "";
 
     if (normalizedValue.length === 0) {
+      if (field.optional === true) {
+        return [];
+      }
+
       throw new BadRequestError(
         input.invalidInputCode,
         `Secret field '${field.label}' is required for method '${input.method.id}'.`,

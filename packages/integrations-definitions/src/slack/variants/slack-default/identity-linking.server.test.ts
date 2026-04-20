@@ -50,14 +50,14 @@ async function startTestServer(input: {
 }
 
 describe("slack identity linking", () => {
-  it("treats only Slack app OAuth connections with client_id and client secret as link-ready", () => {
+  it("treats only Slack app connections with client_id and client secret as link-ready", () => {
     expect(
       SlackIdentityLinkingCapability.supportsConnection?.({
         connection: {
           id: "icn_slack_identity",
           status: "active",
           config: {
-            connection_method: "slack-app-oauth",
+            connection_method: "slack-bot-token",
             client_id: "123.456",
           },
         },

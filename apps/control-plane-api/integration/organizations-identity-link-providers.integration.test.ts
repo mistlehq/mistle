@@ -65,7 +65,7 @@ describe("organization identity-linking providers integration", () => {
           displayName: "Slack",
           logoKey: "slack",
           eligibleTargetKeys: ["slack-default"],
-          eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP_OAUTH],
+          eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP],
           eligibleConnections: [],
           configurationStatus: "unconfigured",
           selectedConnection: null,
