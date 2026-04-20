@@ -65,9 +65,9 @@ There are two supported ways to run Mistle locally:
 | Option                     | Use this when...                                                            | Start here                                     |
 | -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------- |
 | Contributor workflow       | You are developing inside the monorepo and want the normal local dev setup. | [CONTRIBUTING.md](CONTRIBUTING.md)             |
-| Single-node Docker Compose | You want to run Mistle on one machine for local testing and smoke checks.   | [deploy/compose/local/](deploy/compose/local/) |
+| Single-node Docker Compose | You want to run Mistle on one machine for local testing.                    | [deploy/compose/local/](deploy/compose/local/) |
 
-For the single-node Docker Compose workflow:
+Single-node Docker Compose is the easiest way to run Mistle on one machine for local testing:
 
 ```bash
 git clone https://github.com/mistlehq/mistle.git
