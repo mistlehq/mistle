@@ -1,6 +1,4 @@
-import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
@@ -15,49 +13,28 @@ import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   createStoryLongCliOutput,
-  createStoryPtyChunks,
   createStoryWorkbenchCliPtyState,
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   SessionWorkbenchStoryChrome,
+  StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalDockviewWorkspaceView } from "./session-terminal-dockview-workspace.js";
-import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
   headerStatusUi: SandboxStatusBadgeUi;
 };
 
-function StoryPageViewTerminalBody(input: {
-  cwd: string | null;
-  isPanelVisible: boolean;
-  panelId: string;
-}): React.JSX.Element {
-  const [outputText, setOutputText] = useState(
-    [
-      "root@sandbox:~# pwd",
-      input.cwd ?? "/root",
-      "root@sandbox:~# ls",
-      "apps  packages  README.md",
-      "",
-    ].join("\n"),
-  );
-
-  return (
-    <SessionTerminalSurface
-      isVisible={input.isPanelVisible}
-      lifecycleState={SandboxPtyStates.OPEN}
-      onResize={async () => {
-        return;
-      }}
-      onWriteInput={async (nextInput) => {
-        setOutputText((currentOutput) => `${currentOutput}${nextInput}`);
-      }}
-      outputChunks={createStoryPtyChunks(outputText)}
-    />
-  );
+function buildPageViewTerminalOutput(cwd: string | null): string {
+  return [
+    "root@sandbox:~# pwd",
+    cwd ?? "/root",
+    "root@sandbox:~# ls",
+    "apps  packages  README.md",
+    "",
+  ].join("\n");
 }
 
 const meta = {
@@ -208,7 +185,12 @@ export const CliSplitWithTerminal: Story = {
         cwd={null}
         isVisible={true}
         onWorkspaceEmpty={noop}
-        renderTerminalPanel={(panelInput) => <StoryPageViewTerminalBody {...panelInput} />}
+        renderTerminalPanel={(panelInput) => (
+          <StoryTerminalSurfaceBody
+            initialOutput={buildPageViewTerminalOutput(panelInput.cwd)}
+            isVisible={panelInput.isPanelVisible}
+          />
+        )}
       />
     ),
     bottomPanelSize: 32,

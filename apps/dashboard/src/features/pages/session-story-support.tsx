@@ -1,5 +1,6 @@
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { Badge } from "@mistle/ui";
+import { useState } from "react";
 
 import type {
   ChatComposerStatusMessage,
@@ -17,6 +18,7 @@ import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
+import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
@@ -61,6 +63,27 @@ export function createStoryPtyChunks(text: string): readonly Uint8Array[] {
   }
 
   return text.split(/(?<=\n)/).map((chunk) => textEncoder.encode(chunk));
+}
+
+export function StoryTerminalSurfaceBody(input: {
+  initialOutput: string;
+  isVisible: boolean;
+}): React.JSX.Element {
+  const [outputText, setOutputText] = useState(input.initialOutput);
+
+  return (
+    <SessionTerminalSurface
+      isVisible={input.isVisible}
+      lifecycleState={SandboxPtyStates.OPEN}
+      onResize={async () => {
+        return;
+      }}
+      onWriteInput={async (nextInput) => {
+        setOutputText((currentOutput) => `${currentOutput}${nextInput}`);
+      }}
+      outputChunks={createStoryPtyChunks(outputText)}
+    />
+  );
 }
 
 export function createStoryLongCliOutput(prefix: string): string {

@@ -91,7 +91,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     boundaryEpoch: 0,
     latestCompletedEpoch: 0,
     inFlight: false,
-    inFlightEpoch: 0,
   });
 
   const {
@@ -140,7 +139,6 @@ export function useSessionWorkbenchLifecycleState(input: {
 
     const startRefresh = (epoch: number): void => {
       refreshState.inFlight = true;
-      refreshState.inFlightEpoch = epoch;
 
       void sandboxStatusQuery
         .refetch()
@@ -155,7 +153,6 @@ export function useSessionWorkbenchLifecycleState(input: {
           }
 
           refreshState.inFlight = false;
-          refreshState.inFlightEpoch = 0;
         });
     };
 
@@ -242,7 +239,6 @@ export function useSessionWorkbenchLifecycleState(input: {
       boundaryEpoch: 0,
       latestCompletedEpoch: 0,
       inFlight: false,
-      inFlightEpoch: 0,
     };
   }, [input.sandboxInstanceId]);
 

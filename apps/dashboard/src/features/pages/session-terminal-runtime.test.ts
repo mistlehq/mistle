@@ -8,6 +8,7 @@ import {
   shouldAttemptTerminalReconnect,
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
+  shouldObserveTerminalReset,
 } from "./session-terminal-runtime.js";
 
 const ResetInfo = {
@@ -137,6 +138,48 @@ describe("shouldHandleTerminalExit", () => {
         hasHandledExit: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldObserveTerminalReset", () => {
+  it("does not observe resets while the terminal is hidden", () => {
+    expect(
+      shouldObserveTerminalReset({
+        isTerminalVisible: false,
+        lastHandledReset: null,
+        nextReset: ResetInfo,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not observe an absent reset", () => {
+    expect(
+      shouldObserveTerminalReset({
+        isTerminalVisible: true,
+        lastHandledReset: null,
+        nextReset: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not observe the same reset twice", () => {
+    expect(
+      shouldObserveTerminalReset({
+        isTerminalVisible: true,
+        lastHandledReset: ResetInfo,
+        nextReset: ResetInfo,
+      }),
+    ).toBe(false);
+  });
+
+  it("observes a fresh visible reset", () => {
+    expect(
+      shouldObserveTerminalReset({
+        isTerminalVisible: true,
+        lastHandledReset: null,
+        nextReset: ResetInfo,
+      }),
+    ).toBe(true);
   });
 });
 

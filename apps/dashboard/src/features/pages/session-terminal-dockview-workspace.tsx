@@ -33,18 +33,11 @@ import {
   shouldAttemptTerminalReconnect,
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
+  shouldObserveTerminalReset,
+  type SessionTerminalSandboxStatus,
   type TerminalRecoveryState,
 } from "./session-terminal-runtime.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
-
-type SessionTerminalRecoverySandboxStatus =
-  | "pending"
-  | "starting"
-  | "running"
-  | "resuming"
-  | "stopped"
-  | "failed"
-  | null;
 
 type SessionTerminalDockviewWorkspaceProps = {
   cwd: string | null;
@@ -57,7 +50,7 @@ type SessionTerminalDockviewWorkspaceProps = {
   onTerminalReset?: (input: { panelId: string }) => void;
   onWorkspaceEmpty: () => void;
   sandboxInstanceId: string;
-  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+  sandboxStatus: SessionTerminalSandboxStatus;
 };
 
 type SessionTerminalDockviewWorkspaceViewProps = {
@@ -223,7 +216,7 @@ function PtyBackedDockviewTerminalPanel(input: {
   onTerminalReset?: SessionTerminalDockviewWorkspaceProps["onTerminalReset"];
   panelId: string;
   sandboxInstanceId: string;
-  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+  sandboxStatus: SessionTerminalSandboxStatus;
 }): ReactElement {
   const ptyState = useSandboxPtyState({
     ensureTransportConnected: input.ensureTransportConnected,
@@ -240,11 +233,16 @@ function PtyBackedDockviewTerminalPanel(input: {
   const isTerminalVisible = input.isWorkspaceVisible && input.isPanelVisible;
 
   useEffect(() => {
-    const resetInfo = lifecycle.resetInfo;
-    if (!isTerminalVisible || resetInfo === null || lastHandledResetRef.current === resetInfo) {
+    const resetObservation = {
+      isTerminalVisible,
+      lastHandledReset: lastHandledResetRef.current,
+      nextReset: lifecycle.resetInfo,
+    };
+    if (!shouldObserveTerminalReset(resetObservation)) {
       return;
     }
 
+    const resetInfo = resetObservation.nextReset;
     lastHandledResetRef.current = resetInfo;
     isReconnectAttemptInFlightRef.current = false;
     input.onTerminalReset?.({

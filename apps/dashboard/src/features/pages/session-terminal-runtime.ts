@@ -8,7 +8,7 @@ import { INITIAL_PTY_DIMENSIONS } from "./session-terminal-surface.js";
 
 const MaxTerminalReconnectAttempts = 3;
 
-type SessionTerminalRecoverySandboxStatus =
+export type SessionTerminalSandboxStatus =
   | "pending"
   | "starting"
   | "running"
@@ -45,7 +45,7 @@ type TerminalRecoveryEvent =
       type: "sync_observed";
       isReconnectAttemptInFlight: boolean;
       lifecycleState: SandboxPtyState;
-      sandboxStatus: SessionTerminalRecoverySandboxStatus;
+      sandboxStatus: SessionTerminalSandboxStatus;
     };
 
 function shouldOpenPtyForRecovery(input: {
@@ -53,7 +53,7 @@ function shouldOpenPtyForRecovery(input: {
   errorMessage: string | null;
   isReconnectAttemptInFlight: boolean;
   lifecycleState: SandboxPtyState;
-  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+  sandboxStatus: SessionTerminalSandboxStatus;
 }): boolean {
   if (
     input.errorMessage !== null ||
@@ -101,6 +101,22 @@ export function shouldHandleTerminalExit(input: {
   hasHandledExit: boolean;
 }): boolean {
   return input.exitInfo !== null && !input.hasHandledExit;
+}
+
+export function shouldObserveTerminalReset(input: {
+  isTerminalVisible: boolean;
+  lastHandledReset: SandboxPtyResetInfo | null;
+  nextReset: SandboxPtyResetInfo | null;
+}): input is {
+  isTerminalVisible: true;
+  lastHandledReset: SandboxPtyResetInfo | null;
+  nextReset: SandboxPtyResetInfo;
+} {
+  return (
+    input.isTerminalVisible &&
+    input.nextReset !== null &&
+    input.lastHandledReset !== input.nextReset
+  );
 }
 
 export function reduceTerminalRecoveryState(
@@ -223,7 +239,7 @@ export function shouldAttemptTerminalReconnect(input: {
 
 export function resolveTerminalRecoveryMessage(input: {
   recovery: TerminalRecoveryState;
-  sandboxStatus: SessionTerminalRecoverySandboxStatus;
+  sandboxStatus: SessionTerminalSandboxStatus;
 }): string | null {
   if (input.recovery.kind !== "recovering") {
     return null;

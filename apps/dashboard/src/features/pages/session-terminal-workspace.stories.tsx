@@ -1,25 +1,22 @@
-import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { DockviewApi } from "dockview";
-import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
-  createStoryPtyChunks,
   renderSessionWorkbenchContentStory,
+  StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalDockviewWorkspaceView } from "./session-terminal-dockview-workspace.js";
-import { SessionTerminalSurface } from "./session-terminal-surface.js";
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
   withSplitExample?: boolean;
 };
 
-function buildInitialTerminalOutput(input: { cwd: string | null; panelId: string }): string {
+function buildInitialTerminalOutput(input: { cwd: string | null }): string {
   const promptCwd = input.cwd ?? "/root";
 
   return [
@@ -30,28 +27,6 @@ function buildInitialTerminalOutput(input: { cwd: string | null; panelId: string
     " M apps/dashboard/src/features/pages/session-terminal-dockview-workspace.tsx",
     "",
   ].join("\n");
-}
-
-function StoryDockviewTerminalBody(input: {
-  cwd: string | null;
-  isPanelVisible: boolean;
-  panelId: string;
-}): React.JSX.Element {
-  const [outputText, setOutputText] = useState(() => buildInitialTerminalOutput(input));
-
-  return (
-    <SessionTerminalSurface
-      isVisible={input.isPanelVisible}
-      lifecycleState={SandboxPtyStates.OPEN}
-      onResize={async () => {
-        return;
-      }}
-      onWriteInput={async (nextInput) => {
-        setOutputText((currentOutput) => `${currentOutput}${nextInput}`);
-      }}
-      outputChunks={createStoryPtyChunks(outputText)}
-    />
-  );
 }
 
 function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.Element {
@@ -75,7 +50,14 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
         onWorkspaceEmpty={() => {
           return;
         }}
-        renderTerminalPanel={(panelInput) => <StoryDockviewTerminalBody {...panelInput} />}
+        renderTerminalPanel={(panelInput) => (
+          <StoryTerminalSurfaceBody
+            initialOutput={buildInitialTerminalOutput({
+              cwd: panelInput.cwd,
+            })}
+            isVisible={panelInput.isPanelVisible}
+          />
+        )}
       />
     ),
     bottomPanelSize: panelSize,
