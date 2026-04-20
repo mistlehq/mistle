@@ -230,6 +230,31 @@ function updateAgentHarnessConfig(input: {
   };
 }
 
+function ConnectionSelectValueContent(input: {
+  connectionDisplayName: string;
+  targetDisplayName?: string | undefined;
+  targetLogoKey?: string | undefined;
+}): React.JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {input.targetLogoKey === undefined ? null : (
+        <img
+          alt={`${input.targetDisplayName ?? "Integration"} logo`}
+          className="size-4 shrink-0 rounded-sm"
+          src={resolveIntegrationLogoPath({ logoKey: input.targetLogoKey })}
+        />
+      )}
+      {input.targetDisplayName === undefined ? (
+        <span className="truncate">{input.connectionDisplayName}</span>
+      ) : (
+        <span className="truncate">
+          {input.targetDisplayName} - {input.connectionDisplayName}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ConnectorBindingRows(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -636,87 +661,84 @@ function AgentHarnessRows(input: {
 
         return (
           <div className="flex flex-col gap-4 py-2" key={row.clientId}>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0 flex items-center gap-2">
-                {target?.logoKey ? (
-                  <img
-                    alt={`${target.displayName} logo`}
-                    className="h-5 w-5 rounded-sm"
-                    src={resolveIntegrationLogoPath({ logoKey: target.logoKey })}
-                  />
-                ) : (
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-muted text-muted-foreground text-[10px] font-semibold">
-                    {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 gap-0.5 flex flex-col">
-                  <p className="truncate text-sm font-medium">
-                    {target?.displayName ?? "Integration"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                aria-label="Remove binding"
-                className="h-7 w-7"
-                onClick={() => {
-                  input.onRemove(row.clientId);
-                }}
-                type="button"
-                variant="ghost"
-              >
-                <TrashIcon aria-hidden className="size-4" />
-              </Button>
-            </div>
-
             <div className="flex flex-col gap-4">
-              <div className="min-w-0 flex flex-col gap-1.5">
-                <DetailLabel as="p">Connection</DetailLabel>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null) {
-                      return;
-                    }
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                  <DetailLabel as="p">Connection</DetailLabel>
+                  <Select
+                    onValueChange={(nextValue) => {
+                      if (nextValue === null) {
+                        return;
+                      }
 
-                    const nextConnection = availableAgentConnections.find(
-                      (connection) => connection.id === nextValue,
-                    );
-                    const nextTarget = input.availableTargets.find(
-                      (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                    );
+                      const nextConnection = availableAgentConnections.find(
+                        (connection) => connection.id === nextValue,
+                      );
+                      const nextTarget = input.availableTargets.find(
+                        (candidate) => candidate.targetKey === nextConnection?.targetKey,
+                      );
 
-                    input.onChange(row.clientId, {
-                      connectionId: nextValue,
-                      config:
-                        nextConnection === undefined || nextTarget === undefined
-                          ? {}
-                          : createDefaultBindingConfig({
-                              connection: nextConnection,
-                              target: nextTarget,
-                            }),
-                    });
-                  }}
-                  value={resolveSelectableValue({
-                    selectedValue: row.connectionId,
-                    optionValues: availableAgentConnections.map((connection) => connection.id),
-                  })}
-                >
-                  <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
-                    <SelectValue placeholder="Select integration connection">
-                      {connectionDisplayName}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={IntegrationSelectContentClassName}
+                      input.onChange(row.clientId, {
+                        connectionId: nextValue,
+                        config:
+                          nextConnection === undefined || nextTarget === undefined
+                            ? {}
+                            : createDefaultBindingConfig({
+                                connection: nextConnection,
+                                target: nextTarget,
+                              }),
+                      });
+                    }}
+                    value={resolveSelectableValue({
+                      selectedValue: row.connectionId,
+                      optionValues: availableAgentConnections.map((connection) => connection.id),
+                    })}
                   >
-                    {availableAgentConnections.map((connection) => (
-                      <SelectItem key={connection.id} value={connection.id}>
-                        {formatConnectionDisplayName({ connection })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
+                      <SelectValue placeholder="Select integration connection">
+                        {connectionDisplayName === undefined ? null : (
+                          <ConnectionSelectValueContent
+                            connectionDisplayName={connectionDisplayName}
+                            targetDisplayName={target?.displayName}
+                            targetLogoKey={target?.logoKey}
+                          />
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent
+                      align="end"
+                      alignItemWithTrigger={false}
+                      className={IntegrationSelectContentClassName}
+                    >
+                      {availableAgentConnections.map((connection) => {
+                        const connectionTarget = input.availableTargets.find(
+                          (candidate) => candidate.targetKey === connection.targetKey,
+                        );
+
+                        return (
+                          <SelectItem key={connection.id} value={connection.id}>
+                            <ConnectionSelectValueContent
+                              connectionDisplayName={formatConnectionDisplayName({ connection })}
+                              targetDisplayName={connectionTarget?.displayName}
+                              targetLogoKey={connectionTarget?.logoKey}
+                            />
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  aria-label="Remove binding"
+                  className="mt-6 h-7 w-7 shrink-0"
+                  onClick={() => {
+                    input.onRemove(row.clientId);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                </Button>
               </div>
 
               {canRenderExplicitAgentForm ? (
@@ -894,87 +916,84 @@ function GitProviderRows(input: {
         const fieldId = `git-binding-connection-${row.clientId}`;
         return (
           <div className="flex flex-col gap-4 py-2" key={row.clientId}>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0 flex items-center gap-2">
-                {target?.logoKey ? (
-                  <img
-                    alt={`${target.displayName} logo`}
-                    className="h-5 w-5 rounded-sm"
-                    src={resolveIntegrationLogoPath({ logoKey: target.logoKey })}
-                  />
-                ) : (
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-sm bg-muted text-muted-foreground text-[10px] font-semibold">
-                    {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <div className="min-w-0 gap-0.5 flex flex-col">
-                  <p className="truncate text-sm font-medium">
-                    {target?.displayName ?? "Integration"}
-                  </p>
-                </div>
-              </div>
-              <Button
-                aria-label="Remove binding"
-                className="h-7 w-7"
-                onClick={() => {
-                  input.onRemove(row.clientId);
-                }}
-                type="button"
-                variant="ghost"
-              >
-                <TrashIcon aria-hidden className="size-4" />
-              </Button>
-            </div>
-
             <div className="flex flex-col gap-4">
-              <div className="min-w-0 flex flex-col gap-1.5">
-                <DetailLabel as="p">Connection</DetailLabel>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null) {
-                      return;
-                    }
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+                  <DetailLabel as="p">Connection</DetailLabel>
+                  <Select
+                    onValueChange={(nextValue) => {
+                      if (nextValue === null) {
+                        return;
+                      }
 
-                    const nextConnection = availableGitConnections.find(
-                      (connection) => connection.id === nextValue,
-                    );
-                    const nextTarget = input.availableTargets.find(
-                      (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                    );
+                      const nextConnection = availableGitConnections.find(
+                        (connection) => connection.id === nextValue,
+                      );
+                      const nextTarget = input.availableTargets.find(
+                        (candidate) => candidate.targetKey === nextConnection?.targetKey,
+                      );
 
-                    input.onChange(row.clientId, {
-                      connectionId: nextValue,
-                      config:
-                        nextConnection === undefined || nextTarget === undefined
-                          ? {}
-                          : createDefaultBindingConfig({
-                              connection: nextConnection,
-                              target: nextTarget,
-                            }),
-                    });
-                  }}
-                  value={resolveSelectableValue({
-                    selectedValue: row.connectionId,
-                    optionValues: availableGitConnections.map((connection) => connection.id),
-                  })}
-                >
-                  <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
-                    <SelectValue placeholder="Select integration connection">
-                      {connectionDisplayName}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    align="end"
-                    alignItemWithTrigger={false}
-                    className={IntegrationSelectContentClassName}
+                      input.onChange(row.clientId, {
+                        connectionId: nextValue,
+                        config:
+                          nextConnection === undefined || nextTarget === undefined
+                            ? {}
+                            : createDefaultBindingConfig({
+                                connection: nextConnection,
+                                target: nextTarget,
+                              }),
+                      });
+                    }}
+                    value={resolveSelectableValue({
+                      selectedValue: row.connectionId,
+                      optionValues: availableGitConnections.map((connection) => connection.id),
+                    })}
                   >
-                    {availableGitConnections.map((connection) => (
-                      <SelectItem key={connection.id} value={connection.id}>
-                        {formatConnectionDisplayName({ connection })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
+                      <SelectValue placeholder="Select integration connection">
+                        {connectionDisplayName === undefined ? null : (
+                          <ConnectionSelectValueContent
+                            connectionDisplayName={connectionDisplayName}
+                            targetDisplayName={target?.displayName}
+                            targetLogoKey={target?.logoKey}
+                          />
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent
+                      align="end"
+                      alignItemWithTrigger={false}
+                      className={IntegrationSelectContentClassName}
+                    >
+                      {availableGitConnections.map((connection) => {
+                        const connectionTarget = input.availableTargets.find(
+                          (candidate) => candidate.targetKey === connection.targetKey,
+                        );
+
+                        return (
+                          <SelectItem key={connection.id} value={connection.id}>
+                            <ConnectionSelectValueContent
+                              connectionDisplayName={formatConnectionDisplayName({ connection })}
+                              targetDisplayName={connectionTarget?.displayName}
+                              targetLogoKey={connectionTarget?.logoKey}
+                            />
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  aria-label="Remove binding"
+                  className="mt-6 h-7 w-7 shrink-0"
+                  onClick={() => {
+                    input.onRemove(row.clientId);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                </Button>
               </div>
 
               <SandboxProfileBindingConfigEditor

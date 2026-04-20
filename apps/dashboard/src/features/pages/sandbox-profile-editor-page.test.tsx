@@ -202,11 +202,12 @@ describe("IntegrationsEditorSection", () => {
 
     await waitFor(() => {
       const agentSection = getSectionContainer("Agent Harness");
+      const connectionCombobox = within(agentSection).getByRole("combobox", {
+        name: "Connection",
+      });
       expect(within(agentSection).queryByRole("button", { name: "Edit binding" })).toBeNull();
-      expect(within(agentSection).getByRole("combobox", { name: "Connection" })).toBeDefined();
-      expect(within(agentSection).getAllByText("Primary OpenAI Workspace").length).toBeGreaterThan(
-        0,
-      );
+      expect(connectionCombobox).toBeDefined();
+      expect(connectionCombobox.textContent).toContain("Primary OpenAI Workspace");
       expect(within(agentSection).getByRole("button", { name: "Remove binding" })).toBeDefined();
     });
   }, 10000);
@@ -241,15 +242,14 @@ describe("IntegrationsEditorSection", () => {
 
     await waitFor(() => {
       const gitProvidersSection = getSectionContainer("Git Providers");
+      const connectionCombobox = within(gitProvidersSection).getByRole("combobox", {
+        name: "Connection",
+      });
       expect(
         within(gitProvidersSection).queryByRole("button", { name: "Edit binding" }),
       ).toBeNull();
-      expect(
-        within(gitProvidersSection).getByRole("combobox", { name: "Connection" }),
-      ).toBeDefined();
-      expect(within(gitProvidersSection).getAllByText("GitHub Production").length).toBeGreaterThan(
-        0,
-      );
+      expect(connectionCombobox).toBeDefined();
+      expect(connectionCombobox.textContent).toContain("GitHub Production");
       expect(within(gitProvidersSection).getByText("Repositories")).toBeDefined();
       expect(within(gitProvidersSection).getByText("GitHub CLI")).toBeDefined();
     });
