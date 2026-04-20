@@ -92,7 +92,7 @@ describe("slack identity linking", () => {
     expect(authorizationUrl.pathname).toBe("/oauth/v2/authorize");
     expect(authorizationUrl.searchParams.get("client_id")).toBe("123.456");
     expect(authorizationUrl.searchParams.get("user_scope")).toBe(
-      "users.profile:read,users:read.email",
+      "users.profile:read,users:read,users:read.email",
     );
     expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
       "https://mistle.example.com/p/identity-linking/callbacks/slack",
@@ -183,7 +183,7 @@ describe("slack identity linking", () => {
                 },
                 authed_user: {
                   id: "U12345",
-                  scope: "users.profile:read,users:read.email",
+                  scope: "users.profile:read,users:read,users:read.email",
                   access_token: "xoxe.xoxp-slack-user-token",
                   expires_in: 43200,
                   token_type: "user",
@@ -266,7 +266,7 @@ describe("slack identity linking", () => {
         credential: {
           accessToken: "xoxe.xoxp-slack-user-token",
           accessTokenExpiresAt: "2026-04-20T22:00:00.000Z",
-          scopes: ["users.profile:read", "users:read.email"],
+          scopes: ["users.profile:read", "users:read", "users:read.email"],
         },
       });
     } finally {
@@ -294,7 +294,7 @@ describe("slack identity linking", () => {
               },
               authed_user: {
                 id: "U12345",
-                scope: "users.profile:read,users:read.email",
+                scope: "users.profile:read,users:read,users:read.email",
                 access_token: "xoxe.xoxp-refreshed",
                 expires_in: 43200,
                 refresh_token: "xoxe-refreshed",
@@ -321,7 +321,7 @@ describe("slack identity linking", () => {
       expect(refreshed).toEqual({
         credentialKind: "slack_user_token",
         accessTokenExpiresAt: "2026-04-20T22:00:00.000Z",
-        scopes: ["users.profile:read", "users:read.email"],
+        scopes: ["users.profile:read", "users:read", "users:read.email"],
         secrets: [
           {
             secretKind: "oauth2_access_token",

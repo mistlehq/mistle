@@ -353,7 +353,7 @@ describe("me linked accounts integration", () => {
     expect(authorizationUrl.pathname).toBe("/oauth/v2/authorize");
     expect(authorizationUrl.searchParams.get("client_id")).toBe("123.456");
     expect(authorizationUrl.searchParams.get("user_scope")).toBe(
-      "users.profile:read,users:read.email",
+      "users.profile:read,users:read,users:read.email",
     );
     expect(authorizationUrl.searchParams.get("state")).toBeTruthy();
     expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
@@ -796,7 +796,7 @@ describe("me linked accounts integration", () => {
               },
               authed_user: {
                 id: "U12345",
-                scope: "users.profile:read,users:read.email",
+                scope: "users.profile:read,users:read,users:read.email",
                 access_token: "xoxe.xoxp-slack-user-token",
                 expires_in: 43200,
                 token_type: "user",
@@ -961,7 +961,7 @@ describe("me linked accounts integration", () => {
         providerFamily: "slack",
         credentialKind: "slack_user_token",
         status: UserExternalPrincipalCredentialStatuses.ACTIVE,
-        scopes: ["users.profile:read", "users:read.email"],
+        scopes: ["users.profile:read", "users:read", "users:read.email"],
       });
       expect(credential?.accessTokenExpiresAt).toBeTruthy();
       expect(credential?.refreshTokenExpiresAt).toBeNull();

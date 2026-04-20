@@ -15,7 +15,7 @@ import {
 } from "./auth.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 
-const SlackUserScope = "users.profile:read,users:read.email";
+const SlackUserScope = "users.profile:read,users:read,users:read.email";
 
 const SlackAuthorizationCallbackErrorSchema = z
   .object({
