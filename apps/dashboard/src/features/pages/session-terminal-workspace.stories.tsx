@@ -1,5 +1,6 @@
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { DockviewApi } from "dockview";
 import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
@@ -15,6 +16,7 @@ import { SessionTerminalSurface } from "./session-terminal-surface.js";
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
+  withSplitExample?: boolean;
 };
 
 function buildInitialTerminalOutput(input: { cwd: string | null; panelId: string }): string {
@@ -60,6 +62,16 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
       <SessionTerminalDockviewWorkspaceView
         cwd={input.initialCwd}
         isVisible={true}
+        onApiReady={(api) => {
+          if (!input.withSplitExample) {
+            return;
+          }
+
+          seedSplitTerminalExample({
+            api,
+            cwd: input.initialCwd,
+          });
+        }}
         onWorkspaceEmpty={() => {
           return;
         }}
@@ -91,6 +103,7 @@ const meta = {
   decorators: [withDashboardWorkspaceStory],
   args: {
     initialCwd: "/workspace/apps/dashboard",
+    withSplitExample: false,
   },
 } satisfies Meta<typeof StoryTerminalWorkspace>;
 
@@ -99,3 +112,49 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Interactive: Story = {};
+
+export const SplitView: Story = {
+  args: {
+    withSplitExample: true,
+  },
+};
+
+function seedSplitTerminalExample(input: { api: DockviewApi; cwd: string | null }): void {
+  if (input.api.totalPanels !== 1 || input.api.activeGroup === undefined) {
+    return;
+  }
+
+  const middleGroup = input.api.activeGroup;
+  input.api.addPanel({
+    component: "terminal",
+    id: "terminal-2",
+    params: {
+      cwd: input.cwd,
+    },
+    position: {
+      direction: "right",
+      referenceGroup: middleGroup,
+    },
+    renderer: "always",
+    title: "Terminal 2",
+  });
+
+  const rightGroup = input.api.activeGroup;
+  if (rightGroup === undefined) {
+    return;
+  }
+
+  input.api.addPanel({
+    component: "terminal",
+    id: "terminal-3",
+    params: {
+      cwd: input.cwd,
+    },
+    position: {
+      direction: "right",
+      referenceGroup: rightGroup,
+    },
+    renderer: "always",
+    title: "Terminal 3",
+  });
+}

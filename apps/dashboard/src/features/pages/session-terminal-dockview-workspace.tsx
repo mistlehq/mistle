@@ -62,6 +62,7 @@ type SessionTerminalDockviewWorkspaceProps = {
 type SessionTerminalDockviewWorkspaceViewProps = {
   cwd: string | null;
   isVisible: boolean;
+  onApiReady?: (api: DockviewApi) => void;
   onWorkspaceEmpty: () => void;
   renderTerminalPanel: (input: {
     closePanel: () => void;
@@ -425,7 +426,7 @@ export const SessionTerminalDockviewWorkspaceView = forwardRef<
   SessionTerminalDockviewWorkspaceHandle,
   SessionTerminalDockviewWorkspaceViewProps
 >(function SessionTerminalDockviewWorkspaceView(
-  { cwd, isVisible, onWorkspaceEmpty, renderTerminalPanel },
+  { cwd, isVisible, onApiReady, onWorkspaceEmpty, renderTerminalPanel },
   forwardedRef,
 ): ReactElement {
   const apiRef = useRef<DockviewApi | null>(null);
@@ -530,6 +531,8 @@ export const SessionTerminalDockviewWorkspaceView = forwardRef<
                     : { referenceGroup: event.api.activeGroup }),
                 });
               }
+
+              onApiReady?.(event.api);
             }}
             leftHeaderActionsComponent={DockviewTerminalNewTabAction}
             tabAnimation="smooth"
