@@ -319,7 +319,7 @@ describe("me linked accounts integration", () => {
       fixture,
       targetKey: "slack-default",
     });
-    const connectionId = await createSlackAppOAuthConnection({
+    const connectionId = await createSlackAppConnection({
       fixture,
       authenticatedSession: session,
       displayName: "Slack Identity",
@@ -835,7 +835,7 @@ describe("me linked accounts integration", () => {
         targetKey: "slack-default",
         apiBaseUrl,
       });
-      const connectionId = await createSlackAppOAuthConnection({
+      const connectionId = await createSlackAppConnection({
         fixture,
         authenticatedSession: session,
         displayName: "Slack Identity",
@@ -1334,7 +1334,7 @@ async function createGitHubAppConnection(input: {
   return connectionId;
 }
 
-async function createSlackAppOAuthConnection(input: {
+async function createSlackAppConnection(input: {
   fixture: ControlPlaneApiIntegrationFixture;
   authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
   displayName: string;

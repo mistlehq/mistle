@@ -1,12 +1,12 @@
 import type { ResolvedIntegrationForm } from "@mistle/integrations-core";
 
-import { SlackConnectionMethodIds } from "./auth.js";
+import { SlackConnectionMethodId } from "./auth.js";
 
-export const SlackAppConnectionConfigForm: ResolvedIntegrationForm = {
+export const SlackConnectionConfigForm: ResolvedIntegrationForm = {
   schema: {
     properties: {
       connection_method: {
-        default: SlackConnectionMethodIds.SLACK_APP,
+        default: SlackConnectionMethodId,
       },
       client_id: {
         title: "Client ID (Linked User Auth)",
@@ -21,6 +21,3 @@ export const SlackAppConnectionConfigForm: ResolvedIntegrationForm = {
     },
   },
 };
-
-export const SlackBotTokenConnectionConfigForm = SlackAppConnectionConfigForm;
-export const SlackAppOAuthConnectionConfigForm = SlackAppConnectionConfigForm;

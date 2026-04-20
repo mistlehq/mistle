@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-export const SlackAppConnectionMethodId = "slack-bot-token";
-export const SlackBotTokenConnectionMethodId = SlackAppConnectionMethodId;
-export const SlackAppOAuthConnectionMethodId = SlackAppConnectionMethodId;
+export const SlackConnectionMethodId = "slack-bot-token";
 export const SlackApiKeySecretType = "api_key";
 export const SlackBotTokenSlotKey = "slack.slack-default.slack-bot-token.bot-token";
 export const SlackSigningSecretSlotKey = "slack.slack-default.slack-bot-token.signing-secret";
@@ -10,7 +8,7 @@ export const SlackClientSecretSlotKey = "slack.slack-default.slack-bot-token.cli
 export const SlackOAuthClientSecretType = "oauth2_client_secret";
 
 export const SlackConnectionMethodIds = {
-  SLACK_APP: SlackAppConnectionMethodId,
+  SLACK_APP: SlackConnectionMethodId,
 };
 
 export const SlackCredentialSecretTypes = {
@@ -26,13 +24,11 @@ export const SlackCredentialSlotKeys = {
 
 export const SlackAppConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(SlackAppConnectionMethodId),
+    connection_method: z.literal(SlackConnectionMethodId),
     client_id: z.string().min(1).optional(),
   })
   .strict();
 
 export const SlackConnectionConfigSchema = SlackAppConnectionConfigSchema;
-export const SlackBotTokenConnectionConfigSchema = SlackAppConnectionConfigSchema;
-export const SlackAppOAuthConnectionConfigSchema = SlackAppConnectionConfigSchema;
 
 export type SlackConnectionConfig = z.output<typeof SlackConnectionConfigSchema>;

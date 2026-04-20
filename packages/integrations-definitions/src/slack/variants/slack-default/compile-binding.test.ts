@@ -7,7 +7,7 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import {
-  SlackBotTokenConnectionMethodId,
+  SlackConnectionMethodId,
   SlackBotTokenSlotKey,
   SlackCredentialSecretTypes,
 } from "./auth.js";
@@ -102,7 +102,7 @@ describe("compileSlackBinding", () => {
         id: "icn_slack",
         status: "active",
         config: {
-          connection_method: SlackBotTokenConnectionMethodId,
+          connection_method: SlackConnectionMethodId,
         },
       },
       binding: {
@@ -193,7 +193,7 @@ describe("compileSlackBinding", () => {
         id: "icn_slack",
         status: "active",
         config: {
-          connection_method: SlackBotTokenConnectionMethodId,
+          connection_method: SlackConnectionMethodId,
         },
       },
       binding: {

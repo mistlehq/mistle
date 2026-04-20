@@ -1,16 +1,16 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import {
-  SlackAppConnectionConfigSchema,
   type SlackConnectionConfig,
-  SlackConnectionMethodIds,
+  SlackConnectionConfigSchema,
+  SlackConnectionMethodId,
   SlackCredentialSecretTypes,
   SlackCredentialSlotKeys,
 } from "./auth.js";
 import { resolveSlackBindingConfigForm } from "./binding-config-form.js";
 import { SlackBindingConfigSchema } from "./binding-config-schema.js";
 import { compileSlackBinding } from "./compile-binding.js";
-import { SlackAppConnectionConfigForm } from "./connection-config-form.js";
+import { SlackConnectionConfigForm } from "./connection-config-form.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SlackTargetConfigSchema } from "./target-config-schema.js";
 import { SlackTargetSecretSchema } from "./target-secret-schema.js";
@@ -66,16 +66,16 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
   bindingConfigSchema: SlackBindingConfigSchema,
   bindingConfigForm: resolveSlackBindingConfigForm,
   identityLinking: {
-    eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP],
+    eligibleConnectionMethodIds: [SlackConnectionMethodId],
   },
   connectionMethods: [
     {
-      id: SlackConnectionMethodIds.SLACK_APP,
+      id: SlackConnectionMethodId,
       label: "Slack app",
       kind: "form",
       secretFields: SlackAppBaseSecretFields,
-      configSchema: SlackAppConnectionConfigSchema,
-      configForm: SlackAppConnectionConfigForm,
+      configSchema: SlackConnectionConfigSchema,
+      configForm: SlackConnectionConfigForm,
     },
   ],
   supportedWebhookEvents: SlackSupportedWebhookEvents,

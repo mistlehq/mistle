@@ -6,8 +6,8 @@ import {
 import { z } from "zod";
 
 import {
-  SlackAppConnectionMethodId,
   SlackConnectionConfigSchema,
+  SlackConnectionMethodId,
   type SlackConnectionConfig,
   SlackCredentialSlotKeys,
 } from "./auth.js";
@@ -94,33 +94,6 @@ export class SlackIdentityLinkingConfigurationError extends Error {
   }
 }
 
-type SlackLinkedAccountAuthorizationResult = {
-  providerSubjectId: string;
-  profile: {
-    workspaceId: string;
-    workspaceName?: string;
-    displayName?: string;
-    avatarUrl?: string;
-    email?: string;
-  };
-  keys: readonly [
-    {
-      keyType: "workspace_id";
-      keyValue: string;
-    },
-    {
-      keyType: "user_id";
-      keyValue: string;
-    },
-  ];
-  credential: {
-    accessToken: string;
-    refreshToken?: string;
-    accessTokenExpiresAt?: string;
-    scopes?: string[];
-  };
-};
-
 function resolveFutureTimestamp(input: {
   now: string;
   expiresInSeconds: number | undefined;
@@ -161,7 +134,7 @@ function resolveSlackClientIdOrThrow(input: {
   };
 }): string {
   const connectionConfig = SlackConnectionConfigSchema.parse(input.connection.config);
-  if (connectionConfig.connection_method !== SlackAppConnectionMethodId) {
+  if (connectionConfig.connection_method !== SlackConnectionMethodId) {
     throw new SlackIdentityLinkingConfigurationError(
       `Integration connection '${input.connection.id}' does not use the Slack app connection method required for identity linking.`,
     );
@@ -604,7 +577,7 @@ export const SlackIdentityLinkingCapability: IntegrationIdentityLinkingCapabilit
   Record<string, string>,
   SlackConnectionConfig
 > = {
-  eligibleConnectionMethodIds: [SlackAppConnectionMethodId],
+  eligibleConnectionMethodIds: [SlackConnectionMethodId],
   supportsConnection(input) {
     let clientId: string;
     try {
