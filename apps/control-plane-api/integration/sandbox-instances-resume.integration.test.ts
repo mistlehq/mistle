@@ -451,6 +451,98 @@ describe("sandbox instance resume integration", () => {
     }
   });
 
+  it("treats stopped sandboxes with a live ready runtime as already running", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_resume",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const controlPlaneRuntime = await createControlPlaneApiRuntime({
+      app: createControlPlaneConfig({
+        baseConfig: fixture.config,
+        dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
+      }),
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      portAccess: IntegrationPortAccessConfig,
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      },
+    });
+
+    try {
+      const authSession = await createAuthenticatedControlPlaneSession({
+        fixture,
+        request: controlPlaneRuntime.request,
+        db: controlPlaneRuntime.db,
+        email: "integration-sandbox-resume-stopped-live-runtime@example.com",
+      });
+
+      const sandboxInstanceId = "sbi_cp_resume_stopped_live_runtime_001";
+      const providerSandboxId = await startDockerSandboxContainer();
+      startedSandboxContainerIds.push(providerSandboxId);
+      await insertResumableSandboxInstance({
+        dataPlaneFixture,
+        organizationId: authSession.organizationId,
+        sandboxInstanceId,
+        status: "stopped",
+        providerSandboxId,
+      });
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId,
+        runtimeReady: true,
+      });
+
+      const response = await controlPlaneRuntime.request(
+        `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/resume`,
+        {
+          method: "POST",
+          headers: {
+            cookie: authSession.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+      expect(body).toEqual({
+        id: sandboxInstanceId,
+        title: null,
+        status: "running",
+        connectable: true,
+        failureCode: null,
+        failureMessage: null,
+        runtimeContext: {
+          launchCwd: null,
+          primaryRepositoryRoot: null,
+        },
+        automationConversation: null,
+      });
+
+      expect(
+        await countResumeWorkflowRuns({
+          dataPlaneFixture,
+          workflowNamespaceId: fixture.config.workflow.namespaceId,
+          sandboxInstanceId,
+        }),
+      ).toBe("0");
+    } finally {
+      await controlPlaneRuntime.stop();
+    }
+  });
+
   it("returns INSTANCE_NOT_RESUMABLE for pending sandboxes", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,

@@ -9,55 +9,7 @@ set -eu
 
 repo_root="${CODEX_SOURCE_TREE_PATH:?CODEX_SOURCE_TREE_PATH is required}"
 worktree_path="${CODEX_WORKTREE_PATH:?CODEX_WORKTREE_PATH is required}"
-
-copy_optional_local_bootstrap_file() {
-  relative_path="$1"
-  source_path="$repo_root/$relative_path"
-  target_path="$worktree_path/$relative_path"
-
-  if [ -e "$target_path" ]; then
-    return
-  fi
-
-  if [ ! -f "$source_path" ]; then
-    return
-  fi
-
-  mkdir -p "$(dirname "$target_path")"
-  cp -p "$source_path" "$target_path"
-}
-
-if [ ! -d "$repo_root" ]; then
-  echo "repository root does not exist: $repo_root" >&2
-  exit 1
-fi
-
-if [ ! -d "$worktree_path" ]; then
-  echo "worktree path does not exist: $worktree_path" >&2
-  exit 1
-fi
-
-command -v direnv >/dev/null 2>&1 || {
-  echo "direnv is required to bootstrap the worktree environment" >&2
-  exit 1
-}
-
-direnv allow "$worktree_path"
-
-copy_optional_local_bootstrap_file ".env.dev"
-copy_optional_local_bootstrap_file ".env.test"
-copy_optional_local_bootstrap_file "integration-targets.provision.json"
-
-cd "$worktree_path"
-direnv exec "$worktree_path" pnpm install
-
-if [ -f "$worktree_path/config/config.development.toml" ]; then
-  :
-elif [ -f "$repo_root/config/config.development.toml" ]; then
-  copy_optional_local_bootstrap_file "config/config.development.toml"
-else
-  direnv exec "$worktree_path" pnpm config:init:dev
-fi
+"$repo_root/scripts/dev/post-worktree-setup.sh" "$repo_root" "$worktree_path"
 '''
 
 [[actions]]

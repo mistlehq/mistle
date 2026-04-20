@@ -1,9 +1,5 @@
 name: ${MISTLE_COMPOSE_PROJECT_NAME}
 
-x-docker-build: &docker-build
-  context: ../../..
-  dockerfile: docker/Dockerfile
-
 x-mistle-runtime-environment: &mistle-runtime-environment
   MISTLE_CONFIG_PATH: /app/config/mistle.toml
 
@@ -43,7 +39,8 @@ x-mistle-local-migration-job: &mistle-local-migration-job
 services:
   dashboard:
     build:
-      <<: *docker-build
+      context: ../../..
+      dockerfile: docker/Dockerfile
       target: dashboard-runtime
     image: mistle/dashboard:local
     environment:
@@ -68,10 +65,8 @@ services:
       - "3000:80"
 
   control-plane-api:
-    build:
-      <<: *docker-build
-      target: control-plane-api-runtime
-    image: mistle/control-plane-api:local
+    image: ghcr.io/mistlehq/control-plane-api:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -96,10 +91,8 @@ services:
       - "8080:5100"
 
   control-plane-worker:
-    build:
-      <<: *docker-build
-      target: control-plane-worker-runtime
-    image: mistle/control-plane-worker:local
+    image: ghcr.io/mistlehq/control-plane-worker:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -108,8 +101,6 @@ services:
         condition: service_healthy
       data-plane-api:
         condition: service_healthy
-      sandbox-base-publish:
-        condition: service_completed_successfully
       control-plane-bootstrap:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -117,10 +108,8 @@ services:
       - app
 
   data-plane-api:
-    build:
-      <<: *docker-build
-      target: data-plane-api-runtime
-    image: mistle/data-plane-api:local
+    image: ghcr.io/mistlehq/data-plane-api:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -148,10 +137,8 @@ services:
       - "host.docker.internal:host-gateway"
 
   data-plane-gateway:
-    build:
-      <<: *docker-build
-      target: data-plane-gateway-runtime
-    image: mistle/data-plane-gateway:local
+    image: ghcr.io/mistlehq/data-plane-gateway:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -177,10 +164,8 @@ services:
       - "8084:5202"
 
   data-plane-worker:
-    build:
-      <<: *docker-build
-      target: data-plane-worker-runtime
-    image: mistle/data-plane-worker:local
+    image: ghcr.io/mistlehq/data-plane-worker:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -197,8 +182,6 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      sandbox-base-publish:
-        condition: service_completed_successfully
       control-plane-bootstrap:
         condition: service_completed_successfully
       object-store-bootstrap:
@@ -218,10 +201,8 @@ services:
       - "host.docker.internal:host-gateway"
 
   tokenizer-proxy:
-    build:
-      <<: *docker-build
-      target: tokenizer-proxy-runtime
-    image: mistle/tokenizer-proxy:local
+    image: ghcr.io/mistlehq/tokenizer-proxy:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     <<: *mistle-local-app
     environment:
       <<: *mistle-runtime-environment
@@ -274,49 +255,6 @@ services:
       timeout: 3s
       retries: 20
 
-  sandbox-base-image:
-    build:
-      context: ../../..
-      dockerfile: packages/sandboxd/Dockerfile
-      target: sandbox-base
-    image: localhost:5001/mistle/sandbox-base:local
-    entrypoint:
-      - sh
-      - -lc
-    command:
-      - echo "sandbox base image ready"
-    restart: "no"
-
-  sandbox-base-publish:
-    image: docker:28-cli
-    env_file:
-      - ${MISTLE_LOCAL_ENV_FILE:-./.env}
-    entrypoint:
-      - sh
-      - -lc
-    command:
-      - >
-        docker image inspect "${MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE}" >/dev/null &&
-        attempts=0 &&
-        until docker push "${MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE}";
-        do
-          attempts=$$((attempts + 1));
-          if [ "$$attempts" -ge 30 ]; then
-            exit 1;
-          fi;
-          sleep 1;
-        done
-    volumes:
-      - type: bind
-        source: /var/run/docker.sock
-        target: /var/run/docker.sock
-    depends_on:
-      registry:
-        condition: service_started
-      sandbox-base-image:
-        condition: service_completed_successfully
-    restart: "no"
-
   seaweedfs:
     image: chrislusf/seaweedfs:4.17_full
     environment:
@@ -324,7 +262,8 @@ services:
       AWS_SECRET_ACCESS_KEY: mistle-secret-key
     command:
       - server
-      - -ip=0.0.0.0
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
       - -dir=/data
       - -s3
     restart: unless-stopped
@@ -340,40 +279,27 @@ services:
     networks:
       - app
 
-  registry:
-    image: registry:3
-    restart: unless-stopped
-    environment:
-      REGISTRY_STORAGE_DELETE_ENABLED: "true"
-    volumes:
-      - registry-data:/var/lib/registry
-    networks:
-      - app
-    ports:
-      - "5001:5000"
-
   object-store-bootstrap:
-    <<: *mistle-local-bootstrap
-    image: mistle/control-plane-api:local
+    image: chrislusf/seaweedfs:4.17_full
+    pull_policy: always
     depends_on:
       seaweedfs:
         condition: service_healthy
     entrypoint:
-      - pnpm
-      - tsx
-      - scripts/dev/ensure-object-store-bucket.ts
-    environment:
-      DEV_OBJECT_STORE_ACCESS_KEY_ID: mistle-access-key
-      DEV_OBJECT_STORE_SECRET_ACCESS_KEY: mistle-secret-key
-      DEV_OBJECT_STORE_ENDPOINT: http://seaweedfs:8333
-      DEV_OBJECT_STORE_BUCKET_NAME: mistle-assets
-      DEV_OBJECT_STORE_PORT: "8333"
+      - sh
+      - -lc
+    command:
+      - >
+        printf 's3.bucket.create -name mistle-assets\nexit\n' |
+        weed shell -master=seaweedfs:9333
     networks:
       - app
+    restart: "no"
 
   control-plane-db-migrate:
     <<: *mistle-local-migration-job
-    image: mistle/control-plane-api:local
+    image: ghcr.io/mistlehq/control-plane-api:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     depends_on:
       postgres:
         condition: service_healthy
@@ -389,7 +315,8 @@ services:
 
   data-plane-db-migrate:
     <<: *mistle-local-migration-job
-    image: mistle/data-plane-api:local
+    image: ghcr.io/mistlehq/data-plane-api:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     depends_on:
       postgres:
         condition: service_healthy
@@ -405,7 +332,8 @@ services:
 
   control-plane-bootstrap:
     <<: *mistle-local-bootstrap
-    image: mistle/control-plane-api:local
+    image: ghcr.io/mistlehq/control-plane-api:${MISTLE_IMAGE_TAG}
+    pull_policy: always
     depends_on:
       control-plane-db-migrate:
         condition: service_completed_successfully
@@ -441,7 +369,6 @@ volumes:
   postgres-data:
   valkey-data:
   seaweedfs-data:
-  registry-data:
 
 networks:
   app:
