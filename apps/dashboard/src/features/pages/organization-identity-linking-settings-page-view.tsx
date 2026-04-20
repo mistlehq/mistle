@@ -1,10 +1,15 @@
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Badge,
   Button,
   Notice,
   Select,
   SelectContent,
   SelectItem,
+  ScrollArea,
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
@@ -209,44 +214,67 @@ export function OrganizationIdentityLinkingSettingsPageView(
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-3 border-t pt-4">
-              <h3 className="text-sm font-medium">Members</h3>
-              {provider.memberLinksLoading ? (
-                <div className="text-sm text-muted-foreground">Loading member visibility…</div>
-              ) : provider.memberLinksErrorMessage !== null ? (
-                <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
-              ) : provider.memberLinks.length === 0 ? (
-                <Notice>No organization members available to display yet.</Notice>
-              ) : (
-                <div className="flex flex-col divide-y rounded-md border">
-                  {provider.memberLinks.map((memberLink) => (
-                    <div
-                      key={memberLink.userId}
-                      className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium">{memberLink.name}</div>
-                        <div className="text-sm text-muted-foreground">{memberLink.email}</div>
-                        {memberLink.principalSummary === null ? null : (
-                          <div className="text-sm text-muted-foreground">
-                            {memberLink.principalSummary}
-                          </div>
-                        )}
-                        {memberLink.updatedAt === null ? null : (
-                          <div className="text-sm text-muted-foreground">
-                            Updated {memberLink.updatedAt}
-                          </div>
-                        )}
-                      </div>
-                      <StatusBadge
-                        tone={memberLink.statusLabel === "Linked" ? "active" : "unconfigured"}
-                      >
-                        {memberLink.statusLabel}
-                      </StatusBadge>
+            <div className="border-t pt-4">
+              <Accordion>
+                <AccordionItem value={`${provider.providerFamily}-members`}>
+                  <AccordionTrigger>
+                    <div className="flex items-center gap-2">
+                      <span>Members</span>
+                      <span className="text-muted-foreground text-xs font-normal">
+                        ({provider.memberLinks.length})
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="flex flex-col gap-3">
+                      {provider.memberLinksLoading ? (
+                        <div className="text-sm text-muted-foreground">
+                          Loading member visibility…
+                        </div>
+                      ) : provider.memberLinksErrorMessage !== null ? (
+                        <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
+                      ) : provider.memberLinks.length === 0 ? (
+                        <Notice>No organization members available to display yet.</Notice>
+                      ) : (
+                        <ScrollArea className="max-h-80 rounded-md border">
+                          <div className="flex flex-col divide-y">
+                            {provider.memberLinks.map((memberLink) => (
+                              <div
+                                key={memberLink.userId}
+                                className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <div className="min-w-0">
+                                  <div className="font-medium">{memberLink.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {memberLink.email}
+                                  </div>
+                                  {memberLink.principalSummary === null ? null : (
+                                    <div className="text-sm text-muted-foreground">
+                                      {memberLink.principalSummary}
+                                    </div>
+                                  )}
+                                  {memberLink.updatedAt === null ? null : (
+                                    <div className="text-sm text-muted-foreground">
+                                      Updated {memberLink.updatedAt}
+                                    </div>
+                                  )}
+                                </div>
+                                <StatusBadge
+                                  tone={
+                                    memberLink.statusLabel === "Linked" ? "active" : "unconfigured"
+                                  }
+                                >
+                                  {memberLink.statusLabel}
+                                </StatusBadge>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           </div>
         </FormPageSection>

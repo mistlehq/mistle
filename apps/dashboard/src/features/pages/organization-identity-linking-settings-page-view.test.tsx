@@ -99,9 +99,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     expect(screen.getByText("GitHub")).toBeTruthy();
     expect(screen.getByText("Enabled")).toBeTruthy();
-    expect(screen.getByText("Owner User")).toBeTruthy();
-    expect(screen.getByText("owner-github")).toBeTruthy();
-    expect(screen.getByText("Updated 2026-04-20T00:00:00.000Z")).toBeTruthy();
+    expect(screen.queryByText("Owner User")).toBeNull();
     const githubConnectionSelect = screen.getByRole("combobox", {
       name: "Select approved GitHub connection",
     });
@@ -116,8 +114,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     expect(screen.getByText("Slack")).toBeTruthy();
     expect(screen.getByText("Not enabled")).toBeTruthy();
-    expect(screen.getByText("Member User")).toBeTruthy();
-    expect(screen.getByText("Not linked")).toBeTruthy();
+    expect(screen.queryByText("Member User")).toBeNull();
     expect(
       screen.getByText("No eligible active connections yet. Connect a new one first."),
     ).toBeTruthy();
@@ -125,6 +122,17 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     const saveButtons = screen.getAllByRole("button", { name: "Save" });
     expect(saveButtons).toHaveLength(2);
     expect(saveButtons[1]?.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Members/ })[0]!);
+
+    expect(screen.getByText("Owner User")).toBeTruthy();
+    expect(screen.getByText("owner-github")).toBeTruthy();
+    expect(screen.getByText("Updated 2026-04-20T00:00:00.000Z")).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Members/ })[1]!);
+
+    expect(screen.getByText("Member User")).toBeTruthy();
+    expect(screen.getByText("Not linked")).toBeTruthy();
   });
 
   it("runs save and disable flows through the provided handlers", async () => {
@@ -311,6 +319,8 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         />
       </MemoryRouter>,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: /Members/ }));
 
     expect(screen.getByText("Could not load linked-member visibility.")).toBeTruthy();
   });
