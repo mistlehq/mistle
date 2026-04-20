@@ -1,0 +1,231 @@
+import { createServer } from "node:http";
+
+import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
+import { WSContext } from "hono/ws";
+import { afterEach, describe, expect, it } from "vitest";
+import WebSocket, { type RawData, WebSocketServer } from "ws";
+
+import type { RelayPeerSocket } from "../types.js";
+import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
+
+type WebSocketPair = {
+  clientSocket: WebSocket;
+  closeAll: () => Promise<void>;
+  peerSocket: RelayPeerSocket;
+  serverSocket: WebSocket;
+};
+
+const openPairs = new Set<WebSocketPair>();
+
+afterEach(async () => {
+  await Promise.all(Array.from(openPairs, async (pair) => pair.closeAll()));
+  openPairs.clear();
+});
+
+function waitForWebSocketOpen(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onOpen = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("open", onOpen);
+      socket.off("error", onError);
+    };
+
+    socket.once("open", onOpen);
+    socket.once("error", onError);
+  });
+}
+
+function waitForWebSocketClose(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onClose = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("close", onClose);
+      socket.off("error", onError);
+    };
+
+    socket.once("close", onClose);
+    socket.once("error", onError);
+  });
+}
+
+function waitForPong(socket: WebSocket): Promise<Buffer> {
+  return new Promise((resolve) => {
+    socket.once("pong", (data: RawData) => {
+      if (Buffer.isBuffer(data)) {
+        resolve(data);
+        return;
+      }
+      if (data instanceof ArrayBuffer) {
+        resolve(Buffer.from(data));
+        return;
+      }
+      resolve(Buffer.concat(data));
+    });
+  });
+}
+
+function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
+  if (input === 0 || input === 1 || input === 2 || input === 3) {
+    return input;
+  }
+
+  throw new Error(`Unexpected websocket ready state: ${String(input)}`);
+}
+
+function toPeerSocket(socket: WebSocket): RelayPeerSocket {
+  return new WSContext<WebSocket>({
+    send: (data, options) => {
+      socket.send(data, {
+        compress: options.compress,
+      });
+    },
+    close: (code, reason) => {
+      socket.close(code, reason);
+    },
+    get readyState() {
+      return toWsReadyState(socket.readyState);
+    },
+    raw: socket,
+  });
+}
+
+async function createWebSocketPair(): Promise<WebSocketPair> {
+  const server = createServer();
+  const webSocketServer = new WebSocketServer({
+    server,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address to be available.");
+  }
+
+  const serverSocketPromise = new Promise<WebSocket>((resolve, reject) => {
+    webSocketServer.once("connection", (socket) => {
+      resolve(socket);
+    });
+    webSocketServer.once("error", reject);
+  });
+  const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
+
+  await waitForWebSocketOpen(clientSocket);
+  const serverSocket = await serverSocketPromise;
+
+  const closeAll = async (): Promise<void> => {
+    if (clientSocket.readyState === WebSocket.OPEN) {
+      clientSocket.close();
+      await waitForWebSocketClose(clientSocket);
+    }
+    if (serverSocket.readyState === WebSocket.OPEN) {
+      serverSocket.close();
+      await waitForWebSocketClose(serverSocket);
+    }
+    await new Promise<void>((resolve, reject) => {
+      webSocketServer.close((error) => {
+        if (error !== undefined) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error !== undefined) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
+  };
+
+  return {
+    clientSocket,
+    closeAll,
+    peerSocket: toPeerSocket(serverSocket),
+    serverSocket,
+  };
+}
+
+describe("startWebSocketHealthMonitor", () => {
+  it("keeps responsive sockets healthy across ping and pong", async () => {
+    const pair = await createWebSocketPair();
+    openPairs.add(pair);
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    let unhealthyCount = 0;
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    clock.advanceMs(10);
+    const pongPromise = waitForPong(pair.serverSocket);
+    scheduler.runDue();
+    await pongPromise;
+
+    expect(handle.isHealthy()).toBe(true);
+    expect(unhealthyCount).toBe(0);
+    handle.stop();
+  });
+
+  it("marks sockets unhealthy once the peer disconnects before the next ping", async () => {
+    const pair = await createWebSocketPair();
+    openPairs.add(pair);
+    const clock = createMutableClock(2_000);
+    const scheduler = createManualScheduler(clock);
+    let unhealthyCount = 0;
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "connection",
+      socket: pair.peerSocket,
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    pair.clientSocket.close();
+    await waitForWebSocketClose(pair.clientSocket);
+    await waitForWebSocketClose(pair.serverSocket);
+
+    clock.advanceMs(10);
+    scheduler.runDue();
+
+    expect(handle.isHealthy()).toBe(false);
+    expect(unhealthyCount).toBe(1);
+  });
+});

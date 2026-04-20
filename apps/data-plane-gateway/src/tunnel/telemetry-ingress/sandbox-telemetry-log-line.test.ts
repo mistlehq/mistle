@@ -129,4 +129,36 @@ describe("toSandboxTunnelMetricObservation", () => {
       outstandingBytes: 16776192,
     });
   });
+
+  it("maps PTY latency warning telemetry into metric observations", () => {
+    expect(
+      toSandboxTunnelMetricObservation(
+        parseSandboxTelemetryLogLine(
+          '{"timestamp":"2026-04-20T09:00:00.000Z","level":"warn","event":"pty_input_latency_warning","ptySessionId":"pty_123","streamId":11,"channelKind":"pty","thresholdMs":100,"inputToFirstOutputMs":145,"inputBytes":1,"outputBytes":24,"interactionCount":3,"sessionAgeMs":9000}',
+        ),
+      ),
+    ).toEqual({
+      kind: "pty_input_latency_warning",
+      inputToFirstOutputMs: 145,
+      inputBytes: 1,
+      outputBytes: 24,
+    });
+  });
+
+  it("maps PTY session summary telemetry into metric observations", () => {
+    expect(
+      toSandboxTunnelMetricObservation(
+        parseSandboxTelemetryLogLine(
+          '{"timestamp":"2026-04-20T09:00:00.000Z","level":"info","event":"pty_session_summary","ptySessionId":"pty_123","streamId":11,"channelKind":"pty","outcome":"closed","durationMs":12000,"interactionCount":6,"warningCount":2,"avgInputToFirstOutputMs":82,"maxInputToFirstOutputMs":190,"resetCode":null,"reason":null}',
+        ),
+      ),
+    ).toEqual({
+      kind: "pty_session_summary",
+      durationMs: 12000,
+      interactionCount: 6,
+      warningCount: 2,
+      avgInputToFirstOutputMs: 82,
+      maxInputToFirstOutputMs: 190,
+    });
+  });
 });

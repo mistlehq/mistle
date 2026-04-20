@@ -32,12 +32,28 @@ export type SandboxTunnelMetricObservation =
       outstandingBytes: number;
       payloadBytes: number;
       payloadKind: string;
+    }
+  | {
+      kind: "pty_input_latency_warning";
+      inputBytes: number;
+      inputToFirstOutputMs: number;
+      outputBytes: number;
+    }
+  | {
+      kind: "pty_session_summary";
+      avgInputToFirstOutputMs: number | null;
+      durationMs: number;
+      interactionCount: number;
+      maxInputToFirstOutputMs: number | null;
+      warningCount: number;
     };
 
 const InvalidTelemetryLogShapeMessage =
   "Telemetry log line does not match mistle.sandbox-runtime.log.v1.";
 const AgentStreamSummaryEvent = "agent_stream_summary";
 const AgentStreamWindowExhaustedEvent = "agent_stream_window_exhausted";
+const PtyInputLatencyWarningEvent = "pty_input_latency_warning";
+const PtySessionSummaryEvent = "pty_session_summary";
 const ReservedSandboxTelemetryFields = new Set(["timestamp", "level", "event"]);
 const SeverityNumberByLevel = {
   info: SeverityNumber.INFO,
@@ -264,6 +280,32 @@ export function toSandboxTunnelMetricObservation(
       payloadKind: getStringField(logLine.extraFields, "payloadKind"),
       payloadBytes: getNumberField(logLine.extraFields, "payloadBytes"),
       outstandingBytes: getNumberField(logLine.extraFields, "outstandingBytes"),
+    };
+  }
+
+  if (logLine.event === PtyInputLatencyWarningEvent) {
+    return {
+      kind: "pty_input_latency_warning",
+      inputToFirstOutputMs: getNumberField(logLine.extraFields, "inputToFirstOutputMs"),
+      inputBytes: getNumberField(logLine.extraFields, "inputBytes"),
+      outputBytes: getNumberField(logLine.extraFields, "outputBytes"),
+    };
+  }
+
+  if (logLine.event === PtySessionSummaryEvent) {
+    return {
+      kind: "pty_session_summary",
+      durationMs: getNumberField(logLine.extraFields, "durationMs"),
+      interactionCount: getNumberField(logLine.extraFields, "interactionCount"),
+      warningCount: getNumberField(logLine.extraFields, "warningCount"),
+      avgInputToFirstOutputMs: getNullableNumberField(
+        logLine.extraFields,
+        "avgInputToFirstOutputMs",
+      ),
+      maxInputToFirstOutputMs: getNullableNumberField(
+        logLine.extraFields,
+        "maxInputToFirstOutputMs",
+      ),
     };
   }
 

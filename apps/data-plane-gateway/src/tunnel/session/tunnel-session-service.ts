@@ -119,6 +119,8 @@ export class TunnelSessionService {
 
     try {
       websocketHealthHandle = startWebSocketHealthMonitor({
+        clock: this.clock,
+        socketKind: "bootstrap",
         socket: input.socket,
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
@@ -286,6 +288,8 @@ export class TunnelSessionService {
       | undefined;
     try {
       websocketHealthHandle = startWebSocketHealthMonitor({
+        clock: this.clock,
+        socketKind: "connection",
         socket: input.socket,
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,

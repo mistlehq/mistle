@@ -1,7 +1,17 @@
-import type { Scheduler, TimerHandle } from "@mistle/time";
+import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
+import { metrics, type Attributes } from "@opentelemetry/api";
 import { WebSocket } from "ws";
 
-import type { RelayPeerSocket } from "../types.js";
+import type { RelayPeerSide, RelayPeerSocket } from "../types.js";
+
+const TunnelTelemetryMeter = metrics.getMeter("@mistle/data-plane-gateway/tunnel");
+const TunnelWebSocketRoundTripTimeMs = TunnelTelemetryMeter.createHistogram(
+  "mistle.sandbox.tunnel.websocket.rtt",
+  {
+    description: "Observed websocket ping/pong round-trip time for tunnel websocket peers.",
+    unit: "ms",
+  },
+);
 
 export type WebSocketHealthHandle = {
   stop: () => void;
@@ -15,6 +25,8 @@ export type WebSocketHealthHandle = {
  * `onUnhealthy` when the socket stops responding while still nominally open.
  */
 export function startWebSocketHealthMonitor(input: {
+  clock: Clock;
+  socketKind: RelayPeerSide;
   socket: RelayPeerSocket;
   scheduler: Scheduler;
   pingIntervalMs: number;
@@ -29,11 +41,20 @@ export function startWebSocketHealthMonitor(input: {
   let healthy = true;
   let stopped = false;
   let pingHandle: TimerHandle | undefined;
+  let pingSentAtMs: number | undefined;
   let pongTimeoutHandle: TimerHandle | undefined;
 
   const onPong = (): void => {
     if (stopped) {
       return;
+    }
+    if (pingSentAtMs !== undefined) {
+      const roundTripTimeMs = input.clock.nowMs() - pingSentAtMs;
+      TunnelWebSocketRoundTripTimeMs.record(
+        roundTripTimeMs,
+        buildRoundTripAttributes(input.socketKind),
+      );
+      pingSentAtMs = undefined;
     }
     if (pongTimeoutHandle !== undefined) {
       input.scheduler.cancel(pongTimeoutHandle);
@@ -84,6 +105,7 @@ export function startWebSocketHealthMonitor(input: {
         markUnhealthy();
       }, input.pongTimeoutMs);
 
+      pingSentAtMs = input.clock.nowMs();
       rawSocket.ping(undefined, false, (error: Error | null | undefined) => {
         if (error != null) {
           markUnhealthy();
@@ -106,5 +128,11 @@ export function startWebSocketHealthMonitor(input: {
       rawSocket.off("pong", onPong);
     },
     isHealthy: () => healthy,
+  };
+}
+
+function buildRoundTripAttributes(socketKind: RelayPeerSide): Attributes {
+  return {
+    "mistle.socket_kind": socketKind,
   };
 }
