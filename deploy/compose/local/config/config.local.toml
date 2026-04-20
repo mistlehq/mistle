@@ -8,7 +8,7 @@ resource_attributes = "deployment.environment=development"
 
 [global.sandbox]
 provider = "docker"
-default_base_image = "localhost:5001/mistle/sandbox-base:local"
+default_base_image = "ghcr.io/mistlehq/sandbox-base:latest"
 gateway_ws_url = "ws://localhost:8084/tunnel/sandbox"
 internal_gateway_ws_url = "ws://data-plane-gateway:5202/tunnel/sandbox"
 

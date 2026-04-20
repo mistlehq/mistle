@@ -36,17 +36,28 @@ fi
 
 mkdir -p "${GENERATED_DIRECTORY_PATH}"
 
-configured_auth_base_url="$(
-  awk -F= '
+read_env_value() {
+  local key="$1"
+  awk -F= -v target_key="${key}" '
     /^[[:space:]]*#/ { next }
-    $1 == "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL" {
+    $1 == target_key {
       sub(/^[[:space:]]+/, "", $2)
       sub(/[[:space:]]+$/, "", $2)
       print $2
       exit
     }
   ' "${ENV_FILE_PATH}"
-)"
+}
+
+configured_auth_base_url="$(read_env_value "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL")"
+image_tag="$(read_env_value "MISTLE_IMAGE_TAG")"
+
+if [[ -z "${image_tag}" ]]; then
+  echo "MISTLE_IMAGE_TAG must be set in ${ENV_FILE_PATH}." >&2
+  exit 1
+fi
+
+runtime_sandbox_base_image="ghcr.io/mistlehq/sandbox-base:${image_tag}"
 
 runtime_auth_base_url="${configured_auth_base_url}"
 
@@ -108,27 +119,37 @@ fi
 
 cp "${ENV_FILE_PATH}" "${RUNTIME_ENV_PATH}"
 if grep -q '^MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=' "${RUNTIME_ENV_PATH}"; then
-  awk -v auth_base_url="${runtime_auth_base_url}" '
+  awk -v auth_base_url="${runtime_auth_base_url}" -v sandbox_base_image="${runtime_sandbox_base_image}" '
     BEGIN {
-      replaced = 0
+      replaced_auth_base_url = 0
+      replaced_sandbox_base_image = 0
     }
     /^MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=/ {
       print "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=" auth_base_url
-      replaced = 1
+      replaced_auth_base_url = 1
+      next
+    }
+    /^MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=/ {
+      print "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
+      replaced_sandbox_base_image = 1
       next
     }
     {
       print $0
     }
     END {
-      if (replaced == 0) {
+      if (replaced_auth_base_url == 0) {
         print "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=" auth_base_url
+      }
+      if (replaced_sandbox_base_image == 0) {
+        print "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
       }
     }
   ' "${RUNTIME_ENV_PATH}" >"${RUNTIME_ENV_PATH}.tmp"
   mv "${RUNTIME_ENV_PATH}.tmp" "${RUNTIME_ENV_PATH}"
 else
   printf '\nMISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=%s\n' "${runtime_auth_base_url}" >>"${RUNTIME_ENV_PATH}"
+  printf 'MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=%s\n' "${runtime_sandbox_base_image}" >>"${RUNTIME_ENV_PATH}"
 fi
 
 echo "Starting local Compose stack..."
@@ -138,6 +159,7 @@ MISTLE_LOCAL_ENV_FILE="${RUNTIME_ENV_PATH}" docker compose \
   up -d --build
 
 echo "Active callback base URL: ${runtime_auth_base_url}"
+echo "Published image tag: ${image_tag}"
 echo "Dashboard: http://localhost:3000"
 echo "Control Plane API: http://localhost:8080"
 echo "Data Plane Gateway: http://localhost:8084"
