@@ -7,6 +7,10 @@ import type {
   PendingSessionDiffComment,
   PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
+import {
+  buildPendingSessionDiffCommentSummaryLabel,
+  buildPendingSessionDiffCommentSummaryTitle,
+} from "./session-diff-comment.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import {
   createStorySessionBottomPanel,
@@ -105,6 +109,19 @@ function StoryDiffWorkbench({
     ]);
   }
 
+  function updateComment(commentId: string, body: string): void {
+    setPendingComments((currentComments) =>
+      currentComments.map((comment) =>
+        comment.id !== commentId
+          ? comment
+          : {
+              ...comment,
+              body,
+            },
+      ),
+    );
+  }
+
   useEffect(() => {
     if (!autoOpenLocalComment || hasAutoOpenedCommentRef.current) {
       return;
@@ -171,19 +188,25 @@ function StoryDiffWorkbench({
         primaryBottomPanel: createStorySessionBottomPanel({
           composerViewModel: {
             ...SessionComposerFixturePropsWithPendingDiffComments,
-            pendingDiffComments: pendingComments.map((comment) => ({
-              id: comment.id,
-              label: `${comment.filePath.split("/").at(-1) ?? comment.filePath}:${
-                comment.side === "additions" ? "R" : "L"
-              }${comment.lineNumber}`,
-              title: [comment.filePath, "", comment.body].join("\n"),
-            })),
+            onClearPendingDiffComments: () => {
+              setPendingComments([]);
+            },
+            pendingDiffCommentSummary:
+              pendingComments.length === 0
+                ? null
+                : {
+                    count: pendingComments.length,
+                    label: buildPendingSessionDiffCommentSummaryLabel(pendingComments.length),
+                    title: buildPendingSessionDiffCommentSummaryTitle(pendingComments),
+                  },
           },
         }),
         secondaryPanel: (
           <SessionDiffPanel
             errorNotice={errorNotice}
+            onUpdateComment={updateComment}
             patch={patch}
+            pendingComments={pendingComments}
             summaryLabel="Compared with main"
             title="Current changes"
             onAddComment={addComment}

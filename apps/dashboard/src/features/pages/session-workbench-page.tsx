@@ -59,9 +59,16 @@ function SessionWorkbenchPageContent(input: {
   const handleClearPendingDiffComments = useCallback((): void => {
     setPendingDiffComments([]);
   }, []);
-  const handleRemovePendingDiffComment = useCallback((commentId: string): void => {
+  const handleUpdatePendingDiffComment = useCallback((commentId: string, body: string): void => {
     setPendingDiffComments((currentComments) =>
-      currentComments.filter((comment) => comment.id !== commentId),
+      currentComments.map((comment) =>
+        comment.id !== commentId
+          ? comment
+          : {
+              ...comment,
+              body,
+            },
+      ),
     );
   }, []);
   const isTerminalOpenDisabled =
@@ -388,7 +395,6 @@ function SessionWorkbenchPageContent(input: {
               composerText,
               pendingDiffComments,
               clearPendingDiffComments: handleClearPendingDiffComments,
-              removePendingDiffComment: handleRemovePendingDiffComment,
               setComposerText,
             }}
             isRespondingToServerRequest={
@@ -409,6 +415,8 @@ function SessionWorkbenchPageContent(input: {
           errorNotice={diffPanelErrorNotice}
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
           onAddComment={handleAddPendingDiffComment}
+          onUpdateComment={handleUpdatePendingDiffComment}
+          pendingComments={pendingDiffComments}
           patch={diffPanelPatch}
           summaryLabel="Compared with main"
           title="Current changes"
@@ -464,7 +472,7 @@ function renderPrimaryPanelMainContent(input: {
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
-    pendingDiffComments: [],
+    pendingDiffCommentSummary: null,
     isSubmitPending: false,
     pendingAttachments: [],
     modelOptions: [],
@@ -482,7 +490,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     onModelChange: function onModelChange() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},
     onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
-    onRemovePendingDiffComment: function onRemovePendingDiffComment() {},
+    onClearPendingDiffComments: function onClearPendingDiffComments() {},
     onRemovePendingAttachment: function onRemovePendingAttachment() {},
   };
 }

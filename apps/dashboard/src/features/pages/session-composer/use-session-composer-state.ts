@@ -4,9 +4,9 @@ import { useCallback, useMemo, useState } from "react";
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
 import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
-  buildPendingSessionDiffCommentBadgeLabel,
-  buildPendingSessionDiffCommentBadgeTitle,
   buildSessionComposerPrompt,
+  buildPendingSessionDiffCommentSummaryLabel,
+  buildPendingSessionDiffCommentSummaryTitle,
   type PendingSessionDiffComment,
 } from "../session-diff-comment.js";
 import { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
@@ -65,7 +65,6 @@ export type SessionComposerDraftState = {
   composerText: string;
   pendingDiffComments: readonly PendingSessionDiffComment[];
   clearPendingDiffComments: () => void;
-  removePendingDiffComment: (commentId: string) => void;
   setComposerText: (nextText: string) => void;
 };
 
@@ -343,11 +342,16 @@ export function useSessionComposerState(input: {
   return {
     composerViewModel: {
       composerText,
-      pendingDiffComments: draftState.pendingDiffComments.map((comment) => ({
-        id: comment.id,
-        label: buildPendingSessionDiffCommentBadgeLabel(comment),
-        title: buildPendingSessionDiffCommentBadgeTitle(comment),
-      })),
+      pendingDiffCommentSummary:
+        draftState.pendingDiffComments.length === 0
+          ? null
+          : {
+              count: draftState.pendingDiffComments.length,
+              label: buildPendingSessionDiffCommentSummaryLabel(
+                draftState.pendingDiffComments.length,
+              ),
+              title: buildPendingSessionDiffCommentSummaryTitle(draftState.pendingDiffComments),
+            },
       pendingAttachments: pendingComposerAttachments.map((attachment) => ({
         id: attachment.id,
         name: attachment.name,
@@ -372,7 +376,7 @@ export function useSessionComposerState(input: {
       onReasoningEffortChange: handleReasoningEffortChange,
       onPendingImageFilesAdded: addPendingComposerFiles,
       onRemovePendingAttachment: removePendingComposerAttachment,
-      onRemovePendingDiffComment: draftState.removePendingDiffComment,
+      onClearPendingDiffComments: draftState.clearPendingDiffComments,
     },
     statusMessage: composerStatusMessage,
   };

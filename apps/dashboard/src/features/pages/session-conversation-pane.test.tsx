@@ -136,9 +136,6 @@ function RenderedComposerPaneHarness(input: {
         clearPendingDiffComments: () => {
           return;
         },
-        removePendingDiffComment: () => {
-          return;
-        },
         setComposerText: () => {
           return;
         },

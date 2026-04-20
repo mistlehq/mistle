@@ -58,7 +58,7 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const SessionComposerFixtureProps: ChatComposerViewModel = {
   composerText: "Focus on dashboard asset ownership next.",
-  pendingDiffComments: [],
+  pendingDiffCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
   selectedModel: "gpt-5.4",
@@ -76,7 +76,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   onModelChange: function onModelChange() {},
   onReasoningEffortChange: function onReasoningEffortChange() {},
   onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
-  onRemovePendingDiffComment: function onRemovePendingDiffComment() {},
+  onClearPendingDiffComments: function onClearPendingDiffComments() {},
   onRemovePendingAttachment: function onRemovePendingAttachment() {},
 };
 
@@ -92,26 +92,17 @@ export const SessionComposerFixturePropsWithPendingImageAttachments: ChatCompose
 export const SessionComposerFixturePropsWithPendingDiffComments: ChatComposerViewModel = {
   ...SessionComposerFixtureProps,
   composerText: "Please address the diff comments before sending the next patch.",
-  pendingDiffComments: [
-    {
-      id: "comment-1",
-      label: "session-workbench-page.tsx:R10",
-      title: [
-        "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
-        "",
-        "Request change",
-      ].join("\n"),
-    },
-    {
-      id: "comment-2",
-      label: "session-diff-panel.tsx:R24",
-      title: [
-        "apps/dashboard/src/features/pages/session-diff-panel.tsx R24",
-        "",
-        "Use the shared overflow tooltip here.",
-      ].join("\n"),
-    },
-  ],
+  pendingDiffCommentSummary: {
+    count: 2,
+    label: "2 comments",
+    title: [
+      "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
+      "Request change",
+      "",
+      "apps/dashboard/src/features/pages/session-diff-panel.tsx R24",
+      "Use the shared overflow tooltip here.",
+    ].join("\n"),
+  },
 };
 
 export const SessionComposerFixturePropsUploadingImageAttachments: ChatComposerViewModel = {

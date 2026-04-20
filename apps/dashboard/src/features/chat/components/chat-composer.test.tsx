@@ -8,7 +8,7 @@ import { ChatComposer } from "./chat-composer.js";
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerText: "Ship it",
-    pendingDiffComments: [],
+    pendingDiffCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
     selectedModel: "gpt-5.4-codex",
@@ -26,7 +26,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     onModelChange: () => {},
     onReasoningEffortChange: () => {},
     onPendingImageFilesAdded: () => {},
-    onRemovePendingDiffComment: () => {},
+    onClearPendingDiffComments: () => {},
     onRemovePendingAttachment: () => {},
   };
 }
@@ -146,23 +146,19 @@ describe("ChatComposer", () => {
     expect(screen.queryByText("Uploading attachments...")).toBeNull();
   });
 
-  it("renders pending diff comments as removable badges", () => {
+  it("renders a single removable badge for pending diff comments", () => {
     render(
       <ChatComposer
         {...createBaseComposerProps()}
-        pendingDiffComments={[
-          {
-            id: "comment_1",
-            label: "session-workbench-page.tsx:R10",
-            title: "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
-          },
-        ]}
+        pendingDiffCommentSummary={{
+          count: 3,
+          label: "3 comments",
+          title: "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
+        }}
       />,
     );
 
-    expect(screen.getByText("session-workbench-page.tsx:R10")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Remove comment session-workbench-page.tsx:R10" }),
-    ).toBeTruthy();
+    expect(screen.getByText("3 comments")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove all 3 comments" })).toBeTruthy();
   });
 });

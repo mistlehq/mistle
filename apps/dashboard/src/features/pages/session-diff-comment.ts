@@ -36,6 +36,20 @@ export function buildPendingSessionDiffCommentBadgeTitle(
   return `${comment.filePath} ${formatPendingSessionDiffCommentLineLabel(comment)}\n\n${comment.body}`;
 }
 
+export function buildPendingSessionDiffCommentSummaryLabel(commentCount: number): string {
+  return `${commentCount} comment${commentCount === 1 ? "" : "s"}`;
+}
+
+export function buildPendingSessionDiffCommentSummaryTitle(
+  comments: readonly PendingSessionDiffComment[],
+): string {
+  return comments
+    .map((comment) => {
+      return `${comment.filePath} ${formatPendingSessionDiffCommentLineLabel(comment)}\n${comment.body}`;
+    })
+    .join("\n\n");
+}
+
 export function buildPendingSessionDiffCommentPromptBlock(
   comment: Pick<PendingSessionDiffComment, "body" | "filePath" | "lineNumber" | "side">,
 ): string {

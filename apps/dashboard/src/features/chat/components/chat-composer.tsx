@@ -35,11 +35,11 @@ export type ChatComposerStatusMessage = {
 
 export type ChatComposerViewModel = {
   composerText: string;
-  pendingDiffComments: readonly {
-    id: string;
+  pendingDiffCommentSummary: {
+    count: number;
     label: string;
     title: string;
-  }[];
+  } | null;
   pendingAttachments: readonly {
     id: string;
     name: string;
@@ -63,13 +63,13 @@ export type ChatComposerViewModel = {
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
   onPendingImageFilesAdded: (files: readonly File[]) => void;
-  onRemovePendingDiffComment: (commentId: string) => void;
+  onClearPendingDiffComments: () => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
 };
 
 export function ChatComposer({
   composerText,
-  pendingDiffComments,
+  pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
   selectedModel,
@@ -86,7 +86,7 @@ export function ChatComposer({
   onModelChange,
   onReasoningEffortChange,
   onPendingImageFilesAdded,
-  onRemovePendingDiffComment,
+  onClearPendingDiffComments,
   onRemovePendingAttachment,
 }: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,29 +142,28 @@ export function ChatComposer({
         ref={fileInputRef}
         type="file"
       />
-      {pendingAttachments.length === 0 && pendingDiffComments.length === 0 ? null : (
+      {pendingAttachments.length === 0 && pendingDiffCommentSummary === null ? null : (
         <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
-          {pendingDiffComments.map((comment) => (
+          {pendingDiffCommentSummary === null ? null : (
             <div
               className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
-              key={comment.id}
-              title={comment.title}
+              title={pendingDiffCommentSummary.title}
             >
               <ChatCircleTextIcon aria-hidden="true" className="size-3.5" />
-              <span>{comment.label}</span>
+              <span>{pendingDiffCommentSummary.label}</span>
               <button
-                aria-label={`Remove comment ${comment.label}`}
+                aria-label={`Remove all ${pendingDiffCommentSummary.label}`}
                 className="text-muted-foreground disabled:cursor-not-allowed"
                 disabled={isUploadingAttachments}
                 onClick={() => {
-                  onRemovePendingDiffComment(comment.id);
+                  onClearPendingDiffComments();
                 }}
                 type="button"
               >
                 <XIcon aria-hidden="true" className="size-3.5" />
               </button>
             </div>
-          ))}
+          )}
           {pendingAttachments.map((attachment) => (
             <div
               className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"

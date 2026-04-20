@@ -9,11 +9,12 @@ import {
   Textarea,
 } from "@mistle/ui";
 import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
-import { FileDiff, type FileDiffMetadata } from "@pierre/diffs/react";
+import { FileDiff, type DiffLineAnnotation, type FileDiffMetadata } from "@pierre/diffs/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatPendingSessionDiffCommentLineLabel,
+  type PendingSessionDiffComment,
   type PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
@@ -37,6 +38,17 @@ type HoveredSessionDiffLine = {
   left: number;
 };
 
+type SessionDiffPanelAnnotationMetadata =
+  | {
+      kind: "draft";
+    }
+  | {
+      comment: PendingSessionDiffComment;
+      kind: "saved-comment";
+    };
+
+type SessionDiffPanelAnnotation = DiffLineAnnotation<SessionDiffPanelAnnotationMetadata>;
+
 type SessionDiffPanelProps = {
   errorNotice?: {
     message: string;
@@ -45,6 +57,8 @@ type SessionDiffPanelProps = {
   } | null;
   isLoading?: boolean;
   onAddComment?: (comment: PendingSessionDiffCommentInput) => void;
+  onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
+  pendingComments?: readonly PendingSessionDiffComment[];
   patch: string;
   summaryLabel: string;
   title?: string;
@@ -84,6 +98,8 @@ export function SessionDiffPanel({
   errorNotice = null,
   isLoading = false,
   onAddComment,
+  onUpdateComment,
+  pendingComments = [],
   patch,
   summaryLabel,
   title = "Diffs",
@@ -150,6 +166,7 @@ export function SessionDiffPanel({
                   fileKey={fileKey}
                   isOpen={isOpen}
                   onAddComment={onAddComment}
+                  onUpdateComment={onUpdateComment}
                   onOpenChange={(open) => {
                     setOpenFiles((currentOpenFiles) => ({
                       ...currentOpenFiles,
@@ -157,6 +174,9 @@ export function SessionDiffPanel({
                     }));
                   }}
                   open={isOpen}
+                  pendingComments={pendingComments.filter(
+                    (comment) => comment.filePath === resolveFileDiffPath(fileDiff),
+                  )}
                   setActiveCommentDraft={setActiveCommentDraft}
                 />
               );
@@ -174,8 +194,10 @@ type SessionDiffPanelFileSectionProps = {
   fileKey: string;
   isOpen: boolean;
   onAddComment?: ((comment: PendingSessionDiffCommentInput) => void) | undefined;
+  onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  pendingComments: readonly PendingSessionDiffComment[];
   setActiveCommentDraft: React.Dispatch<React.SetStateAction<ActiveSessionDiffCommentDraft | null>>;
 };
 
@@ -185,8 +207,10 @@ function SessionDiffPanelFileSection({
   fileKey,
   isOpen,
   onAddComment,
+  onUpdateComment,
   onOpenChange,
   open,
+  pendingComments,
   setActiveCommentDraft,
 }: SessionDiffPanelFileSectionProps): React.JSX.Element {
   const filePath = resolveFileDiffPath(fileDiff);
@@ -194,12 +218,73 @@ function SessionDiffPanelFileSection({
   const isCommentingCurrentFile = activeCommentDraft?.fileKey === fileKey;
   const overlayRootRef = useRef<HTMLDivElement | null>(null);
   const [hoveredLine, setHoveredLine] = useState<HoveredSessionDiffLine | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
 
   useEffect(() => {
     if (!open) {
       setHoveredLine(null);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (pendingComments.some((comment) => comment.id === editingCommentId)) {
+      return;
+    }
+
+    setEditingCommentId(null);
+    setEditingCommentBody("");
+  }, [editingCommentId, pendingComments]);
+
+  const lineAnnotations = useMemo<SessionDiffPanelAnnotation[]>(() => {
+    const savedAnnotations: SessionDiffPanelAnnotation[] = pendingComments.map((comment) => ({
+      lineNumber: comment.lineNumber,
+      metadata: {
+        comment,
+        kind: "saved-comment",
+      },
+      side: comment.side,
+    }));
+
+    if (activeCommentDraft === null || !isCommentingCurrentFile) {
+      return savedAnnotations;
+    }
+
+    return [
+      ...savedAnnotations,
+      {
+        lineNumber: activeCommentDraft.lineNumber,
+        metadata: {
+          kind: "draft",
+        },
+        side: activeCommentDraft.side,
+      },
+    ];
+  }, [activeCommentDraft, isCommentingCurrentFile, pendingComments]);
+  const supportsCommentAnnotations = onAddComment !== undefined || lineAnnotations.length > 0;
+
+  const selectedLine = useMemo(() => {
+    if (activeCommentDraft !== null && isCommentingCurrentFile) {
+      return {
+        end: activeCommentDraft.lineNumber,
+        endSide: activeCommentDraft.side,
+        side: activeCommentDraft.side,
+        start: activeCommentDraft.lineNumber,
+      };
+    }
+
+    const editingComment = pendingComments.find((comment) => comment.id === editingCommentId);
+    if (editingComment === undefined) {
+      return null;
+    }
+
+    return {
+      end: editingComment.lineNumber,
+      endSide: editingComment.side,
+      side: editingComment.side,
+      start: editingComment.lineNumber,
+    };
+  }, [activeCommentDraft, editingCommentId, isCommentingCurrentFile, pendingComments]);
 
   function handleHoverLine(input: {
     event: PointerEvent;
@@ -275,7 +360,10 @@ function SessionDiffPanelFileSection({
             }}
             ref={overlayRootRef}
           >
-            {onAddComment === undefined || hoveredLine === null ? null : (
+            {onAddComment === undefined ||
+            hoveredLine === null ||
+            activeCommentDraft !== null ||
+            editingCommentId !== null ? null : (
               <button
                 aria-label="Add comment"
                 className="absolute z-10 flex size-5 items-center justify-center rounded-md bg-stone-900 text-white shadow-sm ring-1 ring-black/5"
@@ -298,7 +386,7 @@ function SessionDiffPanelFileSection({
                 <PlusIcon aria-hidden="true" className="size-3.5" />
               </button>
             )}
-            <FileDiff
+            <FileDiff<SessionDiffPanelAnnotationMetadata>
               className="overflow-hidden"
               fileDiff={fileDiff}
               options={
@@ -316,39 +404,94 @@ function SessionDiffPanelFileSection({
                       },
                     }
               }
-              {...(onAddComment === undefined
+              {...(!supportsCommentAnnotations
                 ? {}
                 : {
-                    renderAnnotation: () => {
+                    renderAnnotation: (annotation: SessionDiffPanelAnnotation) => {
+                      if (annotation.metadata.kind === "saved-comment") {
+                        const comment = annotation.metadata.comment;
+                        const isEditing = comment.id === editingCommentId;
+                        return (
+                          <SessionDiffPanelCommentCard
+                            actionRow={
+                              isEditing ? (
+                                <>
+                                  <Button
+                                    onClick={() => {
+                                      setEditingCommentId(null);
+                                      setEditingCommentBody("");
+                                    }}
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    disabled={
+                                      onUpdateComment === undefined ||
+                                      editingCommentBody.trim().length === 0 ||
+                                      editingCommentBody.trim() === comment.body
+                                    }
+                                    onClick={() => {
+                                      const nextCommentBody = editingCommentBody.trim();
+                                      if (
+                                        onUpdateComment === undefined ||
+                                        nextCommentBody.length === 0 ||
+                                        nextCommentBody === comment.body
+                                      ) {
+                                        return;
+                                      }
+
+                                      onUpdateComment(comment.id, nextCommentBody);
+                                      setEditingCommentId(null);
+                                      setEditingCommentBody("");
+                                    }}
+                                    type="button"
+                                  >
+                                    Save changes
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  onClick={() => {
+                                    setEditingCommentId(comment.id);
+                                    setEditingCommentBody(comment.body);
+                                    setActiveCommentDraft(null);
+                                  }}
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  Edit
+                                </Button>
+                              )
+                            }
+                            body={
+                              isEditing ? (
+                                <Textarea
+                                  className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                                  onChange={(event) => {
+                                    setEditingCommentBody(event.target.value);
+                                  }}
+                                  placeholder="Add comment"
+                                  value={editingCommentBody}
+                                />
+                              ) : (
+                                <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
+                              )
+                            }
+                            title={`Comment on line ${formatPendingSessionDiffCommentLineLabel(comment)}`}
+                          />
+                        );
+                      }
+
                       if (!isCommentingCurrentFile || activeCommentDraft === null) {
                         return null;
                       }
 
                       return (
-                        <div className="m-1 max-w-2xl overflow-hidden rounded-md border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-                          <div className="border-b p-3">
-                            <p className="text-foreground text-sm font-semibold">
-                              Add comment on line{" "}
-                              {formatPendingSessionDiffCommentLineLabel(activeCommentDraft)}
-                            </p>
-                          </div>
-                          <div className="p-3">
-                            <Textarea
-                              className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-                              onChange={(event) => {
-                                setActiveCommentDraft((currentDraft) =>
-                                  currentDraft === null
-                                    ? null
-                                    : {
-                                        ...currentDraft,
-                                        body: event.target.value,
-                                      },
-                                );
-                              }}
-                              placeholder="Add comment"
-                              value={activeCommentDraft.body}
-                            />
-                            <div className="mt-4 flex items-center justify-end gap-2">
+                        <SessionDiffPanelCommentCard
+                          actionRow={
+                            <>
                               <Button
                                 onClick={() => {
                                   setActiveCommentDraft(null);
@@ -366,6 +509,10 @@ function SessionDiffPanelFileSection({
                                     return;
                                   }
 
+                                  if (onAddComment === undefined) {
+                                    return;
+                                  }
+
                                   onAddComment({
                                     body: nextCommentBody,
                                     filePath,
@@ -378,35 +525,55 @@ function SessionDiffPanelFileSection({
                               >
                                 Add comment
                               </Button>
-                            </div>
-                          </div>
-                        </div>
+                            </>
+                          }
+                          body={
+                            <Textarea
+                              className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                              onChange={(event) => {
+                                setActiveCommentDraft((currentDraft) =>
+                                  currentDraft === null
+                                    ? null
+                                    : {
+                                        ...currentDraft,
+                                        body: event.target.value,
+                                      },
+                                );
+                              }}
+                              placeholder="Add comment"
+                              value={activeCommentDraft.body}
+                            />
+                          }
+                          title={`Add comment on line ${formatPendingSessionDiffCommentLineLabel(activeCommentDraft)}`}
+                        />
                       );
                     },
-                    selectedLines:
-                      activeCommentDraft === null || !isCommentingCurrentFile
-                        ? null
-                        : {
-                            end: activeCommentDraft.lineNumber,
-                            endSide: activeCommentDraft.side,
-                            side: activeCommentDraft.side,
-                            start: activeCommentDraft.lineNumber,
-                          },
-                    lineAnnotations:
-                      activeCommentDraft === null || !isCommentingCurrentFile
-                        ? []
-                        : [
-                            {
-                              lineNumber: activeCommentDraft.lineNumber,
-                              side: activeCommentDraft.side,
-                            },
-                          ],
+                    selectedLines: selectedLine,
+                    lineAnnotations,
                   })}
             />
           </div>
         </CollapsibleContent>
       </section>
     </Collapsible>
+  );
+}
+
+function SessionDiffPanelCommentCard(input: {
+  actionRow: React.JSX.Element;
+  body: React.JSX.Element;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <div className="m-1 max-w-2xl overflow-hidden rounded-md border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+      <div className="border-b p-3">
+        <p className="text-foreground text-sm font-semibold">{input.title}</p>
+      </div>
+      <div className="p-3">
+        {input.body}
+        <div className="mt-4 flex items-center justify-end gap-2">{input.actionRow}</div>
+      </div>
+    </div>
   );
 }
 
