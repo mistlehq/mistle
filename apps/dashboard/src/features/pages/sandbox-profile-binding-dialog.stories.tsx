@@ -123,10 +123,6 @@ function SandboxProfileBindingDialogStory(input: {
           }));
         }}
         onSave={() => {}}
-        resolveSelectedConnectionDisplayName={(row) =>
-          StoryIntegrationConnections.find((connection) => connection.id === row.connectionId)
-            ?.displayName
-        }
         state={state}
       />
     </QueryClientProvider>
@@ -147,7 +143,6 @@ const meta = {
     onConnectionIdChange: () => {},
     onRowChange: () => {},
     onSave: () => {},
-    resolveSelectedConnectionDisplayName: () => undefined,
   },
   parameters: {
     layout: "fullscreen",

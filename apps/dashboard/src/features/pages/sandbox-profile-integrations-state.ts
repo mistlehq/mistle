@@ -3,7 +3,6 @@ import { useState } from "react";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
@@ -237,7 +236,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
-  resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   isSubmittingIntegrationBindings: boolean;
 } {
   const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
@@ -435,23 +433,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     void persistIntegrationRows(nextRows);
   }
 
-  function resolveSelectedConnectionDisplayName(
-    row: SandboxProfileBindingEditorRow,
-  ): string | undefined {
-    if (row.connectionId === "") {
-      return undefined;
-    }
-    const selectedConnection = input.availableConnections.find(
-      (connection) => connection.id === row.connectionId,
-    );
-    if (selectedConnection === undefined) {
-      return undefined;
-    }
-    return formatConnectionDisplayName({
-      connection: selectedConnection,
-    });
-  }
-
   return {
     integrationSaveError,
     integrationRows,
@@ -461,7 +442,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
-    resolveSelectedConnectionDisplayName,
     isSubmittingIntegrationBindings: putIntegrationBindingsMutation.isPending,
   };
 }

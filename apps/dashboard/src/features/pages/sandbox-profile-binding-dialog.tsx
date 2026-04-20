@@ -8,20 +8,11 @@ import {
   Field,
   FieldContent,
   FieldLabel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import {
-  IntegrationHorizontalFieldGroupClassName,
-  IntegrationSelectContentClassName,
-} from "../forms/integration-form-theme.js";
-import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
-import { resolveSelectableValue } from "../shared/select-value.js";
+import { IntegrationHorizontalFieldGroupClassName } from "../forms/integration-form-theme.js";
+import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import {
   SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
@@ -53,7 +44,6 @@ export function SandboxProfileBindingDialog(input: {
     Record<SandboxProfileBindingEditorRow["kind"], readonly IntegrationConnectionSummary[]>
   >;
   isSubmittingIntegrationBindings: boolean;
-  resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   onClose: () => void;
   onConnectionIdChange: (nextConnectionId: string) => void;
   onRowChange: (
@@ -62,7 +52,9 @@ export function SandboxProfileBindingDialog(input: {
   ) => void;
   onSave: () => void;
 }): React.JSX.Element {
-  if (input.state === null) {
+  const { state } = input;
+
+  if (state === null) {
     return <></>;
   }
 
@@ -78,52 +70,25 @@ export function SandboxProfileBindingDialog(input: {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader variant="sectioned">
           <DialogTitle>
-            {input.state.mode === "add"
-              ? formatAddBindingLabel(input.state.row.kind)
-              : "Edit binding"}
+            {state.mode === "add" ? formatAddBindingLabel(state.row.kind) : "Edit binding"}
           </DialogTitle>
         </DialogHeader>
         <div className={IntegrationHorizontalFieldGroupClassName}>
           <Field className="gap-2" contentWidth="fill" orientation="horizontal">
             <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
             <FieldContent>
-              <Select
-                onValueChange={(nextValue) => {
-                  if (nextValue === null) {
-                    return;
-                  }
-                  input.onConnectionIdChange(nextValue);
-                }}
-                value={resolveSelectableValue({
-                  selectedValue: input.state.row.connectionId,
-                  optionValues: input.availableConnectionsByKind[input.state.row.kind].map(
-                    (connection) => connection.id,
-                  ),
-                })}
-              >
-                <div className="md:flex md:justify-end">
-                  <SelectTrigger
-                    aria-label="Add binding connection"
-                    className="w-full md:w-auto md:min-w-fit md:max-w-full"
-                    id="add-binding-connection"
-                  >
-                    <SelectValue placeholder="Select integration connection">
-                      {input.resolveSelectedConnectionDisplayName(input.state.row)}
-                    </SelectValue>
-                  </SelectTrigger>
-                </div>
-                <SelectContent
-                  align="end"
-                  alignItemWithTrigger={false}
-                  className={IntegrationSelectContentClassName}
-                >
-                  {input.availableConnectionsByKind[input.state.row.kind].map((connection) => (
-                    <SelectItem key={connection.id} value={connection.id}>
-                      {formatConnectionDisplayName({ connection })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="md:flex md:justify-end">
+                <IntegrationConnectionSelect
+                  ariaLabel="Add binding connection"
+                  availableConnections={input.availableConnectionsByKind[state.row.kind]}
+                  availableTargets={input.availableTargets}
+                  id="add-binding-connection"
+                  onValueChange={input.onConnectionIdChange}
+                  placeholder="Select integration connection"
+                  selectedConnectionId={state.row.connectionId}
+                  triggerClassName="w-full md:w-auto md:min-w-fit md:max-w-full"
+                />
+              </div>
             </FieldContent>
           </Field>
           <SandboxProfileBindingConfigEditor
@@ -131,11 +96,9 @@ export function SandboxProfileBindingDialog(input: {
             availableTargets={input.availableTargets}
             layout="horizontal"
             onIntegrationBindingRowChange={input.onRowChange}
-            row={input.state.row}
+            row={state.row}
           />
-          {input.state.error ? (
-            <p className="text-destructive text-sm">{input.state.error}</p>
-          ) : null}
+          {state.error ? <p className="text-destructive text-sm">{state.error}</p> : null}
         </div>
         <DialogFooter>
           <Button onClick={input.onClose} type="button" variant="outline">
@@ -144,13 +107,13 @@ export function SandboxProfileBindingDialog(input: {
           <Button
             disabled={
               input.isSubmittingIntegrationBindings ||
-              input.availableConnectionsByKind[input.state.row.kind].length === 0
+              input.availableConnectionsByKind[state.row.kind].length === 0
             }
             onClick={input.onSave}
             type="button"
           >
-            {input.state.mode === "add" ? <PlusIcon /> : null}
-            {input.state.mode === "add" ? "Add" : "Save changes"}
+            {state.mode === "add" ? <PlusIcon /> : null}
+            {state.mode === "add" ? "Add" : "Save changes"}
           </Button>
         </DialogFooter>
       </DialogContent>

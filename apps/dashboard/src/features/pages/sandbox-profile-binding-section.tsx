@@ -21,7 +21,9 @@ import { IntegrationSelectContentClassName } from "../forms/integration-form-the
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { ActionTile } from "../shared/action-tile.js";
 import { resolveSelectableValue } from "../shared/select-value.js";
+import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
   IntegrationConnectionSummary,
@@ -37,7 +39,7 @@ import {
 } from "./sandbox-profile-binding-config-editor.js";
 import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
-function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
+export function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
     return "Agent Harness";
   }
@@ -57,14 +59,14 @@ function formatBindingSectionEmptyState(kind: SandboxIntegrationBindingKind): st
   return "Add connectors to give the agent access to external tools and their resources, like Linear or Slack.";
 }
 
-function formatBindingSectionConstraint(kind: SandboxIntegrationBindingKind): string | null {
+export function formatBindingSectionConstraint(kind: SandboxIntegrationBindingKind): string | null {
   if (kind === "agent") {
     return "Only one agent harness can be assigned to a sandbox profile.";
   }
   return null;
 }
 
-function shouldHideBindingSectionAddAction(input: {
+export function shouldHideBindingSectionAddAction(input: {
   kind: SandboxIntegrationBindingKind;
   rowCount: number;
 }): boolean {
@@ -230,27 +232,54 @@ function updateAgentHarnessConfig(input: {
   };
 }
 
-function ConnectionSelectValueContent(input: {
-  connectionDisplayName: string;
-  targetDisplayName?: string | undefined;
-  targetLogoKey?: string | undefined;
+function serializeBindingRowState(row: Omit<SandboxProfileBindingEditorRow, "clientId">): string {
+  return JSON.stringify({
+    id: row.id,
+    connectionId: row.connectionId,
+    kind: row.kind,
+    config: row.config,
+  });
+}
+
+function useDraftBindingRow(row: SandboxProfileBindingEditorRow): {
+  draftRow: SandboxProfileBindingEditorRow;
+  isDirty: boolean;
+  setDraftRow: React.Dispatch<React.SetStateAction<SandboxProfileBindingEditorRow>>;
+  resetDraftRow: () => void;
+} {
+  const persistedSignature = serializeBindingRowState(row);
+  const persistedRowRef = React.useRef(row);
+  const [draftRow, setDraftRow] = React.useState(row);
+
+  persistedRowRef.current = row;
+
+  React.useEffect(() => {
+    setDraftRow(persistedRowRef.current);
+  }, [persistedSignature]);
+
+  return {
+    draftRow,
+    isDirty: serializeBindingRowState(draftRow) !== persistedSignature,
+    setDraftRow,
+    resetDraftRow: () => {
+      setDraftRow(row);
+    },
+  };
+}
+
+function BindingDraftActions(input: {
+  isDirty: boolean;
+  onCancel: () => void;
+  onSave: () => void;
 }): React.JSX.Element {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      {input.targetLogoKey === undefined ? null : (
-        <img
-          alt={`${input.targetDisplayName ?? "Integration"} logo`}
-          className="size-4 shrink-0 rounded-sm"
-          src={resolveIntegrationLogoPath({ logoKey: input.targetLogoKey })}
-        />
-      )}
-      {input.targetDisplayName === undefined ? (
-        <span className="truncate">{input.connectionDisplayName}</span>
-      ) : (
-        <span className="truncate">
-          {input.targetDisplayName} - {input.connectionDisplayName}
-        </span>
-      )}
+    <div className="flex items-center justify-end gap-2">
+      <Button disabled={!input.isDirty} onClick={input.onCancel} type="button" variant="outline">
+        Cancel
+      </Button>
+      <Button disabled={!input.isDirty} onClick={input.onSave} type="button">
+        Save
+      </Button>
     </div>
   );
 }
@@ -266,6 +295,8 @@ function ConnectorBindingRows(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemove: (clientId: string) => void;
+  emptyStateAction: React.ReactNode | undefined;
+  emptyStateMessage: string | undefined;
 }): React.JSX.Element {
   function resolveConfigSummaryItems(params: { row: SandboxProfileBindingEditorRow }) {
     return formatSandboxProfileBindingSummaryItems({
@@ -368,6 +399,16 @@ function ConnectorBindingRows(input: {
         <p>Configuration</p>
         <div />
       </div>
+      {input.rows.length === 0 ? (
+        <div className="border-b py-4">
+          <ActionTile
+            action={input.emptyStateAction}
+            className="border-0 px-0 py-0 shadow-none"
+            description={input.emptyStateMessage ?? ""}
+            title={<span className="sr-only">Add connectors</span>}
+          />
+        </div>
+      ) : null}
       <div className="hidden md:flex md:flex-col">
         {input.rows.map((row) => {
           const rowMetadata = resolveRowBindingMetadata({
@@ -559,6 +600,321 @@ function ConnectorBindingRows(input: {
   );
 }
 
+function AgentHarnessConnectionPicker(input: {
+  availableAgentConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  onCreateBindingFromConnection:
+    | ((input: {
+        kind: SandboxIntegrationBindingKind;
+        connectionId: string;
+      }) => Promise<void> | void)
+    | undefined;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+        <DetailLabel as="p">Connection</DetailLabel>
+        <IntegrationConnectionSelect
+          ariaLabel="Connection"
+          availableConnections={input.availableAgentConnections}
+          availableTargets={input.availableTargets}
+          disabled={
+            input.availableAgentConnections.length === 0 ||
+            input.onCreateBindingFromConnection === undefined
+          }
+          onValueChange={(nextValue) => {
+            if (input.onCreateBindingFromConnection === undefined) {
+              return;
+            }
+            void input.onCreateBindingFromConnection({
+              kind: "agent",
+              connectionId: nextValue,
+            });
+          }}
+          placeholder="Select a connection"
+          selectedConnectionId={null}
+        />
+      </div>
+    </div>
+  );
+}
+
+function AgentHarnessRowEditor(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableAgentConnections: readonly IntegrationConnectionSummary[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowError: string | undefined;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+}): React.JSX.Element {
+  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
+
+  React.useEffect(() => {
+    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
+
+    return () => {
+      input.onDraftDirtyChange?.(input.row.clientId, false);
+    };
+  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
+
+  const fieldId = `agent-binding-connection-${input.row.clientId}`;
+  const configUiModel = resolveBindingConfigUiModel({
+    row: draftRow,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
+  });
+  const schemaRecord = configUiModel.mode === "form" ? readRecord(configUiModel.schema) : null;
+  const uiSchemaRecord = configUiModel.mode === "form" ? readRecord(configUiModel.uiSchema) : null;
+  const defaultModelOptions =
+    schemaRecord === null || uiSchemaRecord === null
+      ? []
+      : resolveChoiceOptions({
+          schema: schemaRecord,
+          uiSchema: uiSchemaRecord,
+          schemaPath: ["properties", "model", "properties", "defaultModel"],
+          uiSchemaPath: ["model", "defaultModel"],
+        });
+  const reasoningEffortOptions =
+    schemaRecord === null || uiSchemaRecord === null
+      ? []
+      : resolveChoiceOptions({
+          schema: schemaRecord,
+          uiSchema: uiSchemaRecord,
+          schemaPath: [
+            "properties",
+            "model",
+            "properties",
+            "options",
+            "properties",
+            "reasoningEffort",
+          ],
+          uiSchemaPath: ["model", "options", "reasoningEffort"],
+        });
+  const currentDefaultModel =
+    configUiModel.mode !== "form"
+      ? undefined
+      : readString(
+          resolveNestedSchemaValue({
+            path: ["model", "defaultModel"],
+            value: configUiModel.value,
+          }),
+        );
+  const currentReasoningEffort =
+    configUiModel.mode !== "form"
+      ? undefined
+      : readString(
+          resolveNestedSchemaValue({
+            path: ["model", "options", "reasoningEffort"],
+            value: configUiModel.value,
+          }),
+        );
+  const currentAdditionalInstructions =
+    configUiModel.mode !== "form"
+      ? undefined
+      : readString(
+          resolveNestedSchemaValue({
+            path: ["model", "options", "additionalInstructions"],
+            value: configUiModel.value,
+          }),
+        );
+  const canRenderExplicitAgentForm =
+    configUiModel.mode === "form" &&
+    defaultModelOptions.length > 0 &&
+    reasoningEffortOptions.length > 0;
+
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+            <DetailLabel as="p">Connection</DetailLabel>
+            <IntegrationConnectionSelect
+              ariaLabel="Connection"
+              availableConnections={input.availableAgentConnections}
+              availableTargets={input.availableTargets}
+              id={fieldId}
+              onValueChange={(nextValue) => {
+                const nextConnection = input.availableAgentConnections.find(
+                  (connection) => connection.id === nextValue,
+                );
+                const nextTarget = input.availableTargets.find(
+                  (candidate) => candidate.targetKey === nextConnection?.targetKey,
+                );
+
+                setDraftRow((currentRow) => ({
+                  ...currentRow,
+                  connectionId: nextValue,
+                  config:
+                    nextConnection === undefined || nextTarget === undefined
+                      ? {}
+                      : createDefaultBindingConfig({
+                          connection: nextConnection,
+                          target: nextTarget,
+                        }),
+                }));
+              }}
+              placeholder="Select integration connection"
+              selectedConnectionId={draftRow.connectionId}
+            />
+          </div>
+        </div>
+
+        {canRenderExplicitAgentForm ? (
+          <>
+            <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+              <div className="min-w-0 flex flex-col gap-1.5">
+                <DetailLabel as="p">Default model</DetailLabel>
+                <Select
+                  onValueChange={(nextValue) => {
+                    if (nextValue === null || configUiModel.mode !== "form") {
+                      return;
+                    }
+
+                    setDraftRow((currentRow) => ({
+                      ...currentRow,
+                      config: updateAgentHarnessConfig({
+                        config: configUiModel.value,
+                        defaultModel: nextValue,
+                      }),
+                    }));
+                  }}
+                  value={resolveSelectableValue({
+                    selectedValue: currentDefaultModel ?? null,
+                    optionValues: defaultModelOptions.map((option) => option.value),
+                  })}
+                >
+                  <SelectTrigger aria-label="Default model" className="w-full">
+                    <SelectValue placeholder="Select model">{currentDefaultModel}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className={IntegrationSelectContentClassName}>
+                    {defaultModelOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="min-w-0 flex flex-col gap-1.5">
+                <DetailLabel as="p">Reasoning effort</DetailLabel>
+                <Select
+                  onValueChange={(nextValue) => {
+                    if (nextValue === null || configUiModel.mode !== "form") {
+                      return;
+                    }
+
+                    setDraftRow((currentRow) => ({
+                      ...currentRow,
+                      config: updateAgentHarnessConfig({
+                        config: configUiModel.value,
+                        reasoningEffort: nextValue,
+                      }),
+                    }));
+                  }}
+                  value={resolveSelectableValue({
+                    selectedValue: currentReasoningEffort ?? null,
+                    optionValues: reasoningEffortOptions.map((option) => option.value),
+                  })}
+                >
+                  <SelectTrigger aria-label="Reasoning effort" className="w-full">
+                    <SelectValue placeholder="Select reasoning effort">
+                      {currentReasoningEffort}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className={IntegrationSelectContentClassName}>
+                    {reasoningEffortOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="min-w-0 flex flex-col gap-1.5">
+              <div className="flex items-center gap-1">
+                <DetailLabel as="p">Agent Instructions</DetailLabel>
+                <Tooltip delay={0}>
+                  <TooltipTrigger
+                    aria-label="Explain agent instructions"
+                    render={
+                      <button
+                        className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+                        type="button"
+                      />
+                    }
+                  >
+                    <InfoIcon aria-hidden className="size-3.5" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-64 text-left" side="top">
+                    Appended to the developer message.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Textarea
+                aria-label="Agent Instructions"
+                className="min-h-28 w-full text-sm"
+                onChange={(event) => {
+                  if (configUiModel.mode !== "form") {
+                    return;
+                  }
+                  const nextInstructions = event.currentTarget.value;
+
+                  setDraftRow((currentRow) => ({
+                    ...currentRow,
+                    config: updateAgentHarnessConfig({
+                      config: configUiModel.value,
+                      additionalInstructions: nextInstructions,
+                    }),
+                  }));
+                }}
+                rows={8}
+                value={currentAdditionalInstructions ?? ""}
+              />
+            </div>
+          </>
+        ) : (
+          <SandboxProfileBindingConfigEditor
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            formContext={{
+              columns: 2,
+              labelTone: "detail",
+              layout: "vertical",
+            }}
+            onIntegrationBindingRowChange={(clientId, changes) => {
+              setDraftRow((currentRow) =>
+                clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
+              );
+            }}
+            row={draftRow}
+          />
+        )}
+
+        <BindingDraftActions
+          isDirty={isDirty}
+          onCancel={resetDraftRow}
+          onSave={() => {
+            input.onChange(input.row.clientId, {
+              connectionId: draftRow.connectionId,
+              kind: draftRow.kind,
+              config: draftRow.config,
+            });
+          }}
+        />
+
+        {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
+      </div>
+    </div>
+  );
+}
+
 function AgentHarnessRows(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -569,6 +925,11 @@ function AgentHarnessRows(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemove: (clientId: string) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+  onCreateBindingFromConnection?: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+  }) => Promise<void> | void;
 }): React.JSX.Element {
   const availableAgentConnections = input.availableConnections.filter((connection) => {
     const target = input.availableTargets.find(
@@ -579,303 +940,173 @@ function AgentHarnessRows(input: {
 
   return (
     <div className="flex flex-col divide-y">
-      {input.rows.map((row) => {
-        const rowMetadata = resolveRowBindingMetadata({
-          row,
-          availableConnections: input.availableConnections,
-          availableTargets: input.availableTargets,
-        });
-        const target = rowMetadata?.target;
-        const connectionDisplayName =
-          rowMetadata === null
-            ? undefined
-            : formatConnectionDisplayName({
-                connection: rowMetadata.connection,
-              });
-        const fieldId = `agent-binding-connection-${row.clientId}`;
-        const configUiModel = resolveBindingConfigUiModel({
-          row,
-          connections: input.availableConnections,
-          targets: input.availableTargets,
-        });
-        const schemaRecord =
-          configUiModel.mode === "form" ? readRecord(configUiModel.schema) : null;
-        const uiSchemaRecord =
-          configUiModel.mode === "form" ? readRecord(configUiModel.uiSchema) : null;
-        const defaultModelOptions =
-          schemaRecord === null || uiSchemaRecord === null
-            ? []
-            : resolveChoiceOptions({
-                schema: schemaRecord,
-                uiSchema: uiSchemaRecord,
-                schemaPath: ["properties", "model", "properties", "defaultModel"],
-                uiSchemaPath: ["model", "defaultModel"],
-              });
-        const reasoningEffortOptions =
-          schemaRecord === null || uiSchemaRecord === null
-            ? []
-            : resolveChoiceOptions({
-                schema: schemaRecord,
-                uiSchema: uiSchemaRecord,
-                schemaPath: [
-                  "properties",
-                  "model",
-                  "properties",
-                  "options",
-                  "properties",
-                  "reasoningEffort",
-                ],
-                uiSchemaPath: ["model", "options", "reasoningEffort"],
-              });
-        const currentDefaultModel =
-          configUiModel.mode !== "form"
-            ? undefined
-            : readString(
-                resolveNestedSchemaValue({
-                  path: ["model", "defaultModel"],
-                  value: configUiModel.value,
-                }),
-              );
-        const currentReasoningEffort =
-          configUiModel.mode !== "form"
-            ? undefined
-            : readString(
-                resolveNestedSchemaValue({
-                  path: ["model", "options", "reasoningEffort"],
-                  value: configUiModel.value,
-                }),
-              );
-        const currentAdditionalInstructions =
-          configUiModel.mode !== "form"
-            ? undefined
-            : readString(
-                resolveNestedSchemaValue({
-                  path: ["model", "options", "additionalInstructions"],
-                  value: configUiModel.value,
-                }),
-              );
-        const canRenderExplicitAgentForm =
-          configUiModel.mode === "form" &&
-          defaultModelOptions.length > 0 &&
-          reasoningEffortOptions.length > 0;
+      {input.rows.length === 0 ? (
+        <AgentHarnessConnectionPicker
+          availableAgentConnections={availableAgentConnections}
+          availableTargets={input.availableTargets}
+          onCreateBindingFromConnection={input.onCreateBindingFromConnection}
+        />
+      ) : null}
+      {input.rows.map((row) => (
+        <AgentHarnessRowEditor
+          availableAgentConnections={availableAgentConnections}
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          key={row.clientId}
+          onChange={input.onChange}
+          row={row}
+          rowError={input.rowErrorsByClientId[row.clientId]}
+          {...(input.onDraftDirtyChange === undefined
+            ? {}
+            : { onDraftDirtyChange: input.onDraftDirtyChange })}
+        />
+      ))}
+    </div>
+  );
+}
 
-        return (
-          <div className="flex flex-col gap-4 py-2" key={row.clientId}>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                  <DetailLabel as="p">Connection</DetailLabel>
-                  <Select
-                    onValueChange={(nextValue) => {
-                      if (nextValue === null) {
-                        return;
-                      }
+function GitProviderConnectionPicker(input: {
+  availableGitConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  onCreateBindingFromConnection:
+    | ((input: {
+        kind: SandboxIntegrationBindingKind;
+        connectionId: string;
+      }) => Promise<void> | void)
+    | undefined;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+        <DetailLabel as="p">Connection</DetailLabel>
+        <IntegrationConnectionSelect
+          ariaLabel="Connection"
+          availableConnections={input.availableGitConnections}
+          availableTargets={input.availableTargets}
+          disabled={
+            input.availableGitConnections.length === 0 ||
+            input.onCreateBindingFromConnection === undefined
+          }
+          onValueChange={(nextValue) => {
+            if (input.onCreateBindingFromConnection === undefined) {
+              return;
+            }
+            void input.onCreateBindingFromConnection({
+              kind: "git",
+              connectionId: nextValue,
+            });
+          }}
+          placeholder="Select a connection"
+          selectedConnectionId={null}
+        />
+      </div>
+    </div>
+  );
+}
 
-                      const nextConnection = availableAgentConnections.find(
-                        (connection) => connection.id === nextValue,
-                      );
-                      const nextTarget = input.availableTargets.find(
-                        (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                      );
+function GitProviderRowEditor(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableGitConnections: readonly IntegrationConnectionSummary[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowError: string | undefined;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onRemove: (clientId: string) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+}): React.JSX.Element {
+  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
 
-                      input.onChange(row.clientId, {
-                        connectionId: nextValue,
-                        config:
-                          nextConnection === undefined || nextTarget === undefined
-                            ? {}
-                            : createDefaultBindingConfig({
-                                connection: nextConnection,
-                                target: nextTarget,
-                              }),
-                      });
-                    }}
-                    value={resolveSelectableValue({
-                      selectedValue: row.connectionId,
-                      optionValues: availableAgentConnections.map((connection) => connection.id),
-                    })}
-                  >
-                    <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
-                      <SelectValue placeholder="Select integration connection">
-                        {connectionDisplayName === undefined ? null : (
-                          <ConnectionSelectValueContent
-                            connectionDisplayName={connectionDisplayName}
-                            targetDisplayName={target?.displayName}
-                            targetLogoKey={target?.logoKey}
-                          />
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent
-                      align="end"
-                      alignItemWithTrigger={false}
-                      className={IntegrationSelectContentClassName}
-                    >
-                      {availableAgentConnections.map((connection) => {
-                        const connectionTarget = input.availableTargets.find(
-                          (candidate) => candidate.targetKey === connection.targetKey,
-                        );
+  React.useEffect(() => {
+    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
 
-                        return (
-                          <SelectItem key={connection.id} value={connection.id}>
-                            <ConnectionSelectValueContent
-                              connectionDisplayName={formatConnectionDisplayName({ connection })}
-                              targetDisplayName={connectionTarget?.displayName}
-                              targetLogoKey={connectionTarget?.logoKey}
-                            />
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  aria-label="Remove binding"
-                  className="mt-6 h-7 w-7 shrink-0"
-                  onClick={() => {
-                    input.onRemove(row.clientId);
-                  }}
-                  type="button"
-                  variant="ghost"
-                >
-                  <TrashIcon aria-hidden className="size-4" />
-                </Button>
-              </div>
+    return () => {
+      input.onDraftDirtyChange?.(input.row.clientId, false);
+    };
+  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
 
-              {canRenderExplicitAgentForm ? (
-                <>
-                  <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
-                    <div className="min-w-0 flex flex-col gap-1.5">
-                      <DetailLabel as="p">Default model</DetailLabel>
-                      <Select
-                        onValueChange={(nextValue) => {
-                          if (nextValue === null || configUiModel.mode !== "form") {
-                            return;
-                          }
+  const fieldId = `git-binding-connection-${input.row.clientId}`;
 
-                          input.onChange(row.clientId, {
-                            config: updateAgentHarnessConfig({
-                              config: configUiModel.value,
-                              defaultModel: nextValue,
-                            }),
-                          });
-                        }}
-                        value={resolveSelectableValue({
-                          selectedValue: currentDefaultModel ?? null,
-                          optionValues: defaultModelOptions.map((option) => option.value),
-                        })}
-                      >
-                        <SelectTrigger aria-label="Default model" className="w-full">
-                          <SelectValue placeholder="Select model">
-                            {currentDefaultModel}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className={IntegrationSelectContentClassName}>
-                          {defaultModelOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+            <DetailLabel as="p">Connection</DetailLabel>
+            <IntegrationConnectionSelect
+              ariaLabel="Connection"
+              availableConnections={input.availableGitConnections}
+              availableTargets={input.availableTargets}
+              id={fieldId}
+              onValueChange={(nextValue) => {
+                const nextConnection = input.availableGitConnections.find(
+                  (connection) => connection.id === nextValue,
+                );
+                const nextTarget = input.availableTargets.find(
+                  (candidate) => candidate.targetKey === nextConnection?.targetKey,
+                );
 
-                    <div className="min-w-0 flex flex-col gap-1.5">
-                      <DetailLabel as="p">Reasoning effort</DetailLabel>
-                      <Select
-                        onValueChange={(nextValue) => {
-                          if (nextValue === null || configUiModel.mode !== "form") {
-                            return;
-                          }
-
-                          input.onChange(row.clientId, {
-                            config: updateAgentHarnessConfig({
-                              config: configUiModel.value,
-                              reasoningEffort: nextValue,
-                            }),
-                          });
-                        }}
-                        value={resolveSelectableValue({
-                          selectedValue: currentReasoningEffort ?? null,
-                          optionValues: reasoningEffortOptions.map((option) => option.value),
-                        })}
-                      >
-                        <SelectTrigger aria-label="Reasoning effort" className="w-full">
-                          <SelectValue placeholder="Select reasoning effort">
-                            {currentReasoningEffort}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent className={IntegrationSelectContentClassName}>
-                          {reasoningEffortOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1">
-                      <DetailLabel as="p">Agent Instructions</DetailLabel>
-                      <Tooltip delay={0}>
-                        <TooltipTrigger
-                          aria-label="Explain agent instructions"
-                          render={
-                            <button
-                              className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
-                              type="button"
-                            />
-                          }
-                        >
-                          <InfoIcon aria-hidden className="size-3.5" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-64 text-left" side="top">
-                          Appended to the developer message.
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Textarea
-                      aria-label="Agent Instructions"
-                      className="min-h-28 w-full"
-                      onChange={(event) => {
-                        if (configUiModel.mode !== "form") {
-                          return;
-                        }
-
-                        input.onChange(row.clientId, {
-                          config: updateAgentHarnessConfig({
-                            config: configUiModel.value,
-                            additionalInstructions: event.currentTarget.value,
-                          }),
-                        });
-                      }}
-                      rows={8}
-                      value={currentAdditionalInstructions ?? ""}
-                    />
-                  </div>
-                </>
-              ) : (
-                <SandboxProfileBindingConfigEditor
-                  availableConnections={input.availableConnections}
-                  availableTargets={input.availableTargets}
-                  formContext={{
-                    columns: 2,
-                    labelTone: "detail",
-                    layout: "vertical",
-                  }}
-                  onIntegrationBindingRowChange={input.onChange}
-                  row={row}
-                />
-              )}
-
-              {input.rowErrorsByClientId[row.clientId] === undefined ? null : (
-                <Notice variant="alert">{input.rowErrorsByClientId[row.clientId]}</Notice>
-              )}
-            </div>
+                setDraftRow((currentRow) => ({
+                  ...currentRow,
+                  connectionId: nextValue,
+                  config:
+                    nextConnection === undefined || nextTarget === undefined
+                      ? {}
+                      : createDefaultBindingConfig({
+                          connection: nextConnection,
+                          target: nextTarget,
+                        }),
+                }));
+              }}
+              placeholder="Select integration connection"
+              selectedConnectionId={draftRow.connectionId}
+            />
           </div>
-        );
-      })}
+          <Button
+            aria-label="Remove binding"
+            className="mt-6 h-7 w-7 shrink-0"
+            onClick={() => {
+              input.onRemove(input.row.clientId);
+            }}
+            type="button"
+            variant="ghost"
+          >
+            <TrashIcon aria-hidden className="size-4" />
+          </Button>
+        </div>
+
+        <SandboxProfileBindingConfigEditor
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          formContext={{
+            columns: 2,
+            labelTone: "detail",
+            layout: "vertical",
+          }}
+          onIntegrationBindingRowChange={(clientId, changes) => {
+            setDraftRow((currentRow) =>
+              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
+            );
+          }}
+          row={draftRow}
+        />
+
+        <BindingDraftActions
+          isDirty={isDirty}
+          onCancel={resetDraftRow}
+          onSave={() => {
+            input.onChange(input.row.clientId, {
+              connectionId: draftRow.connectionId,
+              kind: draftRow.kind,
+              config: draftRow.config,
+            });
+          }}
+        />
+
+        {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
+      </div>
     </div>
   );
 }
@@ -890,6 +1121,11 @@ function GitProviderRows(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemove: (clientId: string) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+  onCreateBindingFromConnection?: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+  }) => Promise<void> | void;
 }): React.JSX.Element {
   const availableGitConnections = input.availableConnections.filter((connection) => {
     const target = input.availableTargets.find(
@@ -900,121 +1136,28 @@ function GitProviderRows(input: {
 
   return (
     <div className="flex flex-col divide-y">
-      {input.rows.map((row) => {
-        const rowMetadata = resolveRowBindingMetadata({
-          row,
-          availableConnections: input.availableConnections,
-          availableTargets: input.availableTargets,
-        });
-        const target = rowMetadata?.target;
-        const connectionDisplayName =
-          rowMetadata === null
-            ? undefined
-            : formatConnectionDisplayName({
-                connection: rowMetadata.connection,
-              });
-        const fieldId = `git-binding-connection-${row.clientId}`;
-        return (
-          <div className="flex flex-col gap-4 py-2" key={row.clientId}>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-                  <DetailLabel as="p">Connection</DetailLabel>
-                  <Select
-                    onValueChange={(nextValue) => {
-                      if (nextValue === null) {
-                        return;
-                      }
-
-                      const nextConnection = availableGitConnections.find(
-                        (connection) => connection.id === nextValue,
-                      );
-                      const nextTarget = input.availableTargets.find(
-                        (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                      );
-
-                      input.onChange(row.clientId, {
-                        connectionId: nextValue,
-                        config:
-                          nextConnection === undefined || nextTarget === undefined
-                            ? {}
-                            : createDefaultBindingConfig({
-                                connection: nextConnection,
-                                target: nextTarget,
-                              }),
-                      });
-                    }}
-                    value={resolveSelectableValue({
-                      selectedValue: row.connectionId,
-                      optionValues: availableGitConnections.map((connection) => connection.id),
-                    })}
-                  >
-                    <SelectTrigger aria-label="Connection" className="w-full" id={fieldId}>
-                      <SelectValue placeholder="Select integration connection">
-                        {connectionDisplayName === undefined ? null : (
-                          <ConnectionSelectValueContent
-                            connectionDisplayName={connectionDisplayName}
-                            targetDisplayName={target?.displayName}
-                            targetLogoKey={target?.logoKey}
-                          />
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent
-                      align="end"
-                      alignItemWithTrigger={false}
-                      className={IntegrationSelectContentClassName}
-                    >
-                      {availableGitConnections.map((connection) => {
-                        const connectionTarget = input.availableTargets.find(
-                          (candidate) => candidate.targetKey === connection.targetKey,
-                        );
-
-                        return (
-                          <SelectItem key={connection.id} value={connection.id}>
-                            <ConnectionSelectValueContent
-                              connectionDisplayName={formatConnectionDisplayName({ connection })}
-                              targetDisplayName={connectionTarget?.displayName}
-                              targetLogoKey={connectionTarget?.logoKey}
-                            />
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  aria-label="Remove binding"
-                  className="mt-6 h-7 w-7 shrink-0"
-                  onClick={() => {
-                    input.onRemove(row.clientId);
-                  }}
-                  type="button"
-                  variant="ghost"
-                >
-                  <TrashIcon aria-hidden className="size-4" />
-                </Button>
-              </div>
-
-              <SandboxProfileBindingConfigEditor
-                availableConnections={input.availableConnections}
-                availableTargets={input.availableTargets}
-                formContext={{
-                  columns: 2,
-                  labelTone: "detail",
-                  layout: "vertical",
-                }}
-                onIntegrationBindingRowChange={input.onChange}
-                row={row}
-              />
-
-              {input.rowErrorsByClientId[row.clientId] === undefined ? null : (
-                <Notice variant="alert">{input.rowErrorsByClientId[row.clientId]}</Notice>
-              )}
-            </div>
-          </div>
-        );
-      })}
+      {input.rows.length === 0 ? (
+        <GitProviderConnectionPicker
+          availableGitConnections={availableGitConnections}
+          availableTargets={input.availableTargets}
+          onCreateBindingFromConnection={input.onCreateBindingFromConnection}
+        />
+      ) : null}
+      {input.rows.map((row) => (
+        <GitProviderRowEditor
+          availableConnections={input.availableConnections}
+          availableGitConnections={availableGitConnections}
+          availableTargets={input.availableTargets}
+          key={row.clientId}
+          onChange={input.onChange}
+          onRemove={input.onRemove}
+          row={row}
+          rowError={input.rowErrorsByClientId[row.clientId]}
+          {...(input.onDraftDirtyChange === undefined
+            ? {}
+            : { onDraftDirtyChange: input.onDraftDirtyChange })}
+        />
+      ))}
     </div>
   );
 }
@@ -1033,7 +1176,20 @@ export function SandboxProfileBindingSection(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemove: (clientId: string) => void;
+  showSectionChrome?: boolean;
+  onRowDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+  onCreateBindingFromConnection?: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+  }) => Promise<void> | void;
 }): React.JSX.Element {
+  const showSectionChrome = input.showSectionChrome ?? true;
+  const availableConnectionsForKind = input.availableConnections.filter((connection) => {
+    const target = input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    return resolveBindingKindFromTarget(target) === input.kind;
+  });
   const addConstraintMessage =
     input.rows.length > 0 && input.addDisabled ? formatBindingSectionConstraint(input.kind) : null;
   const hideAddAction = shouldHideBindingSectionAddAction({
@@ -1047,10 +1203,81 @@ export function SandboxProfileBindingSection(input: {
     </Button>
   );
 
+  const sectionContent =
+    input.kind === "connector" ? (
+      <ConnectorBindingRows
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        emptyStateAction={input.rows.length === 0 ? addButton : undefined}
+        emptyStateMessage={
+          input.rows.length === 0 ? formatBindingSectionEmptyState(input.kind) : undefined
+        }
+        onEdit={input.onEdit}
+        onChange={input.onRowChange}
+        onRemove={input.onRemove}
+        rowErrorsByClientId={input.rowErrorsByClientId}
+        rows={input.rows}
+      />
+    ) : input.kind === "agent" ? (
+      <AgentHarnessRows
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        onChange={input.onRowChange}
+        onRemove={input.onRemove}
+        rowErrorsByClientId={input.rowErrorsByClientId}
+        rows={input.rows}
+        {...(input.onRowDraftDirtyChange === undefined
+          ? {}
+          : { onDraftDirtyChange: input.onRowDraftDirtyChange })}
+        {...(input.onCreateBindingFromConnection === undefined
+          ? {}
+          : { onCreateBindingFromConnection: input.onCreateBindingFromConnection })}
+      />
+    ) : input.kind === "git" ? (
+      <GitProviderRows
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        onChange={input.onRowChange}
+        onRemove={input.onRemove}
+        rowErrorsByClientId={input.rowErrorsByClientId}
+        rows={input.rows}
+        {...(input.onRowDraftDirtyChange === undefined
+          ? {}
+          : { onDraftDirtyChange: input.onRowDraftDirtyChange })}
+        {...(input.onCreateBindingFromConnection === undefined
+          ? {}
+          : { onCreateBindingFromConnection: input.onCreateBindingFromConnection })}
+      />
+    ) : (
+      <div className="flex flex-col divide-y">
+        {input.rows.map((row) => (
+          <SandboxProfileBindingCard
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            errorMessage={input.rowErrorsByClientId[row.clientId]}
+            key={row.clientId}
+            onEdit={() => {
+              input.onEdit(row);
+            }}
+            onRemove={() => {
+              input.onRemove(row.clientId);
+            }}
+            row={row}
+          />
+        ))}
+      </div>
+    );
+
+  if (!showSectionChrome) {
+    return sectionContent;
+  }
+
   if (input.rows.length === 0) {
     return (
       <SectionBlock
         action={
+          ((input.kind === "agent" || input.kind === "git") &&
+            availableConnectionsForKind.length > 0) ||
           hideAddAction ? null : addConstraintMessage === null ? (
             addButton
           ) : (
@@ -1060,7 +1287,11 @@ export function SandboxProfileBindingSection(input: {
             </Tooltip>
           )
         }
-        emptyState={formatBindingSectionEmptyState(input.kind)}
+        {...(((input.kind === "agent" || input.kind === "git") &&
+          availableConnectionsForKind.length > 0) ||
+        input.rows.length > 0
+          ? { children: sectionContent }
+          : { emptyState: formatBindingSectionEmptyState(input.kind) })}
         title={formatBindingSectionTitle(input.kind)}
       />
     );
@@ -1078,55 +1309,7 @@ export function SandboxProfileBindingSection(input: {
           </Tooltip>
         )
       }
-      children={
-        input.kind === "connector" ? (
-          <ConnectorBindingRows
-            availableConnections={input.availableConnections}
-            availableTargets={input.availableTargets}
-            onEdit={input.onEdit}
-            onChange={input.onRowChange}
-            onRemove={input.onRemove}
-            rowErrorsByClientId={input.rowErrorsByClientId}
-            rows={input.rows}
-          />
-        ) : input.kind === "agent" ? (
-          <AgentHarnessRows
-            availableConnections={input.availableConnections}
-            availableTargets={input.availableTargets}
-            onChange={input.onRowChange}
-            onRemove={input.onRemove}
-            rowErrorsByClientId={input.rowErrorsByClientId}
-            rows={input.rows}
-          />
-        ) : input.kind === "git" ? (
-          <GitProviderRows
-            availableConnections={input.availableConnections}
-            availableTargets={input.availableTargets}
-            onChange={input.onRowChange}
-            onRemove={input.onRemove}
-            rowErrorsByClientId={input.rowErrorsByClientId}
-            rows={input.rows}
-          />
-        ) : (
-          <div className="flex flex-col divide-y">
-            {input.rows.map((row) => (
-              <SandboxProfileBindingCard
-                availableConnections={input.availableConnections}
-                availableTargets={input.availableTargets}
-                errorMessage={input.rowErrorsByClientId[row.clientId]}
-                key={row.clientId}
-                onEdit={() => {
-                  input.onEdit(row);
-                }}
-                onRemove={() => {
-                  input.onRemove(row.clientId);
-                }}
-                row={row}
-              />
-            ))}
-          </div>
-        )
-      }
+      children={sectionContent}
       title={formatBindingSectionTitle(input.kind)}
     />
   );

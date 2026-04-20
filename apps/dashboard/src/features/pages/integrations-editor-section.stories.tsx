@@ -6,10 +6,8 @@ import type React from "react";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
-  StoryGithubConnection,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
-  StoryOpenAiConnection,
   StoryGithubResources,
   seedStoryIntegrationResources,
 } from "./integrations-editor-section-story-support.js";
@@ -68,11 +66,6 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
         onRemoveIntegrationBindingRow={(clientId) => {
           setRows((currentRows) => currentRows.filter((row) => row.clientId !== clientId));
         }}
-        resolveSelectedConnectionDisplayName={(row) =>
-          [StoryOpenAiConnection, StoryGithubConnection].find(
-            (connection) => connection.id === row.connectionId,
-          )?.displayName
-        }
       />
     </QueryClientProvider>
   );
