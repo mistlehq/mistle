@@ -40,6 +40,6 @@
     "@mistle/db": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox": "workspace:*",
-    "openworkflow": "^0.8.1"
+    "openworkflow": "^0.9.0"
   }
 }
