@@ -23,7 +23,7 @@ use base64::Engine;
 use bytes::Bytes;
 use futures_util::{FutureExt, SinkExt, StreamExt};
 use http_body_util::{BodyExt, Empty};
-use hyper::header::AUTHORIZATION;
+use hyper::header::{AUTHORIZATION, CONTENT_LENGTH};
 use hyper::{Request, StatusCode};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::client::legacy::Client;
@@ -2007,6 +2007,7 @@ async fn exchange_tunnel_token(
 
     let request = Request::post(token_exchange_url)
         .header(AUTHORIZATION, format!("Bearer {normalized_token}"))
+        .header(CONTENT_LENGTH, "0")
         .body(Empty::new())
         .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?;
 
@@ -6561,6 +6562,7 @@ mod tests {
                 "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
             ));
             assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
+            assert_http_header(&first_exchange_request, "content-length", "0");
             write_http_json_response(
                 &mut first_exchange_stream,
                 200,
@@ -6592,6 +6594,7 @@ mod tests {
                 "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
             ));
             assert_http_bearer_token(&second_exchange_request, "exchange-token-reconnect-1");
+            assert_http_header(&second_exchange_request, "content-length", "0");
             write_http_json_response(
                 &mut second_exchange_stream,
                 200,
@@ -6824,6 +6827,7 @@ mod tests {
                 .expect("gateway should accept the first token exchange request");
             let first_exchange_request = read_http_request(&mut first_exchange_stream);
             assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
+            assert_http_header(&first_exchange_request, "content-length", "0");
             first_exchange_stream
                 .write_all(
                     b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: 64\r\nconnection: close\r\n\r\n{\"bootstrapToken\":\"bootstrap-token-reconnect\"",
@@ -6839,6 +6843,7 @@ mod tests {
                 .expect("gateway should accept the retried token exchange request");
             let second_exchange_request = read_http_request(&mut second_exchange_stream);
             assert_http_bearer_token(&second_exchange_request, "exchange-token-initial");
+            assert_http_header(&second_exchange_request, "content-length", "0");
             write_http_json_response(
                 &mut second_exchange_stream,
                 200,
@@ -6964,6 +6969,7 @@ mod tests {
                     "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
                 ));
                 assert_http_bearer_token(&exchange_request, "exchange-token-initial");
+                assert_http_header(&exchange_request, "content-length", "0");
                 write_http_json_response(
                     &mut exchange_stream,
                     status_code,
@@ -9359,6 +9365,18 @@ mod tests {
                 "\r\nauthorization: bearer {expected_token}\r\n"
             )),
             "http request should contain the expected bearer token"
+        );
+    }
+
+    fn assert_http_header(request: &str, header_name: &str, expected_value: &str) {
+        let normalized_request = request.to_ascii_lowercase();
+        let normalized_header_name = header_name.to_ascii_lowercase();
+        let normalized_expected_value = expected_value.to_ascii_lowercase();
+        assert!(
+            normalized_request.contains(&format!(
+                "\r\n{normalized_header_name}: {normalized_expected_value}\r\n"
+            )),
+            "http request should contain header '{header_name}: {expected_value}'"
         );
     }
 
