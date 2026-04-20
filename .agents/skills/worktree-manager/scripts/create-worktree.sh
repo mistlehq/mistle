@@ -5,40 +5,12 @@ repo_root="$1"
 worktree_path="$2"
 branch_name="$3"
 base_ref="$4"
+post_worktree_setup_script="$repo_root/scripts/dev/post-worktree-setup.sh"
 cleanup_worktree_on_error="no"
-copied_local_files=""
-initialized_local_files=""
-missing_local_files=""
+post_worktree_setup_report_file=""
 
 quote_for_shell() {
   printf "'%s'" "$(printf "%s" "$1" | sed "s/'/'\\\\''/g")"
-}
-
-append_csv_value() {
-  current_value="$1"
-  next_value="$2"
-
-  if [ "$current_value" = "" ]; then
-    printf '%s' "$next_value"
-    return
-  fi
-
-  printf '%s,%s' "$current_value" "$next_value"
-}
-
-copy_optional_local_bootstrap_file() {
-  relative_path="$1"
-  source_path="$repo_root/$relative_path"
-  target_path="$worktree_path/$relative_path"
-
-  if [ ! -f "$source_path" ]; then
-    missing_local_files="$(append_csv_value "$missing_local_files" "$relative_path")"
-    return
-  fi
-
-  mkdir -p "$(dirname "$target_path")"
-  cp -p "$source_path" "$target_path"
-  copied_local_files="$(append_csv_value "$copied_local_files" "$relative_path")"
 }
 
 cleanup_failed_worktree() {
@@ -52,6 +24,10 @@ cleanup_failed_worktree() {
 
 on_exit() {
   exit_code="$1"
+
+  if [ "$post_worktree_setup_report_file" != "" ]; then
+    rm -f "$post_worktree_setup_report_file"
+  fi
 
   if [ "$exit_code" -ne 0 ]; then
     cleanup_failed_worktree
@@ -82,27 +58,16 @@ command -v direnv >/dev/null 2>&1 || {
   exit 1
 }
 
+[ -x "$post_worktree_setup_script" ] || {
+  echo "post-worktree setup script is missing or not executable: $post_worktree_setup_script" >&2
+  exit 1
+}
+
 git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" "$base_ref"
 cleanup_worktree_on_error="yes"
-
-copy_optional_local_bootstrap_file ".env.dev"
-copy_optional_local_bootstrap_file ".env.test"
-copy_optional_local_bootstrap_file "integration-targets.provision.json"
-
-(
-  cd "$worktree_path"
-  direnv exec "$worktree_path" pnpm install
-)
-
-if [ -f "$repo_root/config/config.development.toml" ]; then
-  copy_optional_local_bootstrap_file "config/config.development.toml"
-else
-  (
-    cd "$worktree_path"
-    direnv exec "$worktree_path" pnpm config:init:dev
-  )
-  initialized_local_files="$(append_csv_value "$initialized_local_files" "config/config.development.toml")"
-fi
+post_worktree_setup_report_file="$(mktemp)"
+POST_WORKTREE_SETUP_REPORT_FILE="$post_worktree_setup_report_file" \
+  "$post_worktree_setup_script" "$repo_root" "$worktree_path"
 
 cleanup_worktree_on_error="no"
 
@@ -121,14 +86,8 @@ fi
 printf 'worktree_path=%s\n' "$worktree_path"
 printf 'branch_name=%s\n' "$branch_name"
 printf 'base_ref=%s\n' "$base_ref"
-if [ "$copied_local_files" != "" ]; then
-  printf 'copied_local_files=%s\n' "$copied_local_files"
-fi
-if [ "$initialized_local_files" != "" ]; then
-  printf 'initialized_local_files=%s\n' "$initialized_local_files"
-fi
-if [ "$missing_local_files" != "" ]; then
-  printf 'missing_local_files=%s\n' "$missing_local_files"
+if [ -s "$post_worktree_setup_report_file" ]; then
+  cat "$post_worktree_setup_report_file"
 fi
 printf 'bootstrap_steps=copy available local bootstrap files from source worktree,direnv exec <worktree_path> pnpm install,initialize config/config.development.toml when absent in source worktree\n'
 
