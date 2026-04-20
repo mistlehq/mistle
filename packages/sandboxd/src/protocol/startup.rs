@@ -11,9 +11,23 @@ pub enum StartupMode {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct GitSigningConfig {
+    pub enabled: bool,
+    pub format: String,
+    pub program: String,
+    pub key_ref: String,
+    pub organization_id: String,
+    pub provider_family: String,
+    pub acting_user_id: String,
+    pub grant: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GitIdentity {
     pub name: String,
     pub email: String,
+    pub signing: Option<GitSigningConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

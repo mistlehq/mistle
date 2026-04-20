@@ -1224,6 +1224,49 @@
                       "email": {
                         "type": "string",
                         "format": "email"
+                      },
+                      "signing": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "enum": [true]
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": ["ssh"]
+                          },
+                          "program": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "keyRef": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "organizationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "providerFamily": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "actingUserId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "format",
+                          "program",
+                          "keyRef",
+                          "organizationId",
+                          "providerFamily",
+                          "actingUserId"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": ["name", "email"],
@@ -3196,6 +3239,49 @@
                       "email": {
                         "type": "string",
                         "format": "email"
+                      },
+                      "signing": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean",
+                            "enum": [true]
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": ["ssh"]
+                          },
+                          "program": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "keyRef": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "organizationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "providerFamily": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "actingUserId": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "format",
+                          "program",
+                          "keyRef",
+                          "organizationId",
+                          "providerFamily",
+                          "actingUserId"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": ["name", "email"]

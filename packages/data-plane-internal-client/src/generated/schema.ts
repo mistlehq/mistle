@@ -123,6 +123,17 @@ export interface paths {
               /** Format: email */
               email: string;
               name: string;
+              signing?: {
+                actingUserId: string;
+                /** @enum {boolean} */
+                enabled: true;
+                /** @enum {string} */
+                format: "ssh";
+                keyRef: string;
+                organizationId: string;
+                program: string;
+                providerFamily: string;
+              };
             };
             idempotencyKey?: string;
             image: {
@@ -1288,6 +1299,17 @@ export interface paths {
               /** Format: email */
               email: string;
               name: string;
+              signing?: {
+                actingUserId: string;
+                /** @enum {boolean} */
+                enabled: true;
+                /** @enum {string} */
+                format: "ssh";
+                keyRef: string;
+                organizationId: string;
+                program: string;
+                providerFamily: string;
+              };
             };
             idempotencyKey?: string;
             organizationId: string;

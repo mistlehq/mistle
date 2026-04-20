@@ -75,6 +75,44 @@ describe("startup contracts", () => {
     });
   });
 
+  it("accepts startup input with optional git signing config", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
+        ...startupInputFixture,
+        gitIdentity: {
+          name: "Mistle User",
+          email: "mistle-user@example.com",
+          signing: {
+            enabled: true,
+            format: "ssh",
+            program: "/opt/mistle/bin/mistle-ssh-sign",
+            keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
+            organizationId: "org_123",
+            providerFamily: "github",
+            actingUserId: "usr_123",
+            grant: "grant-token",
+          },
+        },
+      }),
+    ).toEqual({
+      ...startupInputFixture,
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+        signing: {
+          enabled: true,
+          format: "ssh",
+          program: "/opt/mistle/bin/mistle-ssh-sign",
+          keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
+          organizationId: "org_123",
+          providerFamily: "github",
+          actingUserId: "usr_123",
+          grant: "grant-token",
+        },
+      },
+    });
+  });
+
   it("rejects init responses with an empty error message", () => {
     expect(() =>
       SandboxdInitResponseSchema.parse({

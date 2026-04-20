@@ -259,6 +259,18 @@ const SandboxStartupInputSchema = z.object({
     .object({
       name: z.string().min(1),
       email: z.email(),
+      signing: z
+        .object({
+          enabled: z.literal(true),
+          format: z.literal("ssh"),
+          program: z.string().min(1),
+          keyRef: z.string().min(1),
+          organizationId: z.string().min(1),
+          providerFamily: z.string().min(1),
+          actingUserId: z.string().min(1),
+          grant: z.string().min(1),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -369,6 +381,47 @@ describe("encodeSandboxStartupInput", () => {
     expect(decoded.gitIdentity).toEqual({
       name: "Mistle User",
       email: "mistle-user@example.com",
+    });
+  });
+
+  it("encodes optional git signing config when present", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {},
+      gitIdentity: {
+        name: "Mistle User",
+        email: "mistle-user@example.com",
+        signing: {
+          enabled: true,
+          format: "ssh",
+          program: "/opt/mistle/bin/mistle-ssh-sign",
+          keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
+          organizationId: "org_123",
+          providerFamily: "github",
+          actingUserId: "usr_123",
+          grant: "grant-token-value",
+        },
+      },
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.gitIdentity).toEqual({
+      name: "Mistle User",
+      email: "mistle-user@example.com",
+      signing: {
+        enabled: true,
+        format: "ssh",
+        program: "/opt/mistle/bin/mistle-ssh-sign",
+        keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
+        organizationId: "org_123",
+        providerFamily: "github",
+        actingUserId: "usr_123",
+        grant: "grant-token-value",
+      },
     });
   });
 

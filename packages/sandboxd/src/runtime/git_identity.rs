@@ -77,6 +77,7 @@ mod tests {
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),
                 email: "mistle-user@example.com".to_string(),
+                signing: None,
             }),
         })
         .expect("git identity should apply successfully");

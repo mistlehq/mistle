@@ -18,6 +18,19 @@ export const SandboxdGitIdentitySchema = z
   .object({
     name: z.string().min(1),
     email: z.email(),
+    signing: z
+      .object({
+        enabled: z.literal(true),
+        format: z.literal("ssh"),
+        program: z.string().min(1),
+        keyRef: z.string().min(1),
+        organizationId: z.string().min(1),
+        providerFamily: z.string().min(1),
+        actingUserId: z.string().min(1),
+        grant: z.string().min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

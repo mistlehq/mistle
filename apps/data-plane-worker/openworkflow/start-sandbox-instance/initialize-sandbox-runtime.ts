@@ -11,6 +11,7 @@ import {
   encodeSandboxStartupInput,
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
+import { createSigningGrant } from "./signing-grant.js";
 
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
@@ -28,37 +29,66 @@ export async function createSandboxStartupInput(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
-  const [bootstrapToken, tunnelExchangeToken, egressGrantByRuleId] = await Promise.all([
-    mintBootstrapToken({
-      config: {
-        bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+  const [bootstrapToken, tunnelExchangeToken, egressGrantByRuleId, signingGrant] =
+    await Promise.all([
+      mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: bootstrapTokenJti,
+        sandboxInstanceId: input.sandboxInstanceId,
+        ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+      }),
+      mintTunnelExchangeToken({
+        config: {
+          tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: tunnelExchangeTokenJti,
+        sandboxInstanceId: input.sandboxInstanceId,
+        bootstrapTokenTtlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+        exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+        ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+      }),
+      createEgressGrantByRuleId({
+        config: input.config,
+        organizationId: input.organizationId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        runtimePlan: input.runtimePlan,
+        ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+      }),
+      createSigningGrant({
+        config: input.config,
+        sandboxInstanceId: input.sandboxInstanceId,
+        ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+      }),
+    ]);
+
+  let gitIdentity: SandboxStartupInput["gitIdentity"];
+  if (input.gitIdentity === undefined) {
+    gitIdentity = undefined;
+  } else if (input.gitIdentity.signing === undefined) {
+    gitIdentity = {
+      name: input.gitIdentity.name,
+      email: input.gitIdentity.email,
+    };
+  } else {
+    if (signingGrant === undefined) {
+      throw new Error("Expected signing grant to be minted when git signing config is present.");
+    }
+
+    gitIdentity = {
+      name: input.gitIdentity.name,
+      email: input.gitIdentity.email,
+      signing: {
+        ...input.gitIdentity.signing,
+        grant: signingGrant,
       },
-      jti: bootstrapTokenJti,
-      sandboxInstanceId: input.sandboxInstanceId,
-      ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
-    }),
-    mintTunnelExchangeToken({
-      config: {
-        tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
-      },
-      jti: tunnelExchangeTokenJti,
-      sandboxInstanceId: input.sandboxInstanceId,
-      bootstrapTokenTtlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
-      exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
-      ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
-    }),
-    createEgressGrantByRuleId({
-      config: input.config,
-      organizationId: input.organizationId,
-      sandboxInstanceId: input.sandboxInstanceId,
-      runtimePlan: input.runtimePlan,
-      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-    }),
-  ]);
+    };
+  }
 
   return {
     startupMode: input.startupMode,
@@ -67,7 +97,7 @@ export async function createSandboxStartupInput(input: {
     tunnelGatewayWsUrl,
     runtimePlan: input.runtimePlan,
     egressGrantByRuleId,
-    ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+    ...(gitIdentity === undefined ? {} : { gitIdentity }),
   };
 }
 

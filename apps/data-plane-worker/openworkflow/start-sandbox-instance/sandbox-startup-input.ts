@@ -1,3 +1,4 @@
+import type { SandboxdStartupInput } from "@mistle/sandbox-runtime-contract";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 const Encoder = new TextEncoder();
@@ -20,7 +21,7 @@ export type SandboxStartupInput = {
   tunnelGatewayWsUrl: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   egressGrantByRuleId: Record<string, string>;
-  gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
+  gitIdentity?: SandboxdStartupInput["gitIdentity"];
 };
 
 export function createSandboxTunnelGatewayWsUrl(input: {
