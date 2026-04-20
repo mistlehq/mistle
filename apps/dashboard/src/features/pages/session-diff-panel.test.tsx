@@ -90,12 +90,46 @@ describe("SessionDiffPanel", () => {
 
     expect(screen.getByText("Request change")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.focus(screen.getByDisplayValue("Request change"));
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "Use the shared overflow tooltip here." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.blur(screen.getByRole("textbox"));
 
-    expect(screen.getByText("Use the shared overflow tooltip here.")).toBeTruthy();
+    expect(screen.getByDisplayValue("Use the shared overflow tooltip here.")).toBeTruthy();
+  });
+
+  it("removes retained comments from the diff panel", () => {
+    function Harness(): React.JSX.Element {
+      const [pendingComments, setPendingComments] = useState<readonly PendingSessionDiffComment[]>([
+        {
+          id: "comment-1",
+          body: "Request change",
+          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+          lineNumber: 2,
+          side: "additions",
+        },
+      ]);
+
+      return (
+        <SessionDiffPanel
+          onDeleteComment={(commentId) => {
+            setPendingComments((currentComments) =>
+              currentComments.filter((comment) => comment.id !== commentId),
+            );
+          }}
+          patch={TestPatch}
+          pendingComments={pendingComments}
+          summaryLabel="Compared with main"
+          title="Current changes"
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete comment on line R2" }));
+
+    expect(screen.queryByDisplayValue("Request change")).toBeNull();
   });
 });

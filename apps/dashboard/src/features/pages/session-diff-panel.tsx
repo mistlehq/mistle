@@ -3,12 +3,13 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
+  DialogShortcut,
   Notice,
   OverflowTooltipText,
   Spinner,
   Textarea,
 } from "@mistle/ui";
-import { CaretDownIcon, PlusIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { FileDiff, type DiffLineAnnotation, type FileDiffMetadata } from "@pierre/diffs/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -57,6 +58,7 @@ type SessionDiffPanelProps = {
   } | null;
   isLoading?: boolean;
   onAddComment?: (comment: PendingSessionDiffCommentInput) => void;
+  onDeleteComment?: ((commentId: string) => void) | undefined;
   onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
   pendingComments?: readonly PendingSessionDiffComment[];
   patch: string;
@@ -98,6 +100,7 @@ export function SessionDiffPanel({
   errorNotice = null,
   isLoading = false,
   onAddComment,
+  onDeleteComment,
   onUpdateComment,
   pendingComments = [],
   patch,
@@ -166,6 +169,7 @@ export function SessionDiffPanel({
                   fileKey={fileKey}
                   isOpen={isOpen}
                   onAddComment={onAddComment}
+                  onDeleteComment={onDeleteComment}
                   onUpdateComment={onUpdateComment}
                   onOpenChange={(open) => {
                     setOpenFiles((currentOpenFiles) => ({
@@ -194,6 +198,7 @@ type SessionDiffPanelFileSectionProps = {
   fileKey: string;
   isOpen: boolean;
   onAddComment?: ((comment: PendingSessionDiffCommentInput) => void) | undefined;
+  onDeleteComment?: ((commentId: string) => void) | undefined;
   onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -207,6 +212,7 @@ function SessionDiffPanelFileSection({
   fileKey,
   isOpen,
   onAddComment,
+  onDeleteComment,
   onUpdateComment,
   onOpenChange,
   open,
@@ -218,8 +224,8 @@ function SessionDiffPanelFileSection({
   const isCommentingCurrentFile = activeCommentDraft?.fileKey === fileKey;
   const overlayRootRef = useRef<HTMLDivElement | null>(null);
   const [hoveredLine, setHoveredLine] = useState<HoveredSessionDiffLine | null>(null);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentBody, setEditingCommentBody] = useState("");
+  const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) {
@@ -228,13 +234,33 @@ function SessionDiffPanelFileSection({
   }, [open]);
 
   useEffect(() => {
-    if (pendingComments.some((comment) => comment.id === editingCommentId)) {
+    const nextDrafts = Object.fromEntries(
+      pendingComments
+        .map((comment) => {
+          const existingDraft = commentDrafts[comment.id];
+          return [comment.id, existingDraft ?? comment.body];
+        })
+        .filter((entry) => entry[1] !== undefined),
+    );
+
+    setCommentDrafts((currentDrafts) => {
+      const currentKeys = Object.keys(currentDrafts);
+      const nextKeys = Object.keys(nextDrafts);
+      const keysChanged =
+        currentKeys.length !== nextKeys.length ||
+        currentKeys.some((key) => currentDrafts[key] !== nextDrafts[key]);
+
+      return keysChanged ? nextDrafts : currentDrafts;
+    });
+  }, [commentDrafts, pendingComments]);
+
+  useEffect(() => {
+    if (pendingComments.some((comment) => comment.id === focusedCommentId)) {
       return;
     }
 
-    setEditingCommentId(null);
-    setEditingCommentBody("");
-  }, [editingCommentId, pendingComments]);
+    setFocusedCommentId(null);
+  }, [focusedCommentId, pendingComments]);
 
   const lineAnnotations = useMemo<SessionDiffPanelAnnotation[]>(() => {
     const savedAnnotations: SessionDiffPanelAnnotation[] = pendingComments.map((comment) => ({
@@ -273,18 +299,18 @@ function SessionDiffPanelFileSection({
       };
     }
 
-    const editingComment = pendingComments.find((comment) => comment.id === editingCommentId);
-    if (editingComment === undefined) {
+    const focusedComment = pendingComments.find((comment) => comment.id === focusedCommentId);
+    if (focusedComment === undefined) {
       return null;
     }
 
     return {
-      end: editingComment.lineNumber,
-      endSide: editingComment.side,
-      side: editingComment.side,
-      start: editingComment.lineNumber,
+      end: focusedComment.lineNumber,
+      endSide: focusedComment.side,
+      side: focusedComment.side,
+      start: focusedComment.lineNumber,
     };
-  }, [activeCommentDraft, editingCommentId, isCommentingCurrentFile, pendingComments]);
+  }, [activeCommentDraft, focusedCommentId, isCommentingCurrentFile, pendingComments]);
 
   function handleHoverLine(input: {
     event: PointerEvent;
@@ -311,6 +337,46 @@ function SessionDiffPanelFileSection({
       side: input.side,
       top: anchor.top + anchor.height / 2 - 10,
     });
+  }
+
+  function submitActiveCommentDraft(): void {
+    if (activeCommentDraft === null || onAddComment === undefined) {
+      return;
+    }
+
+    const nextCommentBody = activeCommentDraft.body.trim();
+    if (nextCommentBody.length === 0) {
+      return;
+    }
+
+    onAddComment({
+      body: nextCommentBody,
+      filePath,
+      lineNumber: activeCommentDraft.lineNumber,
+      side: activeCommentDraft.side,
+    });
+    setActiveCommentDraft(null);
+  }
+
+  function submitExistingComment(comment: PendingSessionDiffComment): void {
+    const nextCommentBody = (commentDrafts[comment.id] ?? comment.body).trim();
+    setFocusedCommentId((currentFocusedCommentId) =>
+      currentFocusedCommentId === comment.id ? null : currentFocusedCommentId,
+    );
+
+    if (
+      onUpdateComment === undefined ||
+      nextCommentBody.length === 0 ||
+      nextCommentBody === comment.body
+    ) {
+      setCommentDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [comment.id]: comment.body,
+      }));
+      return;
+    }
+
+    onUpdateComment(comment.id, nextCommentBody);
   }
 
   return (
@@ -363,7 +429,7 @@ function SessionDiffPanelFileSection({
             {onAddComment === undefined ||
             hoveredLine === null ||
             activeCommentDraft !== null ||
-            editingCommentId !== null ? null : (
+            focusedCommentId !== null ? null : (
               <button
                 aria-label="Add comment"
                 className="absolute z-10 flex size-5 items-center justify-center rounded-md bg-stone-900 text-white shadow-sm ring-1 ring-black/5"
@@ -410,74 +476,60 @@ function SessionDiffPanelFileSection({
                     renderAnnotation: (annotation: SessionDiffPanelAnnotation) => {
                       if (annotation.metadata.kind === "saved-comment") {
                         const comment = annotation.metadata.comment;
-                        const isEditing = comment.id === editingCommentId;
+                        const commentDraft = commentDrafts[comment.id] ?? comment.body;
                         return (
                           <SessionDiffPanelCommentCard
-                            actionRow={
-                              isEditing ? (
-                                <>
-                                  <Button
-                                    onClick={() => {
-                                      setEditingCommentId(null);
-                                      setEditingCommentBody("");
-                                    }}
-                                    type="button"
-                                    variant="ghost"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    disabled={
-                                      onUpdateComment === undefined ||
-                                      editingCommentBody.trim().length === 0 ||
-                                      editingCommentBody.trim() === comment.body
-                                    }
-                                    onClick={() => {
-                                      const nextCommentBody = editingCommentBody.trim();
-                                      if (
-                                        onUpdateComment === undefined ||
-                                        nextCommentBody.length === 0 ||
-                                        nextCommentBody === comment.body
-                                      ) {
-                                        return;
-                                      }
-
-                                      onUpdateComment(comment.id, nextCommentBody);
-                                      setEditingCommentId(null);
-                                      setEditingCommentBody("");
-                                    }}
-                                    type="button"
-                                  >
-                                    Save changes
-                                  </Button>
-                                </>
-                              ) : (
+                            headerAction={
+                              onDeleteComment === undefined ? undefined : (
                                 <Button
+                                  aria-label={`Delete comment on line ${formatPendingSessionDiffCommentLineLabel(comment)}`}
+                                  className="-mr-1 size-7 rounded-sm"
                                   onClick={() => {
-                                    setEditingCommentId(comment.id);
-                                    setEditingCommentBody(comment.body);
-                                    setActiveCommentDraft(null);
+                                    onDeleteComment(comment.id);
                                   }}
                                   type="button"
                                   variant="ghost"
                                 >
-                                  Edit
+                                  <TrashIcon aria-hidden="true" className="size-4" />
                                 </Button>
                               )
                             }
                             body={
-                              isEditing ? (
-                                <Textarea
-                                  className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-                                  onChange={(event) => {
-                                    setEditingCommentBody(event.target.value);
-                                  }}
-                                  placeholder="Add comment"
-                                  value={editingCommentBody}
-                                />
-                              ) : (
-                                <p className="text-sm whitespace-pre-wrap">{comment.body}</p>
-                              )
+                              <Textarea
+                                className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
+                                onBlur={() => {
+                                  submitExistingComment(comment);
+                                }}
+                                onChange={(event) => {
+                                  setCommentDrafts((currentDrafts) => ({
+                                    ...currentDrafts,
+                                    [comment.id]: event.target.value,
+                                  }));
+                                }}
+                                onFocus={() => {
+                                  setFocusedCommentId(comment.id);
+                                  setActiveCommentDraft(null);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Escape") {
+                                    event.preventDefault();
+                                    setCommentDrafts((currentDrafts) => ({
+                                      ...currentDrafts,
+                                      [comment.id]: comment.body,
+                                    }));
+                                    setFocusedCommentId(null);
+                                    event.currentTarget.blur();
+                                    return;
+                                  }
+
+                                  if (event.key === "Enter" && !event.shiftKey) {
+                                    event.preventDefault();
+                                    submitExistingComment(comment);
+                                    event.currentTarget.blur();
+                                  }
+                                }}
+                                value={commentDraft}
+                              />
                             }
                             title={`Comment on line ${formatPendingSessionDiffCommentLineLabel(comment)}`}
                           />
@@ -504,26 +556,14 @@ function SessionDiffPanelFileSection({
                               <Button
                                 disabled={activeCommentDraft.body.trim().length === 0}
                                 onClick={() => {
-                                  const nextCommentBody = activeCommentDraft.body.trim();
-                                  if (nextCommentBody.length === 0) {
-                                    return;
-                                  }
-
-                                  if (onAddComment === undefined) {
-                                    return;
-                                  }
-
-                                  onAddComment({
-                                    body: nextCommentBody,
-                                    filePath,
-                                    lineNumber: activeCommentDraft.lineNumber,
-                                    side: activeCommentDraft.side,
-                                  });
-                                  setActiveCommentDraft(null);
+                                  submitActiveCommentDraft();
                                 }}
                                 type="button"
                               >
-                                Add comment
+                                <>
+                                  Add
+                                  <DialogShortcut aria-label="Enter" />
+                                </>
                               </Button>
                             </>
                           }
@@ -539,6 +579,18 @@ function SessionDiffPanelFileSection({
                                         body: event.target.value,
                                       },
                                 );
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  setActiveCommentDraft(null);
+                                  return;
+                                }
+
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                  event.preventDefault();
+                                  submitActiveCommentDraft();
+                                }
                               }}
                               placeholder="Add comment"
                               value={activeCommentDraft.body}
@@ -560,18 +612,26 @@ function SessionDiffPanelFileSection({
 }
 
 function SessionDiffPanelCommentCard(input: {
-  actionRow: React.JSX.Element;
   body: React.JSX.Element;
   title: string;
+  actionRow?: React.JSX.Element | undefined;
+  headerAction?: React.JSX.Element | undefined;
 }): React.JSX.Element {
   return (
     <div className="m-1 max-w-2xl overflow-hidden rounded-md border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-      <div className="border-b p-3">
-        <p className="text-foreground text-sm font-semibold">{input.title}</p>
+      <div
+        className={`border-b relative px-3 py-2 ${input.headerAction === undefined ? "" : "pr-10"}`}
+      >
+        <p className="text-foreground min-w-0 text-sm font-semibold">{input.title}</p>
+        {input.headerAction === undefined ? null : (
+          <div className="absolute top-1/2 right-1.5 -translate-y-1/2">{input.headerAction}</div>
+        )}
       </div>
       <div className="p-3">
         {input.body}
-        <div className="mt-4 flex items-center justify-end gap-2">{input.actionRow}</div>
+        {input.actionRow === undefined ? null : (
+          <div className="mt-4 flex items-center justify-end gap-2">{input.actionRow}</div>
+        )}
       </div>
     </div>
   );

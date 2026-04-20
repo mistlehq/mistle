@@ -122,6 +122,12 @@ function StoryDiffWorkbench({
     );
   }
 
+  function deleteComment(commentId: string): void {
+    setPendingComments((currentComments) =>
+      currentComments.filter((comment) => comment.id !== commentId),
+    );
+  }
+
   useEffect(() => {
     if (!autoOpenLocalComment || hasAutoOpenedCommentRef.current) {
       return;
@@ -204,6 +210,7 @@ function StoryDiffWorkbench({
         secondaryPanel: (
           <SessionDiffPanel
             errorNotice={errorNotice}
+            onDeleteComment={deleteComment}
             onUpdateComment={updateComment}
             patch={patch}
             pendingComments={pendingComments}

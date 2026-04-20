@@ -71,6 +71,11 @@ function SessionWorkbenchPageContent(input: {
       ),
     );
   }, []);
+  const handleRemovePendingDiffComment = useCallback((commentId: string): void => {
+    setPendingDiffComments((currentComments) =>
+      currentComments.filter((comment) => comment.id !== commentId),
+    );
+  }, []);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
@@ -415,6 +420,7 @@ function SessionWorkbenchPageContent(input: {
           errorNotice={diffPanelErrorNotice}
           isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
           onAddComment={handleAddPendingDiffComment}
+          onDeleteComment={handleRemovePendingDiffComment}
           onUpdateComment={handleUpdatePendingDiffComment}
           pendingComments={pendingDiffComments}
           patch={diffPanelPatch}
