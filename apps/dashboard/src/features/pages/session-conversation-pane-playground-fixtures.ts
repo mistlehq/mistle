@@ -208,9 +208,11 @@ const CodexFixtureConversationPaneMixedEntries: SessionConversationStoryArgs["ch
       "A few links usually show up naturally in replies like this too:",
       "",
       "- external reference: [Mistle GitHub](https://github.com/mistlehq/mistle)",
-      "- docs reference: [OpenAI](https://openai.com/)",
+      "- docs reference: [Mistle Docs](https://docs.mistle.dev/)",
       "",
       "That makes this fixture useful for checking how inline links sit inside longer chat prose before and after hover.",
+      "",
+      "A little further down, the web-search semantic group gives you the second link surface: result-title links. Both should now open the same confirmation dialog.",
     ].join("\n"),
   },
   {

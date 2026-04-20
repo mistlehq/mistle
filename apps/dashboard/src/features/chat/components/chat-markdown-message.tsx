@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { Streamdown } from "streamdown";
 
-import { ChatMarkdownLinkSafetyDialog } from "./chat-markdown-link-safety-dialog.js";
+import { ChatExternalLinkDialog } from "./chat-external-link-dialog.js";
 import { StreamdownPlugins } from "./streamdown-plugins.js";
 
 type ChatMarkdownMessageProps = {
@@ -27,7 +27,7 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
         isAnimating={props.isStreaming}
         linkSafety={{
           enabled: true,
-          renderModal: (modalProps) => <ChatMarkdownLinkSafetyDialog {...modalProps} />,
+          renderModal: (modalProps) => <ChatExternalLinkDialog {...modalProps} />,
         }}
         mode={props.isStreaming ? "streaming" : "static"}
         plugins={StreamdownPlugins}

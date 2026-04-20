@@ -28,6 +28,14 @@ type CopyableValueProps =
       copyTitle?: string;
       failureMessage?: string;
       value: string;
+      variant: "inline";
+    }
+  | {
+      copiedTitle?: string;
+      copyAriaLabel?: string;
+      copyTitle?: string;
+      failureMessage?: string;
+      value: string;
       variant: "panel";
     };
 
@@ -35,9 +43,15 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>({ state: "idle" });
 
   const copyAriaLabel =
-    input.copyAriaLabel ?? (input.variant === "panel" ? "Copy value" : `Copy ${input.label}`);
+    input.copyAriaLabel ??
+    (input.variant === "panel" || input.variant === "inline"
+      ? "Copy value"
+      : `Copy ${input.label}`);
   const idleTitle =
-    input.copyTitle ?? (input.variant === "panel" ? "Copy value" : `Copy ${input.label}`);
+    input.copyTitle ??
+    (input.variant === "panel" || input.variant === "inline"
+      ? "Copy value"
+      : `Copy ${input.label}`);
   const visibleCopyState =
     copyFeedback.state === "idle" || copyFeedback.value !== input.value
       ? "idle"
@@ -110,6 +124,22 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
         </pre>
         {visibleCopyState === "failed" ? (
           <p className="text-destructive mt-2 px-3 pb-3 text-xs">
+            {input.failureMessage ?? "Could not copy automatically."}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (input.variant === "inline") {
+    return (
+      <div className="gap-1.5 flex flex-col">
+        <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
+          <p className="min-w-0 flex-1 break-all px-1 font-mono text-xs">{input.value}</p>
+          {button}
+        </div>
+        {visibleCopyState === "failed" ? (
+          <p className="text-destructive text-xs">
             {input.failureMessage ?? "Could not copy automatically."}
           </p>
         ) : null}

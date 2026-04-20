@@ -1,15 +1,21 @@
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
-import type { LinkSafetyModalProps } from "streamdown";
 
 import { CopyableValue } from "../../shared/copyable-value.js";
 
-export function ChatMarkdownLinkSafetyDialog({
+type ChatExternalLinkDialogProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  url: string;
+};
+
+export function ChatExternalLinkDialog({
   isOpen,
   onClose,
   onConfirm,
   url,
-}: LinkSafetyModalProps): React.JSX.Element | null {
+}: ChatExternalLinkDialogProps): React.JSX.Element {
   return (
     <Dialog
       onOpenChange={(open) => {
@@ -29,8 +35,8 @@ export function ChatMarkdownLinkSafetyDialog({
           copyAriaLabel="Copy link"
           copyTitle="Copy link"
           failureMessage="Could not copy the link automatically."
-          label="Link"
           value={url}
+          variant="inline"
         />
 
         <DialogFooter>

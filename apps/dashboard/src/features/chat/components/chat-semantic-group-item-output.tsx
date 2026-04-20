@@ -1,6 +1,7 @@
 import type { ChatSemanticGroupEntry, ChatSemanticGroupKind } from "../chat-types.js";
 import { getCodeFenceLanguage, isMarkdownPath } from "../code-fence-language.js";
 import { ChatDiffView } from "./chat-diff-view.js";
+import { ChatExternalLink } from "./chat-external-link.js";
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
 type ChatSemanticGroupItemOutputProps = {
@@ -125,17 +126,15 @@ export function ChatSemanticGroupItemOutput({
                 paddingLeft: "var(--chat-semantic-group-output-padding, 0.75rem)",
               }}
             >
-              <a
-                className="block truncate text-sm hover:underline"
+              <ChatExternalLink
+                className="block w-full truncate text-left text-sm hover:underline"
                 href={result.url}
-                rel="noreferrer"
-                target="_blank"
                 style={{
                   lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",
                 }}
               >
                 {result.title}
-              </a>
+              </ChatExternalLink>
               <p
                 className="text-muted-foreground truncate text-xs"
                 style={{

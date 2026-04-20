@@ -248,12 +248,8 @@ describe("ChatSemanticGroup", () => {
 
     fireEvent.click(disclosureSummary);
 
-    expect(screen.getByText("packages/web/src/components/Share.tsx")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/Share.tsx",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("mistlehq/mistle")).toBeTruthy();
+    expect(screen.getByText("https://github.com/mistlehq/mistle")).toBeTruthy();
   });
 
   it("renders running-commands output with the subdued command log treatment", () => {

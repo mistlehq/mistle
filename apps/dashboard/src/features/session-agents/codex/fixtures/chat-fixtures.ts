@@ -382,19 +382,19 @@ export const CodexFixtureSearchingWebGroupEntry: ChatSemanticGroupEntry = {
       id: "searching-web-1",
       sourceKind: "web-search",
       label: "Web search",
-      detail: "opencode shared chat renderer grouped tools",
+      detail: "mistle dashboard chat renderer grouped tools",
       detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
           results: [
             {
-              title: "packages/web/src/components/Share.tsx",
-              url: "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/Share.tsx",
+              title: "mistlehq/mistle",
+              url: "https://github.com/mistlehq/mistle",
             },
             {
-              title: "packages/web/src/components/share/part.tsx",
-              url: "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/share/part.tsx",
+              title: "Mistle Docs",
+              url: "https://docs.mistle.dev/",
             },
           ],
         },
@@ -407,15 +407,15 @@ export const CodexFixtureSearchingWebGroupEntry: ChatSemanticGroupEntry = {
       id: "searching-web-2",
       sourceKind: "web-search",
       label: "Web search",
-      detail: "storybook grouped activity list ux",
+      detail: "mistle product and docs links",
       detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
           results: [
             {
-              title: "Accordion disclosure patterns",
-              url: "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/",
+              title: "Mistle Support",
+              url: "https://mistle.dev/support/",
             },
           ],
         },
