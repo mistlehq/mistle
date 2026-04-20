@@ -34,17 +34,35 @@ const ReadyBootstrap: SessionBootstrapResult = {
 const PendingDiffCommentsFixture: readonly PendingSessionDiffComment[] = [
   {
     id: "comment-1",
+    anchor: {
+      lineText: '          title="Diffs"',
+      nextLineText: '          type="button"',
+      previousLineText: '          size="icon-sm"',
+    },
     body: "Request change",
     filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
     lineNumber: 140,
+    repositoryPath: "/workspace/mistle",
     side: "additions",
+    status: {
+      kind: "current",
+    },
   },
   {
     id: "comment-2",
+    anchor: {
+      lineText: "+export function SessionDiffPanel(): React.JSX.Element {",
+      nextLineText: "+  return <div />;",
+      previousLineText: "",
+    },
     body: "Use the shared overflow tooltip here.",
     filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
     lineNumber: 4,
+    repositoryPath: "/workspace/mistle",
     side: "additions",
+    status: {
+      kind: "current",
+    },
   },
 ];
 

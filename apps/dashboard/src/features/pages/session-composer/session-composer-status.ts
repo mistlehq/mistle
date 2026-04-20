@@ -11,7 +11,7 @@ import {
 export type ComposerStatusMessage = {
   message: string;
   variant: "alert" | "default";
-  presentation?: "loading";
+  presentation?: "loading" | "notice";
 };
 
 export function resolveComposerBootstrapMessage(input: {

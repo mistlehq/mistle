@@ -28,7 +28,7 @@ const meta = {
   argTypes: {
     variant: {
       control: "radio",
-      options: ["default", "alert"],
+      options: ["default", "warning", "alert"],
     },
     appearance: {
       control: "radio",
@@ -63,6 +63,8 @@ const meta = {
   render: function Render(args: NoticeStoryArgs) {
     const icon = args.showIcon ? (
       args.variant === "alert" ? (
+        <WarningIcon />
+      ) : args.variant === "warning" ? (
         <WarningIcon />
       ) : (
         <InfoIcon />

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
@@ -14,6 +14,8 @@ import type {
   PendingSessionDiffComment,
   PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
+import { reconcilePendingSessionDiffComments } from "./session-diff-comment.js";
+import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover } from "./session-port-access-popover.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
@@ -51,6 +53,9 @@ function SessionWorkbenchPageContent(input: {
         {
           ...comment,
           id: crypto.randomUUID(),
+          status: comment.status ?? {
+            kind: "current",
+          },
         },
       ]);
     },
@@ -270,6 +275,22 @@ function SessionWorkbenchPageContent(input: {
   const diffPanelPatch = workbench.connectionReadiness.canConnect
     ? workbench.diffPanelState.patch
     : "";
+  const primaryRepositoryPath = workbench.primaryRepositoryState.selectedRepositoryPath;
+
+  useEffect(() => {
+    if (!workbench.connectionReadiness.canConnect) {
+      return;
+    }
+
+    const parsedPatch = parseSessionDiffPatch(diffPanelPatch);
+    setPendingDiffComments((currentComments) =>
+      reconcilePendingSessionDiffComments({
+        comments: currentComments,
+        currentRepositoryPath: primaryRepositoryPath,
+        fileDiffs: parsedPatch.kind === "parsed" ? parsedPatch.files : [],
+      }),
+    );
+  }, [diffPanelPatch, primaryRepositoryPath, workbench.connectionReadiness.canConnect]);
 
   const alert: SessionWorkbenchAlert | null = workbench.sandboxStatusQuery.isError
     ? {
@@ -424,6 +445,7 @@ function SessionWorkbenchPageContent(input: {
           onUpdateComment={handleUpdatePendingDiffComment}
           pendingComments={pendingDiffComments}
           patch={diffPanelPatch}
+          repositoryPath={primaryRepositoryPath}
           summaryLabel="Compared with main"
           title="Current changes"
         />

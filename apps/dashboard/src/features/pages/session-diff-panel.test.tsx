@@ -4,7 +4,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
-import type { PendingSessionDiffComment } from "./session-diff-comment.js";
+import {
+  capturePendingSessionDiffCommentAnchor,
+  type PendingSessionDiffComment,
+} from "./session-diff-comment.js";
+import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 
 const TestPatch = [
@@ -16,6 +20,39 @@ const TestPatch = [
   ' import { Badge } from "@mistle/ui";',
   '+import { Button } from "@mistle/ui";',
 ].join("\n");
+
+function createTestPendingComment(body = "Request change"): PendingSessionDiffComment {
+  const parsedPatch = parseSessionDiffPatch(TestPatch);
+  if (parsedPatch.kind !== "parsed") {
+    throw new Error("Expected parsed patch fixture.");
+  }
+
+  const fileDiff = parsedPatch.files[0];
+  if (fileDiff === undefined) {
+    throw new Error("Expected parsed file diff.");
+  }
+  const anchor = capturePendingSessionDiffCommentAnchor({
+    fileDiff,
+    lineNumber: 2,
+    side: "additions",
+  });
+  if (anchor === null) {
+    throw new Error("Expected diff comment anchor.");
+  }
+
+  return {
+    id: "comment-1",
+    anchor,
+    body,
+    filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    lineNumber: 2,
+    repositoryPath: "/workspace/mistle",
+    side: "additions",
+    status: {
+      kind: "current",
+    },
+  };
+}
 
 describe("SessionDiffPanel", () => {
   it("collapses and expands individual file diffs", () => {
@@ -55,13 +92,7 @@ describe("SessionDiffPanel", () => {
   it("retains added comments in the diff panel and allows editing them", () => {
     function Harness(): React.JSX.Element {
       const [pendingComments, setPendingComments] = useState<readonly PendingSessionDiffComment[]>([
-        {
-          id: "comment-1",
-          body: "Request change",
-          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-          lineNumber: 2,
-          side: "additions",
-        },
+        createTestPendingComment(),
       ]);
 
       return (
@@ -102,13 +133,7 @@ describe("SessionDiffPanel", () => {
   it("removes retained comments from the diff panel", () => {
     function Harness(): React.JSX.Element {
       const [pendingComments, setPendingComments] = useState<readonly PendingSessionDiffComment[]>([
-        {
-          id: "comment-1",
-          body: "Request change",
-          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-          lineNumber: 2,
-          side: "additions",
-        },
+        createTestPendingComment(),
       ]);
 
       return (
@@ -136,13 +161,7 @@ describe("SessionDiffPanel", () => {
   it("reverts saved comment edits when escape is pressed", () => {
     function Harness(): React.JSX.Element {
       const [pendingComments, setPendingComments] = useState<readonly PendingSessionDiffComment[]>([
-        {
-          id: "comment-1",
-          body: "Request change",
-          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-          lineNumber: 2,
-          side: "additions",
-        },
+        createTestPendingComment(),
       ]);
 
       return (

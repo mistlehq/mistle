@@ -30,4 +30,11 @@ describe("Notice", () => {
 
     expect(notice.getAttribute("aria-live")).toBe("polite");
   });
+
+  it("does not assign alert semantics to warning notices by default", () => {
+    render(<Notice variant="warning">Check this state before continuing.</Notice>);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("Check this state before continuing.")).toBeTruthy();
+  });
 });

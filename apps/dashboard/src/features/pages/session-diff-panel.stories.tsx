@@ -9,10 +9,13 @@ import type {
   PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
 import {
+  capturePendingSessionDiffCommentAnchor,
   buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
   buildPendingSessionDiffCommentSummaryTitle,
+  reconcilePendingSessionDiffComments,
 } from "./session-diff-comment.js";
+import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import {
   createStorySessionBottomPanel,
@@ -79,6 +82,108 @@ const StoryBranchPatch = [
   " };",
 ].join("\n");
 
+const StoryRepositoryPath = "/workspace/mistle";
+const StoryMovedCommentPatch = StoryBranchPatch.replace(
+  '+          size="icon-sm"',
+  ['+          data-slot="diff-trigger"', '+          size="icon-sm"'].join("\n"),
+);
+const StoryStaleCommentPatch = StoryBranchPatch.replace(
+  '+          title="Diffs"',
+  '+          title="Code changes"',
+);
+
+function resolveStoryFileDiff(input: { filePath: string; patch: string }) {
+  const parsedPatch = parseSessionDiffPatch(input.patch);
+  if (parsedPatch.kind !== "parsed") {
+    throw new Error("Expected parsed story patch.");
+  }
+
+  const fileDiff = parsedPatch.files.find((candidateFileDiff) => {
+    return candidateFileDiff.name.replace(/^[ab]\//, "") === input.filePath;
+  });
+  if (fileDiff === undefined) {
+    throw new Error(`Missing story diff for ${input.filePath}.`);
+  }
+
+  return fileDiff;
+}
+
+function createStoryPendingComment(input: {
+  body: string;
+  filePath: string;
+  id: string;
+  lineNumber: number;
+  patch: string;
+  side: "additions" | "deletions";
+}): PendingSessionDiffComment {
+  const fileDiff = resolveStoryFileDiff({
+    filePath: input.filePath,
+    patch: input.patch,
+  });
+  const anchor = capturePendingSessionDiffCommentAnchor({
+    fileDiff,
+    lineNumber: input.lineNumber,
+    side: input.side,
+  });
+  if (anchor === null) {
+    throw new Error(`Could not capture story diff comment anchor for ${input.filePath}.`);
+  }
+
+  return {
+    id: input.id,
+    anchor,
+    body: input.body,
+    filePath: input.filePath,
+    lineNumber: input.lineNumber,
+    repositoryPath: StoryRepositoryPath,
+    side: input.side,
+    status: {
+      kind: "current",
+    },
+  };
+}
+
+const StoryValidPendingComments = [
+  createStoryPendingComment({
+    body: "Request change",
+    filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    id: "comment-story-1",
+    lineNumber: 140,
+    patch: StoryBranchPatch,
+    side: "additions",
+  }),
+  createStoryPendingComment({
+    body: "Use the shared overflow tooltip here.",
+    filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
+    id: "comment-story-2",
+    lineNumber: 4,
+    patch: StoryBranchPatch,
+    side: "additions",
+  }),
+] satisfies readonly PendingSessionDiffComment[];
+
+const StoryMovedPendingComments = [
+  createStoryPendingComment({
+    body: "Keep this aligned with the header icon button sizing.",
+    filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    id: "comment-story-moved-1",
+    lineNumber: 139,
+    patch: StoryBranchPatch,
+    side: "additions",
+  }),
+] satisfies readonly PendingSessionDiffComment[];
+
+const StoryStalePendingComments = [
+  createStoryPendingComment({
+    body: "Retitle this action to match the existing copy.",
+    filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    id: "comment-story-stale-1",
+    lineNumber: 140,
+    patch: StoryBranchPatch,
+    side: "additions",
+  }),
+] satisfies readonly PendingSessionDiffComment[];
+
 type StoryDiffWorkbenchProps = {
   autoOpenLocalComment?: boolean;
   errorNotice?: {
@@ -95,6 +200,7 @@ type StoryDiffWorkbenchProps = {
 function buildStoryPendingDiffCommentSummary(comments: readonly PendingSessionDiffComment[]): {
   count: number;
   label: string;
+  staleCount: number;
   title: string;
 } | null {
   if (comments.length === 0) {
@@ -104,6 +210,7 @@ function buildStoryPendingDiffCommentSummary(comments: readonly PendingSessionDi
   return {
     count: comments.length,
     label: buildPendingSessionDiffCommentSummaryLabel(comments.length),
+    staleCount: comments.filter((comment) => comment.status.kind === "stale").length,
     title: buildPendingSessionDiffCommentSummaryTitle(comments),
   };
 }
@@ -145,6 +252,9 @@ function StoryDiffWorkbench({
       {
         ...comment,
         id: `${comment.filePath}:${comment.side}:${comment.lineNumber}:${currentComments.length}`,
+        status: comment.status ?? {
+          kind: "current",
+        },
       },
     ]);
   }
@@ -167,6 +277,21 @@ function StoryDiffWorkbench({
       currentComments.filter((comment) => comment.id !== commentId),
     );
   }
+
+  useEffect(() => {
+    setPendingComments(initialPendingComments);
+  }, [initialPendingComments]);
+
+  useEffect(() => {
+    const parsedPatch = parseSessionDiffPatch(patch);
+    setPendingComments((currentComments) =>
+      reconcilePendingSessionDiffComments({
+        comments: currentComments,
+        currentRepositoryPath: StoryRepositoryPath,
+        fileDiffs: parsedPatch.kind === "parsed" ? parsedPatch.files : [],
+      }),
+    );
+  }, [patch]);
 
   useEffect(() => {
     if (!autoOpenLocalComment || hasAutoOpenedCommentRef.current) {
@@ -258,6 +383,7 @@ function StoryDiffWorkbench({
             onUpdateComment={updateComment}
             patch={patch}
             pendingComments={pendingComments}
+            repositoryPath={StoryRepositoryPath}
             summaryLabel="Compared with main"
             title="Current changes"
             onAddComment={addComment}
@@ -290,22 +416,21 @@ export const AgainstMain: Story = {};
 
 export const WithPendingDiffCommentBadges: Story = {
   args: {
-    initialPendingComments: [
-      {
-        id: "comment-story-1",
-        body: "Request change",
-        filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-        lineNumber: 140,
-        side: "additions",
-      },
-      {
-        id: "comment-story-2",
-        body: "Use the shared overflow tooltip here.",
-        filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
-        lineNumber: 4,
-        side: "additions",
-      },
-    ],
+    initialPendingComments: StoryValidPendingComments,
+  },
+};
+
+export const WithMovedDiffComment: Story = {
+  args: {
+    initialPendingComments: StoryMovedPendingComments,
+    patch: StoryMovedCommentPatch,
+  },
+};
+
+export const WithCommentNeedingReview: Story = {
+  args: {
+    initialPendingComments: StoryStalePendingComments,
+    patch: StoryStaleCommentPatch,
   },
 };
 
@@ -318,22 +443,7 @@ export const WithOpenLocalComment: Story = {
 export const WithSubmittedDiffCommentMessage: Story = {
   args: {
     submittedComposerText: "Please address these before sending the next patch.",
-    submittedDiffComments: [
-      {
-        id: "comment-story-submitted-1",
-        body: "Request change",
-        filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
-        lineNumber: 140,
-        side: "additions",
-      },
-      {
-        id: "comment-story-submitted-2",
-        body: "Use the shared overflow tooltip here.",
-        filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
-        lineNumber: 4,
-        side: "additions",
-      },
-    ],
+    submittedDiffComments: [...StoryValidPendingComments],
   },
 };
 

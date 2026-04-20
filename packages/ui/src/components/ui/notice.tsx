@@ -3,45 +3,62 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
 
-const noticeVariants = cva(["group/notice w-full rounded-lg text-left text-sm"].join(" "), {
-  variants: {
-    variant: {
-      default: "",
-      alert:
-        "[&_[data-slot=notice-description]]:text-destructive/90 [&_[data-slot=notice-icon]]:text-current text-destructive",
+const noticeVariants = cva(
+  [
+    "group/notice w-full rounded-lg text-left text-sm whitespace-normal [overflow-wrap:anywhere]",
+  ].join(" "),
+  {
+    variants: {
+      variant: {
+        default: "",
+        warning:
+          "[&_[data-slot=notice-description]]:text-amber-950/90 [&_[data-slot=notice-icon]]:text-current text-amber-950",
+        alert:
+          "[&_[data-slot=notice-description]]:text-destructive/90 [&_[data-slot=notice-icon]]:text-current text-destructive",
+      },
+      appearance: {
+        boxed: "border px-4 py-3",
+        subtle: "border border-transparent px-3 py-2",
+      },
     },
-    appearance: {
-      boxed: "border px-4 py-3",
-      subtle: "border border-transparent px-3 py-2",
-    },
-  },
-  compoundVariants: [
-    {
+    compoundVariants: [
+      {
+        variant: "default",
+        appearance: "boxed",
+        className: "bg-muted/20 text-muted-foreground",
+      },
+      {
+        variant: "default",
+        appearance: "subtle",
+        className: "bg-muted/20 text-muted-foreground",
+      },
+      {
+        variant: "warning",
+        appearance: "boxed",
+        className: "bg-amber-50 border-amber-300/70",
+      },
+      {
+        variant: "warning",
+        appearance: "subtle",
+        className: "bg-amber-50/80",
+      },
+      {
+        variant: "alert",
+        appearance: "boxed",
+        className: "bg-destructive/5 border-destructive/40",
+      },
+      {
+        variant: "alert",
+        appearance: "subtle",
+        className: "bg-destructive/5",
+      },
+    ],
+    defaultVariants: {
       variant: "default",
       appearance: "boxed",
-      className: "bg-muted/20 text-muted-foreground",
     },
-    {
-      variant: "default",
-      appearance: "subtle",
-      className: "bg-muted/20 text-muted-foreground",
-    },
-    {
-      variant: "alert",
-      appearance: "boxed",
-      className: "bg-destructive/5 border-destructive/40",
-    },
-    {
-      variant: "alert",
-      appearance: "subtle",
-      className: "bg-destructive/5",
-    },
-  ],
-  defaultVariants: {
-    variant: "default",
-    appearance: "boxed",
   },
-});
+);
 
 type NoticeOwnProps = {
   action?: React.ReactNode;
@@ -209,7 +226,7 @@ function NoticeDescription({ className, ...props }: React.ComponentProps<"div">)
   return (
     <div
       className={cn(
-        "text-sm text-balance md:text-pretty [&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4",
+        "min-w-0 text-sm text-balance whitespace-normal [overflow-wrap:anywhere] md:text-pretty [&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4",
         className,
       )}
       data-slot="notice-description"

@@ -14,6 +14,7 @@ import { FileDiff, type DiffLineAnnotation, type FileDiffMetadata } from "@pierr
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  capturePendingSessionDiffCommentAnchor,
   formatPendingSessionDiffCommentLineLabel,
   type PendingSessionDiffComment,
   type PendingSessionDiffCommentInput,
@@ -28,8 +29,12 @@ const SessionDiffPanelOptions = {
   themeType: "light",
 } as const;
 
-type ActiveSessionDiffCommentDraft = PendingSessionDiffCommentInput & {
+type ActiveSessionDiffCommentDraft = {
+  body: string;
   fileKey: string;
+  filePath: string;
+  lineNumber: number;
+  side: PendingSessionDiffCommentInput["side"];
 };
 
 type HoveredSessionDiffLine = {
@@ -62,6 +67,7 @@ type SessionDiffPanelProps = {
   onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
   pendingComments?: readonly PendingSessionDiffComment[];
   patch: string;
+  repositoryPath?: string | null;
   summaryLabel: string;
   title?: string;
 };
@@ -146,6 +152,7 @@ export function SessionDiffPanel({
   onUpdateComment,
   pendingComments = [],
   patch,
+  repositoryPath = null,
   summaryLabel,
   title = "Diffs",
 }: SessionDiffPanelProps): React.JSX.Element {
@@ -222,6 +229,7 @@ export function SessionDiffPanel({
                   pendingComments={pendingComments.filter(
                     (comment) => comment.filePath === resolveFileDiffPath(fileDiff),
                   )}
+                  repositoryPath={repositoryPath}
                   setActiveCommentDraft={setActiveCommentDraft}
                 />
               );
@@ -243,6 +251,7 @@ type SessionDiffPanelFileSectionProps = {
   onOpenChange: (open: boolean) => void;
   open: boolean;
   pendingComments: readonly PendingSessionDiffComment[];
+  repositoryPath: string | null;
   setActiveCommentDraft: React.Dispatch<React.SetStateAction<ActiveSessionDiffCommentDraft | null>>;
 };
 
@@ -256,6 +265,7 @@ function SessionDiffPanelFileSection({
   onOpenChange,
   open,
   pendingComments,
+  repositoryPath,
   setActiveCommentDraft,
 }: SessionDiffPanelFileSectionProps): React.JSX.Element {
   const filePath = resolveFileDiffPath(fileDiff);
@@ -365,10 +375,21 @@ function SessionDiffPanelFileSection({
       return;
     }
 
+    const anchor = capturePendingSessionDiffCommentAnchor({
+      fileDiff,
+      lineNumber: activeCommentDraft.lineNumber,
+      side: activeCommentDraft.side,
+    });
+    if (anchor === null) {
+      throw new Error("Could not resolve diff comment anchor.");
+    }
+
     onAddComment({
+      anchor,
       body: nextCommentBody,
       filePath,
       lineNumber: activeCommentDraft.lineNumber,
+      repositoryPath,
       side: activeCommentDraft.side,
     });
     setActiveCommentDraft(null);
@@ -571,8 +592,20 @@ function SavedSessionDiffCommentCard(input: {
   onReset: () => void;
   onSubmit: () => void;
 }): React.JSX.Element {
+  const title =
+    input.comment.status.kind === "stale"
+      ? `Comment needs review on line ${formatPendingSessionDiffCommentLineLabel(input.comment)}`
+      : `Comment on line ${formatPendingSessionDiffCommentLineLabel(input.comment)}`;
+  const notice =
+    input.comment.status.kind === "stale" ? (
+      <Notice appearance="boxed" className="mb-3 text-sm" variant="warning">
+        This comment no longer matches the current diff. Review or remove it before sending.
+      </Notice>
+    ) : null;
+
   return (
     <SessionDiffPanelCommentCard
+      tone={input.comment.status.kind === "stale" ? "warning" : "default"}
       headerAction={
         input.onDelete === undefined ? undefined : (
           <Button
@@ -587,30 +620,33 @@ function SavedSessionDiffCommentCard(input: {
         )
       }
       body={
-        <SessionDiffCommentTextarea
-          onBlur={input.onSubmit}
-          onChange={(event) => {
-            input.onBodyChange(event.target.value);
-          }}
-          onFocus={input.onFocus}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              input.onReset();
-              event.currentTarget.blur();
-              return;
-            }
+        <>
+          {notice}
+          <SessionDiffCommentTextarea
+            onBlur={input.onSubmit}
+            onChange={(event) => {
+              input.onBodyChange(event.target.value);
+            }}
+            onFocus={input.onFocus}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                input.onReset();
+                event.currentTarget.blur();
+                return;
+              }
 
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              input.onSubmit();
-              event.currentTarget.blur();
-            }
-          }}
-          value={input.draftBody}
-        />
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                input.onSubmit();
+                event.currentTarget.blur();
+              }
+            }}
+            value={input.draftBody}
+          />
+        </>
       }
-      title={`Comment on line ${formatPendingSessionDiffCommentLineLabel(input.comment)}`}
+      title={title}
     />
   );
 }
@@ -684,9 +720,14 @@ function SessionDiffPanelCommentCard(input: {
   title: string;
   actionRow?: React.JSX.Element | undefined;
   headerAction?: React.JSX.Element | undefined;
+  tone?: "default" | "warning";
 }): React.JSX.Element {
   return (
-    <div className="m-1 max-w-2xl overflow-hidden rounded-md border bg-white font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
+    <div
+      className={`m-1 max-w-2xl overflow-hidden rounded-md border font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)] ${
+        input.tone === "warning" ? "border-amber-300 bg-amber-50/40" : "bg-white"
+      }`}
+    >
       <div
         className={`border-b relative px-3 py-2 ${input.headerAction === undefined ? "" : "pr-10"}`}
       >
