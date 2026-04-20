@@ -48,7 +48,7 @@ export const FormatGallery: Story = {
       "",
       "Paragraph text can include **bold**, *italic*, ~~strikethrough~~, and `inline code`.",
       "",
-      "Links also render inline, for example [OpenAI](https://openai.com/).",
+      "Links also render inline, for example [Mistle Docs](https://docs.mistle.dev/).",
       "",
       "> This is a blockquote used for callouts, quoted output, or emphasized guidance.",
       "",
