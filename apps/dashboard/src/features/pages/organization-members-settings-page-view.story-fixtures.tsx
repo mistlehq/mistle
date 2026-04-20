@@ -193,7 +193,6 @@ export function createOrganizationMembersSettingsPageStoryViewModel(
     inviteMembersDisabled:
       overrides.inviteMembersDisabled ??
       !createOrganizationMembersStoryCapabilities(viewerRole).invite.canExecute,
-    isLoading: overrides.isLoading ?? false,
     isListFetching: overrides.isListFetching ?? false,
     isUpdatingRole: overrides.isUpdatingRole ?? false,
     limit: overrides.limit ?? 25,

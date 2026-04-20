@@ -50,7 +50,6 @@ function renderAutomationPagination(input: {
 
 type WebhookAutomationListViewProps = {
   items: readonly WebhookAutomationListItemViewModel[];
-  isLoading: boolean;
   errorMessage: string | null;
   totalResults: number | null;
   hasNextPage: boolean;
@@ -185,7 +184,7 @@ export function WebhookAutomationListView(
 
   return (
     <div className="flex flex-col gap-4">
-      {input.isLoading ? null : input.errorMessage !== null ? (
+      {input.errorMessage !== null ? (
         <Notice title="Could not load automations" variant="alert">
           {input.errorMessage}
         </Notice>

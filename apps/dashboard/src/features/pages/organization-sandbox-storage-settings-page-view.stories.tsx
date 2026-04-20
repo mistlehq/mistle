@@ -38,7 +38,6 @@ const meta = {
   decorators: [withDashboardPageStory],
   args: {
     state: ManagedState,
-    isLoading: false,
     isSaving: false,
     hasUnsavedChanges: false,
     saveErrorMessage: null,

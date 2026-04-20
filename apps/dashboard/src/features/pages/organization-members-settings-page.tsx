@@ -12,6 +12,14 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   });
   const { title, description } = resolvePageFrameText(pageMeta, "Members");
 
+  if (membersState.isPageLoading) {
+    return (
+      <PageFrame description={description} title={title}>
+        {null}
+      </PageFrame>
+    );
+  }
+
   return (
     <PageFrame description={description} title={title}>
       <OrganizationMembersSettingsPageView viewModel={membersState.viewModel} />

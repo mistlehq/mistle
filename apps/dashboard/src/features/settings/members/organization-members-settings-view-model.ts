@@ -30,7 +30,6 @@ export type OrganizationMembersSettingsPageViewModel = {
     code: string | null;
     raw: unknown;
   }>;
-  isLoading: boolean;
   isListFetching: boolean;
   isUpdatingRole: boolean;
   listErrorNoticeMessage: string | null;

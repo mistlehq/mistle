@@ -47,7 +47,6 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
 export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationGeneralSettingsPageView
-      isLoading={false}
       isSaving={false}
       loadErrorMessage={null}
       logoBusy={false}

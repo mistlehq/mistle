@@ -20,18 +20,13 @@ export type OrganizationIntegrationsSettingsPageViewProps = {
   connectedCards: readonly OrganizationIntegrationsSettingsPageCard[];
   connectionDialog?: ReactNode;
   detailSurface?: ReactNode;
-  isLoading: boolean;
   loadErrorMessage: string | null;
 };
 
 export function OrganizationIntegrationsSettingsPageView(
   props: OrganizationIntegrationsSettingsPageViewProps,
-): React.JSX.Element | null {
+): React.JSX.Element {
   const isDetailFocused = props.detailSurface !== undefined && props.detailSurface !== null;
-
-  if (props.isLoading) {
-    return null;
-  }
 
   if (props.loadErrorMessage !== null) {
     return (

@@ -23,6 +23,7 @@ type UseOrganizationMembersSettingsState = {
 };
 
 type UseOrganizationMembersSettingsStateResult = {
+  isPageLoading: boolean;
   viewModel: OrganizationMembersSettingsPageViewModel;
 };
 
@@ -173,7 +174,6 @@ export function useOrganizationMembersSettingsState(
     inviteDialogOpen,
     inviteMemberRequest: api.inviteMember,
     inviteMembersDisabled,
-    isLoading: directoryQueryState.isPageLoading,
     isListFetching: directoryQueryState.isListFetching,
     isUpdatingRole: mutations.isUpdatingRole,
     limit: membersDirectoryPageLimit,
@@ -277,5 +277,8 @@ export function useOrganizationMembersSettingsState(
     total: directoryQueryState.total,
   };
 
-  return { viewModel };
+  return {
+    isPageLoading: directoryQueryState.isPageLoading,
+    viewModel,
+  };
 }

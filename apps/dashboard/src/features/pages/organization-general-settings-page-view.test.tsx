@@ -10,7 +10,6 @@ describe("OrganizationGeneralSettingsPageView", () => {
   it("shows edit and remove actions when an organization logo is available", () => {
     render(
       <OrganizationGeneralSettingsPageView
-        isLoading={false}
         isSaving={false}
         loadErrorMessage={null}
         logoBusy={false}
@@ -57,7 +56,6 @@ describe("OrganizationGeneralSettingsPageView", () => {
 
       return (
         <OrganizationGeneralSettingsPageView
-          isLoading={false}
           isSaving={false}
           loadErrorMessage={null}
           logoBusy={busy}

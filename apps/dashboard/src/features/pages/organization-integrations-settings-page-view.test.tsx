@@ -35,7 +35,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
             },
           },
         ]}
-        isLoading={false}
         loadErrorMessage={null}
       />,
     );
@@ -51,7 +50,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
       <OrganizationIntegrationsSettingsPageView
         availableCards={[]}
         connectedCards={[]}
-        isLoading={false}
         loadErrorMessage="Could not load integrations."
       />,
     );
@@ -84,7 +82,6 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
           },
         ]}
         detailSurface={<div>GitHub connection detail</div>}
-        isLoading={false}
         loadErrorMessage={null}
       />,
     );

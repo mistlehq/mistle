@@ -22,10 +22,6 @@ export function OrganizationMembersSettingsPageView(input: {
     total: props.total,
   });
 
-  if (props.isLoading) {
-    return null;
-  }
-
   if (props.loadErrorMessage) {
     return <MembersLoadErrorState message={props.loadErrorMessage} />;
   }

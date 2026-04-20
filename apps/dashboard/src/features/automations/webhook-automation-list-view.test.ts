@@ -71,7 +71,6 @@ describe("WebhookAutomationListView", () => {
         errorMessage: null,
         hasNextPage: false,
         hasPreviousPage: false,
-        isLoading: false,
         items: [
           createWebhookAutomationListItemViewModel({
             issue: {
@@ -102,7 +101,6 @@ describe("WebhookAutomationListView", () => {
         errorMessage: "Could not load automations.",
         hasNextPage: false,
         hasPreviousPage: false,
-        isLoading: false,
         items: [],
         onNextPage: () => {},
         onOpenAutomation: () => {},

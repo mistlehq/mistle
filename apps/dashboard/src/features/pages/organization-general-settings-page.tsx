@@ -146,15 +146,18 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         })
       : null);
 
+  if (organizationQuery.isPending) {
+    return (
+      <FormPageFrame description={description} title={title}>
+        {null}
+      </FormPageFrame>
+    );
+  }
+
   return (
     <FormPageFrame description={description} title={title}>
       <OrganizationGeneralSettingsPageView
-        key={
-          organizationQuery.data === undefined
-            ? `loading:${activeOrganizationId}`
-            : `${activeOrganizationId}:${organizationQuery.data.slug}`
-        }
-        isLoading={organizationQuery.isPending}
+        key={`${activeOrganizationId}:${organizationQuery.data?.slug ?? "unknown"}`}
         isSaving={saveMutation.isPending}
         logoBusy={
           uploadOrganizationLogoMutation.isPending || deleteOrganizationLogoMutation.isPending

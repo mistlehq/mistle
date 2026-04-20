@@ -40,7 +40,6 @@ export type OrganizationIdentityLinkingProviderCard = {
 };
 
 export type OrganizationIdentityLinkingSettingsPageViewProps = {
-  isLoading: boolean;
   loadErrorMessage: string | null;
   providers: readonly OrganizationIdentityLinkingProviderCard[];
   onProviderConnectionChange: (input: {
@@ -59,11 +58,7 @@ export type OrganizationIdentityLinkingSettingsPageViewProps = {
 
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
-): React.JSX.Element | null {
-  if (props.isLoading) {
-    return null;
-  }
-
+): React.JSX.Element {
   if (props.loadErrorMessage !== null) {
     return (
       <FormPageStack>

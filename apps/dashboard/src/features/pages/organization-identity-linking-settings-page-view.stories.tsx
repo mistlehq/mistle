@@ -46,7 +46,6 @@ const meta = {
   component: OrganizationIdentityLinkingSettingsPageView,
   decorators: [withDashboardPageStory, withDashboardMemoryRouter],
   args: {
-    isLoading: false,
     loadErrorMessage: null,
     providers: [BaseGitHubProvider],
     onProviderConnectionChange: () => {},

@@ -12,7 +12,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <MemoryRouter>
         <OrganizationIdentityLinkingSettingsPageView
-          isLoading={false}
           loadErrorMessage={null}
           onProviderConnectionChange={() => {}}
           onSaveProvider={async () => {}}
@@ -140,7 +139,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
       return (
         <MemoryRouter>
           <OrganizationIdentityLinkingSettingsPageView
-            isLoading={false}
             loadErrorMessage={null}
             onProviderConnectionChange={({ providerFamily, integrationConnectionId }) => {
               setProviders((currentProviders) =>
@@ -196,7 +194,6 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <MemoryRouter>
         <OrganizationIdentityLinkingSettingsPageView
-          isLoading={false}
           loadErrorMessage={null}
           onProviderConnectionChange={() => {}}
           onSaveProvider={async () => {}}

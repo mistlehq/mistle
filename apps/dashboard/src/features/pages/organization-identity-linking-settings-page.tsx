@@ -175,10 +175,17 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     );
   }
 
+  if (membershipCapabilitiesQuery.isPending || (canManage && providersQuery.isPending)) {
+    return (
+      <PageFrame description={description} maxWidthClassName="max-w-5xl" title={title}>
+        {null}
+      </PageFrame>
+    );
+  }
+
   return (
     <PageFrame description={description} maxWidthClassName="max-w-5xl" title={title}>
       <OrganizationIdentityLinkingSettingsPageView
-        isLoading={membershipCapabilitiesQuery.isPending || (canManage && providersQuery.isPending)}
         loadErrorMessage={resolveLoadErrorMessage({
           canManage,
           providersError: providersQuery.isError ? providersQuery.error : null,

@@ -97,18 +97,7 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
   if (membershipCapabilitiesQuery.isPending) {
     return (
       <FormPageFrame description={description} title={title}>
-        <OrganizationSandboxStorageSettingsPageView
-          hasUnsavedChanges={false}
-          isLoading
-          isSaving={false}
-          loadErrorMessage={null}
-          onCancel={() => undefined}
-          onSave={async () => undefined}
-          onStateChange={() => undefined}
-          saveErrorMessage={null}
-          state={createEmptyOrganizationSandboxStorageFormState()}
-          visibleErrors={{}}
-        />
+        {null}
       </FormPageFrame>
     );
   }
@@ -140,14 +129,21 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
     right: resolvedSavedState,
   });
 
+  if (
+    organizationSandboxStorageSettingsQuery.isPending ||
+    (draftState === null && !organizationSandboxStorageSettingsQuery.isError)
+  ) {
+    return (
+      <FormPageFrame description={description} title={title}>
+        {null}
+      </FormPageFrame>
+    );
+  }
+
   return (
     <FormPageFrame description={description} title={title}>
       <OrganizationSandboxStorageSettingsPageView
         hasUnsavedChanges={hasUnsavedChanges}
-        isLoading={
-          organizationSandboxStorageSettingsQuery.isPending ||
-          (draftState === null && !organizationSandboxStorageSettingsQuery.isError)
-        }
         isSaving={saveMutation.isPending}
         loadErrorMessage={
           organizationSandboxStorageSettingsQuery.isError

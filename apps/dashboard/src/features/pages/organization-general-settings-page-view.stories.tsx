@@ -8,7 +8,6 @@ const meta = {
   component: OrganizationGeneralSettingsPageView,
   decorators: [withDashboardPageStory],
   args: {
-    isLoading: false,
     isSaving: false,
     loadErrorMessage: null,
     logoBusy: false,

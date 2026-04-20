@@ -31,7 +31,6 @@ const ArchilRegionOptions = [
 
 export type OrganizationSandboxStorageSettingsPageViewProps = {
   state: OrganizationSandboxStorageFormState;
-  isLoading: boolean;
   isSaving: boolean;
   hasUnsavedChanges: boolean;
   saveErrorMessage: string | null;
@@ -44,17 +43,13 @@ export type OrganizationSandboxStorageSettingsPageViewProps = {
 
 export function OrganizationSandboxStorageSettingsPageView(
   input: OrganizationSandboxStorageSettingsPageViewProps,
-): React.JSX.Element | null {
+): React.JSX.Element {
   const showConfigurationSource = false;
   const selectedRegionLabel =
     input.state.region.length === 0
       ? undefined
       : (ArchilRegionOptions.find((option) => option.value === input.state.region)?.label ??
         input.state.region);
-
-  if (input.isLoading) {
-    return null;
-  }
 
   if (input.loadErrorMessage !== null) {
     return (

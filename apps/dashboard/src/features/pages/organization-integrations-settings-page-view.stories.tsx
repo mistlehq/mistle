@@ -37,7 +37,6 @@ const meta = {
   args: {
     availableCards: AvailableCards,
     connectedCards: ConnectedCards,
-    isLoading: false,
     loadErrorMessage: null,
   },
 } satisfies Meta<typeof OrganizationIntegrationsSettingsPageView>;

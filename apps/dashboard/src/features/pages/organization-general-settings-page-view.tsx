@@ -5,7 +5,6 @@ import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SettingsImageField } from "../shared/settings-image-field.js";
 
 export type OrganizationGeneralSettingsPageViewProps = {
-  isLoading: boolean;
   isSaving: boolean;
   loadErrorMessage: string | null;
   logoBusy: boolean;
@@ -19,11 +18,7 @@ export type OrganizationGeneralSettingsPageViewProps = {
 
 export function OrganizationGeneralSettingsPageView(
   props: OrganizationGeneralSettingsPageViewProps,
-): React.JSX.Element | null {
-  if (props.isLoading) {
-    return null;
-  }
-
+): React.JSX.Element {
   if (props.loadErrorMessage) {
     return (
       <FormPageStack>

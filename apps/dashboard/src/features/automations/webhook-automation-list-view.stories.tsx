@@ -20,7 +20,6 @@ const meta = {
   },
   args: {
     items: SampleItems,
-    isLoading: false,
     errorMessage: null,
     totalResults: SampleItems.length,
     hasNextPage: false,
@@ -49,13 +48,6 @@ export const Paginated: Story = {
 
 export const Empty: Story = {
   args: {
-    items: [],
-  },
-};
-
-export const Loading: Story = {
-  args: {
-    isLoading: true,
     items: [],
   },
 };

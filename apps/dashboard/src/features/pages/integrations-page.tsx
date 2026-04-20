@@ -70,6 +70,10 @@ export function IntegrationsPage() {
           webhookSource: directoryState.selectedDetailCard.target.webhookSource,
         });
 
+  if (directoryState.integrationsQuery.isPending) {
+    return null;
+  }
+
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
       <IntegrationConnectionDetailView
@@ -148,7 +152,6 @@ export function IntegrationsPage() {
         </>
       }
       detailSurface={detailSurface}
-      isLoading={directoryState.integrationsQuery.isPending}
       loadErrorMessage={
         directoryState.integrationsQuery.isError
           ? resolveApiErrorMessage({

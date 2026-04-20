@@ -90,7 +90,6 @@ export function AutomationsPage(): React.JSX.Element {
         errorMessage={errorMessage}
         hasNextPage={automationsQuery.data?.nextPage != null}
         hasPreviousPage={automationsQuery.data?.previousPage != null}
-        isLoading={automationsQuery.isPending}
         items={items}
         nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
         onNextPage={() => {
