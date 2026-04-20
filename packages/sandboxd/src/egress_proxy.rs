@@ -14,15 +14,18 @@ use std::fs::{self, DirBuilder};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
+use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
+use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
-use hyper::body::Incoming;
+use hyper::body::{Body, Frame, Incoming, SizeHint};
 use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
@@ -33,7 +36,7 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
@@ -44,7 +47,7 @@ use crate::protocol::startup::StartupInput;
 use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
-use crate::time::Clock;
+use crate::time::{Clock, format_rfc3339_timestamp};
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
@@ -53,6 +56,7 @@ const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const RUNTIME_NO_PROXY_DEFAULTS: [&str; 2] = ["127.0.0.1", "localhost"];
+const SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME: &str = "x-mistle-sandbox-egress-id";
 
 const MANAGED_PROXY_ENV_KEYS: [&str; 15] = [
     "HTTP_PROXY",
@@ -72,7 +76,8 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 15] = [
     "GIT_SSL_CAPATH",
 ];
 
-type HyperBody = Full<Bytes>;
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
+type HyperBody = BoxBody<Bytes, BoxError>;
 type EgressConnector = HttpsConnector<HttpConnector>;
 
 #[derive(Debug)]
@@ -93,6 +98,7 @@ pub struct EgressProxyError {
 
 #[derive(Debug, Clone)]
 struct EgressProxyRoute {
+    egress_rule_id: String,
     upstream_base_url: String,
     host: String,
     path_prefixes: Vec<String>,
@@ -102,12 +108,14 @@ struct EgressProxyRoute {
 
 #[derive(Clone)]
 struct EgressProxyState {
+    sandbox_instance_id: String,
     tokenizer_proxy_egress_base_url: String,
     routes: Arc<Vec<EgressProxyRoute>>,
-    client: Client<EgressConnector, HyperBody>,
+    client: Client<EgressConnector, Incoming>,
     proxy_ca_certificate_pem: Arc<String>,
     proxy_ca_private_key_pem: Arc<String>,
     clock: Arc<dyn Clock>,
+    next_request_id: Arc<AtomicU64>,
 }
 
 struct EgressProxySupervisorConfig {
@@ -133,6 +141,32 @@ struct RequestTarget {
     uri: Uri,
 }
 
+#[derive(Clone)]
+struct EgressProxyRequestContext {
+    sandbox_instance_id: String,
+    request_id: String,
+    method: String,
+    authority: String,
+    host: String,
+    path_and_query: String,
+    route_mode: &'static str,
+    egress_rule_id: Option<String>,
+    upstream_url: String,
+    started_at_ms: u64,
+    clock: Arc<dyn Clock>,
+}
+
+struct InstrumentedResponseBody {
+    inner: Incoming,
+    context: Arc<EgressProxyRequestContext>,
+    upstream_status: StatusCode,
+    upstream_trace_id: Option<String>,
+    chunk_count: u64,
+    forwarded_bytes: u64,
+    first_chunk_at_ms: Option<u64>,
+    ended: bool,
+}
+
 impl EgressProxyError {
     fn new(message: impl Into<String>) -> Self {
         Self {
@@ -148,6 +182,166 @@ impl Display for EgressProxyError {
 }
 
 impl std::error::Error for EgressProxyError {}
+
+impl EgressProxyRequestContext {
+    fn elapsed_ms(&self) -> u64 {
+        self.clock.now_ms().saturating_sub(self.started_at_ms)
+    }
+
+    fn common_fields(&self) -> Vec<(&'static str, Value)> {
+        let mut fields = vec![
+            ("requestId", Value::String(self.request_id.clone())),
+            ("method", Value::String(self.method.clone())),
+            ("authority", Value::String(self.authority.clone())),
+            ("host", Value::String(self.host.clone())),
+            ("pathAndQuery", Value::String(self.path_and_query.clone())),
+            ("routeMode", Value::String(self.route_mode.to_string())),
+            ("upstreamUrl", Value::String(self.upstream_url.clone())),
+            ("elapsedMs", Value::from(self.elapsed_ms())),
+        ];
+        if let Some(egress_rule_id) = &self.egress_rule_id {
+            fields.push(("egressRuleId", Value::String(egress_rule_id.clone())));
+        }
+        fields
+    }
+}
+
+impl InstrumentedResponseBody {
+    fn finalize(
+        &mut self,
+        event: &'static str,
+        outcome: &'static str,
+        error: Option<&str>,
+        extra_fields: &[(&str, Value)],
+    ) {
+        if self.ended {
+            return;
+        }
+        self.ended = true;
+        let mut fields = self.context.common_fields();
+        fields.push((
+            "upstreamStatus",
+            Value::from(u64::from(self.upstream_status.as_u16())),
+        ));
+        fields.push(("outcome", Value::String(outcome.to_string())));
+        fields.push(("chunkCount", Value::from(self.chunk_count)));
+        fields.push(("forwardedBytes", Value::from(self.forwarded_bytes)));
+        if let Some(first_chunk_at_ms) = self.first_chunk_at_ms {
+            fields.push((
+                "firstChunkLatencyMs",
+                Value::from(first_chunk_at_ms.saturating_sub(self.context.started_at_ms)),
+            ));
+        }
+        if let Some(upstream_trace_id) = &self.upstream_trace_id {
+            fields.push(("upstreamTraceId", Value::String(upstream_trace_id.clone())));
+        }
+        if let Some(error) = error {
+            fields.push(("error", Value::String(error.to_string())));
+        }
+        fields.extend(
+            extra_fields
+                .iter()
+                .map(|(name, value)| (*name, value.clone())),
+        );
+        emit_egress_proxy_log(
+            self.context.clock.as_ref(),
+            &self.context.sandbox_instance_id,
+            event,
+            &fields,
+        );
+    }
+}
+
+impl Body for InstrumentedResponseBody {
+    type Data = Bytes;
+    type Error = BoxError;
+
+    fn poll_frame(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        match Pin::new(&mut self.inner).poll_frame(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Ok(frame))) => {
+                if let Some(data) = frame.data_ref() {
+                    self.chunk_count = self.chunk_count.saturating_add(1);
+                    self.forwarded_bytes = self
+                        .forwarded_bytes
+                        .saturating_add(data.len().try_into().unwrap_or(u64::MAX));
+                    if self.first_chunk_at_ms.is_none() {
+                        let first_chunk_at_ms = self.context.clock.now_ms();
+                        self.first_chunk_at_ms = Some(first_chunk_at_ms);
+                        let mut fields = self.context.common_fields();
+                        fields.push((
+                            "upstreamStatus",
+                            Value::from(u64::from(self.upstream_status.as_u16())),
+                        ));
+                        fields.push((
+                            "firstChunkLatencyMs",
+                            Value::from(
+                                first_chunk_at_ms.saturating_sub(self.context.started_at_ms),
+                            ),
+                        ));
+                        if let Some(upstream_trace_id) = &self.upstream_trace_id {
+                            fields.push((
+                                "upstreamTraceId",
+                                Value::String(upstream_trace_id.clone()),
+                            ));
+                        }
+                        emit_egress_proxy_log(
+                            self.context.clock.as_ref(),
+                            &self.context.sandbox_instance_id,
+                            "egress_proxy_response_body_first_chunk",
+                            &fields,
+                        );
+                    }
+                }
+                Poll::Ready(Some(Ok(frame)))
+            }
+            Poll::Ready(Some(Err(error))) => {
+                let error_message = error.to_string();
+                self.finalize(
+                    "egress_proxy_response_body_failed",
+                    "upstream_error",
+                    Some(error_message.as_str()),
+                    &[],
+                );
+                Poll::Ready(Some(Err(Box::new(error))))
+            }
+            Poll::Ready(None) => {
+                self.finalize(
+                    "egress_proxy_response_body_completed",
+                    "completed",
+                    None,
+                    &[],
+                );
+                Poll::Ready(None)
+            }
+        }
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.is_end_stream()
+    }
+
+    fn size_hint(&self) -> SizeHint {
+        self.inner.size_hint()
+    }
+}
+
+impl Drop for InstrumentedResponseBody {
+    fn drop(&mut self) {
+        if self.ended {
+            return;
+        }
+        self.finalize(
+            "egress_proxy_response_body_cancelled",
+            "downstream_cancelled",
+            None,
+            &[],
+        );
+    }
+}
 
 impl EgressProxy {
     pub fn start(
@@ -235,12 +429,14 @@ impl EgressProxy {
             .enable_http1()
             .wrap_connector(http_connector);
         let state = EgressProxyState {
+            sandbox_instance_id: supervisor_handle.sandbox_instance_id().to_string(),
             tokenizer_proxy_egress_base_url: tokenizer_proxy_egress_base_url.to_string(),
             routes: Arc::new(routes),
             client: Client::builder(TokioExecutor::new()).build(https_connector),
             proxy_ca_certificate_pem: Arc::new(generated_proxy_ca.certificate_pem.clone()),
             proxy_ca_private_key_pem: Arc::new(generated_proxy_ca.private_key_pem),
             clock,
+            next_request_id: Arc::new(AtomicU64::new(1)),
         };
 
         let runtime_env = build_managed_proxy_env(
@@ -305,17 +501,16 @@ impl EgressProxy {
 
     #[cfg(any(test, debug_assertions))]
     pub(crate) fn force_current_server_shutdown_for_test(&self) -> Result<(), EgressProxyError> {
-        let supervisor_command_sender = self.supervisor_command_sender.as_ref().ok_or_else(|| {
-            EgressProxyError::new(
-                "egress proxy fault injection is unavailable in this build or runtime mode",
-            )
-        })?;
+        let supervisor_command_sender =
+            self.supervisor_command_sender.as_ref().ok_or_else(|| {
+                EgressProxyError::new(
+                    "egress proxy fault injection is unavailable in this build or runtime mode",
+                )
+            })?;
         supervisor_command_sender
             .send(EgressProxySupervisorCommand::ForceCurrentServerShutdown)
             .map_err(|_| {
-                EgressProxyError::new(
-                    "egress proxy supervisor command channel is unavailable",
-                )
+                EgressProxyError::new("egress proxy supervisor command channel is unavailable")
             })
     }
 
@@ -688,6 +883,7 @@ fn build_proxy_route(
         .clone();
 
     Ok(EgressProxyRoute {
+        egress_rule_id: route.egress_rule_id.clone(),
         upstream_base_url: route.upstream.base_url.clone(),
         host: host.to_string(),
         path_prefixes: route
@@ -865,7 +1061,7 @@ fn handle_connect_request(
 
     Response::builder()
         .status(StatusCode::OK)
-        .body(Full::new(Bytes::new()))
+        .body(empty_body())
         .expect("CONNECT acknowledgement response should build")
 }
 
@@ -887,21 +1083,42 @@ async fn forward_request(
         request_path_and_query,
         request_method.as_str(),
     )?;
-    let request_body = body
-        .collect()
-        .await
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to read proxied request body: {error}"))
-        })?
-        .to_bytes();
-
-    let mut outbound_request = Request::builder().method(request_method).uri(match route {
+    let upstream_uri = match route {
         Some(_) => build_tokenizer_proxy_forward_uri(
             &state.tokenizer_proxy_egress_base_url,
             request_path_and_query,
         )?,
         None => request_target.uri.clone(),
+    };
+    let request_context = Arc::new(EgressProxyRequestContext {
+        sandbox_instance_id: state.sandbox_instance_id.clone(),
+        request_id: format!(
+            "egp_{}",
+            state.next_request_id.fetch_add(1, Ordering::Relaxed)
+        ),
+        method: request_method.to_string(),
+        authority: request_target.authority.clone(),
+        host: request_target.host.clone(),
+        path_and_query: request_path_and_query.to_string(),
+        route_mode: if route.is_some() { "managed" } else { "direct" },
+        egress_rule_id: route.map(|matched_route| matched_route.egress_rule_id.clone()),
+        upstream_url: upstream_uri.to_string(),
+        started_at_ms: state.clock.now_ms(),
+        clock: state.clock.clone(),
     });
+    let mut request_started_fields = request_context.common_fields();
+    request_started_fields.push((
+        "hasRequestBody",
+        Value::Bool(body.size_hint().lower() > 0 || body.size_hint().upper().unwrap_or(1) > 0),
+    ));
+    emit_egress_proxy_log(
+        request_context.clock.as_ref(),
+        &request_context.sandbox_instance_id,
+        "egress_proxy_request_started",
+        &request_started_fields,
+    );
+
+    let mut outbound_request = Request::builder().method(request_method).uri(upstream_uri);
     for (header_name, header_value) in filter_outbound_request_headers(&parts.headers) {
         outbound_request = outbound_request.header(header_name, header_value);
     }
@@ -911,47 +1128,91 @@ async fn forward_request(
                 TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME,
                 route.grant.as_str(),
             )
-            .body(Full::new(request_body))
+            .body(body)
             .map_err(|error| {
                 EgressProxyError::new(format!("failed to build proxied request: {error}"))
             })?,
-        None => outbound_request
-            .body(Full::new(request_body))
-            .map_err(|error| {
-                EgressProxyError::new(format!("failed to build direct proxied request: {error}"))
-            })?,
+        None => outbound_request.body(body).map_err(|error| {
+            EgressProxyError::new(format!("failed to build direct proxied request: {error}"))
+        })?,
     };
 
-    let upstream_response = state
-        .client
-        .request(outbound_request)
-        .await
-        .map_err(|error| match route {
-            Some(route) => EgressProxyError::new(format!(
-                "failed to forward request for '{}' through tokenizer-proxy route '{}': {error}",
-                route.host, route.upstream_base_url
-            )),
-            None => EgressProxyError::new(format!(
-                "failed to forward proxied request directly to '{}': {error}",
-                request_target.authority
-            )),
-        })?;
+    let upstream_response = match state.client.request(outbound_request).await {
+        Ok(upstream_response) => upstream_response,
+        Err(error) => {
+            let error_text = error.to_string();
+            let mut request_failed_fields = request_context.common_fields();
+            request_failed_fields.push(("outcome", Value::String("request_failed".to_string())));
+            request_failed_fields.push(("error", Value::String(error_text.clone())));
+            emit_egress_proxy_log(
+                request_context.clock.as_ref(),
+                &request_context.sandbox_instance_id,
+                "egress_proxy_request_failed",
+                &request_failed_fields,
+            );
+            return Err(match route {
+                Some(route) => EgressProxyError::new(format!(
+                    "failed to forward request for '{}' through tokenizer-proxy route '{}': {error_text}",
+                    route.host, route.upstream_base_url
+                )),
+                None => EgressProxyError::new(format!(
+                    "failed to forward proxied request directly to '{}': {error_text}",
+                    request_target.authority
+                )),
+            });
+        }
+    };
+
+    let upstream_status = upstream_response.status();
+    let upstream_headers = upstream_response.headers().clone();
+    let upstream_trace_id = header_value_to_string(upstream_headers.get("x-mistle-trace-id"));
+    let mut response_headers_fields = request_context.common_fields();
+    response_headers_fields.push((
+        "upstreamStatus",
+        Value::from(u64::from(upstream_status.as_u16())),
+    ));
+    if let Some(content_type) = header_value_to_string(upstream_headers.get("content-type")) {
+        response_headers_fields.push(("contentType", Value::String(content_type)));
+    }
+    if let Some(content_length) = header_value_to_string(upstream_headers.get("content-length")) {
+        response_headers_fields.push(("contentLength", Value::String(content_length)));
+    }
+    if let Some(transfer_encoding) =
+        header_value_to_string(upstream_headers.get("transfer-encoding"))
+    {
+        response_headers_fields.push(("transferEncoding", Value::String(transfer_encoding)));
+    }
+    if let Some(upstream_trace_id) = &upstream_trace_id {
+        response_headers_fields.push(("upstreamTraceId", Value::String(upstream_trace_id.clone())));
+    }
+    emit_egress_proxy_log(
+        request_context.clock.as_ref(),
+        &request_context.sandbox_instance_id,
+        "egress_proxy_upstream_headers_received",
+        &response_headers_fields,
+    );
 
     let (parts, body) = upstream_response.into_parts();
-    let response_body = body
-        .collect()
-        .await
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to read proxied response body: {error}"))
-        })?
-        .to_bytes();
     let mut response_builder = Response::builder().status(parts.status);
     for (header_name, header_value) in filter_outbound_response_headers(&parts.headers) {
         response_builder = response_builder.header(header_name, header_value);
     }
+    response_builder = response_builder.header(
+        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+        request_context.request_id.as_str(),
+    );
 
     response_builder
-        .body(Full::new(response_body))
+        .body(box_body(InstrumentedResponseBody {
+            inner: body,
+            context: request_context,
+            upstream_status,
+            upstream_trace_id,
+            chunk_count: 0,
+            forwarded_bytes: 0,
+            first_chunk_at_ms: None,
+            ended: false,
+        }))
         .map_err(|error| {
             EgressProxyError::new(format!("failed to build proxied response: {error}"))
         })
@@ -1215,26 +1476,88 @@ fn load_private_key(private_key_pem: &str) -> Result<PrivateKeyDer<'static>, Egr
     })
 }
 
+fn header_value_to_string(header_value: Option<&HeaderValue>) -> Option<String> {
+    header_value.and_then(|header_value| header_value.to_str().ok().map(ToString::to_string))
+}
+
+fn infallible_to_box_error(error: Infallible) -> BoxError {
+    match error {}
+}
+
+fn box_body<B>(body: B) -> HyperBody
+where
+    B: Body<Data = Bytes> + Send + Sync + 'static,
+    B::Error: Into<BoxError>,
+{
+    body.map_err(Into::into).boxed()
+}
+
+fn empty_body() -> HyperBody {
+    box_body(Full::new(Bytes::new()).map_err(infallible_to_box_error))
+}
+
+fn emit_egress_proxy_log(
+    clock: &dyn Clock,
+    sandbox_instance_id: &str,
+    event: &str,
+    extra_fields: &[(&str, Value)],
+) {
+    if let Some(line) =
+        serialize_egress_proxy_log_line(clock, sandbox_instance_id, event, extra_fields)
+    {
+        eprintln!("{line}");
+    }
+}
+
+fn serialize_egress_proxy_log_line(
+    clock: &dyn Clock,
+    sandbox_instance_id: &str,
+    event: &str,
+    extra_fields: &[(&str, Value)],
+) -> Option<String> {
+    let observed_at = format_rfc3339_timestamp(clock.now_system_time()).ok()?;
+    let mut payload = Map::new();
+    payload.insert("event".to_string(), Value::String(event.to_string()));
+    payload.insert(
+        "sandboxInstanceId".to_string(),
+        Value::String(sandbox_instance_id.to_string()),
+    );
+    payload.insert(
+        "component".to_string(),
+        Value::String(SupervisedComponent::EgressProxy.as_str().to_string()),
+    );
+    payload.insert("observedAt".to_string(), Value::String(observed_at));
+    for (field_name, field_value) in extra_fields {
+        payload.insert((*field_name).to_string(), field_value.clone());
+    }
+    serde_json::to_string(&Value::Object(payload)).ok()
+}
+
 fn text_response(status: StatusCode, message: impl Into<String>) -> Response<HyperBody> {
     Response::builder()
         .status(status)
         .header("content-type", "text/plain; charset=utf-8")
-        .body(Full::new(Bytes::from(message.into())))
+        .body(box_body(
+            Full::new(Bytes::from(message.into())).map_err(infallible_to_box_error),
+        ))
         .expect("text response should build")
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
+    use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpListener as StdTcpListener};
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::sync::mpsc;
     use std::thread;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use crate::egress_proxy::{
-        EgressProxy, EgressProxyRoute, build_direct_forward_uri, build_managed_proxy_env,
-        join_url_path, match_route,
+        EgressProxy, EgressProxyRoute, SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+        build_direct_forward_uri, build_managed_proxy_env, join_url_path, match_route,
+        serialize_egress_proxy_log_line,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::{
@@ -1244,6 +1567,9 @@ mod tests {
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
+    use crate::time::testing::MutableClock;
+    use reqwest::Proxy;
+    use serde_json::Value;
 
     #[test]
     fn joins_proxy_forward_paths_without_duplicate_slashes() {
@@ -1261,6 +1587,7 @@ mod tests {
     fn matches_route_by_host_path_and_method() {
         let routes = vec![
             EgressProxyRoute {
+                egress_rule_id: "egress-rule-a".to_string(),
                 upstream_base_url: "https://api.github.com".to_string(),
                 host: "api.github.com".to_string(),
                 path_prefixes: vec!["/graphql".to_string()],
@@ -1268,6 +1595,7 @@ mod tests {
                 grant: "grant-a".to_string(),
             },
             EgressProxyRoute {
+                egress_rule_id: "egress-rule-b".to_string(),
                 upstream_base_url: "https://github.com".to_string(),
                 host: "github.com".to_string(),
                 path_prefixes: vec!["/mistlehq/mistle.git".to_string()],
@@ -1303,6 +1631,7 @@ mod tests {
     #[test]
     fn leaves_unmatched_requests_for_direct_passthrough() {
         let routes = vec![EgressProxyRoute {
+            egress_rule_id: "egress-rule-a".to_string(),
             upstream_base_url: "https://api.openai.com".to_string(),
             host: "api.openai.com".to_string(),
             path_prefixes: vec!["/v1/responses".to_string()],
@@ -1365,6 +1694,173 @@ mod tests {
         );
         assert!(EgressProxy::managed_env_keys().contains(&"HTTPS_PROXY"));
         assert!(EgressProxy::managed_env_keys().contains(&"NODE_EXTRA_CA_CERTS"));
+    }
+
+    #[test]
+    fn serializes_structured_egress_proxy_logs() {
+        let clock = MutableClock::new(1_750_000_000_000);
+
+        let serialized = serialize_egress_proxy_log_line(
+            &clock,
+            "sandbox-123",
+            "egress_proxy_request_started",
+            &[("requestId", Value::String("egp_1".to_string()))],
+        )
+        .expect("egress proxy log should serialize");
+
+        let parsed: Value =
+            serde_json::from_str(&serialized).expect("egress proxy log should be valid json");
+        assert_eq!(parsed["event"], "egress_proxy_request_started");
+        assert_eq!(parsed["sandboxInstanceId"], "sandbox-123");
+        assert_eq!(parsed["component"], "EgressProxy");
+        assert_eq!(parsed["requestId"], "egp_1");
+        assert!(parsed["observedAt"].as_str().is_some());
+    }
+
+    #[test]
+    fn streams_managed_proxy_responses_without_buffering_the_full_body() {
+        let tokenizer_listener =
+            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
+        let tokenizer_address = tokenizer_listener
+            .local_addr()
+            .expect("tokenizer listener should expose its address");
+        let (request_sender, request_receiver) = mpsc::channel();
+        let (release_second_chunk_sender, release_second_chunk_receiver) = mpsc::channel();
+        let tokenizer_thread = thread::spawn(move || {
+            let (mut stream, _) = tokenizer_listener
+                .accept()
+                .expect("tokenizer listener should accept one connection");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .expect("tokenizer stream read timeout should set");
+            let request_head = read_http_head(&mut stream);
+            request_sender
+                .send(request_head.clone())
+                .expect("request head should send");
+
+            stream
+                .write_all(
+                    concat!(
+                        "HTTP/1.1 200 OK\r\n",
+                        "content-type: text/event-stream\r\n",
+                        "x-mistle-trace-id: trace_123\r\n",
+                        "transfer-encoding: chunked\r\n",
+                        "\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .expect("response headers should write");
+            stream
+                .write_all(b"6\r\nhello \r\n")
+                .expect("first chunk should write");
+            stream.flush().expect("first chunk should flush");
+
+            release_second_chunk_receiver
+                .recv_timeout(Duration::from_secs(5))
+                .expect("test should release second chunk");
+
+            stream
+                .write_all(b"5\r\nworld\r\n0\r\n\r\n")
+                .expect("remaining chunks should write");
+            stream.flush().expect("remaining chunks should flush");
+        });
+
+        let listener_address = reserve_test_listener_address();
+        let ca_certificate_path = test_ca_certificate_path();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            &format!("http://{tokenizer_address}/tokenizer-proxy/egress"),
+            listener_address,
+            &ca_certificate_path,
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+
+        let proxy_url = proxy
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+        let ca_certificate_pem = std::fs::read(&ca_certificate_path)
+            .expect("proxy CA certificate should be readable");
+        let ca_certificate =
+            reqwest::Certificate::from_pem(&ca_certificate_pem).expect("proxy CA should parse");
+        let client = reqwest::blocking::Client::builder()
+            .proxy(Proxy::https(&proxy_url).expect("proxy url should parse"))
+            .add_root_certificate(ca_certificate)
+            .build()
+            .expect("reqwest client should build");
+
+        let mut response = client
+            .post("https://api.openai.com/v1/responses?stream=true")
+            .body(r#"{"stream":true}"#)
+            .send()
+            .expect("managed request should succeed");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get("x-mistle-trace-id")
+                .and_then(|value| value.to_str().ok()),
+            Some("trace_123")
+        );
+        assert!(
+            response
+                .headers()
+                .contains_key(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
+            "response should include a sandbox egress correlation header"
+        );
+
+        let forwarded_request = request_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("tokenizer server should receive the proxied request");
+        assert!(
+            forwarded_request
+                .starts_with("POST /tokenizer-proxy/egress/v1/responses?stream=true HTTP/1.1"),
+            "expected managed route rewrite, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("x-mistle-egress-grant: grant-1"),
+            "expected egress grant header in forwarded request, got: {forwarded_request}"
+        );
+
+        let mut first_chunk = [0_u8; 6];
+        response
+            .read_exact(&mut first_chunk)
+            .expect("first streamed chunk should be readable before upstream completes");
+        assert_eq!(&first_chunk, b"hello ");
+
+        release_second_chunk_sender
+            .send(())
+            .expect("second chunk release should send");
+        let mut rest = String::new();
+        response
+            .read_to_string(&mut rest)
+            .expect("remaining streamed response should read");
+        assert_eq!(rest, "world");
+
+        proxy.close().expect("egress proxy close should succeed");
+        tokenizer_thread
+            .join()
+            .expect("tokenizer thread should exit cleanly");
+        let _ = std::fs::remove_dir_all(
+            ca_certificate_path
+                .parent()
+                .expect("test CA path should have a parent directory"),
+        );
     }
 
     #[test]
@@ -1583,5 +2079,17 @@ mod tests {
             );
             thread::sleep(Duration::from_millis(25));
         }
+    }
+
+    fn read_http_head(stream: &mut std::net::TcpStream) -> String {
+        let mut buffer = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !buffer.ends_with(b"\r\n\r\n") {
+            stream
+                .read_exact(&mut byte)
+                .expect("http request head should be readable");
+            buffer.push(byte[0]);
+        }
+        String::from_utf8(buffer).expect("http request head should be utf-8")
     }
 }
