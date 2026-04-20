@@ -10,8 +10,6 @@
   --terminal-tab-text-inactive-group: color-mix(in srgb, var(--foreground) 45%, transparent);
   --terminal-tab-separator: var(--color-stone-300);
   --terminal-tab-icon-hover-bg: color-mix(in srgb, var(--foreground) 8%, transparent);
-  --terminal-sash-color: color-mix(in srgb, var(--foreground) 10%, transparent);
-  --terminal-sash-active-color: color-mix(in srgb, var(--foreground) 18%, transparent);
   --terminal-scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent);
   --terminal-floating-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 8%, transparent);
   --terminal-tab-strip-height: 36px;
@@ -36,8 +34,6 @@
   --dv-tab-divider-color: transparent;
   --dv-separator-border: var(--terminal-workspace-border);
   --dv-icon-hover-background-color: var(--terminal-tab-icon-hover-bg);
-  --dv-sash-color: var(--terminal-sash-color);
-  --dv-active-sash-color: var(--terminal-sash-active-color);
   --dv-floating-box-shadow: var(--terminal-floating-shadow);
   --dv-border-radius: 0px;
   --dv-scrollbar-background-color: var(--terminal-scrollbar-color);
