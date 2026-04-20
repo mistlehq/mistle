@@ -264,12 +264,11 @@ export function useSessionWorkbenchCodexRecovery(input: {
   isStartingSession: boolean;
   isWaitingForAutomationThread: boolean;
   mainPanelTransitionState: MainPanelTransitionState;
-  markRecoveryBoundary: () => void;
+  requestRecoveryStatusRefresh: () => void;
   recoverSession: ReturnType<typeof useCodexSessionState>["lifecycle"]["recoverSession"];
   recoverableDisconnect: ReturnType<
     typeof useCodexSessionState
   >["lifecycle"]["recoverableDisconnect"];
-  refetchSandboxStatus: () => Promise<unknown>;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
   sessionConnectionState: ReturnType<
@@ -317,9 +316,8 @@ export function useSessionWorkbenchCodexRecovery(input: {
     }
 
     lastRecoverableDisconnectIdRef.current = input.recoverableDisconnect.id;
-    input.markRecoveryBoundary();
-    void input.refetchSandboxStatus().catch(() => {});
-  }, [input.markRecoveryBoundary, input.recoverableDisconnect, input.refetchSandboxStatus]);
+    input.requestRecoveryStatusRefresh();
+  }, [input.recoverableDisconnect, input.requestRecoveryStatusRefresh]);
 
   useEffect(() => {
     if (input.sessionConnectionState !== "connected") {

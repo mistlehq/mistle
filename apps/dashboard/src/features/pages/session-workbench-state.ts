@@ -84,14 +84,14 @@ export function hasFreshSandboxStatusRead(input: {
 }
 
 export function hasFreshSandboxStatusReadSinceRecoveryBoundary(input: {
-  recoveryBoundaryDataUpdatedAtMs: number | null;
-  currentDataUpdatedAtMs: number;
+  recoveryBoundaryEpoch: number | null;
+  latestCompletedRecoveryRefreshEpoch: number;
 }): boolean {
-  if (input.recoveryBoundaryDataUpdatedAtMs === null) {
+  if (input.recoveryBoundaryEpoch === null) {
     return true;
   }
 
-  return input.currentDataUpdatedAtMs > input.recoveryBoundaryDataUpdatedAtMs;
+  return input.latestCompletedRecoveryRefreshEpoch >= input.recoveryBoundaryEpoch;
 }
 
 export function resolveSandboxStatusReadState(input: {

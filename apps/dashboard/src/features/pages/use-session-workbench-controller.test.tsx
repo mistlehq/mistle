@@ -351,22 +351,38 @@ describe("useSessionWorkbenchController", () => {
   it("requires a post-reset sandbox status read before recovery can trust cached status", () => {
     expect(
       hasFreshSandboxStatusReadSinceRecoveryBoundary({
-        recoveryBoundaryDataUpdatedAtMs: 1_000,
-        currentDataUpdatedAtMs: 1_000,
+        recoveryBoundaryEpoch: 1,
+        latestCompletedRecoveryRefreshEpoch: 0,
       }),
     ).toBe(false);
 
     expect(
       hasFreshSandboxStatusReadSinceRecoveryBoundary({
-        recoveryBoundaryDataUpdatedAtMs: 1_000,
-        currentDataUpdatedAtMs: 1_001,
+        recoveryBoundaryEpoch: 1,
+        latestCompletedRecoveryRefreshEpoch: 1,
       }),
     ).toBe(true);
 
     expect(
       hasFreshSandboxStatusReadSinceRecoveryBoundary({
-        recoveryBoundaryDataUpdatedAtMs: null,
-        currentDataUpdatedAtMs: 1_000,
+        recoveryBoundaryEpoch: null,
+        latestCompletedRecoveryRefreshEpoch: 0,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not trust a refresh that completed before the latest reset boundary", () => {
+    expect(
+      hasFreshSandboxStatusReadSinceRecoveryBoundary({
+        recoveryBoundaryEpoch: 2,
+        latestCompletedRecoveryRefreshEpoch: 1,
+      }),
+    ).toBe(false);
+
+    expect(
+      hasFreshSandboxStatusReadSinceRecoveryBoundary({
+        recoveryBoundaryEpoch: 2,
+        latestCompletedRecoveryRefreshEpoch: 2,
       }),
     ).toBe(true);
   });

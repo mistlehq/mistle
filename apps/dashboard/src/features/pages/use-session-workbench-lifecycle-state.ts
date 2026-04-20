@@ -85,12 +85,13 @@ export function useSessionWorkbenchLifecycleState(input: {
     null,
   );
   const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
-  // Recovery must not trust a cached pre-reset "running" read. Each reset/disconnect
-  // records the latest query timestamp and blocks reconnect logic until a newer read lands.
-  const recoveryStatusBoundaryDataUpdatedAtRef = useRef<number | null>(null);
-  const terminalResetRefreshStateRef = useRef({
+  // Recovery must not trust cached status after a reset/disconnect until a recovery-triggered
+  // refresh completes after the latest observed recovery event.
+  const recoveryRefreshStateRef = useRef({
+    boundaryEpoch: 0,
+    latestCompletedEpoch: 0,
     inFlight: false,
-    queued: false,
+    inFlightEpoch: 0,
   });
 
   const {
@@ -133,38 +134,41 @@ export function useSessionWorkbenchLifecycleState(input: {
       });
     },
   });
-  const markRecoveryBoundary = useCallback(() => {
-    recoveryStatusBoundaryDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
-  }, [sandboxStatusQuery.dataUpdatedAt]);
+  const requestRecoveryStatusRefresh = useCallback((): void => {
+    const refreshState = recoveryRefreshStateRef.current;
+    refreshState.boundaryEpoch += 1;
 
-  const handleTerminalWorkspaceReset = useCallback((): void => {
-    markRecoveryBoundary();
+    const startRefresh = (epoch: number): void => {
+      refreshState.inFlight = true;
+      refreshState.inFlightEpoch = epoch;
 
-    const refreshState = terminalResetRefreshStateRef.current;
-    if (refreshState.inFlight) {
-      refreshState.queued = true;
-      return;
-    }
-
-    refreshState.inFlight = true;
-
-    const refetchTerminalWorkspaceStatus = (): void => {
       void sandboxStatusQuery
         .refetch()
+        .then(() => {
+          refreshState.latestCompletedEpoch = Math.max(refreshState.latestCompletedEpoch, epoch);
+        })
         .catch(() => {})
         .finally(() => {
-          if (refreshState.queued) {
-            refreshState.queued = false;
-            refetchTerminalWorkspaceStatus();
+          if (refreshState.boundaryEpoch > epoch) {
+            startRefresh(refreshState.boundaryEpoch);
             return;
           }
 
           refreshState.inFlight = false;
+          refreshState.inFlightEpoch = 0;
         });
     };
 
-    refetchTerminalWorkspaceStatus();
-  }, [markRecoveryBoundary, sandboxStatusQuery.refetch]);
+    if (refreshState.inFlight) {
+      return;
+    }
+
+    startRefresh(refreshState.boundaryEpoch);
+  }, [sandboxStatusQuery.refetch]);
+
+  const handleTerminalWorkspaceReset = useCallback((): void => {
+    requestRecoveryStatusRefresh();
+  }, [requestRecoveryStatusRefresh]);
 
   if (initialSandboxStatusDataUpdatedAtRef.current === null) {
     initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
@@ -175,8 +179,11 @@ export function useSessionWorkbenchLifecycleState(input: {
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
   });
   const hasFreshSandboxStatusSinceRecovery = hasFreshSandboxStatusReadSinceRecoveryBoundary({
-    recoveryBoundaryDataUpdatedAtMs: recoveryStatusBoundaryDataUpdatedAtRef.current,
-    currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
+    recoveryBoundaryEpoch:
+      recoveryRefreshStateRef.current.boundaryEpoch === 0
+        ? null
+        : recoveryRefreshStateRef.current.boundaryEpoch,
+    latestCompletedRecoveryRefreshEpoch: recoveryRefreshStateRef.current.latestCompletedEpoch,
   });
   const sandboxStatusReadState = resolveSandboxStatusReadState({
     hasFreshSandboxStatusSinceMount,
@@ -231,10 +238,11 @@ export function useSessionWorkbenchLifecycleState(input: {
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
     initialSandboxStatusDataUpdatedAtRef.current = null;
-    recoveryStatusBoundaryDataUpdatedAtRef.current = null;
-    terminalResetRefreshStateRef.current = {
+    recoveryRefreshStateRef.current = {
+      boundaryEpoch: 0,
+      latestCompletedEpoch: 0,
       inFlight: false,
-      queued: false,
+      inFlightEpoch: 0,
     };
   }, [input.sandboxInstanceId]);
 
@@ -350,10 +358,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     isStartingSession,
     isWaitingForAutomationThread,
     mainPanelTransitionState: input.mainPanelTransitionState,
-    markRecoveryBoundary,
+    requestRecoveryStatusRefresh,
     recoverSession,
     recoverableDisconnect,
-    refetchSandboxStatus: sandboxStatusQuery.refetch,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: displaySandboxLifecycleStatus,
     sessionConnectionState,
