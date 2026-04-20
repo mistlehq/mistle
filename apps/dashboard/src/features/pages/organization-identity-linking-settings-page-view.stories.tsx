@@ -39,6 +39,9 @@ const BaseGitHubProvider: OrganizationIdentityLinkingProviderCard = {
   saveActionDisabled: false,
   saveActionPending: false,
   statusActionPending: false,
+  memberLinksLoading: false,
+  memberLinksErrorMessage: null,
+  memberLinks: [],
 };
 
 const meta = {
