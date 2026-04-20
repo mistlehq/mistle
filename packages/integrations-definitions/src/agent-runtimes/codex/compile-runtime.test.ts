@@ -357,6 +357,7 @@ describe("compileCodexRuntime", () => {
     ]);
 
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain('name = "OpenAI"');
     expect(configContent).toContain('base_url = "https://chatgpt.com/backend-api/codex"');
     expect(configContent).toContain('chatgpt_base_url = "https://chatgpt.com/backend-api"');
     expect(configContent).toContain("[features]");
