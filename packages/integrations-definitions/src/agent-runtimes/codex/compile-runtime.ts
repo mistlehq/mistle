@@ -18,7 +18,7 @@ const CodexCliArtifactKey = "codex-cli";
 const CodexCliVersion = "0.120.0";
 const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
-const ProxyModelProviderName = "Proxy";
+const ProxyModelProviderName = "OpenAI";
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {

@@ -248,7 +248,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       configContent?.indexOf("Prefer concise answers.") ?? 0,
     );
     expect(configContent).toContain("[model_providers.proxy]");
-    expect(configContent).toContain('name = "Proxy"');
+    expect(configContent).toContain('name = "OpenAI"');
     expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");

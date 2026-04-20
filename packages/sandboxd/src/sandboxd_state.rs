@@ -860,7 +860,7 @@ model = "gpt-5.4-codex"
 model_provider = "proxy"
 
 [model_providers.proxy]
-name = "Proxy"
+name = "OpenAI"
 base_url = "https://api.openai.com/v1"
 wire_api = "responses"
 requires_openai_auth = false
