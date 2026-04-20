@@ -199,6 +199,21 @@ const CodexFixtureConversationPaneMixedEntries: SessionConversationStoryArgs["ch
     text: "The docs and workspace naming are consistent enough that a quick inventory can stay concrete instead of hand-wavy. The remaining judgment call is mostly how much operational detail to include in the final summary.",
   },
   {
+    id: "assistant-mixed-production-links-1",
+    turnId: "turn-mixed-production",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: [
+      "A few links usually show up naturally in replies like this too:",
+      "",
+      "- external reference: [Mistle GitHub](https://github.com/mistlehq/mistle)",
+      "- docs reference: [OpenAI](https://openai.com/)",
+      "",
+      "That makes this fixture useful for checking how inline links sit inside longer chat prose before and after hover.",
+    ].join("\n"),
+  },
+  {
     ...CodexFixtureSearchingWebGroupEntry,
     id: "searching-web-group-mixed-1",
     turnId: "turn-mixed-production",

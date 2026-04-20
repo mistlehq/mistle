@@ -77,6 +77,21 @@
   cursor: default;
 }
 
+.chat-markdown-content [data-streamdown="link"] {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition:
+    text-decoration-thickness 120ms ease,
+    text-underline-offset 120ms ease;
+}
+
+.chat-markdown-content [data-streamdown="link"]:hover,
+.chat-markdown-content [data-streamdown="link"]:focus-visible {
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 0.24em;
+}
+
 .chat-markdown-content :where(p, li) code {
   font-size: 0.9em;
   line-height: inherit;

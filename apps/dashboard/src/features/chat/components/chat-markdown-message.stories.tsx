@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
@@ -89,5 +90,54 @@ export const FormatGallery: Story = {
       "  Renderer --> Output[Rendered markdown]",
       "```",
     ].join("\n"),
+  },
+};
+
+export const ExternalLinkSafety: Story = {
+  args: {
+    isStreaming: false,
+    text: [
+      "Open this external link from a normal chat markdown message:",
+      "",
+      "[mistlehq/e2e-test-repo pull request #125](https://github.com/mistlehq/e2e-test-repo/pull/125)",
+    ].join("\n"),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Focused Streamdown link-safety surface. This uses the real chat markdown link flow with the custom portaled external-link dialog, not a mocked replacement.",
+      },
+    },
+  },
+};
+
+export const ExternalLinkSafetyOpen: Story = {
+  args: {
+    isStreaming: false,
+    text: [
+      "Open this external link from a normal chat markdown message:",
+      "",
+      "[mistlehq/e2e-test-repo pull request #125](https://github.com/mistlehq/e2e-test-repo/pull/125)",
+    ].join("\n"),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Same as ExternalLinkSafety, but the story clicks the markdown link in `play` so the external-link dialog is already visible for inspection.",
+      },
+    },
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", {
+        name: "mistlehq/e2e-test-repo pull request #125",
+      }),
+    );
+    await expect(canvas.getByText("Open external link?")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Copy link" })).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Open link" })).toBeInTheDocument();
   },
 };
