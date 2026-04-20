@@ -4932,8 +4932,7 @@ mod tests {
             .expect("telemetry relay should attach");
         relay
             .handle_control_message(&format!(
-                r#"{{"type":"telemetry.open.ok","streamId":{},"initialWindowBytes":{}}}"#,
-                SANDBOX_TELEMETRY_LOG_STREAM_ID, AGENT_STREAM_WINDOW_BYTES
+                r#"{{"type":"telemetry.open.ok","streamId":{SANDBOX_TELEMETRY_LOG_STREAM_ID},"initialWindowBytes":{AGENT_STREAM_WINDOW_BYTES}}}"#
             ))
             .expect("telemetry open.ok should be accepted");
     }
