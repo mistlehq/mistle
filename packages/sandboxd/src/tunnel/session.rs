@@ -6,7 +6,7 @@
 //! websocket streams, PTY streams, and file uploads.
 
 use std::any::Any;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
@@ -111,6 +111,23 @@ const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
+const AGENT_STREAM_WINDOW_THRESHOLD_BYTES: [usize; 5] = [
+    1024 * 1024,
+    2 * 1024 * 1024,
+    4 * 1024 * 1024,
+    8 * 1024 * 1024,
+    AGENT_STREAM_WINDOW_BYTES.saturating_mul(95) / 100,
+];
+const AGENT_STREAM_CHANNEL_KIND: &str = "agent";
+const AGENT_STREAM_EVENT_SUMMARY: &str = "agent_stream_summary";
+const AGENT_STREAM_EVENT_WINDOW_EXHAUSTED: &str = "agent_stream_window_exhausted";
+const AGENT_STREAM_EVENT_WINDOW_THRESHOLD_CROSSED: &str = "agent_stream_window_threshold_crossed";
+const AGENT_STREAM_OUTCOME_CLOSED: &str = "closed";
+const AGENT_STREAM_OUTCOME_RESET: &str = "reset";
+const AGENT_STREAM_OUTCOME_BOOTSTRAP_CLOSED: &str = "bootstrap_closed";
+const AGENT_STREAM_CLOSE_SOURCE_GATEWAY: &str = "gateway";
+const AGENT_STREAM_CLOSE_SOURCE_RUNTIME: &str = "runtime";
+const AGENT_STREAM_CLOSE_SOURCE_BOOTSTRAP: &str = "bootstrap";
 
 fn resolve_default_attachment_root() -> PathBuf {
     if let Some(attachment_root) = crate::test_support::attachment_root_override() {
@@ -292,9 +309,124 @@ enum TunnelSessionEvent {
     Wake,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct OutstandingAgentSend {
+    bytes: usize,
+    sent_at_ms: u64,
+}
+
+#[derive(Debug)]
+struct AgentStreamStats {
+    opened_at_ms: u64,
+    message_count_out: u64,
+    message_count_in: u64,
+    total_bytes_out: u64,
+    total_bytes_in: u64,
+    max_message_bytes_out: usize,
+    max_message_bytes_in: usize,
+    max_outstanding_bytes: usize,
+    credit_return_count: u64,
+    credit_return_total_ms: u64,
+    threshold_emissions_mask: u8,
+    outstanding_sends: VecDeque<OutstandingAgentSend>,
+}
+
+impl AgentStreamStats {
+    fn new(opened_at_ms: u64) -> Self {
+        Self {
+            opened_at_ms,
+            message_count_out: 0,
+            message_count_in: 0,
+            total_bytes_out: 0,
+            total_bytes_in: 0,
+            max_message_bytes_out: 0,
+            max_message_bytes_in: 0,
+            max_outstanding_bytes: 0,
+            credit_return_count: 0,
+            credit_return_total_ms: 0,
+            threshold_emissions_mask: 0,
+            outstanding_sends: VecDeque::new(),
+        }
+    }
+
+    fn record_outbound_message(
+        &mut self,
+        payload_bytes: usize,
+        sent_at_ms: u64,
+        outstanding_bytes: usize,
+    ) {
+        self.message_count_out = self.message_count_out.saturating_add(1);
+        self.total_bytes_out = self.total_bytes_out.saturating_add(payload_bytes as u64);
+        self.max_message_bytes_out = self.max_message_bytes_out.max(payload_bytes);
+        self.max_outstanding_bytes = self.max_outstanding_bytes.max(outstanding_bytes);
+        self.outstanding_sends.push_back(OutstandingAgentSend {
+            bytes: payload_bytes,
+            sent_at_ms,
+        });
+    }
+
+    fn record_inbound_message(&mut self, payload_bytes: usize) {
+        self.message_count_in = self.message_count_in.saturating_add(1);
+        self.total_bytes_in = self.total_bytes_in.saturating_add(payload_bytes as u64);
+        self.max_message_bytes_in = self.max_message_bytes_in.max(payload_bytes);
+    }
+
+    fn record_credit_restore(&mut self, bytes: usize, restored_at_ms: u64) {
+        let mut remaining_bytes = bytes;
+        while remaining_bytes > 0 {
+            let Some(front_send) = self.outstanding_sends.front_mut() else {
+                return;
+            };
+            let acknowledged_bytes = remaining_bytes.min(front_send.bytes);
+            front_send.bytes -= acknowledged_bytes;
+            remaining_bytes -= acknowledged_bytes;
+            self.credit_return_count = self.credit_return_count.saturating_add(1);
+            self.credit_return_total_ms = self
+                .credit_return_total_ms
+                .saturating_add(restored_at_ms.saturating_sub(front_send.sent_at_ms));
+            if front_send.bytes == 0 {
+                self.outstanding_sends.pop_front();
+            }
+        }
+    }
+
+    fn avg_credit_return_ms(&self) -> Option<u64> {
+        if self.credit_return_count == 0 {
+            return None;
+        }
+
+        Some(self.credit_return_total_ms / self.credit_return_count)
+    }
+
+    fn stream_age_ms(&self, now_ms: u64) -> u64 {
+        now_ms.saturating_sub(self.opened_at_ms)
+    }
+
+    fn oldest_unacked_age_ms(&self, now_ms: u64) -> Option<u64> {
+        self.outstanding_sends
+            .front()
+            .map(|send| now_ms.saturating_sub(send.sent_at_ms))
+    }
+
+    fn take_new_threshold_crossings(&mut self, outstanding_bytes: usize) -> Vec<usize> {
+        let mut crossed_thresholds = Vec::new();
+        for (index, threshold_bytes) in AGENT_STREAM_WINDOW_THRESHOLD_BYTES.iter().enumerate() {
+            let emission_bit = 1_u8 << index;
+            if outstanding_bytes >= *threshold_bytes
+                && self.threshold_emissions_mask & emission_bit == 0
+            {
+                self.threshold_emissions_mask |= emission_bit;
+                crossed_thresholds.push(*threshold_bytes);
+            }
+        }
+        crossed_thresholds
+    }
+}
+
 struct AgentStreamState {
     sender: mpsc::UnboundedSender<Message>,
     send_window: StreamSendWindow,
+    stats: AgentStreamStats,
 }
 
 struct PendingAgentOpenState {
@@ -576,6 +708,36 @@ struct TunnelSessionMutableState {
     file_uploads: BTreeMap<u32, FileUploadState>,
 }
 
+struct AgentStreamTermination {
+    outcome: &'static str,
+    close_source: &'static str,
+    reset_code: Option<&'static str>,
+    reason: Option<String>,
+}
+
+struct AgentStreamWindowExhaustedTelemetry {
+    available_bytes: usize,
+    message_count_out: u64,
+    oldest_unacked_ms: Option<u64>,
+    outstanding_bytes: usize,
+    payload_bytes: usize,
+    payload_kind: &'static str,
+    stream_age_ms: u64,
+    stream_id: u32,
+}
+
+struct AgentStreamThresholdTelemetry {
+    available_bytes: usize,
+    message_count_out: u64,
+    oldest_unacked_ms: Option<u64>,
+    outstanding_bytes: usize,
+    payload_bytes: usize,
+    payload_kind: &'static str,
+    stream_age_ms: u64,
+    stream_id: u32,
+    threshold_bytes: usize,
+}
+
 struct PtyOpenContext<'a> {
     cgroup_root: &'a Path,
     runtime_env: &'a BTreeMap<String, String>,
@@ -583,6 +745,244 @@ struct PtyOpenContext<'a> {
     pty_sessions: &'a mut BTreeMap<String, PtySessionState>,
     clock: &'a dyn Clock,
     sleeper: &'a dyn Sleeper,
+}
+
+fn agent_stream_outstanding_bytes(send_window: &StreamSendWindow) -> usize {
+    AGENT_STREAM_WINDOW_BYTES.saturating_sub(send_window.available_bytes())
+}
+
+fn websocket_payload_kind_name(payload_kind: u8) -> &'static str {
+    match payload_kind {
+        PAYLOAD_KIND_WEBSOCKET_TEXT => "websocket_text",
+        PAYLOAD_KIND_WEBSOCKET_BINARY => "websocket_binary",
+        _ => "unknown",
+    }
+}
+
+fn publish_tunnel_telemetry_log(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    level: SandboxTelemetryLogLevel,
+    event: &str,
+    extra_fields: &[(&str, Value)],
+) {
+    match telemetry_relay.enqueue_log_record(clock, level, event, extra_fields) {
+        Ok(frames) => {
+            if let Err(error) = send_telemetry_frames(tunnel_writer_sender, frames) {
+                eprintln!("sandboxd failed to publish telemetry event '{event}': {error}");
+            }
+        }
+        Err(error) => {
+            eprintln!("sandboxd failed to queue telemetry event '{event}': {error}");
+        }
+    }
+}
+
+fn publish_agent_stream_summary(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    stream_id: u32,
+    agent_stream: &AgentStreamState,
+    termination: &AgentStreamTermination,
+) {
+    let now_ms = clock.now_ms();
+    let extra_fields = vec![
+        ("streamId", Value::from(u64::from(stream_id))),
+        (
+            "channelKind",
+            Value::String(AGENT_STREAM_CHANNEL_KIND.to_string()),
+        ),
+        ("outcome", Value::String(termination.outcome.to_string())),
+        (
+            "closeSource",
+            Value::String(termination.close_source.to_string()),
+        ),
+        (
+            "durationMs",
+            Value::from(agent_stream.stats.stream_age_ms(now_ms)),
+        ),
+        ("messageCountOut", Value::from(agent_stream.stats.message_count_out)),
+        ("messageCountIn", Value::from(agent_stream.stats.message_count_in)),
+        ("totalBytesOut", Value::from(agent_stream.stats.total_bytes_out)),
+        ("totalBytesIn", Value::from(agent_stream.stats.total_bytes_in)),
+        (
+            "maxMessageBytesOut",
+            Value::from(agent_stream.stats.max_message_bytes_out as u64),
+        ),
+        (
+            "maxMessageBytesIn",
+            Value::from(agent_stream.stats.max_message_bytes_in as u64),
+        ),
+        (
+            "maxOutstandingBytes",
+            Value::from(agent_stream.stats.max_outstanding_bytes as u64),
+        ),
+        (
+            "avgCreditReturnMs",
+            agent_stream
+                .stats
+                .avg_credit_return_ms()
+                .map_or(Value::Null, Value::from),
+        ),
+        (
+            "creditReturnCount",
+            Value::from(agent_stream.stats.credit_return_count),
+        ),
+        (
+            "resetCode",
+            termination
+                .reset_code
+                .map(|reset_code| Value::String(reset_code.to_string()))
+                .unwrap_or(Value::Null),
+        ),
+        (
+            "reason",
+            termination
+                .reason
+                .as_ref()
+                .map(|reason| Value::String(reason.clone()))
+                .unwrap_or(Value::Null),
+        ),
+    ];
+
+    publish_tunnel_telemetry_log(
+        tunnel_writer_sender,
+        telemetry_relay,
+        clock,
+        SandboxTelemetryLogLevel::Info,
+        AGENT_STREAM_EVENT_SUMMARY,
+        &extra_fields,
+    );
+}
+
+fn remove_agent_stream_and_publish_summary(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+    stream_id: u32,
+    termination: AgentStreamTermination,
+) -> Option<AgentStreamState> {
+    let agent_stream = session_state.agent_streams.remove(&stream_id)?;
+    publish_agent_stream_summary(
+        tunnel_writer_sender,
+        &mut session_state.telemetry_relay,
+        clock,
+        stream_id,
+        &agent_stream,
+        &termination,
+    );
+    Some(agent_stream)
+}
+
+fn publish_agent_stream_window_exhausted(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    telemetry: AgentStreamWindowExhaustedTelemetry,
+) {
+    let extra_fields = vec![
+        ("streamId", Value::from(u64::from(telemetry.stream_id))),
+        (
+            "channelKind",
+            Value::String(AGENT_STREAM_CHANNEL_KIND.to_string()),
+        ),
+        ("payloadKind", Value::String(telemetry.payload_kind.to_string())),
+        ("payloadBytes", Value::from(telemetry.payload_bytes as u64)),
+        ("availableBytes", Value::from(telemetry.available_bytes as u64)),
+        (
+            "outstandingBytes",
+            Value::from(telemetry.outstanding_bytes as u64),
+        ),
+        ("maxWindowBytes", Value::from(AGENT_STREAM_WINDOW_BYTES as u64)),
+        (
+            "payloadExceedsMaxWindow",
+            Value::Bool(telemetry.payload_bytes > AGENT_STREAM_WINDOW_BYTES),
+        ),
+        (
+            "payloadExceedsAvailableWindow",
+            Value::Bool(telemetry.payload_bytes > telemetry.available_bytes),
+        ),
+        ("messageCountOut", Value::from(telemetry.message_count_out)),
+        ("streamAgeMs", Value::from(telemetry.stream_age_ms)),
+        (
+            "oldestUnackedMs",
+            telemetry.oldest_unacked_ms.map_or(Value::Null, Value::from),
+        ),
+    ];
+
+    publish_tunnel_telemetry_log(
+        tunnel_writer_sender,
+        telemetry_relay,
+        clock,
+        SandboxTelemetryLogLevel::Warn,
+        AGENT_STREAM_EVENT_WINDOW_EXHAUSTED,
+        &extra_fields,
+    );
+}
+
+fn publish_agent_stream_threshold_crossed(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    telemetry: AgentStreamThresholdTelemetry,
+) {
+    let extra_fields = vec![
+        ("streamId", Value::from(u64::from(telemetry.stream_id))),
+        (
+            "channelKind",
+            Value::String(AGENT_STREAM_CHANNEL_KIND.to_string()),
+        ),
+        ("payloadKind", Value::String(telemetry.payload_kind.to_string())),
+        ("payloadBytes", Value::from(telemetry.payload_bytes as u64)),
+        ("availableBytes", Value::from(telemetry.available_bytes as u64)),
+        (
+            "outstandingBytes",
+            Value::from(telemetry.outstanding_bytes as u64),
+        ),
+        ("thresholdBytes", Value::from(telemetry.threshold_bytes as u64)),
+        ("maxWindowBytes", Value::from(AGENT_STREAM_WINDOW_BYTES as u64)),
+        ("messageCountOut", Value::from(telemetry.message_count_out)),
+        ("streamAgeMs", Value::from(telemetry.stream_age_ms)),
+        (
+            "oldestUnackedMs",
+            telemetry.oldest_unacked_ms.map_or(Value::Null, Value::from),
+        ),
+    ];
+
+    publish_tunnel_telemetry_log(
+        tunnel_writer_sender,
+        telemetry_relay,
+        clock,
+        SandboxTelemetryLogLevel::Warn,
+        AGENT_STREAM_EVENT_WINDOW_THRESHOLD_CROSSED,
+        &extra_fields,
+    );
+}
+
+fn publish_bootstrap_closed_agent_stream_summaries(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+    reason: &str,
+) {
+    let drained_streams = std::mem::take(&mut session_state.agent_streams);
+    for (stream_id, agent_stream) in drained_streams {
+        publish_agent_stream_summary(
+            tunnel_writer_sender,
+            &mut session_state.telemetry_relay,
+            clock,
+            stream_id,
+            &agent_stream,
+            &AgentStreamTermination {
+                outcome: AGENT_STREAM_OUTCOME_BOOTSTRAP_CLOSED,
+                close_source: AGENT_STREAM_CLOSE_SOURCE_BOOTSTRAP,
+                reset_code: None,
+                reason: Some(reason.to_string()),
+            },
+        );
+    }
 }
 
 fn continue_with(
@@ -2275,6 +2675,12 @@ async fn handle_tunnel_session_event(
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
+            publish_bootstrap_closed_agent_stream_summaries(
+                tunnel_writer_sender,
+                session_state,
+                context.clock,
+                &reason_text,
+            );
             update_tunnel_supervision_details(
                 context.supervisor_handle,
                 context.gateway_ws_url,
@@ -2338,6 +2744,7 @@ async fn handle_tunnel_session_event(
                         AgentStreamState {
                             sender,
                             send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                            stats: AgentStreamStats::new(context.clock.now_ms()),
                         },
                     );
                     continue_with(write_tunnel_text(
@@ -2472,19 +2879,109 @@ async fn handle_tunnel_session_event(
         },
         TunnelSessionEvent::AgentMessage { stream_id, message } => match message {
             Message::Text(payload) => {
-                let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                    return Ok(TunnelSessionControlFlow::Continue);
+                let now_ms = context.clock.now_ms();
+                let payload_bytes = payload.len();
+                let mut threshold_crossings = Vec::new();
+                let send_outcome = {
+                    let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    };
+                    let available_bytes = agent_stream.send_window.available_bytes();
+                    if !agent_stream.send_window.try_consume(payload_bytes) {
+                        Err((
+                            available_bytes,
+                            agent_stream_outstanding_bytes(&agent_stream.send_window),
+                            agent_stream.stats.message_count_out,
+                            agent_stream.stats.stream_age_ms(now_ms),
+                            agent_stream.stats.oldest_unacked_age_ms(now_ms),
+                        ))
+                    } else {
+                        let available_after = agent_stream.send_window.available_bytes();
+                        let outstanding_bytes = agent_stream_outstanding_bytes(&agent_stream.send_window);
+                        agent_stream
+                            .stats
+                            .record_outbound_message(payload_bytes, now_ms, outstanding_bytes);
+                        let message_count_out = agent_stream.stats.message_count_out;
+                        let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
+                        let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
+                        threshold_crossings = agent_stream
+                            .stats
+                            .take_new_threshold_crossings(outstanding_bytes);
+                        Ok((
+                            available_after,
+                            outstanding_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        ))
+                    }
                 };
-                if !agent_stream.send_window.try_consume(payload.len()) {
-                    session_state.agent_streams.remove(&stream_id);
-                    return continue_with(write_tunnel_text(
+                let (available_bytes, outstanding_bytes, message_count_out, stream_age_ms, oldest_unacked_ms) =
+                    match send_outcome {
+                        Ok(values) => values,
+                        Err((
+                            available_bytes,
+                            outstanding_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        )) => {
+                            publish_agent_stream_window_exhausted(
+                                tunnel_writer_sender,
+                                &mut session_state.telemetry_relay,
+                                context.clock,
+                                AgentStreamWindowExhaustedTelemetry {
+                                    stream_id,
+                                    payload_kind: websocket_payload_kind_name(
+                                        PAYLOAD_KIND_WEBSOCKET_TEXT,
+                                    ),
+                                    payload_bytes,
+                                    available_bytes,
+                                    outstanding_bytes,
+                                    message_count_out,
+                                    stream_age_ms,
+                                    oldest_unacked_ms,
+                                },
+                            );
+                            remove_agent_stream_and_publish_summary(
+                                tunnel_writer_sender,
+                                session_state,
+                                context.clock,
+                                stream_id,
+                                AgentStreamTermination {
+                                    outcome: AGENT_STREAM_OUTCOME_RESET,
+                                    close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                                    reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
+                                    reason: Some("agent stream send window is exhausted".to_string()),
+                                },
+                            );
+                            return continue_with(write_tunnel_text(
+                                tunnel_writer_sender,
+                                stream_reset(
+                                    stream_id,
+                                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                                    "agent stream send window is exhausted",
+                                ),
+                            ));
+                        }
+                    };
+                for threshold_bytes in threshold_crossings {
+                    publish_agent_stream_threshold_crossed(
                         tunnel_writer_sender,
-                        stream_reset(
+                        &mut session_state.telemetry_relay,
+                        context.clock,
+                        AgentStreamThresholdTelemetry {
                             stream_id,
-                            STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                            "agent stream send window is exhausted",
-                        ),
-                    ));
+                            payload_kind: websocket_payload_kind_name(PAYLOAD_KIND_WEBSOCKET_TEXT),
+                            payload_bytes,
+                            available_bytes,
+                            outstanding_bytes,
+                            threshold_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        },
+                    );
                 }
                 let encoded = encode_stream_data_frame(
                     stream_id,
@@ -2495,19 +2992,111 @@ async fn handle_tunnel_session_event(
                 continue_with(write_tunnel_binary(tunnel_writer_sender, encoded))
             }
             Message::Binary(payload) => {
-                let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                    return Ok(TunnelSessionControlFlow::Continue);
+                let now_ms = context.clock.now_ms();
+                let payload_bytes = payload.len();
+                let mut threshold_crossings = Vec::new();
+                let send_outcome = {
+                    let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    };
+                    let available_bytes = agent_stream.send_window.available_bytes();
+                    if !agent_stream.send_window.try_consume(payload_bytes) {
+                        Err((
+                            available_bytes,
+                            agent_stream_outstanding_bytes(&agent_stream.send_window),
+                            agent_stream.stats.message_count_out,
+                            agent_stream.stats.stream_age_ms(now_ms),
+                            agent_stream.stats.oldest_unacked_age_ms(now_ms),
+                        ))
+                    } else {
+                        let available_after = agent_stream.send_window.available_bytes();
+                        let outstanding_bytes = agent_stream_outstanding_bytes(&agent_stream.send_window);
+                        agent_stream
+                            .stats
+                            .record_outbound_message(payload_bytes, now_ms, outstanding_bytes);
+                        let message_count_out = agent_stream.stats.message_count_out;
+                        let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
+                        let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
+                        threshold_crossings = agent_stream
+                            .stats
+                            .take_new_threshold_crossings(outstanding_bytes);
+                        Ok((
+                            available_after,
+                            outstanding_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        ))
+                    }
                 };
-                if !agent_stream.send_window.try_consume(payload.len()) {
-                    session_state.agent_streams.remove(&stream_id);
-                    return continue_with(write_tunnel_text(
+                let (available_bytes, outstanding_bytes, message_count_out, stream_age_ms, oldest_unacked_ms) =
+                    match send_outcome {
+                        Ok(values) => values,
+                        Err((
+                            available_bytes,
+                            outstanding_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        )) => {
+                            publish_agent_stream_window_exhausted(
+                                tunnel_writer_sender,
+                                &mut session_state.telemetry_relay,
+                                context.clock,
+                                AgentStreamWindowExhaustedTelemetry {
+                                    stream_id,
+                                    payload_kind: websocket_payload_kind_name(
+                                        PAYLOAD_KIND_WEBSOCKET_BINARY,
+                                    ),
+                                    payload_bytes,
+                                    available_bytes,
+                                    outstanding_bytes,
+                                    message_count_out,
+                                    stream_age_ms,
+                                    oldest_unacked_ms,
+                                },
+                            );
+                            remove_agent_stream_and_publish_summary(
+                                tunnel_writer_sender,
+                                session_state,
+                                context.clock,
+                                stream_id,
+                                AgentStreamTermination {
+                                    outcome: AGENT_STREAM_OUTCOME_RESET,
+                                    close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                                    reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
+                                    reason: Some("agent stream send window is exhausted".to_string()),
+                                },
+                            );
+                            return continue_with(write_tunnel_text(
+                                tunnel_writer_sender,
+                                stream_reset(
+                                    stream_id,
+                                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                                    "agent stream send window is exhausted",
+                                ),
+                            ));
+                        }
+                    };
+                for threshold_bytes in threshold_crossings {
+                    publish_agent_stream_threshold_crossed(
                         tunnel_writer_sender,
-                        stream_reset(
+                        &mut session_state.telemetry_relay,
+                        context.clock,
+                        AgentStreamThresholdTelemetry {
                             stream_id,
-                            STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                            "agent stream send window is exhausted",
-                        ),
-                    ));
+                            payload_kind: websocket_payload_kind_name(
+                                PAYLOAD_KIND_WEBSOCKET_BINARY,
+                            ),
+                            payload_bytes,
+                            available_bytes,
+                            outstanding_bytes,
+                            threshold_bytes,
+                            message_count_out,
+                            stream_age_ms,
+                            oldest_unacked_ms,
+                        },
+                    );
                 }
                 let encoded = encode_stream_data_frame(
                     stream_id,
@@ -2528,7 +3117,18 @@ async fn handle_tunnel_session_event(
             }
             Message::Pong(_) => Ok(TunnelSessionControlFlow::Continue),
             Message::Close(_) => {
-                session_state.agent_streams.remove(&stream_id);
+                remove_agent_stream_and_publish_summary(
+                    tunnel_writer_sender,
+                    session_state,
+                    context.clock,
+                    stream_id,
+                    AgentStreamTermination {
+                        outcome: AGENT_STREAM_OUTCOME_RESET,
+                        close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                        reset_code: Some(STREAM_RESET_CODE_TARGET_CLOSED),
+                        reason: Some("agent runtime websocket closed".to_string()),
+                    },
+                );
                 continue_with(write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
@@ -2581,7 +3181,24 @@ async fn handle_tunnel_session_event(
             continue_with(write_tunnel_text(tunnel_writer_sender, payload))
         }
         TunnelSessionEvent::AgentClosed { stream_id, reason } => {
-            if session_state.agent_streams.remove(&stream_id).is_some() {
+            if remove_agent_stream_and_publish_summary(
+                tunnel_writer_sender,
+                session_state,
+                context.clock,
+                stream_id,
+                AgentStreamTermination {
+                    outcome: AGENT_STREAM_OUTCOME_RESET,
+                    close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                    reset_code: Some(STREAM_RESET_CODE_TARGET_CLOSED),
+                    reason: Some(
+                        reason
+                            .clone()
+                            .unwrap_or_else(|| "agent runtime websocket closed".to_string()),
+                    ),
+                },
+            )
+            .is_some()
+            {
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
@@ -2830,7 +3447,18 @@ async fn handle_tunnel_control_message(
                 pending_agent_open.task.abort();
                 return Ok(());
             }
-            if let Some(agent_stream) = session_state.agent_streams.remove(&message.stream_id) {
+            if let Some(agent_stream) = remove_agent_stream_and_publish_summary(
+                tunnel_writer_sender,
+                session_state,
+                context.clock,
+                message.stream_id,
+                AgentStreamTermination {
+                    outcome: AGENT_STREAM_OUTCOME_CLOSED,
+                    close_source: AGENT_STREAM_CLOSE_SOURCE_GATEWAY,
+                    reset_code: None,
+                    reason: None,
+                },
+            ) {
                 let _ = agent_stream.sender.send(Message::Close(None));
                 return Ok(());
             }
@@ -2886,6 +3514,9 @@ async fn handle_tunnel_control_message(
                     .send_window
                     .add(message.bytes)
                     .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+                agent_stream
+                    .stats
+                    .record_credit_restore(message.bytes, context.clock.now_ms());
                 return Ok(());
             }
             if let Some(send_window) = session_state
@@ -3170,6 +3801,7 @@ fn handle_tunnel_binary_frame(
     clock: &dyn Clock,
 ) -> Result<(), TunnelSessionError> {
     if let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id) {
+        let payload_bytes = frame.payload.len();
         match frame.payload_kind {
             PAYLOAD_KIND_WEBSOCKET_TEXT => {
                 let payload = String::from_utf8(frame.payload)
@@ -3178,12 +3810,14 @@ fn handle_tunnel_binary_frame(
                     .sender
                     .send(Message::Text(payload.into()))
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
+                agent_stream.stats.record_inbound_message(payload_bytes);
             }
             PAYLOAD_KIND_WEBSOCKET_BINARY => {
                 agent_stream
                     .sender
                     .send(Message::Binary(frame.payload.into()))
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
+                agent_stream.stats.record_inbound_message(payload_bytes);
             }
             _ => {
                 write_tunnel_text(
@@ -3887,12 +4521,13 @@ fn matches_signature(bytes: &[u8], offset: usize, signature: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        AgentStreamState, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
-        TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
-        connect_bootstrap_websocket, handle_tunnel_session_event, resolve_bootstrap_tunnel_url,
-        run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
-        prioritize_ipv4_socket_addresses,
+        AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome,
+        DEFAULT_ATTACHMENT_ROOT, TunnelSessionError, TunnelSessionEvent,
+        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRuntime,
+        TunnelWriterMessage, connect_bootstrap_websocket, handle_tunnel_control_message,
+        handle_tunnel_session_event, prioritize_ipv4_socket_addresses,
+        resolve_bootstrap_tunnel_url, run_connected_tunnel_session_catching_panics,
+        sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -3925,6 +4560,7 @@ mod tests {
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
         StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+        parse_stream_control_message,
     };
     use crate::tunnel::session::{TunnelSession, decode_bounded_output};
     use crate::tunnel::telemetry::{
@@ -3936,6 +4572,10 @@ mod tests {
     #[derive(Default)]
     struct PanicClock {
         panic_requested: std::sync::atomic::AtomicBool,
+    }
+
+    struct FixedClock {
+        now_ms: u64,
     }
 
     impl PanicClock {
@@ -3965,6 +4605,36 @@ mod tests {
         }
     }
 
+    impl Clock for FixedClock {
+        fn now_ms(&self) -> u64 {
+            self.now_ms
+        }
+    }
+
+    fn enable_test_telemetry(relay: &mut TelemetryRelay) {
+        relay
+            .attach_tunnel_connection()
+            .expect("telemetry relay should attach");
+        relay
+            .handle_control_message(&format!(
+                r#"{{"type":"telemetry.open.ok","streamId":{},"initialWindowBytes":{}}}"#,
+                SANDBOX_TELEMETRY_LOG_STREAM_ID, AGENT_STREAM_WINDOW_BYTES
+            ))
+            .expect("telemetry open.ok should be accepted");
+    }
+
+    async fn read_queued_telemetry_log_line(
+        receiver: &mut tokio::sync::mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    ) -> Value {
+        let writer_message = receiver.recv().await.expect("telemetry frame should be queued");
+        let TunnelWriterMessage::Binary(payload) = writer_message else {
+            panic!("expected a binary telemetry frame");
+        };
+        let decoded = decode_telemetry_data_frame(payload.as_ref())
+            .expect("telemetry frame should decode successfully");
+        serde_json::from_slice(&decoded).expect("telemetry line should be valid json")
+    }
+
     #[tokio::test]
     async fn restores_agent_stream_window_credit_after_runtime_writes_complete() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
@@ -3983,6 +4653,7 @@ mod tests {
                 AgentStreamState {
                     sender: agent_sender,
                     send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                    stats: AgentStreamStats::new(0),
                 },
             )]),
             port_access_http_streams: BTreeMap::new(),
@@ -4033,6 +4704,217 @@ mod tests {
                 "bytes": 512
             })
         );
+    }
+
+    #[tokio::test]
+    async fn emits_agent_stream_summary_when_gateway_closes_stream() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (agent_sender, mut agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let runtime_env = BTreeMap::new();
+        let clock = FixedClock { now_ms: 1_500 };
+        let sleeper = ThreadSleeper;
+        let mut stats = AgentStreamStats::new(500);
+        stats.record_outbound_message(256, 700, 256);
+        stats.record_credit_restore(256, 900);
+        stats.record_outbound_message(128, 1_000, 128);
+        stats.record_inbound_message(64);
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::from([(
+                7,
+                AgentStreamState {
+                    sender: agent_sender,
+                    send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                    stats,
+                },
+            )]),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+        enable_test_telemetry(&mut session_state.telemetry_relay);
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            agent_endpoint_url: None,
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            runtime_env: &runtime_env,
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            sleeper: &sleeper,
+            supervisor_handle: &supervisor_handle,
+        };
+        let close_message = parse_stream_control_message(r#"{"type":"stream.close","streamId":7}"#)
+            .expect("stream.close should parse");
+
+        handle_tunnel_control_message(
+            &tunnel_writer_sender,
+            &event_sender,
+            close_message,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("gateway close should succeed");
+
+        let telemetry_log = read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await;
+        assert_eq!(
+            telemetry_log,
+            json!({
+                "timestamp": "1970-01-01T00:00:01.5Z",
+                "level": "info",
+                "event": "agent_stream_summary",
+                "streamId": 7,
+                "channelKind": "agent",
+                "outcome": "closed",
+                "closeSource": "gateway",
+                "durationMs": 1000,
+                "messageCountOut": 2,
+                "messageCountIn": 1,
+                "totalBytesOut": 384,
+                "totalBytesIn": 64,
+                "maxMessageBytesOut": 256,
+                "maxMessageBytesIn": 64,
+                "maxOutstandingBytes": 256,
+                "avgCreditReturnMs": 200,
+                "creditReturnCount": 1,
+                "resetCode": null,
+                "reason": null
+            })
+        );
+        assert!(session_state.agent_streams.is_empty());
+        let forwarded_close = agent_receiver.recv().await.expect("runtime close should be forwarded");
+        assert_eq!(forwarded_close, Message::Close(None));
+    }
+
+    #[tokio::test]
+    async fn emits_window_exhausted_and_summary_telemetry_for_agent_stream() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let runtime_env = BTreeMap::new();
+        let clock = FixedClock { now_ms: 1_200 };
+        let sleeper = ThreadSleeper;
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::from([(
+                7,
+                AgentStreamState {
+                    sender: agent_sender,
+                    send_window: StreamSendWindow::new(1),
+                    stats: AgentStreamStats::new(200),
+                },
+            )]),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+        enable_test_telemetry(&mut session_state.telemetry_relay);
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            agent_endpoint_url: None,
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            runtime_env: &runtime_env,
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            sleeper: &sleeper,
+            supervisor_handle: &supervisor_handle,
+        };
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::AgentMessage {
+                stream_id: 7,
+                message: Message::Text("too big".to_string().into()),
+            },
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("window exhaustion should still produce a reset");
+
+        let exhaustion_log = read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await;
+        assert_eq!(
+            exhaustion_log,
+            json!({
+                "timestamp": "1970-01-01T00:00:01.2Z",
+                "level": "warn",
+                "event": "agent_stream_window_exhausted",
+                "streamId": 7,
+                "channelKind": "agent",
+                "payloadKind": "websocket_text",
+                "payloadBytes": 7,
+                "availableBytes": 1,
+                "outstandingBytes": AGENT_STREAM_WINDOW_BYTES - 1,
+                "maxWindowBytes": AGENT_STREAM_WINDOW_BYTES,
+                "payloadExceedsMaxWindow": false,
+                "payloadExceedsAvailableWindow": true,
+                "messageCountOut": 0,
+                "streamAgeMs": 1000,
+                "oldestUnackedMs": null
+            })
+        );
+
+        let summary_log = read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await;
+        assert_eq!(
+            summary_log,
+            json!({
+                "timestamp": "1970-01-01T00:00:01.2Z",
+                "level": "info",
+                "event": "agent_stream_summary",
+                "streamId": 7,
+                "channelKind": "agent",
+                "outcome": "reset",
+                "closeSource": "runtime",
+                "durationMs": 1000,
+                "messageCountOut": 0,
+                "messageCountIn": 0,
+                "totalBytesOut": 0,
+                "totalBytesIn": 0,
+                "maxMessageBytesOut": 0,
+                "maxMessageBytesIn": 0,
+                "maxOutstandingBytes": 0,
+                "avgCreditReturnMs": null,
+                "creditReturnCount": 0,
+                "resetCode": "stream_window_exhausted",
+                "reason": "agent stream send window is exhausted"
+            })
+        );
+
+        let reset_message = tunnel_writer_receiver
+            .recv()
+            .await
+            .expect("stream reset should be queued");
+        let TunnelWriterMessage::Text(payload) = reset_message else {
+            panic!("expected a stream.reset control message");
+        };
+        assert_eq!(
+            serde_json::from_str::<Value>(&payload).expect("reset payload should be json"),
+            json!({
+                "type": "stream.reset",
+                "streamId": 7,
+                "code": "stream_window_exhausted",
+                "message": "agent stream send window is exhausted"
+            })
+        );
+        assert!(session_state.agent_streams.is_empty());
     }
 
     #[test]
@@ -4287,7 +5169,7 @@ mod tests {
                 })
             );
 
-            let agent_response = read_binary_frame(&mut websocket);
+            let agent_response = read_non_telemetry_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);
             assert_eq!(agent_response.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
             assert_eq!(
@@ -4711,7 +5593,7 @@ mod tests {
                 })
             );
 
-            let agent_response = read_binary_frame(&mut websocket);
+            let agent_response = read_non_telemetry_binary_frame(&mut websocket);
             assert_eq!(agent_response.stream_id, 7);
             assert_eq!(agent_response.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
             let decoded_payload = serde_json::from_slice::<Value>(&agent_response.payload)
@@ -7796,6 +8678,20 @@ mod tests {
         };
 
         decode_stream_data_frame(payload.as_ref()).expect("binary frame should decode")
+    }
+
+    fn read_non_telemetry_binary_frame<S>(
+        socket: &mut WebSocket<S>,
+    ) -> crate::tunnel::protocol::StreamDataFrame
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            let frame = read_binary_frame(socket);
+            if frame.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
+                return frame;
+            }
+        }
     }
 
     #[cfg(target_os = "linux")]

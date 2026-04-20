@@ -5,15 +5,39 @@ import { SandboxTelemetryResetError } from "./errors.js";
 
 type SandboxTelemetryLogLevel = "info" | "warn" | "error";
 type SandboxTelemetryLogValue = string | number | boolean | null;
-type ParsedSandboxTelemetryLogLine = {
+export type ParsedSandboxTelemetryLogLine = {
   event: string;
   extraFields: Readonly<Record<string, SandboxTelemetryLogValue>>;
   level: SandboxTelemetryLogLevel;
   timestamp: Date;
 };
 
+export type SandboxTunnelMetricObservation =
+  | {
+      kind: "agent_stream_summary";
+      avgCreditReturnMs: number | null;
+      channelKind: string;
+      durationMs: number;
+      maxMessageBytesIn: number;
+      maxMessageBytesOut: number;
+      maxOutstandingBytes: number;
+      outcome: string;
+      resetCode: string | null;
+      totalBytesIn: number;
+      totalBytesOut: number;
+    }
+  | {
+      kind: "agent_stream_window_exhausted";
+      channelKind: string;
+      outstandingBytes: number;
+      payloadBytes: number;
+      payloadKind: string;
+    };
+
 const InvalidTelemetryLogShapeMessage =
   "Telemetry log line does not match mistle.sandbox-runtime.log.v1.";
+const AgentStreamSummaryEvent = "agent_stream_summary";
+const AgentStreamWindowExhaustedEvent = "agent_stream_window_exhausted";
 const ReservedSandboxTelemetryFields = new Set(["timestamp", "level", "event"]);
 const SeverityNumberByLevel = {
   info: SeverityNumber.INFO,
@@ -69,6 +93,72 @@ function parseEvent(rawEvent: unknown): string {
   }
 
   return rawEvent;
+}
+
+function getStringField(
+  fields: Readonly<Record<string, SandboxTelemetryLogValue>>,
+  fieldName: string,
+): string {
+  const value = fields[fieldName];
+  if (typeof value === "string") {
+    return value;
+  }
+
+  throw new SandboxTelemetryResetError({
+    code: "invalid_telemetry_log_shape",
+    message: InvalidTelemetryLogShapeMessage,
+  });
+}
+
+function getNumberField(
+  fields: Readonly<Record<string, SandboxTelemetryLogValue>>,
+  fieldName: string,
+): number {
+  const value = fields[fieldName];
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+
+  throw new SandboxTelemetryResetError({
+    code: "invalid_telemetry_log_shape",
+    message: InvalidTelemetryLogShapeMessage,
+  });
+}
+
+function getNullableNumberField(
+  fields: Readonly<Record<string, SandboxTelemetryLogValue>>,
+  fieldName: string,
+): number | null {
+  const value = fields[fieldName];
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+    return value;
+  }
+
+  throw new SandboxTelemetryResetError({
+    code: "invalid_telemetry_log_shape",
+    message: InvalidTelemetryLogShapeMessage,
+  });
+}
+
+function getNullableStringField(
+  fields: Readonly<Record<string, SandboxTelemetryLogValue>>,
+  fieldName: string,
+): string | null {
+  const value = fields[fieldName];
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+
+  throw new SandboxTelemetryResetError({
+    code: "invalid_telemetry_log_shape",
+    message: InvalidTelemetryLogShapeMessage,
+  });
 }
 
 export function parseSandboxTelemetryLogLine(line: string): ParsedSandboxTelemetryLogLine {
@@ -146,4 +236,36 @@ export function toSandboxTelemetryLogRecord(input: {
     body: input.logLine.event,
     attributes,
   };
+}
+
+export function toSandboxTunnelMetricObservation(
+  logLine: ParsedSandboxTelemetryLogLine,
+): SandboxTunnelMetricObservation | undefined {
+  if (logLine.event === AgentStreamSummaryEvent) {
+    return {
+      kind: "agent_stream_summary",
+      channelKind: getStringField(logLine.extraFields, "channelKind"),
+      outcome: getStringField(logLine.extraFields, "outcome"),
+      durationMs: getNumberField(logLine.extraFields, "durationMs"),
+      totalBytesOut: getNumberField(logLine.extraFields, "totalBytesOut"),
+      totalBytesIn: getNumberField(logLine.extraFields, "totalBytesIn"),
+      maxMessageBytesOut: getNumberField(logLine.extraFields, "maxMessageBytesOut"),
+      maxMessageBytesIn: getNumberField(logLine.extraFields, "maxMessageBytesIn"),
+      maxOutstandingBytes: getNumberField(logLine.extraFields, "maxOutstandingBytes"),
+      avgCreditReturnMs: getNullableNumberField(logLine.extraFields, "avgCreditReturnMs"),
+      resetCode: getNullableStringField(logLine.extraFields, "resetCode"),
+    };
+  }
+
+  if (logLine.event === AgentStreamWindowExhaustedEvent) {
+    return {
+      kind: "agent_stream_window_exhausted",
+      channelKind: getStringField(logLine.extraFields, "channelKind"),
+      payloadKind: getStringField(logLine.extraFields, "payloadKind"),
+      payloadBytes: getNumberField(logLine.extraFields, "payloadBytes"),
+      outstandingBytes: getNumberField(logLine.extraFields, "outstandingBytes"),
+    };
+  }
+
+  return undefined;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseSandboxTelemetryLogLine,
+  toSandboxTunnelMetricObservation,
   toSandboxTelemetryLogRecord,
 } from "./sandbox-telemetry-log-line.js";
 
@@ -86,6 +87,46 @@ describe("toSandboxTelemetryLogRecord", () => {
         "mistle.sandbox.log.retryable": false,
         "mistle.sandbox.log.reason": null,
       },
+    });
+  });
+});
+
+describe("toSandboxTunnelMetricObservation", () => {
+  it("maps agent stream summary telemetry into metric observations", () => {
+    expect(
+      toSandboxTunnelMetricObservation(
+        parseSandboxTelemetryLogLine(
+          '{"timestamp":"2026-04-20T09:00:00.000Z","level":"info","event":"agent_stream_summary","streamId":7,"channelKind":"agent","outcome":"reset","closeSource":"runtime","durationMs":1200,"messageCountOut":3,"messageCountIn":2,"totalBytesOut":4096,"totalBytesIn":1536,"maxMessageBytesOut":2048,"maxMessageBytesIn":1024,"maxOutstandingBytes":3072,"avgCreditReturnMs":18,"creditReturnCount":3,"resetCode":"stream_window_exhausted","reason":"agent stream send window is exhausted"}',
+        ),
+      ),
+    ).toEqual({
+      kind: "agent_stream_summary",
+      channelKind: "agent",
+      outcome: "reset",
+      durationMs: 1200,
+      totalBytesOut: 4096,
+      totalBytesIn: 1536,
+      maxMessageBytesOut: 2048,
+      maxMessageBytesIn: 1024,
+      maxOutstandingBytes: 3072,
+      avgCreditReturnMs: 18,
+      resetCode: "stream_window_exhausted",
+    });
+  });
+
+  it("maps agent stream exhaustion telemetry into metric observations", () => {
+    expect(
+      toSandboxTunnelMetricObservation(
+        parseSandboxTelemetryLogLine(
+          '{"timestamp":"2026-04-20T09:00:00.000Z","level":"warn","event":"agent_stream_window_exhausted","streamId":7,"channelKind":"agent","payloadKind":"websocket_text","payloadBytes":8388608,"availableBytes":1024,"outstandingBytes":16776192,"maxWindowBytes":16777216,"payloadExceedsMaxWindow":false,"payloadExceedsAvailableWindow":true,"messageCountOut":4,"streamAgeMs":9000,"oldestUnackedMs":250}',
+        ),
+      ),
+    ).toEqual({
+      kind: "agent_stream_window_exhausted",
+      channelKind: "agent",
+      payloadKind: "websocket_text",
+      payloadBytes: 8388608,
+      outstandingBytes: 16776192,
     });
   });
 });
