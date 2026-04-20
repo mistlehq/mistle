@@ -12,28 +12,11 @@ function getDiffCommentSideLabel(side: PendingSessionDiffComment["side"]): "L" |
   return side === "additions" ? "R" : "L";
 }
 
-function getFileName(filePath: string): string {
-  const pathSegments = filePath.split("/");
-  return pathSegments[pathSegments.length - 1] ?? filePath;
-}
-
 export function formatPendingSessionDiffCommentLineLabel(input: {
   lineNumber: number;
   side: PendingSessionDiffComment["side"];
 }): string {
   return `${getDiffCommentSideLabel(input.side)}${input.lineNumber}`;
-}
-
-export function buildPendingSessionDiffCommentBadgeLabel(
-  comment: Pick<PendingSessionDiffComment, "filePath" | "lineNumber" | "side">,
-): string {
-  return `${getFileName(comment.filePath)}:${formatPendingSessionDiffCommentLineLabel(comment)}`;
-}
-
-export function buildPendingSessionDiffCommentBadgeTitle(
-  comment: PendingSessionDiffComment,
-): string {
-  return `${comment.filePath} ${formatPendingSessionDiffCommentLineLabel(comment)}\n\n${comment.body}`;
 }
 
 export function buildPendingSessionDiffCommentSummaryLabel(commentCount: number): string {

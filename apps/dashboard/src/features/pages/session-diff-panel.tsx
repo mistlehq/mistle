@@ -96,6 +96,48 @@ function getFileDiffLineStats(fileDiff: FileDiffMetadata): {
   );
 }
 
+function buildSessionDiffPanelLineAnnotations(input: {
+  activeCommentDraft: ActiveSessionDiffCommentDraft | null;
+  isCommentingCurrentFile: boolean;
+  pendingComments: readonly PendingSessionDiffComment[];
+}): SessionDiffPanelAnnotation[] {
+  const savedAnnotations: SessionDiffPanelAnnotation[] = input.pendingComments.map((comment) => ({
+    lineNumber: comment.lineNumber,
+    metadata: {
+      comment,
+      kind: "saved-comment",
+    },
+    side: comment.side,
+  }));
+
+  if (input.activeCommentDraft === null || !input.isCommentingCurrentFile) {
+    return savedAnnotations;
+  }
+
+  return [
+    ...savedAnnotations,
+    {
+      lineNumber: input.activeCommentDraft.lineNumber,
+      metadata: {
+        kind: "draft",
+      },
+      side: input.activeCommentDraft.side,
+    },
+  ];
+}
+
+function reconcileSessionDiffCommentDrafts(input: {
+  currentDrafts: Readonly<Record<string, string>>;
+  pendingComments: readonly PendingSessionDiffComment[];
+}): Record<string, string> {
+  return Object.fromEntries(
+    input.pendingComments.map((comment) => [
+      comment.id,
+      input.currentDrafts[comment.id] ?? comment.body,
+    ]),
+  );
+}
+
 export function SessionDiffPanel({
   errorNotice = null,
   isLoading = false,
@@ -167,7 +209,6 @@ export function SessionDiffPanel({
                   activeCommentDraft={activeCommentDraft}
                   fileDiff={fileDiff}
                   fileKey={fileKey}
-                  isOpen={isOpen}
                   onAddComment={onAddComment}
                   onDeleteComment={onDeleteComment}
                   onUpdateComment={onUpdateComment}
@@ -196,7 +237,6 @@ type SessionDiffPanelFileSectionProps = {
   activeCommentDraft: ActiveSessionDiffCommentDraft | null;
   fileDiff: FileDiffMetadata;
   fileKey: string;
-  isOpen: boolean;
   onAddComment?: ((comment: PendingSessionDiffCommentInput) => void) | undefined;
   onDeleteComment?: ((commentId: string) => void) | undefined;
   onUpdateComment?: ((commentId: string, body: string) => void) | undefined;
@@ -210,7 +250,6 @@ function SessionDiffPanelFileSection({
   activeCommentDraft,
   fileDiff,
   fileKey,
-  isOpen,
   onAddComment,
   onDeleteComment,
   onUpdateComment,
@@ -234,16 +273,11 @@ function SessionDiffPanelFileSection({
   }, [open]);
 
   useEffect(() => {
-    const nextDrafts = Object.fromEntries(
-      pendingComments
-        .map((comment) => {
-          const existingDraft = commentDrafts[comment.id];
-          return [comment.id, existingDraft ?? comment.body];
-        })
-        .filter((entry) => entry[1] !== undefined),
-    );
-
     setCommentDrafts((currentDrafts) => {
+      const nextDrafts = reconcileSessionDiffCommentDrafts({
+        currentDrafts,
+        pendingComments,
+      });
       const currentKeys = Object.keys(currentDrafts);
       const nextKeys = Object.keys(nextDrafts);
       const keysChanged =
@@ -252,7 +286,7 @@ function SessionDiffPanelFileSection({
 
       return keysChanged ? nextDrafts : currentDrafts;
     });
-  }, [commentDrafts, pendingComments]);
+  }, [pendingComments]);
 
   useEffect(() => {
     if (pendingComments.some((comment) => comment.id === focusedCommentId)) {
@@ -263,29 +297,11 @@ function SessionDiffPanelFileSection({
   }, [focusedCommentId, pendingComments]);
 
   const lineAnnotations = useMemo<SessionDiffPanelAnnotation[]>(() => {
-    const savedAnnotations: SessionDiffPanelAnnotation[] = pendingComments.map((comment) => ({
-      lineNumber: comment.lineNumber,
-      metadata: {
-        comment,
-        kind: "saved-comment",
-      },
-      side: comment.side,
-    }));
-
-    if (activeCommentDraft === null || !isCommentingCurrentFile) {
-      return savedAnnotations;
-    }
-
-    return [
-      ...savedAnnotations,
-      {
-        lineNumber: activeCommentDraft.lineNumber,
-        metadata: {
-          kind: "draft",
-        },
-        side: activeCommentDraft.side,
-      },
-    ];
+    return buildSessionDiffPanelLineAnnotations({
+      activeCommentDraft,
+      isCommentingCurrentFile,
+      pendingComments,
+    });
   }, [activeCommentDraft, isCommentingCurrentFile, pendingComments]);
   const supportsCommentAnnotations = onAddComment !== undefined || lineAnnotations.length > 0;
 
@@ -380,10 +396,10 @@ function SessionDiffPanelFileSection({
   }
 
   return (
-    <Collapsible onOpenChange={onOpenChange} open={isOpen}>
+    <Collapsible onOpenChange={onOpenChange} open={open}>
       <section className="overflow-hidden">
         <CollapsibleTrigger
-          aria-label={`${isOpen ? "Collapse" : "Expand"} ${resolveFileDiffPath(fileDiff)}`}
+          aria-label={`${open ? "Collapse" : "Expand"} ${resolveFileDiffPath(fileDiff)}`}
           render={
             <button
               className="group bg-background/95 flex w-full items-center justify-between gap-3 px-3 py-2 text-left backdrop-blur-sm"
@@ -413,7 +429,7 @@ function SessionDiffPanelFileSection({
             <CaretDownIcon
               aria-hidden
               className={`size-4 text-muted-foreground transition-transform ${
-                isOpen ? "rotate-180" : ""
+                open ? "rotate-180" : ""
               }`}
             />
           </div>
@@ -476,62 +492,37 @@ function SessionDiffPanelFileSection({
                     renderAnnotation: (annotation: SessionDiffPanelAnnotation) => {
                       if (annotation.metadata.kind === "saved-comment") {
                         const comment = annotation.metadata.comment;
-                        const commentDraft = commentDrafts[comment.id] ?? comment.body;
                         return (
-                          <SessionDiffPanelCommentCard
-                            headerAction={
-                              onDeleteComment === undefined ? undefined : (
-                                <Button
-                                  aria-label={`Delete comment on line ${formatPendingSessionDiffCommentLineLabel(comment)}`}
-                                  className="-mr-1 size-7 rounded-sm"
-                                  onClick={() => {
+                          <SavedSessionDiffCommentCard
+                            comment={comment}
+                            draftBody={commentDrafts[comment.id] ?? comment.body}
+                            onBodyChange={(body) => {
+                              setCommentDrafts((currentDrafts) => ({
+                                ...currentDrafts,
+                                [comment.id]: body,
+                              }));
+                            }}
+                            onDelete={
+                              onDeleteComment === undefined
+                                ? undefined
+                                : () => {
                                     onDeleteComment(comment.id);
-                                  }}
-                                  type="button"
-                                  variant="ghost"
-                                >
-                                  <TrashIcon aria-hidden="true" className="size-4" />
-                                </Button>
-                              )
-                            }
-                            body={
-                              <Textarea
-                                className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-                                onBlur={() => {
-                                  submitExistingComment(comment);
-                                }}
-                                onChange={(event) => {
-                                  setCommentDrafts((currentDrafts) => ({
-                                    ...currentDrafts,
-                                    [comment.id]: event.target.value,
-                                  }));
-                                }}
-                                onFocus={() => {
-                                  setFocusedCommentId(comment.id);
-                                  setActiveCommentDraft(null);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Escape") {
-                                    event.preventDefault();
-                                    setCommentDrafts((currentDrafts) => ({
-                                      ...currentDrafts,
-                                      [comment.id]: comment.body,
-                                    }));
-                                    setFocusedCommentId(null);
-                                    event.currentTarget.blur();
-                                    return;
                                   }
-
-                                  if (event.key === "Enter" && !event.shiftKey) {
-                                    event.preventDefault();
-                                    submitExistingComment(comment);
-                                    event.currentTarget.blur();
-                                  }
-                                }}
-                                value={commentDraft}
-                              />
                             }
-                            title={`Comment on line ${formatPendingSessionDiffCommentLineLabel(comment)}`}
+                            onFocus={() => {
+                              setFocusedCommentId(comment.id);
+                              setActiveCommentDraft(null);
+                            }}
+                            onReset={() => {
+                              setCommentDrafts((currentDrafts) => ({
+                                ...currentDrafts,
+                                [comment.id]: comment.body,
+                              }));
+                              setFocusedCommentId(null);
+                            }}
+                            onSubmit={() => {
+                              submitExistingComment(comment);
+                            }}
                           />
                         );
                       }
@@ -541,62 +532,22 @@ function SessionDiffPanelFileSection({
                       }
 
                       return (
-                        <SessionDiffPanelCommentCard
-                          actionRow={
-                            <>
-                              <Button
-                                onClick={() => {
-                                  setActiveCommentDraft(null);
-                                }}
-                                type="button"
-                                variant="ghost"
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                disabled={activeCommentDraft.body.trim().length === 0}
-                                onClick={() => {
-                                  submitActiveCommentDraft();
-                                }}
-                                type="button"
-                              >
-                                <>
-                                  Add
-                                  <DialogShortcut aria-label="Enter" />
-                                </>
-                              </Button>
-                            </>
-                          }
-                          body={
-                            <Textarea
-                              className="min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0"
-                              onChange={(event) => {
-                                setActiveCommentDraft((currentDraft) =>
-                                  currentDraft === null
-                                    ? null
-                                    : {
-                                        ...currentDraft,
-                                        body: event.target.value,
-                                      },
-                                );
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Escape") {
-                                  event.preventDefault();
-                                  setActiveCommentDraft(null);
-                                  return;
-                                }
-
-                                if (event.key === "Enter" && !event.shiftKey) {
-                                  event.preventDefault();
-                                  submitActiveCommentDraft();
-                                }
-                              }}
-                              placeholder="Add comment"
-                              value={activeCommentDraft.body}
-                            />
-                          }
-                          title={`Add comment on line ${formatPendingSessionDiffCommentLineLabel(activeCommentDraft)}`}
+                        <DraftSessionDiffCommentCard
+                          draft={activeCommentDraft}
+                          onCancel={() => {
+                            setActiveCommentDraft(null);
+                          }}
+                          onChangeBody={(body) => {
+                            setActiveCommentDraft((currentDraft) =>
+                              currentDraft === null
+                                ? null
+                                : {
+                                    ...currentDraft,
+                                    body,
+                                  },
+                            );
+                          }}
+                          onSubmit={submitActiveCommentDraft}
                         />
                       );
                     },
@@ -608,6 +559,123 @@ function SessionDiffPanelFileSection({
         </CollapsibleContent>
       </section>
     </Collapsible>
+  );
+}
+
+function SavedSessionDiffCommentCard(input: {
+  comment: PendingSessionDiffComment;
+  draftBody: string;
+  onBodyChange: (body: string) => void;
+  onDelete?: (() => void) | undefined;
+  onFocus: () => void;
+  onReset: () => void;
+  onSubmit: () => void;
+}): React.JSX.Element {
+  return (
+    <SessionDiffPanelCommentCard
+      headerAction={
+        input.onDelete === undefined ? undefined : (
+          <Button
+            aria-label={`Delete comment on line ${formatPendingSessionDiffCommentLineLabel(input.comment)}`}
+            className="-mr-1 size-7 rounded-sm"
+            onClick={input.onDelete}
+            type="button"
+            variant="ghost"
+          >
+            <TrashIcon aria-hidden="true" className="size-4" />
+          </Button>
+        )
+      }
+      body={
+        <SessionDiffCommentTextarea
+          onBlur={input.onSubmit}
+          onChange={(event) => {
+            input.onBodyChange(event.target.value);
+          }}
+          onFocus={input.onFocus}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              input.onReset();
+              event.currentTarget.blur();
+              return;
+            }
+
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              input.onSubmit();
+              event.currentTarget.blur();
+            }
+          }}
+          value={input.draftBody}
+        />
+      }
+      title={`Comment on line ${formatPendingSessionDiffCommentLineLabel(input.comment)}`}
+    />
+  );
+}
+
+function DraftSessionDiffCommentCard(input: {
+  draft: ActiveSessionDiffCommentDraft;
+  onCancel: () => void;
+  onChangeBody: (body: string) => void;
+  onSubmit: () => void;
+}): React.JSX.Element {
+  return (
+    <SessionDiffPanelCommentCard
+      actionRow={
+        <>
+          <Button onClick={input.onCancel} type="button" variant="ghost">
+            Cancel
+          </Button>
+          <Button
+            disabled={input.draft.body.trim().length === 0}
+            onClick={input.onSubmit}
+            type="button"
+          >
+            <>
+              Add
+              <DialogShortcut aria-label="Enter" />
+            </>
+          </Button>
+        </>
+      }
+      body={
+        <SessionDiffCommentTextarea
+          onChange={(event) => {
+            input.onChangeBody(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              input.onCancel();
+              return;
+            }
+
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              input.onSubmit();
+            }
+          }}
+          placeholder="Add comment"
+          value={input.draft.body}
+        />
+      }
+      title={`Add comment on line ${formatPendingSessionDiffCommentLineLabel(input.draft)}`}
+    />
+  );
+}
+
+function SessionDiffCommentTextarea(
+  props: React.ComponentProps<typeof Textarea>,
+): React.JSX.Element {
+  return (
+    <Textarea
+      {...props}
+      className={`min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 ${
+        props.className ?? ""
+      }`}
+    />
   );
 }
 

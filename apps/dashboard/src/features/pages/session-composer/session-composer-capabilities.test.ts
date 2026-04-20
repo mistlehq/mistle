@@ -46,4 +46,34 @@ describe("resolveComposerSubmitAction", () => {
       shouldClearComposer: true,
     });
   });
+
+  it("starts a turn when only pending input is present", () => {
+    expect(
+      resolveComposerSubmitAction({
+        composerText: "   ",
+        hasActiveTurn: false,
+        hasPendingInput: true,
+      }),
+    ).toEqual({
+      type: "start_turn",
+      submitMode: "start",
+      prompt: "",
+      shouldClearComposer: true,
+    });
+  });
+
+  it("steers an active turn when only pending input is present", () => {
+    expect(
+      resolveComposerSubmitAction({
+        composerText: "   ",
+        hasActiveTurn: true,
+        hasPendingInput: true,
+      }),
+    ).toEqual({
+      type: "steer_turn",
+      submitMode: "steer",
+      prompt: "",
+      shouldClearComposer: true,
+    });
+  });
 });

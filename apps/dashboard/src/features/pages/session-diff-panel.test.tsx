@@ -132,4 +132,51 @@ describe("SessionDiffPanel", () => {
 
     expect(screen.queryByDisplayValue("Request change")).toBeNull();
   });
+
+  it("reverts saved comment edits when escape is pressed", () => {
+    function Harness(): React.JSX.Element {
+      const [pendingComments, setPendingComments] = useState<readonly PendingSessionDiffComment[]>([
+        {
+          id: "comment-1",
+          body: "Request change",
+          filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+          lineNumber: 2,
+          side: "additions",
+        },
+      ]);
+
+      return (
+        <SessionDiffPanel
+          onUpdateComment={(commentId, body) => {
+            setPendingComments((currentComments) =>
+              currentComments.map((comment) =>
+                comment.id !== commentId
+                  ? comment
+                  : {
+                      ...comment,
+                      body,
+                    },
+              ),
+            );
+          }}
+          patch={TestPatch}
+          pendingComments={pendingComments}
+          summaryLabel="Compared with main"
+          title="Current changes"
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    const commentField = screen.getByDisplayValue("Request change");
+    fireEvent.focus(commentField);
+    fireEvent.change(commentField, {
+      target: { value: "Use the shared overflow tooltip here." },
+    });
+    fireEvent.keyDown(commentField, { key: "Escape" });
+
+    expect(screen.getByDisplayValue("Request change")).toBeTruthy();
+    expect(screen.queryByDisplayValue("Use the shared overflow tooltip here.")).toBeNull();
+  });
 });

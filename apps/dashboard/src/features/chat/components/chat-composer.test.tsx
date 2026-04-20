@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { ChatComposer } from "./chat-composer.js";
@@ -160,5 +161,35 @@ describe("ChatComposer", () => {
 
     expect(screen.getByText("3 comments")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove all 3 comments" })).toBeTruthy();
+  });
+
+  it("clears the pending diff comment badge when the remove action is pressed", () => {
+    function Harness(): React.JSX.Element {
+      const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState<{
+        count: number;
+        label: string;
+        title: string;
+      } | null>({
+        count: 3,
+        label: "3 comments",
+        title: "apps/dashboard/src/features/pages/session-workbench-page.tsx R10",
+      });
+
+      return (
+        <ChatComposer
+          {...createBaseComposerProps()}
+          onClearPendingDiffComments={() => {
+            setPendingDiffCommentSummary(null);
+          }}
+          pendingDiffCommentSummary={pendingDiffCommentSummary}
+        />
+      );
+    }
+
+    render(<Harness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove all 3 comments" }));
+
+    expect(screen.queryByText("3 comments")).toBeNull();
   });
 });

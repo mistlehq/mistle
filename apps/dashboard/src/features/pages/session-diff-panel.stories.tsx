@@ -2,12 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useEffect, useRef, useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
+import type { ChatEntry } from "../chat/chat-types.js";
 import { SessionComposerFixturePropsWithPendingDiffComments } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type {
   PendingSessionDiffComment,
   PendingSessionDiffCommentInput,
 } from "./session-diff-comment.js";
 import {
+  buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
   buildPendingSessionDiffCommentSummaryTitle,
 } from "./session-diff-comment.js";
@@ -86,13 +88,51 @@ type StoryDiffWorkbenchProps = {
   } | null;
   initialPendingComments?: readonly PendingSessionDiffComment[];
   patch: string;
+  submittedComposerText?: string | undefined;
+  submittedDiffComments?: readonly PendingSessionDiffComment[] | undefined;
 };
+
+function buildStoryPendingDiffCommentSummary(comments: readonly PendingSessionDiffComment[]): {
+  count: number;
+  label: string;
+  title: string;
+} | null {
+  if (comments.length === 0) {
+    return null;
+  }
+
+  return {
+    count: comments.length,
+    label: buildPendingSessionDiffCommentSummaryLabel(comments.length),
+    title: buildPendingSessionDiffCommentSummaryTitle(comments),
+  };
+}
+
+function buildSubmittedDiffCommentStoryEntries(input: {
+  composerText: string;
+  comments: readonly PendingSessionDiffComment[];
+}): readonly ChatEntry[] {
+  return [
+    {
+      id: "submitted-diff-comment-user",
+      turnId: "submitted-diff-comment-turn",
+      kind: "user-message",
+      status: "completed",
+      text: buildSessionComposerPrompt({
+        composerText: input.composerText,
+        pendingDiffComments: input.comments,
+      }),
+    },
+  ];
+}
 
 function StoryDiffWorkbench({
   autoOpenLocalComment = false,
   errorNotice = null,
   initialPendingComments = [],
   patch,
+  submittedComposerText,
+  submittedDiffComments,
 }: StoryDiffWorkbenchProps): React.JSX.Element {
   const [pendingComments, setPendingComments] =
     useState<readonly PendingSessionDiffComment[]>(initialPendingComments);
@@ -186,25 +226,29 @@ function StoryDiffWorkbench({
     };
   }, [autoOpenLocalComment, patch]);
 
+  const mainContent =
+    submittedComposerText === undefined || submittedDiffComments === undefined
+      ? createStorySessionMainContent()
+      : createStorySessionMainContent({
+          chatEntries: buildSubmittedDiffCommentStoryEntries({
+            comments: submittedDiffComments,
+            composerText: submittedComposerText,
+          }),
+        });
+
   return (
     <div ref={rootRef}>
       {renderSessionWorkbenchContentStory({
         isSecondaryPanelVisible: true,
-        mainContent: createStorySessionMainContent(),
+        mainContent,
         primaryBottomPanel: createStorySessionBottomPanel({
           composerViewModel: {
             ...SessionComposerFixturePropsWithPendingDiffComments,
+            composerText: "",
             onClearPendingDiffComments: () => {
               setPendingComments([]);
             },
-            pendingDiffCommentSummary:
-              pendingComments.length === 0
-                ? null
-                : {
-                    count: pendingComments.length,
-                    label: buildPendingSessionDiffCommentSummaryLabel(pendingComments.length),
-                    title: buildPendingSessionDiffCommentSummaryTitle(pendingComments),
-                  },
+            pendingDiffCommentSummary: buildStoryPendingDiffCommentSummary(pendingComments),
           },
         }),
         secondaryPanel: (
@@ -268,6 +312,28 @@ export const WithPendingDiffCommentBadges: Story = {
 export const WithOpenLocalComment: Story = {
   args: {
     autoOpenLocalComment: true,
+  },
+};
+
+export const WithSubmittedDiffCommentMessage: Story = {
+  args: {
+    submittedComposerText: "Please address these before sending the next patch.",
+    submittedDiffComments: [
+      {
+        id: "comment-story-submitted-1",
+        body: "Request change",
+        filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+        lineNumber: 140,
+        side: "additions",
+      },
+      {
+        id: "comment-story-submitted-2",
+        body: "Use the shared overflow tooltip here.",
+        filePath: "apps/dashboard/src/features/pages/session-diff-panel.tsx",
+        lineNumber: 4,
+        side: "additions",
+      },
+    ],
   },
 };
 
