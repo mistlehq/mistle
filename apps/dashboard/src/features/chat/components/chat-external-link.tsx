@@ -24,18 +24,30 @@ export function ChatExternalLink({
 
   return (
     <>
-      <button
+      <a
         className={["appearance-none border-0 bg-transparent p-0 text-inherit", className]
           .filter(Boolean)
           .join(" ")}
-        onClick={() => {
+        href={href}
+        onClick={(event) => {
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+
+          event.preventDefault();
           setIsDialogOpen(true);
         }}
         style={style}
-        type="button"
       >
         {children}
-      </button>
+      </a>
       <ChatExternalLinkDialog
         isOpen={isDialogOpen}
         onClose={() => {
