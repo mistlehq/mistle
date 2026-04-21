@@ -4,7 +4,7 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import type { SandboxRuntimeControl } from "../../types.js";
-import { E2BClientError, E2BClientErrorCodes } from "./client-errors.js";
+import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
 
 function requireSandboxId(id: string): void {
@@ -53,6 +53,33 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
         sandboxId: input.id,
         payload: input.payload,
       });
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(input.id, error);
+      }
+
+      throw error;
+    }
+  }
+
+  async readOperationLog(input: {
+    id: string;
+    operation: "init" | "resume";
+  }): Promise<string | null> {
+    requireSandboxId(input.id);
+
+    const path = input.operation === "init" ? "/run/mistle/init.log" : "/run/mistle/resume.log";
+
+    try {
+      const result = await this.#client.runCommand({
+        sandboxId: input.id,
+        operation: E2BClientOperationIds.READ_OPERATION_LOG,
+        commandDescription: `Read sandbox ${input.operation} operation log`,
+        command: `if test -f '${path}'; then cat -- '${path}'; fi`,
+        user: "root",
+      });
+      const logText = result.stdout.trim();
+      return logText.length === 0 ? null : logText;
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(input.id, error);

@@ -43,6 +43,8 @@ pub enum RuntimePlanApplyError {
         source_index: usize,
         source_kind: &'static str,
         path: String,
+        origin_url: String,
+        clone_url: Option<String>,
         error: String,
     },
     RuntimeFile {
@@ -75,10 +77,16 @@ impl fmt::Display for RuntimePlanApplyError {
                 source_index,
                 source_kind,
                 path,
+                origin_url,
+                clone_url,
                 error,
             } => write!(
                 f,
-                "runtime plan workspaceSources[{source_index}] failed (sourceKind={source_kind} path={path}): {error}"
+                "runtime plan workspaceSources[{source_index}] failed (sourceKind={source_kind} path={path} originUrl={origin_url}{}): {error}",
+                clone_url
+                    .as_ref()
+                    .map(|value| format!(" cloneUrl={value}"))
+                    .unwrap_or_default()
             ),
             Self::RuntimeFile {
                 client_index,
@@ -127,14 +135,26 @@ pub fn apply_compiled_runtime_plan(
     }
 
     for (source_index, workspace_source) in runtime_plan.workspace_sources.iter().enumerate() {
-        let (source_kind, path) = match workspace_source {
-            plan::CompiledWorkspaceSource::GitClone { path, .. } => ("git-clone", path.clone()),
+        let (source_kind, path, origin_url, clone_url) = match workspace_source {
+            plan::CompiledWorkspaceSource::GitClone {
+                path,
+                origin_url,
+                clone_url,
+                ..
+            } => (
+                "git-clone",
+                path.clone(),
+                origin_url.clone(),
+                clone_url.clone(),
+            ),
         };
         workspace_source::apply_workspace_source(workspace_source).map_err(|error| {
             RuntimePlanApplyError::WorkspaceSource {
                 source_index,
                 source_kind,
                 path,
+                origin_url,
+                clone_url,
                 error,
             }
         })?;

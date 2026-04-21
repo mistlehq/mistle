@@ -10,6 +10,7 @@ import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
+import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
 import { createSandboxStorageBackendAdapter } from "../shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
@@ -543,6 +544,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
         "Failed to initialize sandbox runtime.",
       );
+      await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        providerSandboxId: startedSandbox.providerSandboxId,
+        sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+        operation: "init",
+        persistenceMode: workflowInput.persistenceMode,
+      });
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,

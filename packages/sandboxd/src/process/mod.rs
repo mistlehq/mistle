@@ -5,6 +5,7 @@
 //! policies used during daemon shutdown.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::collections::VecDeque;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -59,6 +60,25 @@ pub struct RuntimeClientProcessManager {
 struct RunningRuntimeClientProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
+    output_capture: ProcessOutputCapture,
+}
+
+#[derive(Clone, Debug)]
+struct ProcessOutputCapture {
+    stdout: Arc<Mutex<TailBuffer>>,
+    stderr: Arc<Mutex<TailBuffer>>,
+}
+
+#[derive(Debug)]
+struct TailBuffer {
+    max_bytes: usize,
+    bytes: VecDeque<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OutputStream {
+    Stdout,
+    Stderr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,10 +113,97 @@ pub struct CodexAppServerControlHandle {
 struct ManagedCodexAppServerProcess {
     spec: RuntimeClientProcessSpec,
     child: Arc<Mutex<Child>>,
+    output_capture: ProcessOutputCapture,
     observation_handle: CodexAppServerObservationHandle,
     supervisor_handle: SandboxdSupervisorHandle,
     restart_lock: Mutex<()>,
     restart_in_progress: AtomicBool,
+}
+
+impl ProcessOutputCapture {
+    fn new() -> Self {
+        Self {
+            stdout: Arc::new(Mutex::new(TailBuffer::new(4 * 1024))),
+            stderr: Arc::new(Mutex::new(TailBuffer::new(8 * 1024))),
+        }
+    }
+
+    fn record_stdout(&self, bytes: &[u8]) {
+        self.stdout
+            .lock()
+            .expect("stdout tail buffer lock should not be poisoned")
+            .append(bytes);
+    }
+
+    fn record_stderr(&self, bytes: &[u8]) {
+        self.stderr
+            .lock()
+            .expect("stderr tail buffer lock should not be poisoned")
+            .append(bytes);
+    }
+
+    fn stdout_tail(&self) -> Option<String> {
+        self.stdout
+            .lock()
+            .expect("stdout tail buffer lock should not be poisoned")
+            .snapshot()
+    }
+
+    fn stderr_tail(&self) -> Option<String> {
+        self.stderr
+            .lock()
+            .expect("stderr tail buffer lock should not be poisoned")
+            .snapshot()
+    }
+}
+
+impl TailBuffer {
+    fn new(max_bytes: usize) -> Self {
+        Self {
+            max_bytes,
+            bytes: VecDeque::new(),
+        }
+    }
+
+    fn append(&mut self, chunk: &[u8]) {
+        for &byte in chunk {
+            self.bytes.push_back(byte);
+        }
+        while self.bytes.len() > self.max_bytes {
+            let _ = self.bytes.pop_front();
+        }
+    }
+
+    fn snapshot(&self) -> Option<String> {
+        if self.bytes.is_empty() {
+            return None;
+        }
+
+        let bytes = self.bytes.iter().copied().collect::<Vec<_>>();
+        Some(String::from_utf8_lossy(&bytes).into_owned())
+    }
+}
+
+fn spawn_output_capture_thread<R>(
+    mut reader: R,
+    output_capture: ProcessOutputCapture,
+    stream: OutputStream,
+) where
+    R: Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let mut buffer = [0_u8; 4096];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(bytes_read) => match stream {
+                    OutputStream::Stdout => output_capture.record_stdout(&buffer[..bytes_read]),
+                    OutputStream::Stderr => output_capture.record_stderr(&buffer[..bytes_read]),
+                },
+                Err(_) => break,
+            }
+        }
+    });
 }
 
 impl CodexAppServerControlHandle {
@@ -121,30 +228,35 @@ impl CodexAppServerControlHandle {
         let mut current_process = RunningRuntimeClientProcess {
             spec: self.managed_process.spec.clone(),
             child: self.managed_process.child.clone(),
+            output_capture: self.managed_process.output_capture.clone(),
         };
         let _ = stop_runtime_client_process(&mut current_process, clock, sleeper);
 
-        let mut replacement_child = match spawn_runtime_client_child(&self.managed_process.spec) {
-            Ok(replacement_child) => replacement_child,
-            Err(error) => {
-                self.managed_process
-                    .supervisor_handle
-                    .mark_component_restarting(SupervisedComponent::CodexAppServer, error.clone());
-                self.managed_process
-                    .supervisor_handle
-                    .emit_component_healthcheck_failed(
-                        SupervisedComponent::CodexAppServer,
-                        "restart_spawn_failed",
-                        &error,
-                        "process_liveness",
-                        &[],
-                    );
-                self.managed_process
-                    .restart_in_progress
-                    .store(false, Ordering::Relaxed);
-                return Err(error);
-            }
-        };
+        let (mut replacement_child, replacement_output_capture) =
+            match spawn_runtime_client_child(&self.managed_process.spec) {
+                Ok(replacement_child) => replacement_child,
+                Err(error) => {
+                    self.managed_process
+                        .supervisor_handle
+                        .mark_component_restarting(
+                            SupervisedComponent::CodexAppServer,
+                            error.clone(),
+                        );
+                    self.managed_process
+                        .supervisor_handle
+                        .emit_component_healthcheck_failed(
+                            SupervisedComponent::CodexAppServer,
+                            "restart_spawn_failed",
+                            &error,
+                            "process_liveness",
+                            &[],
+                        );
+                    self.managed_process
+                        .restart_in_progress
+                        .store(false, Ordering::Relaxed);
+                    return Err(error);
+                }
+            };
         if let Err(error) = wait_for_runtime_client_process_readiness_with(
             &self.managed_process.spec,
             &mut replacement_child,
@@ -155,6 +267,7 @@ impl CodexAppServerControlHandle {
             let mut failed_replacement_process = RunningRuntimeClientProcess {
                 spec: self.managed_process.spec.clone(),
                 child: replacement_child,
+                output_capture: replacement_output_capture.clone(),
             };
             let _ = stop_runtime_client_process(&mut failed_replacement_process, clock, sleeper);
             self.managed_process
@@ -218,13 +331,29 @@ pub enum ProcessManagerError {
         process_index: usize,
         process_key: String,
         error: String,
+        output_tails: Box<ProcessOutputTails>,
     },
     ReadinessCheck {
         process_index: usize,
         process_key: String,
         error: String,
+        details: Box<ProcessReadinessFailureDetails>,
     },
     StopProcesses(String),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ProcessOutputTails {
+    pub stdout_tail: Option<String>,
+    pub stderr_tail: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProcessReadinessFailureDetails {
+    pub readiness_type: String,
+    pub readiness_target: String,
+    pub timeout_ms: u64,
+    pub output_tails: ProcessOutputTails,
 }
 
 impl fmt::Display for ProcessManagerError {
@@ -234,6 +363,7 @@ impl fmt::Display for ProcessManagerError {
                 process_index,
                 process_key,
                 error,
+                ..
             } => write!(
                 f,
                 "runtime client process[{process_index}] failed to start (processKey={process_key}): {error}"
@@ -242,6 +372,7 @@ impl fmt::Display for ProcessManagerError {
                 process_index,
                 process_key,
                 error,
+                ..
             } => write!(
                 f,
                 "runtime client process[{process_index}] readiness check failed (processKey={process_key}): {error}"
@@ -348,6 +479,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 process_index,
                 process_key: process_spec.process_key.clone(),
                 error,
+                output_tails: Box::default(),
             }
         })?;
 
@@ -359,6 +491,15 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 process_index,
                 process_key: process_spec.process_key.clone(),
                 error,
+                details: Box::new(ProcessReadinessFailureDetails {
+                    readiness_type: readiness_type(process_spec).to_string(),
+                    readiness_target: readiness_target(process_spec),
+                    timeout_ms: readiness_timeout_ms(process_spec),
+                    output_tails: ProcessOutputTails {
+                        stdout_tail: process.output_capture.stdout_tail(),
+                        stderr_tail: process.output_capture.stderr_tail(),
+                    },
+                }),
             });
         }
 
@@ -390,6 +531,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                     managed_process: Arc::new(ManagedCodexAppServerProcess {
                         spec: process_spec.clone(),
                         child: process.child.clone(),
+                        output_capture: process.output_capture.clone(),
                         observation_handle: observation_handle.clone(),
                         supervisor_handle: supervisor_handle.clone(),
                         restart_lock: Mutex::new(()),
@@ -758,15 +900,18 @@ fn merge_runtime_client_process_env(
 fn start_runtime_client_process(
     process_spec: &RuntimeClientProcessSpec,
 ) -> Result<RunningRuntimeClientProcess, String> {
-    let child = spawn_runtime_client_child(process_spec)?;
+    let (child, output_capture) = spawn_runtime_client_child(process_spec)?;
 
     Ok(RunningRuntimeClientProcess {
         spec: process_spec.clone(),
         child: Arc::new(Mutex::new(child)),
+        output_capture,
     })
 }
 
-fn spawn_runtime_client_child(process_spec: &RuntimeClientProcessSpec) -> Result<Child, String> {
+fn spawn_runtime_client_child(
+    process_spec: &RuntimeClientProcessSpec,
+) -> Result<(Child, ProcessOutputCapture), String> {
     let command = process_spec
         .command
         .args
@@ -776,8 +921,8 @@ fn spawn_runtime_client_child(process_spec: &RuntimeClientProcessSpec) -> Result
     child_command
         .args(&process_spec.command.args[1..])
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
     if let Some(cwd) = process_spec.command.cwd.as_deref() {
         child_command.current_dir(cwd);
@@ -786,11 +931,19 @@ fn spawn_runtime_client_child(process_spec: &RuntimeClientProcessSpec) -> Result
         child_command.envs(env);
     }
 
-    let child = child_command
+    let mut child = child_command
         .spawn()
         .map_err(|error| format!("failed to start process command: {error}"))?;
 
-    Ok(child)
+    let output_capture = ProcessOutputCapture::new();
+    if let Some(stdout) = child.stdout.take() {
+        spawn_output_capture_thread(stdout, output_capture.clone(), OutputStream::Stdout);
+    }
+    if let Some(stderr) = child.stderr.take() {
+        spawn_output_capture_thread(stderr, output_capture.clone(), OutputStream::Stderr);
+    }
+
+    Ok((child, output_capture))
 }
 
 /// Waits until one process either becomes ready, exits early, or times out.
@@ -854,6 +1007,33 @@ fn check_runtime_client_process_readiness_from_spec(
             ..
         } => check_http_readiness(url, *expected_status),
         RuntimeClientProcessReadiness::Ws { url, .. } => check_ws_readiness(url),
+    }
+}
+
+fn readiness_type(process_spec: &RuntimeClientProcessSpec) -> &'static str {
+    match &process_spec.readiness {
+        RuntimeClientProcessReadiness::None => "none",
+        RuntimeClientProcessReadiness::Tcp { .. } => "tcp",
+        RuntimeClientProcessReadiness::Http { .. } => "http",
+        RuntimeClientProcessReadiness::Ws { .. } => "ws",
+    }
+}
+
+fn readiness_target(process_spec: &RuntimeClientProcessSpec) -> String {
+    match &process_spec.readiness {
+        RuntimeClientProcessReadiness::None => "".to_string(),
+        RuntimeClientProcessReadiness::Tcp { host, port, .. } => format!("{host}:{port}"),
+        RuntimeClientProcessReadiness::Http { url, .. } => url.clone(),
+        RuntimeClientProcessReadiness::Ws { url, .. } => url.clone(),
+    }
+}
+
+fn readiness_timeout_ms(process_spec: &RuntimeClientProcessSpec) -> u64 {
+    match &process_spec.readiness {
+        RuntimeClientProcessReadiness::None => 0,
+        RuntimeClientProcessReadiness::Tcp { timeout_ms, .. }
+        | RuntimeClientProcessReadiness::Http { timeout_ms, .. }
+        | RuntimeClientProcessReadiness::Ws { timeout_ms, .. } => *timeout_ms,
     }
 }
 

@@ -201,6 +201,79 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     await this.init(input);
   }
 
+  async readOperationLog(input: {
+    id: string;
+    operation: "init" | "resume";
+  }): Promise<string | null> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    const path = input.operation === "init" ? "/run/mistle/init.log" : "/run/mistle/resume.log";
+
+    try {
+      const container = this.#docker.getContainer(input.id);
+      const exec = await this.#runDockerOperation(DockerClientOperationIds.READ_OPERATION_LOG, () =>
+        container.exec({
+          AttachStdin: false,
+          AttachStdout: true,
+          AttachStderr: true,
+          Cmd: ["sh", "-euc", `if test -f '${path}'; then cat -- '${path}'; fi`],
+          Tty: false,
+          User: "root",
+        }),
+      );
+      const execStream = await this.#runDockerOperation(
+        DockerClientOperationIds.READ_OPERATION_LOG,
+        () =>
+          exec.start({
+            hijack: true,
+            stdin: false,
+            Detach: false,
+            Tty: false,
+          }),
+      );
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      container.modem.demuxStream(execStream, stdout, stderr);
+      const capturedStdout = captureUtf8Stream(stdout);
+      const capturedStderr = captureUtf8Stream(stderr);
+
+      const exitCode = await this.#runDockerOperation(
+        DockerClientOperationIds.READ_OPERATION_LOG,
+        () => waitForDockerExecExitCode(exec),
+      );
+      const stdoutText = capturedStdout.read();
+      const stderrText = capturedStderr.read();
+      capturedStdout.stop();
+      capturedStderr.stop();
+
+      if (exitCode !== 0) {
+        throw new Error(
+          `Docker sandbox operation log read exited with code ${String(exitCode)}.${formatCommandOutput(
+            {
+              stdout: stdoutText,
+              stderr: stderrText,
+            },
+          )}`,
+        );
+      }
+
+      const logText = stdoutText.trim();
+      return logText.length === 0 ? null : logText;
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
   async close(): Promise<void> {}
 
   async #runDockerOperation<TResult>(

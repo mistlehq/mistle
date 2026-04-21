@@ -5,6 +5,7 @@
 //! control socket is the only boundary that accepts startup lifecycle requests
 //! once the daemon is running.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::io::{Read, Write};
@@ -22,6 +23,9 @@ use serde::{Deserialize, Serialize};
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 use crate::security;
+use crate::startup_diagnostics::{
+    StartupDiagnosticsLogger, StartupOperation, startup_diagnostics_string,
+};
 use crate::supervision::{
     ComponentHealthSnapshot, ComponentHealthState, SandboxdDaemonPhase, SandboxdHealthResponse,
     SandboxdHealthSnapshot, SupervisedComponent,
@@ -763,11 +767,20 @@ fn begin_init(
     }
 
     let state_for_thread = state.clone();
+    let diagnostics_logger =
+        StartupDiagnosticsLogger::initialize(StartupOperation::Init, &startup_input.tunnel_gateway_ws_url)
+            .ok();
+    if let Some(logger) = &diagnostics_logger
+        && let Err(error) = logger.record_started()
+    {
+        eprintln!("sandboxd failed to record init diagnostics start event: {error}");
+    }
     *init_thread_guard = Some(thread::spawn(move || {
         let result = SandboxdState::initialize(
             &startup_input,
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
+            diagnostics_logger.clone(),
         );
 
         match result {
@@ -781,6 +794,14 @@ fn begin_init(
             }
             Err(error) => {
                 let error_text = error.to_string();
+                if let Some(logger) = &diagnostics_logger
+                    && let Err(record_error) = logger.record_failed(BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error_text.clone()),
+                    )]))
+                {
+                    eprintln!("sandboxd failed to record init diagnostics failure event: {record_error}");
+                }
                 state_for_thread
                     .lock()
                     .expect("control server state lock should not be poisoned")
@@ -798,6 +819,14 @@ fn begin_resume(
     startup_input: StartupInput,
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Result<(), ControlError> {
+    let diagnostics_logger =
+        StartupDiagnosticsLogger::initialize(StartupOperation::Resume, &startup_input.tunnel_gateway_ws_url)
+            .ok();
+    if let Some(logger) = &diagnostics_logger
+        && let Err(error) = logger.record_started()
+    {
+        eprintln!("sandboxd failed to record resume diagnostics start event: {error}");
+    }
     let mut sandboxd_state = {
         let mut state_guard = state
             .lock()
@@ -830,8 +859,21 @@ fn begin_resume(
     };
 
     let resume_result = sandboxd_state
-        .resume(&startup_input)
-        .map_err(|error| ControlError::ResumeSandboxdState(error.to_string()));
+        .resume(&startup_input, diagnostics_logger.clone())
+        .map_err(|error| {
+            let error_text = error.to_string();
+            if let Some(logger) = &diagnostics_logger
+                && let Err(record_error) = logger.record_failed(BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error_text.clone()),
+                )]))
+            {
+                eprintln!(
+                    "sandboxd failed to record resume diagnostics failure event: {record_error}"
+                );
+            }
+            ControlError::ResumeSandboxdState(error_text)
+        });
 
     state
         .lock()

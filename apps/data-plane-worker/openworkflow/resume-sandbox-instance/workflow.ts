@@ -11,6 +11,7 @@ import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
+import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -216,6 +217,15 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             const failureMessage = formatPersistedFailureMessage({
               summary: "Failed to initialize resumed sandbox runtime.",
               error,
+            });
+            await emitSandboxStartupDiagnostics({
+              logger,
+              sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+              providerSandboxId: resumedRuntime.providerSandboxId,
+              sandboxInstanceId: resumedRuntime.sandboxInstanceId,
+              runtimeProvider: resumedRuntime.runtimeProvider,
+              operation: "resume",
+              persistenceMode: resumableSandboxState.persistenceMode,
             });
 
             let stopSandboxError: unknown;

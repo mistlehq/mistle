@@ -71,6 +71,7 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/volume.js#L31-L54
    */
   REMOVE_VOLUME: "remove_volume",
+  READ_OPERATION_LOG: "read_operation_log",
 } as const;
 export type DockerClientOperation =
   (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];

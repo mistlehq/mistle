@@ -20,9 +20,13 @@ use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
 use crate::protocol::startup::StartupInput;
 use crate::runtime;
+use crate::runtime::RuntimePlanApplyError;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
+};
+use crate::startup_diagnostics::{
+    StartupDiagnosticsLogger, startup_diagnostics_string, startup_diagnostics_u64,
 };
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
@@ -109,10 +113,18 @@ impl SandboxdState {
         startup_input: &StartupInput,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<Self, SandboxdStateError> {
         let mut runtime_plan: runtime::CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone())
-                .map_err(|error| SandboxdStateError::ApplyRuntimePlan(error.to_string()))?;
+                .map_err(|error| {
+                    let error_text = error.to_string();
+                    record_runtime_plan_apply_failure(
+                        &diagnostics_logger,
+                        &RuntimePlanApplyError::InvalidRuntimePlan(error),
+                    );
+                    SandboxdStateError::ApplyRuntimePlan(error_text)
+                })?;
         let tokenizer_proxy_egress_base_url = resolve_tokenizer_proxy_egress_base_url()?;
         apply_runtime_startup_overrides(
             &mut runtime_plan,
@@ -127,9 +139,21 @@ impl SandboxdState {
             collect_tracked_components(&runtime_plan),
         );
         runtime::git_identity::apply_git_identity(startup_input)
-            .map_err(SandboxdStateError::ApplyGitIdentity)?;
-        runtime::apply_compiled_runtime_plan(&runtime_plan)
-            .map_err(|error| SandboxdStateError::ApplyRuntimePlan(error.to_string()))?;
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "apply_git_identity",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.clone()),
+                    )]),
+                );
+                SandboxdStateError::ApplyGitIdentity(error)
+            })?;
+        runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
+            record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+            SandboxdStateError::ApplyRuntimePlan(error.to_string())
+        })?;
         let egress_proxy = EgressProxy::start(
             &runtime_plan,
             startup_input,
@@ -137,7 +161,17 @@ impl SandboxdState {
             clock.clone(),
             supervisor_handle.clone(),
         )
-        .map_err(|error| SandboxdStateError::StartEgressProxy(error.to_string()))?;
+        .map_err(|error| {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "start_egress_proxy",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                )]),
+            );
+            SandboxdStateError::StartEgressProxy(error.to_string())
+        })?;
         let runtime_env = collect_runtime_environment(&runtime_plan)
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
@@ -154,7 +188,10 @@ impl SandboxdState {
                     sleeper.as_ref(),
                     supervisor_handle.clone(),
                 )
-                .map_err(|error| SandboxdStateError::StartRuntimeProcesses(error.to_string()))?,
+                .map_err(|error| {
+                    record_runtime_process_failure(&diagnostics_logger, &error);
+                    SandboxdStateError::StartRuntimeProcesses(error.to_string())
+                })?,
             )
         };
         let codex_app_server_observation_handle = process_manager
@@ -175,7 +212,17 @@ impl SandboxdState {
                 runtime_readiness_manager.clone(),
                 supervisor_handle.clone(),
             )
-            .map_err(|error| SandboxdStateError::StartRuntimeAdapters(error.to_string()))?;
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_runtime_adapters",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartRuntimeAdapters(error.to_string())
+            })?;
         let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
             [] => None,
@@ -192,6 +239,16 @@ impl SandboxdState {
                     .to_string(),
             ),
             _ => {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_tunnel_session",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(
+                            "sandboxd currently supports exactly one runtime adapter endpoint",
+                        ),
+                    )]),
+                );
                 return Err(SandboxdStateError::StartTunnelSession(
                     "sandboxd currently supports exactly one runtime adapter endpoint".to_string(),
                 ));
@@ -222,7 +279,17 @@ impl SandboxdState {
                 sleeper.clone(),
                 supervisor_handle.clone(),
             )
-            .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_tunnel_session",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartTunnelSession(error.to_string())
+            })?,
         );
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
@@ -263,9 +330,23 @@ impl SandboxdState {
     }
 
     /// Reconnects the bootstrap tunnel for an already-initialized daemon.
-    pub fn resume(&mut self, startup_input: &StartupInput) -> Result<(), SandboxdStateError> {
+    pub fn resume(
+        &mut self,
+        startup_input: &StartupInput,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
+    ) -> Result<(), SandboxdStateError> {
         runtime::git_identity::apply_git_identity(startup_input)
-            .map_err(SandboxdStateError::ApplyGitIdentity)?;
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "apply_git_identity",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.clone()),
+                    )]),
+                );
+                SandboxdStateError::ApplyGitIdentity(error)
+            })?;
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -288,7 +369,17 @@ impl SandboxdState {
                 self.sleeper.clone(),
                 self.supervisor_handle.clone(),
             )
-            .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?,
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_tunnel_session",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartTunnelSession(error.to_string())
+            })?,
         );
 
         Ok(())
@@ -356,6 +447,198 @@ impl SandboxdState {
             .force_current_server_shutdown_for_test()
             .map_err(|error| error.to_string())
     }
+}
+
+fn record_operation_phase_failure(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+    attributes: BTreeMap<String, serde_json::Value>,
+) {
+    if let Some(logger) = diagnostics_logger
+        && let Err(error) = logger.record_phase_failed(phase, attributes)
+    {
+        eprintln!("sandboxd failed to record startup diagnostics phase failure: {error}");
+    }
+}
+
+fn record_runtime_plan_apply_failure(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    error: &RuntimePlanApplyError,
+) {
+    let attributes = match error {
+        RuntimePlanApplyError::InvalidRuntimePlan(error) => BTreeMap::from([
+            (
+                "failureKind".to_string(),
+                startup_diagnostics_string("invalid_runtime_plan"),
+            ),
+            ("error".to_string(), startup_diagnostics_string(error.to_string())),
+        ]),
+        RuntimePlanApplyError::ArtifactInstall {
+            artifact_key,
+            install_index,
+            op,
+            error,
+            ..
+        } => BTreeMap::from([
+            (
+                "failureKind".to_string(),
+                startup_diagnostics_string("artifact_install_failed"),
+            ),
+            (
+                "artifactKey".to_string(),
+                startup_diagnostics_string(artifact_key.clone()),
+            ),
+            ("installIndex".to_string(), startup_diagnostics_u64(*install_index as u64)),
+            ("installOp".to_string(), startup_diagnostics_string(*op)),
+            ("error".to_string(), startup_diagnostics_string(error.clone())),
+        ]),
+        RuntimePlanApplyError::WorkspaceSource {
+            source_kind,
+            path,
+            origin_url,
+            clone_url,
+            error,
+            ..
+        } => {
+            let mut map = BTreeMap::from([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("workspace_source_failed"),
+                ),
+                (
+                    "sourceKind".to_string(),
+                    startup_diagnostics_string(*source_kind),
+                ),
+                ("path".to_string(), startup_diagnostics_string(path.clone())),
+                (
+                    "originUrl".to_string(),
+                    startup_diagnostics_string(origin_url.clone()),
+                ),
+                ("error".to_string(), startup_diagnostics_string(error.clone())),
+            ]);
+            if let Some(clone_url) = clone_url {
+                map.insert(
+                    "cloneUrl".to_string(),
+                    startup_diagnostics_string(clone_url.clone()),
+                );
+            }
+            map
+        }
+        RuntimePlanApplyError::RuntimeFile {
+            client_id,
+            file_id,
+            path,
+            error,
+            ..
+        } => BTreeMap::from([
+            (
+                "failureKind".to_string(),
+                startup_diagnostics_string("runtime_file_failed"),
+            ),
+            (
+                "clientId".to_string(),
+                startup_diagnostics_string(client_id.clone()),
+            ),
+            (
+                "fileId".to_string(),
+                startup_diagnostics_string(file_id.clone()),
+            ),
+            ("path".to_string(), startup_diagnostics_string(path.clone())),
+            ("error".to_string(), startup_diagnostics_string(error.clone())),
+        ]),
+    };
+
+    record_operation_phase_failure(diagnostics_logger, "apply_runtime_plan", attributes);
+}
+
+fn record_runtime_process_failure(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    error: &process::ProcessManagerError,
+) {
+    let attributes = match error {
+        process::ProcessManagerError::StartProcess {
+            process_key,
+            process_index,
+            error,
+            output_tails,
+        } => {
+            let mut map = BTreeMap::from([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("runtime_process_spawn_failed"),
+                ),
+                (
+                    "processKey".to_string(),
+                    startup_diagnostics_string(process_key.clone()),
+                ),
+                ("processIndex".to_string(), startup_diagnostics_u64(*process_index as u64)),
+                ("error".to_string(), startup_diagnostics_string(error.clone())),
+            ]);
+            if let Some(stdout_tail) = &output_tails.stdout_tail {
+                map.insert(
+                    "stdoutTail".to_string(),
+                    startup_diagnostics_string(stdout_tail.clone()),
+                );
+            }
+            if let Some(stderr_tail) = &output_tails.stderr_tail {
+                map.insert(
+                    "stderrTail".to_string(),
+                    startup_diagnostics_string(stderr_tail.clone()),
+                );
+            }
+            map
+        }
+        process::ProcessManagerError::ReadinessCheck {
+            process_key,
+            process_index,
+            error,
+            details,
+        } => {
+            let mut map = BTreeMap::from([
+                (
+                    "failureKind".to_string(),
+                    startup_diagnostics_string("runtime_process_readiness_failed"),
+                ),
+                (
+                    "processKey".to_string(),
+                    startup_diagnostics_string(process_key.clone()),
+                ),
+                ("processIndex".to_string(), startup_diagnostics_u64(*process_index as u64)),
+                (
+                    "readinessType".to_string(),
+                    startup_diagnostics_string(details.readiness_type.clone()),
+                ),
+                (
+                    "readinessTarget".to_string(),
+                    startup_diagnostics_string(details.readiness_target.clone()),
+                ),
+                (
+                    "timeoutMs".to_string(),
+                    startup_diagnostics_u64(details.timeout_ms),
+                ),
+                ("error".to_string(), startup_diagnostics_string(error.clone())),
+            ]);
+            if let Some(stdout_tail) = &details.output_tails.stdout_tail {
+                map.insert(
+                    "stdoutTail".to_string(),
+                    startup_diagnostics_string(stdout_tail.clone()),
+                );
+            }
+            if let Some(stderr_tail) = &details.output_tails.stderr_tail {
+                map.insert(
+                    "stderrTail".to_string(),
+                    startup_diagnostics_string(stderr_tail.clone()),
+                );
+            }
+            map
+        }
+        process::ProcessManagerError::StopProcesses(error) => BTreeMap::from([(
+            "error".to_string(),
+            startup_diagnostics_string(error.clone()),
+        )]),
+    };
+
+    record_operation_phase_failure(diagnostics_logger, "start_runtime_processes", attributes);
 }
 
 const CODEX_COORDINATION_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
