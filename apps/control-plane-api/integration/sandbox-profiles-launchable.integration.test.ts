@@ -315,7 +315,7 @@ describe("sandbox profiles launchable integration", () => {
     expect(response.status).toBe(200);
 
     const body = ListLaunchableSandboxProfilesResponseSchema.parse(await response.json());
-    expect(body.items).toHaveLength(2);
+    expect(body.items).toHaveLength(3);
     expect(body.items).toStrictEqual([
       {
         id: "sbp_launchable_agent_with_repos",
@@ -325,12 +325,12 @@ describe("sandbox profiles launchable integration", () => {
         latestVersion: 1,
         repositoryOptions: [
           {
-            id: "/root/mistlehq/mistle",
+            id: "mistlehq/mistle",
             label: "mistlehq/mistle",
             path: "/root/mistlehq/mistle",
           },
           {
-            id: "/root/mistlehq/platform",
+            id: "mistlehq/platform",
             label: "mistlehq/platform",
             path: "/root/mistlehq/platform",
           },
@@ -347,6 +347,16 @@ describe("sandbox profiles launchable integration", () => {
         repositoryOptions: [],
         createdAt: "2026-01-03T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
+      },
+      {
+        id: "sbp_launchable_mixed_bindings",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Mixed Bindings Profile",
+        status: "active",
+        latestVersion: 1,
+        repositoryOptions: [],
+        createdAt: "2025-12-29T00:00:00.000Z",
+        updatedAt: "2025-12-29T00:00:00.000Z",
       },
     ]);
   });

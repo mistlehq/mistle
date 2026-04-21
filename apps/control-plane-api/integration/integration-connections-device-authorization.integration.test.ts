@@ -39,12 +39,13 @@ describe("integration connections device authorization integration", () => {
     fixture,
   }) => {
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-device-auth-start",
-      familyId: "openai",
-      variantId: "openai-default",
+      targetKey: "github-cloud-device-auth-start",
+      familyId: "github",
+      variantId: "github-cloud",
       enabled: true,
       config: {
-        api_base_url: "https://api.openai.com/v1",
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
       },
     });
 
@@ -53,7 +54,7 @@ describe("integration connections device authorization integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/openai-default-device-auth-start/device-authorization/attempts",
+      "/v1/integration/connections/github-cloud-device-auth-start/device-authorization/attempts",
       {
         method: "POST",
         headers: {
@@ -72,7 +73,7 @@ describe("integration connections device authorization integration", () => {
       StartDeviceAuthorizationConnectionBadRequestResponseSchema.parse({
         code: "DEVICE_AUTH_NOT_SUPPORTED",
         message:
-          "Integration target 'openai-default-device-auth-start' does not support device authorization connection method 'chatgpt-device-code'.",
+          "Integration target 'github-cloud-device-auth-start' does not support device authorization connection method 'chatgpt-device-code'.",
       }),
     );
   });
@@ -268,7 +269,9 @@ describe("integration connections device authorization integration", () => {
       expect(persistedAttempt?.status).toBe(IntegrationDeviceAuthorizationAttemptStatuses.PENDING);
       expect(persistedAttempt?.verificationUrl).toBe("https://auth.example.com/device");
       expect(persistedAttempt?.userCode).toBe("WXYZ-9999");
-      expect(persistedAttempt?.expiresAt).toBe("2099-04-01T00:00:00.000Z");
+      expect(new Date(persistedAttempt?.expiresAt ?? "").toISOString()).toBe(
+        "2099-04-01T00:00:00.000Z",
+      );
       expect(persistedAttempt?.pollAfterAt).not.toBeNull();
       expect(persistedAttempt?.providerStateEncrypted).toBeTruthy();
       expect(persistedAttempt?.providerStateEncrypted).not.toContain("da_123");

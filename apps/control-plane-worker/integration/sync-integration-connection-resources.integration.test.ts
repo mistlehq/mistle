@@ -372,6 +372,7 @@ describe("syncIntegrationConnectionResources integration", () => {
         isIm: false,
         isMpim: false,
         isChannel: true,
+        isGroup: false,
       });
     } finally {
       await internalApiServer.stop();

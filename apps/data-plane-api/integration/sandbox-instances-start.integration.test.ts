@@ -380,6 +380,126 @@ describe("sandboxInstances.start integration", () => {
     expect(parsedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.PERSISTENT);
   }, 60_000);
 
+  it("persists persistent mode for e2b runtimes when archil storage is configured", async ({
+    fixture,
+  }) => {
+    const organizationId = "org_dp_api_e2b_archil_persistent_mode";
+    const sandboxProfileId = "sbp_dp_api_e2b_archil_persistent_mode";
+
+    await fixture.controlPlaneDb.insert(organizations).values({
+      id: organizationId,
+      name: "E2B persistent mode org",
+      slug: "org-dp-api-e2b-archil-persistent-mode",
+    });
+    await fixture.controlPlaneDb.insert(organizationSandboxStorageSettings).values({
+      organizationId,
+      persistentSandboxesEnabled: true,
+      storageConfigSource: SandboxStorageConfigSources.MANAGED,
+    });
+
+    const port = await reserveAvailablePort({ host: fixture.config.server.host });
+    const runtime = await createDataPlaneApiRuntime({
+      app: {
+        ...fixture.config,
+        server: {
+          ...fixture.config.server,
+          port,
+        },
+        sandbox: {
+          ...fixture.config.sandbox,
+          e2b: {
+            apiKey: "integration-e2b-api-key",
+            domain: "e2b.app",
+          },
+        },
+      },
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      sandboxProvider: "e2b",
+      sandboxStorageBackend: "archil",
+    });
+    await runtime.start();
+
+    try {
+      const client = createSandboxInstancesClient(
+        `http://${fixture.config.server.host}:${String(port)}`,
+        fixture.internalAuthServiceToken,
+      );
+      const workflowInput: StartSandboxInstanceInput = {
+        organizationId,
+        sandboxProfileId,
+        sandboxProfileVersion: 4,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId,
+          version: 4,
+        }),
+        startedBy: {
+          kind: "user",
+          id: "usr_dp_api_e2b_archil_persistent_mode",
+        },
+        source: "dashboard",
+        image: {
+          imageId: "im_dp_api_e2b_archil_persistent_mode",
+          createdAt: "2026-02-27T00:00:00.000Z",
+        },
+      };
+
+      const startedSandbox = await client.startSandboxInstance(workflowInput);
+
+      const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+        columns: {
+          id: true,
+          persistenceMode: true,
+          runtimeProvider: true,
+          status: true,
+        },
+        where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
+      });
+
+      expect(persistedSandboxInstance).toEqual({
+        id: startedSandbox.sandboxInstanceId,
+        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        runtimeProvider: "e2b",
+        status: SandboxInstanceStatuses.PENDING,
+      });
+
+      const workflowRuns = await waitForWorkflowRuns({
+        runQuery: async (queuedOrganizationId, queuedProfileId) => {
+          const result = await fixture.dbPool.query<WorkflowRunRow>(
+            `
+              select id, namespace_id, workflow_name, status, input, output
+              from data_plane_openworkflow.workflow_runs
+              where
+                namespace_id = $1
+                and workflow_name = $2
+                and input->>'organizationId' = $3
+                and input->>'sandboxProfileId' = $4
+              order by created_at asc
+            `,
+            [
+              fixture.config.workflow.namespaceId,
+              WorkflowName,
+              queuedOrganizationId,
+              queuedProfileId,
+            ],
+          );
+          return result.rows;
+        },
+        organizationId: workflowInput.organizationId,
+        sandboxProfileId: workflowInput.sandboxProfileId,
+      });
+
+      const queuedRun = workflowRuns[0];
+      if (queuedRun === undefined) {
+        throw new Error("Expected queued workflow run row to exist.");
+      }
+
+      const parsedWorkflowInput = WorkflowRunInputSchema.parse(queuedRun.input);
+      expect(parsedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.PERSISTENT);
+    } finally {
+      await runtime.stop();
+    }
+  }, 60_000);
+
   it("fails before enqueue and insert when persistent sandboxes are enabled without a durable backend", async ({
     fixture,
   }) => {

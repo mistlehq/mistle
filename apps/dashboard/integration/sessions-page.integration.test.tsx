@@ -24,11 +24,13 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbp_profile_alpha",
+                  organizationId: "org_123",
                   displayName: "Alpha Profile",
                   status: "active",
                   latestVersion: 2,
                   createdAt: "2026-03-01T00:00:00.000Z",
                   updatedAt: "2026-03-05T00:00:00.000Z",
+                  repositoryOptions: [],
                 },
               ],
             }),
@@ -47,6 +49,7 @@ describe("SessionsPage integration", () => {
                 items: [
                   {
                     id: "sbi_page_2",
+                    title: "Alpha Profile",
                     sandboxProfileId: "sbp_profile_alpha",
                     sandboxProfileDisplayName: "Alpha Profile",
                     sandboxProfileVersion: 2,
@@ -79,6 +82,7 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbi_page_1",
+                  title: "Alpha Profile",
                   sandboxProfileId: "sbp_profile_alpha",
                   sandboxProfileDisplayName: "Alpha Profile",
                   sandboxProfileVersion: 1,
@@ -119,7 +123,7 @@ describe("SessionsPage integration", () => {
     try {
       expect(await screen.findByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
       expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
-      expect(await screen.findByText("Alpha Profile")).toBeDefined();
+      expect(await screen.findAllByText("Alpha Profile")).toHaveLength(2);
       expect(await screen.findByText("Jordan Example")).toBeDefined();
       expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
       expect(screen.getByRole("button", { name: "Previous" })).toHaveProperty("disabled", true);
@@ -160,6 +164,7 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbi_history",
+                  title: "Historical Profile",
                   sandboxProfileId: "sbp_profile_hidden",
                   sandboxProfileDisplayName: "Historical Profile",
                   sandboxProfileVersion: 3,
@@ -195,7 +200,7 @@ describe("SessionsPage integration", () => {
     });
 
     try {
-      expect(await screen.findByText("Historical Profile")).toBeDefined();
+      expect(await screen.findAllByText("Historical Profile")).toHaveLength(2);
       expect(screen.getByRole("button", { name: "Start session" })).toHaveProperty(
         "disabled",
         true,
@@ -227,6 +232,7 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbi_automation",
+                  title: "GitHub Repo Triage",
                   sandboxProfileId: "sbp_profile_alpha",
                   sandboxProfileDisplayName: "Automation Profile",
                   sandboxProfileVersion: 1,
@@ -262,7 +268,7 @@ describe("SessionsPage integration", () => {
     });
 
     try {
-      expect(await screen.findByText("GitHub Repo Triage")).toBeDefined();
+      expect(await screen.findAllByText("GitHub Repo Triage")).toHaveLength(2);
       expect(screen.queryByText("Webhook")).toBeNull();
       expect(screen.queryByText("System")).toBeNull();
     } finally {
@@ -286,19 +292,23 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbp_profile_alpha",
+                  organizationId: "org_123",
                   displayName: "Alpha Profile",
                   status: "active",
                   latestVersion: 2,
                   createdAt: "2026-03-03T00:00:00.000Z",
                   updatedAt: "2026-03-05T00:00:00.000Z",
+                  repositoryOptions: [],
                 },
                 {
                   id: "sbp_profile_beta",
+                  organizationId: "org_123",
                   displayName: "Beta Profile",
                   status: "active",
                   latestVersion: 1,
                   createdAt: "2026-03-02T00:00:00.000Z",
                   updatedAt: "2026-03-05T00:00:00.000Z",
+                  repositoryOptions: [],
                 },
               ],
             }),
@@ -398,11 +408,13 @@ describe("SessionsPage integration", () => {
               items: [
                 {
                   id: "sbp_profile_alpha",
+                  organizationId: "org_123",
                   displayName: "Alpha Profile",
                   status: "active",
                   latestVersion: 2,
                   createdAt: "2026-03-01T00:00:00.000Z",
                   updatedAt: "2026-03-05T00:00:00.000Z",
+                  repositoryOptions: [],
                 },
               ],
             }),

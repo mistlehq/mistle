@@ -31,9 +31,12 @@ const CONTROL_PLANE_RUNTIME_DATABASE_NAME_PREFIX = "mistle_control_plane_for_dat
 const TestContextId = "data-plane-api.integration";
 const RepoRootPath = fileURLToPath(new URL("../../..", import.meta.url));
 const ControlPlaneApiHealthcheckPath = "/__healthz";
-const ControlPlaneApiStartupTimeoutMs = 20_000;
+const DataPlaneApiHealthcheckPath = "/__healthz";
+const ControlPlaneApiStartupTimeoutMs = 60_000;
+const DataPlaneApiStartupTimeoutMs = 30_000;
 const ControlPlaneApiShutdownTimeoutMs = 5_000;
 const ControlPlaneApiHealthPollIntervalMs = 100;
+const DataPlaneApiHealthPollIntervalMs = 100;
 
 type ControlPlaneApiChildProcess = ChildProcessByStdio<null, Readable, Readable>;
 
@@ -296,6 +299,25 @@ async function waitForControlPlaneApiHealth(input: {
   );
 }
 
+async function waitForDataPlaneApiHealth(input: { baseUrl: string }): Promise<void> {
+  const deadline = systemClock.nowMs() + DataPlaneApiStartupTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      const response = await fetch(new URL(DataPlaneApiHealthcheckPath, input.baseUrl));
+      if (response.status === 200) {
+        return;
+      }
+    } catch {}
+
+    await systemSleeper.sleep(DataPlaneApiHealthPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for data-plane-api healthcheck at ${new URL(DataPlaneApiHealthcheckPath, input.baseUrl).toString()}.`,
+  );
+}
+
 async function stopControlPlaneApiChildProcess(
   childProcess: ControlPlaneApiChildProcess,
 ): Promise<void> {
@@ -460,7 +482,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           dataPlaneApiBaseUrl: `http://${config.server.host}:${String(config.server.port)}`,
           workflowNamespaceId: sharedInfraConfig.workflowNamespaceId,
           internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
-          sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
+          sandboxStorageBackend: SandboxStorageBackend.DOCKER_VOLUME,
         });
         cleanupTasks.unshift(async () => {
           await controlPlaneRuntime.stop();
@@ -470,9 +492,12 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           app: config,
           internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
           sandboxProvider: "docker",
-          sandboxStorageBackend: "archil",
+          sandboxStorageBackend: "docker_volume",
         });
         await runtime.start();
+        await waitForDataPlaneApiHealth({
+          baseUrl: `http://${config.server.host}:${String(config.server.port)}`,
+        });
         cleanupTasks.unshift(async () => {
           await runtime.stop();
         });

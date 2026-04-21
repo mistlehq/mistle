@@ -7,6 +7,7 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import { SandboxProvider } from "@mistle/sandbox";
 import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { typeid } from "typeid-js";
@@ -81,7 +82,8 @@ export function resolveSandboxInstancePersistenceMode(input: {
     return SandboxInstancePersistenceModes.PERSISTENT;
   }
 
-  throw new Error(
+  throw new BadRequestError(
+    "INVALID_SANDBOX_STORAGE_CONFIGURATION",
     `Persistent sandboxes are enabled for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
   );
 }

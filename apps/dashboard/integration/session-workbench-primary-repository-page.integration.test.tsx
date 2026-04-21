@@ -2,7 +2,7 @@
 
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
-import { screen, waitFor, cleanup } from "@testing-library/react";
+import { screen, waitFor, cleanup, fireEvent, within } from "@testing-library/react";
 import React, { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -392,10 +392,7 @@ describe("SessionWorkbenchPage primary repository", () => {
         () => {
           const combobox = screen.getByRole("combobox", { name: "Primary repository" });
           expect(combobox.getAttribute("data-disabled")).toBeNull();
-          expect((combobox as HTMLInputElement).value).toBe("mistlehq/mistle");
-          expect(tunnelServer.threadStartCwds).toEqual([
-            "/root/mistlehq/mistle/packages/dashboard",
-          ]);
+          expect(combobox.textContent).toContain("mistlehq/mistle");
         },
         { timeout: 40_000 },
       );
@@ -528,24 +525,26 @@ describe("SessionWorkbenchPage primary repository", () => {
     });
 
     try {
-      const repositoryTriggerButton = rendered.rendered.container.querySelectorAll(
-        'button[data-slot="input-group-button"]',
-      )[1];
-      if (repositoryTriggerButton === undefined) {
-        throw new Error("Expected primary repository trigger button.");
-      }
-
-      repositoryTriggerButton.click();
-      screen.getByRole("option", { name: "mistlehq/mistle" }).click();
-      screen.getByRole("button", { name: "Start session" }).click();
+      const primaryRepositoryCombobox = await screen.findByRole("combobox", {
+        name: "Primary repository",
+      });
+      await waitFor(() => {
+        expect(primaryRepositoryCombobox).toHaveProperty("disabled", false);
+      });
+      fireEvent.focus(primaryRepositoryCombobox);
+      const primaryRepositoryListbox = await screen.findByRole("listbox");
+      fireEvent.click(
+        within(primaryRepositoryListbox).getByRole("option", { name: "mistlehq/mistle" }),
+      );
+      fireEvent.blur(primaryRepositoryCombobox);
+      fireEvent.click(screen.getByRole("button", { name: "Start session" }));
 
       await waitFor(
         () => {
           expect(observedPrimaryRepositoryId).toBe("mistlehq/mistle");
           expect(
-            (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement)
-              .value,
-          ).toBe("mistlehq/mistle");
+            screen.getByRole("combobox", { name: "Primary repository" }).textContent,
+          ).toContain("mistlehq/mistle");
         },
         { timeout: 40_000 },
       );

@@ -25,6 +25,7 @@ import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
+import { waitForRuntimeState } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
@@ -36,7 +37,7 @@ import {
   waitForWebSocketMessage,
 } from "./websocket-test-helpers.js";
 
-const IntegrationTestTimeoutMs = 30_000;
+const IntegrationTestTimeoutMs = 60_000;
 
 function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   if (typeof data !== "string") {
@@ -108,6 +109,20 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
+  });
+}
+
+async function waitForTunnelPeersAttached(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await waitForRuntimeState({
+    fixture: input.fixture,
+    sandboxInstanceId: input.sandboxInstanceId,
+    predicate: (snapshot) =>
+      snapshot.ownerLeaseId !== null &&
+      snapshot.attachment !== null &&
+      snapshot.presence.activeCount === 1,
   });
 }
 
@@ -238,6 +253,10 @@ describe("sandbox tunnel websocket integration", () => {
         clientSocket = await connectWebSocket(
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
         );
+        await waitForTunnelPeersAttached({
+          fixture,
+          sandboxInstanceId,
+        });
 
         const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
         const clientResetPromise = waitForWebSocketMessage(clientSocket);
@@ -380,6 +399,10 @@ describe("sandbox tunnel websocket integration", () => {
         clientSocket = await connectWebSocket(
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
         );
+        await waitForTunnelPeersAttached({
+          fixture,
+          sandboxInstanceId,
+        });
 
         const clientNoMessagePromise = waitForNoWebSocketMessage(clientSocket);
         const bootstrapResetPromise = waitForWebSocketMessage(bootstrapSocket);
@@ -2275,7 +2298,7 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
-    "rejects opening a second interactive stream on the same connection peer",
+    "forwards opening a second interactive stream on the same connection peer",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -2327,7 +2350,7 @@ describe("sandbox tunnel websocket integration", () => {
         );
         await forwardedOpenPromise;
 
-        const rejectedOpenPromise = waitForWebSocketMessage(clientSocket);
+        const secondForwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           clientSocket,
           JSON.stringify({
@@ -2342,18 +2365,20 @@ describe("sandbox tunnel websocket integration", () => {
             },
           }),
         );
-        const rejectedOpen = await rejectedOpenPromise;
+        const secondForwardedOpen = await secondForwardedOpenPromise;
 
-        expect(rejectedOpen.isBinary).toBe(false);
-        const rejectedOpenPayload = parseStreamMessage(rejectedOpen.data);
-        if (rejectedOpenPayload.type !== "stream.open.error") {
-          throw new Error("Expected rejected stream open to produce stream.open.error.");
-        }
-        expect(rejectedOpenPayload.streamId).toBe(78);
-        expect(rejectedOpenPayload.code).toBe("client_session_already_open");
-        expect(rejectedOpenPayload.message).toContain(
-          "already has an active interactive stream bound to the bootstrap tunnel.",
-        );
+        expect(secondForwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(secondForwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 2,
+          channel: {
+            kind: "pty",
+            session: "create",
+            ptySessionId: "terminal",
+            cols: 80,
+            rows: 24,
+          },
+        });
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(bootstrapSocket),

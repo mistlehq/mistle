@@ -1,10 +1,11 @@
 import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import type { AppContextBindings } from "../../../../types.js";
 import { startSandboxInstance } from "../../../sandbox-instances/services/start-sandbox-instance.js";
 import { route } from "./route.js";
 
-export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
   const openWorkflow = ctx.get("resources").openWorkflow;
   const workflowDbPool = ctx.get("resources").workflowDbPool;
@@ -29,3 +30,6 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
 
   return ctx.json(response, 200);
 };
+
+export const handler: RouteHandler<typeof route, AppContextBindings> =
+  withHttpErrorHandler(routeHandler);

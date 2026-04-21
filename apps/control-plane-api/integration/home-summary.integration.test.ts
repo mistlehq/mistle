@@ -155,6 +155,16 @@ describe("home summary integration", () => {
   });
 
   it("does not count inactive connections as completed integrations", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_home_summary_inactive_connection",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
     const authenticatedSession = await fixture.authSession({
       email: "integration-home-summary-inactive-connection@example.com",
     });
@@ -305,6 +315,16 @@ describe("home summary integration", () => {
   it("does not count active non-agent integrations as completed integrations", async ({
     fixture,
   }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_home_summary_non_agent_connection",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
     const authenticatedSession = await fixture.authSession({
       email: "integration-home-summary-non-agent-connection@example.com",
     });
@@ -342,6 +362,16 @@ describe("home summary integration", () => {
   it("ignores non-agent bindings when checking whether a profile is usable", async ({
     fixture,
   }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_home_summary_non_agent_binding",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
     const authenticatedSession = await fixture.authSession({
       email: "integration-home-summary-non-agent-binding@example.com",
     });
@@ -425,6 +455,6 @@ describe("home summary integration", () => {
     expect(response.status).toBe(200);
     const body = homeSummaryResponseSchema.parse(await response.json());
     expect(body.onboarding.hasUsableProfiles).toBe(true);
-    expect(body.onboarding.hasWebhookCapableIntegration).toBe(true);
+    expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
   });
 });

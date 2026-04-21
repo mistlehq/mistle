@@ -351,8 +351,8 @@ describe("integration connection webhook sources integration", () => {
     const responseBody = CreateIntegrationWebhookSourceBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("INVALID_WEBHOOK_SOURCE_INPUT");
-    expect(responseBody.message).toContain("personal API token");
+    expect(responseBody.code).toBe("WEBHOOK_SOURCE_NOT_SUPPORTED");
+    expect(responseBody.message).toContain("does not support webhook sources");
   });
 
   it("resolves Jira personal PAT webhook secrets from linked credentials", async ({ fixture }) => {

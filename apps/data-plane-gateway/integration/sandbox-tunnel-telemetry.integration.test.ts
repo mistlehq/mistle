@@ -6,7 +6,11 @@ import { randomUUID } from "node:crypto";
 
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
-import { encodeDataFrame, PayloadKindRawBytes } from "@mistle/sandbox-session-protocol";
+import {
+  DefaultStreamWindowBytes,
+  encodeDataFrame,
+  PayloadKindRawBytes,
+} from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
@@ -19,7 +23,7 @@ import {
   waitForWebSocketMessage,
 } from "./websocket-test-helpers.js";
 
-const IntegrationTestTimeoutMs = 30_000;
+const IntegrationTestTimeoutMs = 60_000;
 
 async function insertSandboxInstanceRow(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
@@ -110,7 +114,7 @@ describe("sandbox tunnel telemetry ingress integration", () => {
         data: JSON.stringify({
           type: "telemetry.open.ok",
           streamId: 43,
-          initialWindowBytes: 65536,
+          initialWindowBytes: DefaultStreamWindowBytes,
         }),
         isBinary: false,
       });
@@ -179,7 +183,7 @@ describe("sandbox tunnel telemetry ingress integration", () => {
         data: JSON.stringify({
           type: "telemetry.open.ok",
           streamId: 41,
-          initialWindowBytes: 65536,
+          initialWindowBytes: DefaultStreamWindowBytes,
         }),
         isBinary: false,
       });

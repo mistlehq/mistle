@@ -17,6 +17,7 @@ import {
   runCleanupTasks,
   startDataPlaneApi,
 } from "@mistle/test-harness";
+import { systemClock, systemSleeper } from "@mistle/time";
 import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
@@ -35,6 +36,9 @@ const CONFIG_FIXTURE_HOST_PATH = fileURLToPath(
   new URL("../../../packages/config/integration/fixtures/config.toml", import.meta.url),
 );
 const DATA_PLANE_API_STARTUP_TIMEOUT_MS = 120_000;
+const GATEWAY_HEALTHCHECK_PATH = "/__healthz";
+const GATEWAY_STARTUP_TIMEOUT_MS = 30_000;
+const GATEWAY_HEALTH_POLL_INTERVAL_MS = 100;
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
 const DockerSocketPath = "/var/run/docker.sock";
 
@@ -180,6 +184,25 @@ async function dropDatabaseIfExists(input: {
   } finally {
     await adminClient.end();
   }
+}
+
+async function waitForGatewayHealth(input: { baseUrl: string }): Promise<void> {
+  const deadline = systemClock.nowMs() + GATEWAY_STARTUP_TIMEOUT_MS;
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      const response = await fetch(new URL(GATEWAY_HEALTHCHECK_PATH, input.baseUrl));
+      if (response.status === 200) {
+        return;
+      }
+    } catch {}
+
+    await systemSleeper.sleep(GATEWAY_HEALTH_POLL_INTERVAL_MS);
+  }
+
+  throw new Error(
+    `Timed out waiting for data-plane-gateway healthcheck at ${new URL(GATEWAY_HEALTHCHECK_PATH, input.baseUrl).toString()}.`,
+  );
 }
 
 function createRuntimeStateConfig(input: {
@@ -424,6 +447,9 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
 
           const runtime = createDataPlaneGatewayRuntime(runtimeConfig);
           await runtime.start();
+          await waitForGatewayHealth({
+            baseUrl: `http://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
+          });
           cleanupTasks.unshift(async () => {
             await runtime.stop();
           });
