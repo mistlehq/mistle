@@ -671,6 +671,7 @@ describe("sandbox profile version start instance integration", () => {
       plaintext: "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----",
       metadata: {
         publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
+        publicKeyFingerprint: "SHA256:test-start-instance-signing-key",
       },
     });
 

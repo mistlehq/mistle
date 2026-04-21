@@ -46,11 +46,13 @@
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "sharp": "0.34.5",
+    "sshpk": "^1.18.0",
     "typeid-js": "^1.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.20.0"
+    "@types/pg": "^8.20.0",
+    "@types/sshpk": "^1.17.4"
   }
 }

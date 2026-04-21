@@ -55,6 +55,14 @@ export const LinkedAccountCredentialSummarySchema = z
   })
   .strict();
 
+export const LinkedAccountCommitSigningSummarySchema = z
+  .object({
+    credentialId: z.string().min(1),
+    publicKeyFingerprint: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const LinkedAccountSchema = z
   .object({
     providerFamily: z.string().min(1),
@@ -66,6 +74,7 @@ export const LinkedAccountSchema = z
     ]),
     principal: LinkedAccountPrincipalSummarySchema.nullable(),
     credential: LinkedAccountCredentialSummarySchema.nullable(),
+    commitSigning: LinkedAccountCommitSigningSummarySchema.nullable(),
   })
   .strict();
 
@@ -79,5 +88,11 @@ export const StartLinkedAccountAuthorizationResponseSchema = z
   .object({
     authorizationUrl: z.url(),
     expiresAt: z.string().min(1),
+  })
+  .strict();
+
+export const linkedAccountSigningKeyUploadFormSchema = z
+  .object({
+    file: multipartFileSchema,
   })
   .strict();

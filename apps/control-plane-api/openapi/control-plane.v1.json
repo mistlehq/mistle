@@ -6412,6 +6412,25 @@
                               "updatedAt"
                             ],
                             "additionalProperties": false
+                          },
+                          "commitSigning": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "credentialId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "publicKeyFingerprint": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["credentialId", "publicKeyFingerprint", "updatedAt"],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -6420,7 +6439,8 @@
                           "logoKey",
                           "configurationStatus",
                           "principal",
-                          "credential"
+                          "credential",
+                          "commitSigning"
                         ],
                         "additionalProperties": false
                       }
@@ -6461,6 +6481,182 @@
                 "schema": {
                   "type": "string",
                   "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/linked-accounts/github/signing-key": {
+      "put": {
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["file"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Upload or replace the authenticated user's GitHub SSH signing key."
+          },
+          "400": {
+            "description": "Invalid signing key input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "GitHub linked account was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["LINKED_ACCOUNT_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Me"],
+        "responses": {
+          "204": {
+            "description": "Remove the authenticated user's GitHub SSH signing key."
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "GitHub linked account or signing key was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["LINKED_ACCOUNT_NOT_FOUND"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["LINKED_ACCOUNT_SIGNING_KEY_NOT_FOUND"]
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }

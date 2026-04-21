@@ -1,5 +1,8 @@
 import {
   OrganizationIdentityLinkProviderConfigStatus,
+  userExternalPrincipalCredentialSecrets,
+  userExternalPrincipalCredentials,
+  UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   type UserExternalPrincipalCredentialStatus,
   type UserExternalPrincipalStatus,
@@ -7,8 +10,12 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
+import {
+  GitSshSigningCredentialKind,
+  GitSshSigningSecretMetadataSchema,
+} from "../github-signing.js";
 import {
   IdentityLinkProviderConfigurationStatus,
   listOrganizationIdentityLinkProviders,
@@ -96,6 +103,13 @@ export type LinkedAccount = {
   >;
   principal: LinkedAccountPrincipalSummary | null;
   credential: LinkedAccountCredentialSummary | null;
+  commitSigning: LinkedAccountCommitSigningSummary | null;
+};
+
+export type LinkedAccountCommitSigningSummary = {
+  credentialId: string;
+  publicKeyFingerprint: string;
+  updatedAt: string;
 };
 
 export async function listLinkedAccounts(
@@ -169,6 +183,7 @@ export async function listLinkedAccounts(
             and(
               eq(table.organizationId, input.organizationId),
               inArray(table.principalId, selectedPrincipalIds),
+              ne(table.credentialKind, GitSshSigningCredentialKind),
               ne(table.status, UserExternalPrincipalCredentialStatuses.REVOKED),
             ),
         });
@@ -184,10 +199,72 @@ export async function listLinkedAccounts(
     }
   }
 
+  const commitSigningRows =
+    selectedPrincipalIds.length === 0
+      ? []
+      : await ctx.db
+          .select({
+            principalId: userExternalPrincipalCredentials.principalId,
+            credentialId: userExternalPrincipalCredentials.id,
+            metadata: userExternalPrincipalCredentialSecrets.metadata,
+            updatedAt: userExternalPrincipalCredentials.updatedAt,
+          })
+          .from(userExternalPrincipalCredentials)
+          .innerJoin(
+            userExternalPrincipalCredentialSecrets,
+            and(
+              eq(userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
+              eq(
+                userExternalPrincipalCredentialSecrets.credentialId,
+                userExternalPrincipalCredentials.id,
+              ),
+              eq(
+                userExternalPrincipalCredentialSecrets.secretKind,
+                UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
+              ),
+              isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+            ),
+          )
+          .where(
+            and(
+              eq(userExternalPrincipalCredentials.organizationId, input.organizationId),
+              inArray(userExternalPrincipalCredentials.principalId, selectedPrincipalIds),
+              eq(userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
+              eq(
+                userExternalPrincipalCredentials.status,
+                UserExternalPrincipalCredentialStatuses.ACTIVE,
+              ),
+            ),
+          );
+
+  const commitSigningByPrincipalId = new Map<string, LinkedAccountCommitSigningSummary>();
+  for (const row of commitSigningRows) {
+    if (commitSigningByPrincipalId.has(row.principalId)) {
+      throw new Error(
+        `Multiple active Git SSH signing credentials were found for principal '${row.principalId}'.`,
+      );
+    }
+
+    const parsedMetadata = GitSshSigningSecretMetadataSchema.safeParse(row.metadata ?? {});
+    if (!parsedMetadata.success) {
+      throw new Error(
+        `Git SSH signing credential '${row.credentialId}' is missing required metadata.`,
+      );
+    }
+
+    commitSigningByPrincipalId.set(row.principalId, {
+      credentialId: row.credentialId,
+      publicKeyFingerprint: parsedMetadata.data.publicKeyFingerprint,
+      updatedAt: row.updatedAt,
+    });
+  }
+
   return configuredProviders.map((provider) => {
     const principal = principalsByProviderFamily.get(provider.providerFamily);
     const credential =
       principal === undefined ? undefined : credentialsByPrincipalId.get(principal.id);
+    const commitSigning =
+      principal === undefined ? undefined : commitSigningByPrincipalId.get(principal.id);
 
     return {
       providerFamily: provider.providerFamily,
@@ -220,6 +297,7 @@ export async function listLinkedAccounts(
               lastValidatedAt: credential.lastValidatedAt ?? null,
               updatedAt: credential.updatedAt,
             },
+      commitSigning: commitSigning ?? null,
     };
   });
 }

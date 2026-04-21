@@ -13,19 +13,16 @@ import { SigningGrantError, verifySigningGrant } from "@mistle/sandbox-signing-a
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  GitSshSigningCredentialKind,
+  GitSshSigningSecretMetadataSchema,
+} from "../../../identity-linking/github-signing.js";
 import { createCredentialSecretResolver } from "./credential-secret-resolution.js";
 import { InternalIdentityLinkingError, InternalIdentityLinkingErrorCodes } from "./errors.js";
 
-const GitSshSigningCredentialKind = "git_ssh_signing_key";
 const SshSigningFormat = "ssh";
 const CommitSignSignatureEncoding = "pem";
 const CommitSignBinaryPath = "/usr/local/bin/commit-sign";
-
-const GitSigningSecretMetadataSchema = z
-  .object({
-    publicKey: z.string().min(1),
-  })
-  .loose();
 
 const CommitSignResponseSchema = z
   .object({
@@ -294,7 +291,7 @@ export async function signCommitPayload(
     throw new Error("Expected Git SSH signing credential secret candidate.");
   }
 
-  const parsedSigningMetadata = GitSigningSecretMetadataSchema.safeParse(
+  const parsedSigningMetadata = GitSshSigningSecretMetadataSchema.safeParse(
     signingCredentialSecret.metadata ?? {},
   );
   if (!parsedSigningMetadata.success) {

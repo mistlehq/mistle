@@ -10,11 +10,14 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import {
+  GitHubProviderFamily,
+  GitSshSigningCredentialKind,
+  GitSshSigningSecretMetadataSchema,
+} from "../../identity-linking/github-signing.js";
 import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "../errors.js";
 import { resolveGitCommitSigningPolicy } from "./git-signing-policy.js";
 
-const GitHubProviderFamily = "github";
-const GitSshSigningCredentialKind = "git_ssh_signing_key";
 const GitSigningProgram = "/opt/mistle/bin/mistle-ssh-sign";
 
 const GitHubPrincipalProfileSchema = z
@@ -22,12 +25,6 @@ const GitHubPrincipalProfileSchema = z
     login: z.string().min(1),
     displayName: z.string().min(1).optional(),
     preferredEmail: z.email().optional(),
-  })
-  .loose();
-
-const GitSigningSecretMetadataSchema = z
-  .object({
-    publicKey: z.string().min(1),
   })
   .loose();
 
@@ -237,7 +234,7 @@ export async function resolveActingUserGitIdentity(
     };
   }
 
-  const parsedSigningMetadata = GitSigningSecretMetadataSchema.safeParse(
+  const parsedSigningMetadata = GitSshSigningSecretMetadataSchema.safeParse(
     signingCredential.metadata ?? {},
   );
   if (!parsedSigningMetadata.success) {

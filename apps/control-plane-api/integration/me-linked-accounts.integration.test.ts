@@ -1,5 +1,7 @@
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { fileURLToPath } from "node:url";
 
 import {
   identityLinkRedirectSessions,
@@ -7,6 +9,7 @@ import {
   integrationTargets,
   organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
+  userExternalPrincipalCredentialSecrets,
   UserExternalPrincipalCredentialSecretKinds,
   userExternalPrincipalCredentials,
   userExternalPrincipalKeys,
@@ -22,17 +25,32 @@ import { reserveAvailablePort } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
 
 import {
+  parseGitSshSigningPrivateKeyOrThrow,
+  GitSshSigningCredentialKind,
+  GitSshSigningSecretMetadataSchema,
+} from "../src/identity-linking/github-signing.js";
+import {
   persistIdentityLinkRedirectSession,
   resolveIdentityLinkProviderState,
   resolveIdentityLinkRedirectSecret,
 } from "../src/identity-linking/services/redirect-flow.js";
-import { decryptCredentialUtf8, unwrapOrganizationCredentialKey } from "../src/lib/crypto.js";
+import {
+  decryptCredentialUtf8,
+  encryptCredentialUtf8,
+  unwrapOrganizationCredentialKey,
+} from "../src/lib/crypto.js";
 import {
   LinkedAccountsResponseSchema,
   StartLinkedAccountAuthorizationResponseSchema,
 } from "../src/me/index.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
+
+const TestGitSigningPrivateKeyPath = fileURLToPath(
+  new URL("../../../packages/commit-sign/tests/fixtures/ed25519_private_key", import.meta.url),
+);
+const TestGitSigningPrivateKey = readFileSync(TestGitSigningPrivateKeyPath, "utf8");
+const TestGitSigningKeyMetadata = parseGitSshSigningPrivateKeyOrThrow(TestGitSigningPrivateKey);
 
 describe("me linked accounts integration", () => {
   it("lists configured providers with current-user principal and credential summaries", async ({
@@ -143,6 +161,7 @@ describe("me linked accounts integration", () => {
             lastValidatedAt: payload.linkedAccounts[0]?.credential?.lastValidatedAt ?? "",
             updatedAt: payload.linkedAccounts[0]?.credential?.updatedAt ?? "",
           },
+          commitSigning: null,
         },
         {
           providerFamily: "slack",
@@ -151,6 +170,7 @@ describe("me linked accounts integration", () => {
           configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
           principal: null,
           credential: null,
+          commitSigning: null,
         },
       ],
     });
@@ -841,6 +861,383 @@ describe("me linked accounts integration", () => {
     });
   });
 
+  it("uploads a GitHub signing key and exposes a commit-signing summary", async ({ fixture }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-upload-signing-key@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_signing_key_upload",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_signing_key_upload",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_signing_key_upload",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_signing_key_upload",
+      integrationConnectionId: "icn_github_signing_key_upload",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [
+          {
+            email: "mistle-user@example.com",
+            primary: true,
+            verified: true,
+          },
+        ],
+      },
+    });
+    await fixture.db.insert(userExternalPrincipalCredentials).values({
+      id: "upc_github_oauth_signing_key_upload",
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_upload",
+      providerFamily: "github",
+      credentialKind: "github_app_user_access_token",
+      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    });
+
+    const formData = new FormData();
+    formData.set(
+      "file",
+      new File([TestGitSigningPrivateKey], "id_signing", {
+        type: "application/octet-stream",
+      }),
+    );
+
+    const uploadResponse = await fixture.request("/v1/me/linked-accounts/github/signing-key", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+      },
+      body: formData,
+    });
+
+    expect(uploadResponse.status).toBe(204);
+
+    const signingCredential = await fixture.db.query.userExternalPrincipalCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.principalId, "uep_github_signing_key_upload"),
+          eq(table.credentialKind, GitSshSigningCredentialKind),
+          eq(table.status, UserExternalPrincipalCredentialStatuses.ACTIVE),
+        ),
+    });
+    expect(signingCredential?.credentialKind).toBe(GitSshSigningCredentialKind);
+
+    const signingSecret = await fixture.db.query.userExternalPrincipalCredentialSecrets.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.credentialId, signingCredential?.id ?? "__missing__"),
+          eq(table.secretKind, UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY),
+        ),
+    });
+
+    expect(signingSecret?.revokedAt).toBeNull();
+    expect(GitSshSigningSecretMetadataSchema.parse(signingSecret?.metadata ?? null)).toEqual({
+      publicKey: TestGitSigningKeyMetadata.publicKey,
+      publicKeyFingerprint: TestGitSigningKeyMetadata.publicKeyFingerprint,
+    });
+    expect(
+      await decryptUserExternalPrincipalCredentialSecret({
+        fixture,
+        organizationId: session.organizationId,
+        organizationCredentialKeyVersion: signingSecret?.organizationCredentialKeyVersion ?? -1,
+        nonce: signingSecret?.nonce ?? "__missing__",
+        ciphertext: signingSecret?.ciphertext ?? "__missing__",
+      }),
+    ).toBe(TestGitSigningPrivateKey.trim());
+
+    const listResponse = await fixture.request("/v1/me/linked-accounts", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(listResponse.status).toBe(200);
+    const payload = LinkedAccountsResponseSchema.parse(await listResponse.json());
+    expect(payload.linkedAccounts[0]?.commitSigning).toEqual({
+      credentialId: signingCredential?.id ?? "__missing__",
+      publicKeyFingerprint: TestGitSigningKeyMetadata.publicKeyFingerprint,
+      updatedAt: payload.linkedAccounts[0]?.commitSigning?.updatedAt ?? "",
+    });
+  });
+
+  it("replaces an existing GitHub signing key by revoking the previous credential", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-replace-signing-key@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_signing_key_replace",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_signing_key_replace",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_signing_key_replace",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_signing_key_replace",
+      integrationConnectionId: "icn_github_signing_key_replace",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [
+          {
+            email: "mistle-user@example.com",
+            primary: true,
+            verified: true,
+          },
+        ],
+      },
+    });
+    await fixture.db.insert(userExternalPrincipalCredentials).values({
+      id: "upc_github_oauth_signing_key_replace",
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_replace",
+      providerFamily: "github",
+      credentialKind: "github_app_user_access_token",
+      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    });
+    await insertGitHubSigningCredential({
+      fixture,
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_replace",
+      credentialId: "upc_github_signing_key_replace_existing",
+      privateKey: TestGitSigningPrivateKey,
+    });
+
+    const formData = new FormData();
+    formData.set(
+      "file",
+      new File([TestGitSigningPrivateKey], "id_signing", {
+        type: "application/octet-stream",
+      }),
+    );
+
+    const uploadResponse = await fixture.request("/v1/me/linked-accounts/github/signing-key", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+      },
+      body: formData,
+    });
+
+    expect(uploadResponse.status).toBe(204);
+
+    const signingCredentials = await fixture.db.query.userExternalPrincipalCredentials.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.principalId, "uep_github_signing_key_replace"),
+          eq(table.credentialKind, GitSshSigningCredentialKind),
+        ),
+      orderBy: (table, { asc }) => [asc(table.createdAt)],
+    });
+
+    expect(signingCredentials).toHaveLength(2);
+    expect(signingCredentials[0]?.status).toBe(UserExternalPrincipalCredentialStatuses.REVOKED);
+    expect(signingCredentials[1]?.status).toBe(UserExternalPrincipalCredentialStatuses.ACTIVE);
+
+    const revokedSecrets = await fixture.db.query.userExternalPrincipalCredentialSecrets.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.credentialId, "upc_github_signing_key_replace_existing"),
+        ),
+    });
+    expect(revokedSecrets[0]?.revokedAt).toBeTruthy();
+  });
+
+  it("removes a GitHub signing key", async ({ fixture }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-delete-signing-key@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_signing_key_delete",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_signing_key_delete",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_signing_key_delete",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_signing_key_delete",
+      integrationConnectionId: "icn_github_signing_key_delete",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [
+          {
+            email: "mistle-user@example.com",
+            primary: true,
+            verified: true,
+          },
+        ],
+      },
+    });
+    await fixture.db.insert(userExternalPrincipalCredentials).values({
+      id: "upc_github_oauth_signing_key_delete",
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_delete",
+      providerFamily: "github",
+      credentialKind: "github_app_user_access_token",
+      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    });
+    await insertGitHubSigningCredential({
+      fixture,
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_delete",
+      credentialId: "upc_github_signing_key_delete_existing",
+      privateKey: TestGitSigningPrivateKey,
+    });
+
+    const deleteResponse = await fixture.request("/v1/me/linked-accounts/github/signing-key", {
+      method: "DELETE",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(deleteResponse.status).toBe(204);
+
+    const signingCredential = await fixture.db.query.userExternalPrincipalCredentials.findFirst({
+      where: (table, { eq }) => eq(table.id, "upc_github_signing_key_delete_existing"),
+    });
+    expect(signingCredential?.status).toBe(UserExternalPrincipalCredentialStatuses.REVOKED);
+
+    const signingSecret = await fixture.db.query.userExternalPrincipalCredentialSecrets.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, session.organizationId),
+          eq(table.credentialId, "upc_github_signing_key_delete_existing"),
+        ),
+    });
+    expect(signingSecret?.revokedAt).toBeTruthy();
+  });
+
+  it("rejects an invalid GitHub signing key upload", async ({ fixture }) => {
+    const session = await fixture.authSession({
+      email: "me-linked-accounts-invalid-signing-key@example.com",
+    });
+
+    await upsertGitHubTarget({
+      fixture,
+      targetKey: "github-cloud",
+    });
+    await insertIdentityLinkProviderConfig({
+      fixture,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      configId: "ilp_github_signing_key_invalid",
+      providerFamily: "github",
+      targetKey: "github-cloud",
+      connectionId: "icn_github_signing_key_invalid",
+      connectionDisplayName: "GitHub Identity",
+      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    });
+    await fixture.db.insert(userExternalPrincipals).values({
+      id: "uep_github_signing_key_invalid",
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerFamily: "github",
+      providerSubjectId: "12345",
+      organizationProviderConfigId: "ilp_github_signing_key_invalid",
+      integrationConnectionId: "icn_github_signing_key_invalid",
+      status: UserExternalPrincipalStatuses.ACTIVE,
+      profile: {
+        login: "mistle-user",
+        preferredEmail: "mistle-user@example.com",
+        availableEmails: [
+          {
+            email: "mistle-user@example.com",
+            primary: true,
+            verified: true,
+          },
+        ],
+      },
+    });
+    await fixture.db.insert(userExternalPrincipalCredentials).values({
+      id: "upc_github_oauth_signing_key_invalid",
+      organizationId: session.organizationId,
+      principalId: "uep_github_signing_key_invalid",
+      providerFamily: "github",
+      credentialKind: "github_app_user_access_token",
+      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    });
+
+    const formData = new FormData();
+    formData.set(
+      "file",
+      new File(["not-a-private-key"], "id_signing", {
+        type: "text/plain",
+      }),
+    );
+
+    const uploadResponse = await fixture.request("/v1/me/linked-accounts/github/signing-key", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+      },
+      body: formData,
+    });
+
+    expect(uploadResponse.status).toBe(400);
+    await expect(uploadResponse.json()).resolves.toEqual({
+      code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT",
+      message: "GitHub signing key must be a valid SSH private key.",
+    });
+  });
+
   it("fails explicitly when a GitHub linked account has no selectable emails yet", async ({
     fixture,
   }) => {
@@ -1518,6 +1915,69 @@ async function createSlackAppConnection(input: {
   }
 
   return connectionId;
+}
+
+async function insertGitHubSigningCredential(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  principalId: string;
+  credentialId: string;
+  privateKey: string;
+}): Promise<void> {
+  await input.fixture.db.insert(userExternalPrincipalCredentials).values({
+    id: input.credentialId,
+    organizationId: input.organizationId,
+    principalId: input.principalId,
+    providerFamily: "github",
+    credentialKind: GitSshSigningCredentialKind,
+    status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+  });
+
+  const parsedSigningKey = parseGitSshSigningPrivateKeyOrThrow(input.privateKey);
+  const organizationCredentialKey =
+    await input.fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    });
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterKeyMaterial =
+    input.fixture.config.integrations.masterEncryptionKeys[
+      String(organizationCredentialKey.masterKeyVersion)
+    ];
+  if (masterKeyMaterial === undefined) {
+    throw new Error(
+      `Missing integration master key version '${String(organizationCredentialKey.masterKeyVersion)}'.`,
+    );
+  }
+
+  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial: masterKeyMaterial,
+  });
+
+  try {
+    const encryptedSigningKey = encryptCredentialUtf8({
+      plaintext: parsedSigningKey.privateKey,
+      organizationCredentialKey: organizationCredentialKeyMaterial,
+    });
+
+    await input.fixture.db.insert(userExternalPrincipalCredentialSecrets).values({
+      organizationId: input.organizationId,
+      credentialId: input.credentialId,
+      secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
+      nonce: encryptedSigningKey.nonce,
+      ciphertext: encryptedSigningKey.ciphertext,
+      organizationCredentialKeyVersion: organizationCredentialKey.version,
+      metadata: {
+        publicKey: parsedSigningKey.publicKey,
+        publicKeyFingerprint: parsedSigningKey.publicKeyFingerprint,
+      },
+    });
+  } finally {
+    organizationCredentialKeyMaterial.fill(0);
+  }
 }
 
 async function decryptUserExternalPrincipalCredentialSecret(input: {

@@ -351,6 +351,7 @@ async function insertGitHubSigningContext(input: {
     plaintext: input.privateKey,
     metadata: {
       publicKey: input.publicKey,
+      publicKeyFingerprint: "SHA256:test-sign-commit-payload",
     },
   });
 }
