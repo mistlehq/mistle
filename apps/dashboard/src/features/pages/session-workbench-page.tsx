@@ -18,11 +18,11 @@ import { reconcilePendingSessionDiffComments } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover } from "./session-port-access-popover.js";
+import { SessionStartupStatus } from "./session-startup-status.js";
 import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
 } from "./session-terminal-workspace.js";
-import { SessionStartupStatus } from "./session-startup-status.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import {
   SessionWorkbenchPageView,
