@@ -447,6 +447,47 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(expectedVisibility);
   });
 
+  it("persists diff panel visibility per sandbox instance", () => {
+    const hasStorageApi =
+      typeof window.localStorage === "object" &&
+      window.localStorage !== null &&
+      typeof window.localStorage.getItem === "function" &&
+      typeof window.localStorage.removeItem === "function";
+    const sandboxInstanceIdOne = `sbi-diff-one-${Date.now()}`;
+    const sandboxInstanceIdTwo = `sbi-diff-two-${Date.now()}`;
+
+    if (hasStorageApi) {
+      window.localStorage.removeItem(`dashboard:session-diff-workbench:${sandboxInstanceIdOne}`);
+      window.localStorage.removeItem(`dashboard:session-diff-workbench:${sandboxInstanceIdTwo}`);
+    }
+
+    const queryClient = createControllerQueryClient();
+    const { result, rerender } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId: sandboxInstanceIdOne,
+    });
+
+    act(() => {
+      result.current.workbench.diffPanelState.openPanel();
+    });
+
+    expect(result.current.workbench.diffPanelState.isVisible).toBe(true);
+
+    rerender({
+      sandboxInstanceId: sandboxInstanceIdTwo,
+    });
+
+    expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
+
+    rerender({
+      sandboxInstanceId: sandboxInstanceIdOne,
+    });
+
+    const expectedVisibility = hasStorageApi;
+
+    expect(result.current.workbench.diffPanelState.isVisible).toBe(expectedVisibility);
+  });
+
   it("waits for automation-backed sessions whose persisted thread id is still pending", () => {
     expect(
       shouldWaitForAutomationSessionThread({
