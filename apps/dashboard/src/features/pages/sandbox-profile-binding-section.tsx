@@ -24,11 +24,11 @@ import type {
 } from "./sandbox-profile-binding-config-editor.js";
 import {
   createDefaultBindingConfig,
+  resolveBindingConfigSummaryItems,
   resolveBindingKindFromTarget,
   resolveBindingToolToggleModel,
   SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
-import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
 
 export function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
@@ -421,10 +421,10 @@ function ConnectorBindingRows(input: {
   emptyStateMessage: string | undefined;
 }): React.JSX.Element {
   function resolveConfigSummaryItems(params: { row: SandboxProfileBindingEditorRow }) {
-    return formatSandboxProfileBindingSummaryItems({
+    return resolveBindingConfigSummaryItems({
       row: params.row,
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets,
+      connections: input.availableConnections,
+      targets: input.availableTargets,
       excludedPropertyKeys: ["tools"],
       maxItems: 3,
     });

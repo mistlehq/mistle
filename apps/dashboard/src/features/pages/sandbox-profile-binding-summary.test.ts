@@ -8,9 +8,9 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
+import { resolveBindingConfigSummaryItems } from "./sandbox-profile-binding-config-editor.js";
 
-describe("formatSandboxProfileBindingSummaryItems", () => {
+describe("resolveBindingConfigSummaryItems", () => {
   it("flattens nested agent harness config fields into summary items", () => {
     const target: IntegrationTargetSummary = {
       targetKey: "target-openai",
@@ -55,10 +55,10 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     };
 
     expect(
-      formatSandboxProfileBindingSummaryItems({
+      resolveBindingConfigSummaryItems({
         row,
-        availableConnections: [connection],
-        availableTargets: [target],
+        connections: [connection],
+        targets: [target],
         maxItems: Number.POSITIVE_INFINITY,
       }),
     ).toEqual([
@@ -123,10 +123,10 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     };
 
     expect(
-      formatSandboxProfileBindingSummaryItems({
+      resolveBindingConfigSummaryItems({
         row,
-        availableConnections: [connection],
-        availableTargets: [target],
+        connections: [connection],
+        targets: [target],
       }),
     ).toEqual([
       {
@@ -172,10 +172,10 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     };
 
     expect(
-      formatSandboxProfileBindingSummaryItems({
+      resolveBindingConfigSummaryItems({
         row,
-        availableConnections: [connection],
-        availableTargets: [target],
+        connections: [connection],
+        targets: [target],
       }),
     ).toEqual([
       {
@@ -215,10 +215,10 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     };
 
     expect(
-      formatSandboxProfileBindingSummaryItems({
+      resolveBindingConfigSummaryItems({
         row,
-        availableConnections: [connection],
-        availableTargets: [target],
+        connections: [connection],
+        targets: [target],
       }),
     ).toEqual([
       {
@@ -256,10 +256,10 @@ describe("formatSandboxProfileBindingSummaryItems", () => {
     };
 
     expect(
-      formatSandboxProfileBindingSummaryItems({
+      resolveBindingConfigSummaryItems({
         row,
-        availableConnections: [connection],
-        availableTargets: [target],
+        connections: [connection],
+        targets: [target],
       }),
     ).toEqual([
       {

@@ -8,7 +8,7 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { formatSandboxProfileBindingSummaryItems } from "./sandbox-profile-binding-summary.js";
+import { resolveBindingConfigSummaryItems } from "./sandbox-profile-binding-config-editor.js";
 
 const DefaultSummaryItemCount = 2;
 
@@ -53,10 +53,10 @@ export function SandboxProfileBindingCard(input: {
     availableTargets: input.availableTargets,
   });
   const target = rowMetadata?.target;
-  const summaryItems = formatSandboxProfileBindingSummaryItems({
+  const summaryItems = resolveBindingConfigSummaryItems({
     row: input.row,
-    availableConnections: input.availableConnections,
-    availableTargets: input.availableTargets,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
     maxItems: shouldRenderAllSummaryItems(input.row.kind)
       ? Number.POSITIVE_INFINITY
       : DefaultSummaryItemCount,
