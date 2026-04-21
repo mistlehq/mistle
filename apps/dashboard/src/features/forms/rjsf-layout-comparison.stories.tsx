@@ -22,27 +22,24 @@ import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
-  IntegrationFormWithoutSubmit,
-  type IntegrationFormContext,
-} from "./integration-form-theme.js";
-import {
   createGithubRepositoryResources,
   RepositoryItems,
 } from "./integration-resource-picker-story-support.js";
 import type { IntegrationResourceListViewState } from "./integration-resource-picker-view-model.js";
 import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
+import { SchemaFormWithoutSubmit, type SchemaFormContext } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
 
 function RjsfExampleForm(input: {
-  formContext: IntegrationFormContext;
+  formContext: SchemaFormContext;
   formData: JsonObject;
   initialQueryData?: ReadonlyArray<{
     queryKey: readonly unknown[];
     data: unknown;
   }>;
   schema: RJSFSchema;
-  uiSchema: UiSchema<JsonObject, RJSFSchema, IntegrationFormContext>;
+  uiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext>;
 }): React.JSX.Element {
   const [queryClient] = useState(() => {
     const client = new QueryClient({
@@ -62,7 +59,7 @@ function RjsfExampleForm(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <IntegrationFormWithoutSubmit
+      <SchemaFormWithoutSubmit
         formContext={input.formContext}
         formData={formData}
         noHtml5Validate

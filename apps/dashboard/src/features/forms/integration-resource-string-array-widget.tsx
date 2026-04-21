@@ -11,9 +11,9 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
-import type { IntegrationFormContext } from "./integration-form-theme.js";
 import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
 import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
+import type { SchemaFormContext } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
 const SearchDebounceMs = 300;
@@ -44,7 +44,7 @@ type IntegrationResourceStringArrayWidgetOptions = z.infer<
 >;
 
 function resolveWidgetOptions(
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
+  options: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>["options"],
 ): IntegrationResourceStringArrayWidgetOptions {
   const parsedOptions = IntegrationResourceStringArrayWidgetOptionsSchema.safeParse(options);
   if (!parsedOptions.success) {
@@ -84,7 +84,7 @@ function formatSyncMetadata(input: {
 }
 
 export function IntegrationResourceStringArrayWidget(
-  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
 ): React.JSX.Element {
   const options = resolveWidgetOptions(props.options);
   const queryClient = useQueryClient();

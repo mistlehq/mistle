@@ -19,7 +19,7 @@ import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
-import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
+import { SchemaFormWithoutSubmit } from "../forms/schema-form.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
@@ -237,7 +237,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
       ) : null}
 
       {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
-        <IntegrationFormWithoutSubmit
+        <SchemaFormWithoutSubmit
           formData={props.configValue}
           noHtml5Validate
           onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {

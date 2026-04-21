@@ -55,10 +55,12 @@ type IntegrationFieldLayout = "horizontal" | "vertical";
  * - individual fields may opt out of the horizontal row treatment by setting
  *   `ui:options.layout` to `"stacked"` in their uiSchema.
  */
-export type IntegrationFormLayout = "vertical" | "horizontal";
-export type IntegrationFormLabelTone = "default" | "detail";
+type IntegrationFormLayout = "vertical" | "horizontal";
+type IntegrationFormLabelTone = "default" | "detail";
+export type SchemaFormLayout = IntegrationFormLayout;
+export type SchemaFormLabelTone = IntegrationFormLabelTone;
 
-export type IntegrationFormContext = {
+type IntegrationFormContext = {
   /**
    * Form-wide default layout for RJSF surfaces using the shared integration
    * theme. This is intentionally a small API that mirrors the patterns we use
@@ -81,6 +83,7 @@ export type IntegrationFormContext = {
    */
   columns?: 1 | 2;
 };
+export type SchemaFormContext = IntegrationFormContext;
 
 function resolveSelectWidgetOptions(input: {
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"];
@@ -1030,11 +1033,7 @@ const IntegrationTheme = {
   widgets: IntegrationFormWidgets,
 };
 
-export const IntegrationFormWithoutSubmit = withTheme<
-  JsonObject,
-  RJSFSchema,
-  IntegrationFormContext
->({
+const IntegrationFormWithoutSubmit = withTheme<JsonObject, RJSFSchema, IntegrationFormContext>({
   ...IntegrationTheme,
   templates: {
     ...IntegrationFormTemplates,
@@ -1043,3 +1042,5 @@ export const IntegrationFormWithoutSubmit = withTheme<
     },
   },
 });
+
+export const SchemaFormWithoutSubmit = IntegrationFormWithoutSubmit;

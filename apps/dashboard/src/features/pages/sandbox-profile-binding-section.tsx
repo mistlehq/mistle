@@ -17,7 +17,7 @@ import {
 import { InfoIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
-import { IntegrationSelectContentClassName } from "../forms/integration-form-theme.js";
+import { IntegrationSelectContentClassName } from "../forms/schema-form.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";

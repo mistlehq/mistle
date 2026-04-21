@@ -5,8 +5,8 @@ import validator from "@rjsf/validator-ajv8";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { IntegrationFormContext } from "./integration-form-theme.js";
-import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
+import type { SchemaFormContext } from "./schema-form.js";
+import { SchemaFormWithoutSubmit } from "./schema-form.js";
 
 type JsonObject = Record<string, unknown>;
 
@@ -30,7 +30,7 @@ const Schema: RJSFSchema = {
   },
 };
 
-const UiSchema: UiSchema<JsonObject, RJSFSchema, IntegrationFormContext> = {
+const UiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
   defaultRegion: {
     "ui:placeholder": "Select default region",
     "ui:widget": "single-select-string-combobox",
@@ -39,7 +39,7 @@ const UiSchema: UiSchema<JsonObject, RJSFSchema, IntegrationFormContext> = {
 
 function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element {
   return (
-    <IntegrationFormWithoutSubmit
+    <SchemaFormWithoutSubmit
       formContext={{}}
       formData={input.formData}
       noHtml5Validate
@@ -52,7 +52,7 @@ function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element
   );
 }
 
-describe("IntegrationFormWithoutSubmit", () => {
+describe("SchemaFormWithoutSubmit", () => {
   it("wires the single-select combobox widget through the form theme", async () => {
     render(
       <SingleSelectHarness

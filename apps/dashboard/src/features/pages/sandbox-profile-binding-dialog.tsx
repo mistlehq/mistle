@@ -11,7 +11,7 @@ import {
 } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import { IntegrationHorizontalFieldGroupClassName } from "../forms/integration-form-theme.js";
+import { IntegrationHorizontalFieldGroupClassName } from "../forms/schema-form.js";
 import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import {
   SandboxProfileBindingConfigEditor,

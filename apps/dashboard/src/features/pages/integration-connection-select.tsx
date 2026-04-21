@@ -1,7 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
 import type React from "react";
 
-import { IntegrationSelectContentClassName } from "../forms/integration-form-theme.js";
+import { IntegrationSelectContentClassName } from "../forms/schema-form.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveSelectableValue } from "../shared/select-value.js";
 import { ConnectionSelectValueContent } from "./connection-select-value-content.js";
