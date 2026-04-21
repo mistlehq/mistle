@@ -72,6 +72,11 @@ export type BindingToolToggleOption = {
   checked: boolean;
 };
 
+export type BindingConfigSummaryItem = {
+  label: string;
+  value: string;
+};
+
 export type BindingToolToggleModel =
   | {
       mode: "supported";
@@ -225,6 +230,139 @@ function resolveArrayFieldOptions(input: {
   }
 
   return [];
+}
+
+function createPropertyPath(parentPath: string, propertyKey: string): string {
+  return parentPath.length === 0 ? propertyKey : `${parentPath}.${propertyKey}`;
+}
+
+function hasExcludedPropertyKey(
+  excludedPropertyKeys: ReadonlySet<string>,
+  propertyPath: string,
+  propertyKey: string,
+): boolean {
+  return excludedPropertyKeys.has(propertyPath) || excludedPropertyKeys.has(propertyKey);
+}
+
+function resolvePropertyTitle(input: {
+  schema: Record<string, unknown>;
+  uiSchema: Record<string, unknown>;
+  propertyKey: string;
+}): string {
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (isRecord(propertyUiSchema)) {
+    const uiTitle = propertyUiSchema["ui:title"];
+    if (typeof uiTitle === "string" && uiTitle.length > 0) {
+      return uiTitle;
+    }
+  }
+
+  const properties = input.schema.properties;
+  if (isRecord(properties)) {
+    const propertySchema = properties[input.propertyKey];
+    if (isRecord(propertySchema)) {
+      const title = propertySchema.title;
+      if (typeof title === "string" && title.length > 0) {
+        return title;
+      }
+    }
+  }
+
+  return input.propertyKey;
+}
+
+function resolveScalarSummaryValue(input: {
+  schema: Record<string, unknown>;
+  propertyKey: string;
+  value: string | number | boolean;
+}): string {
+  const properties = input.schema.properties;
+  if (!isRecord(properties)) {
+    return String(input.value);
+  }
+
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema) || !Array.isArray(propertySchema.oneOf)) {
+    return String(input.value);
+  }
+
+  for (const option of propertySchema.oneOf) {
+    if (!isRecord(option)) {
+      continue;
+    }
+
+    if (option.const === input.value && typeof option.title === "string") {
+      return option.title;
+    }
+  }
+
+  return String(input.value);
+}
+
+function resolveArraySummaryValue(input: {
+  schema: Record<string, unknown>;
+  uiSchema: Record<string, unknown>;
+  propertyKey: string;
+  value: ReadonlyArray<unknown>;
+}): string {
+  if (input.value.length === 0) {
+    return "None";
+  }
+
+  const stringEntries = input.value.filter((entry): entry is string => typeof entry === "string");
+  const properties = input.schema.properties;
+  if (!isRecord(properties)) {
+    return stringEntries.join(", ");
+  }
+
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema)) {
+    return stringEntries.join(", ");
+  }
+
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (isRecord(propertyUiSchema)) {
+    const enumNames = propertyUiSchema["ui:enumNames"];
+    const itemsSchema = propertySchema.items;
+    if (Array.isArray(enumNames) && isRecord(itemsSchema) && Array.isArray(itemsSchema.enum)) {
+      const labelByValue = new Map<string, string>();
+
+      for (const [index, itemValue] of itemsSchema.enum.entries()) {
+        const itemLabel = enumNames[index];
+        if (typeof itemValue === "string" && typeof itemLabel === "string") {
+          labelByValue.set(itemValue, itemLabel);
+        }
+      }
+
+      return stringEntries.map((entry) => labelByValue.get(entry) ?? entry).join(", ");
+    }
+  }
+
+  const itemsSchema = propertySchema.items;
+  if (!isRecord(itemsSchema)) {
+    return stringEntries.join(", ");
+  }
+
+  const oneOf = itemsSchema.oneOf;
+  if (Array.isArray(oneOf)) {
+    return stringEntries
+      .map((entry) => {
+        for (const option of oneOf) {
+          if (!isRecord(option)) {
+            continue;
+          }
+
+          if (option.const === entry && typeof option.title === "string") {
+            return option.title;
+          }
+        }
+
+        return entry;
+      })
+      .join(", ");
+  }
+
+  return stringEntries.join(", ");
 }
 
 function resolveBindingDefinitionContext(input: {
@@ -513,6 +651,142 @@ export function resolveBindingConfigUiModel(input: {
     row: input.row,
     context: contextResult.value,
   });
+}
+
+export function resolveBindingConfigSummaryItems(input: {
+  row: SandboxProfileBindingEditorRow;
+  connections: readonly IntegrationConnectionSummary[];
+  targets: readonly IntegrationTargetSummary[];
+  maxItems?: number | undefined;
+  excludedPropertyKeys?: readonly string[] | undefined;
+}): BindingConfigSummaryItem[] {
+  const items: BindingConfigSummaryItem[] = [];
+  const configUiModel = resolveBindingConfigUiModel(input);
+
+  if (configUiModel.mode === "form") {
+    const excludedPropertyKeys = new Set(input.excludedPropertyKeys ?? []);
+
+    function appendSummaryItems(params: {
+      schema: Record<string, unknown>;
+      uiSchema: Record<string, unknown>;
+      value: Record<string, unknown>;
+      visiblePropertyKeys: readonly string[];
+      propertyPath: string;
+    }): void {
+      for (const propertyKey of params.visiblePropertyKeys) {
+        if (
+          input.maxItems !== undefined &&
+          Number.isFinite(input.maxItems) &&
+          items.length >= input.maxItems
+        ) {
+          return;
+        }
+
+        const nextPropertyPath = createPropertyPath(params.propertyPath, propertyKey);
+        if (hasExcludedPropertyKey(excludedPropertyKeys, nextPropertyPath, propertyKey)) {
+          continue;
+        }
+
+        const value = params.value[propertyKey];
+        const label = resolvePropertyTitle({
+          schema: params.schema,
+          uiSchema: params.uiSchema,
+          propertyKey,
+        });
+
+        if (Array.isArray(value)) {
+          items.push({
+            label,
+            value: resolveArraySummaryValue({
+              schema: params.schema,
+              uiSchema: params.uiSchema,
+              propertyKey,
+              value,
+            }),
+          });
+          continue;
+        }
+
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+          items.push({
+            label,
+            value: resolveScalarSummaryValue({
+              schema: params.schema,
+              propertyKey,
+              value,
+            }),
+          });
+          continue;
+        }
+
+        const properties = params.schema.properties;
+        const propertySchema = isRecord(properties) ? properties[propertyKey] : undefined;
+        const propertyUiSchema = params.uiSchema[propertyKey];
+
+        if (!isRecord(value) || !isRecord(propertySchema)) {
+          continue;
+        }
+
+        const nestedProperties = propertySchema.properties;
+        if (!isRecord(nestedProperties)) {
+          continue;
+        }
+
+        const nestedVisiblePropertyKeys = Object.keys(nestedProperties).filter(
+          (nestedPropertyKey) => {
+            if (!isRecord(propertyUiSchema)) {
+              return true;
+            }
+
+            const nestedPropertyUiSchema = propertyUiSchema[nestedPropertyKey];
+            if (!isRecord(nestedPropertyUiSchema)) {
+              return true;
+            }
+
+            return nestedPropertyUiSchema["ui:widget"] !== "hidden";
+          },
+        );
+
+        appendSummaryItems({
+          schema: propertySchema,
+          uiSchema: isRecord(propertyUiSchema) ? propertyUiSchema : {},
+          value,
+          visiblePropertyKeys: nestedVisiblePropertyKeys,
+          propertyPath: nextPropertyPath,
+        });
+      }
+    }
+
+    appendSummaryItems({
+      schema: configUiModel.schema,
+      uiSchema: configUiModel.uiSchema,
+      value: configUiModel.value,
+      visiblePropertyKeys: configUiModel.visiblePropertyKeys,
+      propertyPath: "",
+    });
+
+    return items;
+  }
+
+  if (configUiModel.mode === "no-config") {
+    return [];
+  }
+
+  if (configUiModel.mode === "unsupported") {
+    return [
+      {
+        label: "Config",
+        value: configUiModel.message,
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Config",
+      value: "Connection not selected.",
+    },
+  ];
 }
 
 export function resolveBindingToolToggleModel(input: {
