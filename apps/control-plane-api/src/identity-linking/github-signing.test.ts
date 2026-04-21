@@ -15,12 +15,12 @@ const ValidGitSigningPrivateKeyPath = fileURLToPath(
 const ValidGitSigningPrivateKey = readFileSync(ValidGitSigningPrivateKeyPath, "utf8");
 
 const EncryptedGitSigningPrivateKey = `-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBUODbQh7
-1Ee9N5XEJxQsmOAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIKg9i4qHFoxQs1Li
-6thmHLc4GDvI1AK6c5WGWoqybDILAAAAoF7AedmHz+63DN5qQRhZPivpN/qd1jhenZ8qEz
-JV7oDNijPT5ICJv3Z4S4hsi9ra0k4EhpPWsDw9aExlYKYipCVrppwg++y+CflCtrXhfqrX
-1AZT9wdYbrBmc8lO6niH1rg1IXHOkfLlXIRg5PJBufmVlPveJLcFJU5svA5AgH1JttOY84
-sqUQuVSJhFhTlxx/fq0e+eMMvBrG/Zc09NJBQ=
+b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABCYEwZKgd
+M0Qp++geikSrNyAAAAGAAAAAEAAAAzAAAAC3NzaC1lZDI1NTE5AAAAIIUjGtb6+T6jUnHq
+KKqbpZt8gK66hs+SP2+Pa0+KKHW9AAAAoO4KKK/Ymrm5CL/BIWsxkbcl9Up9joOFmvWBIH
+pP1oimR6zcZ1X4zhPZvydyKu6ZYN86gFc4Uf2f9NYemMk0ws/mm0pQAeniErZ/1XlPWqfB
++SYziwRdbbzDUHWaM63tvt4uZuqyXu56H/d0UkZvp5ftShqZxuDvMBhUatt71a5SxWll5A
+an0+U8MdfPsFnvbu1+3OBtjQ82MuNy6T4vNWg=
 -----END OPENSSH PRIVATE KEY-----`;
 
 function captureThrownError(fn: () => void): unknown {
