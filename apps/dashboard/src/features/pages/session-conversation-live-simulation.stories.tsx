@@ -399,7 +399,7 @@ function SessionConversationWorkbenchHarness(input: {
       primaryBottomPanel={
         <div className="space-y-3">
           {hasRunningTurn && queuedPrompts.length > 0 ? (
-            <div className="max-h-56 space-y-2 overflow-y-auto px-1 pr-2">
+            <div className="max-h-40 space-y-2 overflow-y-auto px-1 pr-2">
               {queuedPrompts.map((queuedPrompt) => (
                 <ChatUserMessage
                   key={queuedPrompt.id}
