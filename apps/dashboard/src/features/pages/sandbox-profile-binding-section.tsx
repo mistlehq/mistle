@@ -4,25 +4,17 @@ import {
   DetailLabel,
   Notice,
   SectionBlock,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { InfoIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
-import { SchemaFormSelectContentClassName } from "../forms/schema-form.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
-import { resolveSelectableValue } from "../shared/select-value.js";
 import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
@@ -33,7 +25,6 @@ import type {
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
-  resolveBindingConfigUiModel,
   resolveBindingToolToggleModel,
   SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
@@ -93,142 +84,6 @@ function resolveRowBindingMetadata(input: {
     target: input.availableTargets.find(
       (candidate) => candidate.targetKey === connection.targetKey,
     ),
-  };
-}
-
-function readRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
-function resolveNestedRecord(input: {
-  value: Record<string, unknown>;
-  path: readonly string[];
-}): Record<string, unknown> | null {
-  let current: unknown = input.value;
-  for (const key of input.path) {
-    const currentRecord = readRecord(current);
-    if (currentRecord === null) {
-      return null;
-    }
-    current = currentRecord[key];
-  }
-  return readRecord(current);
-}
-
-function resolveNestedSchemaValue(input: {
-  value: Record<string, unknown>;
-  path: readonly string[];
-}): unknown {
-  let current: unknown = input.value;
-  for (const key of input.path) {
-    const currentRecord = readRecord(current);
-    if (currentRecord === null) {
-      return undefined;
-    }
-    current = currentRecord[key];
-  }
-  return current;
-}
-
-function resolveChoiceOptions(input: {
-  schema: Record<string, unknown>;
-  uiSchema: Record<string, unknown>;
-  schemaPath: readonly string[];
-  uiSchemaPath: readonly string[];
-}): readonly { label: string; value: string }[] {
-  const schemaValue = resolveNestedSchemaValue({
-    value: input.schema,
-    path: input.schemaPath,
-  });
-  const uiSchemaValue = resolveNestedSchemaValue({
-    value: input.uiSchema,
-    path: input.uiSchemaPath,
-  });
-  const schemaRecord = readRecord(schemaValue);
-  const uiSchemaRecord = readRecord(uiSchemaValue);
-
-  const oneOf = schemaRecord?.["oneOf"];
-  if (Array.isArray(oneOf)) {
-    return oneOf.flatMap((option) => {
-      const optionRecord = readRecord(option);
-      const value = readString(optionRecord?.["const"]);
-      const label = readString(optionRecord?.["title"]);
-      return value === undefined || label === undefined ? [] : [{ label, value }];
-    });
-  }
-
-  const enumValues = schemaRecord?.["enum"];
-  if (!Array.isArray(enumValues)) {
-    return [];
-  }
-
-  const enumNames = Array.isArray(uiSchemaRecord?.["ui:enumNames"])
-    ? uiSchemaRecord["ui:enumNames"]
-    : [];
-
-  return enumValues.flatMap((option, index) => {
-    const value = readString(option);
-    if (value === undefined) {
-      return [];
-    }
-    const enumName = enumNames[index];
-    return [
-      {
-        label: typeof enumName === "string" ? enumName : value,
-        value,
-      },
-    ];
-  });
-}
-
-function updateAgentHarnessConfig(input: {
-  config: Record<string, unknown>;
-  defaultModel?: string;
-  reasoningEffort?: string;
-  additionalInstructions?: string;
-}): Record<string, unknown> {
-  const currentModel = resolveNestedRecord({
-    path: ["model"],
-    value: input.config,
-  });
-  const currentOptions = resolveNestedRecord({
-    path: ["model", "options"],
-    value: input.config,
-  });
-
-  const nextOptions: Record<string, unknown> = {
-    ...(currentOptions ?? {}),
-    ...(input.reasoningEffort === undefined
-      ? {}
-      : {
-          reasoningEffort: input.reasoningEffort,
-        }),
-  };
-  if (input.additionalInstructions !== undefined) {
-    if (input.additionalInstructions.trim().length === 0) {
-      delete nextOptions["additionalInstructions"];
-    } else {
-      nextOptions["additionalInstructions"] = input.additionalInstructions;
-    }
-  }
-
-  return {
-    ...input.config,
-    model: {
-      ...(currentModel ?? {}),
-      ...(input.defaultModel === undefined
-        ? {}
-        : {
-            defaultModel: input.defaultModel,
-          }),
-      options: nextOptions,
-    },
   };
 }
 
@@ -662,69 +517,6 @@ function AgentHarnessRowEditor(input: {
   }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
 
   const fieldId = `agent-binding-connection-${input.row.clientId}`;
-  const configUiModel = resolveBindingConfigUiModel({
-    row: draftRow,
-    connections: input.availableConnections,
-    targets: input.availableTargets,
-  });
-  const schemaRecord = configUiModel.mode === "form" ? readRecord(configUiModel.schema) : null;
-  const uiSchemaRecord = configUiModel.mode === "form" ? readRecord(configUiModel.uiSchema) : null;
-  const defaultModelOptions =
-    schemaRecord === null || uiSchemaRecord === null
-      ? []
-      : resolveChoiceOptions({
-          schema: schemaRecord,
-          uiSchema: uiSchemaRecord,
-          schemaPath: ["properties", "model", "properties", "defaultModel"],
-          uiSchemaPath: ["model", "defaultModel"],
-        });
-  const reasoningEffortOptions =
-    schemaRecord === null || uiSchemaRecord === null
-      ? []
-      : resolveChoiceOptions({
-          schema: schemaRecord,
-          uiSchema: uiSchemaRecord,
-          schemaPath: [
-            "properties",
-            "model",
-            "properties",
-            "options",
-            "properties",
-            "reasoningEffort",
-          ],
-          uiSchemaPath: ["model", "options", "reasoningEffort"],
-        });
-  const currentDefaultModel =
-    configUiModel.mode !== "form"
-      ? undefined
-      : readString(
-          resolveNestedSchemaValue({
-            path: ["model", "defaultModel"],
-            value: configUiModel.value,
-          }),
-        );
-  const currentReasoningEffort =
-    configUiModel.mode !== "form"
-      ? undefined
-      : readString(
-          resolveNestedSchemaValue({
-            path: ["model", "options", "reasoningEffort"],
-            value: configUiModel.value,
-          }),
-        );
-  const currentAdditionalInstructions =
-    configUiModel.mode !== "form"
-      ? undefined
-      : readString(
-          resolveNestedSchemaValue({
-            path: ["model", "options", "additionalInstructions"],
-            value: configUiModel.value,
-          }),
-        );
-  const canRenderExplicitAgentForm =
-    configUiModel.mode === "form" &&
-    defaultModelOptions.length > 0 &&
-    reasoningEffortOptions.length > 0;
 
   return (
     <div className="flex flex-col gap-4 py-2">
@@ -763,139 +555,21 @@ function AgentHarnessRowEditor(input: {
           </div>
         </div>
 
-        {canRenderExplicitAgentForm ? (
-          <>
-            <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
-              <div className="min-w-0 flex flex-col gap-1.5">
-                <DetailLabel as="p">Default model</DetailLabel>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null || configUiModel.mode !== "form") {
-                      return;
-                    }
-
-                    setDraftRow((currentRow) => ({
-                      ...currentRow,
-                      config: updateAgentHarnessConfig({
-                        config: configUiModel.value,
-                        defaultModel: nextValue,
-                      }),
-                    }));
-                  }}
-                  value={resolveSelectableValue({
-                    selectedValue: currentDefaultModel ?? null,
-                    optionValues: defaultModelOptions.map((option) => option.value),
-                  })}
-                >
-                  <SelectTrigger aria-label="Default model" className="w-full">
-                    <SelectValue placeholder="Select model">{currentDefaultModel}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className={SchemaFormSelectContentClassName}>
-                    {defaultModelOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="min-w-0 flex flex-col gap-1.5">
-                <DetailLabel as="p">Reasoning effort</DetailLabel>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null || configUiModel.mode !== "form") {
-                      return;
-                    }
-
-                    setDraftRow((currentRow) => ({
-                      ...currentRow,
-                      config: updateAgentHarnessConfig({
-                        config: configUiModel.value,
-                        reasoningEffort: nextValue,
-                      }),
-                    }));
-                  }}
-                  value={resolveSelectableValue({
-                    selectedValue: currentReasoningEffort ?? null,
-                    optionValues: reasoningEffortOptions.map((option) => option.value),
-                  })}
-                >
-                  <SelectTrigger aria-label="Reasoning effort" className="w-full">
-                    <SelectValue placeholder="Select reasoning effort">
-                      {currentReasoningEffort}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent className={SchemaFormSelectContentClassName}>
-                    {reasoningEffortOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="min-w-0 flex flex-col gap-1.5">
-              <div className="flex items-center gap-1">
-                <DetailLabel as="p">Agent Instructions</DetailLabel>
-                <Tooltip delay={0}>
-                  <TooltipTrigger
-                    aria-label="Explain agent instructions"
-                    render={
-                      <button
-                        className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
-                        type="button"
-                      />
-                    }
-                  >
-                    <InfoIcon aria-hidden className="size-3.5" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-64 text-left" side="top">
-                    Appended to the developer message.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Textarea
-                aria-label="Agent Instructions"
-                className="min-h-28 w-full text-sm"
-                onChange={(event) => {
-                  if (configUiModel.mode !== "form") {
-                    return;
-                  }
-                  const nextInstructions = event.currentTarget.value;
-
-                  setDraftRow((currentRow) => ({
-                    ...currentRow,
-                    config: updateAgentHarnessConfig({
-                      config: configUiModel.value,
-                      additionalInstructions: nextInstructions,
-                    }),
-                  }));
-                }}
-                rows={8}
-                value={currentAdditionalInstructions ?? ""}
-              />
-            </div>
-          </>
-        ) : (
-          <SandboxProfileBindingConfigEditor
-            availableConnections={input.availableConnections}
-            availableTargets={input.availableTargets}
-            formContext={{
-              columns: 2,
-              labelTone: "detail",
-              layout: "vertical",
-            }}
-            onIntegrationBindingRowChange={(clientId, changes) => {
-              setDraftRow((currentRow) =>
-                clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
-              );
-            }}
-            row={draftRow}
-          />
-        )}
+        <SandboxProfileBindingConfigEditor
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          formContext={{
+            columns: 2,
+            labelTone: "detail",
+            layout: "vertical",
+          }}
+          onIntegrationBindingRowChange={(clientId, changes) => {
+            setDraftRow((currentRow) =>
+              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
+            );
+          }}
+          row={draftRow}
+        />
 
         <BindingDraftActions
           isDirty={isDirty}
