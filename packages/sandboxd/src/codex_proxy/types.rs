@@ -121,6 +121,7 @@ pub struct PendingClientRequest {
     pub expected_turn_id: Option<String>,
     pub interruption_source: Option<String>,
     pub interruption_expected: Option<bool>,
+    pub compaction_trigger: Option<String>,
     pub request_started_at: Instant,
     pub delivery_context: Option<DeliveryContext>,
 }
