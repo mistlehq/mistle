@@ -8,6 +8,7 @@ import { INITIAL_PTY_DIMENSIONS } from "./session-terminal-surface.js";
 import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 
 const MaxTerminalReconnectAttempts = 3;
+type TerminalRecoveryFailure = null | "reopen_failed" | "sandbox_failed" | "sandbox_stopped";
 
 export type TerminalRecoveryState =
   | {
@@ -17,8 +18,7 @@ export type TerminalRecoveryState =
       kind: "recovering";
       attemptCount: number;
       command: "none" | "reopen";
-      errorMessage: string | null;
-      resetInfo: SandboxPtyResetInfo;
+      failure: TerminalRecoveryFailure;
     };
 
 type TerminalRecoveryEvent =
@@ -42,13 +42,13 @@ type TerminalRecoveryEvent =
 
 function shouldOpenPtyForRecovery(input: {
   attemptCount: number;
-  errorMessage: string | null;
+  failure: TerminalRecoveryFailure;
   isReconnectAttemptInFlight: boolean;
   lifecycleState: SandboxPtyState;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
 }): boolean {
   if (
-    input.errorMessage !== null ||
+    input.failure !== null ||
     input.isReconnectAttemptInFlight ||
     input.sandboxStatus !== "running" ||
     input.attemptCount >= MaxTerminalReconnectAttempts
@@ -122,8 +122,7 @@ export function reduceTerminalRecoveryState(
           kind: "recovering",
           attemptCount: 0,
           command: "none",
-          errorMessage: null,
-          resetInfo: event.resetInfo,
+          failure: null,
         };
       }
 
@@ -136,8 +135,7 @@ export function reduceTerminalRecoveryState(
             kind: "recovering",
             attemptCount: 0,
             command: "none",
-            errorMessage: null,
-            resetInfo: event.resetInfo,
+            failure: null,
           };
         case "reopen_requested":
           if (state.command !== "reopen") {
@@ -153,7 +151,7 @@ export function reduceTerminalRecoveryState(
           return {
             ...state,
             command: "none",
-            errorMessage: event.message,
+            failure: "reopen_failed",
           };
         case "sync_observed":
           if (event.lifecycleState === "open") {
@@ -166,11 +164,11 @@ export function reduceTerminalRecoveryState(
             return {
               ...state,
               command: "none",
-              errorMessage: "Terminal disconnected and the sandbox failed.",
+              failure: "sandbox_failed",
             };
           }
 
-          if (state.errorMessage !== null) {
+          if (state.failure !== null) {
             return state.command === "none"
               ? state
               : {
@@ -183,7 +181,7 @@ export function reduceTerminalRecoveryState(
             return {
               ...state,
               command: "none",
-              errorMessage: `Could not reconnect terminal after ${String(MaxTerminalReconnectAttempts)} attempts.`,
+              failure: "reopen_failed",
             };
           }
 
@@ -191,14 +189,14 @@ export function reduceTerminalRecoveryState(
             return {
               ...state,
               command: "none",
-              errorMessage: "Terminal disconnected and the sandbox stopped.",
+              failure: "sandbox_stopped",
             };
           }
 
           if (
             shouldOpenPtyForRecovery({
               attemptCount: state.attemptCount,
-              errorMessage: state.errorMessage,
+              failure: state.failure,
               isReconnectAttemptInFlight: event.isReconnectAttemptInFlight,
               lifecycleState: event.lifecycleState,
               sandboxStatus: event.sandboxStatus,
@@ -227,35 +225,6 @@ export function shouldAttemptTerminalReconnect(input: {
   recovery: TerminalRecoveryState;
 }): boolean {
   return input.recovery.kind === "recovering" && input.recovery.command === "reopen";
-}
-
-export function resolveTerminalRecoveryMessage(input: {
-  recovery: TerminalRecoveryState;
-  sandboxStatus: WorkbenchSandboxLifecycleStatus;
-}): string | null {
-  if (input.recovery.kind !== "recovering") {
-    return null;
-  }
-
-  if (input.recovery.errorMessage !== null) {
-    return input.recovery.errorMessage;
-  }
-
-  const prefix = `Terminal disconnected: ${input.recovery.resetInfo.message}`;
-  switch (input.sandboxStatus) {
-    case "stopped":
-      return `${prefix} The sandbox stopped and the terminal cannot reconnect.`;
-    case "pending":
-    case "starting":
-    case "resuming":
-      return `${prefix} Waiting for the sandbox to become ready again.`;
-    case "running":
-      return `${prefix} Reconnecting terminal${input.recovery.attemptCount > 0 ? ` (attempt ${String(input.recovery.attemptCount)} of ${String(MaxTerminalReconnectAttempts)})` : ""}.`;
-    case "failed":
-      return `${prefix} The sandbox failed and the terminal cannot reconnect.`;
-    default:
-      return `${prefix} Reconnecting terminal.`;
-  }
 }
 
 export function buildTerminalPtyOpenInput(input: {

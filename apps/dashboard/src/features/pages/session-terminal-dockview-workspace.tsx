@@ -1,5 +1,5 @@
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { Button, Spinner } from "@mistle/ui";
+import { Button } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import "dockview/dist/styles/dockview.css";
@@ -29,7 +29,6 @@ import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   buildTerminalPtyOpenInput,
   reduceTerminalRecoveryState,
-  resolveTerminalRecoveryMessage,
   shouldAttemptTerminalReconnect,
   shouldAutoOpenTerminal,
   shouldHandleTerminalExit,
@@ -353,9 +352,7 @@ function PtyBackedDockviewTerminalPanel(input: {
         ptySessionId: input.panelId,
         sandboxInstanceId: input.sandboxInstanceId,
       }),
-    ).catch(() => {
-      // Error state is surfaced through the panel message.
-    });
+    ).catch(() => {});
   }, [
     input.cwd,
     input.isConnectionReady,
@@ -366,31 +363,14 @@ function PtyBackedDockviewTerminalPanel(input: {
     openPty,
   ]);
 
-  const terminalRecoveryMessage = resolveTerminalRecoveryMessage({
-    recovery,
-    sandboxStatus: input.sandboxStatus,
-  });
-
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
-      {terminalRecoveryMessage === null ? null : (
-        <div className="border-b border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-          <div className="flex items-center gap-2">
-            {recovery.kind === "recovering" && recovery.errorMessage === null ? (
-              <Spinner className="size-4 shrink-0 text-stone-500" />
-            ) : null}
-            <span>{terminalRecoveryMessage}</span>
-          </div>
-        </div>
-      )}
-      <SessionTerminalSurface
-        isVisible={isTerminalVisible}
-        lifecycleState={lifecycle.state}
-        onResize={resizePty}
-        onWriteInput={writeInput}
-        outputChunks={output.chunks}
-      />
-    </div>
+    <SessionTerminalSurface
+      isVisible={isTerminalVisible}
+      lifecycleState={lifecycle.state}
+      onResize={resizePty}
+      onWriteInput={writeInput}
+      outputChunks={output.chunks}
+    />
   );
 }
 

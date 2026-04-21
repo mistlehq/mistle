@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type { DockviewApi } from "dockview";
+import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
