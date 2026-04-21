@@ -4,11 +4,11 @@ import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
+  createStoryLongCliOutput,
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   renderSessionWorkbenchStory,
   renderSessionWorkbenchStoryWithChrome,
-  renderSessionWorkbenchContentStory,
   StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
@@ -17,7 +17,6 @@ import { SessionWorkbenchHeaderActions } from "./session-workbench-header-action
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
-  withSplitExample?: boolean;
 };
 
 const StoryTerminalWorkspaceHeightPx = 320;
@@ -35,46 +34,18 @@ function buildInitialTerminalOutput(input: { cwd: string | null }): string {
   ].join("\n");
 }
 
-function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.Element {
-  return renderSessionWorkbenchContentStory({
-    bottomPanel: (
-      <SessionTerminalWorkspaceView
-        cwd={input.initialCwd}
-        isVisible={true}
-        onApiReady={(api) => {
-          if (!input.withSplitExample) {
-            return;
-          }
+function buildLongTerminalOutput(input: { cwd: string | null }): string {
+  const promptCwd = input.cwd ?? "/root";
 
-          seedSplitTerminalExample({
-            api,
-            cwd: input.initialCwd,
-          });
-        }}
-        onWorkspaceEmpty={() => {
-          return;
-        }}
-        renderTerminalPanel={(panelInput) => (
-          <StoryTerminalSurfaceBody
-            initialOutput={buildInitialTerminalOutput({
-              cwd: panelInput.cwd,
-            })}
-            isVisible={panelInput.isPanelVisible}
-          />
-        )}
-      />
-    ),
-    bottomPanelSize: StoryTerminalWorkspaceHeightPx,
-    isBottomPanelVisible: true,
-    mainContent: createStorySessionMainContent(),
-    primaryBottomPanel: createStorySessionBottomPanel(),
-    sandboxInstanceId: StorySandboxInstanceId,
-  });
+  return [
+    `root@sandbox:${promptCwd}# pwd`,
+    promptCwd,
+    `root@sandbox:${promptCwd}# ${createStoryLongCliOutput("terminal")}`,
+    "",
+  ].join("\n");
 }
 
-function StoryTerminalWorkspaceWithHeaderToggle(
-  input: TerminalWorkspaceStoryArgs,
-): React.JSX.Element {
+function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.Element {
   const [isBottomPanelVisible, setIsBottomPanelVisible] = useState(true);
 
   return renderSessionWorkbenchStoryWithChrome({
@@ -124,10 +95,6 @@ function StoryTerminalWorkspaceWithHeaderToggle(
           cwd={input.initialCwd}
           isVisible={isBottomPanelVisible}
           onApiReady={(api) => {
-            if (!input.withSplitExample) {
-              return;
-            }
-
             seedSplitTerminalExample({
               api,
               cwd: input.initialCwd,
@@ -138,9 +105,15 @@ function StoryTerminalWorkspaceWithHeaderToggle(
           }}
           renderTerminalPanel={(panelInput) => (
             <StoryTerminalSurfaceBody
-              initialOutput={buildInitialTerminalOutput({
-                cwd: panelInput.cwd,
-              })}
+              initialOutput={
+                panelInput.panelId === "terminal"
+                  ? buildLongTerminalOutput({
+                      cwd: panelInput.cwd,
+                    })
+                  : buildInitialTerminalOutput({
+                      cwd: panelInput.cwd,
+                    })
+              }
               isVisible={panelInput.isPanelVisible}
             />
           )}
@@ -171,7 +144,6 @@ const meta = {
   decorators: [withDashboardWorkspaceStory],
   args: {
     initialCwd: "/workspace/apps/dashboard",
-    withSplitExample: false,
   },
 } satisfies Meta<typeof StoryTerminalWorkspace>;
 
@@ -180,19 +152,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Interactive: Story = {};
-
-export const SplitView: Story = {
-  args: {
-    withSplitExample: true,
-  },
-};
-
-export const HeaderTogglePreservesWorkspace: Story = {
-  args: {
-    withSplitExample: true,
-  },
-  render: (args) => <StoryTerminalWorkspaceWithHeaderToggle {...args} />,
-};
 
 function seedSplitTerminalExample(input: { api: DockviewApi; cwd: string | null }): void {
   if (input.api.totalPanels !== 1 || input.api.activeGroup === undefined) {

@@ -316,10 +316,13 @@ export function SessionTerminalSurface({
   const hasOutput = outputChunks.length > 0;
 
   return (
-    <div className="relative min-h-0 flex-1" style={{ backgroundColor: terminalBackgroundColor }}>
+    <div
+      className="relative h-full min-h-0 overflow-hidden"
+      style={{ backgroundColor: terminalBackgroundColor }}
+    >
       <div
         className={cn(
-          "relative h-full w-full transition-[opacity] duration-150",
+          "relative h-full w-full overflow-hidden transition-[opacity] duration-150",
           isLive ? "opacity-100" : hasOutput ? "opacity-[0.52]" : "opacity-[0.38]",
           !isLive && !hasOutput && "pointer-events-none",
         )}
