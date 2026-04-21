@@ -301,6 +301,90 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("keeps accepted steers ahead of later deltas on the same assistant item", () => {
+    const streaming = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(createInitialCodexChatState(), {
+          type: "start_turn_requested",
+          clientTurnId: "pending:turn_123",
+          prompt: "Test prompt",
+        }),
+        {
+          type: "turn_started_response",
+          clientTurnId: "pending:turn_123",
+          turnId: "turn_123",
+          status: "inProgress",
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn_123",
+            itemId: "msg_1",
+            delta: "Before steer",
+          },
+        },
+      },
+    );
+    const steering = reduceCodexChatState(streaming, {
+      type: "steer_turn_requested",
+      entryId: "steer_1",
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const processed = reduceCodexChatState(steering, {
+      type: "steer_turn_processed",
+      entryId: "steer_1",
+      turnId: "turn_123",
+    });
+    const afterSteerDelta = reduceCodexChatState(processed, {
+      type: "notification_received",
+      notification: {
+        method: "item/agentMessage/delta",
+        params: {
+          turnId: "turn_123",
+          itemId: "msg_1",
+          delta: " and after steer",
+        },
+      },
+    });
+
+    expect(afterSteerDelta.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "msg_1",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "Before steer",
+        phase: null,
+        status: "streaming",
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+      {
+        id: "msg_1",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: " and after steer",
+        phase: null,
+        status: "streaming",
+      },
+    ]);
+  });
+
   it("removes a transient steer message when steering fails", () => {
     const activeTurn = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {

@@ -92,6 +92,10 @@ type CodexRawTurnState = {
     entry: ChatUserEntry;
     insertAfterItemCount: number;
     requestState: "accepted" | "queued" | "sending";
+    splitAssistantMessage?: {
+      itemId: string;
+      text: string;
+    };
   }[];
   itemOrder: readonly string[];
   rawItemsById: Readonly<Record<string, unknown>>;
@@ -229,6 +233,34 @@ function buildNormalizedItems(turn: CodexRawTurnState): readonly NormalizedCodex
       item: rawItem,
     }).filter((item) => item.kind !== "user-message");
   });
+}
+
+function buildRenderedAssistantItemSegment(input: {
+  item: Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }>;
+  text: string;
+}): Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }> {
+  return {
+    ...input.item,
+    text: input.text,
+  };
+}
+
+function mapRenderedItemsToEntries(
+  input: {
+    turnId: string;
+    items: readonly NormalizedCodexThreadItem[];
+  } | null,
+): readonly ChatEntry[] {
+  if (input === null || input.items.length === 0) {
+    return [];
+  }
+
+  const timeline = buildCodexTurnTimelineFromNormalized({
+    turnId: input.turnId,
+    items: input.items,
+  });
+
+  return timeline.flatMap((timelineEntry) => mapTimelineEntryToChatEntries(timelineEntry));
 }
 
 function createGenericEntry(input: {
@@ -691,32 +723,88 @@ function buildEntries(input: {
     }
 
     const normalizedItems = buildNormalizedItems(turn);
+    const normalizedItemIndexById = new Map(normalizedItems.map((item, index) => [item.id, index]));
+    const consumedAssistantTextByItemId = new Map<string, string>();
     let lastRenderedItemCount = 0;
 
     for (const clientUserEntry of turn.clientUserEntries) {
-      const nextItems = normalizedItems.slice(
-        lastRenderedItemCount,
-        clientUserEntry.insertAfterItemCount,
-      );
-      const timeline = buildCodexTurnTimelineFromNormalized({
-        turnId,
-        items: nextItems,
-      });
-      for (const timelineEntry of timeline) {
-        entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
+      const splitAssistantMessage = clientUserEntry.splitAssistantMessage;
+      if (splitAssistantMessage !== undefined) {
+        const splitItemIndex = normalizedItemIndexById.get(splitAssistantMessage.itemId);
+        if (splitItemIndex !== undefined) {
+          entries.push(
+            ...mapRenderedItemsToEntries({
+              turnId,
+              items: normalizedItems.slice(lastRenderedItemCount, splitItemIndex),
+            }),
+          );
+          lastRenderedItemCount = splitItemIndex;
+
+          const splitItem = normalizedItems[splitItemIndex];
+          if (splitItem?.kind === "assistant-message") {
+            const alreadyRenderedText =
+              consumedAssistantTextByItemId.get(splitAssistantMessage.itemId) ?? "";
+            if (
+              splitAssistantMessage.text.startsWith(alreadyRenderedText) &&
+              splitAssistantMessage.text.length > alreadyRenderedText.length
+            ) {
+              entries.push(
+                ...mapRenderedItemsToEntries({
+                  turnId,
+                  items: [
+                    buildRenderedAssistantItemSegment({
+                      item: splitItem,
+                      text: splitAssistantMessage.text.slice(alreadyRenderedText.length),
+                    }),
+                  ],
+                }),
+              );
+            }
+
+            consumedAssistantTextByItemId.set(
+              splitAssistantMessage.itemId,
+              splitAssistantMessage.text,
+            );
+          }
+        }
+      } else {
+        entries.push(
+          ...mapRenderedItemsToEntries({
+            turnId,
+            items: normalizedItems.slice(
+              lastRenderedItemCount,
+              clientUserEntry.insertAfterItemCount,
+            ),
+          }),
+        );
+        lastRenderedItemCount = clientUserEntry.insertAfterItemCount;
       }
-      lastRenderedItemCount = clientUserEntry.insertAfterItemCount;
+
       entries.push(clientUserEntry.entry);
     }
 
-    const trailingItems = normalizedItems.slice(lastRenderedItemCount);
-    const trailingTimeline = buildCodexTurnTimelineFromNormalized({
-      turnId,
-      items: trailingItems,
-    });
-    for (const timelineEntry of trailingTimeline) {
-      entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
-    }
+    const trailingItems = normalizedItems
+      .slice(lastRenderedItemCount)
+      .reduce<NormalizedCodexThreadItem[]>((items, item) => {
+        if (item.kind !== "assistant-message") {
+          items.push(item);
+          return items;
+        }
+
+        const consumedText = consumedAssistantTextByItemId.get(item.id);
+        if (consumedText === undefined || !item.text.startsWith(consumedText)) {
+          items.push(item);
+          return items;
+        }
+
+        const remainingText = item.text.slice(consumedText.length);
+        if (remainingText.length > 0) {
+          items.push(buildRenderedAssistantItemSegment({ item, text: remainingText }));
+        }
+
+        return items;
+      }, []);
+    entries.push(...mapRenderedItemsToEntries({ turnId, items: trailingItems }));
 
     if (turn.planSnapshot !== null) {
       entries.push(
@@ -794,6 +882,34 @@ function clearEntrySteerPresentation(entry: ChatUserEntry): ChatUserEntry {
 function clearEntryAction(entry: ChatUserEntry): ChatUserEntry {
   const { labelAction: _labelAction, ...nextEntry } = entry;
   return nextEntry;
+}
+
+function getCurrentAssistantMessageSplit(
+  turn: CodexRawTurnState,
+): { itemId: string; text: string } | undefined {
+  const lastItemId = turn.itemOrder.at(-1);
+  if (lastItemId === undefined) {
+    return undefined;
+  }
+
+  const lastRawItem = turn.rawItemsById[lastItemId];
+  if (lastRawItem === undefined) {
+    return undefined;
+  }
+
+  const [normalizedItem] = normalizeCodexThreadItem({
+    turnId: turn.id,
+    item: lastRawItem,
+  }).filter((item) => item.kind === "assistant-message");
+
+  if (normalizedItem?.kind !== "assistant-message" || normalizedItem.text.length === 0) {
+    return undefined;
+  }
+
+  return {
+    itemId: normalizedItem.id,
+    text: normalizedItem.text,
+  };
 }
 
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
@@ -1117,6 +1233,8 @@ export function reduceCodexChatState(
   if (action.type === "steer_turn_requested") {
     const ensured = ensureTurn(state.turnsById, state.turnOrder, action.turnId);
     const turn = ensured.turnsById[action.turnId] ?? createTurnState(action.turnId);
+    const splitAssistantMessage = getCurrentAssistantMessageSplit(turn);
+
     return buildState({
       pendingTurnId: state.pendingTurnId,
       turnOrder: ensured.turnOrder,
@@ -1142,6 +1260,7 @@ export function reduceCodexChatState(
               ),
               insertAfterItemCount: turn.itemOrder.length,
               requestState: "queued",
+              ...(splitAssistantMessage === undefined ? {} : { splitAssistantMessage }),
             },
           ],
         },
