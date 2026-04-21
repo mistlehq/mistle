@@ -15,13 +15,13 @@ use tungstenite::{Error as WebSocketError, Message, WebSocket, connect};
 
 use crate::time::{Duration, Sleeper};
 use crate::tunnel::protocol::{
-    AGENT_STREAM_WINDOW_BYTES,
-    CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
-    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-    parse_stream_control_message, stream_open_error, stream_open_ok, stream_reset,
+    AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
+    CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, PAYLOAD_KIND_WEBSOCKET_BINARY,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
+    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
+    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, encode_stream_data_frame, parse_stream_control_message,
+    stream_open_error, stream_open_ok, stream_reset,
 };
 
 /// Default idle poll interval while waiting for tunnel input or runtime output.

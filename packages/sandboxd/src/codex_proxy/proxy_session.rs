@@ -8,13 +8,10 @@ use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{accept_async, connect_async};
 use tungstenite::Message;
 
-use crate::codex_proxy::types::{
-    BufferedSuccessResponse, PendingClientRequest, ProxyClientKind,
-};
+use crate::codex_proxy::types::{BufferedSuccessResponse, PendingClientRequest, ProxyClientKind};
 use crate::codex_proxy::{
     CodexProxyError, CodexSessionManagerError, CodexSessionManagerHandle,
-    MISTLE_AGENT_CLIENT_TITLE, RetainReason,
-    is_connection_termination_error,
+    MISTLE_AGENT_CLIENT_TITLE, RetainReason, is_connection_termination_error,
 };
 const TURN_START_METHOD: &str = "turn/start";
 const TURN_STEER_METHOD: &str = "turn/steer";
@@ -219,12 +216,13 @@ fn record_retention_result(
     retention_result: &RetentionResult,
     buffered_success_responses: &mut VecDeque<BufferedSuccessResponse>,
 ) {
-    if let Some(buffered_success_response) = buffered_success_responses
-        .iter_mut()
-        .find(|buffered_success_response| {
-            json_rpc_id_key(&buffered_success_response.request_id).as_deref()
-                == Some(retention_result.request_key.as_str())
-        })
+    if let Some(buffered_success_response) =
+        buffered_success_responses
+            .iter_mut()
+            .find(|buffered_success_response| {
+                json_rpc_id_key(&buffered_success_response.request_id).as_deref()
+                    == Some(retention_result.request_key.as_str())
+            })
     {
         buffered_success_response.subscription_retention_result =
             Some(clone_retention_result(&retention_result.result));
@@ -235,7 +233,8 @@ async fn flush_buffered_success_responses(
     client_socket: &mut tokio_tungstenite::WebSocketStream<TcpStream>,
     buffered_success_responses: &mut VecDeque<BufferedSuccessResponse>,
 ) -> Result<(), CodexProxyError> {
-    for buffered_success_response in take_ready_buffered_success_responses(buffered_success_responses)
+    for buffered_success_response in
+        take_ready_buffered_success_responses(buffered_success_responses)
     {
         match buffered_success_response
             .subscription_retention_result
@@ -435,13 +434,10 @@ mod tests {
             },
         ]);
 
-        assert!(
-            take_ready_buffered_success_responses(&mut buffered_success_responses).is_empty()
-        );
+        assert!(take_ready_buffered_success_responses(&mut buffered_success_responses).is_empty());
         assert_eq!(buffered_success_responses.len(), 2);
 
-        buffered_success_responses[0].subscription_retention_result =
-            Some(Ok(()));
+        buffered_success_responses[0].subscription_retention_result = Some(Ok(()));
 
         let ready_responses =
             take_ready_buffered_success_responses(&mut buffered_success_responses);

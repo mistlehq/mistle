@@ -56,31 +56,29 @@ use crate::supervision::{
     SandboxdSupervisorHandle, SupervisedComponent, encode_forwarded_lifecycle_event_log_line,
 };
 use crate::time::{Clock, Duration, Sleeper};
-use crate::tunnel::protocol::{
-    AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
-    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL,
-    CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED, CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
-    CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-    FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
-    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
-    STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
-    decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
-    file_upload_completed_event, parse_ports_control_message, parse_ports_transport_message,
-    parse_processes_stream_message, parse_stream_control_message,
-    ports_target_authorize_failure_result, ports_target_authorize_success_result,
-    pty_exit_event, stream_complete,
-    stream_open_error, stream_open_ok, stream_reset, stream_window,
-};
 use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
     PortAccessHttpCommand, PortAccessTransportEvent, PortAccessWsCommand, spawn_http_transport,
     spawn_websocket_transport,
+};
+use crate::tunnel::protocol::{
+    AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
+    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
+    CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
+    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
+    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
+    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
+    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
+    STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
+    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
+    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+    exec_result_event, file_upload_completed_event, parse_ports_control_message,
+    parse_ports_transport_message, parse_processes_stream_message, parse_stream_control_message,
+    ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
+    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
@@ -470,8 +468,7 @@ impl TunnelSession {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
     ) -> Result<Self, TunnelSessionError> {
-        let sandbox_instance_id =
-            derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id,
             clock.clone(),
@@ -502,8 +499,7 @@ impl TunnelSession {
         sleeper: Arc<dyn Sleeper>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Self, TunnelSessionError> {
-        let sandbox_instance_id =
-            derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
+        let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)?;
         supervisor_handle.replace_component_details(
             SupervisedComponent::TunnelSession,
             BTreeMap::from([(
@@ -581,10 +577,7 @@ impl TunnelSession {
                         Some(&panic_text),
                         &[
                             ("exitKind", Value::String("panic".to_string())),
-                            (
-                                "panicBoundary",
-                                Value::String("tunnel_thread".to_string()),
-                            ),
+                            ("panicBoundary", Value::String("tunnel_thread".to_string())),
                         ],
                     );
                     Err(TunnelSessionError::SessionPanicked)
@@ -645,10 +638,7 @@ impl TunnelSession {
                     Some("tunnel session thread panicked"),
                     &[
                         ("exitKind", Value::String("panic".to_string())),
-                        (
-                            "panicBoundary",
-                            Value::String("tunnel_thread".to_string()),
-                        ),
+                        ("panicBoundary", Value::String("tunnel_thread".to_string())),
                     ],
                 );
             }
@@ -813,8 +803,7 @@ impl PtySessionStats {
         output_bytes: usize,
     ) -> Option<PtyInputLatencyTelemetry> {
         let pending_input = self.pending_input.take()?;
-        let input_to_first_output_ms =
-            emitted_at_ms.saturating_sub(pending_input.received_at_ms);
+        let input_to_first_output_ms = emitted_at_ms.saturating_sub(pending_input.received_at_ms);
         self.interaction_count = self.interaction_count.saturating_add(1);
         self.avg_input_to_first_output_total_ms = self
             .avg_input_to_first_output_total_ms
@@ -904,10 +893,22 @@ fn publish_agent_stream_summary(
             "durationMs",
             Value::from(agent_stream.stats.stream_age_ms(now_ms)),
         ),
-        ("messageCountOut", Value::from(agent_stream.stats.message_count_out)),
-        ("messageCountIn", Value::from(agent_stream.stats.message_count_in)),
-        ("totalBytesOut", Value::from(agent_stream.stats.total_bytes_out)),
-        ("totalBytesIn", Value::from(agent_stream.stats.total_bytes_in)),
+        (
+            "messageCountOut",
+            Value::from(agent_stream.stats.message_count_out),
+        ),
+        (
+            "messageCountIn",
+            Value::from(agent_stream.stats.message_count_in),
+        ),
+        (
+            "totalBytesOut",
+            Value::from(agent_stream.stats.total_bytes_out),
+        ),
+        (
+            "totalBytesIn",
+            Value::from(agent_stream.stats.total_bytes_in),
+        ),
         (
             "maxMessageBytesOut",
             Value::from(agent_stream.stats.max_message_bytes_out as u64),
@@ -1002,10 +1003,7 @@ fn publish_pty_input_latency_warning(
         ),
         ("inputBytes", Value::from(telemetry.input_bytes as u64)),
         ("outputBytes", Value::from(telemetry.output_bytes as u64)),
-        (
-            "interactionCount",
-            Value::from(telemetry.interaction_count),
-        ),
+        ("interactionCount", Value::from(telemetry.interaction_count)),
         ("sessionAgeMs", Value::from(telemetry.session_age_ms)),
     ];
 
@@ -1042,7 +1040,8 @@ fn publish_pty_session_summary(
         ("warningCount", Value::from(stats.warning_count)),
         (
             "avgInputToFirstOutputMs",
-            stats.avg_input_to_first_output_ms()
+            stats
+                .avg_input_to_first_output_ms()
                 .map_or(Value::Null, Value::from),
         ),
         (
@@ -1113,14 +1112,23 @@ fn publish_agent_stream_window_exhausted(
             "channelKind",
             Value::String(AGENT_STREAM_CHANNEL_KIND.to_string()),
         ),
-        ("payloadKind", Value::String(telemetry.payload_kind.to_string())),
+        (
+            "payloadKind",
+            Value::String(telemetry.payload_kind.to_string()),
+        ),
         ("payloadBytes", Value::from(telemetry.payload_bytes as u64)),
-        ("availableBytes", Value::from(telemetry.available_bytes as u64)),
+        (
+            "availableBytes",
+            Value::from(telemetry.available_bytes as u64),
+        ),
         (
             "outstandingBytes",
             Value::from(telemetry.outstanding_bytes as u64),
         ),
-        ("maxWindowBytes", Value::from(AGENT_STREAM_WINDOW_BYTES as u64)),
+        (
+            "maxWindowBytes",
+            Value::from(AGENT_STREAM_WINDOW_BYTES as u64),
+        ),
         (
             "payloadExceedsMaxWindow",
             Value::Bool(telemetry.payload_bytes > AGENT_STREAM_WINDOW_BYTES),
@@ -1159,15 +1167,27 @@ fn publish_agent_stream_threshold_crossed(
             "channelKind",
             Value::String(AGENT_STREAM_CHANNEL_KIND.to_string()),
         ),
-        ("payloadKind", Value::String(telemetry.payload_kind.to_string())),
+        (
+            "payloadKind",
+            Value::String(telemetry.payload_kind.to_string()),
+        ),
         ("payloadBytes", Value::from(telemetry.payload_bytes as u64)),
-        ("availableBytes", Value::from(telemetry.available_bytes as u64)),
+        (
+            "availableBytes",
+            Value::from(telemetry.available_bytes as u64),
+        ),
         (
             "outstandingBytes",
             Value::from(telemetry.outstanding_bytes as u64),
         ),
-        ("thresholdBytes", Value::from(telemetry.threshold_bytes as u64)),
-        ("maxWindowBytes", Value::from(AGENT_STREAM_WINDOW_BYTES as u64)),
+        (
+            "thresholdBytes",
+            Value::from(telemetry.threshold_bytes as u64),
+        ),
+        (
+            "maxWindowBytes",
+            Value::from(AGENT_STREAM_WINDOW_BYTES as u64),
+        ),
         ("messageCountOut", Value::from(telemetry.message_count_out)),
         ("streamAgeMs", Value::from(telemetry.stream_age_ms)),
         (
@@ -1224,35 +1244,35 @@ async fn run_tunnel_supervisor(
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
     let initial_connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
-    let (bootstrap_socket, _) = match connect_bootstrap_websocket(initial_connected_url.as_str()).await
-    {
-        Ok(value) => value,
-        Err(startup_error) => {
-            let startup_error_text = startup_error.to_string();
-            update_tunnel_supervision_details(
-                &runtime.supervisor_handle,
-                gateway_ws_url,
-                Some("bootstrap_connect_failed"),
-                Some(1),
-                None,
-            );
-            runtime.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                startup_error_text.clone(),
-            );
-            runtime.supervisor_handle.emit_component_healthcheck_failed(
-                SupervisedComponent::TunnelSession,
-                "bootstrap_connect_failed",
-                startup_error_text.clone(),
-                "bootstrap_connection",
-                &[],
-            );
-            let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
-                startup_error_text,
-            )));
-            return Err(startup_error);
-        }
-    };
+    let (bootstrap_socket, _) =
+        match connect_bootstrap_websocket(initial_connected_url.as_str()).await {
+            Ok(value) => value,
+            Err(startup_error) => {
+                let startup_error_text = startup_error.to_string();
+                update_tunnel_supervision_details(
+                    &runtime.supervisor_handle,
+                    gateway_ws_url,
+                    Some("bootstrap_connect_failed"),
+                    Some(1),
+                    None,
+                );
+                runtime.supervisor_handle.mark_component_restarting(
+                    SupervisedComponent::TunnelSession,
+                    startup_error_text.clone(),
+                );
+                runtime.supervisor_handle.emit_component_healthcheck_failed(
+                    SupervisedComponent::TunnelSession,
+                    "bootstrap_connect_failed",
+                    startup_error_text.clone(),
+                    "bootstrap_connection",
+                    &[],
+                );
+                let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
+                    startup_error_text,
+                )));
+                return Err(startup_error);
+            }
+        };
     let mut current_tunnel_exchange_token = tunnel_exchange_token.to_string();
 
     let mut session_result = run_connected_tunnel_session_catching_panics(
@@ -1317,10 +1337,9 @@ async fn run_connected_tunnel_session_catching_panics(
                 None,
                 None,
             );
-            runtime.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                panic_text.clone(),
-            );
+            runtime
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, panic_text.clone());
             runtime.supervisor_handle.emit_component_exited(
                 SupervisedComponent::TunnelSession,
                 "panic",
@@ -1391,10 +1410,9 @@ async fn run_connected_tunnel_session(
                 None,
                 None,
             );
-            runtime.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                error.to_string(),
-            );
+            runtime
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, error.to_string());
             runtime.supervisor_handle.emit_component_exited(
                 SupervisedComponent::TunnelSession,
                 "thread_returned",
@@ -1433,10 +1451,9 @@ async fn run_connected_tunnel_session(
                 None,
                 None,
             );
-            runtime.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                error.to_string(),
-            );
+            runtime
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, error.to_string());
             runtime.supervisor_handle.emit_component_exited(
                 SupervisedComponent::TunnelSession,
                 "thread_returned",
@@ -1481,10 +1498,9 @@ async fn run_connected_tunnel_session(
                 None,
                 None,
             );
-            loop_context.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                error_text.clone(),
-            );
+            loop_context
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, error_text.clone());
             loop_context.supervisor_handle.emit_component_exited(
                 SupervisedComponent::TunnelSession,
                 "thread_returned",
@@ -1838,8 +1854,10 @@ async fn reconnect_bootstrap_tunnel(
         {
             TunnelExchangeOutcome::Success(exchange) => {
                 *current_tunnel_exchange_token = exchange.tunnel_exchange_token;
-                let connected_url =
-                    resolve_bootstrap_tunnel_url(gateway_ws_url, exchange.bootstrap_token.as_str())?;
+                let connected_url = resolve_bootstrap_tunnel_url(
+                    gateway_ws_url,
+                    exchange.bootstrap_token.as_str(),
+                )?;
                 match connect_bootstrap_websocket(connected_url.as_str()).await {
                     Ok((bootstrap_socket, _)) => {
                         return Ok(Some(bootstrap_socket));
@@ -1874,10 +1892,9 @@ async fn reconnect_bootstrap_tunnel(
                     Some(attempt_number),
                     None,
                 );
-                runtime.supervisor_handle.mark_component_restarting(
-                    SupervisedComponent::TunnelSession,
-                    error.clone(),
-                );
+                runtime
+                    .supervisor_handle
+                    .mark_component_restarting(SupervisedComponent::TunnelSession, error.clone());
                 runtime.supervisor_handle.emit_component_healthcheck_failed(
                     SupervisedComponent::TunnelSession,
                     "token_exchange_failed",
@@ -1894,10 +1911,9 @@ async fn reconnect_bootstrap_tunnel(
                     Some(attempt_number),
                     None,
                 );
-                runtime.supervisor_handle.mark_component_restarting(
-                    SupervisedComponent::TunnelSession,
-                    error.clone(),
-                );
+                runtime
+                    .supervisor_handle
+                    .mark_component_restarting(SupervisedComponent::TunnelSession, error.clone());
                 runtime.supervisor_handle.emit_component_healthcheck_failed(
                     SupervisedComponent::TunnelSession,
                     "token_exchange_terminal",
@@ -1925,9 +1941,7 @@ async fn reconnect_bootstrap_tunnel(
             backoff_ms,
             &[],
         );
-        runtime
-            .sleeper
-            .sleep(Duration::from_millis(backoff_ms));
+        runtime.sleeper.sleep(Duration::from_millis(backoff_ms));
         attempt_index = attempt_index.saturating_add(1);
     }
 }
@@ -1935,7 +1949,11 @@ async fn reconnect_bootstrap_tunnel(
 fn reconnect_backoff_ms(attempt_index: usize) -> u64 {
     *TUNNEL_RECONNECT_BACKOFF_MS
         .get(attempt_index)
-        .unwrap_or_else(|| TUNNEL_RECONNECT_BACKOFF_MS.last().expect("backoff list should not be empty"))
+        .unwrap_or_else(|| {
+            TUNNEL_RECONNECT_BACKOFF_MS
+                .last()
+                .expect("backoff list should not be empty")
+        })
 }
 
 fn forward_supervisor_lifecycle_events(
@@ -2033,13 +2051,13 @@ async fn exchange_tunnel_token(
 
     match status {
         StatusCode::OK => {
-            let parsed_response: TunnelExchangeResponse = match serde_json::from_slice(&response_body)
-            {
-                Ok(response) => response,
-                Err(error) => {
-                    return Ok(TunnelExchangeOutcome::Retryable(error.to_string()));
-                }
-            };
+            let parsed_response: TunnelExchangeResponse =
+                match serde_json::from_slice(&response_body) {
+                    Ok(response) => response,
+                    Err(error) => {
+                        return Ok(TunnelExchangeOutcome::Retryable(error.to_string()));
+                    }
+                };
             if parsed_response.bootstrap_token.trim().is_empty()
                 || parsed_response.tunnel_exchange_token.trim().is_empty()
             {
@@ -2054,10 +2072,9 @@ async fn exchange_tunnel_token(
             }))
         }
         StatusCode::UNAUTHORIZED | StatusCode::NOT_FOUND | StatusCode::CONFLICT => {
-            Ok(TunnelExchangeOutcome::Terminal(read_tunnel_exchange_error_message(
-                status,
-                &response_body,
-            )))
+            Ok(TunnelExchangeOutcome::Terminal(
+                read_tunnel_exchange_error_message(status, &response_body),
+            ))
         }
         StatusCode::TOO_MANY_REQUESTS => Ok(TunnelExchangeOutcome::Retryable(
             read_tunnel_exchange_error_message(status, &response_body),
@@ -2077,13 +2094,21 @@ fn read_tunnel_exchange_error_message(status: StatusCode, response_body: &[u8]) 
             .get("error")
             .and_then(Value::as_str)
             .map(std::string::ToString::to_string)
-            .unwrap_or_else(|| format!("token exchange returned unexpected status {}", status.as_u16())),
+            .unwrap_or_else(|| {
+                format!(
+                    "token exchange returned unexpected status {}",
+                    status.as_u16()
+                )
+            }),
         Ok(other) => format!(
             "token exchange returned status {} with unexpected JSON body: {other}",
             status.as_u16()
         ),
         Err(_) if response_body.is_empty() => {
-            format!("token exchange returned status {} with an empty body", status.as_u16())
+            format!(
+                "token exchange returned status {} with an empty body",
+                status.as_u16()
+            )
         }
         Err(_) => format!(
             "token exchange returned status {} with a non-JSON body",
@@ -2128,18 +2153,18 @@ async fn connect_bootstrap_websocket(
 
     let resolved_addresses = prioritize_ipv4_socket_addresses(
         timeout(
-        DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT,
-        lookup_host((host.as_str(), port)),
-    )
-    .await
-    .map_err(|_| {
-        TunnelSessionError::ConfigureTunnelSocket(format!(
-            "bootstrap websocket host lookup timed out after {}ms: {host}:{port}",
-            DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT.as_millis()
-        ))
-    })?
-    .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
-    .collect::<Vec<_>>(),
+            DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT,
+            lookup_host((host.as_str(), port)),
+        )
+        .await
+        .map_err(|_| {
+            TunnelSessionError::ConfigureTunnelSocket(format!(
+                "bootstrap websocket host lookup timed out after {}ms: {host}:{port}",
+                DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT.as_millis()
+            ))
+        })?
+        .map_err(|error| TunnelSessionError::ConfigureTunnelSocket(error.to_string()))?
+        .collect::<Vec<_>>(),
     );
     if resolved_addresses.is_empty() {
         return Err(TunnelSessionError::ConfigureTunnelSocket(format!(
@@ -2681,9 +2706,7 @@ fn poll_pty_sessions(
                                 PtySessionTermination {
                                     outcome: PTY_OUTCOME_RESET,
                                     reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                    reason: Some(
-                                        "pty stream send window is exhausted".to_string(),
-                                    ),
+                                    reason: Some("pty stream send window is exhausted".to_string()),
                                 },
                             ));
                             break;
@@ -2972,10 +2995,9 @@ async fn handle_tunnel_session_event(
                 None,
                 None,
             );
-            context.supervisor_handle.mark_component_restarting(
-                SupervisedComponent::TunnelSession,
-                reason_text.clone(),
-            );
+            context
+                .supervisor_handle
+                .mark_component_restarting(SupervisedComponent::TunnelSession, reason_text.clone());
             context.supervisor_handle.emit_component_healthcheck_failed(
                 SupervisedComponent::TunnelSession,
                 "bootstrap_closed",
@@ -3049,7 +3071,10 @@ async fn handle_tunnel_session_event(
         }
         TunnelSessionEvent::BootstrapMessage(message) => match message {
             Message::Text(payload) => {
-                match session_state.telemetry_relay.handle_control_message(&payload) {
+                match session_state
+                    .telemetry_relay
+                    .handle_control_message(&payload)
+                {
                     Ok(Some(frames)) => {
                         send_telemetry_frames(tunnel_writer_sender, frames)?;
                         return Ok(TunnelSessionControlFlow::Continue);
@@ -3182,10 +3207,13 @@ async fn handle_tunnel_session_event(
                         ))
                     } else {
                         let available_after = agent_stream.send_window.available_bytes();
-                        let outstanding_bytes = agent_stream_outstanding_bytes(&agent_stream.send_window);
-                        agent_stream
-                            .stats
-                            .record_outbound_message(payload_bytes, now_ms, outstanding_bytes);
+                        let outstanding_bytes =
+                            agent_stream_outstanding_bytes(&agent_stream.send_window);
+                        agent_stream.stats.record_outbound_message(
+                            payload_bytes,
+                            now_ms,
+                            outstanding_bytes,
+                        );
                         let message_count_out = agent_stream.stats.message_count_out;
                         let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
                         let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
@@ -3201,55 +3229,60 @@ async fn handle_tunnel_session_event(
                         ))
                     }
                 };
-                let (available_bytes, outstanding_bytes, message_count_out, stream_age_ms, oldest_unacked_ms) =
-                    match send_outcome {
-                        Ok(values) => values,
-                        Err((
-                            available_bytes,
-                            outstanding_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        )) => {
-                            publish_agent_stream_window_exhausted(
-                                tunnel_writer_sender,
-                                &mut session_state.telemetry_relay,
-                                context.clock,
-                                AgentStreamWindowExhaustedTelemetry {
-                                    stream_id,
-                                    payload_kind: websocket_payload_kind_name(
-                                        PAYLOAD_KIND_WEBSOCKET_TEXT,
-                                    ),
-                                    payload_bytes,
-                                    available_bytes,
-                                    outstanding_bytes,
-                                    message_count_out,
-                                    stream_age_ms,
-                                    oldest_unacked_ms,
-                                },
-                            );
-                            remove_agent_stream_and_publish_summary(
-                                tunnel_writer_sender,
-                                session_state,
-                                context.clock,
+                let (
+                    available_bytes,
+                    outstanding_bytes,
+                    message_count_out,
+                    stream_age_ms,
+                    oldest_unacked_ms,
+                ) = match send_outcome {
+                    Ok(values) => values,
+                    Err((
+                        available_bytes,
+                        outstanding_bytes,
+                        message_count_out,
+                        stream_age_ms,
+                        oldest_unacked_ms,
+                    )) => {
+                        publish_agent_stream_window_exhausted(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            context.clock,
+                            AgentStreamWindowExhaustedTelemetry {
                                 stream_id,
-                                AgentStreamTermination {
-                                    outcome: AGENT_STREAM_OUTCOME_RESET,
-                                    close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-                                    reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                    reason: Some("agent stream send window is exhausted".to_string()),
-                                },
-                            );
-                            return continue_with(write_tunnel_text(
-                                tunnel_writer_sender,
-                                stream_reset(
-                                    stream_id,
-                                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                    "agent stream send window is exhausted",
+                                payload_kind: websocket_payload_kind_name(
+                                    PAYLOAD_KIND_WEBSOCKET_TEXT,
                                 ),
-                            ));
-                        }
-                    };
+                                payload_bytes,
+                                available_bytes,
+                                outstanding_bytes,
+                                message_count_out,
+                                stream_age_ms,
+                                oldest_unacked_ms,
+                            },
+                        );
+                        remove_agent_stream_and_publish_summary(
+                            tunnel_writer_sender,
+                            session_state,
+                            context.clock,
+                            stream_id,
+                            AgentStreamTermination {
+                                outcome: AGENT_STREAM_OUTCOME_RESET,
+                                close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                                reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
+                                reason: Some("agent stream send window is exhausted".to_string()),
+                            },
+                        );
+                        return continue_with(write_tunnel_text(
+                            tunnel_writer_sender,
+                            stream_reset(
+                                stream_id,
+                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                                "agent stream send window is exhausted",
+                            ),
+                        ));
+                    }
+                };
                 for threshold_bytes in threshold_crossings {
                     publish_agent_stream_threshold_crossed(
                         tunnel_writer_sender,
@@ -3295,10 +3328,13 @@ async fn handle_tunnel_session_event(
                         ))
                     } else {
                         let available_after = agent_stream.send_window.available_bytes();
-                        let outstanding_bytes = agent_stream_outstanding_bytes(&agent_stream.send_window);
-                        agent_stream
-                            .stats
-                            .record_outbound_message(payload_bytes, now_ms, outstanding_bytes);
+                        let outstanding_bytes =
+                            agent_stream_outstanding_bytes(&agent_stream.send_window);
+                        agent_stream.stats.record_outbound_message(
+                            payload_bytes,
+                            now_ms,
+                            outstanding_bytes,
+                        );
                         let message_count_out = agent_stream.stats.message_count_out;
                         let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
                         let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
@@ -3314,55 +3350,60 @@ async fn handle_tunnel_session_event(
                         ))
                     }
                 };
-                let (available_bytes, outstanding_bytes, message_count_out, stream_age_ms, oldest_unacked_ms) =
-                    match send_outcome {
-                        Ok(values) => values,
-                        Err((
-                            available_bytes,
-                            outstanding_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        )) => {
-                            publish_agent_stream_window_exhausted(
-                                tunnel_writer_sender,
-                                &mut session_state.telemetry_relay,
-                                context.clock,
-                                AgentStreamWindowExhaustedTelemetry {
-                                    stream_id,
-                                    payload_kind: websocket_payload_kind_name(
-                                        PAYLOAD_KIND_WEBSOCKET_BINARY,
-                                    ),
-                                    payload_bytes,
-                                    available_bytes,
-                                    outstanding_bytes,
-                                    message_count_out,
-                                    stream_age_ms,
-                                    oldest_unacked_ms,
-                                },
-                            );
-                            remove_agent_stream_and_publish_summary(
-                                tunnel_writer_sender,
-                                session_state,
-                                context.clock,
+                let (
+                    available_bytes,
+                    outstanding_bytes,
+                    message_count_out,
+                    stream_age_ms,
+                    oldest_unacked_ms,
+                ) = match send_outcome {
+                    Ok(values) => values,
+                    Err((
+                        available_bytes,
+                        outstanding_bytes,
+                        message_count_out,
+                        stream_age_ms,
+                        oldest_unacked_ms,
+                    )) => {
+                        publish_agent_stream_window_exhausted(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            context.clock,
+                            AgentStreamWindowExhaustedTelemetry {
                                 stream_id,
-                                AgentStreamTermination {
-                                    outcome: AGENT_STREAM_OUTCOME_RESET,
-                                    close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-                                    reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                    reason: Some("agent stream send window is exhausted".to_string()),
-                                },
-                            );
-                            return continue_with(write_tunnel_text(
-                                tunnel_writer_sender,
-                                stream_reset(
-                                    stream_id,
-                                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                    "agent stream send window is exhausted",
+                                payload_kind: websocket_payload_kind_name(
+                                    PAYLOAD_KIND_WEBSOCKET_BINARY,
                                 ),
-                            ));
-                        }
-                    };
+                                payload_bytes,
+                                available_bytes,
+                                outstanding_bytes,
+                                message_count_out,
+                                stream_age_ms,
+                                oldest_unacked_ms,
+                            },
+                        );
+                        remove_agent_stream_and_publish_summary(
+                            tunnel_writer_sender,
+                            session_state,
+                            context.clock,
+                            stream_id,
+                            AgentStreamTermination {
+                                outcome: AGENT_STREAM_OUTCOME_RESET,
+                                close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+                                reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
+                                reason: Some("agent stream send window is exhausted".to_string()),
+                            },
+                        );
+                        return continue_with(write_tunnel_text(
+                            tunnel_writer_sender,
+                            stream_reset(
+                                stream_id,
+                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                                "agent stream send window is exhausted",
+                            ),
+                        ));
+                    }
+                };
                 for threshold_bytes in threshold_crossings {
                     publish_agent_stream_threshold_crossed(
                         tunnel_writer_sender,
@@ -3438,14 +3479,22 @@ async fn handle_tunnel_session_event(
         TunnelSessionEvent::PortAccessTransport(event) => {
             match &event {
                 PortAccessTransportEvent::HttpBodyEnd(message) => {
-                    session_state.port_access_http_streams.remove(&message.stream_id);
+                    session_state
+                        .port_access_http_streams
+                        .remove(&message.stream_id);
                 }
                 PortAccessTransportEvent::WsClose(message) => {
-                    session_state.port_access_ws_streams.remove(&message.stream_id);
+                    session_state
+                        .port_access_ws_streams
+                        .remove(&message.stream_id);
                 }
                 PortAccessTransportEvent::StreamError(message) => {
-                    session_state.port_access_http_streams.remove(&message.stream_id);
-                    session_state.port_access_ws_streams.remove(&message.stream_id);
+                    session_state
+                        .port_access_http_streams
+                        .remove(&message.stream_id);
+                    session_state
+                        .port_access_ws_streams
+                        .remove(&message.stream_id);
                 }
                 PortAccessTransportEvent::HttpResponseStart(_)
                 | PortAccessTransportEvent::HttpBodyChunk(_)
@@ -3454,7 +3503,9 @@ async fn handle_tunnel_session_event(
             }
 
             let payload = match event {
-                PortAccessTransportEvent::HttpResponseStart(message) => serde_json::to_string(&message),
+                PortAccessTransportEvent::HttpResponseStart(message) => {
+                    serde_json::to_string(&message)
+                }
                 PortAccessTransportEvent::HttpBodyChunk(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::HttpBodyEnd(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::WsAccept(message) => serde_json::to_string(&message),
@@ -3985,9 +4036,7 @@ fn handle_ports_transport_message(
                     message.stream_id
                 )));
             }
-            let Some(stream_sender) = session_state
-                .port_access_ws_streams
-                .get(&message.stream_id)
+            let Some(stream_sender) = session_state.port_access_ws_streams.get(&message.stream_id)
             else {
                 return Err(TunnelSessionError::PortAccess(format!(
                     "ports.ws.frame streamId {} is not bound to an active port access websocket stream",
@@ -4011,9 +4060,7 @@ fn handle_ports_transport_message(
                     message.stream_id
                 )));
             }
-            let Some(stream_sender) = session_state
-                .port_access_ws_streams
-                .get(&message.stream_id)
+            let Some(stream_sender) = session_state.port_access_ws_streams.get(&message.stream_id)
             else {
                 return Err(TunnelSessionError::PortAccess(format!(
                     "ports.ws.close streamId {} is not bound to an active port access websocket stream",
@@ -4072,12 +4119,13 @@ fn handle_ports_transport_message(
     Ok(())
 }
 
-fn port_access_stream_is_active(
-    session_state: &TunnelSessionMutableState,
-    stream_id: u32,
-) -> bool {
-    session_state.port_access_http_streams.contains_key(&stream_id)
-        || session_state.port_access_ws_streams.contains_key(&stream_id)
+fn port_access_stream_is_active(session_state: &TunnelSessionMutableState, stream_id: u32) -> bool {
+    session_state
+        .port_access_http_streams
+        .contains_key(&stream_id)
+        || session_state
+            .port_access_ws_streams
+            .contains_key(&stream_id)
 }
 
 fn handle_tunnel_binary_frame(
@@ -4404,7 +4452,11 @@ fn handle_pty_close(
 
         (
             pty_state.primary_stream_id,
-            pty_state.attached_stream_ids.iter().copied().collect::<Vec<_>>(),
+            pty_state
+                .attached_stream_ids
+                .iter()
+                .copied()
+                .collect::<Vec<_>>(),
             pty_state.session.terminate(
                 clock,
                 sleeper,
@@ -4574,7 +4626,9 @@ fn finalize_file_upload(
     Ok(())
 }
 
-pub(crate) fn derive_sandbox_instance_id(gateway_ws_url: &str) -> Result<String, TunnelSessionError> {
+pub(crate) fn derive_sandbox_instance_id(
+    gateway_ws_url: &str,
+) -> Result<String, TunnelSessionError> {
     let parsed_url = Url::parse(gateway_ws_url)
         .map_err(|error| TunnelSessionError::InvalidGatewayUrl(error.to_string()))?;
     let Some(segment) = parsed_url
@@ -4835,11 +4889,11 @@ fn matches_signature(bytes: &[u8], offset: usize, signature: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome,
-        DEFAULT_ATTACHMENT_ROOT, PTY_OUTCOME_CLOSED, PtySessionStats, PtySessionTermination,
-        TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
-        TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
-        connect_bootstrap_websocket, handle_tunnel_control_message, handle_tunnel_session_event,
+        AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
+        PTY_OUTCOME_CLOSED, PtySessionStats, PtySessionTermination, TunnelSessionError,
+        TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
+        TunnelSessionRuntime, TunnelWriterMessage, connect_bootstrap_websocket,
+        handle_tunnel_control_message, handle_tunnel_session_event,
         prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
         publish_pty_session_summary, resolve_bootstrap_tunnel_url,
         run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
@@ -4940,7 +4994,10 @@ mod tests {
     async fn read_queued_telemetry_log_line(
         receiver: &mut tokio::sync::mpsc::UnboundedReceiver<TunnelWriterMessage>,
     ) -> Value {
-        let writer_message = receiver.recv().await.expect("telemetry frame should be queued");
+        let writer_message = receiver
+            .recv()
+            .await
+            .expect("telemetry frame should be queued");
         let TunnelWriterMessage::Binary(payload) = writer_message else {
             panic!("expected a binary telemetry frame");
         };
@@ -5105,7 +5162,10 @@ mod tests {
             })
         );
         assert!(session_state.agent_streams.is_empty());
-        let forwarded_close = agent_receiver.recv().await.expect("runtime close should be forwarded");
+        let forwarded_close = agent_receiver
+            .recv()
+            .await
+            .expect("runtime close should be forwarded");
         assert_eq!(forwarded_close, Message::Close(None));
     }
 
@@ -5352,12 +5412,8 @@ mod tests {
             .expect("scope events should be writable");
         let keepalive_manager = Mutex::new(KeepaliveManager::default());
 
-        sync_pty_scope_keepalive(
-            &keepalive_manager,
-            &test_dir,
-            "sbi_123",
-        )
-        .expect("populated user scope should sync");
+        sync_pty_scope_keepalive(&keepalive_manager, &test_dir, "sbi_123")
+            .expect("populated user scope should sync");
 
         assert!(
             keepalive_manager
@@ -5369,12 +5425,8 @@ mod tests {
 
         std::fs::write(&scope_paths.events_file, "populated 0\n")
             .expect("scope events should be writable");
-        sync_pty_scope_keepalive(
-            &keepalive_manager,
-            &test_dir,
-            "sbi_123",
-        )
-        .expect("empty user scope should sync");
+        sync_pty_scope_keepalive(&keepalive_manager, &test_dir, "sbi_123")
+            .expect("empty user scope should sync");
 
         assert!(
             !keepalive_manager
@@ -5780,7 +5832,11 @@ mod tests {
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(&startup_input, keepalive_manager.clone(), runtime_readiness_manager.clone())
+            .start(
+                &startup_input,
+                keepalive_manager.clone(),
+                runtime_readiness_manager.clone(),
+            )
             .expect("runtime adapters should start");
         let tunnel_session = TunnelSession::start(
             &startup_input,
@@ -5815,8 +5871,10 @@ mod tests {
 
     #[test]
     fn keeps_large_agent_responses_open_when_the_response_fits_within_the_stream_window() {
-        let large_response_payload =
-            "x".repeat(std::cmp::min(1024 * 1024, AGENT_STREAM_WINDOW_BYTES.saturating_sub(2048)));
+        let large_response_payload = "x".repeat(std::cmp::min(
+            1024 * 1024,
+            AGENT_STREAM_WINDOW_BYTES.saturating_sub(2048),
+        ));
         let large_response_payload_len = large_response_payload.len();
 
         let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
@@ -6128,7 +6186,11 @@ mod tests {
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
         let runtime_adapters = RuntimeAdapterRegistry
-            .start(&startup_input, keepalive_manager.clone(), runtime_readiness_manager.clone())
+            .start(
+                &startup_input,
+                keepalive_manager.clone(),
+                runtime_readiness_manager.clone(),
+            )
             .expect("runtime adapters should start");
         let tunnel_session = TunnelSession::start(
             &startup_input,
@@ -6209,8 +6271,10 @@ mod tests {
                     .into(),
                 ))
                 .expect("gateway should send an unsupported bootstrap control message");
-            let dropped_control_message =
-                read_telemetry_log_line_with_event(&mut websocket, "bootstrap_control_message_dropped");
+            let dropped_control_message = read_telemetry_log_line_with_event(
+                &mut websocket,
+                "bootstrap_control_message_dropped",
+            );
             assert_eq!(
                 dropped_control_message["event"],
                 "bootstrap_control_message_dropped"
@@ -6495,7 +6559,9 @@ mod tests {
         };
 
         assert!(
-            error.to_string().contains("failed to configure bootstrap tunnel socket"),
+            error
+                .to_string()
+                .contains("failed to configure bootstrap tunnel socket"),
             "start() should surface the initial websocket establishment failure"
         );
         gateway_thread
@@ -6523,9 +6589,18 @@ mod tests {
         let prioritized = prioritize_ipv4_socket_addresses(addresses);
 
         assert!(prioritized[0].is_ipv4(), "first address should prefer ipv4");
-        assert!(prioritized[1].is_ipv4(), "second address should prefer ipv4");
-        assert!(prioritized[2].is_ipv6(), "third address should fall back to ipv6");
-        assert!(prioritized[3].is_ipv6(), "fourth address should fall back to ipv6");
+        assert!(
+            prioritized[1].is_ipv4(),
+            "second address should prefer ipv4"
+        );
+        assert!(
+            prioritized[2].is_ipv6(),
+            "third address should fall back to ipv6"
+        );
+        assert!(
+            prioritized[3].is_ipv6(),
+            "fourth address should fall back to ipv6"
+        );
     }
 
     #[test]
@@ -6536,7 +6611,8 @@ mod tests {
             .local_addr()
             .expect("bootstrap listener should expose an address")
             .port();
-        let bootstrap_url = format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+        let bootstrap_url =
+            format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
         let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
         let gateway_thread = thread::spawn(move || {
             let (initial_stream, _) = bootstrap_listener
@@ -6557,9 +6633,10 @@ mod tests {
                 .accept()
                 .expect("gateway should accept the first token exchange request");
             let first_exchange_request = read_http_request(&mut first_exchange_stream);
-            assert!(first_exchange_request.starts_with(
-                "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
-            ));
+            assert!(
+                first_exchange_request
+                    .starts_with("POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1")
+            );
             assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
             assert_http_header(&first_exchange_request, "content-length", "0");
             write_http_json_response(
@@ -6589,9 +6666,10 @@ mod tests {
                 .accept()
                 .expect("gateway should accept the second token exchange request");
             let second_exchange_request = read_http_request(&mut second_exchange_stream);
-            assert!(second_exchange_request.starts_with(
-                "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1"
-            ));
+            assert!(
+                second_exchange_request
+                    .starts_with("POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1")
+            );
             assert_http_bearer_token(&second_exchange_request, "exchange-token-reconnect-1");
             assert_http_header(&second_exchange_request, "content-length", "0");
             write_http_json_response(
@@ -6923,9 +7001,9 @@ mod tests {
         )
         .expect("tunnel session should start");
 
-        gateway_ready_receiver
-            .recv()
-            .expect("gateway should observe reconnect after retrying the token exchange body read failure");
+        gateway_ready_receiver.recv().expect(
+            "gateway should observe reconnect after retrying the token exchange body read failure",
+        );
 
         tunnel_session.close();
         gateway_thread
@@ -7014,7 +7092,7 @@ mod tests {
                     "agentRuntimes": []
                 }),
                 egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+                git_identity: None,
             };
 
             let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
@@ -7748,8 +7826,10 @@ mod tests {
     #[test]
     fn starts_live_tunnel_session_for_ports_target_authorize() {
         let listener_port = reserve_available_port();
-        let mut server =
-            spawn_node_fixture("http-ws-listener.js", &[&listener_port.to_string(), "authorize-http"]);
+        let mut server = spawn_node_fixture(
+            "http-ws-listener.js",
+            &[&listener_port.to_string(), "authorize-http"],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -7871,8 +7951,10 @@ mod tests {
     fn starts_live_tunnel_session_for_ports_http_transport() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_http_transport_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("http-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "http-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -8006,7 +8088,10 @@ mod tests {
             );
             assert_eq!(echoed_request["headers"]["x-forwarded-proto"], "https");
             assert_eq!(echoed_request["headers"]["x-forwarded-port"], "443");
-            assert_eq!(echoed_request["headers"]["x-request-marker"], fixture_marker);
+            assert_eq!(
+                echoed_request["headers"]["x-request-marker"],
+                fixture_marker
+            );
 
             websocket
                 .close(None)
@@ -8204,8 +8289,10 @@ mod tests {
     fn sends_ports_stream_error_when_http_transport_upstream_closes_mid_response() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_http_transport_close_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("http-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "http-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -8351,8 +8438,10 @@ mod tests {
     fn relays_port_access_websocket_frames_and_close_frames() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_ws_transport_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("ws-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "ws-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -8552,8 +8641,10 @@ mod tests {
     fn relays_upstream_websocket_ping_without_auto_ponging_locally() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_ws_transport_ping_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("ws-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "ws-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -8717,8 +8808,10 @@ mod tests {
     fn relays_upstream_websocket_close_without_inventing_a_code() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_ws_transport_close_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("ws-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "ws-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -8855,8 +8948,10 @@ mod tests {
     fn rejects_fragmented_upstream_websocket_frames() {
         let listener_port = reserve_available_port();
         let fixture_marker = format!("mistle_ws_transport_fragment_{}", std::process::id());
-        let mut server =
-            spawn_node_fixture("ws-transport-listener.js", &[&listener_port.to_string(), &fixture_marker]);
+        let mut server = spawn_node_fixture(
+            "ws-transport-listener.js",
+            &[&listener_port.to_string(), &fixture_marker],
+        );
         wait_until_listening(listener_port);
 
         let bootstrap_listener =
@@ -9021,7 +9116,10 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn read_port_access_message_for_stream<S>(socket: &mut WebSocket<S>, expected_stream_id: u32) -> Value
+    fn read_port_access_message_for_stream<S>(
+        socket: &mut WebSocket<S>,
+        expected_stream_id: u32,
+    ) -> Value
     where
         S: std::io::Read + std::io::Write,
     {
@@ -9280,7 +9378,10 @@ mod tests {
         }
     }
 
-    fn read_telemetry_log_line_with_event<S>(socket: &mut WebSocket<S>, expected_event: &str) -> Value
+    fn read_telemetry_log_line_with_event<S>(
+        socket: &mut WebSocket<S>,
+        expected_event: &str,
+    ) -> Value
     where
         S: std::io::Read + std::io::Write,
     {
@@ -9333,7 +9434,9 @@ mod tests {
             match control_message["type"].as_str() {
                 Some("keepalive.state") => saw_keepalive = true,
                 Some("runtime.ready") => saw_runtime_ready = true,
-                other => panic!("unexpected bootstrap control message while waiting for reconnect readiness: {other:?}"),
+                other => panic!(
+                    "unexpected bootstrap control message while waiting for reconnect readiness: {other:?}"
+                ),
             }
         }
     }
@@ -9348,7 +9451,10 @@ mod tests {
             let bytes_read = stream
                 .read(&mut buffer)
                 .expect("http request stream should be readable");
-            assert!(bytes_read > 0, "http request stream should not close before headers");
+            assert!(
+                bytes_read > 0,
+                "http request stream should not close before headers"
+            );
             request_bytes.extend_from_slice(&buffer[..bytes_read]);
             if request_bytes.windows(4).any(|window| window == b"\r\n\r\n") {
                 break;
@@ -9360,9 +9466,7 @@ mod tests {
     fn assert_http_bearer_token(request: &str, expected_token: &str) {
         let normalized_request = request.to_ascii_lowercase();
         assert!(
-            normalized_request.contains(&format!(
-                "\r\nauthorization: bearer {expected_token}\r\n"
-            )),
+            normalized_request.contains(&format!("\r\nauthorization: bearer {expected_token}\r\n")),
             "http request should contain the expected bearer token"
         );
     }

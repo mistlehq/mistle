@@ -96,7 +96,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -124,8 +124,11 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         .expect("overwrite fixture should remain writable between cold starts");
     fs::write(&if_absent_path, "keep-me-local")
         .expect("if-absent fixture should remain writable between cold starts");
-    fs::write(clone_target_path.join("README.md"), "local workspace change\n")
-        .expect("existing git repository should remain writable between cold starts");
+    fs::write(
+        clone_target_path.join("README.md"),
+        "local workspace change\n",
+    )
+    .expect("existing git repository should remain writable between cold starts");
     fs::write(clone_target_path.join("LOCAL_ONLY.txt"), "local only\n")
         .expect("untracked file fixture should be writable");
 
@@ -233,8 +236,9 @@ fn preserves_existing_git_repository_with_origin_mismatch() {
         &clone_target_path,
     );
 
-    runtime::apply_runtime_plan(&startup_input)
-        .expect("cold init should leave an existing git repository in place even when origin changes");
+    runtime::apply_runtime_plan(&startup_input).expect(
+        "cold init should leave an existing git repository in place even when origin changes",
+    );
 
     assert_eq!(
         git_remote_url(&clone_target_path, "origin"),
@@ -518,7 +522,7 @@ fn applies_typed_exec_artifact_install_steps() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -567,7 +571,7 @@ fn applies_typed_mise_install_steps() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -635,7 +639,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -714,7 +718,7 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -735,7 +739,10 @@ fn create_git_repository(path: &Path) {
     run_command(&["git", "commit", "--quiet", "-m", "initial commit"], path);
 }
 
-fn create_runtime_plan_apply_input(clone_source_path: &Path, clone_target_path: &Path) -> StartupInput {
+fn create_runtime_plan_apply_input(
+    clone_source_path: &Path,
+    clone_target_path: &Path,
+) -> StartupInput {
     StartupInput {
         startup_mode: StartupMode::New,
         bootstrap_token: "bootstrap-token-value".to_string(),
@@ -762,7 +769,7 @@ fn create_runtime_plan_apply_input(clone_source_path: &Path, clone_target_path: 
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     }
 }
 

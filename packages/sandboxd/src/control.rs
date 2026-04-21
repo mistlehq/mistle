@@ -767,9 +767,11 @@ fn begin_init(
     }
 
     let state_for_thread = state.clone();
-    let diagnostics_logger =
-        StartupDiagnosticsLogger::initialize(StartupOperation::Init, &startup_input.tunnel_gateway_ws_url)
-            .ok();
+    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Init,
+        &startup_input.tunnel_gateway_ws_url,
+    )
+    .ok();
     if let Some(logger) = &diagnostics_logger
         && let Err(error) = logger.record_started()
     {
@@ -800,7 +802,9 @@ fn begin_init(
                         startup_diagnostics_string(error_text.clone()),
                     )]))
                 {
-                    eprintln!("sandboxd failed to record init diagnostics failure event: {record_error}");
+                    eprintln!(
+                        "sandboxd failed to record init diagnostics failure event: {record_error}"
+                    );
                 }
                 state_for_thread
                     .lock()
@@ -819,9 +823,11 @@ fn begin_resume(
     startup_input: StartupInput,
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Result<(), ControlError> {
-    let diagnostics_logger =
-        StartupDiagnosticsLogger::initialize(StartupOperation::Resume, &startup_input.tunnel_gateway_ws_url)
-            .ok();
+    let diagnostics_logger = StartupDiagnosticsLogger::initialize(
+        StartupOperation::Resume,
+        &startup_input.tunnel_gateway_ws_url,
+    )
+    .ok();
     if let Some(logger) = &diagnostics_logger
         && let Err(error) = logger.record_started()
     {
@@ -1452,7 +1458,9 @@ mod tests {
                     panic!("sandboxd init failed while waiting for {expected:?}: {error}")
                 }
                 InitPhase::Initialized => {
-                    panic!("sandboxd reached initialized while waiting for different phase {expected:?}")
+                    panic!(
+                        "sandboxd reached initialized while waiting for different phase {expected:?}"
+                    )
                 }
                 InitPhase::Initializing | InitPhase::Uninitialized => {}
             }

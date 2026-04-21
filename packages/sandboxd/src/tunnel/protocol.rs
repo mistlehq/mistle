@@ -861,11 +861,12 @@ pub fn parse_ports_control_message(
     payload: &str,
 ) -> Result<Option<PortsControlMessage>, TunnelProtocolError> {
     let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
-        TunnelProtocolError::new(format!(
-            "ports control message must be valid json: {error}"
-        ))
+        TunnelProtocolError::new(format!("ports control message must be valid json: {error}"))
     })?;
-    let Some(message_type) = parsed_payload.get("type").and_then(serde_json::Value::as_str) else {
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
         return Ok(None);
     };
 
@@ -889,7 +890,10 @@ pub fn parse_ports_transport_message(
             "ports transport message must be valid json: {error}"
         ))
     })?;
-    let Some(message_type) = parsed_payload.get("type").and_then(serde_json::Value::as_str) else {
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
         return Ok(None);
     };
 
@@ -1696,7 +1700,9 @@ fn validate_ports_stream_error(message: &PortsStreamError) -> Result<(), TunnelP
         )));
     }
     if message.message.trim().is_empty() {
-        return Err(TunnelProtocolError::new("ports.stream.error message is required"));
+        return Err(TunnelProtocolError::new(
+            "ports.stream.error message is required",
+        ));
     }
 
     Ok(())
@@ -1777,8 +1783,8 @@ mod tests {
         ProcessesStreamMessage, PtyControlMessage, StreamControlMessage, StreamSendWindow,
         decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
         file_upload_completed_event, parse_bootstrap_telemetry_control_message,
-        parse_ports_control_message, parse_ports_transport_message,
-        parse_processes_stream_message, parse_pty_control_message, parse_stream_control_message,
+        parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
+        parse_pty_control_message, parse_stream_control_message,
         ports_target_authorize_failure_result, ports_target_authorize_success_result,
         pty_exit_event, stream_complete, stream_open_error, stream_open_ok, stream_reset,
         stream_window, telemetry_close, telemetry_open,
@@ -1887,16 +1893,19 @@ mod tests {
         .expect("ports.http.body.end should parse");
         assert!(matches!(
             body_end,
-            Some(crate::tunnel::protocol::PortsTransportMessage::HttpBodyEnd(_))
+            Some(crate::tunnel::protocol::PortsTransportMessage::HttpBodyEnd(
+                _
+            ))
         ));
 
-        let stream_close = parse_ports_transport_message(
-            r#"{"type":"ports.stream.close","streamId":41}"#,
-        )
-        .expect("ports.stream.close should parse");
+        let stream_close =
+            parse_ports_transport_message(r#"{"type":"ports.stream.close","streamId":41}"#)
+                .expect("ports.stream.close should parse");
         assert!(matches!(
             stream_close,
-            Some(crate::tunnel::protocol::PortsTransportMessage::StreamClose(_))
+            Some(crate::tunnel::protocol::PortsTransportMessage::StreamClose(
+                _
+            ))
         ));
 
         let stream_error = parse_ports_transport_message(
@@ -1905,7 +1914,9 @@ mod tests {
         .expect("ports.stream.error should parse");
         assert!(matches!(
             stream_error,
-            Some(crate::tunnel::protocol::PortsTransportMessage::StreamError(_))
+            Some(crate::tunnel::protocol::PortsTransportMessage::StreamError(
+                _
+            ))
         ));
     }
 

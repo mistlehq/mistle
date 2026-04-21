@@ -397,11 +397,15 @@ pub fn start_codex_proxy_with_supervisor(
             ("rawTarget".to_string(), raw_app_server_url.to_string()),
             (
                 "sessionManagerState".to_string(),
-                CodexSessionManagerHealthState::Starting.as_str().to_string(),
+                CodexSessionManagerHealthState::Starting
+                    .as_str()
+                    .to_string(),
             ),
             (
                 "rawConnectivityState".to_string(),
-                CodexSessionManagerHealthState::Starting.as_str().to_string(),
+                CodexSessionManagerHealthState::Starting
+                    .as_str()
+                    .to_string(),
             ),
         ]),
     );
@@ -435,27 +439,26 @@ pub fn start_codex_proxy_with_supervisor(
         supervisor_handle: supervisor_handle.clone(),
         supervisor_command_sender: supervisor_command_sender.clone(),
     };
-    let local_runtime_readiness_projection = if !supervisor_handle
-        .tracks_component(SupervisedComponent::CodexAppServer)
-    {
-        sync_codex_proxy_runtime_readiness_from_snapshot(
-            &supervisor_handle,
-            &runtime_readiness_manager,
-        );
-        let shutdown_requested = Arc::new(AtomicBool::new(false));
-        let thread = spawn_codex_proxy_runtime_readiness_projection(
-            supervisor_handle.clone(),
-            runtime_readiness_manager.clone(),
-            shutdown_requested.clone(),
-        );
-        Some(LocalRuntimeReadinessProjection {
-            runtime_readiness_manager,
-            shutdown_requested,
-            thread,
-        })
-    } else {
-        None
-    };
+    let local_runtime_readiness_projection =
+        if !supervisor_handle.tracks_component(SupervisedComponent::CodexAppServer) {
+            sync_codex_proxy_runtime_readiness_from_snapshot(
+                &supervisor_handle,
+                &runtime_readiness_manager,
+            );
+            let shutdown_requested = Arc::new(AtomicBool::new(false));
+            let thread = spawn_codex_proxy_runtime_readiness_projection(
+                supervisor_handle.clone(),
+                runtime_readiness_manager.clone(),
+                shutdown_requested.clone(),
+            );
+            Some(LocalRuntimeReadinessProjection {
+                runtime_readiness_manager,
+                shutdown_requested,
+                thread,
+            })
+        } else {
+            None
+        };
     let shutdown_requested = Arc::new(AtomicBool::new(false));
     let supervisor_thread = thread::spawn({
         let shutdown_requested = shutdown_requested.clone();
@@ -546,11 +549,9 @@ impl ActiveCodexProxyRuntime {
     fn join_after_disconnected_exit_channel(&mut self) -> CodexProxyError {
         match self.runtime_thread.take() {
             Some(runtime_thread) => match runtime_thread.join() {
-                Ok(Ok(())) => {
-                    CodexProxyError::ConfigureRuntime(
-                        "Codex proxy exit channel disconnected unexpectedly".to_string(),
-                    )
-                }
+                Ok(Ok(())) => CodexProxyError::ConfigureRuntime(
+                    "Codex proxy exit channel disconnected unexpectedly".to_string(),
+                ),
                 Ok(Err(error)) => error,
                 Err(_) => CodexProxyError::RuntimePanicked,
             },
@@ -566,21 +567,22 @@ impl ActiveCodexProxyRuntime {
 }
 
 fn parse_codex_proxy_listener_address(listen_url: &Url) -> Result<SocketAddr, CodexProxyError> {
-    let listen_host = listen_url
-        .host_str()
-        .ok_or_else(|| CodexProxyError::ListenUrlMissingHost {
-            url: listen_url.to_string(),
-        })?;
+    let listen_host =
+        listen_url
+            .host_str()
+            .ok_or_else(|| CodexProxyError::ListenUrlMissingHost {
+                url: listen_url.to_string(),
+            })?;
     let listen_port = listen_url
         .port()
         .ok_or_else(|| CodexProxyError::ListenUrlMissingPort {
             url: listen_url.to_string(),
         })?;
-    format!("{listen_host}:{listen_port}")
-        .parse()
-        .map_err(|_| CodexProxyError::ConfigureRuntime(format!(
+    format!("{listen_host}:{listen_port}").parse().map_err(|_| {
+        CodexProxyError::ConfigureRuntime(format!(
             "Codex proxy listen URL must use a concrete socket address: {listen_url}"
-        )))
+        ))
+    })
 }
 
 fn spawn_active_codex_proxy_runtime(
@@ -619,10 +621,10 @@ fn spawn_active_codex_proxy_runtime(
 
     match startup_result_receiver.recv() {
         Ok(Ok(startup)) => {
-            let listener_address =
-                parse_codex_proxy_listener_address(&Url::parse(&startup.listen_url).map_err(
-                    |error| CodexProxyError::ParseListenUrl(error.to_string()),
-                )?)?;
+            let listener_address = parse_codex_proxy_listener_address(
+                &Url::parse(&startup.listen_url)
+                    .map_err(|error| CodexProxyError::ParseListenUrl(error.to_string()))?,
+            )?;
             Ok(ActiveCodexProxyRuntime {
                 listener_address,
                 listen_url: startup.listen_url,
@@ -866,10 +868,8 @@ fn record_codex_proxy_start_failure(
     error: &CodexProxyError,
 ) {
     let error_text = error.to_string();
-    supervisor_handle.mark_component_restarting(
-        SupervisedComponent::CodexProxy,
-        error_text.clone(),
-    );
+    supervisor_handle
+        .mark_component_restarting(SupervisedComponent::CodexProxy, error_text.clone());
     supervisor_handle.emit_component_healthcheck_failed(
         SupervisedComponent::CodexProxy,
         "startup_healthcheck_failed",
@@ -884,10 +884,8 @@ fn record_codex_proxy_listener_healthcheck_failure(
     error: &CodexProxyError,
 ) {
     let error_text = error.to_string();
-    supervisor_handle.mark_component_restarting(
-        SupervisedComponent::CodexProxy,
-        error_text.clone(),
-    );
+    supervisor_handle
+        .mark_component_restarting(SupervisedComponent::CodexProxy, error_text.clone());
     supervisor_handle.emit_component_healthcheck_failed(
         SupervisedComponent::CodexProxy,
         "loopback_listener_failed",
@@ -907,10 +905,7 @@ fn record_codex_proxy_exit_for_restart(
             "panic",
             vec![
                 ("exitKind", Value::String("panic".to_string())),
-                (
-                    "panicBoundary",
-                    Value::String("runtime_thread".to_string()),
-                ),
+                ("panicBoundary", Value::String("runtime_thread".to_string())),
             ],
         ),
         _ => (
@@ -921,10 +916,8 @@ fn record_codex_proxy_exit_for_restart(
             )],
         ),
     };
-    supervisor_handle.mark_component_restarting(
-        SupervisedComponent::CodexProxy,
-        error_text.clone(),
-    );
+    supervisor_handle
+        .mark_component_restarting(SupervisedComponent::CodexProxy, error_text.clone());
     supervisor_handle.emit_component_exited(
         SupervisedComponent::CodexProxy,
         reason,
@@ -933,20 +926,20 @@ fn record_codex_proxy_exit_for_restart(
     );
 }
 
-fn normalize_codex_proxy_exit_result(
-    exit_result: Result<(), CodexProxyError>,
-) -> CodexProxyError {
+fn normalize_codex_proxy_exit_result(exit_result: Result<(), CodexProxyError>) -> CodexProxyError {
     match exit_result {
-        Ok(()) => CodexProxyError::ConfigureRuntime(
-            "Codex proxy runtime exited unexpectedly".to_string(),
-        ),
+        Ok(()) => {
+            CodexProxyError::ConfigureRuntime("Codex proxy runtime exited unexpectedly".to_string())
+        }
         Err(error) => error,
     }
 }
 
 fn clone_codex_proxy_error(error: &CodexProxyError) -> CodexProxyError {
     match error {
-        CodexProxyError::ParseListenUrl(message) => CodexProxyError::ParseListenUrl(message.clone()),
+        CodexProxyError::ParseListenUrl(message) => {
+            CodexProxyError::ParseListenUrl(message.clone())
+        }
         CodexProxyError::ParseRawUrl(message) => CodexProxyError::ParseRawUrl(message.clone()),
         CodexProxyError::ListenUrlMustUseWebSocket { url } => {
             CodexProxyError::ListenUrlMustUseWebSocket { url: url.clone() }
@@ -976,22 +969,24 @@ fn clone_codex_proxy_error(error: &CodexProxyError) -> CodexProxyError {
         CodexProxyError::ConfigureRuntime(message) => {
             CodexProxyError::ConfigureRuntime(message.clone())
         }
-        CodexProxyError::ConnectRaw(error) => CodexProxyError::ConnectRaw(clone_websocket_error(error)),
-        CodexProxyError::InvalidJson(error) => {
-            CodexProxyError::InvalidJson(serde_json::Error::io(std::io::Error::other(error.to_string())))
+        CodexProxyError::ConnectRaw(error) => {
+            CodexProxyError::ConnectRaw(clone_websocket_error(error))
         }
-        CodexProxyError::MissingResponseId { expected_id } => {
-            CodexProxyError::MissingResponseId {
-                expected_id: *expected_id,
-            }
-        }
+        CodexProxyError::InvalidJson(error) => CodexProxyError::InvalidJson(serde_json::Error::io(
+            std::io::Error::other(error.to_string()),
+        )),
+        CodexProxyError::MissingResponseId { expected_id } => CodexProxyError::MissingResponseId {
+            expected_id: *expected_id,
+        },
         CodexProxyError::InvalidThreadLoadedList(message) => {
             CodexProxyError::InvalidThreadLoadedList(message.clone())
         }
         CodexProxyError::InvalidThreadRead(message) => {
             CodexProxyError::InvalidThreadRead(message.clone())
         }
-        CodexProxyError::ReadSocket(error) => CodexProxyError::ReadSocket(clone_websocket_error(error)),
+        CodexProxyError::ReadSocket(error) => {
+            CodexProxyError::ReadSocket(clone_websocket_error(error))
+        }
         CodexProxyError::WriteSocket(error) => {
             CodexProxyError::WriteSocket(clone_websocket_error(error))
         }
@@ -1249,6 +1244,10 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
+    use crate::keepalive::KeepaliveManager;
+    use crate::runtime::readiness::RuntimeReadinessManager;
+    use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::time::SystemClock;
     use futures_util::{SinkExt, StreamExt};
     use serde_json::json;
     use tokio::net::{TcpListener, TcpStream};
@@ -1256,12 +1255,6 @@ mod tests {
     use tokio::sync::oneshot;
     use tokio::task::JoinSet;
     use tokio_tungstenite::accept_async;
-    use crate::keepalive::KeepaliveManager;
-    use crate::runtime::readiness::RuntimeReadinessManager;
-    use crate::supervision::{
-        ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent,
-    };
-    use crate::time::SystemClock;
     use tungstenite::Message;
 
     use crate::codex_proxy::{
@@ -1448,9 +1441,10 @@ mod tests {
 
             match message {
                 Message::Text(payload) => {
-                    let value: serde_json::Value =
-                        serde_json::from_str(payload.as_str()).map_err(|error| error.to_string())?;
-                    let Some(method) = value.get("method").and_then(serde_json::Value::as_str) else {
+                    let value: serde_json::Value = serde_json::from_str(payload.as_str())
+                        .map_err(|error| error.to_string())?;
+                    let Some(method) = value.get("method").and_then(serde_json::Value::as_str)
+                    else {
                         continue;
                     };
 
@@ -1489,9 +1483,8 @@ mod tests {
                                 .map_err(|error| error.to_string())?;
                         }
                         "thread/read" => {
-                            let thread_id = value["params"]["threadId"]
-                                .as_str()
-                                .unwrap_or("thr_test");
+                            let thread_id =
+                                value["params"]["threadId"].as_str().unwrap_or("thr_test");
                             socket
                                 .send(Message::Text(
                                     json!({
@@ -1562,7 +1555,8 @@ mod tests {
             let snapshot = supervisor_handle
                 .component_snapshot(SupervisedComponent::CodexProxy)
                 .expect("Codex proxy should be tracked");
-            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count {
+            if snapshot.state == expected_state && snapshot.restart_count >= expected_restart_count
+            {
                 return;
             }
             assert!(

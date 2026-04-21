@@ -6,14 +6,14 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use sandboxd::process::{RuntimeClientProcessSpec, start_runtime_client_process_manager_with_supervisor};
+use sandboxd::process::{
+    RuntimeClientProcessSpec, start_runtime_client_process_manager_with_supervisor,
+};
 use sandboxd::runtime::{
     RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
     RuntimeExecCommand,
 };
-use sandboxd::supervision::{
-    ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent,
-};
+use sandboxd::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
 use sandboxd::time::{SystemClock, ThreadSleeper};
 
 #[test]
@@ -52,7 +52,10 @@ fn records_codex_app_server_exit_after_readiness() {
         Some(format!("ws://127.0.0.1:{port}/health"))
     );
     assert!(!observation.is_alive);
-    assert_eq!(observation.last_exit_status, Some("process exited".to_string()));
+    assert_eq!(
+        observation.last_exit_status,
+        Some("process exited".to_string())
+    );
 
     let snapshot = supervisor_handle
         .component_snapshot(SupervisedComponent::CodexAppServer)
@@ -61,7 +64,10 @@ fn records_codex_app_server_exit_after_readiness() {
         snapshot.details.get("lastExitStatus"),
         Some(&"process exited".to_string())
     );
-    assert_eq!(snapshot.details.get("livenessState"), Some(&"Exited".to_string()));
+    assert_eq!(
+        snapshot.details.get("livenessState"),
+        Some(&"Exited".to_string())
+    );
     assert!(
         wait_for_forwarded_lifecycle_event(
             &supervisor_handle,
@@ -188,11 +194,7 @@ fn codex_app_server_monitor_survives_a_failed_restart_attempt() {
     let _ = fs::remove_dir_all(control_dir);
 }
 
-fn codex_app_server_process_spec(
-    port: u16,
-    mode: &str,
-    delay_ms: u64,
-) -> RuntimeClientProcessSpec {
+fn codex_app_server_process_spec(port: u16, mode: &str, delay_ms: u64) -> RuntimeClientProcessSpec {
     let script = r#"
 const net = require('node:net');
 const [portArg, mode, delayArg] = process.argv.slice(1);

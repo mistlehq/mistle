@@ -66,9 +66,12 @@ impl StartupDiagnosticsLogger {
         let sandbox_instance_id = derive_sandbox_instance_id(tunnel_gateway_ws_url)
             .map_err(|error| format!("failed to derive sandbox instance id: {error}"))?;
         let path = operation_log_path(operation);
-        let parent = path
-            .parent()
-            .ok_or_else(|| format!("startup operation log path {} has no parent", path.display()))?;
+        let parent = path.parent().ok_or_else(|| {
+            format!(
+                "startup operation log path {} has no parent",
+                path.display()
+            )
+        })?;
         fs::create_dir_all(parent).map_err(|error| {
             format!(
                 "failed to create startup operation log directory {}: {error}",
@@ -117,10 +120,7 @@ impl StartupDiagnosticsLogger {
         )
     }
 
-    pub fn record_failed(
-        &self,
-        mut attributes: BTreeMap<String, Value>,
-    ) -> Result<(), String> {
+    pub fn record_failed(&self, mut attributes: BTreeMap<String, Value>) -> Result<(), String> {
         self.record_with_clock(
             &SystemClock,
             StartupDiagnosticLevel::Error,
@@ -143,7 +143,10 @@ impl StartupDiagnosticsLogger {
             .map_err(|error| format!("failed to format startup diagnostic timestamp: {error}"))?;
         let mut payload = Map::new();
         payload.insert("timestamp".to_string(), Value::String(timestamp));
-        payload.insert("level".to_string(), Value::String(level.as_str().to_string()));
+        payload.insert(
+            "level".to_string(),
+            Value::String(level.as_str().to_string()),
+        );
         payload.insert("event".to_string(), Value::String(event.to_string()));
         payload.insert(
             "sandboxInstanceId".to_string(),
@@ -248,7 +251,8 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation, test_log_dir_override_lock,
+        INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation,
+        test_log_dir_override_lock,
     };
     use crate::time::Clock;
 
@@ -299,7 +303,10 @@ mod tests {
                 super::StartupDiagnosticLevel::Error,
                 "sandbox_init_phase_failed",
                 BTreeMap::from([
-                    ("phase".to_string(), Value::String("apply_runtime_plan".to_string())),
+                    (
+                        "phase".to_string(),
+                        Value::String("apply_runtime_plan".to_string()),
+                    ),
                     (
                         "error".to_string(),
                         Value::String("workspace clone failed".to_string()),

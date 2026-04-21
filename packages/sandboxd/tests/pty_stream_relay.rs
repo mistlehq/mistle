@@ -221,8 +221,8 @@ fn supports_attach_streams_and_detaches_secondary_close() {
             .expect("socket should receive PTY frames after writing to the primary stream")
         {
             Message::Text(payload) => {
-                let message: Value =
-                    serde_json::from_str(payload.as_str()).expect("text payload should be valid json");
+                let message: Value = serde_json::from_str(payload.as_str())
+                    .expect("text payload should be valid json");
                 if message["type"] == "stream.window" && message["streamId"] == 1 {
                     assert_eq!(message["bytes"], 4);
                     saw_primary_window = true;
@@ -244,7 +244,9 @@ fn supports_attach_streams_and_detaches_secondary_close() {
                     saw_primary_output = true;
                 }
             }
-            other_message => panic!("unexpected websocket message after primary write: {other_message:?}"),
+            other_message => {
+                panic!("unexpected websocket message after primary write: {other_message:?}")
+            }
         }
 
         if saw_primary_window && saw_primary_output {
@@ -252,8 +254,14 @@ fn supports_attach_streams_and_detaches_secondary_close() {
         }
     }
 
-    assert!(saw_primary_window, "expected primary stream.window after primary write");
-    assert!(saw_primary_output, "expected primary PTY output after primary write");
+    assert!(
+        saw_primary_window,
+        "expected primary stream.window after primary write"
+    );
+    assert!(
+        saw_primary_output,
+        "expected primary PTY output after primary write"
+    );
 
     let encoded_follow_up_input =
         sandboxd::tunnel::protocol::encode_stream_data_frame(1, PAYLOAD_KIND_RAW_BYTES, b"again\n")
@@ -270,8 +278,8 @@ fn supports_attach_streams_and_detaches_secondary_close() {
             .expect("socket should receive PTY frames after follow-up primary write")
         {
             Message::Text(payload) => {
-                let message: Value =
-                    serde_json::from_str(payload.as_str()).expect("text payload should be valid json");
+                let message: Value = serde_json::from_str(payload.as_str())
+                    .expect("text payload should be valid json");
                 if message["type"] == "stream.window" && message["streamId"] == 1 {
                     assert_eq!(message["bytes"], 6);
                     saw_follow_up_window = true;
@@ -285,15 +293,16 @@ fn supports_attach_streams_and_detaches_secondary_close() {
                     "detached secondary stream should not receive newly produced PTY output"
                 );
                 if frame.stream_id == 1 {
-                    let payload =
-                        String::from_utf8(frame.payload).expect("payload should be utf8");
+                    let payload = String::from_utf8(frame.payload).expect("payload should be utf8");
                     if payload == "again\r\n" {
                         saw_follow_up_output = true;
                     }
                 }
             }
             other_message => {
-                panic!("unexpected websocket message after follow-up primary write: {other_message:?}")
+                panic!(
+                    "unexpected websocket message after follow-up primary write: {other_message:?}"
+                )
             }
         }
 
@@ -324,8 +333,8 @@ fn supports_attach_streams_and_detaches_secondary_close() {
             .expect("socket should receive PTY close frames after closing the primary stream")
         {
             Message::Text(payload) => {
-                let message: Value =
-                    serde_json::from_str(payload.as_str()).expect("text payload should be valid json");
+                let message: Value = serde_json::from_str(payload.as_str())
+                    .expect("text payload should be valid json");
                 if message["type"] == "stream.event"
                     && message["streamId"] == 1
                     && message["event"]["type"] == "pty.exit"
@@ -335,11 +344,16 @@ fn supports_attach_streams_and_detaches_secondary_close() {
                 }
             }
             Message::Binary(_) => {}
-            other_message => panic!("unexpected websocket message after primary close: {other_message:?}"),
+            other_message => {
+                panic!("unexpected websocket message after primary close: {other_message:?}")
+            }
         }
     }
 
-    assert!(saw_primary_exit, "expected primary pty.exit after closing the primary stream");
+    assert!(
+        saw_primary_exit,
+        "expected primary pty.exit after closing the primary stream"
+    );
     assert_eq!(read_scope_procs_files(&cgroup_root).len(), 1);
 
     server_thread

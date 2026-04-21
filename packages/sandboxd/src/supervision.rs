@@ -266,8 +266,8 @@ impl SandboxdSupervisorHandle {
 
     /// Marks the initial startup sequence for a tracked component as active.
     pub fn mark_component_starting(&self, component: SupervisedComponent) {
-        let Some((is_restart_attempt, snapshot, _previous_state, observed_at)) =
-            self.update_component(component, |snapshot, _observed_at| {
+        let Some((is_restart_attempt, snapshot, _previous_state, observed_at)) = self
+            .update_component(component, |snapshot, _observed_at| {
                 let is_restart_attempt = snapshot.state == ComponentHealthState::Restarting;
                 if !is_restart_attempt {
                     snapshot.state = ComponentHealthState::Starting;
@@ -405,7 +405,11 @@ impl SandboxdSupervisorHandle {
         let probe_kind_value = probe_kind.as_ref().to_string();
         let mut event_fields = Vec::with_capacity(extra_fields.len() + 1);
         event_fields.push(("probeKind", Value::String(probe_kind_value)));
-        event_fields.extend(extra_fields.iter().map(|(name, value)| (*name, value.clone())));
+        event_fields.extend(
+            extra_fields
+                .iter()
+                .map(|(name, value)| (*name, value.clone())),
+        );
         self.emit_component_lifecycle_event(
             LifecycleEventName::ComponentHealthcheckFailed,
             component,
@@ -442,7 +446,11 @@ impl SandboxdSupervisorHandle {
     ) {
         let mut event_fields = Vec::with_capacity(extra_fields.len() + 1);
         event_fields.push(("backoffMs", Value::from(backoff_ms)));
-        event_fields.extend(extra_fields.iter().map(|(name, value)| (*name, value.clone())));
+        event_fields.extend(
+            extra_fields
+                .iter()
+                .map(|(name, value)| (*name, value.clone())),
+        );
         self.emit_component_lifecycle_event(
             LifecycleEventName::ComponentRestartScheduled,
             component,
@@ -520,11 +528,9 @@ impl SandboxdSupervisorHandle {
         snapshot: &ComponentHealthSnapshot,
         emission: LifecycleEventEmission<'_>,
     ) {
-        let Ok(line) = serialize_lifecycle_event_line(
-            self.sandbox_instance_id(),
-            snapshot,
-            &emission,
-        ) else {
+        let Ok(line) =
+            serialize_lifecycle_event_line(self.sandbox_instance_id(), snapshot, &emission)
+        else {
             return;
         };
 
@@ -581,7 +587,10 @@ fn serialize_lifecycle_event_line(
         let Some(field_value) = snapshot.details.get(*field_name) else {
             continue;
         };
-        payload.insert((*field_name).to_string(), Value::String(field_value.clone()));
+        payload.insert(
+            (*field_name).to_string(),
+            Value::String(field_value.clone()),
+        );
     }
     for (field_name, field_value) in emission.extra_fields {
         payload.insert((*field_name).to_string(), field_value.clone());
@@ -627,8 +636,7 @@ fn snapshot_detail_field_names_for_event(
         ) => &["listenAddr", "rawTarget"],
         (
             SupervisedComponent::CodexAppServer,
-            LifecycleEventName::ComponentStarting
-            | LifecycleEventName::ComponentRestartScheduled,
+            LifecycleEventName::ComponentStarting | LifecycleEventName::ComponentRestartScheduled,
         ) => &["processKey", "readinessUrl"],
         (
             SupervisedComponent::CodexAppServer,
@@ -643,8 +651,8 @@ fn snapshot_detail_field_names_for_event(
 }
 
 pub fn encode_forwarded_lifecycle_event_log_line(raw_line: &str) -> Result<String, String> {
-    let parsed_value: Value =
-        serde_json::from_str(raw_line).map_err(|error| format!("invalid lifecycle event json: {error}"))?;
+    let parsed_value: Value = serde_json::from_str(raw_line)
+        .map_err(|error| format!("invalid lifecycle event json: {error}"))?;
     let parsed_object = parsed_value
         .as_object()
         .ok_or_else(|| "lifecycle event line must be a json object".to_string())?;
@@ -661,9 +669,7 @@ pub fn encode_forwarded_lifecycle_event_log_line(raw_line: &str) -> Result<Strin
         "component_starting" | "component_started" | "component_restart_succeeded" => {
             LifecycleEventLevel::Info
         }
-        "component_healthcheck_failed" | "component_restart_scheduled" => {
-            LifecycleEventLevel::Warn
-        }
+        "component_healthcheck_failed" | "component_restart_scheduled" => LifecycleEventLevel::Warn,
         "component_exited" => LifecycleEventLevel::Error,
         other => {
             return Err(format!(
@@ -705,8 +711,8 @@ mod tests {
         ComponentHealthState, MAX_FORWARDED_LIFECYCLE_EVENT_LINES, SandboxdSupervisorHandle,
         SupervisedComponent,
     };
-    use crate::time::testing::MutableClock;
     use crate::time::Clock;
+    use crate::time::testing::MutableClock;
     use std::sync::Arc;
 
     #[test]
@@ -789,10 +795,7 @@ mod tests {
             .expect("codex proxy should be tracked");
         assert_eq!(snapshot.state, ComponentHealthState::Restarting);
         assert_eq!(snapshot.restart_count, 1);
-        assert_eq!(
-            snapshot.last_failed_at,
-            Some(clock.now_system_time())
-        );
+        assert_eq!(snapshot.last_failed_at, Some(clock.now_system_time()));
         assert_eq!(
             snapshot.last_error.as_deref(),
             Some("listener socket stopped accepting connections")
@@ -851,10 +854,8 @@ mod tests {
         clock.advance_ms(10);
         handle.mark_component_healthy(SupervisedComponent::EgressProxy);
         clock.advance_ms(10);
-        handle.mark_component_restarting(
-            SupervisedComponent::EgressProxy,
-            "loopback connect failed",
-        );
+        handle
+            .mark_component_restarting(SupervisedComponent::EgressProxy, "loopback connect failed");
         handle.emit_component_healthcheck_failed(
             SupervisedComponent::EgressProxy,
             "loopback_connect_failed",

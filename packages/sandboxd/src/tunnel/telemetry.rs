@@ -99,7 +99,9 @@ impl Default for TelemetryRelay {
 
 impl TelemetryRelay {
     /// Starts telemetry negotiation on the current tunnel connection.
-    pub fn attach_tunnel_connection(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
+    pub fn attach_tunnel_connection(
+        &mut self,
+    ) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         self.state = TelemetryRelayState::Opening;
         self.send_window = StreamSendWindow::new(0);
         self.buffered_lines.clear();
@@ -112,7 +114,9 @@ impl TelemetryRelay {
     }
 
     /// Stops telemetry publication on the current tunnel connection.
-    pub fn detach_tunnel_connection(&mut self) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
+    pub fn detach_tunnel_connection(
+        &mut self,
+    ) -> Result<Vec<TelemetryRelayFrame>, TelemetryRelayError> {
         let mut frames = Vec::new();
         if matches!(
             self.state,

@@ -4,8 +4,8 @@
 //! processes, waits for their declared readiness checks, and applies the stop
 //! policies used during daemon shutdown.
 
-use std::collections::{BTreeMap, BTreeSet};
 use std::collections::VecDeque;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
@@ -304,16 +304,18 @@ impl CodexAppServerControlHandle {
             true,
             None,
         );
-        self.managed_process.supervisor_handle.replace_component_details(
-            SupervisedComponent::CodexAppServer,
-            codex_app_server_details_with_status(
-                &self.managed_process.spec,
-                Some(replacement_pid),
-                None,
-                "Alive",
-                "Ready",
-            ),
-        );
+        self.managed_process
+            .supervisor_handle
+            .replace_component_details(
+                SupervisedComponent::CodexAppServer,
+                codex_app_server_details_with_status(
+                    &self.managed_process.spec,
+                    Some(replacement_pid),
+                    None,
+                    "Alive",
+                    "Ready",
+                ),
+            );
         self.managed_process
             .supervisor_handle
             .mark_component_healthy(SupervisedComponent::CodexAppServer);
@@ -463,16 +465,15 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                 ),
             );
             supervisor_handle.mark_component_starting(SupervisedComponent::CodexAppServer);
-            codex_app_server_observation_handle =
-                Some(CodexAppServerObservationHandle {
-                    state: Arc::new(Mutex::new(CodexAppServerObservation {
-                        process_key: process_spec.process_key.clone(),
-                        pid: None,
-                        readiness_url: codex_app_server_readiness_url(process_spec),
-                        is_alive: false,
-                        last_exit_status: None,
-                    })),
-                });
+            codex_app_server_observation_handle = Some(CodexAppServerObservationHandle {
+                state: Arc::new(Mutex::new(CodexAppServerObservation {
+                    process_key: process_spec.process_key.clone(),
+                    pid: None,
+                    readiness_url: codex_app_server_readiness_url(process_spec),
+                    is_alive: false,
+                    last_exit_status: None,
+                })),
+            });
         }
         let mut process = start_runtime_client_process(process_spec).map_err(|error| {
             ProcessManagerError::StartProcess {
@@ -548,10 +549,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
     let monitor_thread = codex_app_server_control_handle
         .clone()
         .map(|control_handle| {
-            spawn_codex_app_server_monitor(
-                control_handle,
-                monitor_shutdown_requested.clone(),
-            )
+            spawn_codex_app_server_monitor(control_handle, monitor_shutdown_requested.clone())
         });
 
     Ok(RuntimeClientProcessManager {
@@ -579,7 +577,8 @@ impl RuntimeClientProcessManager {
         clock: &dyn Clock,
         sleeper: &dyn Sleeper,
     ) -> Result<(), ProcessManagerError> {
-        self.monitor_shutdown_requested.store(true, Ordering::Relaxed);
+        self.monitor_shutdown_requested
+            .store(true, Ordering::Relaxed);
         if let Some(monitor_thread) = self.monitor_thread.take() {
             let _ = monitor_thread.join();
         }
@@ -613,7 +612,8 @@ fn codex_app_server_details(
     process_spec: &RuntimeClientProcessSpec,
     pid: Option<u32>,
 ) -> BTreeMap<String, String> {
-    let mut details = BTreeMap::from([("processKey".to_string(), process_spec.process_key.clone())]);
+    let mut details =
+        BTreeMap::from([("processKey".to_string(), process_spec.process_key.clone())]);
     if let RuntimeClientProcessReadiness::Ws { url, .. } = &process_spec.readiness {
         details.insert("readinessUrl".to_string(), url.clone());
     }
@@ -708,7 +708,11 @@ fn run_codex_app_server_monitor(
                         Some(current_pid),
                         Some(exit_description.clone()),
                         "Exited",
-                        if last_readiness_ok { "Ready" } else { "Unreachable" },
+                        if last_readiness_ok {
+                            "Ready"
+                        } else {
+                            "Unreachable"
+                        },
                     ),
                 );
             control_handle
@@ -734,7 +738,8 @@ fn run_codex_app_server_monitor(
         }
         last_reported_exit_pid = None;
 
-        match check_runtime_client_process_readiness_from_spec(&control_handle.managed_process.spec) {
+        match check_runtime_client_process_readiness_from_spec(&control_handle.managed_process.spec)
+        {
             Ok(()) => {
                 update_codex_app_server_observation(
                     &control_handle.managed_process.observation_handle,
@@ -1132,8 +1137,8 @@ fn signal_runtime_client_process(
     process: &mut RunningRuntimeClientProcess,
     signal: RuntimeClientProcessStopSignal,
 ) -> Result<(), String> {
-    let pid = i32::try_from(process.pid())
-        .map_err(|_| "process pid exceeded i32 range".to_string())?;
+    let pid =
+        i32::try_from(process.pid()).map_err(|_| "process pid exceeded i32 range".to_string())?;
     let unix_signal = match signal {
         RuntimeClientProcessStopSignal::Sigterm => Signal::SIGTERM,
         RuntimeClientProcessStopSignal::Sigkill => Signal::SIGKILL,

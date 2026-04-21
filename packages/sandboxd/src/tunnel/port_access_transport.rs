@@ -25,20 +25,20 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::mpsc;
-use tokio_tungstenite::Connector;
-use tokio_tungstenite::connect_async_tls_with_config;
 use tokio_rustls::rustls::client::danger::{
     HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
 };
 use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use tokio_rustls::rustls::{ClientConfig, DigitallySignedStruct, Error, SignatureScheme};
+use tokio_tungstenite::Connector;
+use tokio_tungstenite::connect_async_tls_with_config;
+use tokio_tungstenite::tungstenite::Error as WebSocketError;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::Request as WebSocketRequest;
-use tokio_tungstenite::tungstenite::Error as WebSocketError;
 
 use crate::tunnel::protocol::{
-    PortAccessTarget, PortsHttpBodyChunk, PortsHttpBodyEnd, PortsHttpOpen, PortsHttpResponseStart, PortsStreamError,
-    PortsWsAccept, PortsWsClose, PortsWsFrame, PortsWsOpen,
+    PortAccessTarget, PortsHttpBodyChunk, PortsHttpBodyEnd, PortsHttpOpen, PortsHttpResponseStart,
+    PortsStreamError, PortsWsAccept, PortsWsClose, PortsWsFrame, PortsWsOpen,
 };
 
 const UPSTREAM_LOCALHOST: &str = "localhost";
@@ -71,16 +71,17 @@ impl std::error::Error for PortAccessTransportError {}
 
 #[derive(Debug)]
 pub enum PortAccessHttpCommand {
-    RequestBodyChunk {
-        bytes: Vec<u8>,
-    },
+    RequestBodyChunk { bytes: Vec<u8> },
     RequestBodyEnd,
     Close,
 }
 
 #[derive(Debug)]
 pub enum PortAccessWsCommand {
-    Frame { opcode: String, bytes: Vec<u8> },
+    Frame {
+        opcode: String,
+        bytes: Vec<u8>,
+    },
     Close {
         code: Option<u16>,
         reason: Option<String>,
@@ -127,7 +128,9 @@ pub fn spawn_websocket_transport(
     let (command_sender, command_receiver) = mpsc::unbounded_channel();
     let stream_id = open.stream_id;
     tokio::spawn(async move {
-        if let Err(error) = run_websocket_transport(open, command_receiver, event_sender.clone()).await {
+        if let Err(error) =
+            run_websocket_transport(open, command_receiver, event_sender.clone()).await
+        {
             let _ = event_sender.send(PortAccessTransportEvent::StreamError(PortsStreamError {
                 message_type: "ports.stream.error".to_string(),
                 stream_id,
@@ -145,12 +148,16 @@ async fn run_http_transport(
     event_sender: mpsc::UnboundedSender<PortAccessTransportEvent>,
 ) -> Result<(), PortAccessTransportError> {
     let client = build_http_client()?;
-    let request_uri = build_request_uri(&open.target, &open.upstream_protocol, &open.request.path, open.request.query.as_deref())?;
+    let request_uri = build_request_uri(
+        &open.target,
+        &open.upstream_protocol,
+        &open.request.path,
+        open.request.query.as_deref(),
+    )?;
     let request_builder = build_upstream_request_builder(&open, request_uri)?;
 
-    let (request_body_sender, request_body) = Channel::<Bytes, Infallible>::new(
-        PORT_ACCESS_HTTP_BODY_CHANNEL_CAPACITY,
-    );
+    let (request_body_sender, request_body) =
+        Channel::<Bytes, Infallible>::new(PORT_ACCESS_HTTP_BODY_CHANNEL_CAPACITY);
     let request = request_builder.body(request_body).map_err(|error| {
         PortAccessTransportError::new(
             "upstream_handshake_failed",
@@ -277,12 +284,15 @@ async fn handle_http_command(
                     "received request body chunk after the upstream request body closed",
                 ));
             };
-            body_sender.send_data(Bytes::from(bytes)).await.map_err(|error| {
-                PortAccessTransportError::new(
-                    "upstream_io_error",
-                    format!("failed to forward request body chunk upstream: {error}"),
-                )
-            })?;
+            body_sender
+                .send_data(Bytes::from(bytes))
+                .await
+                .map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_io_error",
+                        format!("failed to forward request body chunk upstream: {error}"),
+                    )
+                })?;
             Ok(false)
         }
         Some(PortAccessHttpCommand::RequestBodyEnd) => {
@@ -325,14 +335,16 @@ async fn run_websocket_transport(
     let stream_id = open.stream_id;
     let reader_task = tokio::spawn(async move {
         if let Err(error) =
-            relay_upstream_websocket_frames(stream_id, &mut upstream_reader, &read_event_sender).await
+            relay_upstream_websocket_frames(stream_id, &mut upstream_reader, &read_event_sender)
+                .await
         {
-            let _ = read_event_sender.send(PortAccessTransportEvent::StreamError(PortsStreamError {
-                message_type: "ports.stream.error".to_string(),
-                stream_id,
-                code: error.code.to_string(),
-                message: error.to_string(),
-            }));
+            let _ =
+                read_event_sender.send(PortAccessTransportEvent::StreamError(PortsStreamError {
+                    message_type: "ports.stream.error".to_string(),
+                    stream_id,
+                    code: error.code.to_string(),
+                    message: error.to_string(),
+                }));
         }
     });
 
@@ -355,7 +367,9 @@ async fn handle_websocket_command(
                     let _ = String::from_utf8(bytes.clone()).map_err(|error| {
                         PortAccessTransportError::new(
                             "upstream_io_error",
-                            format!("failed to decode request websocket text frame as utf-8: {error}"),
+                            format!(
+                                "failed to decode request websocket text frame as utf-8: {error}"
+                            ),
                         )
                     })?;
                     0x1
@@ -425,7 +439,10 @@ enum ReadWebSocketFrame {
     Binary(Vec<u8>),
     Ping(Vec<u8>),
     Pong(Vec<u8>),
-    Close { code: Option<u16>, reason: Option<String> },
+    Close {
+        code: Option<u16>,
+        reason: Option<String>,
+    },
 }
 
 async fn read_websocket_frame(
@@ -509,7 +526,9 @@ async fn read_websocket_payload_length(
                 .map_err(|error| {
                     PortAccessTransportError::new(
                         "upstream_io_error",
-                        format!("failed to read upstream websocket extended payload length: {error}"),
+                        format!(
+                            "failed to read upstream websocket extended payload length: {error}"
+                        ),
                     )
                 })?;
             Ok(usize::from(u16::from_be_bytes(extended)))
@@ -522,7 +541,9 @@ async fn read_websocket_payload_length(
                 .map_err(|error| {
                     PortAccessTransportError::new(
                         "upstream_io_error",
-                        format!("failed to read upstream websocket extended payload length: {error}"),
+                        format!(
+                            "failed to read upstream websocket extended payload length: {error}"
+                        ),
                     )
                 })?;
             let length = u64::from_be_bytes(extended);
@@ -650,12 +671,15 @@ fn append_websocket_payload_length(
 ) -> Result<(), PortAccessTransportError> {
     let mask_bit = if masked { 0x80 } else { 0x00 };
     if payload_length <= 125 {
-        encoded.push(mask_bit | u8::try_from(payload_length).map_err(|_| {
-            PortAccessTransportError::new(
-                "upstream_io_error",
-                format!("websocket payload length {payload_length} exceeds supported size"),
-            )
-        })?);
+        encoded.push(
+            mask_bit
+                | u8::try_from(payload_length).map_err(|_| {
+                    PortAccessTransportError::new(
+                        "upstream_io_error",
+                        format!("websocket payload length {payload_length} exceeds supported size"),
+                    )
+                })?,
+        );
         return Ok(());
     }
     if u16::try_from(payload_length).is_ok() {
@@ -769,9 +793,10 @@ fn build_request_uri(
     }
 
     request_uri.parse::<Uri>().map_err(|error| {
-        PortAccessTransportError::new("upstream_handshake_failed", format!(
-            "failed to build upstream request uri '{request_uri}': {error}"
-        ))
+        PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!("failed to build upstream request uri '{request_uri}': {error}"),
+        )
     })
 }
 
@@ -783,17 +808,20 @@ fn build_upstream_request_builder(
         .method(open.request.method.as_str())
         .uri(request_uri);
     for (header_name, values) in &open.request.headers {
-        let parsed_header_name =
-            HeaderName::try_from(header_name.as_str()).map_err(|error| {
-                PortAccessTransportError::new("upstream_handshake_failed", format!(
-                    "upstream request header name '{header_name}' is invalid: {error}"
-                ))
-            })?;
+        let parsed_header_name = HeaderName::try_from(header_name.as_str()).map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!("upstream request header name '{header_name}' is invalid: {error}"),
+            )
+        })?;
         for value in values {
             let parsed_header_value = HeaderValue::from_str(value).map_err(|error| {
-                PortAccessTransportError::new("upstream_handshake_failed", format!(
-                    "upstream request header value for '{header_name}' is invalid: {error}"
-                ))
+                PortAccessTransportError::new(
+                    "upstream_handshake_failed",
+                    format!(
+                        "upstream request header value for '{header_name}' is invalid: {error}"
+                    ),
+                )
             })?;
             builder = builder.header(parsed_header_name.clone(), parsed_header_value);
         }
@@ -851,19 +879,24 @@ fn build_websocket_request_uri(
         request_uri.push_str(query);
     }
 
-    let _ = request_uri.as_str().into_client_request().map_err(|error| {
-        PortAccessTransportError::new(
-            "upstream_handshake_failed",
-            format!("failed to build upstream websocket uri '{request_uri}': {error}"),
-        )
-    })?;
+    let _ = request_uri
+        .as_str()
+        .into_client_request()
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!("failed to build upstream websocket uri '{request_uri}': {error}"),
+            )
+        })?;
     Ok(request_uri)
 }
 
 fn build_websocket_connector(upstream_protocol: &str) -> Option<Connector> {
     match upstream_protocol {
         "http" => None,
-        "https" => Some(Connector::Rustls(Arc::new(build_insecure_tls_client_config()))),
+        "https" => Some(Connector::Rustls(Arc::new(
+            build_insecure_tls_client_config(),
+        ))),
         _ => None,
     }
 }
@@ -936,7 +969,6 @@ fn classify_websocket_open_error(error: WebSocketError) -> PortAccessTransportEr
     PortAccessTransportError::new(code, error.to_string())
 }
 
-
 #[derive(Debug)]
 struct AcceptAnyServerCertVerifier;
 
@@ -993,7 +1025,10 @@ mod tests {
     #[test]
     fn builds_http_request_uri_against_localhost() {
         let request_uri = build_request_uri(
-            &PortAccessTarget { kind: "port".to_string(), port: 3000 },
+            &PortAccessTarget {
+                kind: "port".to_string(),
+                port: 3000,
+            },
             "http",
             "/",
             Some("import=1"),
@@ -1006,7 +1041,10 @@ mod tests {
     #[test]
     fn builds_websocket_request_uri_against_localhost() {
         let request_uri = build_websocket_request_uri(
-            &PortAccessTarget { kind: "port".to_string(), port: 3000 },
+            &PortAccessTarget {
+                kind: "port".to_string(),
+                port: 3000,
+            },
             "https",
             "/@vite/client",
             None,

@@ -169,8 +169,12 @@ mod tests {
         )
         .expect("control server should start");
 
-        crate::init::run_init(&mut init_request.as_bytes(), &mut init_stdout, &control_socket_path)
-            .expect("init should succeed before resume");
+        crate::init::run_init(
+            &mut init_request.as_bytes(),
+            &mut init_stdout,
+            &control_socket_path,
+        )
+        .expect("init should succeed before resume");
         run_resume(
             &mut resume_request.as_bytes(),
             &mut resume_stdout,
@@ -337,8 +341,8 @@ mod tests {
                         stream
                             .set_nonblocking(false)
                             .expect("accepted bootstrap connection should become blocking");
-                        let mut socket = accept(stream)
-                            .expect("bootstrap websocket handshake should succeed");
+                        let mut socket =
+                            accept(stream).expect("bootstrap websocket handshake should succeed");
                         loop {
                             match socket.read() {
                                 Ok(Message::Ping(payload)) => {

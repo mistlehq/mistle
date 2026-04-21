@@ -23,8 +23,7 @@ fn daemon_applies_startup_input_after_init_submission() {
     let _env_guard =
         TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
     let test_dir = create_temp_test_dir("serve_runtime_apply");
-    let _attachment_root_guard =
-        TestAttachmentRootGuard::set(test_dir.join("attachments"));
+    let _attachment_root_guard = TestAttachmentRootGuard::set(test_dir.join("attachments"));
     let control_socket_path = test_dir.join("control.sock");
     let startup_output_path = test_dir.join("startup-output.txt");
     let bootstrap_gateway = start_bootstrap_gateway();
@@ -63,7 +62,7 @@ fn daemon_applies_startup_input_after_init_submission() {
           "agentRuntimes": []
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
+        git_identity: None,
     };
 
     let server = control::start_control_server(

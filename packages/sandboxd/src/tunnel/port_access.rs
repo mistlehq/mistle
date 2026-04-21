@@ -109,7 +109,10 @@ pub async fn authorize_target_port(
         probe_outcomes.push(https_outcome);
     }
 
-    if probe_outcomes.into_iter().all(ProbeOutcome::is_port_unreachable) {
+    if probe_outcomes
+        .into_iter()
+        .all(ProbeOutcome::is_port_unreachable)
+    {
         return Ok(PortAccessAuthorizeDecision::Rejected {
             reason: PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
         });
@@ -133,7 +136,10 @@ fn bind_addresses_for_snapshot_port(
             if listener.port != port {
                 continue;
             }
-            if !bind_addresses.iter().any(|existing| existing == &listener.bind_address) {
+            if !bind_addresses
+                .iter()
+                .any(|existing| existing == &listener.bind_address)
+            {
                 bind_addresses.push(listener.bind_address);
             }
         }
@@ -188,7 +194,10 @@ async fn probe_https(bind_address: &str, port: u16) -> ProbeOutcome {
     }
 }
 
-async fn connect_loopback(bind_address: &str, port: u16) -> Result<TcpStream, PortAccessAuthorizeError> {
+async fn connect_loopback(
+    bind_address: &str,
+    port: u16,
+) -> Result<TcpStream, PortAccessAuthorizeError> {
     let connect_result = timeout(
         DEFAULT_PORT_ACCESS_PROBE_TIMEOUT,
         TcpStream::connect((bind_address, port)),
@@ -279,11 +288,7 @@ fn server_name() -> Result<ServerName<'static>, PortAccessAuthorizeError> {
         .map_err(|error| PortAccessAuthorizeError::new(error.to_string()))
 }
 
-async fn probe_websocket_upgrade_response<S>(
-    stream: &mut S,
-    bind_address: &str,
-    port: u16,
-) -> bool
+async fn probe_websocket_upgrade_response<S>(stream: &mut S, bind_address: &str, port: u16) -> bool
 where
     S: AsyncRead + AsyncWrite + Unpin,
 {
@@ -418,8 +423,8 @@ mod tests {
     }
 
     fn reserve_available_port() -> u16 {
-        let listener =
-            std::net::TcpListener::bind("127.0.0.1:0").expect("port reservation listener should bind");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")
+            .expect("port reservation listener should bind");
         let port = listener
             .local_addr()
             .expect("reserved listener should expose its address")
@@ -429,8 +434,8 @@ mod tests {
     }
 
     fn reserve_available_ipv6_port() -> u16 {
-        let listener =
-            std::net::TcpListener::bind("[::1]:0").expect("ipv6 port reservation listener should bind");
+        let listener = std::net::TcpListener::bind("[::1]:0")
+            .expect("ipv6 port reservation listener should bind");
         let port = listener
             .local_addr()
             .expect("reserved ipv6 listener should expose its address")
@@ -444,7 +449,10 @@ mod tests {
         loop {
             let bind_addresses = bind_addresses_for_snapshot_port(&SystemClock, port)
                 .expect("process snapshot should load while waiting for fixture listener");
-            if bind_addresses.iter().any(|existing| existing == bind_address) {
+            if bind_addresses
+                .iter()
+                .any(|existing| existing == bind_address)
+            {
                 return;
             }
             assert!(
@@ -463,7 +471,8 @@ mod tests {
     #[test]
     fn authorizes_reachable_http_ports() {
         let port = reserve_available_port();
-        let mut server = spawn_node_fixture("http-listener.js", &[&port.to_string(), "authorize-http"]);
+        let mut server =
+            spawn_node_fixture("http-listener.js", &[&port.to_string(), "authorize-http"]);
         wait_until_listening("127.0.0.1", port);
 
         let runtime = Builder::new_current_thread()
@@ -528,8 +537,10 @@ mod tests {
     #[test]
     fn authorizes_reachable_http_ports_with_websocket_upgrade_support() {
         let port = reserve_available_port();
-        let mut server =
-            spawn_node_fixture("http-ws-listener.js", &[&port.to_string(), "authorize-http-ws"]);
+        let mut server = spawn_node_fixture(
+            "http-ws-listener.js",
+            &[&port.to_string(), "authorize-http-ws"],
+        );
         wait_until_listening("127.0.0.1", port);
 
         let runtime = Builder::new_current_thread()

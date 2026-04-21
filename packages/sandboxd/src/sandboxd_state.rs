@@ -51,7 +51,10 @@ impl fmt::Display for SandboxdStateError {
         match self {
             Self::ApplyRuntimePlan(error) => write!(f, "failed to apply startup input: {error}"),
             Self::ApplyGitIdentity(error) => {
-                write!(f, "failed to apply git identity from startup input: {error}")
+                write!(
+                    f,
+                    "failed to apply git identity from startup input: {error}"
+                )
             }
             Self::StartEgressProxy(error) => {
                 write!(f, "failed to start local egress proxy: {error}")
@@ -116,15 +119,14 @@ impl SandboxdState {
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<Self, SandboxdStateError> {
         let mut runtime_plan: runtime::CompiledRuntimePlan =
-            serde_json::from_value(startup_input.runtime_plan.clone())
-                .map_err(|error| {
-                    let error_text = error.to_string();
-                    record_runtime_plan_apply_failure(
-                        &diagnostics_logger,
-                        &RuntimePlanApplyError::InvalidRuntimePlan(error),
-                    );
-                    SandboxdStateError::ApplyRuntimePlan(error_text)
-                })?;
+            serde_json::from_value(startup_input.runtime_plan.clone()).map_err(|error| {
+                let error_text = error.to_string();
+                record_runtime_plan_apply_failure(
+                    &diagnostics_logger,
+                    &RuntimePlanApplyError::InvalidRuntimePlan(error),
+                );
+                SandboxdStateError::ApplyRuntimePlan(error_text)
+            })?;
         let tokenizer_proxy_egress_base_url = resolve_tokenizer_proxy_egress_base_url()?;
         apply_runtime_startup_overrides(
             &mut runtime_plan,
@@ -138,18 +140,17 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
-        runtime::git_identity::apply_git_identity(startup_input)
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "apply_git_identity",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.clone()),
-                    )]),
-                );
-                SandboxdStateError::ApplyGitIdentity(error)
-            })?;
+        runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "apply_git_identity",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                )]),
+            );
+            SandboxdStateError::ApplyGitIdentity(error)
+        })?;
         runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
             record_runtime_plan_apply_failure(&diagnostics_logger, &error);
             SandboxdStateError::ApplyRuntimePlan(error.to_string())
@@ -175,7 +176,7 @@ impl SandboxdState {
         let runtime_env = collect_runtime_environment(&runtime_plan)
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
-        .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+            .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
         let process_manager = if process_specs.is_empty() {
@@ -335,18 +336,17 @@ impl SandboxdState {
         startup_input: &StartupInput,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
-        runtime::git_identity::apply_git_identity(startup_input)
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "apply_git_identity",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.clone()),
-                    )]),
-                );
-                SandboxdStateError::ApplyGitIdentity(error)
-            })?;
+        runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "apply_git_identity",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                )]),
+            );
+            SandboxdStateError::ApplyGitIdentity(error)
+        })?;
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -471,7 +471,10 @@ fn record_runtime_plan_apply_failure(
                 "failureKind".to_string(),
                 startup_diagnostics_string("invalid_runtime_plan"),
             ),
-            ("error".to_string(), startup_diagnostics_string(error.to_string())),
+            (
+                "error".to_string(),
+                startup_diagnostics_string(error.to_string()),
+            ),
         ]),
         RuntimePlanApplyError::ArtifactInstall {
             artifact_key,
@@ -488,9 +491,15 @@ fn record_runtime_plan_apply_failure(
                 "artifactKey".to_string(),
                 startup_diagnostics_string(artifact_key.clone()),
             ),
-            ("installIndex".to_string(), startup_diagnostics_u64(*install_index as u64)),
+            (
+                "installIndex".to_string(),
+                startup_diagnostics_u64(*install_index as u64),
+            ),
             ("installOp".to_string(), startup_diagnostics_string(*op)),
-            ("error".to_string(), startup_diagnostics_string(error.clone())),
+            (
+                "error".to_string(),
+                startup_diagnostics_string(error.clone()),
+            ),
         ]),
         RuntimePlanApplyError::WorkspaceSource {
             source_kind,
@@ -514,7 +523,10 @@ fn record_runtime_plan_apply_failure(
                     "originUrl".to_string(),
                     startup_diagnostics_string(origin_url.clone()),
                 ),
-                ("error".to_string(), startup_diagnostics_string(error.clone())),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
             ]);
             if let Some(clone_url) = clone_url {
                 map.insert(
@@ -544,7 +556,10 @@ fn record_runtime_plan_apply_failure(
                 startup_diagnostics_string(file_id.clone()),
             ),
             ("path".to_string(), startup_diagnostics_string(path.clone())),
-            ("error".to_string(), startup_diagnostics_string(error.clone())),
+            (
+                "error".to_string(),
+                startup_diagnostics_string(error.clone()),
+            ),
         ]),
     };
 
@@ -571,8 +586,14 @@ fn record_runtime_process_failure(
                     "processKey".to_string(),
                     startup_diagnostics_string(process_key.clone()),
                 ),
-                ("processIndex".to_string(), startup_diagnostics_u64(*process_index as u64)),
-                ("error".to_string(), startup_diagnostics_string(error.clone())),
+                (
+                    "processIndex".to_string(),
+                    startup_diagnostics_u64(*process_index as u64),
+                ),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
             ]);
             if let Some(stdout_tail) = &output_tails.stdout_tail {
                 map.insert(
@@ -603,7 +624,10 @@ fn record_runtime_process_failure(
                     "processKey".to_string(),
                     startup_diagnostics_string(process_key.clone()),
                 ),
-                ("processIndex".to_string(), startup_diagnostics_u64(*process_index as u64)),
+                (
+                    "processIndex".to_string(),
+                    startup_diagnostics_u64(*process_index as u64),
+                ),
                 (
                     "readinessType".to_string(),
                     startup_diagnostics_string(details.readiness_type.clone()),
@@ -616,7 +640,10 @@ fn record_runtime_process_failure(
                     "timeoutMs".to_string(),
                     startup_diagnostics_u64(details.timeout_ms),
                 ),
-                ("error".to_string(), startup_diagnostics_string(error.clone())),
+                (
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                ),
             ]);
             if let Some(stdout_tail) = &details.output_tails.stdout_tail {
                 map.insert(
@@ -1601,14 +1628,8 @@ supports_websockets = false
         supervisor_handle.replace_component_details(
             SupervisedComponent::CodexProxy,
             BTreeMap::from([
-                (
-                    "sessionManagerState".to_string(),
-                    "Connected".to_string(),
-                ),
-                (
-                    "rawConnectivityState".to_string(),
-                    "Connected".to_string(),
-                ),
+                ("sessionManagerState".to_string(), "Connected".to_string()),
+                ("rawConnectivityState".to_string(), "Connected".to_string()),
             ]),
         );
         supervisor_handle.mark_component_healthy(SupervisedComponent::CodexProxy);

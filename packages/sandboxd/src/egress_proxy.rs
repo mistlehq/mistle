@@ -1792,8 +1792,8 @@ mod tests {
             .get("HTTPS_PROXY")
             .cloned()
             .expect("proxy env should include HTTPS_PROXY");
-        let ca_certificate_pem = std::fs::read(&ca_certificate_path)
-            .expect("proxy CA certificate should be readable");
+        let ca_certificate_pem =
+            std::fs::read(&ca_certificate_path).expect("proxy CA certificate should be readable");
         let ca_certificate =
             reqwest::Certificate::from_pem(&ca_certificate_pem).expect("proxy CA should parse");
         let client = reqwest::blocking::Client::builder()

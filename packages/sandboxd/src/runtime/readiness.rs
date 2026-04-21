@@ -19,10 +19,7 @@ pub enum RuntimeReadinessMode {
 }
 
 /// Derives the publishable runtime readiness bit from the supervision snapshot.
-pub fn derive_runtime_ready(
-    snapshot: &SandboxdHealthSnapshot,
-    mode: RuntimeReadinessMode,
-) -> bool {
+pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeReadinessMode) -> bool {
     match mode {
         RuntimeReadinessMode::NoAgentRuntime => true,
         RuntimeReadinessMode::CodexProxyOnly => codex_proxy_is_ready(snapshot),
@@ -33,10 +30,7 @@ pub fn derive_runtime_ready(
     }
 }
 
-fn component_is_healthy(
-    snapshot: &SandboxdHealthSnapshot,
-    component: SupervisedComponent,
-) -> bool {
+fn component_is_healthy(snapshot: &SandboxdHealthSnapshot, component: SupervisedComponent) -> bool {
     snapshot
         .components
         .iter()
@@ -51,8 +45,14 @@ fn codex_proxy_is_ready(snapshot: &SandboxdHealthSnapshot) -> bool {
         .find(|candidate| candidate.component == SupervisedComponent::CodexProxy)
         .is_some_and(|candidate| {
             candidate.state == ComponentHealthState::Healthy
-                && candidate.details.get("sessionManagerState").is_some_and(|state| state == "Connected")
-                && candidate.details.get("rawConnectivityState").is_some_and(|state| state == "Connected")
+                && candidate
+                    .details
+                    .get("sessionManagerState")
+                    .is_some_and(|state| state == "Connected")
+                && candidate
+                    .details
+                    .get("rawConnectivityState")
+                    .is_some_and(|state| state == "Connected")
         })
 }
 
@@ -208,7 +208,10 @@ mod tests {
             ],
         };
 
-        assert!(!derive_runtime_ready(&snapshot, RuntimeReadinessMode::Codex));
+        assert!(!derive_runtime_ready(
+            &snapshot,
+            RuntimeReadinessMode::Codex
+        ));
     }
 
     #[test]

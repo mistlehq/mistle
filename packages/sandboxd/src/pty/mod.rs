@@ -493,7 +493,10 @@ mod tests {
     #[test]
     fn pty_process_inherits_requested_environment_entries() {
         let mut env = BTreeMap::new();
-        env.insert("MISTLE_TEST_PTY_ENV".to_string(), "from-request".to_string());
+        env.insert(
+            "MISTLE_TEST_PTY_ENV".to_string(),
+            "from-request".to_string(),
+        );
         let session = start_pty_session(PtySpawnRequest {
             command: Some("/bin/sh".to_string()),
             args: Some(vec![
@@ -531,7 +534,8 @@ mod tests {
 
     #[test]
     fn resolve_pty_environment_prefers_requested_path_value() {
-        let requested_path = "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+        let requested_path =
+            "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
         let mut env = BTreeMap::new();
         env.insert("PATH".to_string(), requested_path.to_string());
         let environment = resolve_pty_environment(&env);

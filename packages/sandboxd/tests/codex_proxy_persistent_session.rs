@@ -80,8 +80,12 @@ fn mistle_agent_turn_survives_client_disconnect_after_proxy_retention() {
 
     ThreadSleeper.sleep(Duration::from_millis(500));
 
-    let observed_turn_status =
-        wait_for_turn_status(&mut observer_client, &thread_id, &turn_id, Some(&resumed_thread));
+    let observed_turn_status = wait_for_turn_status(
+        &mut observer_client,
+        &thread_id,
+        &turn_id,
+        Some(&resumed_thread),
+    );
 
     assert_ne!(
         observed_turn_status, "interrupted",
@@ -241,8 +245,9 @@ fn call_json_rpc(
     method: &str,
     params: Value,
 ) -> Value {
-    call_json_rpc_allow_error(client, method, params)
-        .unwrap_or_else(|error_message| panic!("JSON-RPC request {method} should not fail: {error_message}"))
+    call_json_rpc_allow_error(client, method, params).unwrap_or_else(|error_message| {
+        panic!("JSON-RPC request {method} should not fail: {error_message}")
+    })
 }
 
 fn call_json_rpc_allow_error(
