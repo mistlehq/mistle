@@ -14,6 +14,8 @@ use std::sync::mpsc;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 #[cfg(target_os = "linux")]
 use std::thread;
+#[cfg(target_os = "linux")]
+use std::time::Duration as StdDuration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(target_os = "linux")]
@@ -507,9 +509,16 @@ fn start_signing_gateway() -> SigningGateway {
                     stream
                         .set_nonblocking(false)
                         .expect("signing gateway stream should become blocking");
+                    stream
+                        .set_read_timeout(Some(StdDuration::from_millis(100)))
+                        .expect("signing gateway stream should set a read timeout");
                     let mut websocket =
                         accept(stream).expect("signing gateway handshake should succeed");
                     loop {
+                        if shutdown_receiver.try_recv().is_ok() {
+                            return;
+                        }
+
                         match websocket.read() {
                             Ok(Message::Text(message)) => {
                                 let payload = message.as_str();
@@ -542,6 +551,9 @@ fn start_signing_gateway() -> SigningGateway {
                             | Err(tungstenite::Error::Protocol(
                                 tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
                             )) => return,
+                            Err(tungstenite::Error::Io(error))
+                                if error.kind() == std::io::ErrorKind::WouldBlock
+                                    || error.kind() == std::io::ErrorKind::TimedOut => {}
                             Err(error) => panic!("signing gateway should read frames: {error}"),
                         }
                     }
