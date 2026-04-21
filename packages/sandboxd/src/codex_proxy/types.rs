@@ -119,6 +119,8 @@ pub struct PendingClientRequest {
     pub method: String,
     pub thread_id: Option<String>,
     pub expected_turn_id: Option<String>,
+    pub interruption_source: Option<String>,
+    pub interruption_expected: Option<bool>,
     pub request_started_at: Instant,
     pub delivery_context: Option<DeliveryContext>,
 }
