@@ -241,12 +241,7 @@ export function useSessionComposerState(input: {
     draftState.setComposerText("");
     draftState.clearPendingDiffComments();
     setPendingComposerAttachments([]);
-  }, [
-    clearSessionErrorMessage,
-    composerText,
-    draftState,
-    pendingComposerAttachments,
-  ]);
+  }, [clearSessionErrorMessage, composerText, draftState, pendingComposerAttachments]);
 
   const removeQueuedPrompt = useCallback((queuedPromptId: string): void => {
     setQueuedPrompts((currentQueuedPrompts) =>
