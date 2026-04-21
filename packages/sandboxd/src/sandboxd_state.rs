@@ -140,6 +140,7 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
+        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
             record_operation_phase_failure(
                 &diagnostics_logger,
@@ -151,10 +152,14 @@ impl SandboxdState {
             );
             SandboxdStateError::ApplyGitIdentity(error)
         })?;
+        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
+        record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
         runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
             record_runtime_plan_apply_failure(&diagnostics_logger, &error);
             SandboxdStateError::ApplyRuntimePlan(error.to_string())
         })?;
+        record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+        record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
         let egress_proxy = EgressProxy::start(
             &runtime_plan,
             startup_input,
@@ -173,12 +178,14 @@ impl SandboxdState {
             );
             SandboxdStateError::StartEgressProxy(error.to_string())
         })?;
+        record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
         let runtime_env = collect_runtime_environment(&runtime_plan)
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
+        record_operation_phase_started(&diagnostics_logger, "start_runtime_processes");
         let process_manager = if process_specs.is_empty() {
             None
         } else {
@@ -195,6 +202,7 @@ impl SandboxdState {
                 })?,
             )
         };
+        record_operation_phase_completed(&diagnostics_logger, "start_runtime_processes");
         let codex_app_server_observation_handle = process_manager
             .as_ref()
             .and_then(process::RuntimeClientProcessManager::codex_app_server_observation_handle)
@@ -206,6 +214,7 @@ impl SandboxdState {
 
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        record_operation_phase_started(&diagnostics_logger, "start_runtime_adapters");
         let runtime_adapters = RuntimeAdapterRegistry
             .start_with_supervisor(
                 startup_input,
@@ -224,6 +233,7 @@ impl SandboxdState {
                 );
                 SandboxdStateError::StartRuntimeAdapters(error.to_string())
             })?;
+        record_operation_phase_completed(&diagnostics_logger, "start_runtime_adapters");
         let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
             [] => None,
@@ -269,6 +279,7 @@ impl SandboxdState {
             runtime_readiness_shutdown_requested.clone(),
         ));
 
+        record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
         let tunnel_session = Some(
             TunnelSession::start_with_supervisor(
                 startup_input,
@@ -292,6 +303,7 @@ impl SandboxdState {
                 SandboxdStateError::StartTunnelSession(error.to_string())
             })?,
         );
+        record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
             codex_app_server_control_handle.clone(),
@@ -336,6 +348,7 @@ impl SandboxdState {
         startup_input: &StartupInput,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
+        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
             record_operation_phase_failure(
                 &diagnostics_logger,
@@ -347,6 +360,7 @@ impl SandboxdState {
             );
             SandboxdStateError::ApplyGitIdentity(error)
         })?;
+        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -358,6 +372,7 @@ impl SandboxdState {
                 self.agent_endpoint_url.clone()
             };
 
+        record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
         self.tunnel_session = Some(
             TunnelSession::start_with_supervisor(
                 startup_input,
@@ -381,6 +396,7 @@ impl SandboxdState {
                 SandboxdStateError::StartTunnelSession(error.to_string())
             })?,
         );
+        record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
 
         Ok(())
     }
@@ -458,6 +474,28 @@ fn record_operation_phase_failure(
         && let Err(error) = logger.record_phase_failed(phase, attributes)
     {
         eprintln!("sandboxd failed to record startup diagnostics phase failure: {error}");
+    }
+}
+
+fn record_operation_phase_started(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+) {
+    if let Some(logger) = diagnostics_logger
+        && let Err(error) = logger.record_phase_started(phase)
+    {
+        eprintln!("sandboxd failed to record startup diagnostics phase start: {error}");
+    }
+}
+
+fn record_operation_phase_completed(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+) {
+    if let Some(logger) = diagnostics_logger
+        && let Err(error) = logger.record_phase_completed(phase)
+    {
+        eprintln!("sandboxd failed to record startup diagnostics phase completion: {error}");
     }
 }
 
@@ -594,6 +632,14 @@ fn record_runtime_process_failure(
                     "error".to_string(),
                     startup_diagnostics_string(error.clone()),
                 ),
+                (
+                    "stdoutCaptured".to_string(),
+                    serde_json::Value::Bool(output_tails.stdout_captured),
+                ),
+                (
+                    "stderrCaptured".to_string(),
+                    serde_json::Value::Bool(output_tails.stderr_captured),
+                ),
             ]);
             if let Some(stdout_tail) = &output_tails.stdout_tail {
                 map.insert(
@@ -643,6 +689,14 @@ fn record_runtime_process_failure(
                 (
                     "error".to_string(),
                     startup_diagnostics_string(error.clone()),
+                ),
+                (
+                    "stdoutCaptured".to_string(),
+                    serde_json::Value::Bool(details.output_tails.stdout_captured),
+                ),
+                (
+                    "stderrCaptured".to_string(),
+                    serde_json::Value::Bool(details.output_tails.stderr_captured),
                 ),
             ]);
             if let Some(stdout_tail) = &details.output_tails.stdout_tail {

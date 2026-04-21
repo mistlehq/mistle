@@ -67,6 +67,7 @@ struct RunningRuntimeClientProcess {
 struct ProcessOutputCapture {
     stdout: Arc<Mutex<TailBuffer>>,
     stderr: Arc<Mutex<TailBuffer>>,
+    capture_threads: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 #[derive(Debug)]
@@ -125,6 +126,7 @@ impl ProcessOutputCapture {
         Self {
             stdout: Arc::new(Mutex::new(TailBuffer::new(4 * 1024))),
             stderr: Arc::new(Mutex::new(TailBuffer::new(8 * 1024))),
+            capture_threads: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -154,6 +156,40 @@ impl ProcessOutputCapture {
             .lock()
             .expect("stderr tail buffer lock should not be poisoned")
             .snapshot()
+    }
+
+    fn register_capture_thread(&self, capture_thread: JoinHandle<()>) {
+        self.capture_threads
+            .lock()
+            .expect("capture thread list lock should not be poisoned")
+            .push(capture_thread);
+    }
+
+    fn finish_capture_threads(&self) {
+        let capture_threads = {
+            let mut capture_threads = self
+                .capture_threads
+                .lock()
+                .expect("capture thread list lock should not be poisoned");
+            std::mem::take(&mut *capture_threads)
+        };
+
+        for capture_thread in capture_threads {
+            let _ = capture_thread.join();
+        }
+    }
+
+    fn collect_tails_after_process_exit(&self) -> ProcessOutputTails {
+        self.finish_capture_threads();
+
+        let stdout_tail = self.stdout_tail();
+        let stderr_tail = self.stderr_tail();
+        ProcessOutputTails {
+            stdout_captured: stdout_tail.is_some(),
+            stderr_captured: stderr_tail.is_some(),
+            stdout_tail,
+            stderr_tail,
+        }
     }
 }
 
@@ -188,7 +224,8 @@ fn spawn_output_capture_thread<R>(
     mut reader: R,
     output_capture: ProcessOutputCapture,
     stream: OutputStream,
-) where
+) -> JoinHandle<()>
+where
     R: Read + Send + 'static,
 {
     thread::spawn(move || {
@@ -203,7 +240,7 @@ fn spawn_output_capture_thread<R>(
                 Err(_) => break,
             }
         }
-    });
+    })
 }
 
 impl CodexAppServerControlHandle {
@@ -348,6 +385,8 @@ pub enum ProcessManagerError {
 pub struct ProcessOutputTails {
     pub stdout_tail: Option<String>,
     pub stderr_tail: Option<String>,
+    pub stdout_captured: bool,
+    pub stderr_captured: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -496,10 +535,7 @@ pub fn start_runtime_client_process_manager_with_supervisor(
                     readiness_type: readiness_type(process_spec).to_string(),
                     readiness_target: readiness_target(process_spec),
                     timeout_ms: readiness_timeout_ms(process_spec),
-                    output_tails: ProcessOutputTails {
-                        stdout_tail: process.output_capture.stdout_tail(),
-                        stderr_tail: process.output_capture.stderr_tail(),
-                    },
+                    output_tails: process.output_capture.collect_tails_after_process_exit(),
                 }),
             });
         }
@@ -942,10 +978,18 @@ fn spawn_runtime_client_child(
 
     let output_capture = ProcessOutputCapture::new();
     if let Some(stdout) = child.stdout.take() {
-        spawn_output_capture_thread(stdout, output_capture.clone(), OutputStream::Stdout);
+        output_capture.register_capture_thread(spawn_output_capture_thread(
+            stdout,
+            output_capture.clone(),
+            OutputStream::Stdout,
+        ));
     }
     if let Some(stderr) = child.stderr.take() {
-        spawn_output_capture_thread(stderr, output_capture.clone(), OutputStream::Stderr);
+        output_capture.register_capture_thread(spawn_output_capture_thread(
+            stderr,
+            output_capture.clone(),
+            OutputStream::Stderr,
+        ));
     }
 
     Ok((child, output_capture))
@@ -1070,6 +1114,7 @@ fn stop_runtime_client_process(
     sleeper: &dyn Sleeper,
 ) -> Result<(), String> {
     if process_has_exited(process)? {
+        process.output_capture.finish_capture_threads();
         return Ok(());
     }
 
@@ -1085,6 +1130,7 @@ fn stop_runtime_client_process(
             if wait_for_runtime_client_process_exit(process, grace_period_ms, clock, sleeper)
                 .is_ok()
             {
+                process.output_capture.finish_capture_threads();
                 return Ok(());
             }
 
@@ -1093,7 +1139,11 @@ fn stop_runtime_client_process(
     }
 
     let remaining_ms = deadline_ms.saturating_sub(clock.now_ms());
-    wait_for_runtime_client_process_exit(process, remaining_ms, clock, sleeper)
+    let result = wait_for_runtime_client_process_exit(process, remaining_ms, clock, sleeper);
+    if result.is_ok() {
+        process.output_capture.finish_capture_threads();
+    }
+    result
 }
 
 /// Checks whether a child process has already exited without blocking.

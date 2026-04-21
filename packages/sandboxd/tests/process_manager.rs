@@ -7,7 +7,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use sandboxd::process::{
-    RuntimeClientProcessSpec, start_runtime_client_process_manager_with_supervisor,
+    ProcessManagerError, RuntimeClientProcessSpec,
+    start_runtime_client_process_manager_with_supervisor,
 };
 use sandboxd::runtime::{
     RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal,
@@ -194,6 +195,40 @@ fn codex_app_server_monitor_survives_a_failed_restart_attempt() {
     let _ = fs::remove_dir_all(control_dir);
 }
 
+#[test]
+fn readiness_failure_flushes_captured_child_output_before_reporting() {
+    let port = reserve_test_port();
+    let process_spec = codex_app_server_readiness_failure_process_spec(port);
+    let supervisor_handle = SandboxdSupervisorHandle::new(
+        "sandbox-123",
+        std::sync::Arc::new(SystemClock),
+        BTreeSet::from([SupervisedComponent::CodexAppServer]),
+    );
+
+    let error = start_runtime_client_process_manager_with_supervisor(
+        &[process_spec],
+        &SystemClock,
+        &ThreadSleeper,
+        supervisor_handle,
+    )
+    .expect_err("process manager should surface readiness failure");
+
+    let ProcessManagerError::ReadinessCheck { details, .. } = error else {
+        panic!("expected readiness-check failure, got: {error:?}");
+    };
+
+    assert!(details.output_tails.stdout_captured);
+    assert!(details.output_tails.stderr_captured);
+    assert_eq!(
+        details.output_tails.stdout_tail.as_deref(),
+        Some("codex stdout before readiness failure\n")
+    );
+    assert_eq!(
+        details.output_tails.stderr_tail.as_deref(),
+        Some("codex stderr before readiness failure\n")
+    );
+}
+
 fn codex_app_server_process_spec(port: u16, mode: &str, delay_ms: u64) -> RuntimeClientProcessSpec {
     let script = r#"
 const net = require('node:net');
@@ -335,6 +370,33 @@ if (failThisAttempt) {
         readiness: RuntimeClientProcessReadiness::Ws {
             url: format!("ws://127.0.0.1:{port}/health"),
             timeout_ms: 5_000,
+        },
+        stop: RuntimeClientProcessStopPolicy {
+            signal: RuntimeClientProcessStopSignal::Sigkill,
+            timeout_ms: 1_000,
+            grace_period_ms: None,
+        },
+    }
+}
+
+fn codex_app_server_readiness_failure_process_spec(port: u16) -> RuntimeClientProcessSpec {
+    let script = r#"
+console.log('codex stdout before readiness failure');
+console.error('codex stderr before readiness failure');
+setInterval(() => {}, 1000);
+"#;
+
+    RuntimeClientProcessSpec {
+        process_key: "codex-app-server".to_string(),
+        command: RuntimeExecCommand {
+            args: vec!["node".to_string(), "-e".to_string(), script.to_string()],
+            env: Some(BTreeMap::new()),
+            cwd: None,
+            timeout_ms: None,
+        },
+        readiness: RuntimeClientProcessReadiness::Ws {
+            url: format!("ws://127.0.0.1:{port}/health"),
+            timeout_ms: 250,
         },
         stop: RuntimeClientProcessStopPolicy {
             signal: RuntimeClientProcessStopSignal::Sigkill,

@@ -68,6 +68,8 @@ describe("toDiagnosticAttributes", () => {
       processKey: "codex-app-server",
       timeoutMs: 5_000,
       hasTail: true,
+      stdoutCaptured: false,
+      stderrCaptured: true,
     });
 
     expect(attributes).toMatchObject({
@@ -78,6 +80,8 @@ describe("toDiagnosticAttributes", () => {
       "mistle.sandbox.startup_detail.processKey": "codex-app-server",
       "mistle.sandbox.startup_detail.timeoutMs": 5_000,
       "mistle.sandbox.startup_detail.hasTail": true,
+      "mistle.sandbox.startup_detail.stdoutCaptured": false,
+      "mistle.sandbox.startup_detail.stderrCaptured": true,
     });
   });
 });

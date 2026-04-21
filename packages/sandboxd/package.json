@@ -7,7 +7,7 @@
     "typecheck": "cargo check --locked --all-targets",
     "test": "cargo test --locked",
     "test:integration": "cargo test --locked applies_github_release_artifact_install_steps_from_pinned_public_release -- --ignored",
-    "format": "cargo fmt",
-    "format:check": "cargo fmt --check"
+    "format": "node ./scripts/cargo-fmt.mjs",
+    "format:check": "node ./scripts/cargo-fmt.mjs --check"
   }
 }

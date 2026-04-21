@@ -120,6 +120,24 @@ impl StartupDiagnosticsLogger {
         )
     }
 
+    pub fn record_phase_started(&self, phase: &str) -> Result<(), String> {
+        self.record_with_clock(
+            &SystemClock,
+            StartupDiagnosticLevel::Info,
+            phase_started_event_name(self.operation),
+            BTreeMap::from([("phase".to_string(), Value::String(phase.to_string()))]),
+        )
+    }
+
+    pub fn record_phase_completed(&self, phase: &str) -> Result<(), String> {
+        self.record_with_clock(
+            &SystemClock,
+            StartupDiagnosticLevel::Info,
+            phase_completed_event_name(self.operation),
+            BTreeMap::from([("phase".to_string(), Value::String(phase.to_string()))]),
+        )
+    }
+
     pub fn record_failed(&self, mut attributes: BTreeMap<String, Value>) -> Result<(), String> {
         self.record_with_clock(
             &SystemClock,
@@ -195,6 +213,20 @@ fn phase_failed_event_name(operation: StartupOperation) -> &'static str {
     match operation {
         StartupOperation::Init => "sandbox_init_phase_failed",
         StartupOperation::Resume => "sandbox_resume_phase_failed",
+    }
+}
+
+fn phase_started_event_name(operation: StartupOperation) -> &'static str {
+    match operation {
+        StartupOperation::Init => "sandbox_init_phase_started",
+        StartupOperation::Resume => "sandbox_resume_phase_started",
+    }
+}
+
+fn phase_completed_event_name(operation: StartupOperation) -> &'static str {
+    match operation {
+        StartupOperation::Init => "sandbox_init_phase_completed",
+        StartupOperation::Resume => "sandbox_resume_phase_completed",
     }
 }
 
@@ -298,6 +330,12 @@ mod tests {
             )
             .expect("started record should append");
         logger
+            .record_phase_started("apply_runtime_plan")
+            .expect("phase start record should append");
+        logger
+            .record_phase_completed("apply_runtime_plan")
+            .expect("phase completion record should append");
+        logger
             .record_with_clock(
                 &FixedClock,
                 super::StartupDiagnosticLevel::Error,
@@ -318,15 +356,23 @@ mod tests {
         let log_path = temp_dir.join("init.log");
         let log_text = fs::read_to_string(&log_path).expect("log file should be readable");
         let lines = log_text.lines().collect::<Vec<_>>();
-        assert_eq!(lines.len(), 2);
+        assert_eq!(lines.len(), 4);
         let first: Value =
             serde_json::from_str(lines[0]).expect("first log line should be valid json");
         let second: Value =
             serde_json::from_str(lines[1]).expect("second log line should be valid json");
+        let third: Value =
+            serde_json::from_str(lines[2]).expect("third log line should be valid json");
+        let fourth: Value =
+            serde_json::from_str(lines[3]).expect("fourth log line should be valid json");
         assert_eq!(first["event"], "sandbox_init_started");
         assert_eq!(first["sandboxInstanceId"], "sbi_test");
+        assert_eq!(second["event"], "sandbox_init_phase_started");
         assert_eq!(second["phase"], "apply_runtime_plan");
-        assert_eq!(second["error"], "workspace clone failed");
+        assert_eq!(third["event"], "sandbox_init_phase_completed");
+        assert_eq!(third["phase"], "apply_runtime_plan");
+        assert_eq!(fourth["phase"], "apply_runtime_plan");
+        assert_eq!(fourth["error"], "workspace clone failed");
 
         unsafe {
             std::env::remove_var("MISTLE_SANDBOXD_OPERATION_LOG_DIR");
