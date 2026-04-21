@@ -87,30 +87,10 @@ describe("internal sandbox instances list integration", () => {
 
     expect(firstPage.totalResults).toBe(3);
     expect(firstPage.items.map((item) => item.id)).toEqual([
-      "sbi_list_org_a_002",
       "sbi_list_org_a_003",
+      "sbi_list_org_a_002",
     ]);
     expect(firstPage.items[0]).toMatchObject({
-      sandboxProfileId: "sbp_list",
-      title: "Backfill customer export",
-      sandboxProfileVersion: 2,
-      status: "stopped",
-      keepaliveActive: false,
-      startedBy: {
-        kind: "user",
-        id: "usr_list_a",
-      },
-      source: "dashboard",
-      failureCode: null,
-      failureMessage: null,
-    });
-    expect(new Date(firstPage.items[0]?.createdAt ?? "").toISOString()).toBe(
-      "2026-03-11T00:00:00.000Z",
-    );
-    expect(new Date(firstPage.items[0]?.updatedAt ?? "").toISOString()).toBe(
-      "2026-03-12T00:06:00.000Z",
-    );
-    expect(firstPage.items[1]).toMatchObject({
       sandboxProfileId: "sbp_list",
       title: "Investigate failed webhook run",
       sandboxProfileVersion: 3,
@@ -124,11 +104,31 @@ describe("internal sandbox instances list integration", () => {
       failureCode: "SANDBOX_START_FAILED",
       failureMessage: "Sandbox failed to start.",
     });
-    expect(new Date(firstPage.items[1]?.createdAt ?? "").toISOString()).toBe(
+    expect(new Date(firstPage.items[0]?.createdAt ?? "").toISOString()).toBe(
       "2026-03-12T00:00:00.000Z",
     );
-    expect(new Date(firstPage.items[1]?.updatedAt ?? "").toISOString()).toBe(
+    expect(new Date(firstPage.items[0]?.updatedAt ?? "").toISOString()).toBe(
       "2026-03-12T00:05:00.000Z",
+    );
+    expect(firstPage.items[1]).toMatchObject({
+      sandboxProfileId: "sbp_list",
+      title: "Backfill customer export",
+      sandboxProfileVersion: 2,
+      status: "stopped",
+      keepaliveActive: false,
+      startedBy: {
+        kind: "user",
+        id: "usr_list_a",
+      },
+      source: "dashboard",
+      failureCode: null,
+      failureMessage: null,
+    });
+    expect(new Date(firstPage.items[1]?.createdAt ?? "").toISOString()).toBe(
+      "2026-03-11T00:00:00.000Z",
+    );
+    expect(new Date(firstPage.items[1]?.updatedAt ?? "").toISOString()).toBe(
+      "2026-03-12T00:06:00.000Z",
     );
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();

@@ -7,7 +7,8 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { resolveUserDisplayName } from "../../lib/user-display-name.js";
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
-import type { ListSandboxInstancesResult } from "./types.js";
+import { buildSessionSidebarGroups, enrichListedItems } from "./build-session-sidebar-groups.js";
+import type { ListSandboxInstancesResult, ListSessionSidebarGroupsResult } from "./types.js";
 
 async function resolveStartedByNames(
   db: ControlPlaneDatabase,
@@ -152,16 +153,59 @@ export async function listInstances(
     });
     return {
       ...sandboxInstances,
-      items: sandboxInstances.items.map((item) => ({
-        ...item,
-        title: item.title,
-        keepaliveActive: item.keepaliveActive,
-        sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
-        startedBy: {
-          ...item.startedBy,
-          name: startedByNames.get(item.startedBy.id) ?? null,
-        },
-      })),
+      items: enrichListedItems({
+        items: sandboxInstances.items,
+        sandboxProfileDisplayNames,
+        startedByNames,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof DataPlaneSandboxInstancesClientError && error.status === 400) {
+      throw new SandboxInstancesBadRequestError(
+        SandboxInstancesBadRequestCodes.INVALID_LIST_INSTANCES_INPUT,
+        error.body?.message ?? error.message,
+      );
+    }
+
+    throw error;
+  }
+}
+
+export async function listSessionSidebarGroups(
+  {
+    db,
+    dataPlaneClient,
+  }: {
+    db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
+  },
+  input: {
+    organizationId: string;
+    limit?: number;
+  },
+): Promise<ListSessionSidebarGroupsResult> {
+  try {
+    const sandboxInstances = await dataPlaneClient.listRecentSandboxInstances({
+      organizationId: input.organizationId,
+      ...(input.limit === undefined ? {} : { limit: input.limit }),
+    });
+
+    const startedByNames = await resolveStartedByNames(db, {
+      organizationId: input.organizationId,
+      items: sandboxInstances.items,
+    });
+    const sandboxProfileDisplayNames = await resolveSandboxProfileDisplayNames(db, {
+      organizationId: input.organizationId,
+      items: sandboxInstances.items,
+    });
+    const enrichedItems = enrichListedItems({
+      items: sandboxInstances.items,
+      sandboxProfileDisplayNames,
+      startedByNames,
+    });
+
+    return {
+      groups: buildSessionSidebarGroups(enrichedItems),
     };
   } catch (error) {
     if (error instanceof DataPlaneSandboxInstancesClientError && error.status === 400) {

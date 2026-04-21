@@ -8,6 +8,7 @@ import * as createSandboxInstancePortAccess from "./create-sandbox-instance-port
 import * as getSandboxInstanceSessionLink from "./get-sandbox-instance-session-link/index.js";
 import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as listSandboxInstances from "./list-sandbox-instances/index.js";
+import * as listSessionSidebarGroups from "./list-session-sidebar-groups/index.js";
 import * as patchSandboxInstanceTitle from "./patch-sandbox-instance-title/index.js";
 import * as resumeSandboxInstance from "./resume-sandbox-instance/index.js";
 
@@ -19,6 +20,7 @@ export function createSandboxInstancesRoutes(): AppRoutes<
   });
 
   routes.openapi(listSandboxInstances.route, listSandboxInstances.handler);
+  routes.openapi(listSessionSidebarGroups.route, listSessionSidebarGroups.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(getSandboxInstanceSessionLink.route, getSandboxInstanceSessionLink.handler);
   routes.openapi(patchSandboxInstanceTitle.route, patchSandboxInstanceTitle.handler);

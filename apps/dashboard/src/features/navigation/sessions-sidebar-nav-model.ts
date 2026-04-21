@@ -5,12 +5,15 @@ import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 export type SessionsSidebarSourceItem = {
   id: string;
   title: string | null;
-  sandboxProfileId: string;
-  sandboxProfileDisplayName: string | null;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
-  createdAt: string;
   updatedAt: string;
   keepaliveActive: boolean;
+};
+
+export type SessionsSidebarSourceGroup = {
+  profileId: string;
+  profileName: string;
+  items: SessionsSidebarSourceItem[];
 };
 
 export type SessionsSidebarNavItem = {
@@ -43,10 +46,6 @@ export function resolveSessionsSidebarShowActivityIndicator(input: {
   return input.status === "running" && input.keepaliveActive;
 }
 
-function resolveProfileName(input: SessionsSidebarSourceItem): string {
-  return input.sandboxProfileDisplayName ?? input.sandboxProfileId;
-}
-
 function resolveMetadataLabel(
   input: Pick<SessionsSidebarSourceItem, "keepaliveActive" | "status" | "updatedAt"> & {
     nowEpochMs?: number;
@@ -65,83 +64,43 @@ function resolveMetadataLabel(
   });
 }
 
-function compareUpdatedAtDescending(
-  left: { updatedAt: string },
-  right: { updatedAt: string },
-): number {
-  return right.updatedAt.localeCompare(left.updatedAt);
-}
-
 export function buildSessionsSidebarNavGroups(
-  items: readonly SessionsSidebarSourceItem[],
+  groups: readonly SessionsSidebarSourceGroup[],
   input?: {
     nowEpochMs?: number;
   },
 ): SessionsSidebarNavGroup[] {
-  const groupsByProfileId = new Map<string, SessionsSidebarNavGroup>();
-
-  for (const item of items) {
-    const showActivityIndicator = resolveSessionsSidebarShowActivityIndicator({
-      status: item.status,
-      keepaliveActive: item.keepaliveActive,
-    });
-    if (showActivityIndicator === null) {
-      continue;
-    }
-
-    const existingGroup = groupsByProfileId.get(item.sandboxProfileId);
-    const group =
-      existingGroup ??
-      ({
-        profileId: item.sandboxProfileId,
-        profileName: resolveProfileName(item),
-        items: [],
-      } satisfies SessionsSidebarNavGroup);
-
-    group.items.push({
-      id: item.id,
-      label: resolveSessionTitleLabel(item.title),
-      metadataLabel: resolveMetadataLabel({
-        status: item.status,
-        keepaliveActive: item.keepaliveActive,
-        updatedAt: item.updatedAt,
-        ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
-      }),
-      to: `/sessions/${encodeURIComponent(item.id)}`,
-      showActivityIndicator,
-      updatedAt: item.updatedAt,
-    });
-
-    if (existingGroup === undefined) {
-      groupsByProfileId.set(item.sandboxProfileId, group);
-    }
-  }
-
-  return [...groupsByProfileId.values()]
+  return groups
     .map((group) => ({
-      ...group,
-      items: [...group.items].sort((left, right) => {
-        const updatedAtDifference = compareUpdatedAtDescending(left, right);
-        if (updatedAtDifference !== 0) {
-          return updatedAtDifference;
+      profileId: group.profileId,
+      profileName: group.profileName,
+      items: group.items.flatMap((item) => {
+        const showActivityIndicator = resolveSessionsSidebarShowActivityIndicator({
+          status: item.status,
+          keepaliveActive: item.keepaliveActive,
+        });
+        if (showActivityIndicator === null) {
+          return [];
         }
 
-        return left.label.localeCompare(right.label);
+        return [
+          {
+            id: item.id,
+            label: resolveSessionTitleLabel(item.title),
+            metadataLabel: resolveMetadataLabel({
+              status: item.status,
+              keepaliveActive: item.keepaliveActive,
+              updatedAt: item.updatedAt,
+              ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+            }),
+            to: `/sessions/${encodeURIComponent(item.id)}`,
+            showActivityIndicator,
+            updatedAt: item.updatedAt,
+          },
+        ];
       }),
     }))
-    .sort((left, right) => {
-      const leftNewestItem = left.items[0];
-      const rightNewestItem = right.items[0];
-
-      if (leftNewestItem !== undefined && rightNewestItem !== undefined) {
-        const updatedAtDifference = compareUpdatedAtDescending(leftNewestItem, rightNewestItem);
-        if (updatedAtDifference !== 0) {
-          return updatedAtDifference;
-        }
-      }
-
-      return left.profileName.localeCompare(right.profileName);
-    });
+    .filter((group) => group.items.length > 0);
 }
 
 export function filterSessionsSidebarNavGroups(input: {

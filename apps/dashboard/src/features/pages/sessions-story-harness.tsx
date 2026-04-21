@@ -15,7 +15,10 @@ import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { useAppHeaderLeadingModel } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
+import type {
+  SandboxInstancesListResult,
+  SessionSidebarGroupsResult,
+} from "../sessions/sessions-types.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
@@ -48,6 +51,7 @@ type SessionsStoryHarnessProps = {
     failureMessage?: string | null;
   };
   sandboxInstancesList?: SandboxInstancesListResult;
+  sessionSidebarGroups?: SessionSidebarGroupsResult;
   sessionsSidebarQueryState?:
     | {
         kind: "success";
@@ -70,6 +74,9 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
         : {}),
       ...(input.sandboxInstancesList !== undefined
         ? { sandboxInstancesList: input.sandboxInstancesList }
+        : {}),
+      ...(input.sessionSidebarGroups !== undefined
+        ? { sessionSidebarGroups: input.sessionSidebarGroups }
         : {}),
       ...(input.sandboxInstanceStatus !== undefined
         ? { sandboxInstanceStatus: input.sandboxInstanceStatus }

@@ -65,5 +65,14 @@ export const ListSandboxInstancesResponseSchema = createKeysetPaginationEnvelope
   },
 );
 
+export const ListRecentSandboxInstancesResponseSchema = z
+  .object({
+    items: z.array(SandboxInstanceListItemSchema),
+  })
+  .strict();
+
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
 export type ListSandboxInstancesResponse = z.infer<typeof ListSandboxInstancesResponseSchema>;
+export type ListRecentSandboxInstancesResponse = z.infer<
+  typeof ListRecentSandboxInstancesResponseSchema
+>;

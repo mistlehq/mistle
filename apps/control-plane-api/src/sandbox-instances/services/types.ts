@@ -5,6 +5,8 @@ import type {
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { PortAccessBootstrapTokenConfig } from "@mistle/port-access-auth";
 
+import type { SessionSidebarGroup } from "./build-session-sidebar-groups.js";
+
 export type MintSandboxInstanceConnectionTokenInput = {
   organizationId: string;
   instanceId: string;
@@ -71,4 +73,8 @@ export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "ite
       };
     }
   >;
+};
+
+export type ListSessionSidebarGroupsResult = {
+  groups: SessionSidebarGroup[];
 };

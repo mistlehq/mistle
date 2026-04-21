@@ -4,6 +4,7 @@ import {
   buildSessionsSidebarNavGroups,
   filterSessionsSidebarNavGroups,
   resolveSessionsSidebarShowActivityIndicator,
+  type SessionsSidebarSourceGroup,
   type SessionsSidebarSourceItem,
 } from "./sessions-sidebar-nav-model.js";
 
@@ -15,12 +16,22 @@ function buildSourceItem(
   return {
     id,
     title: null,
-    sandboxProfileId: "sbp_profile_alpha",
-    sandboxProfileDisplayName: "Alpha Profile",
     status: "running",
-    createdAt: "2026-04-08T00:00:00.000Z",
     updatedAt: "2026-04-08T00:00:00.000Z",
     keepaliveActive: false,
+    ...restOverrides,
+  };
+}
+
+function buildSourceGroup(
+  overrides: Partial<SessionsSidebarSourceGroup> & Pick<SessionsSidebarSourceGroup, "profileId">,
+): SessionsSidebarSourceGroup {
+  const { profileId, ...restOverrides } = overrides;
+
+  return {
+    profileId,
+    profileName: "Alpha Profile",
+    items: [],
     ...restOverrides,
   };
 }
@@ -70,34 +81,42 @@ describe("resolveSessionsSidebarShowActivityIndicator", () => {
 });
 
 describe("buildSessionsSidebarNavGroups", () => {
-  it("groups only openable sessions by sandbox profile", () => {
+  it("preserves backend group and item order while mapping nav fields", () => {
     expect(
       buildSessionsSidebarNavGroups(
         [
-          buildSourceItem({
-            id: "sbi_working",
-            title: "Investigate flaky test run",
-            keepaliveActive: true,
-            updatedAt: "2026-04-09T00:00:00.000Z",
+          buildSourceGroup({
+            profileId: "sbp_profile_beta",
+            profileName: "Beta Profile",
+            items: [
+              buildSourceItem({
+                id: "sbi_working",
+                title: "Investigate flaky test run",
+                keepaliveActive: true,
+                updatedAt: "2026-04-09T00:00:00.000Z",
+              }),
+              buildSourceItem({
+                id: "sbi_ready",
+                title: "Review migration draft",
+                keepaliveActive: false,
+                updatedAt: "2026-04-10T00:00:00.000Z",
+              }),
+            ],
           }),
-          buildSourceItem({
-            id: "sbi_ready",
-            title: "Review migration draft",
-            keepaliveActive: false,
-            updatedAt: "2026-04-10T00:00:00.000Z",
-          }),
-          buildSourceItem({
-            id: "sbi_stopped",
-            sandboxProfileId: "sbp_profile_beta",
-            sandboxProfileDisplayName: "Beta Profile",
-            status: "stopped",
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          }),
-          buildSourceItem({
-            id: "sbi_failed",
-            sandboxProfileId: "sbp_profile_gamma",
-            sandboxProfileDisplayName: "Gamma Profile",
-            status: "failed",
+          buildSourceGroup({
+            profileId: "sbp_profile_alpha",
+            profileName: "Alpha Profile",
+            items: [
+              buildSourceItem({
+                id: "sbi_stopped",
+                status: "stopped",
+                updatedAt: "2026-04-08T00:00:00.000Z",
+              }),
+              buildSourceItem({
+                id: "sbi_failed",
+                status: "failed",
+              }),
+            ],
           }),
         ],
         {
@@ -106,17 +125,9 @@ describe("buildSessionsSidebarNavGroups", () => {
       ),
     ).toStrictEqual([
       {
-        profileId: "sbp_profile_alpha",
-        profileName: "Alpha Profile",
+        profileId: "sbp_profile_beta",
+        profileName: "Beta Profile",
         items: [
-          {
-            id: "sbi_ready",
-            label: "Review migration draft",
-            metadataLabel: "Idle",
-            to: "/sessions/sbi_ready",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-10T00:00:00.000Z",
-          },
           {
             id: "sbi_working",
             label: "Investigate flaky test run",
@@ -125,11 +136,19 @@ describe("buildSessionsSidebarNavGroups", () => {
             showActivityIndicator: true,
             updatedAt: "2026-04-09T00:00:00.000Z",
           },
+          {
+            id: "sbi_ready",
+            label: "Review migration draft",
+            metadataLabel: "Idle",
+            to: "/sessions/sbi_ready",
+            showActivityIndicator: false,
+            updatedAt: "2026-04-10T00:00:00.000Z",
+          },
         ],
       },
       {
-        profileId: "sbp_profile_beta",
-        profileName: "Beta Profile",
+        profileId: "sbp_profile_alpha",
+        profileName: "Alpha Profile",
         items: [
           {
             id: "sbi_stopped",
@@ -148,35 +167,45 @@ describe("buildSessionsSidebarNavGroups", () => {
 describe("filterSessionsSidebarNavGroups", () => {
   const groups = buildSessionsSidebarNavGroups(
     [
-      buildSourceItem({
-        id: "sbi_docs",
-        title: "Draft onboarding guide",
-        sandboxProfileId: "sbp_docs",
-        sandboxProfileDisplayName: "Docs Maintainer",
-        status: "starting",
-        updatedAt: "2026-04-09T23:00:00.000Z",
+      buildSourceGroup({
+        profileId: "sbp_docs",
+        profileName: "Docs Maintainer",
+        items: [
+          buildSourceItem({
+            id: "sbi_docs",
+            title: "Draft onboarding guide",
+            status: "starting",
+            updatedAt: "2026-04-09T23:00:00.000Z",
+          }),
+        ],
       }),
-      buildSourceItem({
-        id: "sbi_finance",
-        title: null,
-        sandboxProfileId: "sbp_finance",
-        sandboxProfileDisplayName: "Finance Investigator",
-        status: "stopped",
-        updatedAt: "2026-04-08T00:00:00.000Z",
+      buildSourceGroup({
+        profileId: "sbp_finance",
+        profileName: "Finance Investigator",
+        items: [
+          buildSourceItem({
+            id: "sbi_finance",
+            title: null,
+            status: "stopped",
+            updatedAt: "2026-04-08T00:00:00.000Z",
+          }),
+        ],
       }),
-      buildSourceItem({
-        id: "sbi_repo_active",
-        title: "Investigate flaky test run",
-        sandboxProfileId: "sbp_repo",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        keepaliveActive: true,
-      }),
-      buildSourceItem({
-        id: "sbi_repo_idle",
-        title: "Review migration draft",
-        sandboxProfileId: "sbp_repo",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        updatedAt: "2026-04-08T00:00:00.000Z",
+      buildSourceGroup({
+        profileId: "sbp_repo",
+        profileName: "Repo Maintainer",
+        items: [
+          buildSourceItem({
+            id: "sbi_repo_active",
+            title: "Investigate flaky test run",
+            keepaliveActive: true,
+          }),
+          buildSourceItem({
+            id: "sbi_repo_idle",
+            title: "Review migration draft",
+            updatedAt: "2026-04-08T00:00:00.000Z",
+          }),
+        ],
       }),
     ],
     {

@@ -19,21 +19,24 @@ import {
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import type { DataPlaneApiGlobalConfig } from "../../../types.js";
 import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
-import type { ListSandboxInstancesResponse } from "../schemas.js";
+import type {
+  ListRecentSandboxInstancesResponse,
+  ListSandboxInstancesResponse,
+} from "../schemas.js";
 
 export const InvalidListSandboxInstancesInputErrorCode = "INVALID_LIST_INPUT";
 export const InvalidPaginationCursorErrorCode = "INVALID_PAGINATION_CURSOR";
 
 const SandboxInstancesCursorSchema = z
   .object({
-    updatedAt: z.string().min(1),
+    createdAt: z.string().min(1),
     id: z.string().min(1),
   })
   .strict();
@@ -73,6 +76,7 @@ async function resolveListedSandboxRuntimeState(
   input: {
     sandboxInstanceId: string;
     persistedStatus: SandboxInstance["status"];
+    persistedUpdatedAt: string;
     runtimeProvider: SandboxInstance["runtimeProvider"];
     providerSandboxId: SandboxInstance["providerSandboxId"];
     failureCode: SandboxInstance["failureCode"];
@@ -81,6 +85,7 @@ async function resolveListedSandboxRuntimeState(
 ): Promise<{
   status: ListSandboxInstancesResponse["items"][number]["status"];
   keepaliveActive: boolean;
+  updatedAt: string;
 }> {
   if (
     input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
@@ -89,6 +94,7 @@ async function resolveListedSandboxRuntimeState(
     return {
       status: input.persistedStatus,
       keepaliveActive: false,
+      updatedAt: input.persistedUpdatedAt,
     };
   }
 
@@ -106,6 +112,7 @@ async function resolveListedSandboxRuntimeState(
     return {
       status,
       keepaliveActive: status === "running" && runtimeStateSnapshot.keepalive.active,
+      updatedAt: input.persistedUpdatedAt,
     };
   }
 
@@ -126,6 +133,7 @@ async function resolveListedSandboxRuntimeState(
     return {
       status,
       keepaliveActive: false,
+      updatedAt: input.persistedUpdatedAt,
     };
   }
 
@@ -133,15 +141,18 @@ async function resolveListedSandboxRuntimeState(
     return {
       status,
       keepaliveActive: false,
+      updatedAt: input.persistedUpdatedAt,
     };
   }
 
-  await markRunningSandboxInstanceStopped(ctx, {
+  const updatedAt = await markRunningSandboxInstanceStopped(ctx, {
     sandboxInstanceId: input.sandboxInstanceId,
   });
+
   return {
     status: SandboxInstanceStatuses.STOPPED,
     keepaliveActive: false,
+    updatedAt,
   };
 }
 
@@ -150,7 +161,7 @@ async function markRunningSandboxInstanceStopped(
   input: {
     sandboxInstanceId: string;
   },
-): Promise<void> {
+): Promise<string> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -166,10 +177,11 @@ async function markRunningSandboxInstanceStopped(
     )
     .returning({
       status: sandboxInstances.status,
+      updatedAt: sandboxInstances.updatedAt,
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
+    return updatedRows[0].updatedAt;
   }
 
   throw new Error("Failed to transition sandbox instance status from running to stopped.");
@@ -207,6 +219,51 @@ function createInvalidCursorErrorMessage(input: {
   return `\`${input.cursorName}\` cursor has an invalid shape.`;
 }
 
+async function buildListedSandboxInstance(
+  ctx: ListSandboxInstancesContext,
+  item: ListSandboxInstanceRow,
+): Promise<ListSandboxInstancesResponse["items"][number]> {
+  const runtimeState = await resolveListedSandboxRuntimeState(ctx, {
+    sandboxInstanceId: item.id,
+    persistedStatus: item.status,
+    persistedUpdatedAt: item.updatedAt,
+    runtimeProvider: item.runtimeProvider,
+    providerSandboxId: item.providerSandboxId,
+    failureCode: item.failureCode,
+    failureMessage: item.failureMessage,
+  });
+
+  return {
+    id: item.id,
+    sandboxProfileId: item.sandboxProfileId,
+    title: item.title,
+    sandboxProfileVersion: item.sandboxProfileVersion,
+    status: runtimeState.status,
+    keepaliveActive: runtimeState.keepaliveActive,
+    startedBy: {
+      kind: item.startedByKind,
+      id: item.startedById,
+    },
+    source: item.source,
+    createdAt: item.createdAt,
+    updatedAt: runtimeState.updatedAt,
+    failureCode: item.failureCode,
+    failureMessage: item.failureMessage,
+  };
+}
+
+function compareUpdatedAtDescWithIdTieBreak(
+  left: Pick<ListSandboxInstancesResponse["items"][number], "id" | "updatedAt">,
+  right: Pick<ListSandboxInstancesResponse["items"][number], "id" | "updatedAt">,
+): number {
+  const updatedAtDifference = right.updatedAt.localeCompare(left.updatedAt);
+  if (updatedAtDifference !== 0) {
+    return updatedAtDifference;
+  }
+
+  return right.id.localeCompare(left.id);
+}
+
 export async function listSandboxInstances(
   ctx: ListSandboxInstancesContext,
   input: ListSandboxInstancesInput,
@@ -234,7 +291,7 @@ export async function listSandboxInstances(
         }),
       encodeCursor: encodeKeysetCursor,
       getCursor: (item) => ({
-        updatedAt: item.updatedAt,
+        createdAt: item.createdAt,
         id: item.id,
       }),
       fetchPage: async ({ direction, cursor, limitPlusOne }) =>
@@ -266,8 +323,8 @@ export async function listSandboxInstances(
               return and(
                 organizationScope,
                 or(
-                  lt(table.updatedAt, cursor.updatedAt),
-                  and(eq(table.updatedAt, cursor.updatedAt), lt(table.id, cursor.id)),
+                  lt(table.createdAt, cursor.createdAt),
+                  and(eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)),
                 ),
               );
             }
@@ -275,15 +332,15 @@ export async function listSandboxInstances(
             return and(
               organizationScope,
               or(
-                gt(table.updatedAt, cursor.updatedAt),
-                and(eq(table.updatedAt, cursor.updatedAt), gt(table.id, cursor.id)),
+                gt(table.createdAt, cursor.createdAt),
+                and(eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)),
               ),
             );
           },
           orderBy:
             direction === KeysetPaginationDirections.BACKWARD
-              ? (table, { asc }) => [asc(table.updatedAt), asc(table.id)]
-              : (table, { desc }) => [desc(table.updatedAt), desc(table.id)],
+              ? (table, { asc }) => [asc(table.createdAt), asc(table.id)]
+              : (table, { desc }) => [desc(table.createdAt), desc(table.id)],
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
@@ -299,34 +356,7 @@ export async function listSandboxInstances(
     });
 
     const items = await Promise.all(
-      response.items.map(async (item) => {
-        const runtimeState = await resolveListedSandboxRuntimeState(ctx, {
-          sandboxInstanceId: item.id,
-          persistedStatus: item.status,
-          runtimeProvider: item.runtimeProvider,
-          providerSandboxId: item.providerSandboxId,
-          failureCode: item.failureCode,
-          failureMessage: item.failureMessage,
-        });
-
-        return {
-          id: item.id,
-          sandboxProfileId: item.sandboxProfileId,
-          title: item.title,
-          sandboxProfileVersion: item.sandboxProfileVersion,
-          status: runtimeState.status,
-          keepaliveActive: runtimeState.keepaliveActive,
-          startedBy: {
-            kind: item.startedByKind,
-            id: item.startedById,
-          },
-          source: item.source,
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-          failureCode: item.failureCode,
-          failureMessage: item.failureMessage,
-        };
-      }),
+      response.items.map(async (item) => await buildListedSandboxInstance(ctx, item)),
     );
 
     return {
@@ -348,4 +378,42 @@ export async function listSandboxInstances(
 
     throw error;
   }
+}
+
+export async function listRecentSandboxInstances(
+  ctx: ListSandboxInstancesContext,
+  input: {
+    organizationId: string;
+    limit?: number;
+  },
+): Promise<ListRecentSandboxInstancesResponse> {
+  const rows = await ctx.db.query.sandboxInstances.findMany({
+    columns: {
+      id: true,
+      sandboxProfileId: true,
+      title: true,
+      sandboxProfileVersion: true,
+      status: true,
+      runtimeProvider: true,
+      providerSandboxId: true,
+      startedByKind: true,
+      startedById: true,
+      source: true,
+      createdAt: true,
+      updatedAt: true,
+      failureCode: true,
+      failureMessage: true,
+    },
+    where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    orderBy: [desc(sandboxInstances.updatedAt), desc(sandboxInstances.id)],
+    limit: input.limit ?? 100,
+  });
+
+  const items = await Promise.all(
+    rows.map(async (item) => await buildListedSandboxInstance(ctx, item)),
+  );
+
+  return {
+    items: items.sort(compareUpdatedAtDescWithIdTieBreak),
+  };
 }

@@ -8,12 +8,14 @@ import type {
   LaunchableSandboxProfilesResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
+  sessionSidebarGroupsQueryKey,
   sandboxInstanceStatusQueryKey,
   sandboxInstancesListQueryKey,
 } from "../sessions/sessions-query-keys.js";
 import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
+  SessionSidebarGroupsResult,
 } from "../sessions/sessions-types.js";
 
 type SessionsSidebarQueryState =
@@ -79,8 +81,23 @@ export function buildSandboxInstanceListItemFixture(
   };
 }
 
+export function buildSessionSidebarGroupFixture(
+  overrides: Partial<SessionSidebarGroupsResult["groups"][number]> &
+    Pick<SessionSidebarGroupsResult["groups"][number], "profileId">,
+): SessionSidebarGroupsResult["groups"][number] {
+  const { profileId, ...restOverrides } = overrides;
+
+  return {
+    profileId,
+    profileName: "Alpha Profile",
+    items: [],
+    ...restOverrides,
+  };
+}
+
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+  sessionSidebarGroups?: SessionSidebarGroupsResult;
   sandboxInstancesList?: SandboxInstancesListResult;
   sandboxInstanceStatus?: {
     id: string;
@@ -128,10 +145,8 @@ export function createSessionsPageStoryQueryClient(input?: {
       totalResults: 0,
     },
   );
-  const sessionsSidebarQueryKey = sandboxInstancesListQueryKey({
+  const sessionSidebarQueryKey = sessionSidebarGroupsQueryKey({
     limit: 100,
-    after: null,
-    before: null,
   });
   const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
     kind: "success",
@@ -139,18 +154,15 @@ export function createSessionsPageStoryQueryClient(input?: {
 
   if (sessionsSidebarQueryState.kind === "success") {
     queryClient.setQueryData(
-      sessionsSidebarQueryKey,
-      input?.sandboxInstancesList ?? {
-        items: [],
-        nextPage: null,
-        previousPage: null,
-        totalResults: 0,
+      sessionSidebarQueryKey,
+      input?.sessionSidebarGroups ?? {
+        groups: [],
       },
     );
   } else if (sessionsSidebarQueryState.kind === "pending") {
     const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sessionsSidebarQueryKey,
-      queryFn: async () => await new Promise<SandboxInstancesListResult>(() => undefined),
+      queryKey: sessionSidebarQueryKey,
+      queryFn: async () => await new Promise<SessionSidebarGroupsResult>(() => undefined),
     });
 
     sessionsSidebarQuery.setState({
@@ -162,7 +174,7 @@ export function createSessionsPageStoryQueryClient(input?: {
     });
   } else {
     const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sessionsSidebarQueryKey,
+      queryKey: sessionSidebarQueryKey,
       queryFn: async () => {
         throw new Error(
           sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",

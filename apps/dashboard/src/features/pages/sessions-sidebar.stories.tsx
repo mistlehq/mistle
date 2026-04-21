@@ -2,8 +2,12 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
+import type {
+  SandboxInstancesListResult,
+  SessionSidebarGroupsResult,
+} from "../sessions/sessions-types.js";
 import {
+  buildSessionSidebarGroupFixture,
   buildSandboxInstanceListItemFixture,
   buildStoryLaunchableSandboxProfile,
 } from "./sessions-page.story-fixtures.js";
@@ -12,6 +16,7 @@ import { SessionsStoryHarness } from "./sessions-story-harness.js";
 type SessionsSidebarStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
+  sessionSidebarGroups?: SessionSidebarGroupsResult;
   sandboxInstancesList?: SandboxInstancesListResult;
   sessionsSidebarQueryState?:
     | {
@@ -27,166 +32,227 @@ type SessionsSidebarStoryArgs = {
   showSessionsSidebar?: boolean;
 };
 
+type SidebarStoryRecord = {
+  id: string;
+  profileId: string;
+  profileName: string;
+  title: string | null;
+  status: "pending" | "starting" | "running" | "stopped" | "failed";
+  createdAt: string;
+  updatedAt: string;
+  keepaliveActive: boolean;
+};
+
+function buildSessionSidebarGroupsFromRecords(
+  records: readonly SidebarStoryRecord[],
+): SessionSidebarGroupsResult {
+  const groupsByProfileId = new Map<string, SessionSidebarGroupsResult["groups"][number]>();
+
+  for (const record of records) {
+    const existingGroup = groupsByProfileId.get(record.profileId);
+    const group =
+      existingGroup ??
+      buildSessionSidebarGroupFixture({
+        profileId: record.profileId,
+        profileName: record.profileName,
+      });
+
+    group.items.push({
+      id: record.id,
+      title: record.title,
+      status: record.status,
+      updatedAt: record.updatedAt,
+      keepaliveActive: record.keepaliveActive,
+    });
+
+    if (existingGroup === undefined) {
+      groupsByProfileId.set(record.profileId, group);
+    }
+  }
+
+  return {
+    groups: [...groupsByProfileId.values()],
+  };
+}
+
+function buildMixedOpenableSessionRecords(): SidebarStoryRecord[] {
+  return [
+    {
+      id: "sbi_working_alpha",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title:
+        "Investigate flaky test run after gateway lease handoff in the repo-maintainer sandbox",
+      status: "running",
+      createdAt: "2026-04-08T09:00:00.000Z",
+      updatedAt: "2026-04-08T09:00:00.000Z",
+      keepaliveActive: true,
+    },
+    {
+      id: "sbi_recent_five_min",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title: "Review migration draft",
+      status: "running",
+      createdAt: "2026-04-08T08:50:00.000Z",
+      updatedAt: "2026-04-08T08:55:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_recent_forty_five_min",
+      profileId: "sbp_ops",
+      profileName: "Ops Coordinator",
+      title: "Prepare release notes",
+      status: "running",
+      createdAt: "2026-04-08T08:20:00.000Z",
+      updatedAt: "2026-04-08T08:15:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_starting_docs",
+      profileId: "sbp_docs",
+      profileName: "Docs Maintainer",
+      title:
+        "Draft onboarding guide for new operators working across control plane and gateway runtime flows",
+      status: "starting",
+      createdAt: "2026-04-08T08:40:00.000Z",
+      updatedAt: "2026-04-08T06:00:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_stopped_one_day",
+      profileId: "sbp_finance",
+      profileName: "Finance Investigator",
+      title: "Reconcile billing export",
+      status: "stopped",
+      createdAt: "2026-04-07T09:00:00.000Z",
+      updatedAt: "2026-04-07T09:00:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_stopped_finance",
+      profileId: "sbp_finance",
+      profileName: "Finance Investigator",
+      title: null,
+      status: "stopped",
+      createdAt: "2026-04-08T07:30:00.000Z",
+      updatedAt: "2026-04-06T07:30:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_stopped_four_day",
+      profileId: "sbp_ops",
+      profileName: "Ops Coordinator",
+      title: "Audit webhook retry behavior",
+      status: "stopped",
+      createdAt: "2026-04-04T06:30:00.000Z",
+      updatedAt: "2026-04-04T06:30:00.000Z",
+      keepaliveActive: false,
+    },
+  ];
+}
+
 function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
   return {
-    items: [
+    items: buildMixedOpenableSessionRecords().map((record) =>
       buildSandboxInstanceListItemFixture({
-        id: "sbi_working_alpha",
-        title:
-          "Investigate flaky test run after gateway lease handoff in the repo-maintainer sandbox",
-        sandboxProfileId: "sbp_repo_maintainer",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        status: "running",
-        createdAt: "2026-04-08T09:00:00.000Z",
-        updatedAt: "2026-04-08T09:00:00.000Z",
-        keepaliveActive: true,
+        id: record.id,
+        title: record.title,
+        sandboxProfileId: record.profileId,
+        sandboxProfileDisplayName: record.profileName,
+        status: record.status,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        keepaliveActive: record.keepaliveActive,
       }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_recent_five_min",
-        title: "Review migration draft",
-        sandboxProfileId: "sbp_repo_maintainer",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        status: "running",
-        createdAt: "2026-04-08T08:50:00.000Z",
-        updatedAt: "2026-04-08T08:55:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_recent_forty_five_min",
-        title: "Prepare release notes",
-        sandboxProfileId: "sbp_ops",
-        sandboxProfileDisplayName: "Ops Coordinator",
-        status: "running",
-        createdAt: "2026-04-08T08:20:00.000Z",
-        updatedAt: "2026-04-08T08:15:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_starting_docs",
-        title:
-          "Draft onboarding guide for new operators working across control plane and gateway runtime flows",
-        sandboxProfileId: "sbp_docs",
-        sandboxProfileDisplayName: "Docs Maintainer",
-        status: "starting",
-        createdAt: "2026-04-08T08:40:00.000Z",
-        updatedAt: "2026-04-08T06:00:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_stopped_one_day",
-        title: "Reconcile billing export",
-        sandboxProfileId: "sbp_finance",
-        sandboxProfileDisplayName: "Finance Investigator",
-        status: "stopped",
-        createdAt: "2026-04-07T09:00:00.000Z",
-        updatedAt: "2026-04-07T09:00:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_stopped_finance",
-        title: null,
-        sandboxProfileId: "sbp_finance",
-        sandboxProfileDisplayName: "Finance Investigator",
-        status: "stopped",
-        createdAt: "2026-04-08T07:30:00.000Z",
-        updatedAt: "2026-04-06T07:30:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_stopped_four_day",
-        title: "Audit webhook retry behavior",
-        sandboxProfileId: "sbp_ops",
-        sandboxProfileDisplayName: "Ops Coordinator",
-        status: "stopped",
-        createdAt: "2026-04-04T06:30:00.000Z",
-        updatedAt: "2026-04-04T06:30:00.000Z",
-        keepaliveActive: false,
-      }),
-    ],
+    ),
     nextPage: null,
     previousPage: null,
     totalResults: 7,
   };
 }
 
-function buildRecentlyUpdatedOrderingList(): SandboxInstancesListResult {
-  return {
-    items: [
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_finance_newest",
-        title: "Investigate failing payout reconciliation worker",
-        sandboxProfileId: "sbp_finance",
-        sandboxProfileDisplayName: "Finance Investigator",
-        status: "stopped",
-        createdAt: "2026-04-10T08:00:00.000Z",
-        updatedAt: "2026-04-20T11:45:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_repo_newest",
-        title: "Fix flaky gateway lease handoff test",
-        sandboxProfileId: "sbp_repo_maintainer",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        status: "running",
-        createdAt: "2026-04-09T12:00:00.000Z",
-        updatedAt: "2026-04-20T09:30:00.000Z",
-        keepaliveActive: true,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_ops_newest",
-        title: "Validate release checklist after CI drift",
-        sandboxProfileId: "sbp_ops",
-        sandboxProfileDisplayName: "Ops Coordinator",
-        status: "running",
-        createdAt: "2026-04-11T07:30:00.000Z",
-        updatedAt: "2026-04-19T14:00:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_repo_older_update",
-        title: "Trace Codex thread persistence in dashboard",
-        sandboxProfileId: "sbp_repo_maintainer",
-        sandboxProfileDisplayName: "Repo Maintainer",
-        status: "running",
-        createdAt: "2026-04-08T09:30:00.000Z",
-        updatedAt: "2026-04-18T16:00:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_finance_older_update",
-        title: "Audit invoice export retries after webhook timeout",
-        sandboxProfileId: "sbp_finance",
-        sandboxProfileDisplayName: "Finance Investigator",
-        status: "stopped",
-        createdAt: "2026-04-06T08:00:00.000Z",
-        updatedAt: "2026-04-17T10:15:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_docs_newest",
-        title: "Draft setup guide for sandbox session recovery",
-        sandboxProfileId: "sbp_docs",
-        sandboxProfileDisplayName: "Docs Maintainer",
-        status: "starting",
-        createdAt: "2026-04-12T09:45:00.000Z",
-        updatedAt: "2026-04-16T08:00:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
-        id: "sbi_docs_oldest",
-        title: "Tidy release note wording for session sidebar rollout",
-        sandboxProfileId: "sbp_docs",
-        sandboxProfileDisplayName: "Docs Maintainer",
-        status: "stopped",
-        createdAt: "2026-04-08T09:45:00.000Z",
-        updatedAt: "2026-04-13T08:00:00.000Z",
-        keepaliveActive: false,
-      }),
-    ],
-    nextPage: null,
-    previousPage: null,
-    totalResults: 7,
-  };
+function buildMixedOpenableSessionSidebarGroups(): SessionSidebarGroupsResult {
+  return buildSessionSidebarGroupsFromRecords(buildMixedOpenableSessionRecords());
+}
+
+function buildRecentlyUpdatedOrderingRecords(): SidebarStoryRecord[] {
+  return [
+    {
+      id: "sbi_finance_newest",
+      profileId: "sbp_finance",
+      profileName: "Finance Investigator",
+      title: "Investigate failing payout reconciliation worker",
+      status: "stopped",
+      createdAt: "2026-04-10T08:00:00.000Z",
+      updatedAt: "2026-04-20T11:45:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_finance_older_update",
+      profileId: "sbp_finance",
+      profileName: "Finance Investigator",
+      title: "Audit invoice export retries after webhook timeout",
+      status: "stopped",
+      createdAt: "2026-04-06T08:00:00.000Z",
+      updatedAt: "2026-04-17T10:15:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_repo_newest",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title: "Fix flaky gateway lease handoff test",
+      status: "running",
+      createdAt: "2026-04-09T12:00:00.000Z",
+      updatedAt: "2026-04-20T09:30:00.000Z",
+      keepaliveActive: true,
+    },
+    {
+      id: "sbi_repo_older_update",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title: "Trace Codex thread persistence in dashboard",
+      status: "running",
+      createdAt: "2026-04-08T09:30:00.000Z",
+      updatedAt: "2026-04-18T16:00:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_ops_newest",
+      profileId: "sbp_ops",
+      profileName: "Ops Coordinator",
+      title: "Validate release checklist after CI drift",
+      status: "running",
+      createdAt: "2026-04-11T07:30:00.000Z",
+      updatedAt: "2026-04-19T14:00:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_docs_newest",
+      profileId: "sbp_docs",
+      profileName: "Docs Maintainer",
+      title: "Draft setup guide for sandbox session recovery",
+      status: "starting",
+      createdAt: "2026-04-12T09:45:00.000Z",
+      updatedAt: "2026-04-16T08:00:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_docs_oldest",
+      profileId: "sbp_docs",
+      profileName: "Docs Maintainer",
+      title: "Tidy release note wording for session sidebar rollout",
+      status: "stopped",
+      createdAt: "2026-04-08T09:45:00.000Z",
+      updatedAt: "2026-04-13T08:00:00.000Z",
+      keepaliveActive: false,
+    },
+  ];
+}
+
+function buildRecentlyUpdatedOrderingGroups(): SessionSidebarGroupsResult {
+  return buildSessionSidebarGroupsFromRecords(buildRecentlyUpdatedOrderingRecords());
 }
 
 const meta = {
@@ -211,6 +277,7 @@ const meta = {
         latestVersion: 7,
       }),
     ],
+    sessionSidebarGroups: buildMixedOpenableSessionSidebarGroups(),
     sandboxInstancesList: buildMixedOpenableSessionsList(),
   },
   render: function RenderStory(args): React.JSX.Element {
@@ -222,6 +289,9 @@ const meta = {
           : {})}
         {...(args.sandboxInstancesList !== undefined
           ? { sandboxInstancesList: args.sandboxInstancesList }
+          : {})}
+        {...(args.sessionSidebarGroups !== undefined
+          ? { sessionSidebarGroups: args.sessionSidebarGroups }
           : {})}
         {...(args.sessionsSidebarQueryState !== undefined
           ? { sessionsSidebarQueryState: args.sessionsSidebarQueryState }
@@ -242,6 +312,9 @@ export const EmptyState: Story = {
   args: {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
+    sessionSidebarGroups: {
+      groups: [],
+    },
     sandboxInstancesList: {
       items: [],
       nextPage: null,
@@ -255,13 +328,13 @@ export const OrderedByMostRecentlyUpdated: Story = {
   args: {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
-    sandboxInstancesList: buildRecentlyUpdatedOrderingList(),
+    sessionSidebarGroups: buildRecentlyUpdatedOrderingGroups(),
   },
   parameters: {
     docs: {
       description: {
         story:
-          "Shows sidebar grouping kept in the frontend while both groups and items are ordered by descending updatedAt. Expected group order: Finance Investigator, Repo Maintainer, Ops Coordinator, Docs Maintainer.",
+          "Shows the backend-provided sidebar grouping and recency order. Expected group order: Finance Investigator, Repo Maintainer, Ops Coordinator, Docs Maintainer.",
       },
     },
   },
