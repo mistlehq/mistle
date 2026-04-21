@@ -13,6 +13,7 @@ import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.j
 import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import type { SessionStartupState } from "./session-startup-status.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -444,9 +445,16 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxFailureMessage,
     stoppedSessionMessage,
   });
+  const initialEntryStartupState = resolveInitialEntryStartupState({
+    mainPanelTransitionState: input.mainPanelTransitionState,
+    rawSandboxStatus: sandboxStatus?.status ?? null,
+    sandboxStatusReadState,
+    sessionSnapshot,
+  });
 
   return {
     handleTerminalWorkspaceReset,
+    initialEntryStartupState,
     sessionSnapshot,
     sandboxStatusReadState,
     connectionReadiness,
@@ -455,4 +463,36 @@ export function useSessionWorkbenchLifecycleState(input: {
     sandboxStatusQuery,
     stoppedSessionMessage,
   };
+}
+
+function resolveInitialEntryStartupState(input: {
+  mainPanelTransitionState: MainPanelTransitionState;
+  rawSandboxStatus: SandboxInstanceStatusResult["status"] | null;
+  sandboxStatusReadState: "error" | "loading" | "ready";
+  sessionSnapshot: ReturnType<typeof useCodexSessionState>["lifecycle"]["sessionSnapshot"];
+}): SessionStartupState | null {
+  if (input.sandboxStatusReadState === "loading") {
+    return "loading_status";
+  }
+
+  if (input.sandboxStatusReadState === "error") {
+    return null;
+  }
+
+  if (input.rawSandboxStatus === "pending") {
+    return "preparing_sandbox";
+  }
+
+  if (input.rawSandboxStatus === "starting") {
+    return "running_setup";
+  }
+
+  if (
+    input.rawSandboxStatus === "running" &&
+    (input.sessionSnapshot === null || input.mainPanelTransitionState !== "stable_chat")
+  ) {
+    return "connecting_chat";
+  }
+
+  return null;
 }

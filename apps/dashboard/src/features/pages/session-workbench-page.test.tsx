@@ -25,7 +25,7 @@ function HeaderActionsHarness(input: React.PropsWithChildren): React.JSX.Element
 function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
   sandboxInstanceId?: string;
-  seededStatus?: "starting" | "running" | "stopped" | "failed";
+  seededStatus?: "pending" | "starting" | "running" | "stopped" | "failed";
 }): RenderResult & { queryClient: ReturnType<typeof createTestQueryClient> } {
   const sandboxInstanceId = input?.sandboxInstanceId ?? "sbi_test";
   const queryClient = createTestQueryClient({
@@ -61,10 +61,11 @@ function renderSessionWorkbenchPage(input?: {
 }
 
 describe("SessionWorkbenchPage", () => {
-  it("renders the dedicated session shell for a sandbox instance route", () => {
+  it("shows the initial loading startup state before sandbox status is trusted", () => {
     renderSessionWorkbenchPage();
 
-    expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+    expect(screen.getByRole("status", { name: "Loading sandbox status" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 
   it("does not reserve alert space when there are no alerts", () => {
@@ -100,5 +101,65 @@ describe("SessionWorkbenchPage", () => {
     const status = await screen.findByRole("status", { name: "Running" });
     expect(status.className).toContain("bg-emerald-600");
     expect(status.className).toContain("border-emerald-700");
+  });
+
+  it("shows preparing sandbox while the trusted sandbox status is pending", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      seededStatus: "pending",
+    });
+
+    await act(async () => {
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+        failureCode: null,
+        failureMessage: null,
+        id: sandboxInstanceId,
+        status: "pending" as const,
+      });
+    });
+
+    expect(await screen.findByRole("status", { name: "Preparing sandbox" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
+  });
+
+  it("shows running setup while the trusted sandbox status is starting", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      seededStatus: "starting",
+    });
+
+    await act(async () => {
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+        failureCode: null,
+        failureMessage: null,
+        id: sandboxInstanceId,
+        status: "starting" as const,
+      });
+    });
+
+    expect(await screen.findByRole("status", { name: "Running setup" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
+  });
+
+  it("shows connecting chat while the sandbox is running but chat is not connected yet", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      seededStatus: "running",
+    });
+
+    await act(async () => {
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+        failureCode: null,
+        failureMessage: null,
+        id: sandboxInstanceId,
+        status: "running" as const,
+      });
+    });
+
+    expect(await screen.findByRole("status", { name: "Connecting chat" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 });

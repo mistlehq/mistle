@@ -22,6 +22,7 @@ import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
 } from "./session-terminal-workspace.js";
+import { SessionStartupStatus } from "./session-startup-status.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import {
   SessionWorkbenchPageView,
@@ -44,6 +45,7 @@ function SessionWorkbenchPageContent(input: {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -317,6 +319,16 @@ function SessionWorkbenchPageContent(input: {
                 : "Could not start Codex TUI."),
           }
         : null;
+  useEffect(() => {
+    if (
+      workbench.connectionReadiness.canConnect &&
+      workbench.primaryPanelState.transitionState === "stable_chat"
+    ) {
+      setHasEnteredReadyWorkbench(true);
+    }
+  }, [workbench.connectionReadiness.canConnect, workbench.primaryPanelState.transitionState]);
+  const initialEntryStartupState =
+    !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   if (input.sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
@@ -385,7 +397,8 @@ function SessionWorkbenchPageContent(input: {
       isBottomPanelVisible={workbench.terminalPanelState.isVisible}
       isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
       mainContentLayout={
-        workbench.primaryPanelState.transitionState === "stable_cli"
+        workbench.primaryPanelState.transitionState === "stable_cli" ||
+        initialEntryStartupState !== null
           ? { scroll: "contained", width: "full" }
           : { scroll: "page", width: "chat" }
       }
@@ -408,13 +421,14 @@ function SessionWorkbenchPageContent(input: {
             ? "cli:terminal-open"
             : "cli:terminal-closed",
         },
+        initialEntryStartupState,
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       mainContentScrollContainerRef={conversationScrollContainerRef}
       onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
       onSecondaryPanelResize={workbench.diffPanelState.setPanelSize}
       primaryBottomPanel={
-        workbench.primaryPanelState.showsChatComposer ? (
+        workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
           <SessionConversationBottomPanelController
             chatEntries={conversationPane.chatState.entries}
             composerStateInput={conversationPane.composerStateInput}
@@ -478,10 +492,21 @@ type PrimaryPanelCliContent = Pick<
 function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
   conversation: PrimaryPanelConversationContent;
+  initialEntryStartupState: ReturnType<
+    typeof useSessionWorkbenchController
+  >["workbench"]["initialEntryStartupState"];
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
+  if (input.initialEntryStartupState !== null) {
+    return (
+      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center px-4 py-6">
+        <SessionStartupStatus state={input.initialEntryStartupState} />
+      </div>
+    );
+  }
+
   switch (input.transitionState) {
     case "switching_to_cli":
     case "restoring_chat":

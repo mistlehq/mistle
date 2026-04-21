@@ -15,6 +15,7 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import type { SessionStartupState } from "./session-startup-status.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -63,6 +64,7 @@ type SessionWorkbenchState = {
   sandboxLifecycleStatus: ReturnType<
     typeof useSessionWorkbenchLifecycleState
   >["sandboxLifecycleStatus"];
+  initialEntryStartupState: SessionStartupState | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
   lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
@@ -265,6 +267,7 @@ export function useSessionWorkbenchController(input: {
       workbenchStatus: workbenchLifecycleState.workbenchStatus,
       cliPtyState,
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
+      initialEntryStartupState: workbenchLifecycleState.initialEntryStartupState,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
       lifecycleStep: lifecycle.step,
       primaryPanelState: {
