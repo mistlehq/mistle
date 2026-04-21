@@ -56,7 +56,7 @@ WORKDIR /app/packages/sandboxd
 
 COPY packages/sandboxd /app/packages/sandboxd
 
-RUN cargo build --locked --bin sandboxd
+RUN cargo build --locked --release --bin sandboxd
 
 FROM sandbox-base-common AS sandbox-base
 
@@ -80,7 +80,7 @@ RUN apt-get update \
   && rm -f "${archil_package}" \
   && rm -rf /var/lib/apt/lists/*
 
-COPY --from=sandboxd-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
+COPY --from=sandboxd-build /app/packages/sandboxd/target/release/sandboxd /opt/mistle/bin/sandboxd
 
 RUN chmod +x /opt/mistle/bin/sandboxd \
   && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign
