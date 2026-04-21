@@ -276,7 +276,7 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "msg_before",
+        id: "msg_before:segment:0",
         turnId: "turn_123",
         kind: "assistant-message",
         text: "First assistant chunk",
@@ -360,7 +360,7 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "msg_1",
+        id: "msg_1:segment:0",
         turnId: "turn_123",
         kind: "assistant-message",
         text: "Before steer",
@@ -375,7 +375,7 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "msg_1",
+        id: "msg_1:segment:12",
         turnId: "turn_123",
         kind: "assistant-message",
         text: " and after steer",

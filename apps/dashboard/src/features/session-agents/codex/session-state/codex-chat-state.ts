@@ -237,10 +237,12 @@ function buildNormalizedItems(turn: CodexRawTurnState): readonly NormalizedCodex
 
 function buildRenderedAssistantItemSegment(input: {
   item: Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }>;
+  startOffset: number;
   text: string;
 }): Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }> {
   return {
     ...input.item,
+    id: `${input.item.id}:segment:${input.startOffset}`,
     text: input.text,
   };
 }
@@ -754,6 +756,7 @@ function buildEntries(input: {
                   items: [
                     buildRenderedAssistantItemSegment({
                       item: splitItem,
+                      startOffset: alreadyRenderedText.length,
                       text: splitAssistantMessage.text.slice(alreadyRenderedText.length),
                     }),
                   ],
@@ -799,7 +802,13 @@ function buildEntries(input: {
 
         const remainingText = item.text.slice(consumedText.length);
         if (remainingText.length > 0) {
-          items.push(buildRenderedAssistantItemSegment({ item, text: remainingText }));
+          items.push(
+            buildRenderedAssistantItemSegment({
+              item,
+              startOffset: consumedText.length,
+              text: remainingText,
+            }),
+          );
         }
 
         return items;
