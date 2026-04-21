@@ -9,7 +9,7 @@
   --terminal-tab-text-active: var(--foreground);
   --terminal-tab-text-inactive-group: color-mix(in srgb, var(--foreground) 45%, transparent);
   --terminal-tab-separator: var(--color-stone-300);
-  --terminal-tab-icon-hover-bg: color-mix(in srgb, var(--foreground) 8%, transparent);
+  --terminal-tab-icon-hover-bg: var(--color-stone-100);
   --terminal-scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent);
   --terminal-floating-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 8%, transparent);
   --terminal-tab-strip-height: 36px;
@@ -106,8 +106,9 @@
   color: var(--terminal-tab-text);
 }
 
-.session-terminal-dockview .dv-default-tab .dv-default-tab-action:hover {
-  background-color: var(--terminal-tab-icon-hover-bg);
+.session-terminal-dockview .dv-tab .dv-default-tab .dv-default-tab-action:hover {
+  background-color: var(--color-stone-100);
+  border-radius: var(--radius-md);
 }
 
 .session-terminal-dockview .dv-tab.dv-active-tab {
@@ -230,10 +231,12 @@
   margin-left: 0.125rem;
   opacity: 0;
   pointer-events: none;
-  padding: 2px;
+  border-radius: var(--radius-md);
   transition: opacity 120ms ease;
   width: var(--terminal-tab-close-slot-size);
+  height: var(--terminal-tab-close-slot-size);
   min-width: var(--terminal-tab-close-slot-size);
+  min-height: var(--terminal-tab-close-slot-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
