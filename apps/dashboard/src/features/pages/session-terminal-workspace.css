@@ -9,7 +9,7 @@
   --terminal-tab-text-active: var(--foreground);
   --terminal-tab-text-inactive-group: color-mix(in srgb, var(--foreground) 45%, transparent);
   --terminal-tab-separator: var(--color-stone-300);
-  --terminal-tab-icon-hover-bg: var(--color-stone-100);
+  --terminal-tab-icon-hover-bg: color-mix(in srgb, var(--foreground) 8%, transparent);
   --terminal-scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent);
   --terminal-floating-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 8%, transparent);
   --terminal-tab-strip-height: 36px;
