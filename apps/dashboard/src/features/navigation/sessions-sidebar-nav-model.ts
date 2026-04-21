@@ -1,4 +1,3 @@
-import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 
@@ -33,11 +32,7 @@ export type SessionsSidebarSearchFilter = {
 export function resolveSessionsSidebarShowActivityIndicator(input: {
   status: SessionsSidebarSourceItem["status"];
   keepaliveActive: boolean;
-}): boolean | null {
-  if (!isSessionPageNavigableSandboxStatus(input.status)) {
-    return null;
-  }
-
+}): boolean {
   return input.status === "running" && input.keepaliveActive;
 }
 
@@ -54,6 +49,10 @@ function resolveMetadataLabel(
     return "Idle";
   }
 
+  if (input.status === "failed") {
+    return "Failed";
+  }
+
   return formatCompactRelativeOrDate(input.updatedAt, {
     ...(input.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
   });
@@ -67,32 +66,23 @@ export function buildSessionsSidebarNavItems(
 ): SessionsSidebarNavItem[] {
   return groups
     .flatMap((group) =>
-      group.items.flatMap((item) => {
-        const showActivityIndicator = resolveSessionsSidebarShowActivityIndicator({
+      group.items.map((item) => ({
+        id: item.id,
+        label: resolveSessionTitleLabel(item.title),
+        profileName: group.profileName,
+        metadataLabel: resolveMetadataLabel({
           status: item.status,
           keepaliveActive: item.keepaliveActive,
-        });
-        if (showActivityIndicator === null) {
-          return [];
-        }
-
-        return [
-          {
-            id: item.id,
-            label: resolveSessionTitleLabel(item.title),
-            profileName: group.profileName,
-            metadataLabel: resolveMetadataLabel({
-              status: item.status,
-              keepaliveActive: item.keepaliveActive,
-              updatedAt: item.updatedAt,
-              ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
-            }),
-            to: `/sessions/${encodeURIComponent(item.id)}`,
-            showActivityIndicator,
-            updatedAt: item.updatedAt,
-          },
-        ];
-      }),
+          updatedAt: item.updatedAt,
+          ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+        }),
+        to: `/sessions/${encodeURIComponent(item.id)}`,
+        showActivityIndicator: resolveSessionsSidebarShowActivityIndicator({
+          status: item.status,
+          keepaliveActive: item.keepaliveActive,
+        }),
+        updatedAt: item.updatedAt,
+      })),
     )
     .sort((left, right) => {
       const updatedAtDifference = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);

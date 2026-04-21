@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { SessionSidebarGroup } from "../sessions/sessions-types.js";
 import {
   buildSessionsShellSidebarItems,
+  resolveSessionsShellSidebarRequestedLimitAfterError,
   resolveSessionsShellSidebarHasMore,
+  shouldResolveSessionsShellSidebarLimit,
 } from "./sessions-shell-sidebar.js";
 
 function buildSessionSidebarGroup(
@@ -87,6 +89,15 @@ describe("buildSessionsShellSidebarItems", () => {
         showActivityIndicator: true,
         updatedAt: "2026-04-08T00:00:00.000Z",
       },
+      {
+        id: "sbi_failed",
+        label: "Untitled",
+        profileName: "Broken",
+        metadataLabel: "Failed",
+        to: "/sessions/sbi_failed",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-08T00:00:00.000Z",
+      },
     ]);
   });
 });
@@ -108,5 +119,65 @@ describe("resolveSessionsShellSidebarHasMore", () => {
         resolvedLimit: 60,
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldResolveSessionsShellSidebarLimit", () => {
+  it("promotes the resolved limit only after a non-placeholder success", () => {
+    expect(
+      shouldResolveSessionsShellSidebarLimit({
+        isSuccess: true,
+        isPlaceholderData: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not promote the resolved limit while placeholder data is shown", () => {
+    expect(
+      shouldResolveSessionsShellSidebarLimit({
+        isSuccess: true,
+        isPlaceholderData: true,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("resolveSessionsShellSidebarRequestedLimitAfterError", () => {
+  it("rolls the requested limit back to the last successful limit after a load-more error", () => {
+    expect(
+      resolveSessionsShellSidebarRequestedLimitAfterError({
+        requestedLimit: 60,
+        resolvedLimit: 30,
+        isError: true,
+        isFetching: false,
+      }),
+    ).toBe(30);
+  });
+
+  it("keeps the current request when no load-more error occurred", () => {
+    expect(
+      resolveSessionsShellSidebarRequestedLimitAfterError({
+        requestedLimit: 60,
+        resolvedLimit: 30,
+        isError: false,
+        isFetching: false,
+      }),
+    ).toBeNull();
+    expect(
+      resolveSessionsShellSidebarRequestedLimitAfterError({
+        requestedLimit: 60,
+        resolvedLimit: 30,
+        isError: true,
+        isFetching: true,
+      }),
+    ).toBeNull();
+    expect(
+      resolveSessionsShellSidebarRequestedLimitAfterError({
+        requestedLimit: 30,
+        resolvedLimit: 30,
+        isError: true,
+        isFetching: false,
+      }),
+    ).toBeNull();
   });
 });

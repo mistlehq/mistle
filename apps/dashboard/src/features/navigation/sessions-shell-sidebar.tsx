@@ -49,6 +49,26 @@ export function resolveSessionsShellSidebarHasMore(input: {
   return input.itemCount >= input.resolvedLimit;
 }
 
+export function shouldResolveSessionsShellSidebarLimit(input: {
+  isPlaceholderData: boolean;
+  isSuccess: boolean;
+}): boolean {
+  return input.isSuccess && !input.isPlaceholderData;
+}
+
+export function resolveSessionsShellSidebarRequestedLimitAfterError(input: {
+  requestedLimit: number;
+  resolvedLimit: number;
+  isError: boolean;
+  isFetching: boolean;
+}): number | null {
+  if (!input.isError || input.isFetching || input.requestedLimit <= input.resolvedLimit) {
+    return null;
+  }
+
+  return input.resolvedLimit;
+}
+
 export function SessionsShellSidebar(): React.JSX.Element {
   const [requestedLimit, setRequestedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
   const [resolvedLimit, setResolvedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
@@ -88,12 +108,37 @@ export function SessionsShellSidebar(): React.JSX.Element {
   }, [hasMore, sandboxInstancesQuery.isFetching]);
 
   useEffect(() => {
-    if (sandboxInstancesQuery.data === undefined || sandboxInstancesQuery.isFetching) {
+    if (
+      !shouldResolveSessionsShellSidebarLimit({
+        isSuccess: sandboxInstancesQuery.isSuccess,
+        isPlaceholderData: sandboxInstancesQuery.isPlaceholderData,
+      })
+    ) {
       return;
     }
 
     setResolvedLimit(requestedLimit);
-  }, [requestedLimit, sandboxInstancesQuery.data, sandboxInstancesQuery.isFetching]);
+  }, [requestedLimit, sandboxInstancesQuery.isPlaceholderData, sandboxInstancesQuery.isSuccess]);
+
+  useEffect(() => {
+    const nextRequestedLimit = resolveSessionsShellSidebarRequestedLimitAfterError({
+      requestedLimit,
+      resolvedLimit,
+      isError: sandboxInstancesQuery.isError,
+      isFetching: sandboxInstancesQuery.isFetching,
+    });
+
+    if (nextRequestedLimit === null) {
+      return;
+    }
+
+    setRequestedLimit(nextRequestedLimit);
+  }, [
+    requestedLimit,
+    resolvedLimit,
+    sandboxInstancesQuery.isError,
+    sandboxInstancesQuery.isFetching,
+  ]);
 
   useEffect(() => {
     if (infiniteScrollStatusBanner?.kind !== "loading" || sandboxInstancesQuery.isFetching) {

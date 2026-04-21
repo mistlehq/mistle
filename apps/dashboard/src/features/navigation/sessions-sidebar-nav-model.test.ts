@@ -70,13 +70,13 @@ describe("resolveSessionsSidebarShowActivityIndicator", () => {
     ).toBe(false);
   });
 
-  it("excludes failed sessions from the sidebar", () => {
+  it("hides activity for failed sessions", () => {
     expect(
       resolveSessionsSidebarShowActivityIndicator({
         status: "failed",
         keepaliveActive: false,
       }),
-    ).toBeNull();
+    ).toBe(false);
   });
 });
 
@@ -141,6 +141,15 @@ describe("buildSessionsSidebarNavItems", () => {
         to: "/sessions/sbi_working",
         showActivityIndicator: true,
         updatedAt: "2026-04-09T00:00:00.000Z",
+      },
+      {
+        id: "sbi_failed",
+        label: "Untitled",
+        profileName: "Alpha Profile",
+        metadataLabel: "Failed",
+        to: "/sessions/sbi_failed",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
       {
         id: "sbi_stopped",

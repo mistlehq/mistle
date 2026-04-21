@@ -40,22 +40,12 @@ export function enrichListedItems(input: {
   }));
 }
 
-export function isSessionSidebarNavigableStatus(
-  status: NonNullable<GetSandboxInstanceResponse>["status"],
-): boolean {
-  return status !== "failed";
-}
-
 export function buildSessionSidebarGroups(
   items: readonly EnrichedListedItem[],
 ): SessionSidebarGroup[] {
   const groupsByProfileId = new Map<SessionSidebarGroup["profileId"], SessionSidebarGroup>();
 
   for (const item of items) {
-    if (!isSessionSidebarNavigableStatus(item.status)) {
-      continue;
-    }
-
     const existingGroup = groupsByProfileId.get(item.sandboxProfileId);
     const group =
       existingGroup ??
