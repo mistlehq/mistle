@@ -16,6 +16,10 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
+import {
+  SandboxInstancesListQueryPrefix,
+  SessionSidebarGroupsQueryPrefix,
+} from "../sessions/sessions-query-keys.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame } from "../shared/page-frame.js";
@@ -95,9 +99,14 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
     },
     onSuccess: async (result) => {
       setStartErrorMessage(null);
-      await queryClient.invalidateQueries({
-        queryKey: ["sandbox-instances", "list"],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: SandboxInstancesListQueryPrefix,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: SessionSidebarGroupsQueryPrefix,
+        }),
+      ]);
       await navigate(`/sessions/${encodeURIComponent(result.sandboxInstanceId)}`);
     },
     onError: (error) => {

@@ -6,7 +6,11 @@ import {
   applyPatchedSessionTitleToCache,
   resolveCachedSessionStatus,
 } from "./session-header-title-model.js";
-import { sandboxInstanceStatusQueryKey } from "./sessions-query-keys.js";
+import {
+  sandboxInstanceStatusQueryKey,
+  SandboxInstancesListQueryPrefix,
+  SessionSidebarGroupsQueryPrefix,
+} from "./sessions-query-keys.js";
 import { patchSandboxInstanceTitle } from "./sessions-service.js";
 
 export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.JSX.Element | null {
@@ -35,7 +39,10 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
           exact: true,
         }),
         queryClient.invalidateQueries({
-          queryKey: ["sandbox-instances", "list"],
+          queryKey: SandboxInstancesListQueryPrefix,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: SessionSidebarGroupsQueryPrefix,
         }),
       ]);
     },

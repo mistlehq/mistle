@@ -1,11 +1,13 @@
+export const SandboxInstancesListQueryPrefix = ["sandbox-instances", "list"] as const;
+export const SessionSidebarGroupsQueryPrefix = ["session-sidebar-groups"] as const;
+
 export function sandboxInstancesListQueryKey(input: {
   limit: number;
   after: string | null;
   before: string | null;
 }) {
   return [
-    "sandbox-instances",
-    "list",
+    ...SandboxInstancesListQueryPrefix,
     {
       limit: input.limit,
       after: input.after,
@@ -16,7 +18,7 @@ export function sandboxInstancesListQueryKey(input: {
 
 export function sessionSidebarGroupsQueryKey(input: { limit: number }) {
   return [
-    "session-sidebar-groups",
+    ...SessionSidebarGroupsQueryPrefix,
     {
       limit: input.limit,
     },
