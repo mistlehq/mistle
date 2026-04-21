@@ -286,6 +286,7 @@ describe("sandbox instance deadlines integration", () => {
       port: await reserveAvailablePort({ host: GatewayPortHost }),
       databaseUrl: databaseStack.directUrl,
       dataPlaneApiBaseUrl: "http://127.0.0.1:1",
+      controlPlaneApiBaseUrl: "http://127.0.0.1:1",
       internalAuthServiceToken: InternalAuthServiceToken,
     });
   }, IntegrationTestTimeoutMs);

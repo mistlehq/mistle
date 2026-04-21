@@ -30,6 +30,7 @@ function createGatewayEnvironment(input: {
   port: number;
   databaseUrl: string;
   dataPlaneApiBaseUrl: string;
+  controlPlaneApiBaseUrl: string;
   internalAuthServiceToken: string;
 }): NodeJS.ProcessEnv {
   const host = "127.0.0.1";
@@ -63,6 +64,7 @@ function createGatewayEnvironment(input: {
     MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: input.databaseUrl,
     MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "memory",
     MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: input.dataPlaneApiBaseUrl,
+    MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL: input.controlPlaneApiBaseUrl,
     MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: "300000",
     MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: "60000",
     NO_COLOR: "1",
@@ -76,6 +78,7 @@ function startGatewayChildProcess(input: {
   port: number;
   databaseUrl: string;
   dataPlaneApiBaseUrl: string;
+  controlPlaneApiBaseUrl: string;
   internalAuthServiceToken: string;
 }): GatewayChildProcess {
   return spawn("pnpm", ["exec", "tsx", "apps/data-plane-gateway/src/index.ts"], {
@@ -147,6 +150,7 @@ export async function startGatewayProcess(input: {
   port: number;
   databaseUrl: string;
   dataPlaneApiBaseUrl: string;
+  controlPlaneApiBaseUrl: string;
   internalAuthServiceToken: string;
 }): Promise<StartedGatewayProcess> {
   const baseUrl = `http://127.0.0.1:${String(input.port)}`;

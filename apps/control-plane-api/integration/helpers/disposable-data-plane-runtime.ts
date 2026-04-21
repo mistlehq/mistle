@@ -251,6 +251,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       port: gatewayPort,
       databaseUrl,
       dataPlaneApiBaseUrl: `http://${host}:${String(port)}`,
+      controlPlaneApiBaseUrl: input.controlPlaneBaseUrl,
       internalAuthServiceToken: input.internalAuthServiceToken,
     });
 

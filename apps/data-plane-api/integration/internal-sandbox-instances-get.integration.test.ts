@@ -124,6 +124,7 @@ async function startGatewayForFixture(input: { fixture: DataPlaneApiIntegrationF
     port: gatewayPort,
     databaseUrl: input.fixture.config.database.url,
     dataPlaneApiBaseUrl: input.fixture.baseUrl,
+    controlPlaneApiBaseUrl: input.fixture.config.controlPlaneApi.baseUrl,
     internalAuthServiceToken: input.fixture.internalAuthServiceToken,
   });
 }
