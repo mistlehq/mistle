@@ -27,6 +27,8 @@ use sandboxd::control;
 #[cfg(target_os = "linux")]
 use sandboxd::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
 #[cfg(target_os = "linux")]
+use sandboxd::test_support::TestAttachmentRootGuard;
+#[cfg(target_os = "linux")]
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 #[cfg(target_os = "linux")]
 use tungstenite::{Message, accept};
@@ -47,9 +49,11 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
     let test_dir = create_temp_test_dir("git_signing_real_alias");
     let home_dir = test_dir.join("home");
     let repo_dir = test_dir.join("repo");
+    let attachment_root = test_dir.join("attachments");
     let signer_path = test_dir.join("mistle-ssh-sign");
     let control_socket_path = test_dir.join("control.sock");
     let global_git_config_path = home_dir.join(".gitconfig");
+    let _attachment_root_guard = TestAttachmentRootGuard::set(attachment_root.clone());
     let _env_guard = MultiEnvGuard::set([
         (
             TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
@@ -73,6 +77,7 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
 
     fs::create_dir_all(&home_dir).expect("home dir should be creatable");
     fs::create_dir_all(&repo_dir).expect("repo dir should be creatable");
+    fs::create_dir_all(&attachment_root).expect("attachment root should be creatable");
     symlink(env!("CARGO_BIN_EXE_sandboxd"), &signer_path)
         .expect("signer alias symlink should be creatable");
 
