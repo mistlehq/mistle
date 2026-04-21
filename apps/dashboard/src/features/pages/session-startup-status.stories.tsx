@@ -17,7 +17,7 @@ const StartupStates: readonly SessionStartupState[] = [
 ] as const;
 const StartupStateStepMs = 1_800;
 
-function SessionBootstrapTranscriptPanelStory(): React.JSX.Element {
+function SessionStartupStatusStory(): React.JSX.Element {
   const [startupStateIndex, setStartupStateIndex] = useState(0);
   const startupState = StartupStates[startupStateIndex] ?? StartupStates[0];
 
@@ -56,14 +56,14 @@ function SessionBootstrapTranscriptPanelStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Sessions/SessionWorkbench/BootstrapTranscriptPanel",
-  component: SessionBootstrapTranscriptPanelStory,
+  title: "Dashboard/Sessions/SessionWorkbench/StartupStatus",
+  component: SessionStartupStatusStory,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
   },
   decorators: [withDashboardWorkspaceStory],
-} satisfies Meta<typeof SessionBootstrapTranscriptPanelStory>;
+} satisfies Meta<typeof SessionStartupStatusStory>;
 
 export default meta;
 
