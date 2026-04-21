@@ -3,7 +3,6 @@ import {
   DetailLabel,
   Field,
   FieldContent,
-  FieldDescription,
   FieldError,
   FieldHeader,
   FieldLabel,
@@ -15,8 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   cn,
 } from "@mistle/ui";
+import { InfoIcon } from "@phosphor-icons/react";
 import { withTheme } from "@rjsf/core";
 import type {
   DescriptionFieldProps,
@@ -39,7 +42,7 @@ import {
 import * as React from "react";
 
 import { isRecord } from "../shared/is-record.js";
-import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
+import { IntegrationResourcePickerWidget } from "./integration-resource-picker-widget.js";
 import { MultiSelectStringArrayComboboxField } from "./multi-select-string-array-combobox-field.js";
 import { SingleSelectStringComboboxField } from "./single-select-string-combobox-field.js";
 
@@ -722,7 +725,7 @@ function SchemaFormDescriptionFieldTemplate(
     return null;
   }
 
-  return <FieldDescription id={props.id}>{props.description}</FieldDescription>;
+  return null;
 }
 
 function SchemaFormFieldHelpTemplate(
@@ -732,7 +735,7 @@ function SchemaFormFieldHelpTemplate(
     return null;
   }
 
-  return <FieldDescription>{props.help}</FieldDescription>;
+  return <p className="text-muted-foreground text-sm">{props.help}</p>;
 }
 
 function SchemaFormFieldErrorTemplate(
@@ -820,6 +823,39 @@ function hasRenderableSchemaContent(input: { schema: unknown; uiSchema: unknown 
   );
 }
 
+function isFlattenableObjectWrapper(input: {
+  schema: unknown;
+  uiSchema: unknown;
+  isRootObject: boolean;
+}): boolean {
+  if (input.isRootObject || !isObjectSchema(input.schema)) {
+    return false;
+  }
+
+  const schemaRecord = isRecord(input.schema) ? input.schema : {};
+  const title =
+    typeof schemaRecord.title === "string" && schemaRecord.title.length > 0
+      ? schemaRecord.title
+      : "";
+  const description =
+    typeof schemaRecord.description === "string" && schemaRecord.description.length > 0
+      ? schemaRecord.description
+      : undefined;
+  const propertySchemas = resolveSchemaProperties(input.schema);
+  const propertyNames = Object.keys(propertySchemas);
+
+  if (title.length > 0 || description !== undefined || propertyNames.length === 0) {
+    return false;
+  }
+
+  return propertyNames.some((propertyName) =>
+    hasRenderableSchemaContent({
+      schema: propertySchemas[propertyName],
+      uiSchema: resolveObjectPropertyUiSchema(input.uiSchema, propertyName),
+    }),
+  );
+}
+
 function shouldSpanFullWidth(input: {
   layout: SchemaFormFieldLayout;
   formContext: SchemaFormContext | undefined;
@@ -831,29 +867,35 @@ function shouldSpanFullWidth(input: {
   }
 
   const widget = resolveUiWidget(input.uiSchema);
-  if (widget === "textarea" || widget === "integration-resource-string-array") {
+  if (
+    widget === "textarea" ||
+    widget === "TextareaWidget" ||
+    widget === "integration-resource-picker"
+  ) {
     return true;
   }
 
   return isRecord(input.schema) && input.schema.type === "array";
 }
 
-function shouldPropertyWrapperSpanFullWidth(input: {
-  layout: SchemaFormFieldLayout;
-  formContext: SchemaFormContext | undefined;
-  propertyName: string;
-  schema: unknown;
-  uiSchema: unknown;
-}): boolean {
-  if (
-    input.propertyName.toLowerCase().includes("instructions") &&
-    resolveFormColumns(input.formContext) === 2 &&
-    input.layout === "vertical"
-  ) {
-    return true;
-  }
-
-  return shouldSpanFullWidth(input);
+function SchemaFormDescriptionTooltip(input: { description: string }): React.JSX.Element {
+  return (
+    <Tooltip delay={0}>
+      <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+        <button
+          aria-label="Field description"
+          className="text-muted-foreground hover:text-foreground inline-flex cursor-help items-center justify-center rounded-sm"
+          tabIndex={0}
+          type="button"
+        >
+          <InfoIcon aria-hidden className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64 text-left" side="top">
+        {input.description}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function SchemaFormFieldTemplate(
@@ -894,12 +936,16 @@ function SchemaFormFieldTemplate(
     >
       {props.displayLabel && props.label.length > 0 ? (
         <FieldHeader>
-          {useDetailLabel ? (
-            <DetailLabel as="p">{props.label}</DetailLabel>
-          ) : (
-            <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
-          )}
-          {props.description}
+          <div className="flex items-center gap-1.5">
+            {useDetailLabel ? (
+              <DetailLabel as="p">{props.label}</DetailLabel>
+            ) : (
+              <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
+            )}
+            {typeof props.rawDescription === "string" && props.rawDescription.length > 0 ? (
+              <SchemaFormDescriptionTooltip description={props.rawDescription} />
+            ) : null}
+          </div>
         </FieldHeader>
       ) : null}
       <FieldContent>
@@ -940,6 +986,14 @@ function SchemaFormObjectFieldTemplate(
         uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
       }),
   );
+  const isRootObject = props.fieldPathId.path.length === 0;
+  const shouldFlattenWrapper =
+    props.optionalDataControl === undefined &&
+    isFlattenableObjectWrapper({
+      isRootObject,
+      schema: props.schema,
+      uiSchema: props.uiSchema,
+    });
 
   if (
     visibleRenderableProperties.length === 0 &&
@@ -948,6 +1002,16 @@ function SchemaFormObjectFieldTemplate(
     title.length === 0
   ) {
     return <>{hiddenProperties.map((property) => property.content)}</>;
+  }
+
+  if (shouldFlattenWrapper) {
+    return (
+      <>
+        {visibleRenderableProperties.map((property) => property.content)}
+        {hiddenOnlyVisibleProperties.map((property) => property.content)}
+        {hiddenProperties.map((property) => property.content)}
+      </>
+    );
   }
 
   return (
@@ -965,23 +1029,38 @@ function SchemaFormObjectFieldTemplate(
       >
         {title.length > 0 || description !== undefined ? (
           <FieldHeader className={columns === 2 ? "md:col-span-2" : undefined}>
-            {title.length > 0 ? <FieldTitle>{title}</FieldTitle> : null}
-            {description !== undefined ? <FieldDescription>{description}</FieldDescription> : null}
+            <div className="flex items-center gap-1.5">
+              {title.length > 0 ? <FieldTitle>{title}</FieldTitle> : null}
+              {description !== undefined ? (
+                <SchemaFormDescriptionTooltip description={description} />
+              ) : null}
+            </div>
           </FieldHeader>
         ) : null}
         {visibleRenderableProperties.map((property) => (
           <div
-            className={
-              shouldPropertyWrapperSpanFullWidth({
+            className={(() => {
+              const propertySchema = schemaProperties[property.name];
+              const propertyUiSchema = resolveObjectPropertyUiSchema(props.uiSchema, property.name);
+              if (
+                isFlattenableObjectWrapper({
+                  isRootObject: false,
+                  schema: propertySchema,
+                  uiSchema: propertyUiSchema,
+                })
+              ) {
+                return "contents";
+              }
+
+              return shouldSpanFullWidth({
                 layout,
                 formContext: props.registry.formContext,
-                propertyName: property.name,
-                schema: schemaProperties[property.name],
-                uiSchema: resolveObjectPropertyUiSchema(props.uiSchema, property.name),
+                schema: propertySchema,
+                uiSchema: propertyUiSchema,
               })
                 ? "md:col-span-2"
-                : undefined
-            }
+                : undefined;
+            })()}
             key={property.name}
           >
             {property.content}
@@ -1013,7 +1092,7 @@ export const SchemaFormWidgets = {
   TextareaWidget,
   checkboxes: CheckboxesWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
-  "integration-resource-string-array": IntegrationResourceStringArrayWidget,
+  "integration-resource-picker": IntegrationResourcePickerWidget,
   "multi-select-string-array-combobox": MultiSelectStringArrayComboboxWidget,
   "single-select-string-combobox": SingleSelectStringComboboxWidget,
 };

@@ -52,6 +52,93 @@ function SingleSelectHarness(input: { formData: JsonObject }): React.JSX.Element
   );
 }
 
+const NestedSchema: RJSFSchema = {
+  type: "object",
+  properties: {
+    model: {
+      type: "object",
+      properties: {
+        defaultModel: {
+          title: "Default model",
+          type: "string",
+          oneOf: [
+            {
+              const: "gpt-5.3-codex",
+              title: "gpt-5.3-codex",
+            },
+            {
+              const: "gpt-5.4",
+              title: "gpt-5.4",
+            },
+          ],
+        },
+        options: {
+          type: "object",
+          properties: {
+            reasoningEffort: {
+              title: "Reasoning effort",
+              type: "string",
+              oneOf: [
+                {
+                  const: "medium",
+                  title: "medium",
+                },
+                {
+                  const: "high",
+                  title: "high",
+                },
+              ],
+            },
+            additionalInstructions: {
+              title: "Agent Instructions",
+              type: "string",
+              description: "Appended to the developer message.",
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const NestedUiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
+  model: {
+    defaultModel: {
+      "ui:widget": "single-select-string-combobox",
+    },
+    options: {
+      reasoningEffort: {
+        "ui:widget": "single-select-string-combobox",
+      },
+      additionalInstructions: {
+        "ui:widget": "TextareaWidget",
+        "ui:options": {
+          rows: 8,
+        },
+      },
+    },
+  },
+};
+
+function NestedObjectLayoutHarness(input: { formData: JsonObject }): React.JSX.Element {
+  return (
+    <SchemaFormWithoutSubmit
+      formContext={{
+        columns: 2,
+        labelTone: "detail",
+        layout: "vertical",
+      }}
+      formData={input.formData}
+      noHtml5Validate
+      onChange={() => {}}
+      schema={NestedSchema}
+      showErrorList={false}
+      uiSchema={NestedUiSchema}
+      validator={validator}
+    />
+  );
+}
+
 describe("SchemaFormWithoutSubmit", () => {
   it("wires the single-select combobox widget through the form theme", async () => {
     render(
@@ -77,5 +164,25 @@ describe("SchemaFormWithoutSubmit", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Default region")).toHaveProperty("value", "us-east-1");
     });
+  });
+
+  it("flattens nested wrapper objects into the parent two-column layout", () => {
+    render(
+      <NestedObjectLayoutHarness
+        formData={{
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+              additionalInstructions: "Stay concise and ask before destructive changes.",
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("Default model")).toBeDefined();
+    expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
+    expect(screen.getByLabelText("Agent Instructions").closest(".md\\:col-span-2")).not.toBeNull();
   });
 });
