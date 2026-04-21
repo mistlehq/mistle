@@ -151,7 +151,9 @@ function ComboboxLayout(input: {
               className="min-w-28"
               id={input.props.id}
               onFocus={input.props.onFocus}
-              placeholder={input.props.selectedHandles.length === 0 ? "Select repositories" : ""}
+              placeholder={
+                input.props.selectedHandles.length === 0 ? input.props.searchPlaceholder : ""
+              }
             />
           </ComboboxChips>
         </div>

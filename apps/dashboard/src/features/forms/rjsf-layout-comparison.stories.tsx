@@ -21,8 +21,10 @@ import { useState } from "react";
 import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import type { IntegrationFormContext } from "./integration-form-context.js";
-import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
+import {
+  IntegrationFormWithoutSubmit,
+  type IntegrationFormContext,
+} from "./integration-form-theme.js";
 import {
   createGithubRepositoryResources,
   RepositoryItems,

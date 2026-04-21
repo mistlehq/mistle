@@ -39,13 +39,48 @@ import {
 import * as React from "react";
 
 import { isRecord } from "../shared/is-record.js";
-import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 import { MultiSelectStringArrayComboboxField } from "./multi-select-string-array-combobox-field.js";
 import { SingleSelectStringComboboxField } from "./single-select-string-combobox-field.js";
 
 type JsonObject = Record<string, unknown>;
 type IntegrationFieldLayout = "horizontal" | "vertical";
+
+/**
+ * Global layout mode for schema-driven integration forms.
+ *
+ * Contract:
+ * - `vertical` is the default and stacks labels above controls.
+ * - `horizontal` renders rows using the shared `Field` horizontal layout.
+ * - individual fields may opt out of the horizontal row treatment by setting
+ *   `ui:options.layout` to `"stacked"` in their uiSchema.
+ */
+export type IntegrationFormLayout = "vertical" | "horizontal";
+export type IntegrationFormLabelTone = "default" | "detail";
+
+export type IntegrationFormContext = {
+  /**
+   * Form-wide default layout for RJSF surfaces using the shared integration
+   * theme. This is intentionally a small API that mirrors the patterns we use
+   * in hand-built dashboard forms:
+   * - set the form to `horizontal` when the editor is primarily row-based
+   * - leave it `vertical` for dialog-style or stacked forms
+   * - use field-level `ui:options.layout = "stacked"` for large fields that
+   *   should remain vertical inside an otherwise horizontal form
+   */
+  layout?: IntegrationFormLayout;
+  /**
+   * Optional label presentation for compact read/write surfaces that should
+   * visually match summary metadata labels.
+   */
+  labelTone?: IntegrationFormLabelTone;
+  /**
+   * Optional column count for vertical object layouts. Use this to render
+   * compact side-by-side field groups while keeping each field internally
+   * vertical.
+   */
+  columns?: 1 | 2;
+};
 
 function resolveSelectWidgetOptions(input: {
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"];

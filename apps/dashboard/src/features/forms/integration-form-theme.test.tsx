@@ -5,7 +5,7 @@ import validator from "@rjsf/validator-ajv8";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { IntegrationFormContext } from "./integration-form-context.js";
+import type { IntegrationFormContext } from "./integration-form-theme.js";
 import { IntegrationFormWithoutSubmit } from "./integration-form-theme.js";
 
 type JsonObject = Record<string, unknown>;

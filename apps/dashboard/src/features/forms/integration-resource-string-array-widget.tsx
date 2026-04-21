@@ -11,7 +11,7 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
-import type { IntegrationFormContext } from "./integration-form-context.js";
+import type { IntegrationFormContext } from "./integration-form-theme.js";
 import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
 import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
 

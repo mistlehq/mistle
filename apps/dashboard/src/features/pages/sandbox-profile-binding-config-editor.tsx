@@ -6,8 +6,10 @@ import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
-import type { IntegrationFormContext } from "../forms/integration-form-context.js";
-import { IntegrationFormWithoutSubmit } from "../forms/integration-form-theme.js";
+import {
+  IntegrationFormWithoutSubmit,
+  type IntegrationFormContext,
+} from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isRecord } from "../shared/is-record.js";
