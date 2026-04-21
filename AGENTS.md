@@ -46,7 +46,7 @@
 - Import and call the app's code directly (e.g., `import { createApp } from "@mistle/control-plane-api/app.js"`)
 - Located in `apps/*/integration/` folders
 - Use real infrastructure (Postgres, etc.) but test the app as a unit
-- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, Postgres + Restate for tests that need both).
+- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, or Postgres plus any other required service for tests that need both).
 - When an integration test starts a local TCP service/runtime, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness/network`) so suites can run in parallel without `EADDRINUSE`.
 - Example: Testing auth routes by importing `createApp()` and making requests to it, verifying database state
 
@@ -57,7 +57,7 @@
 - Located in `tests/system/` folder
 - Require services to be running and accessible via URLs (e.g., `CONTROL_PLANE_BASE_URL`, `DATA_PLANE_BASE_URL`)
 - **Infrastructure:** Services are typically started via Testcontainers by composing `@mistle/test-harness` primitives (for example app launchers in `src/apps/*` plus backing services). Tests receive service URLs via environment variables.
-- Example: Testing that control-plane, data-plane, and restate services all respond to health checks
+- Example: Testing that control-plane and data-plane services both respond to health checks
 
 **E2E tests** (`*.e2e.test.ts`):
 
