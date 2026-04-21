@@ -5,7 +5,7 @@ import type React from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import {
   StoryAwsConnection,
   createIntegrationsEditorSectionStoryQueryClient,
@@ -109,7 +109,7 @@ function SandboxProfileIntegrationsPageViewStory(): React.JSX.Element {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <FormPageFrame title="">
+      <PageFrame maxWidthClassName="max-w-5xl" title="">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <AutoSaveTitleHeading
@@ -164,7 +164,7 @@ function SandboxProfileIntegrationsPageViewStory(): React.JSX.Element {
             }}
           />
         </div>
-      </FormPageFrame>
+      </PageFrame>
     </QueryClientProvider>
   );
 }

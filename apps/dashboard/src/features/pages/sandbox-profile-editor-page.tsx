@@ -22,7 +22,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { IntegrationsEditorSection } from "./integrations-editor-section.js";
 import type {
   IntegrationConnectionSummary,
@@ -138,7 +138,11 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
   });
 
   if (profileQuery.isPending) {
-    return <FormPageFrame title="">{null}</FormPageFrame>;
+    return (
+      <PageFrame maxWidthClassName="max-w-5xl" title="">
+        {null}
+      </PageFrame>
+    );
   }
 
   if (profileQuery.isError || profileQuery.data === undefined) {
@@ -146,7 +150,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
-      <FormPageFrame title="">
+      <PageFrame maxWidthClassName="max-w-5xl" title="">
         <div className="gap-4 flex flex-col">
           <h1 className="text-xl font-semibold">Edit profile</h1>
           <Card>
@@ -176,12 +180,12 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
             </CardContent>
           </Card>
         </div>
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   return (
-    <FormPageFrame title="">
+    <PageFrame maxWidthClassName="max-w-5xl" title="">
       <LoadedSandboxProfileEditorPage
         navigate={navigate}
         profileId={profileId}
@@ -205,7 +209,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
           });
         }}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

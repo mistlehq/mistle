@@ -1,10 +1,11 @@
 import {
   Button,
   Notice,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -372,79 +373,120 @@ export function IntegrationsEditorSection(
   );
 
   return (
-    <div className="gap-2 flex flex-col">
-      <Tabs
-        className="w-full gap-6"
-        onValueChange={(value) => setActiveTab(value as SandboxIntegrationBindingKind)}
-        value={activeTab}
-      >
-        <TabsList className="justify-start p-0" variant="line">
+    <div className="flex flex-col gap-4">
+      <div className="md:hidden">
+        <Select
+          onValueChange={(value) => setActiveTab(value as SandboxIntegrationBindingKind)}
+          value={activeTab}
+        >
+          <SelectTrigger aria-label="Select integration section" className="w-full">
+            <SelectValue placeholder="Select section">
+              {BindingSectionTabs.find((tab) => tab.kind === activeTab)?.label}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            {BindingSectionTabs.map((tab) => (
+              <SelectItem key={tab.kind} value={tab.kind}>
+                {tab.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]">
+        <div aria-label="Integration sections" className="hidden flex-col md:flex" role="tablist">
           {BindingSectionTabs.map((tab) => (
-            <TabsTrigger key={tab.kind} value={tab.kind}>
+            <button
+              aria-controls={`sandbox-profile-integrations-panel-${tab.kind}`}
+              aria-selected={tab.kind === activeTab}
+              className={`flex w-full items-start border-l-2 py-3 pl-4 pr-3 text-left text-sm font-medium leading-tight transition-colors ${
+                tab.kind === activeTab
+                  ? "border-foreground text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+              id={`sandbox-profile-integrations-tab-${tab.kind}`}
+              key={tab.kind}
+              onClick={() => setActiveTab(tab.kind)}
+              role="tab"
+              tabIndex={tab.kind === activeTab ? 0 : -1}
+              type="button"
+            >
               {tab.label}
-            </TabsTrigger>
+            </button>
           ))}
-        </TabsList>
+        </div>
 
-        {props.integrationBindingsQuery.isError ? (
-          <Notice title="Could not load integration bindings" variant="alert">
-            {resolveApiErrorMessage({
-              error: props.integrationBindingsQuery.error,
-              fallbackMessage: "Could not load sandbox profile integration bindings.",
-            })}
-          </Notice>
-        ) : null}
+        <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
 
-        {props.integrationDirectoryQuery.isError ? (
-          <Notice title="Could not load integration connections" variant="alert">
-            {resolveApiErrorMessage({
-              error: props.integrationDirectoryQuery.error,
-              fallbackMessage: "Could not load integration connections.",
-            })}
-          </Notice>
-        ) : null}
+        <div className="flex min-w-0 flex-1 flex-col gap-4 md:pl-8">
+          {props.integrationBindingsQuery.isError ? (
+            <Notice title="Could not load integration bindings" variant="alert">
+              {resolveApiErrorMessage({
+                error: props.integrationBindingsQuery.error,
+                fallbackMessage: "Could not load sandbox profile integration bindings.",
+              })}
+            </Notice>
+          ) : null}
 
-        {props.integrationSaveError ? (
-          <Notice title="Save failed" variant="alert">
-            {props.integrationSaveError}
-          </Notice>
-        ) : null}
+          {props.integrationDirectoryQuery.isError ? (
+            <Notice title="Could not load integration connections" variant="alert">
+              {resolveApiErrorMessage({
+                error: props.integrationDirectoryQuery.error,
+                fallbackMessage: "Could not load integration connections.",
+              })}
+            </Notice>
+          ) : null}
 
-        {BindingSectionKinds.map((kind) => (
-          <TabsContent className="w-full" key={kind} value={kind}>
-            {activeTab !== kind || hideActiveAddAction ? null : activeAddConstraintMessage ===
-              null ? (
-              <div className="mb-4 flex justify-end">{activeAddButton}</div>
-            ) : (
-              <div className="mb-4 flex justify-end">
-                <Tooltip delay={0}>
-                  <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
-                    {activeAddButton}
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{activeAddConstraintMessage}</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-            <SandboxProfileBindingSection
-              addDisabled={isAddDisabled(kind)}
-              availableConnections={props.availableConnections}
-              availableTargets={props.availableTargets}
-              kind={kind}
-              onAdd={() => {
-                openAddDialog(kind);
-              }}
-              onEdit={openEditDialog}
-              onRowChange={props.onIntegrationBindingRowChange}
-              onRemove={props.onRemoveIntegrationBindingRow}
-              rowErrorsByClientId={props.integrationRowErrorsByClientId}
-              rows={integrationRowsByKind[kind]}
-              showSectionChrome={false}
-              onCreateBindingFromConnection={createBindingFromConnection}
-              onRowDraftDirtyChange={handleRowDraftDirtyChange}
-            />
-          </TabsContent>
-        ))}
-      </Tabs>
+          {props.integrationSaveError ? (
+            <Notice title="Save failed" variant="alert">
+              {props.integrationSaveError}
+            </Notice>
+          ) : null}
+
+          {BindingSectionKinds.map((kind) => (
+            <div
+              aria-labelledby={`sandbox-profile-integrations-tab-${kind}`}
+              className="w-full"
+              hidden={activeTab !== kind}
+              id={`sandbox-profile-integrations-panel-${kind}`}
+              key={kind}
+              role="tabpanel"
+            >
+              {activeTab !== kind || hideActiveAddAction ? null : activeAddConstraintMessage ===
+                null ? (
+                <div className="mb-4 flex justify-end">{activeAddButton}</div>
+              ) : (
+                <div className="mb-4 flex justify-end">
+                  <Tooltip delay={0}>
+                    <TooltipTrigger render={<span className="inline-flex shrink-0" />}>
+                      {activeAddButton}
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{activeAddConstraintMessage}</TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+              <SandboxProfileBindingSection
+                addDisabled={isAddDisabled(kind)}
+                availableConnections={props.availableConnections}
+                availableTargets={props.availableTargets}
+                kind={kind}
+                onAdd={() => {
+                  openAddDialog(kind);
+                }}
+                onEdit={openEditDialog}
+                onRowChange={props.onIntegrationBindingRowChange}
+                onRemove={props.onRemoveIntegrationBindingRow}
+                rowErrorsByClientId={props.integrationRowErrorsByClientId}
+                rows={integrationRowsByKind[kind]}
+                showSectionChrome={false}
+                onCreateBindingFromConnection={createBindingFromConnection}
+                onRowDraftDirtyChange={handleRowDraftDirtyChange}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
       <SandboxProfileBindingDialog
         availableConnections={props.availableConnections}
