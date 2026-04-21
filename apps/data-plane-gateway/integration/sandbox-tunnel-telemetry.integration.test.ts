@@ -5,6 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
   DefaultStreamWindowBytes,
@@ -85,6 +86,71 @@ async function waitForCondition(
 }
 
 describe("sandbox tunnel telemetry ingress integration", () => {
+  it(
+    "exports gateway tunnel spans with connection token and relay-session correlation keys",
+    async ({ fixture }) => {
+      fixture.otlpRequests.length = 0;
+      const sandboxInstanceId = typeid("sbi").toString();
+      const connectionTokenJti = `conn-${randomUUID()}`;
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        fixture,
+        sandboxInstanceId,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: connectionTokenJti,
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      const connectionSocket = await connectSandboxTunnelWebSocket({
+        websocketBaseUrl: fixture.websocketBaseUrl,
+        sandboxInstanceId,
+        tokenKind: "connect",
+        token: connectionToken,
+      });
+
+      await closeWebSocket(connectionSocket);
+
+      await waitForCondition(
+        () =>
+          fixture.otlpRequests.some(
+            (request) =>
+              request.path === "/v1/traces" &&
+              request.body.includes("data_plane_gateway.sandbox_tunnel.connection_session") &&
+              request.body.includes(connectionTokenJti) &&
+              request.body.includes("mistle.tunnel.relay_session_id"),
+          ),
+        10_000,
+        "Expected a gateway tunnel span export with token and relay-session correlation fields.",
+      );
+
+      const otlpRequest = fixture.otlpRequests.find(
+        (request) =>
+          request.path === "/v1/traces" &&
+          request.body.includes("data_plane_gateway.sandbox_tunnel.connection_session") &&
+          request.body.includes(connectionTokenJti),
+      );
+
+      expect(otlpRequest?.body).toContain('"mistle.connection.token_jti"');
+      expect(otlpRequest?.body).toContain(connectionTokenJti);
+      expect(otlpRequest?.body).toContain('"mistle.tunnel.relay_session_id"');
+      expect(otlpRequest?.body).toContain('"mistle.delivery.correlation_scope"');
+      expect(otlpRequest?.body).toContain('"join_via_connection_token_jti"');
+
+      await closeWebSocket(bootstrapSocket);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
   it(
     "forwards sandbox OTLP trace exports to the gateway traces endpoint",
     async ({ fixture }) => {

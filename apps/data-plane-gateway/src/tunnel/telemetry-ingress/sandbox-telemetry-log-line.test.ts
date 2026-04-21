@@ -76,7 +76,9 @@ describe("toSandboxTelemetryLogRecord", () => {
       eventName: "sandbox_runtime_failed",
       body: "sandbox_runtime_failed",
       attributes: {
+        "mistle.delivery.correlation_scope": "transport_only",
         "mistle.sandbox.instance.id": "sbi_test",
+        "mistle.sandbox.instance_id": "sbi_test",
         "mistle.gateway.node.id": "dpg_test",
         "mistle.tunnel.relay_session_id": "sess_bootstrap",
         "mistle.telemetry.transport": "bootstrap_tunnel",

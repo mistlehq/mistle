@@ -2,6 +2,7 @@ import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 import { metrics, type Attributes } from "@opentelemetry/api";
 import { WebSocket } from "ws";
 
+import { getSandboxTunnelDeliveryCorrelationScope } from "../telemetry.js";
 import type { RelayPeerSide, RelayPeerSocket } from "../types.js";
 
 const TunnelTelemetryMeter = metrics.getMeter("@mistle/data-plane-gateway/tunnel");
@@ -33,6 +34,7 @@ export type WebSocketHealthMissedPong = {
 export function startWebSocketHealthMonitor(input: {
   clock: Clock;
   socketKind: RelayPeerSide;
+  tokenKind: RelayPeerSide;
   socket: RelayPeerSocket;
   scheduler: Scheduler;
   pingIntervalMs: number;
@@ -40,6 +42,7 @@ export function startWebSocketHealthMonitor(input: {
   maxConsecutiveMissedPongs?: number;
   onMissedPong?: (state: WebSocketHealthMissedPong) => void;
   onUnhealthy: () => void;
+  onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
 }): WebSocketHealthHandle {
   const rawSocket = input.socket.raw;
   if (rawSocket === undefined) {
@@ -67,8 +70,12 @@ export function startWebSocketHealthMonitor(input: {
       const roundTripTimeMs = input.clock.nowMs() - pingSentAtMs;
       TunnelWebSocketRoundTripTimeMs.record(
         roundTripTimeMs,
-        buildRoundTripAttributes(input.socketKind),
+        buildRoundTripAttributes({
+          socketKind: input.socketKind,
+          tokenKind: input.tokenKind,
+        }),
       );
+      input.onRoundTripTimeObserved?.(roundTripTimeMs);
       pingSentAtMs = undefined;
     }
     consecutiveMissedPongs = 0;
@@ -162,8 +169,15 @@ export function startWebSocketHealthMonitor(input: {
   };
 }
 
-function buildRoundTripAttributes(socketKind: RelayPeerSide): Attributes {
+function buildRoundTripAttributes(input: {
+  socketKind: RelayPeerSide;
+  tokenKind: RelayPeerSide;
+}): Attributes {
+  const deliveryCorrelationScope = getSandboxTunnelDeliveryCorrelationScope({
+    tokenKind: input.tokenKind,
+  });
   return {
-    "mistle.socket_kind": socketKind,
+    "mistle.socket_kind": input.socketKind,
+    "mistle.delivery.correlation_scope": deliveryCorrelationScope,
   };
 }

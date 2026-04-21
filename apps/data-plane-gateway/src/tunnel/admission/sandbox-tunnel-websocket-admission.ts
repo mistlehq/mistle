@@ -32,11 +32,13 @@ export type AdmittedSandboxTunnelWebSocketRequest =
       ownerLeaseId: string;
       relaySessionId: string;
       sandboxInstanceId: string;
+      tokenJti: string;
     }
   | {
       kind: "connection";
       relaySessionId: string;
       sandboxInstanceId: string;
+      tokenJti: string;
     };
 
 export type SandboxTunnelAdmissionRejection = {
@@ -166,6 +168,7 @@ export class SandboxTunnelWebSocketAdmission {
           kind: "connection",
           relaySessionId: typeid("dts").toString(),
           sandboxInstanceId: input.requestedInstanceId,
+          tokenJti: verifiedToken.tokenJti,
         },
       };
     }
@@ -178,6 +181,7 @@ export class SandboxTunnelWebSocketAdmission {
         ownerLeaseId: typeid("dtl").toString(),
         relaySessionId,
         sandboxInstanceId: input.requestedInstanceId,
+        tokenJti: verifiedToken.tokenJti,
       },
     };
   }

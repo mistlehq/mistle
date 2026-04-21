@@ -1,7 +1,10 @@
 import { SpanStatusCode, type Span } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
-import { classifySandboxTunnelClose } from "./telemetry.js";
+import {
+  classifySandboxTunnelClose,
+  getSandboxTunnelDeliveryCorrelationScope,
+} from "./telemetry.js";
 import type { RelayPeerSide } from "./types.js";
 
 type TokenKind = "bootstrap" | "connection";
@@ -44,22 +47,33 @@ export function finalizeTunnelSession(input: {
   relaySessionId: string;
   sandboxInstanceId: string;
   tokenKind: TokenKind;
+  tokenJti?: string;
   tunnelSessionSpan: Span | undefined;
 }): void {
   const closeClassification = classifySandboxTunnelClose({
     closeCode: input.closeCode,
     closeReason: input.closeReason,
   });
+  const deliveryCorrelationScope = getSandboxTunnelDeliveryCorrelationScope({
+    tokenKind: input.tokenKind,
+  });
   const durationMs = input.openedAtMs === undefined ? undefined : Date.now() - input.openedAtMs;
   const logData = {
+    eventName: closeClassification.eventName,
     closeCode: input.closeCode,
     closeOutcome: closeClassification.outcome,
     closeReason: input.closeReason,
     durationMs,
-    peerSide: input.peerSide,
-    relaySessionId: input.relaySessionId,
-    sandboxInstanceId: input.sandboxInstanceId,
-    tokenKind: input.tokenKind,
+    "mistle.delivery.correlation_scope": deliveryCorrelationScope,
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.tunnel.peer_side": input.peerSide,
+    "mistle.sandbox.tunnel.token_kind": input.tokenKind,
+    "mistle.tunnel.relay_session_id": input.relaySessionId,
+    ...(deliveryCorrelationScope !== "join_via_connection_token_jti" || input.tokenJti === undefined
+      ? {}
+      : {
+          "mistle.connection.token_jti": input.tokenJti,
+        }),
   };
   const expectedClose = closeClassification.logLevel !== "warn";
   const logMessage =
@@ -85,6 +99,13 @@ export function finalizeTunnelSession(input: {
     "mistle.sandbox.tunnel.close_code": input.closeCode,
     "mistle.sandbox.tunnel.close_outcome": closeClassification.outcome,
     "mistle.sandbox.tunnel.close_reason": input.closeReason,
+    "mistle.delivery.correlation_scope": deliveryCorrelationScope,
+    "mistle.tunnel.relay_session_id": input.relaySessionId,
+    ...(deliveryCorrelationScope !== "join_via_connection_token_jti" || input.tokenJti === undefined
+      ? {}
+      : {
+          "mistle.connection.token_jti": input.tokenJti,
+        }),
     ...(durationMs === undefined
       ? {}
       : {

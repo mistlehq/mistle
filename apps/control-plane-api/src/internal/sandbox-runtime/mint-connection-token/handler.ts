@@ -29,6 +29,13 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       organizationId: body.organizationId,
       instanceId: body.instanceId,
       ...(body.actingUserId === undefined ? {} : { actingUserId: body.actingUserId }),
+      ...(body.webhookEventId === undefined ? {} : { webhookEventId: body.webhookEventId }),
+      ...(body.deliveryTaskId === undefined ? {} : { deliveryTaskId: body.deliveryTaskId }),
+      ...(body.externalDeliveryId === undefined
+        ? {}
+        : { externalDeliveryId: body.externalDeliveryId }),
+      ...(body.automationRunId === undefined ? {} : { automationRunId: body.automationRunId }),
+      ...(body.conversationId === undefined ? {} : { conversationId: body.conversationId }),
     },
   );
 

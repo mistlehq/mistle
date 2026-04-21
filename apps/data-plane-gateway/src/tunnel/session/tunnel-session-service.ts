@@ -99,6 +99,7 @@ export class TunnelSessionService {
     leaseId: string;
     onFatalError: (failure: TunnelSessionFatalError) => void;
     onLeaseLost: (failure: TunnelSessionLeaseLost) => void;
+    onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
     onTransportUnhealthy: (failure: TunnelSessionTransportUnhealthy) => void;
     ownerLeaseTtlMs: number;
     relaySessionId: string;
@@ -129,6 +130,7 @@ export class TunnelSessionService {
       websocketHealthHandle = startWebSocketHealthMonitor({
         clock: this.clock,
         socketKind: "bootstrap",
+        tokenKind: "bootstrap",
         socket: input.socket,
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
@@ -160,6 +162,9 @@ export class TunnelSessionService {
             statusMessage: "Sandbox bootstrap websocket stopped responding to ping.",
           });
         },
+        ...(input.onRoundTripTimeObserved === undefined
+          ? {}
+          : { onRoundTripTimeObserved: input.onRoundTripTimeObserved }),
       });
     } catch (error) {
       logger.error(
@@ -221,6 +226,7 @@ export class TunnelSessionService {
    */
   public attachConnectionPeer(input: {
     onFatalError: (failure: TunnelSessionFatalError) => void;
+    onRoundTripTimeObserved?: (roundTripTimeMs: number) => void;
     onTransportUnhealthy: (failure: TunnelSessionTransportUnhealthy) => void;
     relaySessionId: string;
     sandboxInstanceId: string;
@@ -248,6 +254,7 @@ export class TunnelSessionService {
       websocketHealthHandle = startWebSocketHealthMonitor({
         clock: this.clock,
         socketKind: "connection",
+        tokenKind: "connection",
         socket: input.socket,
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
@@ -266,6 +273,9 @@ export class TunnelSessionService {
             statusMessage: "Sandbox connection websocket stopped responding to ping.",
           });
         },
+        ...(input.onRoundTripTimeObserved === undefined
+          ? {}
+          : { onRoundTripTimeObserved: input.onRoundTripTimeObserved }),
       });
     } catch (error) {
       logger.error(

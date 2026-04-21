@@ -207,6 +207,7 @@ describe("startWebSocketHealthMonitor", () => {
     const handle = startWebSocketHealthMonitor({
       clock,
       socketKind: "bootstrap",
+      tokenKind: "bootstrap",
       socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,
@@ -236,6 +237,7 @@ describe("startWebSocketHealthMonitor", () => {
     const handle = startWebSocketHealthMonitor({
       clock,
       socketKind: "connection",
+      tokenKind: "connection",
       socket: pair.peerSocket,
       scheduler,
       pingIntervalMs: 10,

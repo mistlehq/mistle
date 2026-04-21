@@ -180,9 +180,15 @@ export async function mintConnectionToken(
     organizationId: string;
     instanceId: string;
     actingUserId?: string;
+    webhookEventId?: string;
+    deliveryTaskId?: string;
+    externalDeliveryId?: string;
+    automationRunId?: string;
+    conversationId?: string;
   },
 ): Promise<{
   instanceId: string;
+  tokenJti: string;
   url: string;
   token: string;
   expiresAt: string;
@@ -198,6 +204,21 @@ export async function mintConnectionToken(
       logger.info(
         {
           eventName: "connection_token.mint_started",
+          ...(input.webhookEventId === undefined
+            ? {}
+            : { "mistle.webhook.event_id": input.webhookEventId }),
+          ...(input.deliveryTaskId === undefined
+            ? {}
+            : { "mistle.delivery.task_id": input.deliveryTaskId }),
+          ...(input.externalDeliveryId === undefined
+            ? {}
+            : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
+          ...(input.automationRunId === undefined
+            ? {}
+            : { "mistle.automation.run_id": input.automationRunId }),
+          ...(input.conversationId === undefined
+            ? {}
+            : { "mistle.conversation.id": input.conversationId }),
           "mistle.sandbox.instance_id": input.instanceId,
         },
         "Minting sandbox connection token",
@@ -251,19 +272,54 @@ export async function mintConnectionToken(
           });
         }
 
+        const tokenJti = createTokenJti(sandboxInstance.id);
         const token = await mintGatewayConnectionToken({
           config: tokenConfig,
-          jti: createTokenJti(sandboxInstance.id),
+          jti: tokenJti,
           sandboxInstanceId: sandboxInstance.id,
           ttlSeconds: tokenTtlSeconds,
         });
         const mintDurationMs = systemClock.nowMs() - mintStartedAt;
 
-        span.setAttribute("mistle.connection.mint_ms", mintDurationMs);
+        span.setAttributes({
+          "mistle.connection.mint_ms": mintDurationMs,
+          "mistle.connection.token_jti": tokenJti,
+          ...(input.webhookEventId === undefined
+            ? {}
+            : { "mistle.webhook.event_id": input.webhookEventId }),
+          ...(input.deliveryTaskId === undefined
+            ? {}
+            : { "mistle.delivery.task_id": input.deliveryTaskId }),
+          ...(input.externalDeliveryId === undefined
+            ? {}
+            : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
+          ...(input.automationRunId === undefined
+            ? {}
+            : { "mistle.automation.run_id": input.automationRunId }),
+          ...(input.conversationId === undefined
+            ? {}
+            : { "mistle.conversation.id": input.conversationId }),
+        });
         logger.info(
           {
             eventName: "connection_token.minted",
             "mistle.connection.mint_ms": mintDurationMs,
+            "mistle.connection.token_jti": tokenJti,
+            ...(input.webhookEventId === undefined
+              ? {}
+              : { "mistle.webhook.event_id": input.webhookEventId }),
+            ...(input.deliveryTaskId === undefined
+              ? {}
+              : { "mistle.delivery.task_id": input.deliveryTaskId }),
+            ...(input.externalDeliveryId === undefined
+              ? {}
+              : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
+            ...(input.automationRunId === undefined
+              ? {}
+              : { "mistle.automation.run_id": input.automationRunId }),
+            ...(input.conversationId === undefined
+              ? {}
+              : { "mistle.conversation.id": input.conversationId }),
             "mistle.sandbox.instance_id": sandboxInstance.id,
           },
           "Minted sandbox connection token",
@@ -271,6 +327,7 @@ export async function mintConnectionToken(
 
         return {
           instanceId: sandboxInstance.id,
+          tokenJti,
           url: createConnectionUrl({
             gatewayWebsocketUrl,
             sandboxInstanceId: sandboxInstance.id,
@@ -284,6 +341,21 @@ export async function mintConnectionToken(
           {
             err: error,
             eventName: "connection_token.failed",
+            ...(input.webhookEventId === undefined
+              ? {}
+              : { "mistle.webhook.event_id": input.webhookEventId }),
+            ...(input.deliveryTaskId === undefined
+              ? {}
+              : { "mistle.delivery.task_id": input.deliveryTaskId }),
+            ...(input.externalDeliveryId === undefined
+              ? {}
+              : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
+            ...(input.automationRunId === undefined
+              ? {}
+              : { "mistle.automation.run_id": input.automationRunId }),
+            ...(input.conversationId === undefined
+              ? {}
+              : { "mistle.conversation.id": input.conversationId }),
             "mistle.sandbox.instance_id": input.instanceId,
           },
           "Failed to mint sandbox connection token",

@@ -230,6 +230,8 @@ export function toSandboxTelemetryLogRecord(input: {
 }): LogRecord {
   const attributes: Record<string, string | number | boolean | null> = {
     "mistle.sandbox.instance.id": input.sandboxInstanceId,
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.delivery.correlation_scope": "transport_only",
     "mistle.gateway.node.id": input.gatewayNodeId,
     "mistle.tunnel.relay_session_id": input.relaySessionId,
     "mistle.telemetry.transport": "bootstrap_tunnel",

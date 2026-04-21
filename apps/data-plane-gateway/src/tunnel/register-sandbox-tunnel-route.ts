@@ -2,7 +2,7 @@ import type { NodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { Clock, Scheduler } from "@mistle/time";
-import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+import { SpanStatusCode, type Span } from "@opentelemetry/api";
 
 import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../logger.js";
@@ -26,7 +26,10 @@ import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-r
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
 import { SandboxSigningRequestService } from "./signing/sandbox-signing-request-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
-import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
+import {
+  getSandboxTunnelDeliveryCorrelationScope,
+  startSandboxTunnelSessionSpan,
+} from "./telemetry.js";
 import { finalizeTunnelSession, recordTunnelSessionError } from "./tunnel-session-observability.js";
 import type { TunnelSessionRegistry } from "./tunnel-session/index.js";
 import {
@@ -72,8 +75,6 @@ const CloseCodes: {
   INTERNAL_ERROR: 1011,
   PROTOCOL_ERROR: 1008,
 };
-const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
-
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
 }
@@ -156,6 +157,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         const sandboxInstanceId = admittedRequest.sandboxInstanceId;
         const sourceTokenKind: TokenKind = admittedRequest.kind;
         const sourcePeerSide = toSourcePeerSide(sourceTokenKind);
+        const sourceTokenJti = admittedRequest.tokenJti;
+        const deliveryCorrelationScope = getSandboxTunnelDeliveryCorrelationScope({
+          tokenKind: sourceTokenKind,
+        });
         let attachedPeer: AttachedTunnelPeer | undefined;
         let tunnelSessionSpan: Span | undefined;
         let tunnelOpenedAtMs: number | undefined;
@@ -164,24 +169,24 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         return {
           onOpen: (_event, ws) => {
             tunnelOpenedAtMs = Date.now();
-            tunnelSessionSpan = TunnelLifecycleTracer.startSpan(
-              getSandboxTunnelSessionSpanName({
-                peerSide: sourcePeerSide,
-              }),
-              {
-                attributes: getSandboxTunnelSessionAttributes({
-                  sandboxInstanceId,
-                  peerSide: sourcePeerSide,
-                  tokenKind: sourceTokenKind,
-                }),
-              },
-            );
+            tunnelSessionSpan = startSandboxTunnelSessionSpan({
+              sandboxInstanceId,
+              peerSide: sourcePeerSide,
+              tokenKind: sourceTokenKind,
+              relaySessionId,
+              tokenJti: sourceTokenJti,
+            });
             logger.debug(
               {
-                sandboxInstanceId,
-                peerSide: sourcePeerSide,
-                relaySessionId,
-                tokenKind: sourceTokenKind,
+                eventName: "gateway.tunnel.opened",
+                "mistle.delivery.correlation_scope": deliveryCorrelationScope,
+                "mistle.sandbox.instance_id": sandboxInstanceId,
+                "mistle.sandbox.tunnel.peer_side": sourcePeerSide,
+                "mistle.sandbox.tunnel.token_kind": sourceTokenKind,
+                "mistle.tunnel.relay_session_id": relaySessionId,
+                ...(deliveryCorrelationScope !== "join_via_connection_token_jti"
+                  ? {}
+                  : { "mistle.connection.token_jti": sourceTokenJti }),
                 ...(admittedRequest.kind === "bootstrap"
                   ? {
                       leaseId: admittedRequest.ownerLeaseId,
@@ -221,6 +226,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     });
                     ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                   },
+                  onRoundTripTimeObserved: (roundTripTimeMs) => {
+                    tunnelSessionSpan?.addEvent("gateway.tunnel.websocket_rtt", {
+                      "mistle.sandbox.tunnel.websocket_rtt_ms": roundTripTimeMs,
+                    });
+                  },
                   ownerLeaseTtlMs: OWNER_LEASE_TTL_MS,
                   relaySessionId,
                   sandboxInstanceId,
@@ -245,6 +255,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     message: failure.statusMessage,
                   });
                   ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
+                },
+                onRoundTripTimeObserved: (roundTripTimeMs) => {
+                  tunnelSessionSpan?.addEvent("gateway.tunnel.websocket_rtt", {
+                    "mistle.sandbox.tunnel.websocket_rtt_ms": roundTripTimeMs,
+                  });
                 },
                 relaySessionId,
                 sandboxInstanceId,
@@ -451,6 +466,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               relaySessionId,
               sandboxInstanceId,
               tokenKind: sourceTokenKind,
+              tokenJti: sourceTokenJti,
               tunnelSessionSpan,
             });
             tunnelSessionSpan = undefined;

@@ -190,10 +190,22 @@ export async function acquireAutomationConnection(
               ...(input.preparedAutomationRun.actingUserId === undefined
                 ? {}
                 : { actingUserId: input.preparedAutomationRun.actingUserId }),
+              webhookEventId: input.preparedAutomationRun.webhookEventId,
+              deliveryTaskId: input.deliveryTaskId,
+              automationRunId: input.preparedAutomationRun.automationRunId,
+              conversationId: input.preparedAutomationRun.conversationId,
+              ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+                ? {}
+                : {
+                    externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,
+                  }),
             });
             const mintDurationMs = Date.now() - mintStartedAt;
 
-            mintSpan.setAttribute("mistle.connection.mint_ms", mintDurationMs);
+            mintSpan.setAttributes({
+              "mistle.connection.mint_ms": mintDurationMs,
+              "mistle.connection.token_jti": connection.tokenJti,
+            });
             logAutomationConversationDeliveryEvent({
               eventName: "connection_token.minted",
               message: "Minted sandbox connection token",
@@ -207,6 +219,7 @@ export async function acquireAutomationConnection(
               },
               attributes: {
                 "mistle.connection.mint_ms": mintDurationMs,
+                "mistle.connection.token_jti": connection.tokenJti,
               },
             });
 

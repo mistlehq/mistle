@@ -1064,8 +1064,13 @@ export interface paths {
         content: {
           "application/json": {
             actingUserId?: string;
+            automationRunId?: string;
+            conversationId?: string;
+            deliveryTaskId?: string;
+            externalDeliveryId?: string;
             instanceId: string;
             organizationId: string;
+            webhookEventId?: string;
           };
         };
       };
@@ -1081,6 +1086,7 @@ export interface paths {
               expiresAt: string;
               instanceId: string;
               token: string;
+              tokenJti: string;
               /** Format: uri */
               url: string;
             };

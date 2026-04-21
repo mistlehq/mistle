@@ -3637,6 +3637,23 @@
                     "minLength": 1
                   },
                   "actingUserId": {
+                  "webhookEventId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "deliveryTaskId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "externalDeliveryId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "automationRunId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conversationId": {
                     "type": "string",
                     "minLength": 1
                   }
@@ -3659,6 +3676,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "tokenJti": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "url": {
                       "type": "string",
                       "format": "uri"
@@ -3672,7 +3693,7 @@
                       "format": "date-time"
                     }
                   },
-                  "required": ["instanceId", "url", "token", "expiresAt"],
+                  "required": ["instanceId", "tokenJti", "url", "token", "expiresAt"],
                   "additionalProperties": false
                 }
               }
