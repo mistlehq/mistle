@@ -1,6 +1,12 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { SidebarProvider } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useEffect, useState } from "react";
+import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { buildSessionsShellSidebarItems } from "../navigation/sessions-shell-sidebar.js";
+import { SessionsSidebarNav } from "../navigation/sessions-sidebar-nav.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type {
   SandboxInstancesListResult,
@@ -43,9 +49,7 @@ type SidebarStoryRecord = {
   keepaliveActive: boolean;
 };
 
-function buildSessionSidebarGroupsFromRecords(
-  records: readonly SidebarStoryRecord[],
-): SessionSidebarGroupsResult {
+function buildSessionSidebarGroupsFromRecords(records: readonly SidebarStoryRecord[]) {
   const groupsByProfileId = new Map<string, SessionSidebarGroupsResult["groups"][number]>();
 
   for (const record of records) {
@@ -75,86 +79,11 @@ function buildSessionSidebarGroupsFromRecords(
   };
 }
 
-function buildMixedOpenableSessionRecords(): SidebarStoryRecord[] {
-  return [
-    {
-      id: "sbi_working_alpha",
-      profileId: "sbp_repo_maintainer",
-      profileName: "Repo Maintainer",
-      title:
-        "Investigate flaky test run after gateway lease handoff in the repo-maintainer sandbox",
-      status: "running",
-      createdAt: "2026-04-08T09:00:00.000Z",
-      updatedAt: "2026-04-08T09:00:00.000Z",
-      keepaliveActive: true,
-    },
-    {
-      id: "sbi_recent_five_min",
-      profileId: "sbp_repo_maintainer",
-      profileName: "Repo Maintainer",
-      title: "Review migration draft",
-      status: "running",
-      createdAt: "2026-04-08T08:50:00.000Z",
-      updatedAt: "2026-04-08T08:55:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_recent_forty_five_min",
-      profileId: "sbp_ops",
-      profileName: "Ops Coordinator",
-      title: "Prepare release notes",
-      status: "running",
-      createdAt: "2026-04-08T08:20:00.000Z",
-      updatedAt: "2026-04-08T08:15:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_starting_docs",
-      profileId: "sbp_docs",
-      profileName: "Docs Maintainer",
-      title:
-        "Draft onboarding guide for new operators working across control plane and gateway runtime flows",
-      status: "starting",
-      createdAt: "2026-04-08T08:40:00.000Z",
-      updatedAt: "2026-04-08T06:00:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_stopped_one_day",
-      profileId: "sbp_finance",
-      profileName: "Finance Investigator",
-      title: "Reconcile billing export",
-      status: "stopped",
-      createdAt: "2026-04-07T09:00:00.000Z",
-      updatedAt: "2026-04-07T09:00:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_stopped_finance",
-      profileId: "sbp_finance",
-      profileName: "Finance Investigator",
-      title: null,
-      status: "stopped",
-      createdAt: "2026-04-08T07:30:00.000Z",
-      updatedAt: "2026-04-06T07:30:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_stopped_four_day",
-      profileId: "sbp_ops",
-      profileName: "Ops Coordinator",
-      title: "Audit webhook retry behavior",
-      status: "stopped",
-      createdAt: "2026-04-04T06:30:00.000Z",
-      updatedAt: "2026-04-04T06:30:00.000Z",
-      keepaliveActive: false,
-    },
-  ];
-}
-
-function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
+function buildSandboxInstancesListFromRecords(
+  records: readonly SidebarStoryRecord[],
+): SandboxInstancesListResult {
   return {
-    items: buildMixedOpenableSessionRecords().map((record) =>
+    items: records.map((record) =>
       buildSandboxInstanceListItemFixture({
         id: record.id,
         title: record.title,
@@ -168,24 +97,40 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
     ),
     nextPage: null,
     previousPage: null,
-    totalResults: 7,
+    totalResults: records.length,
   };
 }
 
-function buildMixedOpenableSessionSidebarGroups(): SessionSidebarGroupsResult {
-  return buildSessionSidebarGroupsFromRecords(buildMixedOpenableSessionRecords());
-}
-
-function buildRecentlyUpdatedOrderingRecords(): SidebarStoryRecord[] {
+function buildSidebarStoryRecords(): SidebarStoryRecord[] {
   return [
     {
       id: "sbi_finance_newest",
       profileId: "sbp_finance",
       profileName: "Finance Investigator",
-      title: "Investigate failing payout reconciliation worker",
+      title: "Trace payout reconciliation worker after webhook retry storm",
       status: "stopped",
       createdAt: "2026-04-10T08:00:00.000Z",
       updatedAt: "2026-04-20T11:45:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_repo_newest",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title: "Stabilize gateway lease handoff integration run",
+      status: "running",
+      createdAt: "2026-04-09T12:00:00.000Z",
+      updatedAt: "2026-04-20T10:50:00.000Z",
+      keepaliveActive: true,
+    },
+    {
+      id: "sbi_ops_newest",
+      profileId: "sbp_ops",
+      profileName: "Ops Coordinator",
+      title: "Re-run release checklist after CI token rotation",
+      status: "running",
+      createdAt: "2026-04-11T07:30:00.000Z",
+      updatedAt: "2026-04-20T10:05:00.000Z",
       keepaliveActive: false,
     },
     {
@@ -195,75 +140,139 @@ function buildRecentlyUpdatedOrderingRecords(): SidebarStoryRecord[] {
       title: "Audit invoice export retries after webhook timeout",
       status: "stopped",
       createdAt: "2026-04-06T08:00:00.000Z",
-      updatedAt: "2026-04-17T10:15:00.000Z",
+      updatedAt: "2026-04-20T09:40:00.000Z",
       keepaliveActive: false,
-    },
-    {
-      id: "sbi_repo_newest",
-      profileId: "sbp_repo_maintainer",
-      profileName: "Repo Maintainer",
-      title: "Fix flaky gateway lease handoff test",
-      status: "running",
-      createdAt: "2026-04-09T12:00:00.000Z",
-      updatedAt: "2026-04-20T09:30:00.000Z",
-      keepaliveActive: true,
     },
     {
       id: "sbi_repo_older_update",
       profileId: "sbp_repo_maintainer",
       profileName: "Repo Maintainer",
-      title: "Trace Codex thread persistence in dashboard",
+      title: "Trace Codex thread persistence after reconnect",
       status: "running",
       createdAt: "2026-04-08T09:30:00.000Z",
-      updatedAt: "2026-04-18T16:00:00.000Z",
-      keepaliveActive: false,
-    },
-    {
-      id: "sbi_ops_newest",
-      profileId: "sbp_ops",
-      profileName: "Ops Coordinator",
-      title: "Validate release checklist after CI drift",
-      status: "running",
-      createdAt: "2026-04-11T07:30:00.000Z",
-      updatedAt: "2026-04-19T14:00:00.000Z",
+      updatedAt: "2026-04-20T09:05:00.000Z",
       keepaliveActive: false,
     },
     {
       id: "sbi_docs_newest",
       profileId: "sbp_docs",
       profileName: "Docs Maintainer",
-      title: "Draft setup guide for sandbox session recovery",
+      title: "Rewrite setup guide for session recovery handoff",
       status: "starting",
       createdAt: "2026-04-12T09:45:00.000Z",
-      updatedAt: "2026-04-16T08:00:00.000Z",
+      updatedAt: "2026-04-20T08:40:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_platform_recent",
+      profileId: "sbp_platform",
+      profileName: "Platform Debugger",
+      title: "Verify restate worker startup after config reload",
+      status: "running",
+      createdAt: "2026-04-10T06:45:00.000Z",
+      updatedAt: "2026-04-20T08:05:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_ops_older",
+      profileId: "sbp_ops",
+      profileName: "Ops Coordinator",
+      title: "Check deploy freeze window before weekend release",
+      status: "stopped",
+      createdAt: "2026-04-09T07:30:00.000Z",
+      updatedAt: "2026-04-20T07:10:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_repo_third",
+      profileId: "sbp_repo_maintainer",
+      profileName: "Repo Maintainer",
+      title: "Review dashboard query invalidation after rename",
+      status: "stopped",
+      createdAt: "2026-04-06T09:30:00.000Z",
+      updatedAt: "2026-04-20T06:55:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_docs_second",
+      profileId: "sbp_docs",
+      profileName: "Docs Maintainer",
+      title: "Polish operator runbook for sandbox rebuild path",
+      status: "stopped",
+      createdAt: "2026-04-11T09:45:00.000Z",
+      updatedAt: "2026-04-20T06:20:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_platform_second",
+      profileId: "sbp_platform",
+      profileName: "Platform Debugger",
+      title: "Inspect control-plane retries after auth callback failure",
+      status: "running",
+      createdAt: "2026-04-08T06:45:00.000Z",
+      updatedAt: "2026-04-20T05:50:00.000Z",
+      keepaliveActive: false,
+    },
+    {
+      id: "sbi_finance_third",
+      profileId: "sbp_finance",
+      profileName: "Finance Investigator",
+      title: "Compare ledger snapshots across billing backfill runs",
+      status: "stopped",
+      createdAt: "2026-04-05T08:00:00.000Z",
+      updatedAt: "2026-04-20T05:10:00.000Z",
       keepaliveActive: false,
     },
     {
       id: "sbi_docs_oldest",
       profileId: "sbp_docs",
       profileName: "Docs Maintainer",
-      title: "Tidy release note wording for session sidebar rollout",
+      title: "Tidy release note wording for sidebar rollout",
       status: "stopped",
       createdAt: "2026-04-08T09:45:00.000Z",
-      updatedAt: "2026-04-13T08:00:00.000Z",
+      updatedAt: "2026-04-20T04:30:00.000Z",
       keepaliveActive: false,
     },
   ];
 }
 
-function buildRecentlyUpdatedOrderingGroups(): SessionSidebarGroupsResult {
-  return buildSessionSidebarGroupsFromRecords(buildRecentlyUpdatedOrderingRecords());
+function buildSidebarStoryGroups(): SessionSidebarGroupsResult {
+  return buildSessionSidebarGroupsFromRecords(buildSidebarStoryRecords());
 }
 
-const meta = {
-  title: "Dashboard/Sessions/Sidebar",
-  component: SessionsStoryHarness,
-  tags: ["autodocs"],
-  decorators: [withDashboardPageStory],
-  parameters: {
-    layout: "fullscreen",
-  },
-  args: {
+function buildSidebarStoryItems() {
+  return buildSessionsShellSidebarItems(buildSidebarStoryGroups().groups, {
+    nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
+  });
+}
+
+function buildSidebarStoryRecordsBatch(batchIndex: number): SidebarStoryRecord[] {
+  return buildSidebarStoryRecords().map((record, recordIndex) => ({
+    ...record,
+    id: `${record.id}_batch_${String(batchIndex)}`,
+    title:
+      record.title === null
+        ? null
+        : `${record.title} · follow-up ${String(batchIndex + 1)}.${String(recordIndex + 1)}`,
+    updatedAt: new Date(
+      Date.parse(record.updatedAt) - (batchIndex * 90 + recordIndex) * 60_000,
+    ).toISOString(),
+  }));
+}
+
+function buildInteractiveSidebarStoryPage(pageIndex: number) {
+  return buildSessionsShellSidebarItems(
+    buildSessionSidebarGroupsFromRecords(buildSidebarStoryRecordsBatch(pageIndex)).groups,
+    {
+      nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
+    },
+  );
+}
+
+function buildSessionsSidebarStoryArgs(
+  overrides?: Partial<SessionsSidebarStoryArgs>,
+): SessionsSidebarStoryArgs {
+  return {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
     launchableProfiles: [
@@ -277,9 +286,21 @@ const meta = {
         latestVersion: 7,
       }),
     ],
-    sessionSidebarGroups: buildMixedOpenableSessionSidebarGroups(),
-    sandboxInstancesList: buildMixedOpenableSessionsList(),
+    sessionSidebarGroups: buildSidebarStoryGroups(),
+    sandboxInstancesList: buildSandboxInstancesListFromRecords(buildSidebarStoryRecords()),
+    ...overrides,
+  };
+}
+
+const meta = {
+  title: "Dashboard/Sessions/Sidebar",
+  component: SessionsStoryHarness,
+  tags: ["autodocs"],
+  decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
   },
+  args: buildSessionsSidebarStoryArgs(),
   render: function RenderStory(args): React.JSX.Element {
     return (
       <SessionsStoryHarness
@@ -308,10 +329,128 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+export const Default: Story = {
+  args: buildSessionsSidebarStoryArgs(),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shows the flat recent-session feed sorted globally by updatedAt. Expected top rows stay in this order: payout reconciliation, gateway lease handoff, release checklist, invoice export retries, then Codex thread persistence.",
+      },
+    },
+  },
+};
+
+export const AutoLoadingOlderSessions: Story = {
+  render: function RenderAutoLoadingOlderSessionsStory(): React.JSX.Element {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen bg-background">
+          <div className="w-56 border-r bg-sidebar py-3">
+            <MemoryRouter initialEntries={["/sessions/new"]}>
+              <SessionsSidebarNav
+                items={buildSidebarStoryItems().slice(0, 8)}
+                infiniteScroll={{
+                  hasMore: true,
+                  statusBanner: {
+                    kind: "loading",
+                    label: "Loading more",
+                  },
+                }}
+              />
+            </MemoryRouter>
+          </div>
+        </div>
+      </SidebarProvider>
+    );
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shows the flat recent-session sidebar while older sessions are loading automatically as the user reaches the bottom.",
+      },
+    },
+  },
+};
+
+function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
+  const [visiblePageCount, setVisiblePageCount] = useState(1);
+  const [statusBanner, setStatusBanner] = useState<
+    | {
+        kind: "loading";
+        label: string;
+      }
+    | undefined
+  >(undefined);
+  const totalPageCount = 3;
+  const hasMore = visiblePageCount < totalPageCount;
+  const items = Array.from({ length: visiblePageCount }, (_, pageIndex) =>
+    buildInteractiveSidebarStoryPage(pageIndex),
+  ).flat();
+
+  useEffect(() => {
+    if (statusBanner?.kind !== "loading") {
+      return;
+    }
+
+    const timeoutId: TimerHandle = systemScheduler.schedule(() => {
+      if (hasMore) {
+        setVisiblePageCount((currentCount) => currentCount + 1);
+      }
+      setStatusBanner(undefined);
+    }, 800);
+
+    return () => {
+      systemScheduler.cancel(timeoutId);
+    };
+  }, [hasMore, statusBanner]);
+
+  return (
+    <SidebarProvider>
+      <div className="min-h-screen bg-background">
+        <div className="h-[480px] w-56 overflow-y-auto border-r bg-sidebar py-3">
+          <MemoryRouter initialEntries={["/sessions/new"]}>
+            <SessionsSidebarNav
+              items={items}
+              infiniteScroll={{
+                hasMore,
+                onReachEnd: () => {
+                  if (statusBanner !== undefined) {
+                    return;
+                  }
+
+                  setStatusBanner({
+                    kind: "loading",
+                    label: "Loading more",
+                  });
+                },
+                ...(statusBanner === undefined ? {} : { statusBanner }),
+              }}
+            />
+          </MemoryRouter>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+export const InteractiveInfiniteScroll: Story = {
+  render: function RenderInteractiveInfiniteScrollStory(): React.JSX.Element {
+    return <InteractiveInfiniteScrollSidebarPreview />;
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Uses the real bottom sentinel interaction. Scroll to the end of the sidebar to trigger the loading text, append another page of sessions, and repeat until the feed quietly stops loading more.",
+      },
+    },
+  },
+};
+
 export const EmptyState: Story = {
-  args: {
-    initialEntries: ["/sessions/new"],
-    showSessionsSidebar: true,
+  args: buildSessionsSidebarStoryArgs({
     sessionSidebarGroups: {
       groups: [],
     },
@@ -321,41 +460,21 @@ export const EmptyState: Story = {
       previousPage: null,
       totalResults: 0,
     },
-  },
-};
-
-export const OrderedByMostRecentlyUpdated: Story = {
-  args: {
-    initialEntries: ["/sessions/new"],
-    showSessionsSidebar: true,
-    sessionSidebarGroups: buildRecentlyUpdatedOrderingGroups(),
-  },
-  parameters: {
-    docs: {
-      description: {
-        story:
-          "Shows the backend-provided sidebar grouping and recency order. Expected group order: Finance Investigator, Repo Maintainer, Ops Coordinator, Docs Maintainer.",
-      },
-    },
-  },
+  }),
 };
 
 export const LoadingState: Story = {
-  args: {
-    initialEntries: ["/sessions/new"],
+  args: buildSessionsSidebarStoryArgs({
     sessionsSidebarQueryState: {
       kind: "pending",
     },
-    showSessionsSidebar: true,
-  },
+  }),
 };
 
 export const LoadError: Story = {
-  args: {
-    initialEntries: ["/sessions/new"],
+  args: buildSessionsSidebarStoryArgs({
     sessionsSidebarQueryState: {
       kind: "error",
     },
-    showSessionsSidebar: true,
-  },
+  }),
 };

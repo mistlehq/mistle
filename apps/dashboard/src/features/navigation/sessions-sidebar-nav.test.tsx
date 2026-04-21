@@ -5,65 +5,50 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
+import type { SessionsSidebarNavItem } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
-const groups: SessionsSidebarNavGroup[] = [
+const items: SessionsSidebarNavItem[] = [
   {
-    profileId: "sbp_repo",
+    id: "sbi_active",
+    label: "Investigate flaky test run",
     profileName: "Repo Maintainer",
-    items: [
-      {
-        id: "sbi_active",
-        label: "Investigate flaky test run",
-        metadataLabel: "Working",
-        to: "/sessions/sbi_active",
-        showActivityIndicator: true,
-        updatedAt: "2026-04-08T00:00:00.000Z",
-      },
-      {
-        id: "sbi_idle",
-        label: "Review migration draft",
-        metadataLabel: "Idle",
-        to: "/sessions/sbi_idle",
-        showActivityIndicator: false,
-        updatedAt: "2026-04-07T00:00:00.000Z",
-      },
-    ],
+    metadataLabel: "Working",
+    to: "/sessions/sbi_active",
+    showActivityIndicator: true,
+    updatedAt: "2026-04-08T00:00:00.000Z",
   },
   {
-    profileId: "sbp_docs",
+    id: "sbi_idle",
+    label: "Review migration draft",
+    profileName: "Repo Maintainer",
+    metadataLabel: "Idle",
+    to: "/sessions/sbi_idle",
+    showActivityIndicator: false,
+    updatedAt: "2026-04-07T00:00:00.000Z",
+  },
+  {
+    id: "sbi_docs",
+    label: "Draft onboarding guide",
     profileName: "Docs Maintainer",
-    items: [
-      {
-        id: "sbi_docs",
-        label: "Draft onboarding guide",
-        metadataLabel: "1h",
-        to: "/sessions/sbi_docs",
-        showActivityIndicator: false,
-        updatedAt: "2026-04-09T23:00:00.000Z",
-      },
-    ],
+    metadataLabel: "1h",
+    to: "/sessions/sbi_docs",
+    showActivityIndicator: false,
+    updatedAt: "2026-04-09T23:00:00.000Z",
   },
 ];
 
 function renderSidebarNav(input?: {
-  groups?: readonly SessionsSidebarNavGroup[];
+  items?: readonly SessionsSidebarNavItem[];
   initialEntries?: string[];
 }): void {
   render(
     <SidebarProvider>
       <MemoryRouter initialEntries={input?.initialEntries ?? ["/sessions"]}>
-        <SessionsSidebarNav groups={input?.groups ?? groups} />
+        <SessionsSidebarNav items={input?.items ?? items} />
       </MemoryRouter>
     </SidebarProvider>,
   );
-}
-
-function getRepoMaintainerTrigger(): HTMLElement {
-  return screen.getByRole("button", {
-    name: "Toggle Repo Maintainer sessions",
-  });
 }
 
 function getSearchInput(): HTMLElement {
@@ -86,8 +71,31 @@ function installMatchMediaStub(): void {
   });
 }
 
+function installIntersectionObserverStub(): void {
+  Object.defineProperty(window, "IntersectionObserver", {
+    configurable: true,
+    value: class IntersectionObserver {
+      public constructor(
+        _callback: IntersectionObserverCallback,
+        _options?: IntersectionObserverInit,
+      ) {}
+
+      public disconnect(): void {}
+
+      public observe(): void {}
+
+      public unobserve(): void {}
+
+      public takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
+    },
+  });
+}
+
 describe("SessionsSidebarNav", () => {
   installMatchMediaStub();
+  installIntersectionObserverStub();
 
   it("renders a new session link above the search field", () => {
     renderSidebarNav();
@@ -108,39 +116,60 @@ describe("SessionsSidebarNav", () => {
     ).not.toBeNull();
   });
 
-  it("allows sandbox profile groups to be collapsed and expanded", () => {
+  it("renders the profile name inline with each session row", () => {
     renderSidebarNav();
 
-    const trigger = getRepoMaintainerTrigger();
-
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
-
-    fireEvent.click(trigger);
-
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("link", { name: /Review migration draft/ })).toBeNull();
-
-    fireEvent.click(trigger);
-
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
+    expect(screen.getAllByText("Repo Maintainer")).toHaveLength(2);
+    expect(screen.getByText("Docs Maintainer")).toBeDefined();
   });
 
-  it("expands matching groups while search is active", () => {
+  it("filters sessions by title and profile name", () => {
     renderSidebarNav();
 
-    const trigger = getRepoMaintainerTrigger();
-
-    fireEvent.click(trigger);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-
     fireEvent.change(getSearchInput(), {
-      target: { value: "migration" },
+      target: { value: "docs" },
     });
 
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
+    expect(screen.getByRole("link", { name: /Draft onboarding guide/ })).toBeDefined();
+    expect(screen.queryByRole("link", { name: /Investigate flaky test run/ })).toBeNull();
+  });
+
+  it("shows no terminal hint once older-session loading is exhausted", () => {
+    render(
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav
+            items={items}
+            infiniteScroll={{
+              hasMore: false,
+            }}
+          />
+        </MemoryRouter>
+      </SidebarProvider>,
+    );
+
+    expect(screen.queryByText("No older sessions")).toBeNull();
+    expect(screen.queryByText("Loading more")).toBeNull();
+  });
+
+  it("renders a loading hint while older sessions are being fetched", () => {
+    render(
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav
+            items={items}
+            infiniteScroll={{
+              hasMore: true,
+              statusBanner: {
+                kind: "loading",
+                label: "Loading more",
+              },
+            }}
+          />
+        </MemoryRouter>
+      </SidebarProvider>,
+    );
+    expect(screen.getByText("Loading more")).toBeDefined();
   });
 
   it("shows working for active running sessions and idle for inactive running sessions", () => {
@@ -151,12 +180,12 @@ describe("SessionsSidebarNav", () => {
     expect(screen.getByText("Idle")).toBeDefined();
   });
 
-  it("keeps the new session action visible when there are no groups", () => {
+  it("keeps the new session action visible when there are no items", () => {
     renderSidebarNav({
-      groups: [],
+      items: [],
     });
 
     expect(screen.getByRole("link", { name: "Create a new session" })).toBeDefined();
-    expect(screen.getByText("No openable sessions yet.")).toBeDefined();
+    expect(screen.getByText("No sessions yet.")).toBeDefined();
   });
 });

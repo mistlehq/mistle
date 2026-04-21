@@ -1,7 +1,4 @@
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -11,30 +8,34 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  Spinner,
 } from "@mistle/ui";
-import { CaretRightIcon, MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { MagnifyingGlassIcon, PlusIcon } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, useLocation } from "react-router";
 
 import { isNewSessionPath } from "../shell/app-shell-sessions-sidebar-mode.js";
-import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
-import { filterSessionsSidebarNavGroups } from "./sessions-sidebar-nav-model.js";
+import type { SessionsSidebarNavItem } from "./sessions-sidebar-nav-model.js";
+import { filterSessionsSidebarNavItems } from "./sessions-sidebar-nav-model.js";
 
 export function SessionsSidebarNav(input: {
-  groups: readonly SessionsSidebarNavGroup[];
+  items: readonly SessionsSidebarNavItem[];
   emptyMessage?: string;
+  infiniteScroll?: {
+    hasMore: boolean;
+    onReachEnd?: () => void;
+    statusBanner?: {
+      kind: "loading";
+      label: string;
+    };
+  };
 }): React.JSX.Element {
   const location = useLocation();
-  const emptyMessage = input.emptyMessage ?? "No openable sessions yet.";
+  const emptyMessage = input.emptyMessage ?? "No sessions yet.";
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedProfileIds, setExpandedProfileIds] = useState(
-    () => new Set(input.groups.map((group) => group.profileId)),
-  );
-  const visibleGroups = filterSessionsSidebarNavGroups({
-    groups: input.groups,
+  const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null);
+  const visibleItems = filterSessionsSidebarNavItems({
+    items: input.items,
     searchFilter: {
       searchQuery,
     },
@@ -42,22 +43,46 @@ export function SessionsSidebarNav(input: {
   const hasActiveSearch = searchQuery.trim().length > 0;
 
   useEffect(() => {
-    setExpandedProfileIds((currentExpandedProfileIds) => {
-      let hasAddedProfile = false;
-      const nextExpandedProfileIds = new Set(currentExpandedProfileIds);
+    if (
+      hasActiveSearch ||
+      input.infiniteScroll?.hasMore !== true ||
+      input.infiniteScroll.onReachEnd === undefined
+    ) {
+      return;
+    }
 
-      for (const group of input.groups) {
-        if (nextExpandedProfileIds.has(group.profileId)) {
-          continue;
+    if (typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const sentinelElement = infiniteScrollSentinelRef.current;
+
+    if (sentinelElement === null) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          input.infiniteScroll?.onReachEnd?.();
         }
+      },
+      {
+        rootMargin: "160px 0px",
+      },
+    );
 
-        nextExpandedProfileIds.add(group.profileId);
-        hasAddedProfile = true;
-      }
+    observer.observe(sentinelElement);
 
-      return hasAddedProfile ? nextExpandedProfileIds : currentExpandedProfileIds;
-    });
-  }, [input.groups]);
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    hasActiveSearch,
+    input.infiniteScroll?.hasMore,
+    input.infiniteScroll?.onReachEnd,
+    visibleItems.length,
+  ]);
 
   return (
     <>
@@ -82,71 +107,75 @@ export function SessionsSidebarNav(input: {
           />
         </SidebarGroupContent>
       </SidebarGroup>
-      {visibleGroups.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <div className="px-4 py-2 text-muted-foreground text-sm">
-          {input.groups.length === 0 ? emptyMessage : "No sessions match your search."}
+          {input.items.length === 0 ? emptyMessage : "No sessions match your search."}
         </div>
-      ) : null}
-      {visibleGroups.map((group) => (
-        <SidebarGroup className="gap-0.5 pb-0.5" key={group.profileId}>
-          <Collapsible
-            onOpenChange={(open) => {
-              setExpandedProfileIds((currentExpandedProfileIds) => {
-                const nextExpandedProfileIds = new Set(currentExpandedProfileIds);
+      ) : (
+        <SidebarGroup className="gap-0.5 pb-0.5">
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+              {visibleItems.map((item) => {
+                const isActive = location.pathname === item.to;
 
-                if (open) {
-                  nextExpandedProfileIds.add(group.profileId);
-                } else {
-                  nextExpandedProfileIds.delete(group.profileId);
-                }
-
-                return nextExpandedProfileIds;
-              });
-            }}
-            open={hasActiveSearch || expandedProfileIds.has(group.profileId)}
-          >
-            <CollapsibleTrigger
-              aria-label={`Toggle ${group.profileName} sessions`}
-              className="text-sidebar-foreground/70 hover:text-sidebar-foreground group/header flex h-6 w-full items-center justify-between rounded-md px-2 text-[10px] font-semibold tracking-[0.08em] uppercase outline-hidden transition-colors"
-            >
-              <span className="truncate">{group.profileName}</span>
-              <CaretRightIcon
-                aria-hidden
-                className={`pointer-events-none size-3 shrink-0 opacity-0 transition-[opacity,transform] group-hover/header:opacity-100 ${
-                  hasActiveSearch || expandedProfileIds.has(group.profileId) ? "rotate-90" : ""
-                }`}
+                return (
+                  <SidebarMenuItem className="w-full" key={item.id}>
+                    <SidebarMenuButton
+                      className="h-auto min-h-8 cursor-default items-center px-2 py-1.5"
+                      isActive={isActive}
+                      render={<NavLink to={item.to} />}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center">
+                        <SessionsSidebarItemLabel
+                          label={item.label}
+                          metadataLabel={item.metadataLabel}
+                          profileName={item.profileName}
+                        />
+                      </div>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+            {hasActiveSearch || input.infiniteScroll === undefined ? null : input.infiniteScroll
+                .hasMore ? (
+              <>
+                <div aria-hidden className="h-1" ref={infiniteScrollSentinelRef} />
+                <SessionsSidebarInfiniteScrollStatusBanner
+                  statusBanner={input.infiniteScroll.statusBanner}
+                />
+              </>
+            ) : (
+              <SessionsSidebarInfiniteScrollStatusBanner
+                statusBanner={input.infiniteScroll.statusBanner}
               />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenuSub className="mx-0 gap-0.5 border-l-0 px-0 py-0">
-                  {group.items.map((item) => {
-                    const isActive = location.pathname === item.to;
-
-                    return (
-                      <SidebarMenuSubItem className="w-full" key={item.id}>
-                        <SidebarMenuSubButton
-                          className="h-auto min-h-8 cursor-default items-center px-2 py-1.5"
-                          isActive={isActive}
-                          render={<NavLink to={item.to} />}
-                        >
-                          <div className="flex min-w-0 flex-1 items-center">
-                            <SessionsSidebarItemLabel
-                              label={item.label}
-                              metadataLabel={item.metadataLabel}
-                            />
-                          </div>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    );
-                  })}
-                </SidebarMenuSub>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </Collapsible>
+            )}
+          </SidebarGroupContent>
         </SidebarGroup>
-      ))}
+      )}
     </>
+  );
+}
+
+function SessionsSidebarInfiniteScrollStatusBanner(input: {
+  statusBanner:
+    | {
+        kind: "loading";
+        label: string;
+      }
+    | undefined;
+}): React.JSX.Element | null {
+  if (input.statusBanner === undefined) {
+    return null;
+  }
+
+  return (
+    <div className="animate-in fade-in-0 slide-in-from-top-1 px-2 pt-2 text-[11px] text-muted-foreground duration-200">
+      <div className="flex items-center gap-2">
+        <Spinner aria-hidden className="size-3 shrink-0" />
+        <span>{input.statusBanner.label}</span>
+      </div>
+    </div>
   );
 }
 
@@ -176,6 +205,7 @@ function SessionsSidebarSearch(input: {
 function SessionsSidebarItemLabel(input: {
   label: string;
   metadataLabel: string;
+  profileName: string;
 }): React.JSX.Element {
   return (
     <div className="min-w-0 flex-1">
@@ -183,12 +213,21 @@ function SessionsSidebarItemLabel(input: {
         className="min-w-0 flex-1 text-[13px] leading-tight"
         text={input.label}
       />
-      <div
-        className={`pt-px text-[10px] leading-tight font-medium ${
-          input.metadataLabel === "Working" ? "text-sky-700" : "text-muted-foreground"
-        }`}
-      >
-        {input.metadataLabel}
+      <div className="flex min-w-0 items-center gap-1 pt-px text-[10px] leading-tight">
+        <OverflowTooltipText
+          className="min-w-0 flex-1 text-muted-foreground"
+          text={input.profileName}
+        />
+        <span aria-hidden className="text-muted-foreground">
+          •
+        </span>
+        <span
+          className={`shrink-0 font-medium ${
+            input.metadataLabel === "Working" ? "text-sky-700" : "text-muted-foreground"
+          }`}
+        >
+          {input.metadataLabel}
+        </span>
       </div>
     </div>
   );

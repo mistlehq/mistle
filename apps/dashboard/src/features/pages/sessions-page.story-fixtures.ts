@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { SESSIONS_SIDEBAR_INITIAL_LIMIT } from "../navigation/sessions-shell-sidebar.js";
 import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
@@ -8,6 +9,7 @@ import type {
   LaunchableSandboxProfilesResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
+  SessionSidebarGroupsQueryPrefix,
   sessionSidebarGroupsQueryKey,
   sandboxInstanceStatusQueryKey,
   sandboxInstancesListQueryKey,
@@ -116,10 +118,21 @@ export function createSessionsPageStoryQueryClient(input?: {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
+        refetchOnMount: false,
+        refetchOnReconnect: false,
+        refetchOnWindowFocus: false,
         retry: false,
         staleTime: Number.POSITIVE_INFINITY,
       },
     },
+  });
+  queryClient.setQueryDefaults(SessionSidebarGroupsQueryPrefix, {
+    enabled: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
   seedAuthenticatedSession(queryClient);
@@ -146,7 +159,7 @@ export function createSessionsPageStoryQueryClient(input?: {
     },
   );
   const sessionSidebarQueryKey = sessionSidebarGroupsQueryKey({
-    limit: 100,
+    limit: SESSIONS_SIDEBAR_INITIAL_LIMIT,
   });
   const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
     kind: "success",

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { SessionSidebarGroup } from "../sessions/sessions-types.js";
-import { buildSessionsShellSidebarGroups } from "./sessions-shell-sidebar.js";
+import {
+  buildSessionsShellSidebarItems,
+  resolveSessionsShellSidebarHasMore,
+} from "./sessions-shell-sidebar.js";
 
 function buildSessionSidebarGroup(
   overrides: Partial<SessionSidebarGroup> & Pick<SessionSidebarGroup, "profileId">,
@@ -16,10 +19,10 @@ function buildSessionSidebarGroup(
   };
 }
 
-describe("buildSessionsShellSidebarGroups", () => {
-  it("maps listed sandbox instances into grouped session sidebar items", () => {
+describe("buildSessionsShellSidebarItems", () => {
+  it("maps listed sandbox instances into a globally recent flat session list", () => {
     expect(
-      buildSessionsShellSidebarGroups(
+      buildSessionsShellSidebarItems(
         [
           buildSessionSidebarGroup({
             profileId: "sbp_default",
@@ -42,7 +45,7 @@ describe("buildSessionsShellSidebarGroups", () => {
                 id: "sbi_setup",
                 title: "Draft onboarding guide",
                 status: "starting",
-                updatedAt: "2026-04-08T00:00:00.000Z",
+                updatedAt: "2026-04-09T00:00:00.000Z",
                 keepaliveActive: false,
               },
             ],
@@ -67,33 +70,43 @@ describe("buildSessionsShellSidebarGroups", () => {
       ),
     ).toStrictEqual([
       {
-        profileId: "sbp_default",
-        profileName: "Default Profile",
-        items: [
-          {
-            id: "sbi_active",
-            label: "Investigate flaky test run",
-            metadataLabel: "Working",
-            to: "/sessions/sbi_active",
-            showActivityIndicator: true,
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          },
-        ],
+        id: "sbi_setup",
+        label: "Draft onboarding guide",
+        profileName: "Docs",
+        metadataLabel: "1d",
+        to: "/sessions/sbi_setup",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-09T00:00:00.000Z",
       },
       {
-        profileId: "sbp_docs",
-        profileName: "Docs",
-        items: [
-          {
-            id: "sbi_setup",
-            label: "Draft onboarding guide",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_setup",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          },
-        ],
+        id: "sbi_active",
+        label: "Investigate flaky test run",
+        profileName: "Default Profile",
+        metadataLabel: "Working",
+        to: "/sessions/sbi_active",
+        showActivityIndicator: true,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
     ]);
+  });
+});
+
+describe("resolveSessionsShellSidebarHasMore", () => {
+  it("keeps loading while the fetched item count still fills the requested limit", () => {
+    expect(
+      resolveSessionsShellSidebarHasMore({
+        itemCount: 30,
+        resolvedLimit: 30,
+      }),
+    ).toBe(true);
+  });
+
+  it("stops loading when the fetched item count falls short of the requested limit", () => {
+    expect(
+      resolveSessionsShellSidebarHasMore({
+        itemCount: 42,
+        resolvedLimit: 60,
+      }),
+    ).toBe(false);
   });
 });

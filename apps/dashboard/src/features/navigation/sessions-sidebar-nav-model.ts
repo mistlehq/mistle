@@ -19,16 +19,11 @@ export type SessionsSidebarSourceGroup = {
 export type SessionsSidebarNavItem = {
   id: string;
   label: string;
+  profileName: string;
   metadataLabel: string;
   to: string;
   showActivityIndicator: boolean;
   updatedAt: string;
-};
-
-export type SessionsSidebarNavGroup = {
-  profileId: string;
-  profileName: string;
-  items: SessionsSidebarNavItem[];
 };
 
 export type SessionsSidebarSearchFilter = {
@@ -64,17 +59,15 @@ function resolveMetadataLabel(
   });
 }
 
-export function buildSessionsSidebarNavGroups(
+export function buildSessionsSidebarNavItems(
   groups: readonly SessionsSidebarSourceGroup[],
   input?: {
     nowEpochMs?: number;
   },
-): SessionsSidebarNavGroup[] {
+): SessionsSidebarNavItem[] {
   return groups
-    .map((group) => ({
-      profileId: group.profileId,
-      profileName: group.profileName,
-      items: group.items.flatMap((item) => {
+    .flatMap((group) =>
+      group.items.flatMap((item) => {
         const showActivityIndicator = resolveSessionsSidebarShowActivityIndicator({
           status: item.status,
           keepaliveActive: item.keepaliveActive,
@@ -87,6 +80,7 @@ export function buildSessionsSidebarNavGroups(
           {
             id: item.id,
             label: resolveSessionTitleLabel(item.title),
+            profileName: group.profileName,
             metadataLabel: resolveMetadataLabel({
               status: item.status,
               keepaliveActive: item.keepaliveActive,
@@ -99,29 +93,32 @@ export function buildSessionsSidebarNavGroups(
           },
         ];
       }),
-    }))
-    .filter((group) => group.items.length > 0);
+    )
+    .sort((left, right) => {
+      const updatedAtDifference = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
+
+      if (updatedAtDifference !== 0) {
+        return updatedAtDifference;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
 }
 
-export function filterSessionsSidebarNavGroups(input: {
-  groups: readonly SessionsSidebarNavGroup[];
+export function filterSessionsSidebarNavItems(input: {
+  items: readonly SessionsSidebarNavItem[];
   searchFilter: SessionsSidebarSearchFilter;
-}): SessionsSidebarNavGroup[] {
+}): SessionsSidebarNavItem[] {
   const normalizedQuery = input.searchFilter.searchQuery.trim().toLocaleLowerCase();
 
   if (normalizedQuery.length === 0) {
-    return [...input.groups];
+    return [...input.items];
   }
 
-  return input.groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        return (
-          item.label.toLocaleLowerCase().includes(normalizedQuery) ||
-          group.profileName.toLocaleLowerCase().includes(normalizedQuery)
-        );
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+  return input.items.filter((item) => {
+    return (
+      item.label.toLocaleLowerCase().includes(normalizedQuery) ||
+      item.profileName.toLocaleLowerCase().includes(normalizedQuery)
+    );
+  });
 }

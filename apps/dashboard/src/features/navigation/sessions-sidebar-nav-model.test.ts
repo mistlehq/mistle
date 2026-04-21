@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildSessionsSidebarNavGroups,
-  filterSessionsSidebarNavGroups,
+  buildSessionsSidebarNavItems,
+  filterSessionsSidebarNavItems,
   resolveSessionsSidebarShowActivityIndicator,
   type SessionsSidebarSourceGroup,
   type SessionsSidebarSourceItem,
@@ -80,10 +80,10 @@ describe("resolveSessionsSidebarShowActivityIndicator", () => {
   });
 });
 
-describe("buildSessionsSidebarNavGroups", () => {
-  it("preserves backend group and item order while mapping nav fields", () => {
+describe("buildSessionsSidebarNavItems", () => {
+  it("maps nav fields and sorts all visible items by updatedAt descending", () => {
     expect(
-      buildSessionsSidebarNavGroups(
+      buildSessionsSidebarNavItems(
         [
           buildSourceGroup({
             profileId: "sbp_profile_beta",
@@ -125,47 +125,38 @@ describe("buildSessionsSidebarNavGroups", () => {
       ),
     ).toStrictEqual([
       {
-        profileId: "sbp_profile_beta",
+        id: "sbi_ready",
+        label: "Review migration draft",
         profileName: "Beta Profile",
-        items: [
-          {
-            id: "sbi_working",
-            label: "Investigate flaky test run",
-            metadataLabel: "Working",
-            to: "/sessions/sbi_working",
-            showActivityIndicator: true,
-            updatedAt: "2026-04-09T00:00:00.000Z",
-          },
-          {
-            id: "sbi_ready",
-            label: "Review migration draft",
-            metadataLabel: "Idle",
-            to: "/sessions/sbi_ready",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-10T00:00:00.000Z",
-          },
-        ],
+        metadataLabel: "Idle",
+        to: "/sessions/sbi_ready",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-10T00:00:00.000Z",
       },
       {
-        profileId: "sbp_profile_alpha",
+        id: "sbi_working",
+        label: "Investigate flaky test run",
+        profileName: "Beta Profile",
+        metadataLabel: "Working",
+        to: "/sessions/sbi_working",
+        showActivityIndicator: true,
+        updatedAt: "2026-04-09T00:00:00.000Z",
+      },
+      {
+        id: "sbi_stopped",
+        label: "Untitled",
         profileName: "Alpha Profile",
-        items: [
-          {
-            id: "sbi_stopped",
-            label: "Untitled",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_stopped",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          },
-        ],
+        metadataLabel: "2d",
+        to: "/sessions/sbi_stopped",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
     ]);
   });
 });
 
-describe("filterSessionsSidebarNavGroups", () => {
-  const groups = buildSessionsSidebarNavGroups(
+describe("filterSessionsSidebarNavItems", () => {
+  const items = buildSessionsSidebarNavItems(
     [
       buildSourceGroup({
         profileId: "sbp_docs",
@@ -213,80 +204,83 @@ describe("filterSessionsSidebarNavGroups", () => {
     },
   );
 
-  it("returns the original groups when the query is empty", () => {
+  it("returns the original item list when the query is empty", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
           searchQuery: "   ",
         },
       }),
-    ).toStrictEqual(groups);
+    ).toStrictEqual(items);
   });
 
   it("matches items by session title", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
           searchQuery: "draft",
         },
       }),
     ).toStrictEqual([
       {
-        profileId: "sbp_docs",
+        id: "sbi_docs",
+        label: "Draft onboarding guide",
         profileName: "Docs Maintainer",
-        items: [
-          {
-            id: "sbi_docs",
-            label: "Draft onboarding guide",
-            metadataLabel: "1h",
-            to: "/sessions/sbi_docs",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-09T23:00:00.000Z",
-          },
-        ],
+        metadataLabel: "1h",
+        to: "/sessions/sbi_docs",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-09T23:00:00.000Z",
       },
       {
-        profileId: "sbp_repo",
+        id: "sbi_repo_idle",
+        label: "Review migration draft",
         profileName: "Repo Maintainer",
-        items: [
-          {
-            id: "sbi_repo_idle",
-            label: "Review migration draft",
-            metadataLabel: "Idle",
-            to: "/sessions/sbi_repo_idle",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          },
-        ],
+        metadataLabel: "Idle",
+        to: "/sessions/sbi_repo_idle",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
     ]);
   });
 
   it("matches items by profile name", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
-          searchQuery: "finance",
+          searchQuery: "repo",
         },
       }),
     ).toStrictEqual([
       {
-        profileId: "sbp_finance",
-        profileName: "Finance Investigator",
-        items: [
-          {
-            id: "sbi_finance",
-            label: "Untitled",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_finance",
-            showActivityIndicator: false,
-            updatedAt: "2026-04-08T00:00:00.000Z",
-          },
-        ],
+        id: "sbi_repo_active",
+        label: "Investigate flaky test run",
+        profileName: "Repo Maintainer",
+        metadataLabel: "Working",
+        to: "/sessions/sbi_repo_active",
+        showActivityIndicator: true,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
+      {
+        id: "sbi_repo_idle",
+        label: "Review migration draft",
+        profileName: "Repo Maintainer",
+        metadataLabel: "Idle",
+        to: "/sessions/sbi_repo_idle",
+        showActivityIndicator: false,
+        updatedAt: "2026-04-08T00:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("breaks equal updatedAt ties by id for deterministic order", () => {
+    expect(items.map((item) => item.id)).toStrictEqual([
+      "sbi_docs",
+      "sbi_finance",
+      "sbi_repo_active",
+      "sbi_repo_idle",
     ]);
   });
 });
