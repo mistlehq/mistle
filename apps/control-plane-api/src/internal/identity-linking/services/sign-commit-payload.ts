@@ -22,7 +22,8 @@ import { InternalIdentityLinkingError, InternalIdentityLinkingErrorCodes } from 
 
 const SshSigningFormat = "ssh";
 const CommitSignSignatureEncoding = "pem";
-const CommitSignBinaryPath = "/usr/local/bin/commit-sign";
+const CommitSignBinaryPath =
+  process.env.MISTLE_COMMIT_SIGN_BINARY_PATH?.trim() || "/usr/local/bin/commit-sign";
 
 const CommitSignResponseSchema = z
   .object({
