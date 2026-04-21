@@ -140,7 +140,24 @@ export const listSandboxInstancesResponseSchema = createKeysetPaginationEnvelope
 
 export const listSessionSidebarGroupsQuerySchema = z
   .object({
-    limit: createKeysetPageSizeSchema({ defaultLimit: 100, maxLimit: 100 }),
+    limit: z.preprocess(
+      (rawValue) => {
+        if (rawValue === undefined) {
+          return undefined;
+        }
+
+        if (typeof rawValue === "number") {
+          return rawValue;
+        }
+
+        if (typeof rawValue === "string") {
+          return Number(rawValue);
+        }
+
+        return rawValue;
+      },
+      createKeysetPageSizeSchema({ defaultLimit: 100, maxLimit: 100 }),
+    ),
   })
   .strict();
 
