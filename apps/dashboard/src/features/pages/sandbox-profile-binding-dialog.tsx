@@ -11,7 +11,7 @@ import {
 } from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
-import { IntegrationHorizontalFieldGroupClassName } from "../forms/schema-form.js";
+import { SchemaFormHorizontalFieldGroupClassName } from "../forms/schema-form.js";
 import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import {
   SandboxProfileBindingConfigEditor,
@@ -73,7 +73,7 @@ export function SandboxProfileBindingDialog(input: {
             {state.mode === "add" ? formatAddBindingLabel(state.row.kind) : "Edit binding"}
           </DialogTitle>
         </DialogHeader>
-        <div className={IntegrationHorizontalFieldGroupClassName}>
+        <div className={SchemaFormHorizontalFieldGroupClassName}>
           <Field className="gap-2" contentWidth="fill" orientation="horizontal">
             <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
             <FieldContent>

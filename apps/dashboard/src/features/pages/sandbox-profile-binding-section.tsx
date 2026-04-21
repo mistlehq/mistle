@@ -17,7 +17,7 @@ import {
 import { InfoIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import * as React from "react";
 
-import { IntegrationSelectContentClassName } from "../forms/schema-form.js";
+import { SchemaFormSelectContentClassName } from "../forms/schema-form.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -790,7 +790,7 @@ function AgentHarnessRowEditor(input: {
                   <SelectTrigger aria-label="Default model" className="w-full">
                     <SelectValue placeholder="Select model">{currentDefaultModel}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className={IntegrationSelectContentClassName}>
+                  <SelectContent className={SchemaFormSelectContentClassName}>
                     {defaultModelOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -826,7 +826,7 @@ function AgentHarnessRowEditor(input: {
                       {currentReasoningEffort}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className={IntegrationSelectContentClassName}>
+                  <SelectContent className={SchemaFormSelectContentClassName}>
                     {reasoningEffortOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
