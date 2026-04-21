@@ -96,6 +96,10 @@ export function ChatThread({
               {...(group.userEntry.attachments === undefined
                 ? {}
                 : { attachments: group.userEntry.attachments })}
+              {...(group.userEntry.labelAction === undefined
+                ? {}
+                : { labelAction: group.userEntry.labelAction })}
+              {...(group.userEntry.label === undefined ? {} : { label: group.userEntry.label })}
               text={group.userEntry.text}
             />
           )}

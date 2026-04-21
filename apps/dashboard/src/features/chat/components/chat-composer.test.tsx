@@ -192,4 +192,37 @@ describe("ChatComposer", () => {
 
     expect(screen.queryByText("3 comments")).toBeNull();
   });
+
+  it("routes Cmd/Ctrl+Enter to the secondary submit action when provided", () => {
+    let submitCount = 0;
+    let secondarySubmitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerText="Queue this for later."
+        keyboardShortcuts={[
+          { action: "Steer", shortcut: "enter" },
+          { action: "Queue", shortcut: "mod-enter" },
+        ]}
+        onSecondarySubmit={() => {
+          secondarySubmitCount += 1;
+        }}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+        secondarySubmitDisabled={false}
+        submitMode="steer"
+        submitLabel="Steer"
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      key: "Enter",
+      metaKey: true,
+    });
+
+    expect(secondarySubmitCount).toBe(1);
+    expect(submitCount).toBe(0);
+  });
 });

@@ -55,11 +55,17 @@ export type ChatComposerViewModel = {
   submitLabel: string;
   submitDisabled: boolean;
   submitDisabledReason: string | null;
+  keyboardShortcuts?: readonly {
+    action: string;
+    shortcut: string;
+  }[];
+  secondarySubmitDisabled?: boolean;
   canUploadAttachments: boolean;
   isUploadingAttachments: boolean;
   configControlsDisabled: boolean;
   onComposerTextChange: (value: string) => void;
   onSubmit: () => void;
+  onSecondarySubmit?: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
   onPendingImageFilesAdded: (files: readonly File[]) => void;
@@ -78,11 +84,14 @@ export function ChatComposer({
   submitMode,
   submitLabel,
   submitDisabled,
+  keyboardShortcuts,
+  secondarySubmitDisabled = true,
   canUploadAttachments,
   isUploadingAttachments,
   configControlsDisabled,
   onComposerTextChange,
   onSubmit,
+  onSecondarySubmit,
   onModelChange,
   onReasoningEffortChange,
   onPendingImageFilesAdded,
@@ -197,6 +206,15 @@ export function ChatComposer({
           }
 
           event.preventDefault();
+          if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
+            if (secondarySubmitDisabled) {
+              return;
+            }
+
+            onSecondarySubmit();
+            return;
+          }
+
           if (submitDisabled) {
             return;
           }
@@ -290,21 +308,40 @@ export function ChatComposer({
           </Select>
         </div>
 
-        <Button
-          aria-label={submitLabel}
-          className={[
-            "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
-            isSubmitPending ? "disabled:opacity-100" : null,
-          ].join(" ")}
-          disabled={submitDisabled}
-          onClick={onSubmit}
-          size="icon-fill"
-          title={submitLabel}
-          type="button"
-          variant="ghost"
-        >
-          {composerActionIcon}
-        </Button>
+        <div className="group/submit relative shrink-0">
+          {keyboardShortcuts === undefined || keyboardShortcuts.length === 0 ? null : (
+            <div className="bg-background/95 pointer-events-none absolute right-0 bottom-full mb-3 min-w-[10.5rem] translate-y-1 rounded-[1.35rem] border px-4 py-3 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover/submit:translate-y-0 group-hover/submit:opacity-100 group-focus-within/submit:translate-y-0 group-focus-within/submit:opacity-100 backdrop-blur-xs">
+              <div className="space-y-2">
+                {keyboardShortcuts.map((shortcutHint) => (
+                  <div
+                    className="flex items-center justify-between gap-4 text-sm"
+                    key={`${shortcutHint.action}:${shortcutHint.shortcut}`}
+                  >
+                    <span>{shortcutHint.action}</span>
+                    <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 font-medium">
+                      {shortcutHint.shortcut}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <Button
+            aria-label={submitLabel}
+            className={[
+              "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
+              isSubmitPending ? "disabled:opacity-100" : null,
+            ].join(" ")}
+            disabled={submitDisabled}
+            onClick={onSubmit}
+            size="icon-fill"
+            title={submitLabel}
+            type="button"
+            variant="ghost"
+          >
+            {composerActionIcon}
+          </Button>
+        </div>
       </div>
     </div>
   );
