@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_tungstenite::connect_async;
@@ -18,6 +18,7 @@ use crate::codex_proxy::{
     wait_for_response,
 };
 use crate::keepalive::KeepaliveManager;
+use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 
 const INITIALIZE_CLIENT_TITLE: &str = "Mistle sandboxd Codex session manager";
 const INITIALIZE_CLIENT_VERSION: &str = "0.0.0";
@@ -114,6 +115,110 @@ struct SessionManagerStatusSinks<'a> {
     health_state_sender: &'a watch::Sender<CodexSessionManagerHealthState>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ThreadStatusUpdateSource {
+    LiveResume,
+    ReplayResume,
+    StatusChanged,
+}
+
+impl ThreadStatusUpdateSource {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::LiveResume => "live_resume",
+            Self::ReplayResume => "replay_resume",
+            Self::StatusChanged => "status_changed",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ThreadStatusUpdate {
+    thread_id: String,
+    status: CodexThreadStatus,
+    source: ThreadStatusUpdateSource,
+}
+
+impl ThreadStatusUpdate {
+    fn new(thread_id: String, status: CodexThreadStatus, source: ThreadStatusUpdateSource) -> Self {
+        Self {
+            thread_id,
+            status,
+            source,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct SessionManagerSessionEnd {
+    reason: SessionManagerSessionEndReason,
+    error: Option<CodexProxyError>,
+}
+
+impl SessionManagerSessionEnd {
+    fn completed(reason: SessionManagerSessionEndReason) -> Self {
+        Self {
+            reason,
+            error: None,
+        }
+    }
+
+    fn failed(reason: SessionManagerSessionEndReason, error: CodexProxyError) -> Self {
+        Self {
+            reason,
+            error: Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionManagerSessionEndReason {
+    ShutdownRequested,
+    CommandChannelClosed,
+    RawSocketClosed,
+    InitializeFailed,
+    ReadLoadedThreadIdsFailed,
+    ReadLoadedThreadsFailed,
+    ApplyInitialUpdatesFailed,
+    ReplayRetainedThreadsFailed,
+    HandleCommandFailed,
+    ReadSocketFailed,
+    ApplyStatusUpdateFailed,
+}
+
+impl SessionManagerSessionEndReason {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ShutdownRequested => "shutdown_requested",
+            Self::CommandChannelClosed => "command_channel_closed",
+            Self::RawSocketClosed => "raw_socket_closed",
+            Self::InitializeFailed => "initialize_failed",
+            Self::ReadLoadedThreadIdsFailed => "read_loaded_thread_ids_failed",
+            Self::ReadLoadedThreadsFailed => "read_loaded_threads_failed",
+            Self::ApplyInitialUpdatesFailed => "apply_initial_updates_failed",
+            Self::ReplayRetainedThreadsFailed => "replay_retained_threads_failed",
+            Self::HandleCommandFailed => "handle_command_failed",
+            Self::ReadSocketFailed => "read_socket_failed",
+            Self::ApplyStatusUpdateFailed => "apply_status_update_failed",
+        }
+    }
+
+    fn level(self) -> &'static str {
+        match self {
+            Self::ShutdownRequested | Self::CommandChannelClosed => "info",
+            Self::RawSocketClosed => "warn",
+            Self::InitializeFailed
+            | Self::ReadLoadedThreadIdsFailed
+            | Self::ReadLoadedThreadsFailed
+            | Self::ApplyInitialUpdatesFailed
+            | Self::ReplayRetainedThreadsFailed
+            | Self::HandleCommandFailed
+            | Self::ReadSocketFailed
+            | Self::ApplyStatusUpdateFailed => "error",
+        }
+    }
+}
+
 async fn run_codex_session_manager_loop(
     raw_app_server_url: &str,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
@@ -133,7 +238,7 @@ async fn run_codex_session_manager_loop(
         let status_sinks = SessionManagerStatusSinks {
             health_state_sender: &health_state_sender,
         };
-        let session_result = run_codex_session_manager_session(
+        let session_end = run_codex_session_manager_session(
             raw_app_server_url,
             &mut monitor,
             &mut manager_state,
@@ -143,6 +248,7 @@ async fn run_codex_session_manager_loop(
             &mut command_receiver,
         )
         .await;
+        emit_session_manager_session_end_log(raw_app_server_url, &manager_state, &session_end);
 
         if let Ok(mut keepalive_manager) = keepalive_manager.lock() {
             monitor.clear(&mut keepalive_manager);
@@ -161,7 +267,7 @@ async fn run_codex_session_manager_loop(
             _ = tokio::time::sleep(DEFAULT_CODEX_MONITOR_RECONNECT_INTERVAL) => {}
         }
 
-        if let Err(error) = session_result {
+        if let Some(error) = session_end.error {
             let _ = error;
         }
     }
@@ -175,24 +281,53 @@ async fn run_codex_session_manager_session(
     status_sinks: &SessionManagerStatusSinks<'_>,
     shutdown_receiver: &mut watch::Receiver<bool>,
     command_receiver: &mut mpsc::Receiver<CodexSessionManagerCommand>,
-) -> Result<(), CodexProxyError> {
-    let (mut socket, _) = connect_async(raw_app_server_url)
-        .await
-        .map_err(CodexProxyError::ConnectRaw)?;
+) -> SessionManagerSessionEnd {
+    let (mut socket, _) =
+        match (connect_async(raw_app_server_url).await).map_err(CodexProxyError::ConnectRaw) {
+            Ok(value) => value,
+            Err(error) => {
+                return SessionManagerSessionEnd::failed(
+                    SessionManagerSessionEndReason::InitializeFailed,
+                    error,
+                );
+            }
+        };
 
-    initialize_session(&mut socket, shutdown_receiver).await?;
+    if let Err(error) = initialize_session(&mut socket, shutdown_receiver).await {
+        return SessionManagerSessionEnd::failed(
+            SessionManagerSessionEndReason::InitializeFailed,
+            error,
+        );
+    }
 
     let mut pending_updates = Vec::new();
     let loaded_thread_ids =
-        read_loaded_thread_ids(&mut socket, shutdown_receiver, &mut pending_updates).await?;
-    let threads = read_loaded_threads(
+        match read_loaded_thread_ids(&mut socket, shutdown_receiver, &mut pending_updates).await {
+            Ok(value) => value,
+            Err(error) => {
+                return SessionManagerSessionEnd::failed(
+                    SessionManagerSessionEndReason::ReadLoadedThreadIdsFailed,
+                    error,
+                );
+            }
+        };
+    let threads = match read_loaded_threads(
         &mut socket,
         manager_state,
         shutdown_receiver,
         &loaded_thread_ids,
         &mut pending_updates,
     )
-    .await?;
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            return SessionManagerSessionEnd::failed(
+                SessionManagerSessionEndReason::ReadLoadedThreadsFailed,
+                error,
+            );
+        }
+    };
 
     {
         let mut keepalive_manager = keepalive_manager
@@ -206,37 +341,57 @@ async fn run_codex_session_manager_session(
         }
     }
 
-    apply_pending_updates(
+    let mut pending_snapshot_updates = pending_updates
+        .into_iter()
+        .map(|(thread_id, status)| {
+            ThreadStatusUpdate::new(thread_id, status, ThreadStatusUpdateSource::StatusChanged)
+        })
+        .collect::<Vec<_>>();
+    if let Err(error) = apply_pending_updates(
         &mut socket,
         manager_state,
         monitor,
         keepalive_manager,
-        &mut pending_updates,
+        &mut pending_snapshot_updates,
         shutdown_receiver,
     )
-    .await?;
+    .await
+    {
+        return SessionManagerSessionEnd::failed(
+            SessionManagerSessionEndReason::ApplyInitialUpdatesFailed,
+            error,
+        );
+    }
 
     manager_state.initialized = true;
     let _ = status_sinks
         .health_state_sender
         .send(CodexSessionManagerHealthState::Connected);
 
-    replay_retained_threads(
+    if let Err(error) = replay_retained_threads(
         &mut socket,
         manager_state,
         monitor,
         keepalive_manager,
         shutdown_receiver,
     )
-    .await?;
+    .await
+    {
+        return SessionManagerSessionEnd::failed(
+            SessionManagerSessionEndReason::ReplayRetainedThreadsFailed,
+            error,
+        );
+    }
 
     loop {
         tokio::select! {
-            _ = shutdown_receiver.changed() => return Ok(()),
+            _ = shutdown_receiver.changed() => {
+                return SessionManagerSessionEnd::completed(SessionManagerSessionEndReason::ShutdownRequested);
+            }
             command = command_receiver.recv() => {
                 match command {
                     Some(command) => {
-                        if handle_command(
+                        let should_shutdown = match handle_command(
                             command,
                             &mut socket,
                             manager_state,
@@ -244,21 +399,53 @@ async fn run_codex_session_manager_session(
                             keepalive_manager,
                             shutdown_receiver,
                         )
-                        .await? {
-                            return Ok(());
+                        .await {
+                            Ok(should_shutdown) => should_shutdown,
+                            Err(error) => {
+                                return SessionManagerSessionEnd::failed(
+                                    SessionManagerSessionEndReason::HandleCommandFailed,
+                                    error,
+                                );
+                            }
+                        };
+                        if should_shutdown {
+                            return SessionManagerSessionEnd::completed(SessionManagerSessionEndReason::ShutdownRequested);
                         }
                     }
-                    None => return Ok(()),
+                    None => {
+                        return SessionManagerSessionEnd::completed(SessionManagerSessionEndReason::CommandChannelClosed);
+                    }
                 }
             }
             message = socket.next() => {
                 let Some(message) = message else {
-                    return Ok(());
+                    return SessionManagerSessionEnd::completed(SessionManagerSessionEndReason::RawSocketClosed);
                 };
-                let message = message.map_err(CodexProxyError::ReadSocket)?;
-                if let Some((thread_id, status)) = parse_thread_status_changed_message(&message)? {
-                    let mut pending_updates = vec![(thread_id, status)];
-                    apply_pending_updates(
+                let message = match message.map_err(CodexProxyError::ReadSocket) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return SessionManagerSessionEnd::failed(
+                            SessionManagerSessionEndReason::ReadSocketFailed,
+                            error,
+                        );
+                    }
+                };
+                let status_update = match parse_thread_status_changed_message(&message) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return SessionManagerSessionEnd::failed(
+                            SessionManagerSessionEndReason::ReadSocketFailed,
+                            error,
+                        );
+                    }
+                };
+                if let Some((thread_id, status)) = status_update {
+                    let mut pending_updates = vec![ThreadStatusUpdate::new(
+                        thread_id,
+                        status,
+                        ThreadStatusUpdateSource::StatusChanged,
+                    )];
+                    if let Err(error) = apply_pending_updates(
                         &mut socket,
                         manager_state,
                         monitor,
@@ -266,7 +453,13 @@ async fn run_codex_session_manager_session(
                         &mut pending_updates,
                         shutdown_receiver,
                     )
-                    .await?;
+                    .await
+                    {
+                        return SessionManagerSessionEnd::failed(
+                            SessionManagerSessionEndReason::ApplyStatusUpdateFailed,
+                            error,
+                        );
+                    }
                 }
             }
         }
@@ -360,7 +553,10 @@ async fn handle_retain_thread(
         .get(thread_id)
         .map(|state| {
             state.retain_reasons.contains(&reason)
-                && matches!(state.subscription_state, ThreadSubscriptionState::Subscribed)
+                && matches!(
+                    state.subscription_state,
+                    ThreadSubscriptionState::Subscribed
+                )
         })
         .unwrap_or(false);
     if already_subscribed {
@@ -383,11 +579,24 @@ async fn handle_retain_thread(
     .await
     {
         Ok((status, mut pending_updates)) => {
+            emit_replay_resume_status_log(
+                "codex_session_manager_live_resume_status",
+                thread_id,
+                &status,
+                ThreadStatusUpdateSource::LiveResume,
+            );
             if let Some(retained_thread) = manager_state.retained_threads.get_mut(thread_id) {
                 retained_thread.last_status = Some(status.clone());
                 retained_thread.subscription_state = ThreadSubscriptionState::Subscribed;
             }
-            pending_updates.insert(0, (thread_id.to_string(), status));
+            pending_updates.insert(
+                0,
+                ThreadStatusUpdate::new(
+                    thread_id.to_string(),
+                    status,
+                    ThreadStatusUpdateSource::LiveResume,
+                ),
+            );
             apply_pending_updates(
                 socket,
                 manager_state,
@@ -456,9 +665,10 @@ async fn handle_release_thread(
                 .map_err(CommandExecutionError::Transport)?;
             }
             Err(CommandRequestError::Rejected { message })
-                if is_release_success_message(&message) => {
-                    manager_state.retained_threads.remove(thread_id);
-                }
+                if is_release_success_message(&message) =>
+            {
+                manager_state.retained_threads.remove(thread_id);
+            }
             Err(CommandRequestError::Rejected { message }) => {
                 return Err(CommandExecutionError::Command(
                     CodexSessionManagerError::RequestRejected {
@@ -508,13 +718,27 @@ async fn replay_retained_threads(
             continue;
         }
 
-        match resume_thread_subscription(socket, manager_state, shutdown_receiver, &thread_id).await {
+        match resume_thread_subscription(socket, manager_state, shutdown_receiver, &thread_id).await
+        {
             Ok((status, mut pending_updates)) => {
+                emit_replay_resume_status_log(
+                    "codex_session_manager_replay_resume_status",
+                    &thread_id,
+                    &status,
+                    ThreadStatusUpdateSource::ReplayResume,
+                );
                 if let Some(retained_thread) = manager_state.retained_threads.get_mut(&thread_id) {
                     retained_thread.last_status = Some(status.clone());
                     retained_thread.subscription_state = ThreadSubscriptionState::Subscribed;
                 }
-                pending_updates.insert(0, (thread_id.clone(), status));
+                pending_updates.insert(
+                    0,
+                    ThreadStatusUpdate::new(
+                        thread_id.clone(),
+                        status,
+                        ThreadStatusUpdateSource::ReplayResume,
+                    ),
+                );
                 apply_pending_updates(
                     socket,
                     manager_state,
@@ -525,7 +749,9 @@ async fn replay_retained_threads(
                 )
                 .await?;
             }
-            Err(CommandRequestError::Rejected { message }) if is_missing_thread_message(&message) => {
+            Err(CommandRequestError::Rejected { message })
+                if is_missing_thread_message(&message) =>
+            {
                 eprintln!(
                     "sandboxd Codex session manager removed stale retained thread {thread_id}: {message}"
                 );
@@ -552,19 +778,18 @@ async fn apply_pending_updates(
     manager_state: &mut CodexSessionManagerState,
     monitor: &mut CodexMonitor,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
-    pending_updates: &mut Vec<(String, CodexThreadStatus)>,
+    pending_updates: &mut Vec<ThreadStatusUpdate>,
     shutdown_receiver: &mut watch::Receiver<bool>,
 ) -> Result<(), CodexProxyError> {
     let mut queued_updates = VecDeque::from(std::mem::take(pending_updates));
-    while let Some((thread_id, status)) = queued_updates.pop_front() {
+    while let Some(update) = queued_updates.pop_front() {
         let additional_updates = apply_one_thread_status_update(
             socket,
             manager_state,
             monitor,
             keepalive_manager,
             shutdown_receiver,
-            &thread_id,
-            status,
+            update,
         )
         .await?;
         queued_updates.extend(additional_updates);
@@ -578,17 +803,21 @@ async fn apply_one_thread_status_update(
     monitor: &mut CodexMonitor,
     keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
     shutdown_receiver: &mut watch::Receiver<bool>,
-    thread_id: &str,
-    status: CodexThreadStatus,
-) -> Result<Vec<(String, CodexThreadStatus)>, CodexProxyError> {
+    update: ThreadStatusUpdate,
+) -> Result<Vec<ThreadStatusUpdate>, CodexProxyError> {
+    let ThreadStatusUpdate {
+        thread_id,
+        status,
+        source,
+    } = update;
     {
         let mut keepalive_manager = keepalive_manager
             .lock()
             .expect("Codex keepalive manager lock should not be poisoned");
-        monitor.apply_thread_status(thread_id, &status, &mut keepalive_manager);
+        monitor.apply_thread_status(&thread_id, &status, &mut keepalive_manager);
     }
 
-    let Some(retained_thread) = manager_state.retained_threads.get_mut(thread_id) else {
+    let Some(retained_thread) = manager_state.retained_threads.get_mut(&thread_id) else {
         return Ok(Vec::new());
     };
     retained_thread.last_status = Some(status.clone());
@@ -598,7 +827,7 @@ async fn apply_one_thread_status_update(
 
     let mut retained_thread = manager_state
         .retained_threads
-        .remove(thread_id)
+        .remove(&thread_id)
         .expect("retained thread should still exist");
     retained_thread
         .retain_reasons
@@ -607,7 +836,7 @@ async fn apply_one_thread_status_update(
     if !retained_thread.retain_reasons.is_empty() {
         manager_state
             .retained_threads
-            .insert(thread_id.to_string(), retained_thread);
+            .insert(thread_id, retained_thread);
         return Ok(Vec::new());
     }
 
@@ -615,7 +844,14 @@ async fn apply_one_thread_status_update(
         retained_thread.subscription_state,
         ThreadSubscriptionState::Subscribed
     ) {
-        match unsubscribe_thread(socket, manager_state, shutdown_receiver, thread_id).await {
+        emit_auto_release_triggered_log(
+            &thread_id,
+            &status,
+            source,
+            manager_state.retention_replay_in_progress,
+            &retained_thread.subscription_state,
+        );
+        match unsubscribe_thread(socket, manager_state, shutdown_receiver, &thread_id).await {
             Ok(pending_updates) => return Ok(pending_updates),
             Err(CommandRequestError::Rejected { message })
                 if is_release_success_message(&message) => {}
@@ -738,9 +974,10 @@ async fn issue_thread_resume_with_live_retain_retry(
     manager_state: &mut CodexSessionManagerState,
     shutdown_receiver: &mut watch::Receiver<bool>,
     thread_id: &str,
-) -> Result<(CodexThreadStatus, Vec<(String, CodexThreadStatus)>), CommandRequestError> {
+) -> Result<(CodexThreadStatus, Vec<ThreadStatusUpdate>), CommandRequestError> {
     for attempt in 0..LIVE_RETAIN_MAX_ATTEMPTS {
-        match resume_thread_subscription(socket, manager_state, shutdown_receiver, thread_id).await {
+        match resume_thread_subscription(socket, manager_state, shutdown_receiver, thread_id).await
+        {
             Ok(result) => return Ok(result),
             Err(error)
                 if should_retry_live_retain_thread_resume(&error)
@@ -768,7 +1005,7 @@ async fn resume_thread_subscription(
     manager_state: &mut CodexSessionManagerState,
     shutdown_receiver: &mut watch::Receiver<bool>,
     thread_id: &str,
-) -> Result<(CodexThreadStatus, Vec<(String, CodexThreadStatus)>), CommandRequestError> {
+) -> Result<(CodexThreadStatus, Vec<ThreadStatusUpdate>), CommandRequestError> {
     let request_id = next_request_id(manager_state);
     let mut pending_updates = Vec::new();
     send_json_message(
@@ -791,7 +1028,15 @@ async fn resume_thread_subscription(
     }
 
     let status = parse_thread_read_response(&response).map_err(CommandRequestError::Transport)?;
-    Ok((status, pending_updates))
+    Ok((
+        status,
+        pending_updates
+            .into_iter()
+            .map(|(thread_id, status)| {
+                ThreadStatusUpdate::new(thread_id, status, ThreadStatusUpdateSource::StatusChanged)
+            })
+            .collect(),
+    ))
 }
 
 async fn unsubscribe_thread(
@@ -799,7 +1044,7 @@ async fn unsubscribe_thread(
     manager_state: &mut CodexSessionManagerState,
     shutdown_receiver: &mut watch::Receiver<bool>,
     thread_id: &str,
-) -> Result<Vec<(String, CodexThreadStatus)>, CommandRequestError> {
+) -> Result<Vec<ThreadStatusUpdate>, CommandRequestError> {
     let request_id = next_request_id(manager_state);
     let mut pending_updates = Vec::new();
     send_json_message(
@@ -821,7 +1066,12 @@ async fn unsubscribe_thread(
         return Err(CommandRequestError::Rejected { message });
     }
 
-    Ok(pending_updates)
+    Ok(pending_updates
+        .into_iter()
+        .map(|(thread_id, status)| {
+            ThreadStatusUpdate::new(thread_id, status, ThreadStatusUpdateSource::StatusChanged)
+        })
+        .collect())
 }
 
 fn next_request_id(manager_state: &mut CodexSessionManagerState) -> u64 {
@@ -878,20 +1128,156 @@ enum CommandExecutionError {
     Transport(CodexProxyError),
 }
 
+fn emit_session_manager_session_end_log(
+    raw_app_server_url: &str,
+    manager_state: &CodexSessionManagerState,
+    session_end: &SessionManagerSessionEnd,
+) {
+    let mut attributes = vec![
+        ("component", Value::String("CodexProxy".to_string())),
+        (
+            "rawAppServerUrl",
+            Value::String(raw_app_server_url.to_string()),
+        ),
+        (
+            "reason",
+            Value::String(session_end.reason.as_str().to_string()),
+        ),
+        (
+            "retainedThreadCount",
+            Value::from(manager_state.retained_threads.len() as u64),
+        ),
+        ("initialized", Value::Bool(manager_state.initialized)),
+        (
+            "retentionReplayInProgress",
+            Value::Bool(manager_state.retention_replay_in_progress),
+        ),
+    ];
+    if let Some(error) = &session_end.error {
+        attributes.push(("error", Value::String(error.to_string())));
+    }
+
+    emit_session_manager_log(
+        session_end.reason.level(),
+        "codex_session_manager_session_ended",
+        attributes,
+    );
+}
+
+fn emit_replay_resume_status_log(
+    event: &str,
+    thread_id: &str,
+    status: &CodexThreadStatus,
+    source: ThreadStatusUpdateSource,
+) {
+    emit_session_manager_log(
+        "info",
+        event,
+        vec![
+            ("component", Value::String("CodexProxy".to_string())),
+            ("threadId", Value::String(thread_id.to_string())),
+            (
+                "status",
+                Value::String(thread_status_name(status).to_string()),
+            ),
+            ("statusSource", Value::String(source.as_str().to_string())),
+        ],
+    );
+}
+
+fn emit_auto_release_triggered_log(
+    thread_id: &str,
+    status: &CodexThreadStatus,
+    source: ThreadStatusUpdateSource,
+    retention_replay_in_progress: bool,
+    subscription_state: &ThreadSubscriptionState,
+) {
+    emit_session_manager_log(
+        "warn",
+        "codex_session_manager_auto_release_triggered",
+        vec![
+            ("component", Value::String("CodexProxy".to_string())),
+            ("threadId", Value::String(thread_id.to_string())),
+            (
+                "status",
+                Value::String(thread_status_name(status).to_string()),
+            ),
+            ("statusSource", Value::String(source.as_str().to_string())),
+            (
+                "subscriptionState",
+                Value::String(thread_subscription_state_name(subscription_state).to_string()),
+            ),
+            (
+                "retentionReplayInProgress",
+                Value::Bool(retention_replay_in_progress),
+            ),
+        ],
+    );
+}
+
+fn emit_session_manager_log(level: &str, event: &str, attributes: Vec<(&str, Value)>) {
+    let Some(line) = serialize_session_manager_log_line(&SystemClock, level, event, &attributes)
+    else {
+        return;
+    };
+    eprint!("{line}");
+}
+
+fn serialize_session_manager_log_line(
+    clock: &dyn Clock,
+    level: &str,
+    event: &str,
+    attributes: &[(&str, Value)],
+) -> Option<String> {
+    let timestamp = format_rfc3339_timestamp(clock.now_system_time()).ok()?;
+    let mut payload = Map::new();
+    payload.insert("timestamp".to_string(), Value::String(timestamp));
+    payload.insert("level".to_string(), Value::String(level.to_string()));
+    payload.insert("event".to_string(), Value::String(event.to_string()));
+
+    for (key, value) in attributes {
+        payload.insert((*key).to_string(), value.clone());
+    }
+
+    let mut line = serde_json::to_string(&Value::Object(payload)).ok()?;
+    line.push('\n');
+    Some(line)
+}
+
+fn thread_status_name(status: &CodexThreadStatus) -> &'static str {
+    match status {
+        CodexThreadStatus::NotLoaded => "NotLoaded",
+        CodexThreadStatus::Idle => "Idle",
+        CodexThreadStatus::SystemError => "SystemError",
+        CodexThreadStatus::Active { .. } => "Active",
+    }
+}
+
+fn thread_subscription_state_name(state: &ThreadSubscriptionState) -> &'static str {
+    match state {
+        ThreadSubscriptionState::Requested => "Requested",
+        ThreadSubscriptionState::Subscribed => "Subscribed",
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
     use serde_json::json;
     use tokio::sync::oneshot;
 
+    use crate::codex_proxy::CodexThreadStatus;
     use crate::codex_proxy::session_manager::{
-        CommandExecutionError, THREAD_RESUME_METHOD, THREAD_UNSUBSCRIBE_METHOD,
-        is_missing_thread_message, is_release_success_message, next_request_id,
-        parse_response_error_message, reply_with_command_result,
+        CommandExecutionError, SessionManagerSessionEndReason, THREAD_RESUME_METHOD,
+        THREAD_UNSUBSCRIBE_METHOD, ThreadStatusUpdateSource, is_missing_thread_message,
+        is_release_success_message, next_request_id, parse_response_error_message,
+        reply_with_command_result, serialize_session_manager_log_line,
     };
     use crate::codex_proxy::types::{
         CodexSessionManagerCommand, CodexSessionManagerError, CodexSessionManagerState,
         RetainReason,
     };
+    use crate::time::testing::MutableClock;
 
     #[test]
     fn next_request_id_starts_at_three() {
@@ -914,7 +1300,9 @@ mod tests {
 
     #[test]
     fn detects_missing_thread_messages() {
-        assert!(is_missing_thread_message("no rollout found for thread id thr_123"));
+        assert!(is_missing_thread_message(
+            "no rollout found for thread id thr_123"
+        ));
         assert!(is_missing_thread_message("thread not found: thr_123"));
         assert!(!is_missing_thread_message("permission denied"));
     }
@@ -987,5 +1375,90 @@ mod tests {
             }
             _ => panic!("expected retain thread command"),
         }
+    }
+
+    #[test]
+    fn thread_status_update_source_strings_match_log_fields() {
+        assert_eq!(ThreadStatusUpdateSource::LiveResume.as_str(), "live_resume");
+        assert_eq!(
+            ThreadStatusUpdateSource::ReplayResume.as_str(),
+            "replay_resume"
+        );
+        assert_eq!(
+            ThreadStatusUpdateSource::StatusChanged.as_str(),
+            "status_changed"
+        );
+    }
+
+    #[test]
+    fn session_end_reason_strings_and_levels_match_expected_values() {
+        assert_eq!(
+            SessionManagerSessionEndReason::RawSocketClosed.as_str(),
+            "raw_socket_closed"
+        );
+        assert_eq!(
+            SessionManagerSessionEndReason::RawSocketClosed.level(),
+            "warn"
+        );
+        assert_eq!(
+            SessionManagerSessionEndReason::HandleCommandFailed.as_str(),
+            "handle_command_failed"
+        );
+        assert_eq!(
+            SessionManagerSessionEndReason::HandleCommandFailed.level(),
+            "error"
+        );
+    }
+
+    #[test]
+    fn serialize_session_manager_log_line_emits_otel_compatible_jsonl() {
+        let clock = MutableClock::new(1_650_000_000_000);
+        let line = serialize_session_manager_log_line(
+            &clock,
+            "warn",
+            "codex_session_manager_auto_release_triggered",
+            &[
+                ("component", Value::String("CodexProxy".to_string())),
+                ("threadId", Value::String("thr_123".to_string())),
+                ("status", Value::String("Idle".to_string())),
+            ],
+        )
+        .expect("log line should serialize");
+
+        let payload: Value = serde_json::from_str(&line).expect("line should parse as JSON");
+        assert_eq!(payload["level"], Value::String("warn".to_string()));
+        assert_eq!(
+            payload["event"],
+            Value::String("codex_session_manager_auto_release_triggered".to_string())
+        );
+        assert_eq!(
+            payload["component"],
+            Value::String("CodexProxy".to_string())
+        );
+        assert_eq!(payload["threadId"], Value::String("thr_123".to_string()));
+        assert_eq!(payload["status"], Value::String("Idle".to_string()));
+        assert_eq!(
+            payload["timestamp"],
+            Value::String("2022-04-15T05:20:00Z".to_string())
+        );
+    }
+
+    #[test]
+    fn thread_status_name_uses_codex_status_labels() {
+        assert_eq!(
+            super::thread_status_name(&CodexThreadStatus::NotLoaded),
+            "NotLoaded"
+        );
+        assert_eq!(super::thread_status_name(&CodexThreadStatus::Idle), "Idle");
+        assert_eq!(
+            super::thread_status_name(&CodexThreadStatus::SystemError),
+            "SystemError"
+        );
+        assert_eq!(
+            super::thread_status_name(&CodexThreadStatus::Active {
+                active_flags: Vec::new(),
+            }),
+            "Active"
+        );
     }
 }
