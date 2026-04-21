@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionSidebarGroup } from "../sessions/sessions-types.js";
 import {
   buildSessionsShellSidebarItems,
+  resolveNextSessionsShellSidebarRequestedLimit,
   resolveSessionsShellSidebarRequestedLimitAfterError,
   resolveSessionsShellSidebarHasMore,
   shouldResolveSessionsShellSidebarLimit,
@@ -106,8 +107,8 @@ describe("resolveSessionsShellSidebarHasMore", () => {
   it("keeps loading while the fetched item count still fills the requested limit", () => {
     expect(
       resolveSessionsShellSidebarHasMore({
-        itemCount: 30,
-        resolvedLimit: 30,
+        itemCount: 25,
+        resolvedLimit: 25,
       }),
     ).toBe(true);
   });
@@ -146,38 +147,61 @@ describe("resolveSessionsShellSidebarRequestedLimitAfterError", () => {
   it("rolls the requested limit back to the last successful limit after a load-more error", () => {
     expect(
       resolveSessionsShellSidebarRequestedLimitAfterError({
-        requestedLimit: 60,
-        resolvedLimit: 30,
+        requestedLimit: 50,
+        resolvedLimit: 25,
         isError: true,
         isFetching: false,
       }),
-    ).toBe(30);
+    ).toBe(25);
   });
 
   it("keeps the current request when no load-more error occurred", () => {
     expect(
       resolveSessionsShellSidebarRequestedLimitAfterError({
-        requestedLimit: 60,
-        resolvedLimit: 30,
+        requestedLimit: 50,
+        resolvedLimit: 25,
         isError: false,
         isFetching: false,
       }),
     ).toBeNull();
     expect(
       resolveSessionsShellSidebarRequestedLimitAfterError({
-        requestedLimit: 60,
-        resolvedLimit: 30,
+        requestedLimit: 50,
+        resolvedLimit: 25,
         isError: true,
         isFetching: true,
       }),
     ).toBeNull();
     expect(
       resolveSessionsShellSidebarRequestedLimitAfterError({
-        requestedLimit: 30,
-        resolvedLimit: 30,
+        requestedLimit: 25,
+        resolvedLimit: 25,
         isError: true,
         isFetching: false,
       }),
     ).toBeNull();
+  });
+});
+
+describe("resolveNextSessionsShellSidebarRequestedLimit", () => {
+  it("loads older sessions in 25-item steps", () => {
+    expect(
+      resolveNextSessionsShellSidebarRequestedLimit({
+        currentLimit: 25,
+      }),
+    ).toBe(50);
+  });
+
+  it("clamps the final request to the 100-item API cap", () => {
+    expect(
+      resolveNextSessionsShellSidebarRequestedLimit({
+        currentLimit: 75,
+      }),
+    ).toBe(100);
+    expect(
+      resolveNextSessionsShellSidebarRequestedLimit({
+        currentLimit: 100,
+      }),
+    ).toBe(100);
   });
 });

@@ -16,8 +16,9 @@ import {
 } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
-export const SESSIONS_SIDEBAR_INITIAL_LIMIT = 30;
-const SESSIONS_SIDEBAR_LIMIT_INCREMENT = 30;
+export const SESSIONS_SIDEBAR_INITIAL_LIMIT = 25;
+const SESSIONS_SIDEBAR_LIMIT_INCREMENT = 25;
+const SESSIONS_SIDEBAR_MAX_LIMIT = 100;
 
 export function buildSessionsShellSidebarItems(
   groups: readonly SessionSidebarGroup[],
@@ -69,6 +70,15 @@ export function resolveSessionsShellSidebarRequestedLimitAfterError(input: {
   return input.resolvedLimit;
 }
 
+export function resolveNextSessionsShellSidebarRequestedLimit(input: {
+  currentLimit: number;
+}): number {
+  return Math.min(
+    input.currentLimit + SESSIONS_SIDEBAR_LIMIT_INCREMENT,
+    SESSIONS_SIDEBAR_MAX_LIMIT,
+  );
+}
+
 export function SessionsShellSidebar(): React.JSX.Element {
   const [requestedLimit, setRequestedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
   const [resolvedLimit, setResolvedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
@@ -106,7 +116,11 @@ export function SessionsShellSidebar(): React.JSX.Element {
       kind: "loading",
       label: "Loading more",
     });
-    setRequestedLimit((currentLimit) => currentLimit + SESSIONS_SIDEBAR_LIMIT_INCREMENT);
+    setRequestedLimit((currentLimit) =>
+      resolveNextSessionsShellSidebarRequestedLimit({
+        currentLimit,
+      }),
+    );
   }, [hasMore, sandboxInstancesQuery.isFetching]);
 
   useEffect(() => {
