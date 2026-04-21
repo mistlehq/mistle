@@ -9,34 +9,12 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import { resolveBindingConfigSummaryItems } from "./sandbox-profile-binding-config-editor.js";
+import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 
 const DefaultSummaryItemCount = 2;
 
 function shouldRenderAllSummaryItems(kind: SandboxProfileBindingEditorRow["kind"]): boolean {
   return kind === "agent" || kind === "git";
-}
-
-function resolveRowBindingMetadata(input: {
-  row: SandboxProfileBindingEditorRow;
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-}): {
-  connection: IntegrationConnectionSummary;
-  target: IntegrationTargetSummary | undefined;
-} | null {
-  const connection = input.availableConnections.find(
-    (candidate) => candidate.id === input.row.connectionId,
-  );
-  if (connection === undefined) {
-    return null;
-  }
-
-  return {
-    connection,
-    target: input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    ),
-  };
 }
 
 export function SandboxProfileBindingCard(input: {

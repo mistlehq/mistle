@@ -15,7 +15,6 @@ import { formatConnectionDisplayName } from "../integrations/format-connection-d
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
-import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import { SandboxProfileBindingCard } from "./sandbox-profile-binding-card.js";
 import type {
   IntegrationConnectionSummary,
@@ -29,6 +28,10 @@ import {
   resolveBindingToolToggleModel,
   SandboxProfileBindingConfigEditor,
 } from "./sandbox-profile-binding-config-editor.js";
+import {
+  BindingConnectionField,
+  resolveRowBindingMetadata,
+} from "./sandbox-profile-binding-shared.js";
 
 export function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
@@ -62,29 +65,6 @@ export function shouldHideBindingSectionAddAction(input: {
   rowCount: number;
 }): boolean {
   return (input.kind === "agent" || input.kind === "git") && input.rowCount > 0;
-}
-
-function resolveRowBindingMetadata(input: {
-  row: SandboxProfileBindingEditorRow;
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-}): {
-  connection: IntegrationConnectionSummary;
-  target: IntegrationTargetSummary | undefined;
-} | null {
-  const connection = input.availableConnections.find(
-    (candidate) => candidate.id === input.row.connectionId,
-  );
-  if (connection === undefined) {
-    return null;
-  }
-
-  return {
-    connection,
-    target: input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    ),
-  };
 }
 
 function serializeBindingRowState(row: Omit<SandboxProfileBindingEditorRow, "clientId">): string {
@@ -135,45 +115,6 @@ function BindingDraftActions(input: {
       <Button disabled={!input.isDirty} onClick={input.onSave} type="button">
         Save
       </Button>
-    </div>
-  );
-}
-
-function BindingConnectionField(input: {
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  selectedConnectionId: string | null;
-  onValueChange: (nextConnectionId: string) => void;
-  placeholder: string;
-  ariaLabel: string;
-  disabled?: boolean;
-  id?: string;
-  trailingAction?: React.ReactNode;
-}): React.JSX.Element {
-  const field = (
-    <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-      <DetailLabel as="p">Connection</DetailLabel>
-      <IntegrationConnectionSelect
-        ariaLabel={input.ariaLabel}
-        availableConnections={input.availableConnections}
-        availableTargets={input.availableTargets}
-        onValueChange={input.onValueChange}
-        placeholder={input.placeholder}
-        selectedConnectionId={input.selectedConnectionId}
-        {...(input.id === undefined ? {} : { id: input.id })}
-        {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
-      />
-    </div>
-  );
-
-  if (input.trailingAction === undefined) {
-    return field;
-  }
-
-  return (
-    <div className="flex items-start justify-between gap-4">
-      {field}
-      {input.trailingAction}
     </div>
   );
 }
@@ -420,37 +361,6 @@ function ConnectorBindingRows(input: {
   emptyStateAction: React.ReactNode | undefined;
   emptyStateMessage: string | undefined;
 }): React.JSX.Element {
-  function resolveConfigSummaryItems(params: { row: SandboxProfileBindingEditorRow }) {
-    return resolveBindingConfigSummaryItems({
-      row: params.row,
-      connections: input.availableConnections,
-      targets: input.availableTargets,
-      excludedPropertyKeys: ["tools"],
-      maxItems: 3,
-    });
-  }
-
-  function renderConfigSummary(params: {
-    summaryItems: ReturnType<typeof resolveConfigSummaryItems>;
-  }): React.JSX.Element | null {
-    const summaryItems = params.summaryItems;
-
-    if (summaryItems.length === 0) {
-      return null;
-    }
-
-    return (
-      <div className="flex min-w-0 flex-col gap-2">
-        {summaryItems.map((item) => (
-          <div className="min-w-0" key={item.label}>
-            <DetailLabel as="p">{item.label}</DetailLabel>
-            <p className="truncate text-sm">{item.value}</p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   function renderToolContent(params: {
     row: SandboxProfileBindingEditorRow;
     toolToggleModel: ReturnType<typeof resolveBindingToolToggleModel>;
@@ -551,12 +461,24 @@ function ConnectorBindingRows(input: {
             targets: input.availableTargets,
           });
           const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
-          const summaryItems = resolveConfigSummaryItems({
+          const summaryItems = resolveBindingConfigSummaryItems({
             row,
+            connections: input.availableConnections,
+            targets: input.availableTargets,
+            excludedPropertyKeys: ["tools"],
+            maxItems: 3,
           });
-          const configSummary = renderConfigSummary({
-            summaryItems,
-          });
+          const configSummary =
+            summaryItems.length === 0 ? null : (
+              <div className="flex min-w-0 flex-col gap-2">
+                {summaryItems.map((item) => (
+                  <div className="min-w-0" key={item.label}>
+                    <DetailLabel as="p">{item.label}</DetailLabel>
+                    <p className="truncate text-sm">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            );
           const showEditAction = summaryItems.length > 0;
 
           return (
@@ -648,12 +570,24 @@ function ConnectorBindingRows(input: {
             targets: input.availableTargets,
           });
           const rowErrorMessage = input.rowErrorsByClientId[row.clientId];
-          const summaryItems = resolveConfigSummaryItems({
+          const summaryItems = resolveBindingConfigSummaryItems({
             row,
+            connections: input.availableConnections,
+            targets: input.availableTargets,
+            excludedPropertyKeys: ["tools"],
+            maxItems: 3,
           });
-          const configSummary = renderConfigSummary({
-            summaryItems,
-          });
+          const configSummary =
+            summaryItems.length === 0 ? null : (
+              <div className="flex min-w-0 flex-col gap-2">
+                {summaryItems.map((item) => (
+                  <div className="min-w-0" key={item.label}>
+                    <DetailLabel as="p">{item.label}</DetailLabel>
+                    <p className="truncate text-sm">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            );
           const showEditAction = summaryItems.length > 0;
 
           return (
