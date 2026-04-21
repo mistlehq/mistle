@@ -43,11 +43,7 @@ export function SessionsSidebarNav(input: {
   const hasActiveSearch = searchQuery.trim().length > 0;
 
   useEffect(() => {
-    if (
-      hasActiveSearch ||
-      input.infiniteScroll?.hasMore !== true ||
-      input.infiniteScroll.onReachEnd === undefined
-    ) {
+    if (input.infiniteScroll?.hasMore !== true || input.infiniteScroll.onReachEnd === undefined) {
       return;
     }
 
@@ -77,10 +73,25 @@ export function SessionsSidebarNav(input: {
     return () => {
       observer.disconnect();
     };
+  }, [input.infiniteScroll?.hasMore, input.infiniteScroll?.onReachEnd, visibleItems.length]);
+
+  useEffect(() => {
+    if (
+      !hasActiveSearch ||
+      visibleItems.length > 0 ||
+      input.infiniteScroll?.hasMore !== true ||
+      input.infiniteScroll.onReachEnd === undefined ||
+      input.infiniteScroll.statusBanner?.kind === "loading"
+    ) {
+      return;
+    }
+
+    input.infiniteScroll.onReachEnd();
   }, [
     hasActiveSearch,
     input.infiniteScroll?.hasMore,
     input.infiniteScroll?.onReachEnd,
+    input.infiniteScroll?.statusBanner?.kind,
     visibleItems.length,
   ]);
 
@@ -108,9 +119,18 @@ export function SessionsSidebarNav(input: {
         </SidebarGroupContent>
       </SidebarGroup>
       {visibleItems.length === 0 ? (
-        <div className="px-4 py-2 text-muted-foreground text-sm">
-          {input.items.length === 0 ? emptyMessage : "No sessions match your search."}
-        </div>
+        <>
+          <div className="px-4 py-2 text-muted-foreground text-sm">
+            {input.items.length === 0 ? emptyMessage : "No sessions match your search."}
+          </div>
+          {input.infiniteScroll?.statusBanner === undefined ? null : (
+            <div className="px-2 pb-0.5">
+              <SessionsSidebarInfiniteScrollStatusBanner
+                statusBanner={input.infiniteScroll.statusBanner}
+              />
+            </div>
+          )}
+        </>
       ) : (
         <SidebarGroup className="gap-0.5 pb-0.5">
           <SidebarGroupContent>
@@ -137,8 +157,7 @@ export function SessionsSidebarNav(input: {
                 );
               })}
             </SidebarMenu>
-            {hasActiveSearch || input.infiniteScroll === undefined ? null : input.infiniteScroll
-                .hasMore ? (
+            {input.infiniteScroll === undefined ? null : input.infiniteScroll.hasMore ? (
               <>
                 <div aria-hidden className="h-1" ref={infiniteScrollSentinelRef} />
                 <SessionsSidebarInfiniteScrollStatusBanner

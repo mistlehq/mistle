@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -93,6 +94,46 @@ function installIntersectionObserverStub(): void {
   });
 }
 
+function SearchAutoLoadHarness(): React.JSX.Element {
+  const [loadCount, setLoadCount] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  useEffect(() => {
+    if (isLoadingMore && loadCount > 0) {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, loadCount]);
+
+  return (
+    <div>
+      <span>load-count:{loadCount}</span>
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav
+            items={items}
+            infiniteScroll={{
+              hasMore: loadCount === 0,
+              onReachEnd: () => {
+                setIsLoadingMore(true);
+                setLoadCount((currentCount) => currentCount + 1);
+              },
+              ...(isLoadingMore ? {} : {}),
+              ...(isLoadingMore
+                ? {
+                    statusBanner: {
+                      kind: "loading" as const,
+                      label: "Loading more",
+                    },
+                  }
+                : {}),
+            }}
+          />
+        </MemoryRouter>
+      </SidebarProvider>
+    </div>
+  );
+}
+
 describe("SessionsSidebarNav", () => {
   installMatchMediaStub();
   installIntersectionObserverStub();
@@ -132,6 +173,19 @@ describe("SessionsSidebarNav", () => {
 
     expect(screen.getByRole("link", { name: /Draft onboarding guide/ })).toBeDefined();
     expect(screen.queryByRole("link", { name: /Investigate flaky test run/ })).toBeNull();
+  });
+
+  it("keeps requesting older pages while a search is active with no visible matches", async () => {
+    render(<SearchAutoLoadHarness />);
+
+    fireEvent.change(getSearchInput(), {
+      target: { value: "nonexistent-session" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText((content) => content === "load-count:1")).toBeDefined();
+    });
+    expect(screen.getByText("No sessions match your search.")).toBeDefined();
   });
 
   it("shows no terminal hint once older-session loading is exhausted", () => {
