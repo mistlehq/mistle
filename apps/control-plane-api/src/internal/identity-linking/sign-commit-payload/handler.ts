@@ -33,7 +33,6 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     {
       db: ctx.get("db"),
       integrationsConfig: config.integrations,
-      commitSignConfig: config.commitSign,
       sandboxBootstrapConfig,
     },
     parsedInput.data,

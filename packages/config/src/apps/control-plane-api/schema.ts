@@ -63,12 +63,6 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiCommitSignConfigSchema = z
-  .object({
-    binaryPath: z.string().min(1),
-  })
-  .strict();
-
 const ControlPlaneApiIntegrationsConfigObjectSchema = z
   .object({
     activeMasterEncryptionKeyVersion: z.number().int().min(1),
@@ -104,7 +98,6 @@ export const ControlPlaneApiConfigSchema = z
     dashboard: ControlPlaneApiDashboardConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
-    commitSign: ControlPlaneApiCommitSignConfigSchema,
     integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
   .strict();
@@ -118,7 +111,6 @@ export const PartialControlPlaneApiConfigSchema = z
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
-    commitSign: ControlPlaneApiCommitSignConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),
   })
   .strict();

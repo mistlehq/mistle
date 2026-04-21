@@ -26,7 +26,6 @@ function createControlPlaneApiEnvironment(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
-  commitSignBinaryPath: string;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -41,7 +40,6 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
     MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
-    MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: input.commitSignBinaryPath,
   };
 }
 
@@ -53,7 +51,6 @@ function startControlPlaneApiChildProcess(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
-  commitSignBinaryPath: string;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -103,7 +100,6 @@ export async function startControlPlaneApiProcess(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
-  commitSignBinaryPath: string;
 }): Promise<StartedControlPlaneApiProcess> {
   const childProcess = startControlPlaneApiChildProcess(input);
   const stdoutChunks: string[] = [];

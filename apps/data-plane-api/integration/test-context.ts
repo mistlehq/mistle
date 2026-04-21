@@ -23,7 +23,7 @@ import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
-import { getCommitSignBinaryPath } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { ensureCommitSignBinaryInstalled } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import { createDataPlaneApiRuntime } from "../src/main.js";
 import type { DataPlaneApiConfig } from "../src/types.js";
 
@@ -222,7 +222,6 @@ function createControlPlaneApiEnvironment(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: string;
-  commitSignBinaryPath: string;
 }): NodeJS.ProcessEnv {
   return {
     ...process.env,
@@ -237,7 +236,6 @@ function createControlPlaneApiEnvironment(input: {
     MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
     MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
     MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND: input.sandboxStorageBackend,
-    MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: input.commitSignBinaryPath,
   };
 }
 
@@ -249,7 +247,6 @@ function startControlPlaneApiChildProcess(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: string;
-  commitSignBinaryPath: string;
 }): ControlPlaneApiChildProcess {
   return spawn(
     "pnpm",
@@ -349,7 +346,6 @@ async function startControlPlaneApiProcess(input: {
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
   sandboxStorageBackend: string;
-  commitSignBinaryPath: string;
 }): Promise<StartedControlPlaneApiProcess> {
   const baseUrl = `http://${input.host}:${String(input.port)}`;
   const childProcess = startControlPlaneApiChildProcess(input);
@@ -386,6 +382,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
     async ({}, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
       const sharedInfraConfig = await readSharedInfraConfig();
+      await ensureCommitSignBinaryInstalled();
       const runtimeDatabaseName = createFileScopedDatabaseName({
         integrationRunId: sharedInfraConfig.integrationRunId,
         filePath: getCurrentVitestFilePath(),
@@ -488,7 +485,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           workflowNamespaceId: sharedInfraConfig.workflowNamespaceId,
           internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
           sandboxStorageBackend: SandboxStorageBackend.DOCKER_VOLUME,
-          commitSignBinaryPath: getCommitSignBinaryPath(),
         });
         cleanupTasks.unshift(async () => {
           await controlPlaneRuntime.stop();

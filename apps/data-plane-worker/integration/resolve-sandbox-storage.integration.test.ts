@@ -29,7 +29,7 @@ import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-h
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { getCommitSignBinaryPath } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { ensureCommitSignBinaryInstalled } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { insertSandboxInstanceStorage } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
@@ -133,6 +133,7 @@ async function seedOrganizationWithCredentialKey(input: { organizationId: string
 
 describe("resolve ready Archil sandbox storage integration", () => {
   beforeAll(async () => {
+    await ensureCommitSignBinaryInstalled();
     databaseStack = await startPostgresWithPgBouncer();
 
     await runControlPlaneMigrations({
@@ -164,7 +165,6 @@ describe("resolve ready Archil sandbox storage integration", () => {
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
       sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
-      commitSignBinaryPath: getCommitSignBinaryPath(),
     });
   }, IntegrationTestTimeoutMs);
 

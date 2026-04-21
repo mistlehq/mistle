@@ -187,39 +187,3 @@ describe("control-plane api auth google config", () => {
     ).toThrow("clientSecret");
   });
 });
-
-describe("control-plane api commit-sign config", () => {
-  it("loads commit-sign config from env when fully configured", () => {
-    const loaded = loadControlPlaneApiFromEnv({
-      MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: "/usr/local/bin/commit-sign",
-    });
-
-    expect(loaded.commitSign).toEqual({
-      binaryPath: "/usr/local/bin/commit-sign",
-    });
-  });
-
-  it("loads commit-sign config from toml when fully configured", () => {
-    const loaded = loadControlPlaneApiFromToml({
-      apps: {
-        control_plane_api: {
-          commit_sign: {
-            binary_path: "/usr/local/bin/commit-sign",
-          },
-          server: {},
-          database: {},
-          object_store: {},
-          auth: {},
-          dashboard: {},
-          workflow: {},
-          data_plane_api: {},
-          integrations: {},
-        },
-      },
-    });
-
-    expect(loaded.commitSign).toEqual({
-      binaryPath: "/usr/local/bin/commit-sign",
-    });
-  });
-});

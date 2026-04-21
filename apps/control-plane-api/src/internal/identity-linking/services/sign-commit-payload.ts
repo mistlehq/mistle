@@ -19,6 +19,7 @@ import { InternalIdentityLinkingError, InternalIdentityLinkingErrorCodes } from 
 const GitSshSigningCredentialKind = "git_ssh_signing_key";
 const SshSigningFormat = "ssh";
 const CommitSignSignatureEncoding = "pem";
+const CommitSignBinaryPath = "/usr/local/bin/commit-sign";
 
 const GitSigningSecretMetadataSchema = z
   .object({
@@ -71,12 +72,11 @@ function resolveRequestedKeyRefOrThrow(keyRef: string): string {
 }
 
 async function runCommitSignBinary(input: {
-  binaryPath: string;
   format: "ssh";
   privateKey: string;
   payloadBase64: string;
 }): Promise<SignCommitPayloadResult> {
-  const child = spawn(input.binaryPath, [], {
+  const child = spawn(CommitSignBinaryPath, [], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -129,9 +129,6 @@ export async function signCommitPayload(
     integrationsConfig: {
       activeMasterEncryptionKeyVersion: number;
       masterEncryptionKeys: Record<string, string>;
-    };
-    commitSignConfig: {
-      binaryPath: string;
     };
     sandboxBootstrapConfig: {
       tokenSecret: string;
@@ -346,7 +343,6 @@ export async function signCommitPayload(
       UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
     );
     return await runCommitSignBinary({
-      binaryPath: ctx.commitSignConfig.binaryPath,
       format: SshSigningFormat,
       privateKey,
       payloadBase64: input.payload,

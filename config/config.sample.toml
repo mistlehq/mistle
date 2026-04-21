@@ -97,9 +97,6 @@ namespace_id = "production"
 [apps.control_plane_api.data_plane_api]
 base_url = "http://data-plane-api:8082"
 
-[apps.control_plane_api.commit_sign]
-binary_path = "/usr/local/bin/commit-sign"
-
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 1
 

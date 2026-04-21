@@ -3,7 +3,6 @@ import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
-  ControlPlaneApiCommitSignConfigSchema,
   ControlPlaneApiDashboardConfigSchema,
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
@@ -125,13 +124,6 @@ const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneApiDataPlaneApiCo
   },
 ]);
 
-const loadCommitSignEnv = createEnvLoader<typeof ControlPlaneApiCommitSignConfigSchema>([
-  {
-    key: "binaryPath",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH",
-  },
-]);
-
 const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>([
   {
     key: "activeMasterEncryptionKeyVersion",
@@ -214,11 +206,6 @@ export function loadControlPlaneApiFromEnv(
   const dataPlaneApi = loadDataPlaneApiEnv(env);
   if (hasEntries(dataPlaneApi)) {
     partialConfig.dataPlaneApi = dataPlaneApi;
-  }
-
-  const commitSign = loadCommitSignEnv(env);
-  if (hasEntries(commitSign)) {
-    partialConfig.commitSign = commitSign;
   }
 
   const integrations = loadIntegrationsEnv(env);

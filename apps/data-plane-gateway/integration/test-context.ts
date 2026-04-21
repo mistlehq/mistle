@@ -23,7 +23,7 @@ import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
-import { getCommitSignBinaryPath } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { ensureCommitSignBinaryInstalled } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import { startControlPlaneApiProcess } from "../../data-plane-worker/integration/helpers/control-plane-api.js";
 import { createDataPlaneGatewayRuntime } from "../src/runtime/index.js";
 import type { DataPlaneGatewayRuntime, DataPlaneGatewayRuntimeConfig } from "../src/types.js";
@@ -284,6 +284,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
       async ({}, use) => {
         const cleanupTasks: Array<() => Promise<void>> = [];
         const sharedInfraConfig = await readSharedInfraConfig();
+        await ensureCommitSignBinaryInstalled();
         const runtimeDatabaseName = createFileScopedDatabaseName({
           integrationRunId: sharedInfraConfig.integrationRunId,
           filePath: getCurrentVitestFilePath(),
@@ -391,7 +392,6 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             workflowNamespaceId,
             internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
             sandboxStorageBackend: "archil",
-            commitSignBinaryPath: getCommitSignBinaryPath(),
           });
           cleanupTasks.unshift(async () => {
             await controlPlaneApi.stop();
