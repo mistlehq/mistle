@@ -149,6 +149,7 @@ function RenderedComposerPaneHarness(input: {
 
 function QueuedPromptComposerHarness(): React.JSX.Element {
   const [activeTurnState, setActiveTurnState] = useState<"idle" | "running">("running");
+  const [composerText, setComposerText] = useState("");
   const [startedPrompts, setStartedPrompts] = useState<readonly string[]>([]);
 
   return (
@@ -229,6 +230,14 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
               return;
             },
           },
+        }}
+        draftState={{
+          composerText,
+          pendingDiffComments: [],
+          clearPendingDiffComments: () => {
+            return;
+          },
+          setComposerText,
         }}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
