@@ -2917,6 +2917,7 @@ export interface paths {
                         inputType: "password" | "text" | "textarea";
                         label: string;
                         name: string;
+                        optional?: boolean;
                         placeholder?: string;
                         slotKey: string;
                       }[];

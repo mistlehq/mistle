@@ -81,20 +81,20 @@ describe("organization members integration", () => {
         members: [
           {
             id: expect.any(String),
-            userId: memberOneSession.userId,
-            name: "Members Case Alpha",
-            email: "members-case-alpha@example.com",
-            role: "member",
-            joinedAt: "2026-03-02T00:00:00.000Z",
+            userId: memberTwoSession.userId,
+            name: "Completely Different Name",
+            email: searchedEmail,
+            role: "admin",
+            joinedAt: "2026-03-03T00:00:00.000Z",
             avatar: {
-              hasImage: true,
-              imageUrl: expect.any(String),
+              hasImage: false,
+              imageUrl: null,
             },
           },
         ],
         limit: 1,
         offset: 0,
-        total: 1,
+        total: 2,
       });
 
       const emailSearchResponse = await runtime.request(
@@ -222,7 +222,7 @@ describe("organization members integration", () => {
             organizationId: ownerSession.organizationId,
             limit: 25,
             offset: 0,
-            search: "",
+            search: "members-avatar-failure@example.com",
           },
         ),
       ).resolves.toEqual({
@@ -318,11 +318,11 @@ describe("organization members integration", () => {
       members: [
         {
           id: expect.any(String),
-          userId: blankNameSession.userId,
-          name: "alpha@example.com",
-          email: "alpha@example.com",
+          userId: aliceSession.userId,
+          name: "Alice Person",
+          email: "alice@example.com",
           role: "member",
-          joinedAt: "2026-03-05T00:00:00.000Z",
+          joinedAt: "2026-03-01T00:00:00.000Z",
           avatar: {
             hasImage: false,
             imageUrl: null,
@@ -331,7 +331,7 @@ describe("organization members integration", () => {
       ],
       limit: 1,
       offset: 0,
-      total: 3,
+      total: 4,
     });
 
     const secondPageResponse = await fixture.request(
@@ -347,11 +347,11 @@ describe("organization members integration", () => {
       members: [
         {
           id: expect.any(String),
-          userId: aliceSession.userId,
-          name: "Alice Person",
-          email: "alice@example.com",
+          userId: namedSession.userId,
+          name: "Beta Person",
+          email: "zeta@example.com",
           role: "member",
-          joinedAt: "2026-03-01T00:00:00.000Z",
+          joinedAt: "2026-03-05T00:00:00.000Z",
           avatar: {
             hasImage: false,
             imageUrl: null,
@@ -360,7 +360,7 @@ describe("organization members integration", () => {
       ],
       limit: 1,
       offset: 1,
-      total: 3,
+      total: 4,
     });
 
     const thirdPageResponse = await fixture.request(
@@ -376,9 +376,9 @@ describe("organization members integration", () => {
       members: [
         {
           id: expect.any(String),
-          userId: namedSession.userId,
-          name: "Beta Person",
-          email: "zeta@example.com",
+          userId: blankNameSession.userId,
+          name: "alpha@example.com",
+          email: "alpha@example.com",
           role: "member",
           joinedAt: "2026-03-05T00:00:00.000Z",
           avatar: {
@@ -389,7 +389,7 @@ describe("organization members integration", () => {
       ],
       limit: 1,
       offset: 2,
-      total: 3,
+      total: 4,
     });
   });
 });

@@ -1,5 +1,6 @@
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { screen, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -8,6 +9,7 @@ import { type RawData, type WebSocket, WebSocket as NodeWebSocket, WebSocketServ
 
 import { CodexAppServerListenUrl } from "../../../../packages/integrations-definitions/src/agent-runtimes/codex/app-server.ts";
 import {
+  encodeDataFrame,
   decodeDataFrame,
   parseStreamControlMessage,
   PayloadKindWebSocketText,
@@ -21,6 +23,15 @@ type JsonRpcRequest = {
   id?: string | number;
   method: string;
   params?: unknown;
+};
+
+type JsonRpcResponse = {
+  id: string | number;
+  result?: unknown;
+  error?: {
+    code: number;
+    message: string;
+  };
 };
 
 type PtyOpenRecord = {
@@ -124,6 +135,10 @@ function parseJsonRpcRequest(data: RawData): JsonRpcRequest {
   return payload as JsonRpcRequest;
 }
 
+function resolveAgentStreamId(data: RawData): number {
+  return decodeDataFrame(toUint8Array(data)).streamId;
+}
+
 function createThreadStartResult(threadId: string) {
   return {
     thread: {
@@ -134,12 +149,94 @@ function createThreadStartResult(threadId: string) {
 
 function installNodeWebSocket(): () => void {
   const originalWebSocket = globalThis.WebSocket;
+  const originalWindowWebSocket = typeof window === "undefined" ? undefined : window.WebSocket;
+
+  class TestWebSocket {
+    static readonly CONNECTING = NodeWebSocket.CONNECTING;
+    static readonly OPEN = NodeWebSocket.OPEN;
+    static readonly CLOSING = NodeWebSocket.CLOSING;
+    static readonly CLOSED = NodeWebSocket.CLOSED;
+
+    binaryType: BinaryType = "blob";
+    readonly #listeners = new Map<string, Set<(event: unknown) => void>>();
+    readonly #socket: NodeWebSocket;
+
+    constructor(url: string | URL) {
+      this.#socket = new NodeWebSocket(String(url));
+      this.#socket.on("open", () => {
+        this.#emit("open", {});
+      });
+      this.#socket.on("error", () => {
+        this.#emit("error", {});
+      });
+      this.#socket.on("close", (code, reason) => {
+        this.#emit("close", {
+          code,
+          reason: reason.toString("utf8"),
+          wasClean: true,
+        });
+      });
+      this.#socket.on("message", (data, isBinary) => {
+        this.#emit("message", {
+          data: resolveWebSocketMessageData({
+            binaryType: this.binaryType,
+            data,
+            isBinary,
+          }),
+        });
+      });
+    }
+
+    get readyState(): number {
+      return this.#socket.readyState;
+    }
+
+    addEventListener(eventName: string, listener: (event: unknown) => void): void {
+      const listeners = this.#listeners.get(eventName) ?? new Set<(event: unknown) => void>();
+      listeners.add(listener);
+      this.#listeners.set(eventName, listeners);
+    }
+
+    removeEventListener(eventName: string, listener: (event: unknown) => void): void {
+      const listeners = this.#listeners.get(eventName);
+      if (listeners === undefined) {
+        return;
+      }
+
+      listeners.delete(listener);
+      if (listeners.size === 0) {
+        this.#listeners.delete(eventName);
+      }
+    }
+
+    close(code?: number, reason?: string): void {
+      this.#socket.close(code, reason);
+    }
+
+    send(data: Parameters<NodeWebSocket["send"]>[0]): void {
+      this.#socket.send(data);
+    }
+
+    #emit(eventName: string, event: unknown): void {
+      for (const listener of this.#listeners.get(eventName) ?? []) {
+        listener(event);
+      }
+    }
+  }
 
   Object.defineProperty(globalThis, "WebSocket", {
     configurable: true,
-    value: NodeWebSocket,
+    value: TestWebSocket,
     writable: true,
   });
+
+  if (typeof window !== "undefined") {
+    Object.defineProperty(window, "WebSocket", {
+      configurable: true,
+      value: TestWebSocket,
+      writable: true,
+    });
+  }
 
   return () => {
     Object.defineProperty(globalThis, "WebSocket", {
@@ -147,7 +244,62 @@ function installNodeWebSocket(): () => void {
       value: originalWebSocket,
       writable: true,
     });
+
+    if (typeof window !== "undefined") {
+      Object.defineProperty(window, "WebSocket", {
+        configurable: true,
+        value: originalWindowWebSocket,
+        writable: true,
+      });
+    }
   };
+}
+
+function resolveWebSocketMessageData(input: {
+  binaryType: BinaryType;
+  data: RawData;
+  isBinary: boolean;
+}): ArrayBuffer | Blob | string {
+  if (!input.isBinary) {
+    if (typeof input.data === "string") {
+      return input.data;
+    }
+    if (input.data instanceof ArrayBuffer) {
+      return new TextDecoder().decode(new Uint8Array(input.data));
+    }
+    if (Buffer.isBuffer(input.data)) {
+      return input.data.toString("utf8");
+    }
+
+    return Buffer.concat(input.data).toString("utf8");
+  }
+
+  if (input.binaryType === "arraybuffer") {
+    if (input.data instanceof ArrayBuffer) {
+      return input.data;
+    }
+    if (Buffer.isBuffer(input.data)) {
+      return input.data.buffer.slice(
+        input.data.byteOffset,
+        input.data.byteOffset + input.data.byteLength,
+      );
+    }
+
+    const concatenated = Buffer.concat(input.data);
+    return concatenated.buffer.slice(
+      concatenated.byteOffset,
+      concatenated.byteOffset + concatenated.byteLength,
+    );
+  }
+
+  if (input.data instanceof ArrayBuffer) {
+    return new Blob([input.data]);
+  }
+  if (Buffer.isBuffer(input.data)) {
+    return new Blob([input.data]);
+  }
+
+  return new Blob(input.data);
 }
 
 async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunnelServer> {
@@ -167,6 +319,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
   const ptyCloseWaiters = new Map<number, Array<(streamId: number) => void>>();
   const ptyChannels = new Map<number, PTYStreamChannel>();
   const ptySockets = new Map<number, WebSocket>();
+  const streamKindById = new Map<number, "agent" | "exec" | "processes" | "pty">();
   const threadResumeRequests: string[] = [];
   const threadResumeWaiters: ThreadResumeWaiter[] = [];
   const threadsById = new Map<
@@ -174,6 +327,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     {
       summary: {
         createdAt: number;
+        cwd: string;
         id: string;
         name: string;
         updatedAt: number;
@@ -249,6 +403,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
     threadsById.set(input.id, {
       summary: {
         createdAt,
+        cwd: `${DefaultSandboxWorkspaceDir}/mistlehq/mistle`,
         id: input.id,
         name: "TUI Test Thread",
         updatedAt: createdAt,
@@ -277,15 +432,22 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
   wsServer.on("connection", (socket) => {
     sockets.add(socket);
-    let streamKind: "agent" | "pty" | null = null;
+
+    function sendAgentResponse(streamId: number, response: JsonRpcResponse): void {
+      socket.send(
+        encodeDataFrame({
+          streamId,
+          payloadKind: PayloadKindWebSocketText,
+          payload: new TextEncoder().encode(JSON.stringify(response)),
+        }),
+      );
+    }
 
     socket.on("message", async (data, isBinary) => {
       if (!isBinary) {
         const controlMessage = parseStreamControlMessage(toText(data));
         if (controlMessage?.type === "stream.open") {
-          if (controlMessage.channel.kind === "agent") {
-            streamKind = "agent";
-          }
+          streamKindById.set(controlMessage.streamId, controlMessage.channel.kind);
 
           if (controlMessage.channel.kind === "pty") {
             if (
@@ -305,7 +467,6 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
               return;
             }
 
-            streamKind = "pty";
             ptySockets.set(controlMessage.streamId, socket);
             ptyChannels.set(controlMessage.streamId, controlMessage.channel);
             dispatchPtyOpen({
@@ -335,15 +496,70 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
               streamId: controlMessage.streamId,
             }),
           );
+
+          if (controlMessage.channel.kind === "exec") {
+            socket.send(
+              JSON.stringify({
+                type: "stream.event",
+                streamId: controlMessage.streamId,
+                event: {
+                  type: "exec.result",
+                  exitCode: 0,
+                  stdout: `${DefaultSandboxWorkspaceDir}/mistlehq/mistle/.git\n`,
+                  stderr: "",
+                  truncated: false,
+                },
+              }),
+            );
+            socket.send(
+              JSON.stringify({
+                type: "stream.complete",
+                streamId: controlMessage.streamId,
+              }),
+            );
+          }
           return;
         }
 
         if (controlMessage?.type === "stream.close") {
-          dispatchPtyClose(controlMessage.streamId);
-          emitPtyExit(controlMessage.streamId);
+          const streamKind = streamKindById.get(controlMessage.streamId);
+          streamKindById.delete(controlMessage.streamId);
+          if (streamKind === "pty") {
+            dispatchPtyClose(controlMessage.streamId);
+            emitPtyExit(controlMessage.streamId);
+          }
           return;
         }
 
+        return;
+      }
+
+      const streamId = resolveAgentStreamId(data);
+      const streamKind = streamKindById.get(streamId);
+      if (streamKind === "processes") {
+        const frame = decodeDataFrame(toUint8Array(data));
+        if (frame.payloadKind !== PayloadKindWebSocketText) {
+          return;
+        }
+
+        const payload = JSON.parse(new TextDecoder().decode(frame.payload)) as { type?: string };
+        if (payload.type !== "processes.refresh") {
+          return;
+        }
+
+        socket.send(
+          encodeDataFrame({
+            streamId,
+            payloadKind: PayloadKindWebSocketText,
+            payload: new TextEncoder().encode(
+              JSON.stringify({
+                type: "processes.snapshot",
+                observedAt: "2026-03-31T00:00:00.000Z",
+                processes: [],
+              }),
+            ),
+          }),
+        );
         return;
       }
 
@@ -356,14 +572,12 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
 
       switch (request.method) {
         case "initialize": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                protocolVersion: "2026-03-14",
-              },
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              protocolVersion: "2026-03-14",
+            },
+          });
           return;
         }
 
@@ -377,27 +591,23 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
             return;
           }
 
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data: [...threadsById.values()].map((thread) => thread.summary),
-                nextCursor: null,
-              },
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              data: [...threadsById.values()].map((thread) => thread.summary),
+              nextCursor: null,
+            },
+          });
           return;
         }
 
         case "thread/loaded/list": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data: [...loadedThreadIds],
-              },
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              data: [...loadedThreadIds],
+            },
+          });
           return;
         }
 
@@ -407,12 +617,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
             id: knownThreadId,
             turnCount: 0,
           });
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: createThreadStartResult(knownThreadId),
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: createThreadStartResult(knownThreadId),
+          });
           return;
         }
 
@@ -446,12 +654,10 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
           });
           loadedThreadIds.add(requestedThreadId);
           dispatchThreadResume(requestedThreadId);
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: createThreadStartResult(requestedThreadId),
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: createThreadStartResult(requestedThreadId),
+          });
           return;
         }
 
@@ -471,80 +677,70 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
               : (knownThreadId ?? "thread_cli_test");
           const threadRecord = threadsById.get(requestedThreadId);
           if (threadRecord === undefined || threadRecord.turnCount === 0) {
-            socket.send(
-              JSON.stringify({
-                id: requestId,
-                error: {
-                  code: -32600,
-                  message: `thread ${requestedThreadId} is not materialized yet; includeTurns is unavailable before first user message`,
-                },
-              }),
-            );
+            sendAgentResponse(streamId, {
+              id: requestId,
+              error: {
+                code: -32600,
+                message: `thread ${requestedThreadId} is not materialized yet; includeTurns is unavailable before first user message`,
+              },
+            });
             return;
           }
 
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                thread: {
-                  id: requestedThreadId,
-                  turns: [
-                    {
-                      id: `${requestedThreadId}_turn_1`,
-                      items: [],
-                      status: "completed",
-                    },
-                  ],
-                },
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              thread: {
+                id: requestedThreadId,
+                turns: [
+                  {
+                    id: `${requestedThreadId}_turn_1`,
+                    items: [],
+                    status: "completed",
+                  },
+                ],
               },
-            }),
-          );
+            },
+          });
           return;
         }
 
         case "model/list": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                data: [
-                  {
-                    id: "mdl_gpt53",
-                    model: "gpt-5.3-codex",
-                    displayName: "GPT-5.3 Codex",
-                    hidden: false,
-                    isDefault: true,
-                    inputModalities: ["text", "image"],
-                    supportsPersonality: false,
-                  },
-                ],
-                nextCursor: null,
-              },
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              data: [
+                {
+                  id: "mdl_gpt53",
+                  model: "gpt-5.3-codex",
+                  displayName: "GPT-5.3 Codex",
+                  hidden: false,
+                  isDefault: true,
+                  inputModalities: ["text", "image"],
+                  supportsPersonality: false,
+                },
+              ],
+              nextCursor: null,
+            },
+          });
           return;
         }
 
         case "config/read": {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {
-                config: {},
-              },
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {
+              config: {},
+            },
+          });
           return;
         }
 
         default: {
-          socket.send(
-            JSON.stringify({
-              id: requestId,
-              result: {},
-            }),
-          );
+          sendAgentResponse(streamId, {
+            id: requestId,
+            result: {},
+          });
         }
       }
     });
@@ -557,6 +753,7 @@ async function startSessionWorkbenchTunnelServer(): Promise<SessionWorkbenchTunn
           ptyChannels.delete(streamId);
         }
       }
+      streamKindById.clear();
     });
   });
 

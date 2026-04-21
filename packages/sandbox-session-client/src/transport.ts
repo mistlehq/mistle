@@ -147,8 +147,18 @@ function readTextPayload(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function isCrossRealmArrayBuffer(value: unknown): value is ArrayBuffer {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Object.prototype.toString.call(value) === "[object ArrayBuffer]" &&
+    "byteLength" in value &&
+    typeof value.byteLength === "number"
+  );
+}
+
 function readBinaryPayload(value: unknown): ArrayBuffer | ArrayBufferView | null {
-  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value) || isCrossRealmArrayBuffer(value)) {
     return value;
   }
 

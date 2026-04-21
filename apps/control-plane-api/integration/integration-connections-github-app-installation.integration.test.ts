@@ -160,6 +160,7 @@ describe("integration connections GitHub App installation integration", () => {
       connection_method: "github-app-installation",
       app_id: "123",
       app_slug: "mistle-github-app",
+      client_id: "Iv1.client123",
       installation_id: "12345",
       setup_action: "install",
     });
@@ -189,7 +190,7 @@ describe("integration connections GitHub App installation integration", () => {
       })
       .from(integrationConnectionCredentials)
       .where(eq(integrationConnectionCredentials.connectionId, persistedConnection.id));
-    expect(linkedCredentials).toHaveLength(2);
+    expect(linkedCredentials).toHaveLength(3);
 
     const persistedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
       where: (table, { and, eq }) =>

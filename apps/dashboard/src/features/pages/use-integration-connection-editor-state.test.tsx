@@ -8,6 +8,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
+import { resetAuthClientForTest } from "../../lib/auth/client.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
 import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
 
@@ -114,6 +115,7 @@ function setControlPlaneOrigin(origin: string): void {
     VITE_CONTROL_PLANE_API_ORIGIN: origin,
   });
   resetDashboardConfigForTest();
+  resetAuthClientForTest();
 }
 
 function openAiCreateEditorInput() {

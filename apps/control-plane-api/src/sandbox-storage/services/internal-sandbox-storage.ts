@@ -76,38 +76,38 @@ export async function resolveSandboxStorageConfiguration(input: {
     };
   }
 
+  if (
+    input.runtimeProvider !== SandboxProvider.DOCKER &&
+    settings.storageConfigSource !== "managed"
+  ) {
+    if (
+      settings.organizationStorageConfig === null ||
+      settings.storageBackend !== SandboxStorageBackend.ARCHIL
+    ) {
+      throw new Error(
+        `Expected organization storage override for organization '${input.organizationId}'.`,
+      );
+    }
+
+    return {
+      persistentSandboxesEnabled: true,
+      storageConfigSource: "organization",
+      storageBackend: SandboxStorageBackend.ARCHIL,
+      organizationStorageConfig: settings.organizationStorageConfig,
+    };
+  }
+
   if (input.managedStorageBackend === undefined) {
     throw new Error(
       `Persistent sandboxes are enabled for organization '${input.organizationId}' but no managed sandbox storage backend is configured.`,
     );
   }
 
-  if (
-    input.runtimeProvider === SandboxProvider.DOCKER ||
-    settings.storageConfigSource === "managed"
-  ) {
-    return {
-      persistentSandboxesEnabled: true,
-      storageConfigSource: "managed",
-      storageBackend: input.managedStorageBackend,
-      organizationStorageConfig: null,
-    };
-  }
-
-  if (
-    settings.organizationStorageConfig === null ||
-    settings.storageBackend !== SandboxStorageBackend.ARCHIL
-  ) {
-    throw new Error(
-      `Expected organization storage override for organization '${input.organizationId}'.`,
-    );
-  }
-
   return {
     persistentSandboxesEnabled: true,
-    storageConfigSource: "organization",
-    storageBackend: SandboxStorageBackend.ARCHIL,
-    organizationStorageConfig: settings.organizationStorageConfig,
+    storageConfigSource: "managed",
+    storageBackend: input.managedStorageBackend,
+    organizationStorageConfig: null,
   };
 }
 

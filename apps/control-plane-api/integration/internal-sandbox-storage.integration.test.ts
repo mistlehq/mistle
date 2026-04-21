@@ -96,7 +96,6 @@ describe("internal sandbox storage", () => {
         },
         body: JSON.stringify({
           organizationId: session.organizationId,
-          runtimeProvider: "e2b",
         }),
       },
     );

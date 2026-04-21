@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, type RenderResult } from "@testing-library/react";
 
 import { resetDashboardConfigForTest } from "../../src/config.js";
+import { resetAuthClientForTest } from "../../src/lib/auth/client.js";
 import { resetControlPlaneApiClientForTest } from "../../src/lib/control-plane-api/client.js";
 import { seedAuthenticatedSession } from "../../src/test-support/auth-session.js";
 import { createTestQueryClient } from "../../src/test-support/query-client.js";
@@ -72,6 +73,7 @@ export async function renderDashboardPageIntegration(input: {
     VITE_AUTH_METHOD_GOOGLE: "false",
   });
   resetDashboardConfigForTest();
+  resetAuthClientForTest();
   resetControlPlaneApiClientForTest();
 
   const queryClient = createDashboardQueryClient();
@@ -88,6 +90,7 @@ export async function renderDashboardPageIntegration(input: {
       queryClient.clear();
       cleanup();
       resetDashboardConfigForTest();
+      resetAuthClientForTest();
       resetControlPlaneApiClientForTest();
       await server.close();
     },

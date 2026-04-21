@@ -451,7 +451,7 @@ describe("sandbox instance resume integration", () => {
     }
   });
 
-  it("treats stopped sandboxes with a live ready runtime as already running", async ({
+  it("queues resume for stopped sandboxes even when a live ready runtime is attached", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
@@ -520,8 +520,8 @@ describe("sandbox instance resume integration", () => {
       expect(body).toEqual({
         id: sandboxInstanceId,
         title: null,
-        status: "running",
-        connectable: true,
+        status: "starting",
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         runtimeContext: {
@@ -537,7 +537,7 @@ describe("sandbox instance resume integration", () => {
           workflowNamespaceId: fixture.config.workflow.namespaceId,
           sandboxInstanceId,
         }),
-      ).toBe("0");
+      ).toBe("1");
     } finally {
       await controlPlaneRuntime.stop();
     }

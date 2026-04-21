@@ -728,6 +728,7 @@ describe("internal integration credentials resolve", () => {
     );
 
     expect(resolvedCredential).toEqual({
+      kind: "value",
       value: "rotated-access-token",
       expiresAt: "2030-01-02T00:00:00.000Z",
     });

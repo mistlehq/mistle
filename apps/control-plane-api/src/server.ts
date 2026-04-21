@@ -6,6 +6,10 @@ function closeServer(server: ServerType): Promise<void> {
   return new Promise((resolve, reject) => {
     server.close((error) => {
       if (error !== undefined) {
+        if (error.message === "Server is not running.") {
+          resolve();
+          return;
+        }
         reject(error);
         return;
       }

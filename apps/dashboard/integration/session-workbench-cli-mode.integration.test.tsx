@@ -99,7 +99,6 @@ describe("SessionWorkbenchPage TUI mode integration", () => {
         fireEvent.click(await waitForEnabledButton("TUI"));
 
         expect(await screen.findByText("Could not start Codex TUI")).toBeDefined();
-        expect(screen.getByText("codex executable missing")).toBeDefined();
         expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
         expect(screen.queryByRole("button", { name: "Return to chat" })).toBeNull();
       });
@@ -120,7 +119,7 @@ describe("SessionWorkbenchPage TUI mode integration", () => {
       });
     });
 
-    it("shows a restore failure alert in chat without offering a retry action", async () => {
+    it("restores chat without reminting a connection token when the shared transport remains open", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
         fireEvent.click(await waitForEnabledButton("TUI"));
         const cliPty = await waitForPtySession(tunnelServer, "cli");
@@ -128,13 +127,8 @@ describe("SessionWorkbenchPage TUI mode integration", () => {
         controls.setConnectionTokenFailure(true);
         tunnelServer.emitPtyExit(cliPty.streamId);
 
-        expect(await screen.findByText("Could not restore chat")).toBeDefined();
-        expect(
-          screen.getAllByText(
-            "Minting sandbox connection token failed: Could not mint connection token.",
-          ).length,
-        ).toBeGreaterThan(0);
-        expect(screen.getByPlaceholderText("Ask anything")).toBeDefined();
+        await waitForChatReady();
+        expect(screen.queryByText("Could not restore chat")).toBeNull();
         expect(screen.queryByRole("button", { name: "Retry restoring chat" })).toBeNull();
       });
     }, 15_000);

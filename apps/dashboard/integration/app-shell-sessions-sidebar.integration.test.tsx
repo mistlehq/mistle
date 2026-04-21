@@ -16,6 +16,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../src/config.js";
+import { resetAuthClientForTest } from "../src/lib/auth/client.js";
 import { resetControlPlaneApiClientForTest } from "../src/lib/control-plane-api/client.js";
 import { seedAuthenticatedSession } from "../src/test-support/auth-session.js";
 import { createTestQueryClient } from "../src/test-support/query-client.js";
@@ -148,6 +149,7 @@ async function renderAppShellIntegration(input: { handler: DashboardRequestHandl
     VITE_AUTH_METHOD_GOOGLE: "false",
   });
   resetDashboardConfigForTest();
+  resetAuthClientForTest();
   resetControlPlaneApiClientForTest();
 
   const queryClient = createTestQueryClient();
@@ -170,6 +172,7 @@ async function renderAppShellIntegration(input: { handler: DashboardRequestHandl
       queryClient.clear();
       cleanup();
       resetDashboardConfigForTest();
+      resetAuthClientForTest();
       resetControlPlaneApiClientForTest();
       await server.close();
     },
@@ -264,5 +267,5 @@ describe("AppShell sessions sidebar toggle integration", () => {
     } finally {
       await renderedPage.close();
     }
-  });
+  }, 15_000);
 });

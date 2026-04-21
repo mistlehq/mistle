@@ -5,8 +5,6 @@ import { parseInvitationDetails } from "./invitation-accept-state.js";
 
 type AuthApiRequestMethod = "GET" | "POST";
 
-const dashboardConfig = getDashboardConfig();
-
 async function readResponsePayload(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.toLowerCase().includes("application/json")) {
@@ -22,6 +20,8 @@ export async function fetchAuthApi(input: {
   query?: Record<string, string>;
   body?: Record<string, string>;
 }): Promise<unknown> {
+  const dashboardConfig = getDashboardConfig();
+
   const response = await requestControlPlane({
     operation: `authApi:${input.path}`,
     pathname: input.path,

@@ -47,6 +47,20 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     listener: SandboxSessionSocketEventMap[EventName],
   ): void {
     const wrappedListener: EventListener = (event) => {
+      if (
+        eventName === "message" &&
+        typeof Blob !== "undefined" &&
+        event instanceof MessageEvent &&
+        event.data instanceof Blob
+      ) {
+        void event.data.arrayBuffer().then((data) => {
+          listener({
+            data,
+          });
+        });
+        return;
+      }
+
       listener(event);
     };
 

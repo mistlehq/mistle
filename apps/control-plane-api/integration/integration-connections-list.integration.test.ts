@@ -429,15 +429,18 @@ describe("integration connections list integration", () => {
       email: "integration-connections-list-slack-webhook-support@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "slack-default",
-      familyId: "slack",
-      variantId: "slack-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://slack.com/api",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "slack-default",
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      })
+      .onConflictDoNothing();
 
     await fixture.db.insert(integrationConnections).values({
       id: "icn_slack_support",

@@ -497,6 +497,7 @@ describe("receive integration webhook immediate response integration", () => {
     });
 
     await fixture.db.insert(integrationConnections).values({
+      id: "icn_missing_config_connection",
       organizationId: authenticatedSession.organizationId,
       targetKey,
       displayName: "Malformed active connection",

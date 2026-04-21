@@ -5,6 +5,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
+import { resetAuthClientForTest } from "../../lib/auth/client.js";
 import { createSandboxInstancePortAccess } from "./sessions-service.js";
 
 type RequestRecord = {
@@ -75,10 +76,12 @@ function setControlPlaneOrigin(origin: string): void {
     VITE_CONTROL_PLANE_API_ORIGIN: origin,
   });
   resetDashboardConfigForTest();
+  resetAuthClientForTest();
 }
 
 afterEach(() => {
   resetDashboardConfigForTest();
+  resetAuthClientForTest();
 });
 
 describe("sessions service", () => {
