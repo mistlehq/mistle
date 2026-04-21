@@ -521,7 +521,7 @@ function RjsfResourcePicker(): React.JSX.Element {
       }}
       uiSchema={{
         repositories: {
-          "ui:widget": "integration-resource-string-array",
+          "ui:widget": "integration-resource-picker",
           "ui:options": {
             connectionId: "storybook-github",
             kind: "repository",

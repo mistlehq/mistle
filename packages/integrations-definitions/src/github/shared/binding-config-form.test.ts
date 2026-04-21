@@ -51,7 +51,7 @@ describe("github binding config forms", () => {
 
     expect(resolvedForm.uiSchema).toEqual({
       repositories: {
-        "ui:widget": "integration-resource-string-array",
+        "ui:widget": "integration-resource-picker",
         "ui:options": {
           connectionId: "icn_github_form_test_001",
           kind: "repository",

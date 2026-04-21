@@ -27,7 +27,7 @@ const IntegrationResourceSummaryOptionSchema = z
   })
   .strict();
 
-const IntegrationResourceStringArrayWidgetOptionsSchema = z
+const IntegrationResourcePickerWidgetOptionsSchema = z
   .object({
     connectionId: z.string().min(1),
     kind: z.string().min(1),
@@ -39,14 +39,14 @@ const IntegrationResourceStringArrayWidgetOptionsSchema = z
   })
   .loose();
 
-type IntegrationResourceStringArrayWidgetOptions = z.infer<
-  typeof IntegrationResourceStringArrayWidgetOptionsSchema
+type IntegrationResourcePickerWidgetOptions = z.infer<
+  typeof IntegrationResourcePickerWidgetOptionsSchema
 >;
 
 function resolveWidgetOptions(
   options: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>["options"],
-): IntegrationResourceStringArrayWidgetOptions {
-  const parsedOptions = IntegrationResourceStringArrayWidgetOptionsSchema.safeParse(options);
+): IntegrationResourcePickerWidgetOptions {
+  const parsedOptions = IntegrationResourcePickerWidgetOptionsSchema.safeParse(options);
   if (!parsedOptions.success) {
     throw new Error("Integration resource widget received invalid options.");
   }
@@ -83,7 +83,7 @@ function formatSyncMetadata(input: {
   return `Last synced ${input.lastSyncedAt}`;
 }
 
-export function IntegrationResourceStringArrayWidget(
+export function IntegrationResourcePickerWidget(
   props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
 ): React.JSX.Element {
   const options = resolveWidgetOptions(props.options);

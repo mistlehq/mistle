@@ -45,7 +45,7 @@ export function resolveGitHubBindingConfigForm(
     },
     uiSchema: {
       repositories: {
-        "ui:widget": "integration-resource-string-array",
+        "ui:widget": "integration-resource-picker",
         "ui:options": {
           connectionId,
           kind: "repository",
