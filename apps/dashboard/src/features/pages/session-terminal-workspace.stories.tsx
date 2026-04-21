@@ -6,16 +6,21 @@ import { withDashboardWorkspaceStory } from "../../storybook/decorators.js";
 import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
+  renderSessionWorkbenchStory,
+  renderSessionWorkbenchStoryWithChrome,
   renderSessionWorkbenchContentStory,
   StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
+import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
   withSplitExample?: boolean;
 };
+
+const StoryTerminalWorkspaceHeightPx = 320;
 
 function buildInitialTerminalOutput(input: { cwd: string | null }): string {
   const promptCwd = input.cwd ?? "/root";
@@ -31,8 +36,6 @@ function buildInitialTerminalOutput(input: { cwd: string | null }): string {
 }
 
 function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.Element {
-  const [panelSize, setPanelSize] = useState(38);
-
   return renderSessionWorkbenchContentStory({
     bottomPanel: (
       <SessionTerminalWorkspaceView
@@ -61,12 +64,94 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
         )}
       />
     ),
-    bottomPanelSize: panelSize,
+    bottomPanelSize: StoryTerminalWorkspaceHeightPx,
     isBottomPanelVisible: true,
     mainContent: createStorySessionMainContent(),
-    onBottomPanelResize: setPanelSize,
     primaryBottomPanel: createStorySessionBottomPanel(),
     sandboxInstanceId: StorySandboxInstanceId,
+  });
+}
+
+function StoryTerminalWorkspaceWithHeaderToggle(
+  input: TerminalWorkspaceStoryArgs,
+): React.JSX.Element {
+  const [isBottomPanelVisible, setIsBottomPanelVisible] = useState(true);
+
+  return renderSessionWorkbenchStoryWithChrome({
+    headerActions: (
+      <SessionWorkbenchHeaderActions
+        cliControl={{
+          ariaLabel: "TUI",
+          className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+          disabled: false,
+          onClick: () => {
+            return;
+          },
+          pressed: false,
+          title: "Open Codex TUI",
+        }}
+        diffControl={{
+          ariaLabel: "Open changes",
+          className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+          disabled: false,
+          onClick: () => {
+            return;
+          },
+          pressed: false,
+          title: "Open changes",
+        }}
+        status={{
+          kind: "connected",
+          label: "Connected",
+        }}
+        terminalControl={{
+          ariaLabel: isBottomPanelVisible ? "Terminal" : "Open terminal",
+          className: isBottomPanelVisible
+            ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+            : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+          disabled: false,
+          onClick: () => {
+            setIsBottomPanelVisible((currentValue) => !currentValue);
+          },
+          pressed: isBottomPanelVisible,
+          title: isBottomPanelVisible ? "Terminal" : "Open terminal",
+        }}
+      />
+    ),
+    children: renderSessionWorkbenchStory({
+      bottomPanel: (
+        <SessionTerminalWorkspaceView
+          cwd={input.initialCwd}
+          isVisible={isBottomPanelVisible}
+          onApiReady={(api) => {
+            if (!input.withSplitExample) {
+              return;
+            }
+
+            seedSplitTerminalExample({
+              api,
+              cwd: input.initialCwd,
+            });
+          }}
+          onWorkspaceEmpty={() => {
+            return;
+          }}
+          renderTerminalPanel={(panelInput) => (
+            <StoryTerminalSurfaceBody
+              initialOutput={buildInitialTerminalOutput({
+                cwd: panelInput.cwd,
+              })}
+              isVisible={panelInput.isPanelVisible}
+            />
+          )}
+        />
+      ),
+      bottomPanelSize: StoryTerminalWorkspaceHeightPx,
+      isBottomPanelVisible,
+      mainContent: createStorySessionMainContent(),
+      primaryBottomPanel: createStorySessionBottomPanel(),
+      sandboxInstanceId: StorySandboxInstanceId,
+    }),
   });
 }
 
@@ -100,6 +185,13 @@ export const SplitView: Story = {
   args: {
     withSplitExample: true,
   },
+};
+
+export const HeaderTogglePreservesWorkspace: Story = {
+  args: {
+    withSplitExample: true,
+  },
+  render: (args) => <StoryTerminalWorkspaceWithHeaderToggle {...args} />,
 };
 
 function seedSplitTerminalExample(input: { api: DockviewApi; cwd: string | null }): void {

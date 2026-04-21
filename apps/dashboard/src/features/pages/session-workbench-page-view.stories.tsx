@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { noop } from "../chat/components/chat-story-support.js";
 import {
@@ -21,11 +22,14 @@ import {
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
+import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
   headerStatusUi: SandboxStatusBadgeUi;
 };
+
+const StoryTerminalPanelHeightPx = 320;
 
 function buildPageViewTerminalOutput(cwd: string | null): string {
   return [
@@ -35,6 +39,87 @@ function buildPageViewTerminalOutput(cwd: string | null): string {
     "apps  packages  README.md",
     "",
   ].join("\n");
+}
+
+function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
+  const [isBottomPanelVisible, setIsBottomPanelVisible] = useState(true);
+
+  return (
+    <SessionWorkbenchStoryChrome
+      headerActions={
+        <SessionWorkbenchHeaderActions
+          cliControl={{
+            ariaLabel: "TUI",
+            className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            disabled: false,
+            onClick: () => {
+              return;
+            },
+            pressed: false,
+            title: "Open Codex TUI",
+          }}
+          diffControl={{
+            ariaLabel: "Open changes",
+            className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            disabled: false,
+            onClick: () => {
+              return;
+            },
+            pressed: false,
+            title: "Open changes",
+          }}
+          status={{
+            kind: "connected",
+            label: "Connected",
+          }}
+          terminalControl={{
+            ariaLabel: isBottomPanelVisible ? "Terminal" : "Open terminal",
+            className: isBottomPanelVisible
+              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+              : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            disabled: false,
+            onClick: () => {
+              setIsBottomPanelVisible((currentValue) => !currentValue);
+            },
+            pressed: isBottomPanelVisible,
+            title: isBottomPanelVisible ? "Terminal" : "Open terminal",
+          }}
+        />
+      }
+    >
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={
+          <SessionTerminalWorkspaceView
+            cwd={null}
+            isVisible={isBottomPanelVisible}
+            onWorkspaceEmpty={noop}
+            renderTerminalPanel={(panelInput) => (
+              <StoryTerminalSurfaceBody
+                initialOutput={buildPageViewTerminalOutput(panelInput.cwd)}
+                isVisible={panelInput.isPanelVisible}
+              />
+            )}
+          />
+        }
+        bottomPanelSize={StoryTerminalPanelHeightPx}
+        isBottomPanelVisible={isBottomPanelVisible}
+        isSecondaryPanelVisible={false}
+        mainContent={
+          <SessionCliPanel
+            ptyState={createStoryWorkbenchCliPtyState(createStoryLongCliOutput("task"))}
+          />
+        }
+        mainContentLayout={{ scroll: "contained", width: "full" }}
+        onBottomPanelResize={noop}
+        onSecondaryPanelResize={noop}
+        primaryBottomPanel={null}
+        sandboxInstanceId={StorySandboxInstanceId}
+        secondaryPanel={<></>}
+        secondaryPanelSize={38}
+      />
+    </SessionWorkbenchStoryChrome>
+  );
 }
 
 const meta = {
@@ -48,7 +133,7 @@ const meta = {
     sandboxInstanceId: StorySandboxInstanceId,
     alert: null,
     bottomPanel: <div className="h-full w-full border-t bg-white" />,
-    bottomPanelSize: 32,
+    bottomPanelSize: StoryTerminalPanelHeightPx,
     isBottomPanelVisible: false,
     isSecondaryPanelVisible: false,
     mainContent: createStorySessionMainContent(),
@@ -193,6 +278,10 @@ export const CliSplitWithTerminal: Story = {
         )}
       />
     ),
-    bottomPanelSize: 32,
+    bottomPanelSize: StoryTerminalPanelHeightPx,
   },
+};
+
+export const HeaderToggleTerminalWorkspace: Story = {
+  render: () => <StoryPageViewHeaderToggleTerminalWorkspace />,
 };

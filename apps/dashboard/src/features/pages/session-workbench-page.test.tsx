@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { act, type RenderResult, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
@@ -61,6 +61,18 @@ function renderSessionWorkbenchPage(input?: {
 }
 
 describe("SessionWorkbenchPage", () => {
+  beforeAll(() => {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class ResizeObserver {
+        disconnect(): void {}
+        observe(): void {}
+        unobserve(): void {}
+      },
+      writable: true,
+    });
+  });
+
   it("shows the initial loading startup state before sandbox status is trusted", () => {
     renderSessionWorkbenchPage();
 

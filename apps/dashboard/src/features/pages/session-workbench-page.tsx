@@ -194,7 +194,6 @@ function SessionWorkbenchPageContent(input: {
           onClick: () => {
             if (workbench.terminalPanelState.isVisible) {
               workbench.terminalPanelState.closePanel();
-              void terminalWorkspaceRef.current?.disconnectAllTerminals();
               return;
             }
 

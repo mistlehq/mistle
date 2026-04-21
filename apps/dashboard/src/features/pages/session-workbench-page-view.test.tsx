@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
 
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 describe("SessionWorkbenchPageView", () => {
+  beforeAll(() => {
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      configurable: true,
+      value: class ResizeObserver {
+        disconnect(): void {}
+        observe(): void {}
+        unobserve(): void {}
+      },
+      writable: true,
+    });
+  });
+
   it("retains scrollbar gutter and removes chat-width side padding until the desktop breakpoint", () => {
     const { container } = render(
       <SessionWorkbenchPageView
@@ -57,5 +69,26 @@ describe("SessionWorkbenchPageView", () => {
     expect(
       within(container).getByRole("region", { name: "Conversation chat" }).className,
     ).not.toContain("scrollbar-gutter");
+  });
+
+  it("keeps the bottom panel mounted while hidden", () => {
+    render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        bottomPanelSize={32}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        onBottomPanelResize={function onBottomPanelResize() {}}
+        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Secondary</div>}
+        secondaryPanelSize={40}
+      />,
+    );
+
+    expect(screen.getByText("Terminal workspace")).toBeDefined();
   });
 });

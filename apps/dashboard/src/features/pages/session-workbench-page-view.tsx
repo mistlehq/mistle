@@ -1,4 +1,5 @@
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup, Notice } from "@mistle/ui";
+import { useEffect, useRef } from "react";
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -34,6 +35,17 @@ export type {
   SessionWorkbenchPageViewProps,
 };
 
+type BottomResizablePanelHandle = {
+  collapse: () => void;
+  expand: () => void;
+  getSize: () => {
+    asPercentage: number;
+    inPixels: number;
+  };
+  isCollapsed: () => boolean;
+  resize: (size: number | string) => void;
+};
+
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alert,
@@ -51,6 +63,37 @@ export function SessionWorkbenchPageView({
   onSecondaryPanelResize,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
+  const bottomPanelRef = useRef<BottomResizablePanelHandle | null>(null);
+
+  useEffect(() => {
+    const bottomPanel = bottomPanelRef.current;
+    if (bottomPanel === null) {
+      return;
+    }
+
+    const frameId = requestAnimationFrame(() => {
+      if (isBottomPanelVisible) {
+        if (bottomPanel.isCollapsed()) {
+          bottomPanel.expand();
+
+          requestAnimationFrame(() => {
+            bottomPanel.resize(bottomPanelSize);
+          });
+          return;
+        }
+
+        bottomPanel.resize(bottomPanelSize);
+        return;
+      }
+
+      bottomPanel.collapse();
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [bottomPanelSize, isBottomPanelVisible]);
+
   if (sandboxInstanceId === null) {
     return (
       <Notice title="Session id is missing" variant="alert">
@@ -95,26 +138,29 @@ export function SessionWorkbenchPageView({
       )}
     </div>
   );
-  const workspaceWithBottomPanel = isBottomPanelVisible ? (
+  const workspaceWithBottomPanel = (
     <ResizablePanelGroup className="min-h-0 h-full" orientation="vertical">
-      <ResizablePanel defaultSize={100 - bottomPanelSize} minSize={25}>
+      <ResizablePanel defaultSize={isBottomPanelVisible ? 100 - bottomPanelSize : 100} minSize={25}>
         {mainWorkspace}
       </ResizablePanel>
-      <ResizableHandle />
+      <ResizableHandle className={isBottomPanelVisible ? undefined : "hidden"} />
       <ResizablePanel
-        defaultSize={bottomPanelSize}
+        collapsedSize={0}
+        collapsible
+        defaultSize={isBottomPanelVisible ? bottomPanelSize : 0}
         minSize={15}
         onResize={(panelSize) => {
-          onBottomPanelResize(panelSize.asPercentage);
+          if (panelSize.asPercentage > 0) {
+            onBottomPanelResize(panelSize.asPercentage);
+          }
         }}
+        panelRef={bottomPanelRef}
       >
         <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
           <div className="h-full w-full">{bottomPanel}</div>
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
-  ) : (
-    mainWorkspace
   );
 
   return (
