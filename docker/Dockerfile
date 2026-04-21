@@ -35,6 +35,17 @@ RUN pnpm --filter @mistle/data-plane-gateway... build
 FROM workspace-deps AS tokenizer-proxy-build
 RUN pnpm --filter @mistle/tokenizer-proxy... build
 
+FROM rust:1.89-alpine AS commit-sign-build
+
+WORKDIR /build/packages/commit-sign
+
+RUN apk add --no-cache build-base musl-dev
+
+COPY packages/commit-sign/Cargo.toml packages/commit-sign/Cargo.lock ./
+COPY packages/commit-sign/src ./src
+
+RUN cargo build --locked --release --bin commit-sign
+
 FROM base AS control-plane-worker-runtime
 
 COPY --from=control-plane-worker-build /app /app
@@ -105,9 +116,10 @@ ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]
 FROM base AS control-plane-api-runtime
 
 COPY --from=control-plane-api-build /app /app
+COPY --from=commit-sign-build /build/packages/commit-sign/target/release/commit-sign /usr/local/bin/commit-sign
 COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-control-plane-api-entrypoint
+RUN chmod +x /usr/local/bin/commit-sign /usr/local/bin/mistle-control-plane-api-entrypoint
 
 EXPOSE 5100
 
