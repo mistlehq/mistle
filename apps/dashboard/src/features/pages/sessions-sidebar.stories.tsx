@@ -240,12 +240,6 @@ function buildSidebarStoryGroups(): SessionSidebarGroupsResult {
   return buildSessionSidebarGroupsFromRecords(buildSidebarStoryRecords());
 }
 
-function buildSidebarStoryItems() {
-  return buildSessionsShellSidebarItems(buildSidebarStoryGroups().groups, {
-    nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
-  });
-}
-
 function buildSidebarStoryRecordsBatch(batchIndex: number): SidebarStoryRecord[] {
   return buildSidebarStoryRecords().map((record, recordIndex) => ({
     ...record,
@@ -330,45 +324,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  args: buildSessionsSidebarStoryArgs(),
-  parameters: {
-    docs: {
-      description: {
-        story:
-          "Shows the flat recent-session feed sorted globally by updatedAt. Expected top rows stay in this order: payout reconciliation, gateway lease handoff, release checklist, invoice export retries, then Codex thread persistence.",
-      },
-    },
-  },
-};
-
-export const AutoLoadingOlderSessions: Story = {
-  render: function RenderAutoLoadingOlderSessionsStory(): React.JSX.Element {
-    return (
-      <SidebarProvider>
-        <div className="min-h-screen bg-background">
-          <div className="w-56 border-r bg-sidebar py-3">
-            <MemoryRouter initialEntries={["/sessions/new"]}>
-              <SessionsSidebarNav
-                items={buildSidebarStoryItems().slice(0, 8)}
-                infiniteScroll={{
-                  hasMore: true,
-                  statusBanner: {
-                    kind: "loading",
-                    label: "Loading more",
-                  },
-                }}
-              />
-            </MemoryRouter>
-          </div>
-        </div>
-      </SidebarProvider>
-    );
+  render: function RenderDefaultStory(): React.JSX.Element {
+    return <InteractiveInfiniteScrollSidebarPreview />;
   },
   parameters: {
     docs: {
       description: {
         story:
-          "Shows the flat recent-session sidebar while older sessions are loading automatically as the user reaches the bottom.",
+          "Shows the flat recent-session feed in its main interactive state. The sidebar is isolated in its own scroll container, sorted globally by updatedAt, and automatically appends older sessions when you reach the bottom.",
       },
     },
   },
@@ -408,8 +371,8 @@ function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-background">
-        <div className="h-[480px] w-56 overflow-y-auto border-r bg-sidebar py-3">
+      <div className="h-screen bg-background">
+        <div className="h-full w-56 overflow-y-auto border-r bg-sidebar py-3">
           <MemoryRouter initialEntries={["/sessions/new"]}>
             <SessionsSidebarNav
               items={items}
@@ -434,20 +397,6 @@ function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
     </SidebarProvider>
   );
 }
-
-export const InteractiveInfiniteScroll: Story = {
-  render: function RenderInteractiveInfiniteScrollStory(): React.JSX.Element {
-    return <InteractiveInfiniteScrollSidebarPreview />;
-  },
-  parameters: {
-    docs: {
-      description: {
-        story:
-          "Uses the real bottom sentinel interaction. Scroll to the end of the sidebar to trigger the loading text, append another page of sessions, and repeat until the feed quietly stops loading more.",
-      },
-    },
-  },
-};
 
 export const EmptyState: Story = {
   args: buildSessionsSidebarStoryArgs({
