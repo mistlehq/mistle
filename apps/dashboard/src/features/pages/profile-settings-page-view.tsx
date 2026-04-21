@@ -425,7 +425,7 @@ function LinkedAccountCard(input: {
               }}
             >
               <DialogHeader variant="sectioned">
-                <DialogTitle>{`${input.linkedAccountCard.displayName} commit signing`}</DialogTitle>
+                <DialogTitle>Upload SSH private key</DialogTitle>
               </DialogHeader>
 
               <div className="flex flex-col gap-3">
