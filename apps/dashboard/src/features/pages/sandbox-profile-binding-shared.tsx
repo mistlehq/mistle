@@ -31,34 +31,6 @@ export function resolveRowBindingMetadata(input: {
   };
 }
 
-export function BindingConnectionControl(input: {
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  selectedConnectionId: string | null;
-  onValueChange: (nextConnectionId: string) => void;
-  placeholder: string;
-  ariaLabel: string;
-  disabled?: boolean;
-  id?: string;
-  triggerClassName?: string;
-}): React.JSX.Element {
-  return (
-    <IntegrationConnectionSelect
-      ariaLabel={input.ariaLabel}
-      availableConnections={input.availableConnections}
-      availableTargets={input.availableTargets}
-      onValueChange={input.onValueChange}
-      placeholder={input.placeholder}
-      selectedConnectionId={input.selectedConnectionId}
-      {...(input.id === undefined ? {} : { id: input.id })}
-      {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
-      {...(input.triggerClassName === undefined
-        ? {}
-        : { triggerClassName: input.triggerClassName })}
-    />
-  );
-}
-
 export function BindingConnectionField(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
@@ -73,15 +45,15 @@ export function BindingConnectionField(input: {
   const field = (
     <div className="min-w-0 flex-1 flex flex-col gap-1.5">
       <DetailLabel as="p">Connection</DetailLabel>
-      <BindingConnectionControl
+      <IntegrationConnectionSelect
         ariaLabel={input.ariaLabel}
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
+        {...(input.id === undefined ? {} : { id: input.id })}
+        {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
         onValueChange={input.onValueChange}
         placeholder={input.placeholder}
         selectedConnectionId={input.selectedConnectionId}
-        {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
-        {...(input.id === undefined ? {} : { id: input.id })}
       />
     </div>
   );

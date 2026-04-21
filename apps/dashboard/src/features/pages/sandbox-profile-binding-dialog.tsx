@@ -12,13 +12,13 @@ import {
 import { PlusIcon } from "@phosphor-icons/react";
 
 import { SchemaFormHorizontalFieldGroupClassName } from "../forms/schema-form.js";
+import { IntegrationConnectionSelect } from "./integration-connection-select.js";
 import {
   SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
   type IntegrationTargetSummary,
   type SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { BindingConnectionControl } from "./sandbox-profile-binding-shared.js";
 
 export type SandboxProfileBindingDialogState = {
   mode: "add" | "edit";
@@ -78,7 +78,7 @@ export function SandboxProfileBindingDialog(input: {
             <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
             <FieldContent>
               <div className="md:flex md:justify-end">
-                <BindingConnectionControl
+                <IntegrationConnectionSelect
                   ariaLabel="Add binding connection"
                   availableConnections={input.availableConnectionsByKind[state.row.kind]}
                   availableTargets={input.availableTargets}
