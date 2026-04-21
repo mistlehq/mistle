@@ -1,5 +1,7 @@
 {
-  "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,md,mdx,yaml,yml,toml,css,html}": ["oxfmt ."],
+  "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,md,mdx,yaml,yml,toml,css,html}": [
+    "oxfmt --no-error-on-unmatched-pattern"
+  ],
   "packages/sandboxd/**/*.rs": ["pnpm --filter @mistle/sandboxd format"],
   "packages/commit-sign/**/*.rs": ["pnpm --filter @mistle/commit-sign format"]
 }
