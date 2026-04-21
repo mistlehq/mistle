@@ -571,6 +571,56 @@ pub struct TelemetryReset {
     pub message: String,
 }
 
+/// Outbound `signing.request` payload sent from sandboxd to the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SigningRequest {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub organization_id: String,
+    pub sandbox_instance_id: String,
+    pub acting_user_id: String,
+    pub provider_family: String,
+    pub format: String,
+    pub key_ref: String,
+    pub grant: String,
+    pub payload: String,
+    pub encoding: String,
+}
+
+/// Successful `signing.result` payload sent by the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SigningSuccessResult {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub ok: bool,
+    pub signature: String,
+    pub encoding: String,
+}
+
+/// Failed `signing.result` payload sent by the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SigningFailureResult {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub ok: bool,
+    pub code: String,
+    pub message: String,
+}
+
+/// Signing control messages exchanged over the bootstrap tunnel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SigningControlMessage {
+    Request(SigningRequest),
+    ResultSuccess(SigningSuccessResult),
+    ResultFailure(SigningFailureResult),
+}
+
 /// Telemetry control messages accepted by the bootstrap tunnel side of the protocol.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BootstrapTelemetryControlMessage {
@@ -1003,6 +1053,51 @@ pub fn parse_bootstrap_telemetry_control_message(
     }
 }
 
+/// Parses one inbound `signing.*` control message.
+pub fn parse_signing_control_message(
+    payload: &str,
+) -> Result<Option<SigningControlMessage>, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "signing control message must be valid json: {error}"
+        ))
+    })?;
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+
+    match message_type {
+        "signing.request" => {
+            let message: SigningRequest = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_signing_request(&message)?;
+            Ok(Some(SigningControlMessage::Request(message)))
+        }
+        "signing.result" => {
+            let is_ok = parsed_payload
+                .get("ok")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| TunnelProtocolError::new("signing.result ok flag is required"))?;
+
+            if is_ok {
+                let message: SigningSuccessResult = serde_json::from_value(parsed_payload)
+                    .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                validate_signing_success_result(&message)?;
+                Ok(Some(SigningControlMessage::ResultSuccess(message)))
+            } else {
+                let message: SigningFailureResult = serde_json::from_value(parsed_payload)
+                    .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                validate_signing_failure_result(&message)?;
+                Ok(Some(SigningControlMessage::ResultFailure(message)))
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Encodes one outbound stream data frame for websocket binary transport.
 pub fn encode_stream_data_frame(
     stream_id: u32,
@@ -1088,6 +1183,11 @@ pub fn stream_complete(stream_id: u32) -> String {
         message_type: "stream.complete",
         stream_id,
     })
+}
+
+/// Builds one outbound `signing.request` payload.
+pub fn signing_request(request: &SigningRequest) -> String {
+    serialize_json(request)
 }
 
 /// Builds one successful `ports.target.authorize.result` payload.
@@ -1776,18 +1876,127 @@ fn validate_telemetry_reset(message: &TelemetryReset) -> Result<(), TunnelProtoc
     Ok(())
 }
 
+fn validate_signing_request(message: &SigningRequest) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "signing.request" {
+        return Err(TunnelProtocolError::new(
+            "signing.request message type must be 'signing.request'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request requestId is required",
+        ));
+    }
+    if message.organization_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request organizationId is required",
+        ));
+    }
+    if message.sandbox_instance_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request sandboxInstanceId is required",
+        ));
+    }
+    if message.acting_user_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request actingUserId is required",
+        ));
+    }
+    if message.provider_family.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request providerFamily is required",
+        ));
+    }
+    if message.format.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request format is required",
+        ));
+    }
+    if message.key_ref.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request keyRef is required",
+        ));
+    }
+    if message.grant.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.request grant is required",
+        ));
+    }
+    if message.encoding != "base64" {
+        return Err(TunnelProtocolError::new(
+            "signing.request encoding must be 'base64'",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_signing_success_result(
+    message: &SigningSuccessResult,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "signing.result" {
+        return Err(TunnelProtocolError::new(
+            "signing.result message type must be 'signing.result'",
+        ));
+    }
+    if !message.ok {
+        return Err(TunnelProtocolError::new(
+            "successful signing.result payload must set ok=true",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.result requestId is required",
+        ));
+    }
+    if message.encoding != "base64" {
+        return Err(TunnelProtocolError::new(
+            "successful signing.result encoding must be 'base64'",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_signing_failure_result(
+    message: &SigningFailureResult,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "signing.result" {
+        return Err(TunnelProtocolError::new(
+            "signing.result message type must be 'signing.result'",
+        ));
+    }
+    if message.ok {
+        return Err(TunnelProtocolError::new(
+            "failed signing.result payload must set ok=false",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.result requestId is required",
+        ));
+    }
+    if message.code.trim().is_empty() {
+        return Err(TunnelProtocolError::new("signing.result code is required"));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "signing.result message is required",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        ProcessesStreamMessage, PtyControlMessage, StreamControlMessage, StreamSendWindow,
-        decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
-        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
+        ProcessesStreamMessage, PtyControlMessage, SigningControlMessage, SigningRequest,
+        StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+        exec_result_event, file_upload_completed_event, parse_bootstrap_telemetry_control_message,
         parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
-        parse_pty_control_message, parse_stream_control_message,
+        parse_pty_control_message, parse_signing_control_message, parse_stream_control_message,
         ports_target_authorize_failure_result, ports_target_authorize_success_result,
-        pty_exit_event, stream_complete, stream_open_error, stream_open_ok, stream_reset,
-        stream_window, telemetry_close, telemetry_open,
+        pty_exit_event, signing_request, stream_complete, stream_open_error, stream_open_ok,
+        stream_reset, stream_window, telemetry_close, telemetry_open,
     };
 
     #[test]
@@ -1969,6 +2178,24 @@ mod tests {
     }
 
     #[test]
+    fn parses_valid_signing_control_messages() {
+        let request = parse_signing_control_message(
+            r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#,
+        )
+        .expect("signing.request should parse");
+        assert!(matches!(request, Some(SigningControlMessage::Request(_))));
+
+        let result = parse_signing_control_message(
+            r#"{"type":"signing.result","requestId":"sign_req_123","ok":false,"code":"signing_backend_not_implemented","message":"Git signing backend is not implemented yet."}"#,
+        )
+        .expect("signing.result should parse");
+        assert!(matches!(
+            result,
+            Some(SigningControlMessage::ResultFailure(_))
+        ));
+    }
+
+    #[test]
     fn round_trips_data_frames() {
         let encoded = encode_stream_data_frame(9, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello")
             .expect("frame should encode");
@@ -2000,6 +2227,22 @@ mod tests {
         assert_eq!(
             stream_complete(7),
             r#"{"type":"stream.complete","streamId":7}"#
+        );
+        assert_eq!(
+            signing_request(&SigningRequest {
+                message_type: "signing.request".to_string(),
+                request_id: "sign_req_123".to_string(),
+                organization_id: "org_123".to_string(),
+                sandbox_instance_id: "sbi_123".to_string(),
+                acting_user_id: "usr_123".to_string(),
+                provider_family: "github".to_string(),
+                format: "ssh".to_string(),
+                key_ref: "key::ssh-ed25519 AAAA".to_string(),
+                grant: "grant-token".to_string(),
+                payload: "c2lnbi1tZQ==".to_string(),
+                encoding: "base64".to_string(),
+            }),
+            r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#
         );
         assert_eq!(
             ports_target_authorize_success_result("req_port_access_1", "https", true),

@@ -7,6 +7,10 @@ import {
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
+  userExternalPrincipalCredentialSecrets,
+  UserExternalPrincipalCredentialSecretKinds,
+  userExternalPrincipalCredentials,
+  UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
   userExternalPrincipals,
 } from "@mistle/db/control-plane";
@@ -19,6 +23,11 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import {
+  encryptCredentialUtf8,
+  resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
+} from "../src/lib/crypto.js";
 import {
   StartSandboxProfileInstanceBadRequestResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
@@ -39,6 +48,16 @@ const WorkflowRunInputSchema = z.looseObject({
     .object({
       name: z.string().min(1),
       email: z.email(),
+      signing: z
+        .object({
+          format: z.literal("ssh"),
+          program: z.string().min(1),
+          keyRef: z.string().min(1),
+          organizationId: z.string().min(1),
+          providerFamily: z.string().min(1),
+          actingUserId: z.string().min(1),
+        })
+        .optional(),
     })
     .optional(),
 });
@@ -85,6 +104,7 @@ async function insertIdentityLinkProviderConfig(input: {
   providerFamily: string;
   targetKey: string;
   connectionId: string;
+  policy?: Record<string, unknown>;
 }): Promise<void> {
   await input.fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
     id: input.configId,
@@ -95,7 +115,53 @@ async function insertIdentityLinkProviderConfig(input: {
     integrationConnectionId: input.connectionId,
     createdByUserId: input.userId,
     updatedByUserId: input.userId,
+    ...(input.policy === undefined ? {} : { policy: input.policy }),
   });
+}
+
+async function insertPrincipalCredentialSecret(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  credentialId: string;
+  secretKind: (typeof UserExternalPrincipalCredentialSecretKinds)[keyof typeof UserExternalPrincipalCredentialSecretKinds];
+  plaintext: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    });
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
+  });
+  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.plaintext,
+      organizationCredentialKey: organizationCredentialKeyMaterial,
+    });
+
+    await input.fixture.db.insert(userExternalPrincipalCredentialSecrets).values({
+      organizationId: input.organizationId,
+      credentialId: input.credentialId,
+      secretKind: input.secretKind,
+      ciphertext: encryptedSecret.ciphertext,
+      nonce: encryptedSecret.nonce,
+      organizationCredentialKeyVersion: organizationCredentialKey.version,
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    });
+  } finally {
+    organizationCredentialKeyMaterial.fill(0);
+  }
 }
 
 describe("sandbox profile version start instance integration", () => {
@@ -569,6 +635,9 @@ describe("sandbox profile version start instance integration", () => {
       providerFamily: "github",
       targetKey: "github-start-instance-git-identity",
       connectionId: "icn_start_instance_git_identity_provider",
+      policy: {
+        gitCommitSigningMode: "allowed",
+      },
     });
     await fixture.db.insert(userExternalPrincipals).values({
       id: "uep_start_instance_git_identity",
@@ -584,6 +653,24 @@ describe("sandbox profile version start instance integration", () => {
         displayName: "Mistle User",
         preferredEmail: "mistle-user@example.com",
         avatarUrl: "https://avatars.example.com/u/12345",
+      },
+    });
+    await fixture.db.insert(userExternalPrincipalCredentials).values({
+      id: "upc_start_instance_git_identity_signing",
+      organizationId: authenticatedSession.organizationId,
+      principalId: "uep_start_instance_git_identity",
+      providerFamily: "github",
+      credentialKind: "git_ssh_signing_key",
+      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    });
+    await insertPrincipalCredentialSecret({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      credentialId: "upc_start_instance_git_identity_signing",
+      secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
+      plaintext: "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----",
+      metadata: {
+        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
       },
     });
 
@@ -609,6 +696,15 @@ describe("sandbox profile version start instance integration", () => {
       expect(queuedWorkflowInput.gitIdentity).toEqual({
         name: "Mistle User",
         email: "mistle-user@example.com",
+        signing: {
+          format: "ssh",
+          program: "/opt/mistle/bin/mistle-ssh-sign",
+          keyRef:
+            "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
+          organizationId: authenticatedSession.organizationId,
+          providerFamily: "github",
+          actingUserId: authenticatedSession.userId,
+        },
       });
       expect(queuedWorkflowInput.actingUserId).toBe(authenticatedSession.userId);
     } finally {

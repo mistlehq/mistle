@@ -5,11 +5,13 @@ import {
   parseBootstrapControlMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
+  parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
   type RuntimeReadyControlMessage,
+  type SigningRequest,
   type StreamControlMessage,
   type TelemetryClose,
   type TelemetryOpen,
@@ -61,6 +63,10 @@ export type TunnelProtocolDelivery =
       kind: "telemetryInvalidData";
       payloadKind: number;
       streamId: number;
+    }
+  | {
+      kind: "signingRequest";
+      message: SigningRequest;
     };
 
 export type TunnelProtocolTranslation = {
@@ -253,6 +259,12 @@ function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string
 function createUnsupportedConnectionTelemetryMessageError(messageType: string): Error {
   return new TunnelProtocolViolationError(
     `Connection websocket cannot send telemetry control message type '${messageType}'.`,
+  );
+}
+
+function createUnsupportedConnectionSigningMessageError(messageType: string): Error {
+  return new TunnelProtocolViolationError(
+    `Connection websocket cannot send signing control message type '${messageType}'.`,
   );
 }
 
@@ -539,6 +551,11 @@ export class TunnelProtocolTranslator {
       throw createUnsupportedConnectionTelemetryMessageError(telemetryControlMessage.type);
     }
 
+    const signingControlMessage = parseSigningControlMessage(input.payload);
+    if (signingControlMessage !== undefined) {
+      throw createUnsupportedConnectionSigningMessageError(signingControlMessage.type);
+    }
+
     const controlMessage = parseStreamControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(
@@ -675,6 +692,22 @@ export class TunnelProtocolTranslator {
       throw new TunnelProtocolViolationError(
         `Bootstrap websocket cannot send ports transport message type '${portsTransportMessage.type}'.`,
       );
+    }
+
+    const signingControlMessage = parseSigningControlMessage(input.payload);
+    if (signingControlMessage !== undefined) {
+      if (signingControlMessage.type !== "signing.request") {
+        throw new TunnelProtocolViolationError(
+          `Bootstrap websocket cannot send signing control message type '${signingControlMessage.type}'.`,
+        );
+      }
+
+      return createTranslation({
+        delivery: {
+          kind: "signingRequest",
+          message: signingControlMessage,
+        },
+      });
     }
 
     const controlMessage = parseBootstrapControlMessage(input.payload);

@@ -62,6 +62,12 @@ const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/sandbox-signing-auth$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/sandbox-signing-auth/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/telemetry$/,
     replacement: fileURLToPath(new URL("../../packages/telemetry/src/index.ts", import.meta.url)),
   },

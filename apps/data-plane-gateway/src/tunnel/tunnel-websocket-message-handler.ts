@@ -21,6 +21,13 @@ export type TelemetryDelivery = Extract<
   }
 >;
 
+export type SigningDelivery = Extract<
+  TunnelProtocolDelivery,
+  {
+    kind: "signingRequest";
+  }
+>;
+
 /**
  * Normalizes websocket message payloads to the tunnel relay payload types.
  */
@@ -47,6 +54,7 @@ export async function handleTunnelWebSocketMessage(input: {
   bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
+  handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
   sandboxRuntimeReadinessRepository: SandboxRuntimeReadinessRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
@@ -107,6 +115,12 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleTelemetryDelivery(translation.delivery);
+  } else if (translation.delivery.kind === "signingRequest") {
+    if (input.handleSigningDelivery === undefined) {
+      throw new Error("Signing delivery requires a signing handler.");
+    }
+
+    await input.handleSigningDelivery(translation.delivery);
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {

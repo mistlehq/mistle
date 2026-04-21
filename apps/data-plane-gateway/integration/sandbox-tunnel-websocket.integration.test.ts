@@ -11,13 +11,16 @@ import {
   DataFrameKindData,
   decodeDataFrame,
   encodeDataFrame,
+  parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
+  type SigningControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
+import { mintSigningGrant } from "@mistle/sandbox-signing-auth";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
@@ -56,6 +59,19 @@ function parseTelemetryMessage(data: string | Buffer) {
   const parsedPayload = parseTelemetryControlMessage(data);
   if (parsedPayload === undefined) {
     throw new Error("Expected websocket message payload to be a valid telemetry control message.");
+  }
+
+  return parsedPayload;
+}
+
+function parseSigningMessage(data: string | Buffer): SigningControlMessage {
+  if (typeof data !== "string") {
+    throw new Error("Expected websocket message data to be a string.");
+  }
+
+  const parsedPayload = parseSigningControlMessage(data);
+  if (parsedPayload === undefined) {
+    throw new Error("Expected websocket message payload to be a valid signing control message.");
   }
 
   return parsedPayload;
@@ -107,6 +123,83 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
 }
 
 describe("sandbox tunnel websocket integration", () => {
+  it(
+    "returns an explicit not-yet-implemented signing result for valid bootstrap signing requests",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const signingGrant = await mintSigningGrant({
+        config: {
+          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        claims: {
+          sub: sandboxInstanceId,
+          jti: randomUUID(),
+          organizationId: "org_data_plane_gateway_integration",
+          actingUserId: "usr_data_plane_gateway_integration",
+          providerFamily: "github",
+          format: "ssh",
+          keyRef: "key::ssh-ed25519 AAAA",
+        },
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+
+        const signingResultPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "signing.request",
+            requestId: "sign_req_123",
+            organizationId: "org_data_plane_gateway_integration",
+            sandboxInstanceId,
+            actingUserId: "usr_data_plane_gateway_integration",
+            providerFamily: "github",
+            format: "ssh",
+            keyRef: "key::ssh-ed25519 AAAA",
+            grant: signingGrant,
+            payload: "c2lnbi1tZQ==",
+            encoding: "base64",
+          }),
+        );
+        const signingResult = await signingResultPromise;
+
+        expect(signingResult.isBinary).toBe(false);
+        expect(parseSigningMessage(signingResult.data)).toEqual({
+          type: "signing.result",
+          requestId: "sign_req_123",
+          ok: false,
+          code: "signing_backend_not_implemented",
+          message: "Git signing backend is not implemented yet.",
+        });
+      } finally {
+        await closeWebSocketIfOpen(bootstrapSocket);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
   it(
     "responds to the connection peer when an interactive control message is not bound",
     async ({ fixture }) => {
@@ -163,6 +256,80 @@ describe("sandbox tunnel websocket integration", () => {
           streamId: 77,
           code: "interactive_stream_not_found",
           message: "Interactive stream is not bound on this tunnel session.",
+        });
+        await bootstrapNoMessagePromise;
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "closes the connection peer when it sends signing control messages reserved for bootstrap",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosedPromise = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "signing.request",
+            requestId: "sign_req_123",
+            organizationId: "org_123",
+            sandboxInstanceId,
+            actingUserId: "usr_123",
+            providerFamily: "github",
+            format: "ssh",
+            keyRef: "key::ssh-ed25519 AAAA",
+            grant: "grant-token",
+            payload: "c2lnbi1tZQ==",
+            encoding: "base64",
+          }),
+        );
+        await expect(clientClosedPromise).resolves.toEqual({
+          code: 1008,
+          reason:
+            "Connection websocket cannot send signing control message type 'signing.request'.",
         });
         await bootstrapNoMessagePromise;
       } finally {

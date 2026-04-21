@@ -357,6 +357,44 @@ const TelemetryResetSchema = z.object({
   message: NonEmptyStringSchema,
 });
 
+const SigningFormatSchema = z.enum(["ssh"]);
+
+const SigningRequestSchema = z.object({
+  type: z.literal("signing.request"),
+  requestId: NonEmptyStringSchema,
+  organizationId: NonEmptyStringSchema,
+  sandboxInstanceId: NonEmptyStringSchema,
+  actingUserId: NonEmptyStringSchema,
+  providerFamily: NonEmptyStringSchema,
+  format: SigningFormatSchema,
+  keyRef: NonEmptyStringSchema,
+  grant: NonEmptyStringSchema,
+  payload: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const SigningSuccessResultSchema = z.object({
+  type: z.literal("signing.result"),
+  requestId: NonEmptyStringSchema,
+  ok: z.literal(true),
+  signature: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const SigningFailureResultSchema = z.object({
+  type: z.literal("signing.result"),
+  requestId: NonEmptyStringSchema,
+  ok: z.literal(false),
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
+const SigningControlMessageSchema = z.union([
+  SigningRequestSchema,
+  SigningSuccessResultSchema,
+  SigningFailureResultSchema,
+]);
+
 const SandboxKeepaliveStateSchema = z.object({
   type: z.literal("keepalive.state"),
   ttlMs: PositiveIntegerSchema,
@@ -464,6 +502,12 @@ export type TelemetryWindow = z.infer<typeof TelemetryWindowSchema>;
 export type TelemetryClose = z.infer<typeof TelemetryCloseSchema>;
 export type TelemetryReset = z.infer<typeof TelemetryResetSchema>;
 export type TelemetryControlMessage = z.infer<typeof TelemetryControlMessageSchema>;
+export type SigningFormat = z.infer<typeof SigningFormatSchema>;
+export type SigningRequest = z.infer<typeof SigningRequestSchema>;
+export type SigningSuccessResult = z.infer<typeof SigningSuccessResultSchema>;
+export type SigningFailureResult = z.infer<typeof SigningFailureResultSchema>;
+export type SigningResult = SigningSuccessResult | SigningFailureResult;
+export type SigningControlMessage = z.infer<typeof SigningControlMessageSchema>;
 export type SandboxKeepaliveState = z.infer<typeof SandboxKeepaliveStateSchema>;
 export type SandboxRuntimeReady = z.infer<typeof SandboxRuntimeReadySchema>;
 export type KeepaliveControlMessage = SandboxKeepaliveState;
@@ -497,6 +541,16 @@ export function parseTelemetryControlMessage(payload: string): TelemetryControlM
   }
 
   const result = TelemetryControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parseSigningControlMessage(payload: string): SigningControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = SigningControlMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 
@@ -542,5 +596,6 @@ export function parsePortsTransportMessage(payload: string): PortsTransportMessa
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
+  | SigningControlMessage
   | KeepaliveControlMessage
   | RuntimeReadyControlMessage;

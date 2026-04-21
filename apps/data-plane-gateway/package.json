@@ -26,6 +26,7 @@
     "@mistle/port-access-auth": "workspace:*",
     "@mistle/sandbox-runtime-contract": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
+    "@mistle/sandbox-signing-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@opentelemetry/api": "^1.9.1",

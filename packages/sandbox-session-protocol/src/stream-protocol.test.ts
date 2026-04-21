@@ -5,6 +5,7 @@ import {
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseProcessesStreamMessage,
+  parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
 } from "./stream-protocol.js";
@@ -527,6 +528,79 @@ describe("stream control message parser", () => {
         kind: "processes",
       },
     });
+  });
+});
+
+describe("signing control message parser", () => {
+  it("parses signing requests", () => {
+    expect(
+      parseSigningControlMessage(
+        JSON.stringify({
+          type: "signing.request",
+          requestId: "sign_req_123",
+          organizationId: "org_123",
+          sandboxInstanceId: "sbi_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+          format: "ssh",
+          keyRef: "key::ssh-ed25519 AAAA",
+          grant: "grant-token",
+          payload: "c2lnbi1tZQ==",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "signing.request",
+      requestId: "sign_req_123",
+      organizationId: "org_123",
+      sandboxInstanceId: "sbi_123",
+      actingUserId: "usr_123",
+      providerFamily: "github",
+      format: "ssh",
+      keyRef: "key::ssh-ed25519 AAAA",
+      grant: "grant-token",
+      payload: "c2lnbi1tZQ==",
+      encoding: "base64",
+    });
+  });
+
+  it("parses signing results", () => {
+    expect(
+      parseSigningControlMessage(
+        JSON.stringify({
+          type: "signing.result",
+          requestId: "sign_req_123",
+          ok: false,
+          code: "signing_backend_not_implemented",
+          message: "Git signing backend is not implemented yet.",
+        }),
+      ),
+    ).toEqual({
+      type: "signing.result",
+      requestId: "sign_req_123",
+      ok: false,
+      code: "signing_backend_not_implemented",
+      message: "Git signing backend is not implemented yet.",
+    });
+  });
+
+  it("rejects malformed signing control messages", () => {
+    expect(
+      parseSigningControlMessage(
+        JSON.stringify({
+          type: "signing.request",
+          requestId: "sign_req_123",
+          organizationId: "org_123",
+          sandboxInstanceId: "sbi_123",
+          actingUserId: "usr_123",
+          providerFamily: "github",
+          format: "ssh",
+          grant: "grant-token",
+          payload: "c2lnbi1tZQ==",
+          encoding: "base64",
+        }),
+      ),
+    ).toBeUndefined();
   });
 });
 

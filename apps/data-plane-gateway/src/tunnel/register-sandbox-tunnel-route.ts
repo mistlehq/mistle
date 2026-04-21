@@ -24,6 +24,7 @@ import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
+import { SandboxSigningRequestService } from "./signing/sandbox-signing-request-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
 import { finalizeTunnelSession, recordTunnelSessionError } from "./tunnel-session-observability.js";
@@ -43,6 +44,7 @@ type RegisterSandboxTunnelRouteInput = {
   gatewayNodeId: string;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
+  sandboxSigningRequestService: SandboxSigningRequestService;
   portAccessTransportService: PortAccessTransportService;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -287,6 +289,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 : {}),
               clientSessionId: relaySessionId,
               currentSocket: ws,
+              handleSigningDelivery: async (delivery) => {
+                const result =
+                  await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
+                    liveSandboxInstanceId: sandboxInstanceId,
+                    request: delivery.message,
+                  });
+                ws.send(JSON.stringify(result));
+              },
               sandboxKeepaliveRepository,
               sandboxRuntimeReadinessRepository,
               handleTelemetryDelivery: async (delivery) => {

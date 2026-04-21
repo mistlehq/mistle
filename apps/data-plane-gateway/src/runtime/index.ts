@@ -41,6 +41,7 @@ import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-le
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
+import { SandboxSigningRequestService } from "../tunnel/signing/sandbox-signing-request-service.js";
 import {
   createSandboxTelemetryIngressSink,
   SandboxTelemetryIngressService,
@@ -141,6 +142,11 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
   );
   const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
+  const sandboxSigningRequestService = new SandboxSigningRequestService({
+    bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
+    tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
+    tokenAudience: config.sandbox.bootstrap.tokenAudience,
+  });
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
@@ -187,6 +193,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.connect.tokenIssuer,
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
+    sandboxSigningRequestService,
     portAccessTransportService,
     portsTargetAuthorizeService,
     interactiveStreamRouter,

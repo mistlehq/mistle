@@ -504,6 +504,9 @@ importers:
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol
+      '@mistle/sandbox-signing-auth':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-signing-auth
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

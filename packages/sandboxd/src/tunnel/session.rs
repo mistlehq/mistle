@@ -17,7 +17,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
-use std::time::Instant;
+use std::time::{Duration as StdDuration, Instant};
 
 use base64::Engine;
 use bytes::Bytes;
@@ -74,11 +74,13 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
     STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
     STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
-    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-    exec_result_event, file_upload_completed_event, parse_ports_control_message,
-    parse_ports_transport_message, parse_processes_stream_message, parse_stream_control_message,
+    SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+    file_upload_completed_event, parse_ports_control_message, parse_ports_transport_message,
+    parse_processes_stream_message, parse_signing_control_message, parse_stream_control_message,
     ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
-    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
+    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+    stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
@@ -106,6 +108,7 @@ const WEBP_BRAND_SIGNATURE: &[u8] = &[0x57, 0x45, 0x42, 0x50];
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(30);
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -133,6 +136,32 @@ const PTY_OUTCOME_CLOSED: &str = "closed";
 const PTY_OUTCOME_EXITED: &str = "exited";
 const PTY_OUTCOME_RESET: &str = "reset";
 const PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS: u64 = 100;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelSigningRequest {
+    pub request_id: String,
+    pub organization_id: String,
+    pub sandbox_instance_id: String,
+    pub acting_user_id: String,
+    pub provider_family: String,
+    pub format: String,
+    pub key_ref: String,
+    pub grant: String,
+    pub payload_base64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TunnelSigningResponse {
+    Success {
+        request_id: String,
+        signature_base64: String,
+    },
+    Failure {
+        request_id: String,
+        code: String,
+        message: String,
+    },
+}
 
 fn resolve_default_attachment_root() -> PathBuf {
     if let Some(attachment_root) = crate::test_support::attachment_root_override() {
@@ -171,6 +200,7 @@ pub enum TunnelSessionError {
     ReadTunnel(String),
     ParseControl(String),
     ParseDataFrame(String),
+    Signing(String),
     AgentDial(String),
     AgentSocket(String),
     AgentRead(String),
@@ -220,6 +250,7 @@ impl Display for TunnelSessionError {
             Self::ParseDataFrame(error) => {
                 write!(f, "invalid bootstrap tunnel data frame: {error}")
             }
+            Self::Signing(error) => write!(f, "failed to handle signing request: {error}"),
             Self::AgentDial(error) => {
                 write!(f, "failed to connect agent runtime endpoint: {error}")
             }
@@ -246,6 +277,7 @@ impl std::error::Error for TunnelSessionError {}
 /// Owns the background tunnel session thread for the initialized daemon.
 pub struct TunnelSession {
     shutdown_requested: Arc<AtomicBool>,
+    request_sender: mpsc::UnboundedSender<TunnelSessionRequest>,
     thread: Option<JoinHandle<Result<(), TunnelSessionError>>>,
     supervisor_handle: SandboxdSupervisorHandle,
 }
@@ -263,6 +295,11 @@ enum ConnectedTunnelSessionOutcome {
 struct ConnectedTunnelSessionResult {
     outcome: ConnectedTunnelSessionOutcome,
     startup_completed: bool,
+}
+
+enum ConnectedTunnelSessionLoopItem {
+    Event(TunnelSessionEvent),
+    Request(TunnelSessionRequest),
 }
 
 type TunnelExchangeHttpClient = Client<HttpsConnector<HttpConnector>, Empty<Bytes>>;
@@ -312,6 +349,13 @@ enum TunnelSessionEvent {
         result: Box<Result<ExecCommandResult, String>>,
     },
     Wake,
+}
+
+enum TunnelSessionRequest {
+    Signing {
+        request: TunnelSigningRequest,
+        response_sender: std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -513,6 +557,7 @@ impl TunnelSession {
             .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 
         let shutdown_requested = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (request_sender, request_receiver) = mpsc::unbounded_channel();
         let (startup_result_sender, startup_result_receiver) = std::sync::mpsc::channel();
         let thread = thread::spawn({
             let shutdown_requested = shutdown_requested.clone();
@@ -552,6 +597,7 @@ impl TunnelSession {
                         &connected_url,
                         &bootstrap_token,
                         &tunnel_exchange_token,
+                        request_receiver,
                         startup_result_sender,
                     )
                     .await
@@ -599,9 +645,27 @@ impl TunnelSession {
 
         Ok(Self {
             shutdown_requested,
+            request_sender,
             thread: Some(thread),
             supervisor_handle,
         })
+    }
+
+    pub fn request_signing(
+        &self,
+        request: TunnelSigningRequest,
+    ) -> Result<TunnelSigningResponse, TunnelSessionError> {
+        let (response_sender, response_receiver) = std::sync::mpsc::channel();
+        self.request_sender
+            .send(TunnelSessionRequest::Signing {
+                request,
+                response_sender,
+            })
+            .map_err(|error| TunnelSessionError::Signing(error.to_string()))?;
+
+        response_receiver
+            .recv_timeout(DEFAULT_SIGNING_REQUEST_TIMEOUT)
+            .map_err(|error| TunnelSessionError::Signing(error.to_string()))?
     }
 
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
@@ -695,6 +759,10 @@ struct TunnelSessionLoopContext<'a> {
 
 struct TunnelSessionMutableState {
     telemetry_relay: TelemetryRelay,
+    pending_signing_requests: BTreeMap<
+        String,
+        std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
+    >,
     pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
     pending_exec_opens: BTreeMap<u32, PendingExecOpenState>,
     agent_streams: BTreeMap<u32, AgentStreamState>,
@@ -1230,6 +1298,13 @@ fn publish_bootstrap_closed_agent_stream_summaries(
     }
 }
 
+fn fail_pending_signing_requests(session_state: &mut TunnelSessionMutableState, message: &str) {
+    for response_sender in std::mem::take(&mut session_state.pending_signing_requests).into_values()
+    {
+        let _ = response_sender.send(Err(TunnelSessionError::Signing(message.to_string())));
+    }
+}
+
 fn continue_with(
     result: Result<(), TunnelSessionError>,
 ) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
@@ -1241,6 +1316,7 @@ async fn run_tunnel_supervisor(
     gateway_ws_url: &str,
     bootstrap_token: &str,
     tunnel_exchange_token: &str,
+    request_receiver: mpsc::UnboundedReceiver<TunnelSessionRequest>,
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
     let initial_connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
@@ -1275,9 +1351,11 @@ async fn run_tunnel_supervisor(
         };
     let mut current_tunnel_exchange_token = tunnel_exchange_token.to_string();
 
+    let mut request_receiver = request_receiver;
     let mut session_result = run_connected_tunnel_session_catching_panics(
         &runtime,
         bootstrap_socket,
+        &mut request_receiver,
         Some(&startup_result_sender),
     )
     .await;
@@ -1307,20 +1385,27 @@ async fn run_tunnel_supervisor(
             return Ok(());
         };
 
-        session_result =
-            run_connected_tunnel_session_catching_panics(&runtime, reconnected_socket, None).await;
+        session_result = run_connected_tunnel_session_catching_panics(
+            &runtime,
+            reconnected_socket,
+            &mut request_receiver,
+            None,
+        )
+        .await;
     }
 }
 
 async fn run_connected_tunnel_session_catching_panics(
     runtime: &TunnelSessionRuntime,
     bootstrap_socket: TunnelWebSocket,
+    request_receiver: &mut mpsc::UnboundedReceiver<TunnelSessionRequest>,
     startup_result_sender: Option<&std::sync::mpsc::Sender<Result<(), TunnelSessionError>>>,
 ) -> ConnectedTunnelSessionResult {
     let startup_completed = Arc::new(AtomicBool::new(startup_result_sender.is_none()));
     match AssertUnwindSafe(run_connected_tunnel_session(
         runtime,
         bootstrap_socket,
+        request_receiver,
         startup_result_sender,
         startup_completed.as_ref(),
     ))
@@ -1370,6 +1455,7 @@ async fn run_connected_tunnel_session_catching_panics(
 async fn run_connected_tunnel_session(
     runtime: &TunnelSessionRuntime,
     bootstrap_socket: TunnelWebSocket,
+    request_receiver: &mut mpsc::UnboundedReceiver<TunnelSessionRequest>,
     startup_result_sender: Option<&std::sync::mpsc::Sender<Result<(), TunnelSessionError>>>,
     startup_completed: &AtomicBool,
 ) -> ConnectedTunnelSessionResult {
@@ -1388,6 +1474,7 @@ async fn run_connected_tunnel_session(
 
     let mut session_state = TunnelSessionMutableState {
         telemetry_relay: TelemetryRelay::default(),
+        pending_signing_requests: BTreeMap::new(),
         pending_agent_opens: BTreeMap::new(),
         pending_exec_opens: BTreeMap::new(),
         agent_streams: BTreeMap::new(),
@@ -1639,7 +1726,11 @@ async fn run_connected_tunnel_session(
                 }
             }
         }
-        let Some(event) = event_receiver.recv().await else {
+        let next_item = tokio::select! {
+            event = event_receiver.recv() => event.map(ConnectedTunnelSessionLoopItem::Event),
+            request = request_receiver.recv() => request.map(ConnectedTunnelSessionLoopItem::Request),
+        };
+        let Some(next_item) = next_item else {
             break;
         };
 
@@ -1671,6 +1762,10 @@ async fn run_connected_tunnel_session(
             if let Ok(frames) = session_state.telemetry_relay.detach_tunnel_connection() {
                 let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
             }
+            fail_pending_signing_requests(
+                &mut session_state,
+                "bootstrap tunnel session shut down before a signing result arrived",
+            );
             mark_tunnel_disconnected(runtime);
             let _ = write_tunnel_close(&tunnel_writer_sender);
             return ConnectedTunnelSessionResult {
@@ -1679,15 +1774,23 @@ async fn run_connected_tunnel_session(
             };
         }
 
-        match handle_tunnel_session_event(
-            event,
-            &tunnel_writer_sender,
-            &event_sender,
-            &loop_context,
-            &mut session_state,
-        )
-        .await
-        {
+        let control_flow_result = match next_item {
+            ConnectedTunnelSessionLoopItem::Event(event) => {
+                handle_tunnel_session_event(
+                    event,
+                    &tunnel_writer_sender,
+                    &event_sender,
+                    &loop_context,
+                    &mut session_state,
+                )
+                .await
+            }
+            ConnectedTunnelSessionLoopItem::Request(request) => {
+                handle_tunnel_session_request(request, &tunnel_writer_sender, &mut session_state)
+            }
+        };
+
+        match control_flow_result {
             Ok(TunnelSessionControlFlow::Continue) => {
                 forward_supervisor_lifecycle_events(
                     loop_context.supervisor_handle,
@@ -1696,6 +1799,10 @@ async fn run_connected_tunnel_session(
                 );
             }
             Ok(TunnelSessionControlFlow::RestartRequired) => {
+                fail_pending_signing_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session restarted before a signing result arrived",
+                );
                 mark_tunnel_disconnected(runtime);
                 return ConnectedTunnelSessionResult {
                     outcome: ConnectedTunnelSessionOutcome::RestartRequired,
@@ -1720,6 +1827,10 @@ async fn run_connected_tunnel_session(
                     "thread_returned",
                     Some(&error_text),
                     &[("exitKind", Value::String("thread_returned".to_string()))],
+                );
+                fail_pending_signing_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session failed before a signing result arrived",
                 );
                 mark_tunnel_disconnected(runtime);
                 return ConnectedTunnelSessionResult {
@@ -3137,6 +3248,23 @@ async fn handle_tunnel_session_event(
                     }
                 }
 
+                match parse_signing_control_message(&payload) {
+                    Ok(Some(message)) => {
+                        handle_signing_control_message(session_state, message);
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        report_dropped_bootstrap_text_message(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            context.clock,
+                            error.to_string(),
+                        );
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    }
+                }
+
                 let control_message = match parse_stream_control_message(&payload) {
                     Ok(message) => message,
                     Err(error) => {
@@ -3576,6 +3704,105 @@ async fn handle_tunnel_session_event(
                     tunnel_writer_sender,
                     stream_reset(stream_id, STREAM_RESET_CODE_EXEC_COMMAND_FAILED, error),
                 )),
+            }
+        }
+    }
+}
+
+fn handle_tunnel_session_request(
+    request: TunnelSessionRequest,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
+    match request {
+        TunnelSessionRequest::Signing {
+            request,
+            response_sender,
+        } => {
+            if request.request_id.trim().is_empty() {
+                let _ = response_sender.send(Err(TunnelSessionError::Signing(
+                    "signing request id is required".to_string(),
+                )));
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+
+            if session_state
+                .pending_signing_requests
+                .contains_key(&request.request_id)
+            {
+                let _ = response_sender.send(Err(TunnelSessionError::Signing(
+                    "duplicate signing request id".to_string(),
+                )));
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+
+            session_state
+                .pending_signing_requests
+                .insert(request.request_id.clone(), response_sender);
+            let request_id = request.request_id.clone();
+
+            let payload = signing_request(&SigningRequest {
+                message_type: "signing.request".to_string(),
+                request_id: request.request_id,
+                organization_id: request.organization_id,
+                sandbox_instance_id: request.sandbox_instance_id,
+                acting_user_id: request.acting_user_id,
+                provider_family: request.provider_family,
+                format: request.format,
+                key_ref: request.key_ref,
+                grant: request.grant,
+                payload: request.payload_base64,
+                encoding: "base64".to_string(),
+            });
+
+            match write_tunnel_text(tunnel_writer_sender, payload) {
+                Ok(()) => Ok(TunnelSessionControlFlow::Continue),
+                Err(error) => {
+                    if let Some(response_sender) =
+                        session_state.pending_signing_requests.remove(&request_id)
+                    {
+                        let _ = response_sender
+                            .send(Err(TunnelSessionError::Signing(error.to_string())));
+                    }
+                    Err(error)
+                }
+            }
+        }
+    }
+}
+
+fn handle_signing_control_message(
+    session_state: &mut TunnelSessionMutableState,
+    message: SigningControlMessage,
+) {
+    match message {
+        SigningControlMessage::Request(request) => {
+            eprintln!(
+                "sandboxd dropped unexpected signing request '{}' from the gateway",
+                request.request_id
+            );
+        }
+        SigningControlMessage::ResultSuccess(result) => {
+            if let Some(response_sender) = session_state
+                .pending_signing_requests
+                .remove(&result.request_id)
+            {
+                let _ = response_sender.send(Ok(TunnelSigningResponse::Success {
+                    request_id: result.request_id,
+                    signature_base64: result.signature,
+                }));
+            }
+        }
+        SigningControlMessage::ResultFailure(result) => {
+            if let Some(response_sender) = session_state
+                .pending_signing_requests
+                .remove(&result.request_id)
+            {
+                let _ = response_sender.send(Ok(TunnelSigningResponse::Failure {
+                    request_id: result.request_id,
+                    code: result.code,
+                    message: result.message,
+                }));
             }
         }
     }
@@ -4931,7 +5158,9 @@ mod tests {
         StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
         parse_stream_control_message,
     };
-    use crate::tunnel::session::{TunnelSession, decode_bounded_output};
+    use crate::tunnel::session::{
+        TunnelSession, TunnelSigningRequest, TunnelSigningResponse, decode_bounded_output,
+    };
     use crate::tunnel::telemetry::{
         SANDBOX_TELEMETRY_LOG_STREAM_ID, TelemetryRelay, decode_telemetry_data_frame,
     };
@@ -5017,6 +5246,7 @@ mod tests {
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::from([(
@@ -5093,6 +5323,7 @@ mod tests {
         stats.record_inbound_message(64);
         let mut session_state = TunnelSessionMutableState {
             telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::from([(
@@ -5180,6 +5411,7 @@ mod tests {
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::from([(
@@ -6383,6 +6615,245 @@ mod tests {
     }
 
     #[test]
+    fn forwards_signing_requests_over_the_bootstrap_tunnel_and_returns_gateway_results() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            expect_tunnel_connected_publications(&mut websocket);
+
+            let signing_request = read_json_text_message(&mut websocket);
+            assert_eq!(
+                signing_request,
+                json!({
+                    "type": "signing.request",
+                    "requestId": "sign_req_123",
+                    "organizationId": "org_123",
+                    "sandboxInstanceId": "sbi_tunnel_session",
+                    "actingUserId": "usr_123",
+                    "providerFamily": "github",
+                    "format": "ssh",
+                    "keyRef": "key::ssh-ed25519 AAAA",
+                    "grant": "grant-token",
+                    "payload": "c2lnbi1tZQ==",
+                    "encoding": "base64"
+                })
+            );
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "signing.result",
+                        "requestId": "sign_req_123",
+                        "ok": false,
+                        "code": "signing_backend_not_implemented",
+                        "message": "Git signing backend is not implemented yet."
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should return a signing result");
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        let signing_result = tunnel_session
+            .request_signing(TunnelSigningRequest {
+                request_id: "sign_req_123".to_string(),
+                organization_id: "org_123".to_string(),
+                sandbox_instance_id: "sbi_tunnel_session".to_string(),
+                acting_user_id: "usr_123".to_string(),
+                provider_family: "github".to_string(),
+                format: "ssh".to_string(),
+                key_ref: "key::ssh-ed25519 AAAA".to_string(),
+                grant: "grant-token".to_string(),
+                payload_base64: "c2lnbi1tZQ==".to_string(),
+            })
+            .expect("signing request should complete through the tunnel");
+
+        assert_eq!(
+            signing_result,
+            TunnelSigningResponse::Failure {
+                request_id: "sign_req_123".to_string(),
+                code: "signing_backend_not_implemented".to_string(),
+                message: "Git signing backend is not implemented yet.".to_string(),
+            }
+        );
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the signing interaction");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn returns_authorization_failures_from_gateway_signing_results() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            expect_tunnel_connected_publications(&mut websocket);
+            let _signing_request = read_json_text_message(&mut websocket);
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "signing.result",
+                        "requestId": "sign_req_123",
+                        "ok": false,
+                        "code": "invalid_grant",
+                        "message": "Signing grant verification failed: token_invalid."
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should return an authorization failure");
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tunnel session finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "mistle/sandbox-base:dev"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        let signing_result = tunnel_session
+            .request_signing(TunnelSigningRequest {
+                request_id: "sign_req_123".to_string(),
+                organization_id: "org_123".to_string(),
+                sandbox_instance_id: "sbi_tunnel_session".to_string(),
+                acting_user_id: "usr_123".to_string(),
+                provider_family: "github".to_string(),
+                format: "ssh".to_string(),
+                key_ref: "key::ssh-ed25519 AAAA".to_string(),
+                grant: "grant-token".to_string(),
+                payload_base64: "c2lnbi1tZQ==".to_string(),
+            })
+            .expect("signing request should complete through the tunnel");
+
+        assert_eq!(
+            signing_result,
+            TunnelSigningResponse::Failure {
+                request_id: "sign_req_123".to_string(),
+                code: "invalid_grant".to_string(),
+                message: "Signing grant verification failed: token_invalid.".to_string(),
+            }
+        );
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the signing interaction");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
     fn bootstrap_disconnect_leaves_publish_managers_disconnected_until_explicit_close() {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
@@ -6836,6 +7307,7 @@ mod tests {
             let (bootstrap_socket, _) = connect_bootstrap_websocket(connected_url.as_str())
                 .await
                 .expect("bootstrap websocket should connect");
+            let (_request_sender, mut request_receiver) = tokio::sync::mpsc::unbounded_channel();
             let panic_clock = panic_clock.clone();
             let ready_thread = thread::spawn(move || {
                 initial_connected_receiver
@@ -6846,6 +7318,7 @@ mod tests {
             let session_result = run_connected_tunnel_session_catching_panics(
                 &runtime,
                 bootstrap_socket,
+                &mut request_receiver,
                 Some(&startup_result_sender),
             )
             .await;
