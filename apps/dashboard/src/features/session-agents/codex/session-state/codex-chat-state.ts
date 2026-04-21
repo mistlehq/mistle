@@ -88,7 +88,11 @@ type CodexRawTurnState = {
   completedErrorMessage: string | null;
   planSnapshot: CodexTurnPlanSnapshot | null;
   userEntry: ChatUserEntry | null;
-  clientUserEntries: readonly ChatUserEntry[];
+  clientUserEntries: readonly {
+    entry: ChatUserEntry;
+    insertAfterItemCount: number;
+    requestState: "accepted" | "queued" | "sending";
+  }[];
   itemOrder: readonly string[];
   rawItemsById: Readonly<Record<string, unknown>>;
 };
@@ -133,6 +137,11 @@ export type CodexChatAction =
     }
   | {
       type: "steer_turn_processed";
+      entryId: string;
+      turnId: string;
+    }
+  | {
+      type: "steer_turn_sending";
       entryId: string;
       turnId: string;
     }
@@ -681,11 +690,31 @@ function buildEntries(input: {
       entries.push(turn.userEntry);
     }
 
-    const timeline = buildCodexTurnTimelineFromNormalized({
+    const normalizedItems = buildNormalizedItems(turn);
+    let lastRenderedItemCount = 0;
+
+    for (const clientUserEntry of turn.clientUserEntries) {
+      const nextItems = normalizedItems.slice(
+        lastRenderedItemCount,
+        clientUserEntry.insertAfterItemCount,
+      );
+      const timeline = buildCodexTurnTimelineFromNormalized({
+        turnId,
+        items: nextItems,
+      });
+      for (const timelineEntry of timeline) {
+        entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
+      }
+      lastRenderedItemCount = clientUserEntry.insertAfterItemCount;
+      entries.push(clientUserEntry.entry);
+    }
+
+    const trailingItems = normalizedItems.slice(lastRenderedItemCount);
+    const trailingTimeline = buildCodexTurnTimelineFromNormalized({
       turnId,
-      items: buildNormalizedItems(turn),
+      items: trailingItems,
     });
-    for (const timelineEntry of timeline) {
+    for (const timelineEntry of trailingTimeline) {
       entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
     }
 
@@ -700,8 +729,6 @@ function buildEntries(input: {
         }),
       );
     }
-
-    entries.push(...turn.clientUserEntries);
   }
 
   return entries;
@@ -761,6 +788,11 @@ function buildChatUserAttachments(
 
 function clearEntrySteerPresentation(entry: ChatUserEntry): ChatUserEntry {
   const { label: _label, labelAction: _labelAction, ...nextEntry } = entry;
+  return nextEntry;
+}
+
+function clearEntryAction(entry: ChatUserEntry): ChatUserEntry {
+  const { labelAction: _labelAction, ...nextEntry } = entry;
   return nextEntry;
 }
 
@@ -1094,20 +1126,51 @@ export function reduceCodexChatState(
           ...turn,
           clientUserEntries: [
             ...turn.clientUserEntries,
-            buildUserEntry(
-              action.turnId,
-              action.prompt,
-              buildChatUserAttachments(action.attachments),
-              action.entryId,
-              {
-                label: "Steer",
-                labelAction: {
-                  ariaLabel: "Remove steer message",
-                  actionId: action.entryId,
+            {
+              entry: buildUserEntry(
+                action.turnId,
+                action.prompt,
+                buildChatUserAttachments(action.attachments),
+                action.entryId,
+                {
+                  label: "Steer",
+                  labelAction: {
+                    ariaLabel: "Remove steer message",
+                    actionId: action.entryId,
+                  },
                 },
-              },
-            ),
+              ),
+              insertAfterItemCount: turn.itemOrder.length,
+              requestState: "queued",
+            },
           ],
+        },
+      },
+    });
+  }
+
+  if (action.type === "steer_turn_sending") {
+    const turn = state.turnsById[action.turnId];
+    if (turn === undefined) {
+      return state;
+    }
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: state.turnOrder,
+      turnsById: {
+        ...state.turnsById,
+        [action.turnId]: {
+          ...turn,
+          clientUserEntries: turn.clientUserEntries.map((clientUserEntry) =>
+            clientUserEntry.entry.id !== action.entryId
+              ? clientUserEntry
+              : {
+                  ...clientUserEntry,
+                  entry: clearEntryAction(clientUserEntry.entry),
+                  requestState: "sending",
+                },
+          ),
         },
       },
     });
@@ -1126,8 +1189,14 @@ export function reduceCodexChatState(
         ...state.turnsById,
         [action.turnId]: {
           ...turn,
-          clientUserEntries: turn.clientUserEntries.map((entry) =>
-            entry.id !== action.entryId ? entry : clearEntrySteerPresentation(entry),
+          clientUserEntries: turn.clientUserEntries.map((clientUserEntry) =>
+            clientUserEntry.entry.id !== action.entryId
+              ? clientUserEntry
+              : {
+                  ...clientUserEntry,
+                  entry: clearEntrySteerPresentation(clientUserEntry.entry),
+                  requestState: "accepted",
+                },
           ),
         },
       },
@@ -1147,7 +1216,9 @@ export function reduceCodexChatState(
         ...state.turnsById,
         [action.turnId]: {
           ...turn,
-          clientUserEntries: turn.clientUserEntries.filter((entry) => entry.id !== action.entryId),
+          clientUserEntries: turn.clientUserEntries.filter(
+            (clientUserEntry) => clientUserEntry.entry.id !== action.entryId,
+          ),
         },
       },
     });

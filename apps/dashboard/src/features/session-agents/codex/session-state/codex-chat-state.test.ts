@@ -161,6 +161,146 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("removes the steer delete action once the request is sending", () => {
+    const activeTurn = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "start_turn_requested",
+        clientTurnId: "pending:turn_123",
+        prompt: "Test prompt",
+      }),
+      {
+        type: "turn_started_response",
+        clientTurnId: "pending:turn_123",
+        turnId: "turn_123",
+        status: "inProgress",
+      },
+    );
+    const queued = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: "steer_1",
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const sending = reduceCodexChatState(queued, {
+      type: "steer_turn_sending",
+      entryId: "steer_1",
+      turnId: "turn_123",
+    });
+
+    expect(queued.entries).toContainEqual({
+      id: "steer_1",
+      turnId: "turn_123",
+      kind: "user-message",
+      label: "Steer",
+      labelAction: {
+        ariaLabel: "Remove steer message",
+        actionId: "steer_1",
+      },
+      text: "Focus on the reducer",
+      status: "completed",
+    });
+    expect(sending.entries).toContainEqual({
+      id: "steer_1",
+      turnId: "turn_123",
+      kind: "user-message",
+      label: "Steer",
+      text: "Focus on the reducer",
+      status: "completed",
+    });
+  });
+
+  it("keeps accepted steer entries between earlier and later assistant items", () => {
+    const completedBeforeSteer = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(createInitialCodexChatState(), {
+          type: "start_turn_requested",
+          clientTurnId: "pending:turn_123",
+          prompt: "Test prompt",
+        }),
+        {
+          type: "turn_started_response",
+          clientTurnId: "pending:turn_123",
+          turnId: "turn_123",
+          status: "inProgress",
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/completed",
+          params: {
+            turnId: "turn_123",
+            item: {
+              type: "agentMessage",
+              id: "msg_before",
+              text: "First assistant chunk",
+              phase: "commentary",
+            },
+          },
+        },
+      },
+    );
+    const steering = reduceCodexChatState(completedBeforeSteer, {
+      type: "steer_turn_requested",
+      entryId: "steer_1",
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const processed = reduceCodexChatState(steering, {
+      type: "steer_turn_processed",
+      entryId: "steer_1",
+      turnId: "turn_123",
+    });
+    const completedAfterSteer = reduceCodexChatState(processed, {
+      type: "notification_received",
+      notification: {
+        method: "item/completed",
+        params: {
+          turnId: "turn_123",
+          item: {
+            type: "agentMessage",
+            id: "msg_after",
+            text: "Second assistant chunk",
+            phase: "final_answer",
+          },
+        },
+      },
+    });
+
+    expect(completedAfterSteer.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "msg_before",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "First assistant chunk",
+        phase: "commentary",
+        status: "completed",
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+      {
+        id: "msg_after",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "Second assistant chunk",
+        phase: "final_answer",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("removes a transient steer message when steering fails", () => {
     const activeTurn = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {

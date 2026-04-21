@@ -29,6 +29,7 @@ type QueuedSteerRequest = {
   threadId: string;
   turnId: string;
   request: ReturnType<typeof buildTurnRequest>;
+  status: "queued" | "sending";
 };
 
 function buildTurnRequest(input: {
@@ -274,6 +275,20 @@ export function useCodexChatController(input: {
             continue;
           }
 
+          queuedSteerRequestsRef.current = queuedSteerRequestsRef.current.map((request) =>
+            request.entryId !== queuedRequest.entryId
+              ? request
+              : {
+                  ...request,
+                  status: "sending",
+                },
+          );
+          dispatchChatAction({
+            type: "steer_turn_sending",
+            entryId: queuedRequest.entryId,
+            turnId: queuedRequest.turnId,
+          });
+
           try {
             await steerCodexTurn({
               rpcClient,
@@ -354,11 +369,15 @@ export function useCodexChatController(input: {
         const matchingQueuedRequest = queuedSteerRequestsRef.current.find(
           (request) => request.entryId === actionId,
         );
-        const turnId = matchingQueuedRequest?.turnId ?? activeTurnIdRef.current;
-        if (turnId === null || actionId.length === 0) {
+        if (
+          actionId.length === 0 ||
+          matchingQueuedRequest === undefined ||
+          matchingQueuedRequest.status !== "queued"
+        ) {
           return;
         }
 
+        const turnId = matchingQueuedRequest.turnId;
         queuedSteerRequestsRef.current = queuedSteerRequestsRef.current.filter(
           (request) => request.entryId !== actionId,
         );
@@ -403,6 +422,7 @@ export function useCodexChatController(input: {
             threadId,
             turnId,
             request: turnRequest,
+            status: "queued",
           },
         ];
         syncPendingSteerCount();
