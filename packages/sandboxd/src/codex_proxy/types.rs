@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::time::Instant;
 
 use serde::Deserialize;
 use serde_json::Value;
@@ -117,6 +118,8 @@ impl From<DeliveryContextPayload> for DeliveryContext {
 pub struct PendingClientRequest {
     pub method: String,
     pub thread_id: Option<String>,
+    pub expected_turn_id: Option<String>,
+    pub request_started_at: Instant,
     pub delivery_context: Option<DeliveryContext>,
 }
 

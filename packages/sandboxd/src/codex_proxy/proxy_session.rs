@@ -1,10 +1,14 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::io::ErrorKind;
 use std::sync::OnceLock;
+use std::time::Instant;
 
 use futures_util::{SinkExt, StreamExt};
 use opentelemetry::Context as OtelContext;
-use opentelemetry::propagation::{Extractor, TextMapCompositePropagator, TextMapPropagator};
+use opentelemetry::propagation::{
+    Extractor, TextMapCompositePropagator, TextMapPropagator,
+};
+use opentelemetry::trace::TraceContextExt as _;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 use serde_json::{Value, json};
 use tokio::net::TcpStream;
@@ -38,10 +42,41 @@ struct MatchedRetentionTarget {
     request_key: String,
     thread_id: String,
     turn_id: String,
+    request_kind: TurnRequestKind,
+    expected_turn_id: Option<String>,
+    request_started_at: Instant,
     delivery_context: Option<DeliveryContext>,
 }
 
 static DELIVERY_CONTEXT_PROPAGATOR: OnceLock<TextMapCompositePropagator> = OnceLock::new();
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TurnRequestKind {
+    Start,
+    Steer,
+}
+
+impl TurnRequestKind {
+    fn as_log_value(self) -> &'static str {
+        match self {
+            Self::Start => "turn_start",
+            Self::Steer => "turn_steer",
+        }
+    }
+}
+
+struct ActiveTurnState {
+    delivery_context: DeliveryContext,
+    thread_id: String,
+    turn_id: String,
+    expected_turn_id: Option<String>,
+    request_kind: TurnRequestKind,
+    request_started_at: Instant,
+    started_at: Option<Instant>,
+    first_item_at: Option<Instant>,
+    first_item_type: Option<String>,
+    span: tracing::Span,
+}
 
 fn read_trace_id(traceparent: &str) -> Option<&str> {
     let mut parts = traceparent.split('-');
@@ -122,6 +157,299 @@ fn log_delivery_context_mapping(
     );
 }
 
+fn request_kind_for_method(method: &str) -> Option<TurnRequestKind> {
+    match method {
+        TURN_START_METHOD => Some(TurnRequestKind::Start),
+        TURN_STEER_METHOD => Some(TurnRequestKind::Steer),
+        _ => None,
+    }
+}
+
+fn read_turn_id_from_notification_params(value: &Value) -> Option<String> {
+    value["params"]["turn"]["id"]
+        .as_str()
+        .map(ToString::to_string)
+        .or_else(|| value["params"]["turnId"].as_str().map(ToString::to_string))
+}
+
+fn read_item_type_from_notification_params(value: &Value) -> Option<String> {
+    value["params"]["item"]["type"]
+        .as_str()
+        .map(ToString::to_string)
+}
+
+fn read_turn_status_from_notification_params(value: &Value) -> Option<String> {
+    value["params"]["turn"]["status"]
+        .as_str()
+        .map(ToString::to_string)
+}
+
+fn read_response_error_message(value: &Value) -> Option<String> {
+    value["error"]["message"]
+        .as_str()
+        .map(ToString::to_string)
+        .or_else(|| value["error"]["code"].as_i64().map(|code| code.to_string()))
+}
+
+fn start_turn_lifecycle_span(
+    request_kind: TurnRequestKind,
+    delivery_context: &DeliveryContext,
+    thread_id: &str,
+    turn_id: &str,
+    expected_turn_id: Option<&str>,
+) -> tracing::Span {
+    let turn_span = match request_kind {
+        TurnRequestKind::Start => info_span!(
+            "codex_proxy.turn_start",
+            "otel.trace_id" = %delivery_trace_id(delivery_context),
+            "mistle.traceparent" = %delivery_context.traceparent,
+            "mistle.webhook.event_id" = %delivery_context.webhook_event_id,
+            "mistle.delivery.task_id" = %delivery_context.delivery_task_id,
+            "mistle.conversation.id" = %delivery_context.conversation_id,
+            "mistle.sandbox.instance_id" = %delivery_context.sandbox_instance_id,
+            "mistle.provider.conversation_id" = %thread_id,
+            "mistle.provider.execution_id" = %turn_id,
+            "mistle.turn.id" = %turn_id,
+            "mistle.turn.request_kind" = %request_kind.as_log_value(),
+            "mistle.turn.expected_id" = field::display(expected_turn_id.unwrap_or("")),
+            outcome = field::Empty,
+            reason = field::Empty,
+            "thread.id" = %thread_id,
+            "turn.id" = %turn_id,
+        ),
+        TurnRequestKind::Steer => info_span!(
+            "codex_proxy.turn_steer",
+            "otel.trace_id" = %delivery_trace_id(delivery_context),
+            "mistle.traceparent" = %delivery_context.traceparent,
+            "mistle.webhook.event_id" = %delivery_context.webhook_event_id,
+            "mistle.delivery.task_id" = %delivery_context.delivery_task_id,
+            "mistle.conversation.id" = %delivery_context.conversation_id,
+            "mistle.sandbox.instance_id" = %delivery_context.sandbox_instance_id,
+            "mistle.provider.conversation_id" = %thread_id,
+            "mistle.provider.execution_id" = %turn_id,
+            "mistle.turn.id" = %turn_id,
+            "mistle.turn.request_kind" = %request_kind.as_log_value(),
+            "mistle.turn.expected_id" = field::display(expected_turn_id.unwrap_or("")),
+            outcome = field::Empty,
+            reason = field::Empty,
+            "thread.id" = %thread_id,
+            "turn.id" = %turn_id,
+        ),
+    };
+    let _ = turn_span.set_parent(extract_delivery_parent_context(delivery_context));
+    turn_span
+}
+
+fn span_id_for(span: &tracing::Span) -> String {
+    span.context().span().span_context().span_id().to_string()
+}
+
+fn log_turn_lifecycle_event(
+    active_turn: &ActiveTurnState,
+    event: &'static str,
+    outcome: &'static str,
+    reason: Option<&str>,
+    duration_ms: Option<u128>,
+) {
+    let _entered = active_turn.span.enter();
+    active_turn
+        .span
+        .record("outcome", field::display(outcome));
+    if let Some(reason) = reason {
+        active_turn.span.record("reason", field::display(reason));
+    }
+
+    info!(
+        event = event,
+        "otel.trace_id" = %delivery_trace_id(&active_turn.delivery_context),
+        traceId = %delivery_trace_id(&active_turn.delivery_context),
+        spanId = %span_id_for(&active_turn.span),
+        webhookEventId = %active_turn.delivery_context.webhook_event_id,
+        deliveryTaskId = %active_turn.delivery_context.delivery_task_id,
+        externalDeliveryId =
+            field::display(active_turn.delivery_context.external_delivery_id.as_deref().unwrap_or("")),
+        automationRunId = %active_turn.delivery_context.automation_run_id,
+        conversationId = %active_turn.delivery_context.conversation_id,
+        sandboxInstanceId = %active_turn.delivery_context.sandbox_instance_id,
+        routeId = field::display(active_turn.delivery_context.route_id.as_deref().unwrap_or("")),
+        providerConversationId = %active_turn.thread_id,
+        providerExecutionId = %active_turn.turn_id,
+        turnId = %active_turn.turn_id,
+        threadId = %active_turn.thread_id,
+        outcome = outcome,
+        reason = field::display(reason.unwrap_or("")),
+        durationMs = field::display(duration_ms.map_or(String::new(), |value| value.to_string())),
+        "mistle.turn.request_kind" = %active_turn.request_kind.as_log_value(),
+        "mistle.turn.id" = %active_turn.turn_id,
+        "mistle.turn.expected_id" =
+            field::display(active_turn.expected_turn_id.as_deref().unwrap_or("")),
+        "mistle.provider.conversation_id" = %active_turn.thread_id,
+        "mistle.provider.execution_id" = %active_turn.turn_id,
+        "thread.id" = %active_turn.thread_id,
+        "turn.id" = %active_turn.turn_id,
+    );
+}
+
+fn log_turn_request_failure(
+    request_kind: TurnRequestKind,
+    delivery_context: &DeliveryContext,
+    thread_id: Option<&str>,
+    expected_turn_id: Option<&str>,
+    reason: Option<&str>,
+    duration_ms: u128,
+) {
+    let delivery_span = start_delivery_proxy_span(
+        match request_kind {
+            TurnRequestKind::Start => TURN_START_METHOD,
+            TurnRequestKind::Steer => TURN_STEER_METHOD,
+        },
+        delivery_context,
+        thread_id,
+    );
+    let _entered = delivery_span.enter();
+    info!(
+        event = "codex_proxy.turn.request_failed",
+        "otel.trace_id" = %delivery_trace_id(delivery_context),
+        traceId = %delivery_trace_id(delivery_context),
+        spanId = %span_id_for(&delivery_span),
+        webhookEventId = %delivery_context.webhook_event_id,
+        deliveryTaskId = %delivery_context.delivery_task_id,
+        externalDeliveryId =
+            field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
+        automationRunId = %delivery_context.automation_run_id,
+        conversationId = %delivery_context.conversation_id,
+        sandboxInstanceId = %delivery_context.sandbox_instance_id,
+        routeId = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
+        providerConversationId = field::display(thread_id.unwrap_or("")),
+        providerExecutionId = field::display(expected_turn_id.unwrap_or("")),
+        turnId = field::display(expected_turn_id.unwrap_or("")),
+        threadId = field::display(thread_id.unwrap_or("")),
+        outcome = "failed",
+        reason = field::display(reason.unwrap_or("rpc_error")),
+        durationMs = duration_ms,
+        "mistle.turn.request_kind" = %request_kind.as_log_value(),
+        "mistle.turn.expected_id" = field::display(expected_turn_id.unwrap_or("")),
+        "thread.id" = field::display(thread_id.unwrap_or("")),
+        "turn.id" = field::display(expected_turn_id.unwrap_or("")),
+    );
+}
+
+fn finalize_active_turns_for_transport_outcome(
+    active_turns: &mut BTreeMap<String, ActiveTurnState>,
+    transport_outcome: &'static str,
+    transport_reason: &'static str,
+) {
+    let unresolved_turn_ids: Vec<String> = active_turns.keys().cloned().collect();
+    for turn_id in unresolved_turn_ids {
+        if let Some(active_turn) = active_turns.remove(turn_id.as_str()) {
+            let reason = if active_turn.started_at.is_some()
+                && active_turn.first_item_at.is_none()
+            {
+                Some("started_but_no_output")
+            } else {
+                Some(transport_reason)
+            };
+            log_turn_lifecycle_event(
+                &active_turn,
+                "codex_proxy.turn.transport_ended",
+                transport_outcome,
+                reason,
+                Some(active_turn.request_started_at.elapsed().as_millis()),
+            );
+            log_turn_lifecycle_event(
+                &active_turn,
+                "codex_proxy.turn.stalled",
+                "stalled",
+                Some(transport_reason),
+                Some(active_turn.request_started_at.elapsed().as_millis()),
+            );
+        }
+    }
+}
+
+fn observe_server_notification(
+    message: &Message,
+    active_turns: &mut BTreeMap<String, ActiveTurnState>,
+) -> Result<(), CodexProxyError> {
+    let Some(value) = parse_json_value_from_message(message)? else {
+        return Ok(());
+    };
+    let Some(method) = value.get("method").and_then(Value::as_str) else {
+        return Ok(());
+    };
+
+    match method {
+        "turn/started" => {
+            let Some(turn_id) = read_turn_id_from_notification_params(&value) else {
+                return Ok(());
+            };
+            let Some(active_turn) = active_turns.get_mut(turn_id.as_str()) else {
+                return Ok(());
+            };
+            active_turn.started_at = Some(Instant::now());
+            log_turn_lifecycle_event(
+                active_turn,
+                "codex_proxy.turn.started",
+                "started",
+                None,
+                Some(active_turn.request_started_at.elapsed().as_millis()),
+            );
+        }
+        "item/started" => {
+            let Some(turn_id) = read_turn_id_from_notification_params(&value) else {
+                return Ok(());
+            };
+            let Some(active_turn) = active_turns.get_mut(turn_id.as_str()) else {
+                return Ok(());
+            };
+            if active_turn.first_item_at.is_none() {
+                active_turn.first_item_at = Some(Instant::now());
+                active_turn.first_item_type = read_item_type_from_notification_params(&value);
+                log_turn_lifecycle_event(
+                    active_turn,
+                    "codex_proxy.turn.first_item",
+                    "started",
+                    active_turn.first_item_type.as_deref(),
+                    Some(active_turn.request_started_at.elapsed().as_millis()),
+                );
+            }
+        }
+        "turn/completed" => {
+            let Some(turn_id) = read_turn_id_from_notification_params(&value) else {
+                return Ok(());
+            };
+            let Some(active_turn) = active_turns.remove(turn_id.as_str()) else {
+                return Ok(());
+            };
+            let status = read_turn_status_from_notification_params(&value)
+                .unwrap_or_else(|| "unknown".to_string());
+            let (outcome, reason) = match status.as_str() {
+                "completed" => ("completed", None),
+                "failed" => (
+                    "failed",
+                    Some(if active_turn.first_item_at.is_none() {
+                        "failed_before_first_item"
+                    } else {
+                        "failed_after_output"
+                    }),
+                ),
+                "interrupted" => ("interrupted", None),
+                _ => ("failed", Some("unknown_turn_status")),
+            };
+            log_turn_lifecycle_event(
+                &active_turn,
+                "codex_proxy.turn.completed",
+                outcome,
+                reason,
+                Some(active_turn.request_started_at.elapsed().as_millis()),
+            );
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 struct DeliveryContextExtractor<'a> {
     delivery_context: &'a DeliveryContext,
 }
@@ -179,16 +507,29 @@ pub async fn relay_codex_proxy_connection(
     let mut pending_requests = BTreeMap::<String, PendingClientRequest>::new();
     let mut thread_delivery_contexts = BTreeMap::<String, DeliveryContext>::new();
     let mut turn_delivery_contexts = BTreeMap::<String, DeliveryContext>::new();
+    let mut active_turns = BTreeMap::<String, ActiveTurnState>::new();
     let mut buffered_success_responses = VecDeque::<BufferedSuccessResponse>::new();
     let mut next_response_sequence = 0_u64;
 
     loop {
         tokio::select! {
-            _ = shutdown_receiver.changed() => return Ok(()),
+            _ = shutdown_receiver.changed() => {
+                finalize_active_turns_for_transport_outcome(
+                    &mut active_turns,
+                    "closed",
+                    "shutdown",
+                );
+                return Ok(());
+            },
             retention_result = retention_result_receiver.recv() => {
                 if let Some(retention_result) = retention_result {
                     record_retention_result(&retention_result, &mut buffered_success_responses);
                 } else {
+                    finalize_active_turns_for_transport_outcome(
+                        &mut active_turns,
+                        "closed",
+                        "retention_channel_closed",
+                    );
                     return Ok(());
                 }
             }
@@ -196,10 +537,14 @@ pub async fn relay_codex_proxy_connection(
                 match client_message {
                     Some(Ok(message)) => {
                         if let Message::Close(frame) = message {
-                            raw_socket
-                                .send(Message::Close(frame))
-                                .await
-                                .map_err(CodexProxyError::WriteSocket)?;
+                            finalize_active_turns_for_transport_outcome(
+                                &mut active_turns,
+                                "closed",
+                                "client_close",
+                            );
+                            if let Err(error) = raw_socket.send(Message::Close(frame)).await {
+                                return Err(CodexProxyError::WriteSocket(error));
+                            }
                             return Ok(());
                         }
 
@@ -208,28 +553,57 @@ pub async fn relay_codex_proxy_connection(
                             &mut client_kind,
                             &mut current_delivery_context,
                             &mut pending_requests,
-                        )? {
-                            raw_socket
-                                .send(message)
-                                .await
-                                .map_err(CodexProxyError::WriteSocket)?;
+                        )? && let Err(error) = raw_socket.send(message).await {
+                            finalize_active_turns_for_transport_outcome(
+                                &mut active_turns,
+                                "reset",
+                                "raw_write_error",
+                            );
+                            return Err(CodexProxyError::WriteSocket(error));
                         }
                     }
-                    Some(Err(error)) if is_connection_termination_error(&error) => return Ok(()),
-                    Some(Err(error)) => return Err(CodexProxyError::ReadSocket(error)),
-                    None => return Ok(()),
+                    Some(Err(error)) if is_connection_termination_error(&error) => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "closed",
+                            "client_terminated",
+                        );
+                        return Ok(());
+                    }
+                    Some(Err(error)) => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "reset",
+                            "client_socket_error",
+                        );
+                        return Err(CodexProxyError::ReadSocket(error));
+                    }
+                    None => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "closed",
+                            "client_stream_ended",
+                        );
+                        return Ok(());
+                    }
                 }
             }
             raw_message = raw_socket.next() => {
                 match raw_message {
                     Some(Ok(message)) => {
                         if let Message::Close(frame) = message {
-                            client_socket
-                                .send(Message::Close(frame))
-                                .await
-                                .map_err(CodexProxyError::WriteSocket)?;
+                            finalize_active_turns_for_transport_outcome(
+                                &mut active_turns,
+                                "closed",
+                                "raw_close",
+                            );
+                            if let Err(error) = client_socket.send(Message::Close(frame)).await {
+                                return Err(CodexProxyError::WriteSocket(error));
+                            }
                             return Ok(());
                         }
+
+                        observe_server_notification(&message, &mut active_turns)?;
 
                         if let Some(retention_target) =
                             matched_retention_target(&message, &client_kind, &mut pending_requests)?
@@ -239,7 +613,7 @@ pub async fn relay_codex_proxy_connection(
                                 thread_delivery_contexts
                                     .insert(retention_target.thread_id.clone(), delivery_context.clone());
                                 turn_delivery_contexts
-                                    .insert(retention_target.turn_id.clone(), delivery_context);
+                                    .insert(retention_target.turn_id.clone(), delivery_context.clone());
                                 if let (Some(thread_delivery_context), Some(turn_delivery_context)) = (
                                     thread_delivery_contexts
                                         .get(retention_target.thread_id.as_str()),
@@ -256,6 +630,37 @@ pub async fn relay_codex_proxy_connection(
                                         retention_target.turn_id.as_str(),
                                     );
                                 }
+
+                                let active_turn = ActiveTurnState {
+                                    delivery_context: delivery_context.clone(),
+                                    thread_id: retention_target.thread_id.clone(),
+                                    turn_id: retention_target.turn_id.clone(),
+                                    expected_turn_id: retention_target.expected_turn_id.clone(),
+                                    request_kind: retention_target.request_kind,
+                                    request_started_at: retention_target.request_started_at,
+                                    started_at: None,
+                                    first_item_at: None,
+                                    first_item_type: None,
+                                    span: start_turn_lifecycle_span(
+                                        retention_target.request_kind,
+                                        &delivery_context,
+                                        retention_target.thread_id.as_str(),
+                                        retention_target.turn_id.as_str(),
+                                        retention_target.expected_turn_id.as_deref(),
+                                    ),
+                                };
+                                let accepted_outcome = match retention_target.request_kind {
+                                    TurnRequestKind::Start => "started",
+                                    TurnRequestKind::Steer => "steered",
+                                };
+                                log_turn_lifecycle_event(
+                                    &active_turn,
+                                    "codex_proxy.turn.accepted",
+                                    accepted_outcome,
+                                    None,
+                                    Some(active_turn.request_started_at.elapsed().as_millis()),
+                                );
+                                active_turns.insert(retention_target.turn_id.clone(), active_turn);
                             }
                             next_response_sequence = next_response_sequence.saturating_add(1);
                             buffered_success_responses.push_back(BufferedSuccessResponse {
@@ -278,16 +683,39 @@ pub async fn relay_codex_proxy_connection(
                                     result,
                                 });
                             });
-                        } else {
-                            client_socket
-                                .send(message)
-                                .await
-                                .map_err(CodexProxyError::WriteSocket)?;
+                        } else if let Err(error) = client_socket.send(message).await {
+                            finalize_active_turns_for_transport_outcome(
+                                &mut active_turns,
+                                "reset",
+                                "client_write_error",
+                            );
+                            return Err(CodexProxyError::WriteSocket(error));
                         }
                     }
-                    Some(Err(error)) if is_connection_termination_error(&error) => return Ok(()),
-                    Some(Err(error)) => return Err(CodexProxyError::ReadSocket(error)),
-                    None => return Ok(()),
+                    Some(Err(error)) if is_connection_termination_error(&error) => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "reset",
+                            "raw_terminated",
+                        );
+                        return Ok(());
+                    }
+                    Some(Err(error)) => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "reset",
+                            "raw_socket_error",
+                        );
+                        return Err(CodexProxyError::ReadSocket(error));
+                    }
+                    None => {
+                        finalize_active_turns_for_transport_outcome(
+                            &mut active_turns,
+                            "reset",
+                            "raw_stream_ended",
+                        );
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -336,11 +764,19 @@ fn should_forward_client_message(
             .map(ToString::to_string),
         _ => None,
     };
+    let expected_turn_id = match method {
+        TURN_STEER_METHOD => value["params"]["expectedTurnId"]
+            .as_str()
+            .map(ToString::to_string),
+        _ => None,
+    };
     pending_requests.insert(
         request_key,
         PendingClientRequest {
             method: method.to_string(),
             thread_id: thread_id.clone(),
+            expected_turn_id,
+            request_started_at: Instant::now(),
             delivery_context: current_delivery_context.clone(),
         },
     );
@@ -383,19 +819,35 @@ fn matched_retention_target(
     if *client_kind != ProxyClientKind::MistleAgentClient {
         return Ok(None);
     }
+    let request_kind = request_kind_for_method(pending_request.method.as_str());
     if value.get("error").is_some() {
+        if let (Some(request_kind), Some(delivery_context)) = (
+            request_kind,
+            pending_request.delivery_context.as_ref(),
+        ) {
+            log_turn_request_failure(
+                request_kind,
+                delivery_context,
+                pending_request.thread_id.as_deref(),
+                pending_request.expected_turn_id.as_deref(),
+                read_response_error_message(&value).as_deref(),
+                pending_request.request_started_at.elapsed().as_millis(),
+            );
+        }
         return Ok(None);
     }
 
     let Some(thread_id) = pending_request.thread_id else {
         return Ok(None);
     };
-    let turn_id = match pending_request.method.as_str() {
-        TURN_START_METHOD => value["result"]["turn"]["id"]
+    let Some(request_kind) = request_kind else {
+        return Ok(None);
+    };
+    let turn_id = match request_kind {
+        TurnRequestKind::Start => value["result"]["turn"]["id"]
             .as_str()
             .map(ToString::to_string),
-        TURN_STEER_METHOD => value["result"]["turnId"].as_str().map(ToString::to_string),
-        _ => None,
+        TurnRequestKind::Steer => value["result"]["turnId"].as_str().map(ToString::to_string),
     };
     let Some(turn_id) = turn_id else {
         return Ok(None);
@@ -405,6 +857,9 @@ fn matched_retention_target(
         request_key,
         thread_id,
         turn_id,
+        request_kind,
+        expected_turn_id: pending_request.expected_turn_id,
+        request_started_at: pending_request.request_started_at,
         delivery_context: pending_request.delivery_context,
     }))
 }
@@ -552,6 +1007,7 @@ mod tests {
     use std::collections::VecDeque;
     use std::io;
     use std::sync::{Arc, Mutex};
+    use std::time::Instant;
 
     use opentelemetry::trace::{TraceContextExt, TracerProvider as _};
     use opentelemetry_sdk::trace::SdkTracerProvider;
@@ -567,8 +1023,10 @@ mod tests {
     };
 
     use super::{
-        log_delivery_context_mapping, matched_retention_target, should_forward_client_message,
-        start_delivery_proxy_span, take_ready_buffered_success_responses,
+        ActiveTurnState, TurnRequestKind, finalize_active_turns_for_transport_outcome,
+        log_delivery_context_mapping, matched_retention_target,
+        observe_server_notification, should_forward_client_message, start_delivery_proxy_span,
+        start_turn_lifecycle_span, take_ready_buffered_success_responses,
     };
 
     #[derive(Clone, Default)]
@@ -716,6 +1174,8 @@ mod tests {
             PendingClientRequest {
                 method: "turn/steer".to_string(),
                 thread_id: Some("thr_123".to_string()),
+                expected_turn_id: Some("turn_122".to_string()),
+                request_started_at: Instant::now(),
                 delivery_context: Some(test_delivery_context()),
             },
         )]);
@@ -740,6 +1200,8 @@ mod tests {
         assert_eq!(matched.request_key, "17");
         assert_eq!(matched.thread_id, "thr_123");
         assert_eq!(matched.turn_id, "turn_123");
+        assert_eq!(matched.request_kind, TurnRequestKind::Steer);
+        assert_eq!(matched.expected_turn_id.as_deref(), Some("turn_122"));
         assert_eq!(
             matched
                 .delivery_context
@@ -783,6 +1245,290 @@ mod tests {
         assert!(output.contains("thr_123"));
         assert!(output.contains("turn_123"));
         assert!(output.contains("0123456789abcdef0123456789abcdef"));
+    }
+
+    fn test_active_turn(request_kind: TurnRequestKind) -> ActiveTurnState {
+        let delivery_context = test_delivery_context();
+        let thread_id = "thr_123".to_string();
+        let turn_id = "turn_123".to_string();
+        let expected_turn_id = Some("turn_122".to_string());
+        ActiveTurnState {
+            span: start_turn_lifecycle_span(
+                request_kind,
+                &delivery_context,
+                thread_id.as_str(),
+                turn_id.as_str(),
+                expected_turn_id.as_deref(),
+            ),
+            delivery_context,
+            thread_id,
+            turn_id,
+            expected_turn_id,
+            request_kind,
+            request_started_at: Instant::now(),
+            started_at: None,
+            first_item_at: None,
+            first_item_type: None,
+        }
+    }
+
+    #[test]
+    fn records_turn_lifecycle_from_started_to_completed() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+
+        tracing::subscriber::with_default(subscriber, || {
+            let mut active_turns = std::collections::BTreeMap::from([(
+                "turn_123".to_string(),
+                test_active_turn(TurnRequestKind::Start),
+            )]);
+
+            observe_server_notification(
+                &Message::Text(
+                    json!({
+                        "method": "turn/started",
+                        "params": {
+                            "turn": {
+                                "id": "turn_123"
+                            }
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ),
+                &mut active_turns,
+            )
+            .expect("turn/started should parse");
+            observe_server_notification(
+                &Message::Text(
+                    json!({
+                        "method": "item/started",
+                        "params": {
+                            "turn": {
+                                "id": "turn_123"
+                            },
+                            "item": {
+                                "type": "contextCompaction"
+                            }
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ),
+                &mut active_turns,
+            )
+            .expect("item/started should parse");
+            observe_server_notification(
+                &Message::Text(
+                    json!({
+                        "method": "turn/completed",
+                        "params": {
+                            "turn": {
+                                "id": "turn_123",
+                                "status": "completed"
+                            }
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ),
+                &mut active_turns,
+            )
+            .expect("turn/completed should parse");
+
+            assert!(active_turns.is_empty());
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("codex_proxy.turn.started"));
+        assert!(output.contains("codex_proxy.turn.first_item"));
+        assert!(output.contains("contextCompaction"));
+        assert!(output.contains("codex_proxy.turn.completed"));
+        assert!(output.contains("outcome=completed"));
+        assert!(output.contains("deliveryTaskId=cdt_123"));
+    }
+
+    #[test]
+    fn classifies_failed_turns_before_first_item() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+
+        tracing::subscriber::with_default(subscriber, || {
+            let mut active_turns = std::collections::BTreeMap::from([(
+                "turn_123".to_string(),
+                test_active_turn(TurnRequestKind::Steer),
+            )]);
+
+            observe_server_notification(
+                &Message::Text(
+                    json!({
+                        "method": "turn/completed",
+                        "params": {
+                            "turn": {
+                                "id": "turn_123",
+                                "status": "failed"
+                            }
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ),
+                &mut active_turns,
+            )
+            .expect("turn/completed should parse");
+
+            assert!(active_turns.is_empty());
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("codex_proxy.turn.completed"));
+        assert!(output.contains("outcome=failed"));
+        assert!(output.contains("reason=failed_before_first_item"));
+        assert!(output.contains("mistle.turn.request_kind=turn_steer"));
+    }
+
+    #[test]
+    fn classifies_transport_reset_for_unfinished_turns() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+
+        tracing::subscriber::with_default(subscriber, || {
+            let mut active_turns = std::collections::BTreeMap::from([(
+                "turn_123".to_string(),
+                test_active_turn(TurnRequestKind::Start),
+            )]);
+
+            finalize_active_turns_for_transport_outcome(
+                &mut active_turns,
+                "reset",
+                "raw_socket_error",
+            );
+
+            assert!(active_turns.is_empty());
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("codex_proxy.turn.transport_ended"));
+        assert!(output.contains("codex_proxy.turn.stalled"));
+        assert!(output.contains("outcome=reset"));
+        assert!(output.contains("outcome=stalled"));
+        assert!(output.contains("reason=raw_socket_error"));
+    }
+
+    #[test]
+    fn distinguishes_started_without_output_when_transport_ends() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+
+        tracing::subscriber::with_default(subscriber, || {
+            let mut active_turn = test_active_turn(TurnRequestKind::Start);
+            active_turn.started_at = Some(Instant::now());
+            let mut active_turns =
+                std::collections::BTreeMap::from([("turn_123".to_string(), active_turn)]);
+
+            finalize_active_turns_for_transport_outcome(
+                &mut active_turns,
+                "reset",
+                "raw_socket_error",
+            );
+
+            assert!(active_turns.is_empty());
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("codex_proxy.turn.transport_ended"));
+        assert!(output.contains("reason=started_but_no_output"));
+    }
+
+    #[test]
+    fn logs_failed_turn_request_responses_with_delivery_context() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+
+        tracing::subscriber::with_default(subscriber, || {
+            let mut pending_requests = std::collections::BTreeMap::from([(
+                "17".to_string(),
+                PendingClientRequest {
+                    method: "turn/start".to_string(),
+                    thread_id: Some("thr_123".to_string()),
+                    expected_turn_id: None,
+                    request_started_at: Instant::now(),
+                    delivery_context: Some(test_delivery_context()),
+                },
+            )]);
+
+            let matched = matched_retention_target(
+                &Message::Text(
+                    json!({
+                        "id": 17,
+                        "error": {
+                            "code": -32001,
+                            "message": "turn rejected"
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ),
+                &ProxyClientKind::MistleAgentClient,
+                &mut pending_requests,
+            )
+            .expect("error response should parse");
+
+            assert!(matched.is_none());
+            assert!(pending_requests.is_empty());
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("codex_proxy.turn.request_failed"));
+        assert!(output.contains("failed"));
+        assert!(output.contains("turn rejected"));
+        assert!(output.contains("deliveryTaskId=cdt_123"));
+        assert!(output.contains("threadId=thr_123"));
     }
 
     #[test]
