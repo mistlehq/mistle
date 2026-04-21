@@ -22,8 +22,7 @@ import { InternalIdentityLinkingError, InternalIdentityLinkingErrorCodes } from 
 
 const SshSigningFormat = "ssh";
 const CommitSignSignatureEncoding = "pem";
-const CommitSignBinaryPath =
-  process.env.MISTLE_COMMIT_SIGN_BINARY_PATH?.trim() || "/usr/local/bin/commit-sign";
+const DefaultCommitSignBinaryPath = "/usr/local/bin/commit-sign";
 
 const CommitSignResponseSchema = z
   .object({
@@ -70,11 +69,12 @@ function resolveRequestedKeyRefOrThrow(keyRef: string): string {
 }
 
 async function runCommitSignBinary(input: {
+  binaryPath: string;
   format: "ssh";
   privateKey: string;
   payloadBase64: string;
 }): Promise<SignCommitPayloadResult> {
-  const child = spawn(CommitSignBinaryPath, [], {
+  const child = spawn(input.binaryPath, [], {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
@@ -128,6 +128,9 @@ export async function signCommitPayload(
       activeMasterEncryptionKeyVersion: number;
       masterEncryptionKeys: Record<string, string>;
     };
+    commitSignConfig?: {
+      binaryPath: string;
+    };
     sandboxBootstrapConfig: {
       tokenSecret: string;
       tokenIssuer: string;
@@ -143,6 +146,8 @@ export async function signCommitPayload(
       `Git commit signing format '${input.format}' is not supported yet.`,
     );
   }
+
+  const commitSignBinaryPath = ctx.commitSignConfig?.binaryPath ?? DefaultCommitSignBinaryPath;
 
   let verifiedGrant;
   try {
@@ -341,6 +346,7 @@ export async function signCommitPayload(
       UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
     );
     return await runCommitSignBinary({
+      binaryPath: commitSignBinaryPath,
       format: SshSigningFormat,
       privateKey,
       payloadBase64: input.payload,

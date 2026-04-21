@@ -258,6 +258,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "commitSign", "binaryPath"],
+    tomlPath: ["apps", "control_plane_api", "commit_sign", "binary_path"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH",
+  },
+  {
     configPath: ["apps", "control_plane_api", "integrations", "activeMasterEncryptionKeyVersion"],
     tomlPath: ["apps", "control_plane_api", "integrations", "active_master_encryption_key_version"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",

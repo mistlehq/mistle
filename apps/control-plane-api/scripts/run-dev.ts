@@ -25,7 +25,7 @@ function runDevServer(): void {
     stdio: "inherit",
     env: {
       ...process.env,
-      MISTLE_COMMIT_SIGN_BINARY_PATH: commitSignBinaryPath,
+      MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: commitSignBinaryPath,
     },
   });
 
