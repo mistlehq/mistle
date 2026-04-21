@@ -105,13 +105,24 @@ fn records_codex_app_server_readiness_degradation_while_process_stays_alive() {
         .expect("Codex app-server observation handle should exist")
         .clone();
 
+    thread::sleep(Duration::from_secs(2));
+
+    let healthy_snapshot = supervisor_handle
+        .component_snapshot(SupervisedComponent::CodexAppServer)
+        .expect("Codex app-server should be tracked");
+    assert_eq!(healthy_snapshot.state, ComponentHealthState::Healthy);
+    assert_eq!(
+        healthy_snapshot.details.get("readinessState"),
+        Some(&"Degraded".to_string())
+    );
+
     assert!(
         wait_for_forwarded_lifecycle_event(
             &supervisor_handle,
-            "\"probeKind\":\"readiness_ws\"",
-            Duration::from_secs(5),
+            "\"probeKind\":\"readiness_http_readyz\"",
+            Duration::from_secs(10),
         ),
-        "expected a readiness_ws healthcheck failure event for the Codex app-server"
+        "expected a readiness_http_readyz healthcheck failure event for the Codex app-server"
     );
 
     let observation = observation_handle.snapshot();
@@ -237,13 +248,26 @@ const port = Number(portArg);
 const delayMs = Number(delayArg);
 const keepAlive = setInterval(() => {}, 1000);
 const server = net.createServer((socket) => {
-  socket.once('data', () => {
+  socket.once('data', (chunk) => {
     socket.write(
-      'HTTP/1.1 101 Switching Protocols\r\n' +
-      'Connection: Upgrade\r\n' +
-      'Upgrade: websocket\r\n' +
-      'Sec-WebSocket-Accept: sandboxd-test\r\n' +
-      '\r\n',
+      (() => {
+        const request = chunk.toString('utf8');
+        if (request.includes('Upgrade: websocket')) {
+          return (
+            'HTTP/1.1 101 Switching Protocols\r\n' +
+            'Connection: Upgrade\r\n' +
+            'Upgrade: websocket\r\n' +
+            'Sec-WebSocket-Accept: sandboxd-test\r\n' +
+            '\r\n'
+          );
+        }
+        return (
+          'HTTP/1.1 200 OK\r\n' +
+          'Connection: close\r\n' +
+          'Content-Length: 0\r\n' +
+          '\r\n'
+        );
+      })(),
     );
   });
 });
@@ -316,13 +340,26 @@ const failThisAttempt = attempt === 2;
 const keepAlive = setInterval(() => {}, 1000);
 let exitWatcher = null;
 const server = net.createServer((socket) => {
-  socket.once('data', () => {
+  socket.once('data', (chunk) => {
     socket.write(
-      'HTTP/1.1 101 Switching Protocols\r\n' +
-      'Connection: Upgrade\r\n' +
-      'Upgrade: websocket\r\n' +
-      'Sec-WebSocket-Accept: sandboxd-test\r\n' +
-      '\r\n',
+      (() => {
+        const request = chunk.toString('utf8');
+        if (request.includes('Upgrade: websocket')) {
+          return (
+            'HTTP/1.1 101 Switching Protocols\r\n' +
+            'Connection: Upgrade\r\n' +
+            'Upgrade: websocket\r\n' +
+            'Sec-WebSocket-Accept: sandboxd-test\r\n' +
+            '\r\n'
+          );
+        }
+        return (
+          'HTTP/1.1 200 OK\r\n' +
+          'Connection: close\r\n' +
+          'Content-Length: 0\r\n' +
+          '\r\n'
+        );
+      })(),
     );
   });
 });

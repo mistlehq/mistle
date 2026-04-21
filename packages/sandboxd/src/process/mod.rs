@@ -19,6 +19,7 @@ use std::time::Duration;
 use nix::errno::Errno;
 use nix::sys::signal::{Signal, kill as send_signal};
 use nix::unistd::Pid;
+use serde_json::Value;
 
 use crate::runtime::{
     RuntimeClient, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
@@ -33,7 +34,11 @@ pub const DEFAULT_PROCESS_READINESS_POLL_INTERVAL: Duration = Duration::from_mil
 /// Poll interval for exit checks while waiting for a process to stop.
 pub const DEFAULT_PROCESS_EXIT_POLL_INTERVAL: Duration = Duration::from_millis(25);
 /// Poll interval for post-readiness child monitoring.
-pub const DEFAULT_PROCESS_MONITOR_POLL_INTERVAL: Duration = Duration::from_millis(250);
+pub const DEFAULT_PROCESS_MONITOR_POLL_INTERVAL: Duration = Duration::from_millis(1_000);
+/// Timeout budget for post-start Codex app-server readiness probes.
+pub const CODEX_APP_SERVER_POST_START_READINESS_TIMEOUT: Duration = Duration::from_millis(1_000);
+/// Number of consecutive post-start readiness failures before restarting Codex.
+pub const CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD: u8 = 3;
 
 /// Captures one runtime client process after client-level environment merging.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -699,6 +704,7 @@ fn run_codex_app_server_monitor(
 ) {
     let mut last_readiness_ok = true;
     let mut last_reported_exit_pid = None;
+    let mut consecutive_readiness_failures = 0u8;
 
     while !shutdown_requested.load(Ordering::Relaxed) {
         if control_handle
@@ -774,9 +780,9 @@ fn run_codex_app_server_monitor(
         }
         last_reported_exit_pid = None;
 
-        match check_runtime_client_process_readiness_from_spec(&control_handle.managed_process.spec)
-        {
+        match check_codex_app_server_post_start_readiness(&control_handle.managed_process.spec) {
             Ok(()) => {
+                consecutive_readiness_failures = 0;
                 update_codex_app_server_observation(
                     &control_handle.managed_process.observation_handle,
                     &control_handle.managed_process.spec,
@@ -810,6 +816,7 @@ fn run_codex_app_server_monitor(
                 last_readiness_ok = true;
             }
             Err(error) => {
+                consecutive_readiness_failures = consecutive_readiness_failures.saturating_add(1);
                 update_codex_app_server_observation(
                     &control_handle.managed_process.observation_handle,
                     &control_handle.managed_process.spec,
@@ -827,10 +834,19 @@ fn run_codex_app_server_monitor(
                             Some(current_pid),
                             None,
                             "Alive",
-                            "Unreachable",
+                            if consecutive_readiness_failures
+                                >= CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD
+                            {
+                                "Unreachable"
+                            } else {
+                                "Degraded"
+                            },
                         ),
                     );
-                if last_readiness_ok {
+                if last_readiness_ok
+                    && consecutive_readiness_failures
+                        >= CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD
+                {
                     control_handle
                         .managed_process
                         .supervisor_handle
@@ -845,11 +861,23 @@ fn run_codex_app_server_monitor(
                             SupervisedComponent::CodexAppServer,
                             "readiness_probe_failed",
                             error,
-                            "readiness_ws",
-                            &[],
+                            "readiness_http_readyz",
+                            &[
+                                (
+                                    "consecutiveFailures",
+                                    Value::String(consecutive_readiness_failures.to_string()),
+                                ),
+                                (
+                                    "failureThreshold",
+                                    Value::String(
+                                        CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD.to_string(),
+                                    ),
+                                ),
+                            ],
                         );
                 }
-                last_readiness_ok = false;
+                last_readiness_ok =
+                    consecutive_readiness_failures < CODEX_APP_SERVER_POST_START_FAILURE_THRESHOLD;
             }
         }
 
@@ -1059,6 +1087,21 @@ fn check_runtime_client_process_readiness_from_spec(
     }
 }
 
+fn check_codex_app_server_post_start_readiness(
+    process_spec: &RuntimeClientProcessSpec,
+) -> Result<(), String> {
+    if let RuntimeClientProcessReadiness::Ws { url, .. } = &process_spec.readiness {
+        let ready_url = codex_app_server_readyz_url(url)?;
+        return check_http_readiness_with_timeout(
+            &ready_url,
+            200,
+            CODEX_APP_SERVER_POST_START_READINESS_TIMEOUT,
+        );
+    }
+
+    check_runtime_client_process_readiness_from_spec(process_spec)
+}
+
 fn readiness_type(process_spec: &RuntimeClientProcessSpec) -> &'static str {
     match &process_spec.readiness {
         RuntimeClientProcessReadiness::None => "none",
@@ -1222,7 +1265,15 @@ fn check_tcp_readiness(host: &str, port: u16) -> Result<(), String> {
 
 /// Performs a minimal HTTP GET readiness probe and verifies the expected status.
 fn check_http_readiness(url: &str, expected_status: u16) -> Result<(), String> {
-    let status = readiness_probe_request(url, None)?;
+    check_http_readiness_with_timeout(url, expected_status, Duration::from_millis(250))
+}
+
+fn check_http_readiness_with_timeout(
+    url: &str,
+    expected_status: u16,
+    timeout: Duration,
+) -> Result<(), String> {
+    let status = readiness_probe_request(url, None, timeout)?;
     if status == expected_status {
         return Ok(());
     }
@@ -1234,7 +1285,7 @@ fn check_http_readiness(url: &str, expected_status: u16) -> Result<(), String> {
 
 /// Performs a minimal WebSocket handshake against the configured readiness URL.
 fn check_ws_readiness(url: &str) -> Result<(), String> {
-    let status = readiness_probe_request(url, Some("websocket"))?;
+    let status = readiness_probe_request(url, Some("websocket"), Duration::from_millis(250))?;
     if status == 101 {
         return Ok(());
     }
@@ -1245,7 +1296,11 @@ fn check_ws_readiness(url: &str) -> Result<(), String> {
 }
 
 /// Issues one plain-text readiness probe and returns the response status code.
-fn readiness_probe_request(url: &str, expected_upgrade: Option<&str>) -> Result<u16, String> {
+fn readiness_probe_request(
+    url: &str,
+    expected_upgrade: Option<&str>,
+    timeout: Duration,
+) -> Result<u16, String> {
     let parsed_url = ParsedReadinessUrl::parse(url)?;
     if parsed_url.scheme == "https" || parsed_url.scheme == "wss" {
         return Err(format!(
@@ -1255,13 +1310,13 @@ fn readiness_probe_request(url: &str, expected_upgrade: Option<&str>) -> Result<
     }
 
     let address = resolve_socket_address(&parsed_url.host, parsed_url.port)?;
-    let mut stream = TcpStream::connect_timeout(&address, Duration::from_millis(250))
+    let mut stream = TcpStream::connect_timeout(&address, timeout)
         .map_err(|error| format!("readiness request failed: {error}"))?;
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(timeout))
         .map_err(|error| format!("failed to configure readiness request timeout: {error}"))?;
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(timeout))
         .map_err(|error| format!("failed to configure readiness request timeout: {error}"))?;
 
     let mut request = format!(
@@ -1289,6 +1344,19 @@ fn readiness_probe_request(url: &str, expected_upgrade: Option<&str>) -> Result<
     let response = std::str::from_utf8(&response_bytes[..byte_count])
         .map_err(|error| format!("readiness response was not valid utf-8: {error}"))?;
     parse_http_status(response)
+}
+
+fn codex_app_server_readyz_url(readiness_url: &str) -> Result<String, String> {
+    let parsed_url = ParsedReadinessUrl::parse(readiness_url)?;
+    match parsed_url.scheme.as_str() {
+        "ws" | "http" => Ok(format!(
+            "http://{}:{}/readyz",
+            parsed_url.host, parsed_url.port
+        )),
+        scheme => Err(format!(
+            "unsupported Codex app-server readiness scheme '{scheme}'"
+        )),
+    }
 }
 
 /// Parses the HTTP status code from the first line of a readiness response.
