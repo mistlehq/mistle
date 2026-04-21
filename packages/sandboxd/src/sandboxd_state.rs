@@ -30,7 +30,10 @@ use crate::startup_diagnostics::{
 };
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
-use crate::tunnel::session::{TunnelSession, derive_sandbox_instance_id};
+use crate::tunnel::session::{
+    TunnelSession, TunnelSessionError, TunnelSigningRequest, TunnelSigningResponse,
+    derive_sandbox_instance_id,
+};
 
 /// Describes why the initialized daemon runtime failed to start or stop.
 #[derive(Debug)]
@@ -44,6 +47,7 @@ pub enum SandboxdStateError {
     StopEgressProxy(String),
     StopRuntimeProcesses(String),
     StopRuntimeAdapters(String),
+    SigningUnavailable(String),
 }
 
 impl fmt::Display for SandboxdStateError {
@@ -76,6 +80,9 @@ impl fmt::Display for SandboxdStateError {
             }
             Self::StopEgressProxy(error) => {
                 write!(f, "failed to stop local egress proxy: {error}")
+            }
+            Self::SigningUnavailable(error) => {
+                write!(f, "failed to use bootstrap tunnel signing: {error}")
             }
         }
     }
@@ -399,6 +406,23 @@ impl SandboxdState {
         record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
 
         Ok(())
+    }
+
+    pub fn request_signing(
+        &self,
+        request: TunnelSigningRequest,
+    ) -> Result<TunnelSigningResponse, SandboxdStateError> {
+        let tunnel_session = self.tunnel_session.as_ref().ok_or_else(|| {
+            SandboxdStateError::SigningUnavailable(
+                "bootstrap tunnel session is not initialized".to_string(),
+            )
+        })?;
+
+        tunnel_session
+            .request_signing(request)
+            .map_err(|error: TunnelSessionError| {
+                SandboxdStateError::SigningUnavailable(error.to_string())
+            })
     }
 
     /// Stops the initialized runtime resources owned by the daemon.

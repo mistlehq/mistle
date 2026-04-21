@@ -7,7 +7,7 @@
 
 use std::fmt;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub mod bootstrap;
 pub mod cgroups;
@@ -25,6 +25,7 @@ pub mod resume;
 pub mod runtime;
 pub mod sandboxd_state;
 pub mod security;
+pub mod sign;
 pub mod startup_diagnostics;
 pub mod supervision;
 #[doc(hidden)]
@@ -40,6 +41,7 @@ pub enum SandboxdCommand {
     Daemon,
     Init,
     Resume,
+    Sign,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
@@ -94,7 +96,13 @@ where
 }
 
 /// Runs one `sandboxd` CLI invocation against the provided process I/O streams.
-pub fn run<I, S, R, W, E>(args: I, stdin: &mut R, stdout: &mut W, stderr: &mut E) -> i32
+pub fn run<I, S, R, W, E>(
+    program_name: &str,
+    args: I,
+    stdin: &mut R,
+    stdout: &mut W,
+    stderr: &mut E,
+) -> i32
 where
     I: IntoIterator<Item = S>,
     S: Into<String>,
@@ -102,11 +110,16 @@ where
     W: io::Write,
     E: io::Write,
 {
-    let command = match parse_sandboxd_command(args) {
-        Ok(command) => command,
-        Err(error) => {
-            let _ = writeln!(stderr, "{error}");
-            return 1;
+    let parsed_args: Vec<String> = args.into_iter().map(Into::into).collect();
+    let command = if is_signer_alias(program_name) {
+        SandboxdCommand::Sign
+    } else {
+        match parse_sandboxd_command(parsed_args.iter().cloned()) {
+            Ok(command) => command,
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                return 1;
+            }
         }
     };
 
@@ -153,12 +166,34 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::Sign => match sign::run_sign(parsed_args, &sign_control_socket_path()) {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
     }
+}
+
+fn is_signer_alias(program_name: &str) -> bool {
+    Path::new(program_name)
+        .file_name()
+        .and_then(|value| value.to_str())
+        == Some(sign::DEFAULT_SIGNER_ALIAS_NAME)
+}
+
+fn sign_control_socket_path() -> PathBuf {
+    std::env::var_os("MISTLE_SANDBOXD_CONTROL_SOCKET_PATH")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(control::DEFAULT_CONTROL_SOCKET_PATH))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{ParseSandboxdCommandError, SandboxdCommand, parse_sandboxd_command};
+    use crate::{
+        ParseSandboxdCommandError, SandboxdCommand, is_signer_alias, parse_sandboxd_command,
+    };
 
     #[test]
     fn defaults_to_daemon_without_args() {
@@ -203,5 +238,11 @@ mod tests {
                 "--verbose".to_string()
             ))
         );
+    }
+
+    #[test]
+    fn recognizes_signer_alias_program_name() {
+        assert!(is_signer_alias("/opt/mistle/bin/mistle-ssh-sign"));
+        assert!(!is_signer_alias("/opt/mistle/bin/sandboxd"));
     }
 }

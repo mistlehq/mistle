@@ -82,6 +82,7 @@ RUN apt-get update \
 
 COPY --from=sandboxd-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
 
-RUN chmod +x /opt/mistle/bin/sandboxd
+RUN chmod +x /opt/mistle/bin/sandboxd \
+  && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]

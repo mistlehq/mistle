@@ -13,6 +13,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -31,6 +32,9 @@ use crate::supervision::{
     SandboxdHealthSnapshot, SupervisedComponent,
 };
 use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper, format_rfc3339_timestamp};
+use crate::tunnel::session::{
+    TunnelSigningRequest, TunnelSigningResponse, derive_sandbox_instance_id,
+};
 
 /// Default Unix socket path for the local `sandboxd` control channel.
 pub const DEFAULT_CONTROL_SOCKET_PATH: &str = "/run/mistle/sandboxd/control.sock";
@@ -44,6 +48,7 @@ pub const DEFAULT_HEALTH_ENDPOINT_PATH: &str = "/__healthz";
 const TEST_FAULTS_ENABLED_ENV: &str = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
 #[cfg(any(test, debug_assertions))]
 const EGRESS_PROXY_FAULT_KILL_PATH: &str = "/__faults/components/egress-proxy/kill";
+static SIGN_REQUEST_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Tracks whether this daemon has already accepted startup input.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,6 +225,16 @@ enum ControlRequest {
     Init { startup_input: StartupInput },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
+    #[serde(rename = "sign")]
+    Sign { sign_request: ControlSignRequest },
+}
+
+/// Carries one local signer request from the helper alias to the running daemon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ControlSignRequest {
+    pub key_ref: String,
+    pub payload_base64: String,
 }
 
 /// Carries one JSON response back to a local control socket client.
@@ -228,6 +243,7 @@ enum ControlRequest {
 struct ControlResponse {
     ok: bool,
     error: Option<String>,
+    signature_base64: Option<String>,
 }
 
 /// Tracks observable daemon state for tests and daemon lifecycle control.
@@ -471,6 +487,48 @@ pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result
     )
 }
 
+/// Submits one signing request to the running daemon over the local control socket.
+pub fn submit_signing(
+    socket_path: &Path,
+    sign_request: &ControlSignRequest,
+) -> Result<String, ControlError> {
+    let mut stream =
+        UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
+            path: socket_path.to_path_buf(),
+            error,
+        })?;
+
+    let request = serde_json::to_vec(&ControlRequest::Sign {
+        sign_request: sign_request.clone(),
+    })
+    .map_err(ControlError::SerializeResponse)?;
+    stream
+        .write_all(&request)
+        .map_err(ControlError::WriteResponse)?;
+    stream
+        .shutdown(std::net::Shutdown::Write)
+        .map_err(ControlError::WriteResponse)?;
+
+    let mut raw_response = Vec::new();
+    stream
+        .read_to_end(&mut raw_response)
+        .map_err(ControlError::ReadRequest)?;
+    let response: ControlResponse =
+        serde_json::from_slice(&raw_response).map_err(ControlError::InvalidResponse)?;
+
+    if !response.ok {
+        return Err(ControlError::ResponseError(response.error.unwrap_or_else(
+            || "control socket returned ok=false without an error".to_string(),
+        )));
+    }
+
+    response.signature_base64.ok_or_else(|| {
+        ControlError::ResponseError(
+            "control socket returned ok=true without a signature payload".to_string(),
+        )
+    })
+}
+
 fn submit_startup_request(socket_path: &Path, request: ControlRequest) -> Result<(), ControlError> {
     let mut stream =
         UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
@@ -521,13 +579,15 @@ fn run_control_server_loop(
                     .set_nonblocking(false)
                     .map_err(ControlError::ConfigureConnection)?;
                 let response = match handle_connection(&mut stream, state, init_thread) {
-                    Ok(()) => ControlResponse {
+                    Ok(signature_base64) => ControlResponse {
                         ok: true,
                         error: None,
+                        signature_base64,
                     },
                     Err(error) => ControlResponse {
                         ok: false,
                         error: Some(error.to_string()),
+                        signature_base64: None,
                     },
                 };
                 let response_bytes =
@@ -708,7 +768,7 @@ fn handle_connection(
     stream: &mut UnixStream,
     state: &Arc<Mutex<ControlServerState>>,
     init_thread: &SharedInitThread,
-) -> Result<(), ControlError> {
+) -> Result<Option<String>, ControlError> {
     security::ensure_unix_socket_peer_matches_current_process_uid(stream)
         .map_err(|error| ControlError::VerifyPeer(error.to_string()))?;
 
@@ -720,8 +780,97 @@ fn handle_connection(
         serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
 
     match request {
-        ControlRequest::Init { startup_input } => begin_init(startup_input, state, init_thread),
-        ControlRequest::Resume { startup_input } => begin_resume(startup_input, state),
+        ControlRequest::Init { startup_input } => {
+            begin_init(startup_input, state, init_thread)?;
+            Ok(None)
+        }
+        ControlRequest::Resume { startup_input } => {
+            begin_resume(startup_input, state)?;
+            Ok(None)
+        }
+        ControlRequest::Sign { sign_request } => begin_sign(sign_request, state).map(Some),
+    }
+}
+
+fn begin_sign(
+    sign_request: ControlSignRequest,
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<String, ControlError> {
+    let state_guard = state
+        .lock()
+        .expect("control server state lock should not be poisoned");
+    let startup_input = state_guard.startup_input.as_ref().ok_or_else(|| {
+        ControlError::StartupRequestRejected("sandboxd is not initialized".to_string())
+    })?;
+    let git_signing_config = startup_input
+        .git_identity
+        .as_ref()
+        .and_then(|git_identity| git_identity.signing.as_ref())
+        .ok_or_else(|| {
+            ControlError::StartupRequestRejected(
+                "sandbox does not have a configured Git signing identity".to_string(),
+            )
+        })?;
+    let tunnel_session = state_guard.sandboxd_state.as_ref().ok_or_else(|| {
+        ControlError::StartupRequestRejected(
+            "sandboxd state is missing for an initialized daemon".to_string(),
+        )
+    })?;
+
+    if git_signing_config.key_ref != sign_request.key_ref {
+        return Err(ControlError::StartupRequestRejected(
+            "requested Git signing key does not match the configured Git signing identity"
+                .to_string(),
+        ));
+    }
+
+    let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
+        .map_err(|error| ControlError::InitializeSandboxdState(error.to_string()))?;
+    let request_id = format!(
+        "sign_req_{}",
+        SIGN_REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed)
+    );
+    let signing_response = tunnel_session
+        .request_signing(TunnelSigningRequest {
+            request_id: request_id.clone(),
+            organization_id: git_signing_config.organization_id.clone(),
+            sandbox_instance_id,
+            acting_user_id: git_signing_config.acting_user_id.clone(),
+            provider_family: git_signing_config.provider_family.clone(),
+            format: git_signing_config.format.clone(),
+            key_ref: sign_request.key_ref,
+            grant: git_signing_config.grant.clone(),
+            payload_base64: sign_request.payload_base64,
+        })
+        .map_err(|error| ControlError::ResponseError(error.to_string()))?;
+
+    match signing_response {
+        TunnelSigningResponse::Success {
+            request_id: response_request_id,
+            signature_base64,
+        } => {
+            if response_request_id != request_id {
+                return Err(ControlError::ResponseError(format!(
+                    "signing response request id '{}' did not match '{}'",
+                    response_request_id, request_id
+                )));
+            }
+            Ok(signature_base64)
+        }
+        TunnelSigningResponse::Failure {
+            request_id: response_request_id,
+            code,
+            message,
+        } => Err(ControlError::ResponseError(
+            if response_request_id == request_id {
+                format!("{code}: {message}")
+            } else {
+                format!(
+                    "signing response request id '{}' did not match '{}': {code}: {message}",
+                    response_request_id, request_id
+                )
+            },
+        )),
     }
 }
 
@@ -1100,11 +1249,11 @@ mod tests {
     use tungstenite::{Message, accept};
 
     use crate::control::{
-        DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
+        ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
-        start_control_server_with_health_endpoint, submit_init, submit_resume,
+        start_control_server_with_health_endpoint, submit_init, submit_resume, submit_signing,
     };
-    use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
     use crate::test_support::TestEnvVarGuard;
     use crate::time::testing::ManualSleeper;
     use crate::time::{Sleeper, ThreadSleeper};
@@ -1112,6 +1261,7 @@ mod tests {
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
     const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
         "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+    const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
 
     #[test]
     fn accepts_one_init_request_from_the_control_socket() {
@@ -1223,6 +1373,75 @@ mod tests {
         gateway
             .close()
             .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn accepts_signing_requests_after_initialization() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_sign_ok");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_signing_gateway();
+        let startup_input =
+            valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        wait_for_init_phase(&server, InitPhase::Initialized);
+
+        let signature_base64 = submit_signing(
+            &socket_path,
+            &ControlSignRequest {
+                key_ref: format!("key::{TEST_PUBLIC_KEY}"),
+                payload_base64: "c2lnbiBtZQ==".to_string(),
+            },
+        )
+        .expect("sign submission should succeed");
+
+        assert_eq!(
+            signature_base64,
+            "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KZXhhbXBsZS1zaWduYXR1cmUKLS0tLS1FTkQgU1NIIFNJR05BVFVSRS0tLS0tCg=="
+        );
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("signing gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn rejects_signing_requests_for_a_different_key_ref() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_sign_wrong_key");
+        let socket_path = test_dir.join("control.sock");
+        let gateway = start_signing_gateway();
+        let startup_input =
+            valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        wait_for_init_phase(&server, InitPhase::Initialized);
+
+        let error = submit_signing(
+            &socket_path,
+            &ControlSignRequest {
+                key_ref: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDIFFERENT".to_string(),
+                payload_base64: "c2lnbiBtZQ==".to_string(),
+            },
+        )
+        .expect_err("sign submission should fail for a mismatched key ref");
+
+        assert!(error.to_string().contains(
+            "requested Git signing key does not match the configured Git signing identity"
+        ));
+
+        server.close().expect("control server should stop cleanly");
+        gateway
+            .close()
+            .expect("signing gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -1499,6 +1718,42 @@ mod tests {
         }
     }
 
+    fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, key_ref: String) -> StartupInput {
+        StartupInput {
+            startup_mode: StartupMode::New,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
+            git_identity: Some(GitIdentity {
+                name: "Mistle User".to_string(),
+                email: "mistle-user@example.com".to_string(),
+                signing: Some(GitSigningConfig {
+                    format: "ssh".to_string(),
+                    program: "/opt/mistle/bin/mistle-ssh-sign".to_string(),
+                    key_ref,
+                    organization_id: "org_123".to_string(),
+                    provider_family: "github".to_string(),
+                    acting_user_id: "usr_123".to_string(),
+                    grant: "grant-token".to_string(),
+                }),
+            }),
+        }
+    }
+
     fn create_temp_test_dir(prefix: &str) -> std::path::PathBuf {
         let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
         let unique_suffix = SystemTime::now()
@@ -1586,6 +1841,88 @@ mod tests {
                         ThreadSleeper.sleep(Duration::from_millis(10));
                     }
                     Err(error) => panic!("bootstrap gateway accept should succeed: {error}"),
+                }
+            }
+        });
+
+        BootstrapGateway {
+            ws_url,
+            shutdown_sender,
+            thread: Some(thread),
+        }
+    }
+
+    fn start_signing_gateway() -> BootstrapGateway {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("signing gateway should bind");
+        listener
+            .set_nonblocking(true)
+            .expect("signing gateway listener should become nonblocking");
+        let ws_url = format!(
+            "ws://127.0.0.1:{}/bootstrap",
+            listener
+                .local_addr()
+                .expect("signing gateway should expose its address")
+                .port()
+        );
+        let (shutdown_sender, shutdown_receiver) = mpsc::channel();
+
+        let thread = thread::spawn(move || {
+            loop {
+                if shutdown_receiver.try_recv().is_ok() {
+                    return;
+                }
+
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream
+                            .set_nonblocking(false)
+                            .expect("signing gateway stream should become blocking");
+                        let mut websocket =
+                            accept(stream).expect("signing gateway handshake should succeed");
+                        loop {
+                            match websocket.read() {
+                                Ok(Message::Text(message)) => {
+                                    let payload = message.as_str();
+                                    if payload.contains("\"type\":\"signing.request\"") {
+                                        let request: serde_json::Value =
+                                            serde_json::from_str(payload)
+                                                .expect("signing request should be valid json");
+                                        let request_id = request["requestId"]
+                                            .as_str()
+                                            .expect("signing request id should exist");
+                                        let response = serde_json::json!({
+                                            "type": "signing.result",
+                                            "requestId": request_id,
+                                            "ok": true,
+                                            "signature": "LS0tLS1CRUdJTiBTU0ggU0lHTkFUVVJFLS0tLS0KZXhhbXBsZS1zaWduYXR1cmUKLS0tLS1FTkQgU1NIIFNJR05BVFVSRS0tLS0tCg==",
+                                            "encoding": "base64"
+                                        });
+                                        websocket
+                                            .send(Message::Text(response.to_string().into()))
+                                            .expect("signing result should send");
+                                    }
+                                }
+                                Ok(Message::Close(_)) => return,
+                                Ok(
+                                    Message::Binary(_)
+                                    | Message::Ping(_)
+                                    | Message::Pong(_)
+                                    | Message::Frame(_),
+                                ) => {}
+                                Err(tungstenite::Error::ConnectionClosed)
+                                | Err(tungstenite::Error::Protocol(
+                                    tungstenite::error::ProtocolError::ResetWithoutClosingHandshake,
+                                )) => return,
+                                Err(error) => {
+                                    panic!("signing gateway should read frames: {error}");
+                                }
+                            }
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        ThreadSleeper.sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("signing gateway accept should succeed: {error}"),
                 }
             }
         });
