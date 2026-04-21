@@ -32,6 +32,8 @@ export function UnsavedChangesGuard({
       return;
     }
     event.preventDefault();
+    // oxlint-disable-next-line typescript-eslint/no-deprecated -- Chromium/WebKit still require returnValue for beforeunload confirmation.
+    event.returnValue = "";
   });
 
   return (
