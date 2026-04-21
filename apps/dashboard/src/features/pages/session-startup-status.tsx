@@ -17,16 +17,12 @@ const SessionStartupLabels: Record<SessionStartupState, string> = {
   connecting_chat: "Connecting chat",
 };
 
-export function resolveSessionStartupLabel(state: SessionStartupState): string {
-  return SessionStartupLabels[state];
-}
-
 export function SessionStartupStatus(input: {
   className?: string;
   state: SessionStartupState;
 }): React.JSX.Element {
   const [spinnerIndex, setSpinnerIndex] = useState(0);
-  const label = resolveSessionStartupLabel(input.state);
+  const label = SessionStartupLabels[input.state];
 
   useEffect(() => {
     const handle = systemScheduler.schedule(function tick() {
