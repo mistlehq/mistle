@@ -52,11 +52,11 @@ export function SessionWorkbenchPageView({
   mainContent,
   primaryBottomPanel,
   bottomPanel,
-  bottomPanelSize: _bottomPanelSize,
+  bottomPanelSize,
   onBottomPanelResize,
   isBottomPanelVisible,
   secondaryPanel,
-  secondaryPanelSize: _secondaryPanelSize,
+  secondaryPanelSize,
   onSecondaryPanelResize,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
@@ -150,6 +150,7 @@ export function SessionWorkbenchPageView({
       <ResizablePanel
         collapsedSize={0}
         collapsible
+        defaultSize={`${String(bottomPanelSize)}px`}
         minSize={`${String(MIN_TERMINAL_PANEL_SIZE)}px`}
         onResize={(panelSize) => {
           if (panelSize.inPixels > 0) {
@@ -188,6 +189,7 @@ export function SessionWorkbenchPageView({
           <>
             <ResizableHandle id="session-workbench-secondary-handle" />
             <ResizablePanel
+              defaultSize={`${String(secondaryPanelSize)}%`}
               id="session-workbench-secondary-panel"
               minSize="20%"
               onResize={(panelSize) => {
