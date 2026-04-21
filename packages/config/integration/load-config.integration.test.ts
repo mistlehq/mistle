@@ -320,6 +320,9 @@ const dataPlaneGatewayEnvConfig = {
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5000",
+  },
   lifecycle: {
     idleTimeoutMs: 300000,
     bootstrapDisconnectGraceMs: 60000,
@@ -341,6 +344,9 @@ const dataPlaneGatewayFixtureConfig = {
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
   },
 } as const;
 
@@ -748,8 +754,11 @@ describe("loadConfig integrations", () => {
     expect(config).toEqual({
       global: globalProductionConfig,
       app: {
-        ...dataPlaneGatewayEnvConfig,
-        lifecycle: undefined,
+        server: dataPlaneGatewayEnvConfig.server,
+        database: dataPlaneGatewayEnvConfig.database,
+        runtimeState: dataPlaneGatewayEnvConfig.runtimeState,
+        dataPlaneApi: dataPlaneGatewayEnvConfig.dataPlaneApi,
+        controlPlaneApi: dataPlaneGatewayEnvConfig.controlPlaneApi,
       },
     });
   });

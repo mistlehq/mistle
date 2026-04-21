@@ -208,7 +208,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           readiness: {
             type: "ws",
             url: CodexAppServerListenUrl,
-            timeoutMs: 5_000,
+            timeoutMs: 60_000,
           },
           stop: {
             signal: "sigterm",
