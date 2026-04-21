@@ -18,7 +18,7 @@ import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profi
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import {
   SandboxInstancesListQueryPrefix,
-  SessionSidebarGroupsQueryPrefix,
+  SidebarSessionsQueryPrefix,
 } from "../sessions/sessions-query-keys.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -104,7 +104,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
           queryKey: SandboxInstancesListQueryPrefix,
         }),
         queryClient.invalidateQueries({
-          queryKey: SessionSidebarGroupsQueryPrefix,
+          queryKey: SidebarSessionsQueryPrefix,
         }),
       ]);
       await navigate(`/sessions/${encodeURIComponent(result.sandboxInstanceId)}`);

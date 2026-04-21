@@ -2,7 +2,6 @@ import { z } from "@hono/zod-openapi";
 import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPaginationEnvelopeSchema,
-  createKeysetPageSizeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
 
@@ -107,24 +106,6 @@ export const sandboxInstanceListItemSchema = z
   })
   .strict();
 
-export const sandboxInstanceSidebarItemSchema = z
-  .object({
-    id: z.string().min(1),
-    title: z.string().min(1).nullable(),
-    status: sandboxInstanceStatusSchema,
-    keepaliveActive: z.boolean(),
-    updatedAt: z.string().min(1),
-  })
-  .strict();
-
-export const sandboxInstanceSidebarGroupSchema = z
-  .object({
-    profileId: z.string().min(1),
-    profileName: z.string().min(1),
-    items: z.array(sandboxInstanceSidebarItemSchema),
-  })
-  .strict();
-
 export const listSandboxInstancesQuerySchema = createKeysetPaginationQuerySchema({
   defaultLimit: 20,
   maxLimit: 100,
@@ -137,32 +118,3 @@ export const listSandboxInstancesResponseSchema = createKeysetPaginationEnvelope
     maxLimit: 100,
   },
 );
-
-export const listSessionSidebarGroupsQuerySchema = z
-  .object({
-    limit: z.preprocess(
-      (rawValue) => {
-        if (rawValue === undefined) {
-          return undefined;
-        }
-
-        if (typeof rawValue === "number") {
-          return rawValue;
-        }
-
-        if (typeof rawValue === "string") {
-          return Number(rawValue);
-        }
-
-        return rawValue;
-      },
-      createKeysetPageSizeSchema({ defaultLimit: 100, maxLimit: 100 }),
-    ),
-  })
-  .strict();
-
-export const listSessionSidebarGroupsResponseSchema = z
-  .object({
-    groups: z.array(sandboxInstanceSidebarGroupSchema),
-  })
-  .strict();

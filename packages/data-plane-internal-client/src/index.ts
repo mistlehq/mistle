@@ -155,10 +155,6 @@ export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
   paths["/internal/sandbox/instances"]["get"]["responses"]["200"]["content"]["application/json"];
-export type ListRecentSandboxInstancesInput =
-  paths["/internal/sandbox/instances/recent"]["get"]["parameters"]["query"];
-export type ListRecentSandboxInstancesResponse =
-  paths["/internal/sandbox/instances/recent"]["get"]["responses"]["200"]["content"]["application/json"];
 
 type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
 
@@ -198,9 +194,6 @@ export type DataPlaneSandboxInstancesClient = {
   ) => Promise<PatchSandboxInstanceTitleResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
-  listRecentSandboxInstances: (
-    input: ListRecentSandboxInstancesInput,
-  ) => Promise<ListRecentSandboxInstancesResponse>;
 };
 
 function extractErrorMessage(input: unknown): string {
@@ -613,25 +606,6 @@ export function createDataPlaneSandboxInstancesClient(
         status: result.response.status,
         error: result.error,
         operation: "list",
-      });
-    },
-
-    async listRecentSandboxInstances(listInput): Promise<ListRecentSandboxInstancesResponse> {
-      const result = await internalClient.client.GET("/internal/sandbox/instances/recent", {
-        params: {
-          query: listInput,
-        },
-        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-      });
-
-      if (result.response.status === 200 && result.data !== undefined) {
-        return result.data;
-      }
-
-      throw createClientError({
-        status: result.response.status,
-        error: result.error,
-        operation: "listRecent",
       });
     },
   };

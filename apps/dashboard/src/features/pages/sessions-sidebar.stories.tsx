@@ -5,15 +5,11 @@ import { useEffect, useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { buildSessionsShellSidebarItems } from "../navigation/sessions-shell-sidebar.js";
+import { buildSidebarSessionNavItems } from "../navigation/sessions-shell-sidebar.js";
 import { SessionsSidebarNav } from "../navigation/sessions-sidebar-nav.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type {
-  SandboxInstancesListResult,
-  SessionSidebarGroupsResult,
-} from "../sessions/sessions-types.js";
+import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import {
-  buildSessionSidebarGroupFixture,
   buildSandboxInstanceListItemFixture,
   buildStoryLaunchableSandboxProfile,
 } from "./sessions-page.story-fixtures.js";
@@ -22,9 +18,9 @@ import { SessionsStoryHarness } from "./sessions-story-harness.js";
 type SessionsSidebarStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
-  sessionSidebarGroups?: SessionSidebarGroupsResult;
+  sidebarSessionsPages?: SandboxInstancesListResult[];
   sandboxInstancesList?: SandboxInstancesListResult;
-  sessionsSidebarQueryState?:
+  sidebarSessionsQueryState?:
     | {
         kind: "success";
       }
@@ -49,41 +45,24 @@ type SidebarStoryRecord = {
   keepaliveActive: boolean;
 };
 
-function buildSessionSidebarGroupsFromRecords(records: readonly SidebarStoryRecord[]) {
-  const groupsByProfileId = new Map<string, SessionSidebarGroupsResult["groups"][number]>();
-
-  for (const record of records) {
-    const existingGroup = groupsByProfileId.get(record.profileId);
-    const group =
-      existingGroup ??
-      buildSessionSidebarGroupFixture({
-        profileId: record.profileId,
-        profileName: record.profileName,
-      });
-
-    group.items.push({
-      id: record.id,
-      title: record.title,
-      status: record.status,
-      updatedAt: record.updatedAt,
-      keepaliveActive: record.keepaliveActive,
-    });
-
-    if (existingGroup === undefined) {
-      groupsByProfileId.set(record.profileId, group);
+function sortRecordsByCreatedAtDesc(records: readonly SidebarStoryRecord[]): SidebarStoryRecord[] {
+  return [...records].sort((left, right) => {
+    const createdAtDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt);
+    if (createdAtDifference !== 0) {
+      return createdAtDifference;
     }
-  }
 
-  return {
-    groups: [...groupsByProfileId.values()],
-  };
+    return right.id.localeCompare(left.id);
+  });
 }
 
 function buildSandboxInstancesListFromRecords(
   records: readonly SidebarStoryRecord[],
 ): SandboxInstancesListResult {
+  const orderedRecords = sortRecordsByCreatedAtDesc(records);
+
   return {
-    items: records.map((record) =>
+    items: orderedRecords.map((record) =>
       buildSandboxInstanceListItemFixture({
         id: record.id,
         title: record.title,
@@ -236,10 +215,6 @@ function buildSidebarStoryRecords(): SidebarStoryRecord[] {
   ];
 }
 
-function buildSidebarStoryGroups(): SessionSidebarGroupsResult {
-  return buildSessionSidebarGroupsFromRecords(buildSidebarStoryRecords());
-}
-
 function buildSidebarStoryRecordsBatch(batchIndex: number): SidebarStoryRecord[] {
   return buildSidebarStoryRecords().map((record, recordIndex) => ({
     ...record,
@@ -255,12 +230,10 @@ function buildSidebarStoryRecordsBatch(batchIndex: number): SidebarStoryRecord[]
 }
 
 function buildInteractiveSidebarStoryPage(pageIndex: number) {
-  return buildSessionsShellSidebarItems(
-    buildSessionSidebarGroupsFromRecords(buildSidebarStoryRecordsBatch(pageIndex)).groups,
-    {
-      nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
-    },
-  );
+  return buildSidebarSessionNavItems({
+    items: buildSandboxInstancesListFromRecords(buildSidebarStoryRecordsBatch(pageIndex)).items,
+    nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
+  });
 }
 
 function buildSessionsSidebarStoryArgs(
@@ -280,7 +253,7 @@ function buildSessionsSidebarStoryArgs(
         latestVersion: 7,
       }),
     ],
-    sessionSidebarGroups: buildSidebarStoryGroups(),
+    sidebarSessionsPages: [buildSandboxInstancesListFromRecords(buildSidebarStoryRecords())],
     sandboxInstancesList: buildSandboxInstancesListFromRecords(buildSidebarStoryRecords()),
     ...overrides,
   };
@@ -305,11 +278,11 @@ const meta = {
         {...(args.sandboxInstancesList !== undefined
           ? { sandboxInstancesList: args.sandboxInstancesList }
           : {})}
-        {...(args.sessionSidebarGroups !== undefined
-          ? { sessionSidebarGroups: args.sessionSidebarGroups }
+        {...(args.sidebarSessionsPages !== undefined
+          ? { sidebarSessionsPages: args.sidebarSessionsPages }
           : {})}
-        {...(args.sessionsSidebarQueryState !== undefined
-          ? { sessionsSidebarQueryState: args.sessionsSidebarQueryState }
+        {...(args.sidebarSessionsQueryState !== undefined
+          ? { sidebarSessionsQueryState: args.sidebarSessionsQueryState }
           : {})}
         {...(args.showSessionsSidebar !== undefined
           ? { showSessionsSidebar: args.showSessionsSidebar }
@@ -331,7 +304,7 @@ export const Default: Story = {
     docs: {
       description: {
         story:
-          "Shows the flat recent-session feed in its main interactive state. The sidebar is isolated in its own scroll container, sorted globally by updatedAt, and automatically appends older sessions when you reach the bottom.",
+          "Shows the flat sessions feed in its main interactive state. The sidebar is isolated in its own scroll container, follows createdAt ordering from the shared list endpoint, and automatically appends older pages when you reach the bottom.",
       },
     },
   },
@@ -400,9 +373,14 @@ function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
 
 export const EmptyState: Story = {
   args: buildSessionsSidebarStoryArgs({
-    sessionSidebarGroups: {
-      groups: [],
-    },
+    sidebarSessionsPages: [
+      {
+        items: [],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 0,
+      },
+    ],
     sandboxInstancesList: {
       items: [],
       nextPage: null,
@@ -414,7 +392,7 @@ export const EmptyState: Story = {
 
 export const LoadingState: Story = {
   args: buildSessionsSidebarStoryArgs({
-    sessionsSidebarQueryState: {
+    sidebarSessionsQueryState: {
       kind: "pending",
     },
   }),
@@ -422,7 +400,7 @@ export const LoadingState: Story = {
 
 export const LoadError: Story = {
   args: buildSessionsSidebarStoryArgs({
-    sessionsSidebarQueryState: {
+    sidebarSessionsQueryState: {
       kind: "error",
     },
   }),

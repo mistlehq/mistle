@@ -19,17 +19,14 @@ import {
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import type { DataPlaneApiGlobalConfig } from "../../../types.js";
 import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
-import type {
-  ListRecentSandboxInstancesResponse,
-  ListSandboxInstancesResponse,
-} from "../schemas.js";
+import type { ListSandboxInstancesResponse } from "../schemas.js";
 
 export const InvalidListSandboxInstancesInputErrorCode = "INVALID_LIST_INPUT";
 export const InvalidPaginationCursorErrorCode = "INVALID_PAGINATION_CURSOR";
@@ -252,18 +249,6 @@ async function buildListedSandboxInstance(
   };
 }
 
-function compareUpdatedAtDescWithIdTieBreak(
-  left: Pick<ListSandboxInstancesResponse["items"][number], "id" | "updatedAt">,
-  right: Pick<ListSandboxInstancesResponse["items"][number], "id" | "updatedAt">,
-): number {
-  const updatedAtDifference = right.updatedAt.localeCompare(left.updatedAt);
-  if (updatedAtDifference !== 0) {
-    return updatedAtDifference;
-  }
-
-  return right.id.localeCompare(left.id);
-}
-
 export async function listSandboxInstances(
   ctx: ListSandboxInstancesContext,
   input: ListSandboxInstancesInput,
@@ -378,42 +363,4 @@ export async function listSandboxInstances(
 
     throw error;
   }
-}
-
-export async function listRecentSandboxInstances(
-  ctx: ListSandboxInstancesContext,
-  input: {
-    organizationId: string;
-    limit?: number;
-  },
-): Promise<ListRecentSandboxInstancesResponse> {
-  const rows = await ctx.db.query.sandboxInstances.findMany({
-    columns: {
-      id: true,
-      sandboxProfileId: true,
-      title: true,
-      sandboxProfileVersion: true,
-      status: true,
-      runtimeProvider: true,
-      providerSandboxId: true,
-      startedByKind: true,
-      startedById: true,
-      source: true,
-      createdAt: true,
-      updatedAt: true,
-      failureCode: true,
-      failureMessage: true,
-    },
-    where: (table, { eq }) => eq(table.organizationId, input.organizationId),
-    orderBy: [desc(sandboxInstances.updatedAt), desc(sandboxInstances.id)],
-    limit: input.limit ?? 100,
-  });
-
-  const items = await Promise.all(
-    rows.map(async (item) => await buildListedSandboxInstance(ctx, item)),
-  );
-
-  return {
-    items: items.sort(compareUpdatedAtDescWithIdTieBreak),
-  };
 }

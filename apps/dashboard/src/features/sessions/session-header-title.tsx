@@ -9,7 +9,7 @@ import {
 import {
   sandboxInstanceStatusQueryKey,
   SandboxInstancesListQueryPrefix,
-  SessionSidebarGroupsQueryPrefix,
+  SidebarSessionsQueryPrefix,
 } from "./sessions-query-keys.js";
 import { patchSandboxInstanceTitle } from "./sessions-service.js";
 
@@ -42,7 +42,7 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
           queryKey: SandboxInstancesListQueryPrefix,
         }),
         queryClient.invalidateQueries({
-          queryKey: SessionSidebarGroupsQueryPrefix,
+          queryKey: SidebarSessionsQueryPrefix,
         }),
       ]);
     },

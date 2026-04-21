@@ -4,8 +4,6 @@ export { SandboxInstancesConflictCodes, SandboxInstancesNotFoundCodes } from "./
 export {
   sandboxInstanceConnectionTokenSchema as SandboxInstanceConnectionTokenSchema,
   sandboxInstancePortAccessSchema as SandboxInstancePortAccessSchema,
-  listSessionSidebarGroupsQuerySchema as ListSessionSidebarGroupsQuerySchema,
-  listSessionSidebarGroupsResponseSchema as ListSessionSidebarGroupsResponseSchema,
   listSandboxInstancesQuerySchema as ListSandboxInstancesQuerySchema,
   listSandboxInstancesResponseSchema as ListSandboxInstancesResponseSchema,
   sandboxInstancesNotFoundResponseSchema as SandboxInstancesNotFoundResponseSchema,
@@ -13,7 +11,6 @@ export {
 } from "./schemas.js";
 export { route as createSandboxInstanceConnectionTokenRoute } from "./create-sandbox-instance-connection-token/route.js";
 export { route as createSandboxInstancePortAccessRoute } from "./create-sandbox-instance-port-access/route.js";
-export { route as listSessionSidebarGroupsRoute } from "./list-session-sidebar-groups/route.js";
 export { route as listSandboxInstancesRoute } from "./list-sandbox-instances/route.js";
 export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.js";
 export { route as getSandboxInstanceSessionLinkRoute } from "./get-sandbox-instance-session-link/route.js";

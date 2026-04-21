@@ -4,7 +4,7 @@ import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js"
 import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
-import type { SandboxInstancesListResult, SessionSidebarGroupsResult } from "./sessions-types.js";
+import type { SandboxInstancesListResult } from "./sessions-types.js";
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
@@ -130,44 +130,6 @@ export async function listSandboxInstances(input: {
     throw new SandboxProfilesApiError(
       normalizeHttpApiError({
         operation: "listSandboxInstances",
-        error,
-        fallbackMessage: "Could not load sandbox instances.",
-      }),
-    );
-  }
-}
-
-export async function listSessionSidebarGroups(input: {
-  limit: number;
-  signal?: AbortSignal;
-}): Promise<SessionSidebarGroupsResult> {
-  try {
-    const client = getControlPlaneApiClient();
-    const { data } = await client.GET("/v1/sandbox/instances/recent", {
-      credentials: "include",
-      params: {
-        query: {
-          limit: input.limit,
-        },
-      },
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    });
-
-    if (data === undefined) {
-      throw new SandboxProfilesApiError({
-        operation: "listSessionSidebarGroups",
-        status: 500,
-        body: null,
-        message: "Session sidebar groups response was empty.",
-        code: null,
-      });
-    }
-
-    return data;
-  } catch (error) {
-    throw new SandboxProfilesApiError(
-      normalizeHttpApiError({
-        operation: "listSessionSidebarGroups",
         error,
         fallbackMessage: "Could not load sandbox instances.",
       }),

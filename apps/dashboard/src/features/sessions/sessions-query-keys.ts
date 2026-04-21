@@ -1,5 +1,5 @@
 export const SandboxInstancesListQueryPrefix = ["sandbox-instances", "list"] as const;
-export const SessionSidebarGroupsQueryPrefix = ["session-sidebar-groups"] as const;
+export const SidebarSessionsQueryPrefix = ["sidebar-sessions"] as const;
 
 export function sandboxInstancesListQueryKey(input: {
   limit: number;
@@ -16,13 +16,8 @@ export function sandboxInstancesListQueryKey(input: {
   ] as const;
 }
 
-export function sessionSidebarGroupsQueryKey(input: { limit: number }) {
-  return [
-    ...SessionSidebarGroupsQueryPrefix,
-    {
-      limit: input.limit,
-    },
-  ] as const;
+export function sidebarSessionsQueryKey() {
+  return SidebarSessionsQueryPrefix;
 }
 
 export function sandboxInstanceStatusQueryKey(sandboxInstanceId: string) {

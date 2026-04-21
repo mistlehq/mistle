@@ -1,168 +1,84 @@
-import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { ErrorNotice } from "../auth/error-notice.js";
-import { sessionSidebarGroupsQueryKey } from "../sessions/sessions-query-keys.js";
-import { listSessionSidebarGroups } from "../sessions/sessions-service.js";
+import { sidebarSessionsQueryKey } from "../sessions/sessions-query-keys.js";
+import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type {
-  SessionSidebarGroup,
-  SessionSidebarGroupsResult,
+  SandboxInstanceListItem,
+  SandboxInstancesListResult,
+  SandboxInstancesNextPageCursor,
 } from "../sessions/sessions-types.js";
 import {
-  buildSessionsSidebarNavItems,
+  buildSidebarSessionNavItems as buildSidebarSessionNavItemsModel,
   type SessionsSidebarNavItem,
-  type SessionsSidebarSourceGroup,
+  type SidebarSessionItem,
 } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
 export const SESSIONS_SIDEBAR_INITIAL_LIMIT = 25;
-const SESSIONS_SIDEBAR_LIMIT_INCREMENT = 25;
-const SESSIONS_SIDEBAR_MAX_LIMIT = 100;
 
-export function buildSessionsShellSidebarItems(
-  groups: readonly SessionSidebarGroup[],
-  input?: {
-    nowEpochMs?: number;
-  },
-): SessionsSidebarNavItem[] {
-  const sourceGroups: SessionsSidebarSourceGroup[] = groups.map((group) => ({
-    profileId: group.profileId,
-    profileName: group.profileName,
-    items: group.items.map((item: SessionSidebarGroup["items"][number]) => ({
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      updatedAt: item.updatedAt,
-      keepaliveActive: item.keepaliveActive,
-    })),
+export function buildSidebarSessionItems(
+  items: readonly SandboxInstanceListItem[],
+): SidebarSessionItem[] {
+  return items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    profileName: item.sandboxProfileDisplayName ?? item.sandboxProfileId,
+    status: item.status,
+    updatedAt: item.updatedAt,
+    keepaliveActive: item.keepaliveActive,
   }));
+}
 
-  return buildSessionsSidebarNavItems(sourceGroups, {
-    ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+export function buildSidebarSessionNavItems(input: {
+  items: readonly SandboxInstanceListItem[];
+  nowEpochMs?: number;
+}): SessionsSidebarNavItem[] {
+  return buildSidebarSessionNavItemsModel(buildSidebarSessionItems(input.items), {
+    ...(input.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
   });
 }
 
-export function resolveSessionsShellSidebarHasMore(input: {
-  itemCount: number;
-  resolvedLimit: number;
-}): boolean {
-  return input.itemCount >= input.resolvedLimit;
+export function flattenSidebarSessionPages(
+  pages: readonly SandboxInstancesListResult[],
+): SandboxInstanceListItem[] {
+  return pages.flatMap((page) => page.items);
 }
 
-export function shouldResolveSessionsShellSidebarLimit(input: {
-  isPlaceholderData: boolean;
-  isSuccess: boolean;
-}): boolean {
-  return input.isSuccess && !input.isPlaceholderData;
+export function resolveSidebarSessionsHasMore(
+  pages: readonly SandboxInstancesListResult[],
+): boolean {
+  const lastPage = pages.at(-1);
+  return lastPage?.nextPage !== null && lastPage?.nextPage !== undefined;
 }
 
-export function resolveSessionsShellSidebarRequestedLimitAfterError(input: {
-  requestedLimit: number;
-  resolvedLimit: number;
-  isError: boolean;
-  isFetching: boolean;
-}): number | null {
-  if (!input.isError || input.isFetching || input.requestedLimit <= input.resolvedLimit) {
-    return null;
-  }
-
-  return input.resolvedLimit;
-}
-
-export function resolveNextSessionsShellSidebarRequestedLimit(input: {
-  currentLimit: number;
-}): number {
-  return Math.min(
-    input.currentLimit + SESSIONS_SIDEBAR_LIMIT_INCREMENT,
-    SESSIONS_SIDEBAR_MAX_LIMIT,
-  );
+export function resolveSidebarSessionsNextCursor(
+  pages: readonly SandboxInstancesListResult[],
+): SandboxInstancesNextPageCursor | null {
+  const lastPage = pages.at(-1);
+  return lastPage?.nextPage ?? null;
 }
 
 export function SessionsShellSidebar(): React.JSX.Element {
-  const [requestedLimit, setRequestedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
-  const [resolvedLimit, setResolvedLimit] = useState(SESSIONS_SIDEBAR_INITIAL_LIMIT);
-  const [infiniteScrollStatusBanner, setInfiniteScrollStatusBanner] = useState<
-    | {
-        kind: "loading";
-        label: string;
-      }
-    | undefined
-  >(undefined);
-  const sandboxInstancesQuery = useQuery<SessionSidebarGroupsResult>({
-    queryKey: sessionSidebarGroupsQueryKey({
-      limit: requestedLimit,
-    }),
-    placeholderData: (
-      previousData: SessionSidebarGroupsResult | undefined,
-    ): SessionSidebarGroupsResult | undefined => previousData,
-    queryFn: async ({ signal }) =>
-      listSessionSidebarGroups({
-        limit: requestedLimit,
+  const sandboxInstancesQuery = useInfiniteQuery({
+    initialPageParam: null as SandboxInstancesNextPageCursor | null,
+    queryKey: sidebarSessionsQueryKey(),
+    queryFn: async ({ pageParam, signal }) =>
+      listSandboxInstances({
+        limit: SESSIONS_SIDEBAR_INITIAL_LIMIT,
+        after: pageParam?.after ?? null,
+        before: null,
         signal,
       }),
+    getNextPageParam: (lastPage) => lastPage.nextPage ?? undefined,
   });
-  const items = buildSessionsShellSidebarItems(sandboxInstancesQuery.data?.groups ?? []);
-  const hasMore = resolveSessionsShellSidebarHasMore({
-    itemCount: items.length,
-    resolvedLimit,
+
+  const items = flattenSidebarSessionPages(sandboxInstancesQuery.data?.pages ?? []);
+  const navItems = buildSidebarSessionNavItems({
+    items,
   });
-  const handleReachEnd = useCallback(() => {
-    if (sandboxInstancesQuery.isFetching || !hasMore) {
-      return;
-    }
-
-    setInfiniteScrollStatusBanner({
-      kind: "loading",
-      label: "Loading more",
-    });
-    setRequestedLimit((currentLimit) =>
-      resolveNextSessionsShellSidebarRequestedLimit({
-        currentLimit,
-      }),
-    );
-  }, [hasMore, sandboxInstancesQuery.isFetching]);
-
-  useEffect(() => {
-    if (
-      !shouldResolveSessionsShellSidebarLimit({
-        isSuccess: sandboxInstancesQuery.isSuccess,
-        isPlaceholderData: sandboxInstancesQuery.isPlaceholderData,
-      })
-    ) {
-      return;
-    }
-
-    setResolvedLimit(requestedLimit);
-  }, [requestedLimit, sandboxInstancesQuery.isPlaceholderData, sandboxInstancesQuery.isSuccess]);
-
-  useEffect(() => {
-    const nextRequestedLimit = resolveSessionsShellSidebarRequestedLimitAfterError({
-      requestedLimit,
-      resolvedLimit,
-      isError: sandboxInstancesQuery.isError,
-      isFetching: sandboxInstancesQuery.isFetching,
-    });
-
-    if (nextRequestedLimit === null) {
-      return;
-    }
-
-    setRequestedLimit(nextRequestedLimit);
-  }, [
-    requestedLimit,
-    resolvedLimit,
-    sandboxInstancesQuery.isError,
-    sandboxInstancesQuery.isFetching,
-  ]);
-
-  useEffect(() => {
-    if (infiniteScrollStatusBanner?.kind !== "loading" || sandboxInstancesQuery.isFetching) {
-      return;
-    }
-
-    setInfiniteScrollStatusBanner(undefined);
-  }, [infiniteScrollStatusBanner, sandboxInstancesQuery.isFetching]);
+  const hasMore = resolveSidebarSessionsHasMore(sandboxInstancesQuery.data?.pages ?? []);
 
   const errorMessage = sandboxInstancesQuery.isError
     ? resolveApiErrorMessage({
@@ -178,13 +94,24 @@ export function SessionsShellSidebar(): React.JSX.Element {
     <>
       <SessionsSidebarNav
         emptyMessage={emptyMessage}
-        items={items}
+        items={navItems}
         infiniteScroll={{
           hasMore,
-          onReachEnd: handleReachEnd,
-          ...(infiniteScrollStatusBanner === undefined
-            ? {}
-            : { statusBanner: infiniteScrollStatusBanner }),
+          onReachEnd: () => {
+            if (sandboxInstancesQuery.isFetchingNextPage || !hasMore) {
+              return;
+            }
+
+            void sandboxInstancesQuery.fetchNextPage();
+          },
+          ...(sandboxInstancesQuery.isFetchingNextPage
+            ? {
+                statusBanner: {
+                  kind: "loading" as const,
+                  label: "Loading more",
+                },
+              }
+            : {}),
         }}
       />
       {errorMessage === null ? null : (

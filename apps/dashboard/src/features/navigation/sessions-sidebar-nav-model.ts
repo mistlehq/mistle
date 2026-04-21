@@ -1,18 +1,13 @@
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 
-export type SessionsSidebarSourceItem = {
+export type SidebarSessionItem = {
   id: string;
   title: string | null;
+  profileName: string;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
   updatedAt: string;
   keepaliveActive: boolean;
-};
-
-export type SessionsSidebarSourceGroup = {
-  profileId: string;
-  profileName: string;
-  items: SessionsSidebarSourceItem[];
 };
 
 export type SessionsSidebarNavItem = {
@@ -30,14 +25,14 @@ export type SessionsSidebarSearchFilter = {
 };
 
 export function resolveSessionsSidebarShowActivityIndicator(input: {
-  status: SessionsSidebarSourceItem["status"];
+  status: SidebarSessionItem["status"];
   keepaliveActive: boolean;
 }): boolean {
   return input.status === "running" && input.keepaliveActive;
 }
 
 function resolveMetadataLabel(
-  input: Pick<SessionsSidebarSourceItem, "keepaliveActive" | "status" | "updatedAt"> & {
+  input: Pick<SidebarSessionItem, "keepaliveActive" | "status" | "updatedAt"> & {
     nowEpochMs?: number;
   },
 ): string {
@@ -58,41 +53,29 @@ function resolveMetadataLabel(
   });
 }
 
-export function buildSessionsSidebarNavItems(
-  groups: readonly SessionsSidebarSourceGroup[],
+export function buildSidebarSessionNavItems(
+  items: readonly SidebarSessionItem[],
   input?: {
     nowEpochMs?: number;
   },
 ): SessionsSidebarNavItem[] {
-  return groups
-    .flatMap((group) =>
-      group.items.map((item) => ({
-        id: item.id,
-        label: resolveSessionTitleLabel(item.title),
-        profileName: group.profileName,
-        metadataLabel: resolveMetadataLabel({
-          status: item.status,
-          keepaliveActive: item.keepaliveActive,
-          updatedAt: item.updatedAt,
-          ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
-        }),
-        to: `/sessions/${encodeURIComponent(item.id)}`,
-        showActivityIndicator: resolveSessionsSidebarShowActivityIndicator({
-          status: item.status,
-          keepaliveActive: item.keepaliveActive,
-        }),
-        updatedAt: item.updatedAt,
-      })),
-    )
-    .sort((left, right) => {
-      const updatedAtDifference = Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
-
-      if (updatedAtDifference !== 0) {
-        return updatedAtDifference;
-      }
-
-      return left.id.localeCompare(right.id);
-    });
+  return items.map((item) => ({
+    id: item.id,
+    label: resolveSessionTitleLabel(item.title),
+    profileName: item.profileName,
+    metadataLabel: resolveMetadataLabel({
+      status: item.status,
+      keepaliveActive: item.keepaliveActive,
+      updatedAt: item.updatedAt,
+      ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+    }),
+    to: `/sessions/${encodeURIComponent(item.id)}`,
+    showActivityIndicator: resolveSessionsSidebarShowActivityIndicator({
+      status: item.status,
+      keepaliveActive: item.keepaliveActive,
+    }),
+    updatedAt: item.updatedAt,
+  }));
 }
 
 export function filterSessionsSidebarNavItems(input: {

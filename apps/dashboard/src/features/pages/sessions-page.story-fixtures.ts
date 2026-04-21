@@ -1,7 +1,7 @@
+import type { InfiniteData } from "@tanstack/react-query";
 import { QueryClient } from "@tanstack/react-query";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
-import { SESSIONS_SIDEBAR_INITIAL_LIMIT } from "../navigation/sessions-shell-sidebar.js";
 import { organizationLogoQueryKey } from "../organizations/organization-logo-query.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
@@ -9,18 +9,18 @@ import type {
   LaunchableSandboxProfilesResult,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
-  SessionSidebarGroupsQueryPrefix,
-  sessionSidebarGroupsQueryKey,
+  SidebarSessionsQueryPrefix,
+  sidebarSessionsQueryKey,
   sandboxInstanceStatusQueryKey,
   sandboxInstancesListQueryKey,
 } from "../sessions/sessions-query-keys.js";
 import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
-  SessionSidebarGroupsResult,
+  SandboxInstancesNextPageCursor,
 } from "../sessions/sessions-types.js";
 
-type SessionsSidebarQueryState =
+type SidebarSessionsQueryState =
   | {
       kind: "success";
     }
@@ -83,23 +83,20 @@ export function buildSandboxInstanceListItemFixture(
   };
 }
 
-export function buildSessionSidebarGroupFixture(
-  overrides: Partial<SessionSidebarGroupsResult["groups"][number]> &
-    Pick<SessionSidebarGroupsResult["groups"][number], "profileId">,
-): SessionSidebarGroupsResult["groups"][number] {
-  const { profileId, ...restOverrides } = overrides;
-
+export function buildSidebarSessionsInfiniteDataFixture(
+  pages: readonly SandboxInstancesListResult[],
+): InfiniteData<SandboxInstancesListResult, SandboxInstancesNextPageCursor | null> {
   return {
-    profileId,
-    profileName: "Alpha Profile",
-    items: [],
-    ...restOverrides,
+    pages: [...pages],
+    pageParams: pages.map((page, pageIndex) =>
+      pageIndex === 0 ? null : (pages[pageIndex - 1]?.nextPage ?? null),
+    ),
   };
 }
 
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
-  sessionSidebarGroups?: SessionSidebarGroupsResult;
+  sidebarSessionsPages?: SandboxInstancesListResult[];
   sandboxInstancesList?: SandboxInstancesListResult;
   sandboxInstanceStatus?: {
     id: string;
@@ -113,7 +110,7 @@ export function createSessionsPageStoryQueryClient(input?: {
     failureCode?: string | null;
     failureMessage?: string | null;
   };
-  sessionsSidebarQueryState?: SessionsSidebarQueryState;
+  sidebarSessionsQueryState?: SidebarSessionsQueryState;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -126,7 +123,7 @@ export function createSessionsPageStoryQueryClient(input?: {
       },
     },
   });
-  queryClient.setQueryDefaults(SessionSidebarGroupsQueryPrefix, {
+  queryClient.setQueryDefaults(SidebarSessionsQueryPrefix, {
     enabled: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -158,48 +155,56 @@ export function createSessionsPageStoryQueryClient(input?: {
       totalResults: 0,
     },
   );
-  const sessionSidebarQueryKey = sessionSidebarGroupsQueryKey({
-    limit: SESSIONS_SIDEBAR_INITIAL_LIMIT,
-  });
-  const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
+  const sidebarQueryKey = sidebarSessionsQueryKey();
+  const sidebarSessionsQueryState = input?.sidebarSessionsQueryState ?? {
     kind: "success",
   };
 
-  if (sessionsSidebarQueryState.kind === "success") {
+  if (sidebarSessionsQueryState.kind === "success") {
     queryClient.setQueryData(
-      sessionSidebarQueryKey,
-      input?.sessionSidebarGroups ?? {
-        groups: [],
-      },
+      sidebarQueryKey,
+      buildSidebarSessionsInfiniteDataFixture(
+        input?.sidebarSessionsPages ?? [
+          {
+            items: [],
+            nextPage: null,
+            previousPage: null,
+            totalResults: 0,
+          },
+        ],
+      ),
     );
-  } else if (sessionsSidebarQueryState.kind === "pending") {
-    const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sessionSidebarQueryKey,
-      queryFn: async () => await new Promise<SessionSidebarGroupsResult>(() => undefined),
+  } else if (sidebarSessionsQueryState.kind === "pending") {
+    const sidebarSessionsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sidebarQueryKey,
+      queryFn: async () =>
+        await new Promise<
+          InfiniteData<SandboxInstancesListResult, SandboxInstancesNextPageCursor | null>
+        >(() => undefined),
     });
 
-    sessionsSidebarQuery.setState({
-      ...sessionsSidebarQuery.state,
+    sidebarSessionsQuery.setState({
+      ...sidebarSessionsQuery.state,
       data: undefined,
       error: null,
       fetchStatus: "fetching",
       status: "pending",
     });
   } else {
-    const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sessionSidebarQueryKey,
+    const sidebarSessionsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sidebarQueryKey,
       queryFn: async () => {
         throw new Error(
-          sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
+          sidebarSessionsQueryState.errorMessage ?? "Could not load sandbox instances.",
         );
       },
     });
 
-    sessionsSidebarQuery.setState({
-      ...sessionsSidebarQuery.state,
+    sidebarSessionsQuery.setState({
+      ...sidebarSessionsQuery.state,
       data: undefined,
       error: new Error(
-        sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
+        sidebarSessionsQueryState.errorMessage ?? "Could not load sandbox instances.",
       ),
       errorUpdateCount: 1,
       errorUpdatedAt: Date.now(),
