@@ -32,11 +32,13 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       linkedAccountsEmptyStateMessage={null}
       linkedAccountsLoading={false}
       linkedAccountsLoadErrorMessage={null}
+      onDeleteLinkedAccountCommitSigningKey={async () => {}}
       onDeleteProfileImage={async () => {}}
       onLinkLinkedAccount={async () => {}}
       onSaveChanges={async () => {}}
       onUnlinkLinkedAccount={async () => {}}
       onUpdateLinkedAccountPreferredEmail={async () => {}}
+      onUploadLinkedAccountCommitSigningKey={async () => {}}
       onUploadProfileImage={async () => {}}
       profileImageBusy={false}
       profileImageErrorMessage={null}

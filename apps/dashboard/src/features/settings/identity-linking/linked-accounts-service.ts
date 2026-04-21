@@ -26,6 +26,14 @@ export const LinkedAccountCredentialSchema = z
   })
   .strict();
 
+export const LinkedAccountCommitSigningSchema = z
+  .object({
+    credentialId: z.string().min(1),
+    publicKeyFingerprint: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const LinkedAccountSchema = z
   .object({
     providerFamily: z.string().min(1),
@@ -34,6 +42,7 @@ export const LinkedAccountSchema = z
     configurationStatus: z.enum(["active", "disabled"]),
     principal: LinkedAccountPrincipalSchema.nullable(),
     credential: LinkedAccountCredentialSchema.nullable(),
+    commitSigning: LinkedAccountCommitSigningSchema.nullable(),
   })
   .strict();
 
@@ -213,6 +222,48 @@ export async function updateGitHubLinkedAccountPreferredEmail(input: {
       operation: "updateGitHubLinkedAccountPreferredEmail",
       error,
       fallbackMessage: "Could not update GitHub preferred email.",
+    });
+  }
+}
+
+export async function uploadGitHubLinkedAccountSigningKey(input: { file: File }): Promise<void> {
+  const body = new FormData();
+  body.set("file", input.file);
+
+  try {
+    const response = await requestControlPlane({
+      operation: "uploadGitHubLinkedAccountSigningKey",
+      method: "PUT",
+      pathname: "/v1/me/linked-accounts/github/signing-key",
+      body,
+      fallbackMessage: "Could not upload GitHub signing key.",
+    });
+
+    await response.text();
+  } catch (error) {
+    throw wrapLinkedAccountsApiError({
+      operation: "uploadGitHubLinkedAccountSigningKey",
+      error,
+      fallbackMessage: "Could not upload GitHub signing key.",
+    });
+  }
+}
+
+export async function deleteGitHubLinkedAccountSigningKey(): Promise<void> {
+  try {
+    const response = await requestControlPlane({
+      operation: "deleteGitHubLinkedAccountSigningKey",
+      method: "DELETE",
+      pathname: "/v1/me/linked-accounts/github/signing-key",
+      fallbackMessage: "Could not remove GitHub signing key.",
+    });
+
+    await response.text();
+  } catch (error) {
+    throw wrapLinkedAccountsApiError({
+      operation: "deleteGitHubLinkedAccountSigningKey",
+      error,
+      fallbackMessage: "Could not remove GitHub signing key.",
     });
   }
 }

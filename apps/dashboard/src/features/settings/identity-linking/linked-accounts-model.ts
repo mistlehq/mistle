@@ -20,6 +20,13 @@ export type LinkedAccountEmailPreferenceViewModel = {
   helperText: string;
 };
 
+export type LinkedAccountCommitSigningViewModel = {
+  statusLabel: string;
+  keySummaryLabel: string | null;
+  uploadActionLabel: string;
+  removeActionLabel: string | null;
+};
+
 export type LinkedAccountCardViewModel = {
   providerFamily: string;
   displayName: string;
@@ -30,6 +37,7 @@ export type LinkedAccountCardViewModel = {
   linkedAtLabel: string | null;
   helperMessage: string | null;
   emailPreference: LinkedAccountEmailPreferenceViewModel | null;
+  commitSigning: LinkedAccountCommitSigningViewModel | null;
   primaryActionLabel: string | null;
   secondaryActionLabel: string | null;
 };
@@ -71,6 +79,7 @@ export function resolveLinkedAccountCardViewModel(
     linkedAccount.credential?.status === "expired" ||
     linkedAccount.credential?.status === "reauthorization_required";
   const emailPreference = resolveLinkedAccountEmailPreferenceViewModel(linkedAccount);
+  const commitSigning = resolveLinkedAccountCommitSigningViewModel(linkedAccount);
 
   if (linkedAccount.configurationStatus === "disabled") {
     return {
@@ -89,6 +98,7 @@ export function resolveLinkedAccountCardViewModel(
           ? `Your organization has disabled ${providerDisplayName} identity linking.`
           : `Your organization has disabled ${providerDisplayName} identity linking. You can still unlink this account.`,
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: null,
       secondaryActionLabel: linkedAccount.principal === null ? null : "Unlink",
     };
@@ -105,6 +115,7 @@ export function resolveLinkedAccountCardViewModel(
       linkedAtLabel: null,
       helperMessage: null,
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: "Link account",
       secondaryActionLabel: null,
     };
@@ -121,6 +132,7 @@ export function resolveLinkedAccountCardViewModel(
       linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
       helperMessage: `${providerDisplayName} needs to be linked again before Mistle can act as you.`,
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     };
@@ -139,8 +151,38 @@ export function resolveLinkedAccountCardViewModel(
         ? "GitHub has not provided selectable commit emails for this link."
         : null,
     emailPreference,
+    commitSigning,
     primaryActionLabel: "Relink",
     secondaryActionLabel: "Unlink",
+  };
+}
+
+function resolveLinkedAccountCommitSigningViewModel(
+  linkedAccount: LinkedAccount,
+): LinkedAccountCommitSigningViewModel | null {
+  if (
+    linkedAccount.providerFamily !== "github" ||
+    linkedAccount.configurationStatus !== "active" ||
+    linkedAccount.principal?.status !== "active" ||
+    linkedAccount.credential?.status !== "active"
+  ) {
+    return null;
+  }
+
+  if (linkedAccount.commitSigning === null) {
+    return {
+      statusLabel: "Not configured",
+      keySummaryLabel: null,
+      uploadActionLabel: "Upload key",
+      removeActionLabel: null,
+    };
+  }
+
+  return {
+    statusLabel: "Configured",
+    keySummaryLabel: linkedAccount.commitSigning.publicKeyFingerprint,
+    uploadActionLabel: "Replace key",
+    removeActionLabel: "Remove key",
   };
 }
 

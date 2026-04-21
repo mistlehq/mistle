@@ -35,6 +35,7 @@ function createGitHubLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAc
       lastValidatedAt: "2026-04-19T10:15:00.000Z",
       updatedAt: "2026-04-19T10:15:00.000Z",
     },
+    commitSigning: null,
     ...overrides,
   };
 }
@@ -65,6 +66,7 @@ function createSlackLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAcc
       lastValidatedAt: "2026-04-19T10:15:00.000Z",
       updatedAt: "2026-04-19T10:15:00.000Z",
     },
+    commitSigning: null,
     ...overrides,
   };
 }
@@ -105,6 +107,12 @@ describe("linked-accounts-model", () => {
       linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
       helperMessage: "GitHub has not provided selectable commit emails for this link.",
       emailPreference: null,
+      commitSigning: {
+        statusLabel: "Not configured",
+        keySummaryLabel: null,
+        uploadActionLabel: "Upload key",
+        removeActionLabel: null,
+      },
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     });
@@ -126,6 +134,7 @@ describe("linked-accounts-model", () => {
       linkedAtLabel: null,
       helperMessage: null,
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: "Link account",
       secondaryActionLabel: null,
     });
@@ -149,6 +158,7 @@ describe("linked-accounts-model", () => {
       statusTone: "warning",
       helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: "Relink",
       secondaryActionLabel: "Unlink",
     });
@@ -170,8 +180,30 @@ describe("linked-accounts-model", () => {
       helperMessage:
         "Your organization has disabled GitHub identity linking. You can still unlink this account.",
       emailPreference: null,
+      commitSigning: null,
       primaryActionLabel: null,
       secondaryActionLabel: "Unlink",
+    });
+  });
+
+  it("builds a commit-signing summary when a GitHub signing key is configured", () => {
+    expect(
+      resolveLinkedAccountCardViewModel(
+        createGitHubLinkedAccount({
+          commitSigning: {
+            credentialId: "upc_git_ssh_signing_key",
+            publicKeyFingerprint: "SHA256:abc123",
+            updatedAt: "2026-04-19T10:15:00.000Z",
+          },
+        }),
+      ),
+    ).toMatchObject({
+      commitSigning: {
+        statusLabel: "Configured",
+        keySummaryLabel: "SHA256:abc123",
+        uploadActionLabel: "Replace key",
+        removeActionLabel: "Remove key",
+      },
     });
   });
 

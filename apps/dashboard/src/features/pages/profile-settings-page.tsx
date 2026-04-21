@@ -11,10 +11,12 @@ import {
   type LinkedAccountCallbackNotice,
 } from "../settings/identity-linking/linked-accounts-model.js";
 import {
+  deleteGitHubLinkedAccountSigningKey,
   linkedAccountsQueryKey,
   listLinkedAccounts,
   startLinkedAccountAuthorization,
   unlinkLinkedAccount,
+  uploadGitHubLinkedAccountSigningKey,
   updateGitHubLinkedAccountPreferredEmail,
 } from "../settings/identity-linking/linked-accounts-service.js";
 import {
@@ -172,6 +174,44 @@ export function ProfileSettingsPage(): React.JSX.Element {
       );
     },
   });
+  const uploadGitHubLinkedAccountSigningKeyMutation = useMutation({
+    mutationFn: async (file: File) => uploadGitHubLinkedAccountSigningKey({ file }),
+    onMutate: async () => {
+      setLinkedAccountOperationErrorMessage(null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: linkedAccountsQueryKey(activeOrganizationId),
+      });
+    },
+    onError: (error) => {
+      setLinkedAccountOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not upload GitHub signing key.",
+        }),
+      );
+    },
+  });
+  const deleteGitHubLinkedAccountSigningKeyMutation = useMutation({
+    mutationFn: deleteGitHubLinkedAccountSigningKey,
+    onMutate: async () => {
+      setLinkedAccountOperationErrorMessage(null);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: linkedAccountsQueryKey(activeOrganizationId),
+      });
+    },
+    onError: (error) => {
+      setLinkedAccountOperationErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not remove GitHub signing key.",
+        }),
+      );
+    },
+  });
 
   useEffect(() => {
     const resolvedNotice = resolveLinkedAccountCallbackNotice({
@@ -241,6 +281,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
         onLinkLinkedAccount={async (providerFamily) => {
           await startLinkedAccountAuthorizationMutation.mutateAsync(providerFamily);
         }}
+        onDeleteLinkedAccountCommitSigningKey={async () => {
+          await deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync();
+        }}
         onSaveChanges={async (displayNameDraft) => {
           await saveMutation.mutateAsync(displayNameDraft.trim());
         }}
@@ -250,13 +293,18 @@ export function ProfileSettingsPage(): React.JSX.Element {
         onUpdateLinkedAccountPreferredEmail={async (_providerFamily, preferredEmail) => {
           await updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync(preferredEmail);
         }}
+        onUploadLinkedAccountCommitSigningKey={async (_providerFamily, file) => {
+          await uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync(file);
+        }}
         onUploadProfileImage={async (file) => {
           await uploadProfileImageMutation.mutateAsync(file);
         }}
         linkedAccountActionPending={
           startLinkedAccountAuthorizationMutation.isPending ||
           unlinkLinkedAccountMutation.isPending ||
-          updateGitHubLinkedAccountPreferredEmailMutation.isPending
+          updateGitHubLinkedAccountPreferredEmailMutation.isPending ||
+          uploadGitHubLinkedAccountSigningKeyMutation.isPending ||
+          deleteGitHubLinkedAccountSigningKeyMutation.isPending
         }
         saving={saveMutation.isPending}
       />

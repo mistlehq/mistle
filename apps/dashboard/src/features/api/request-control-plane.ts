@@ -9,7 +9,7 @@ type RequestControlPlaneInput = {
   pathname: string;
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   query?: Record<string, ControlPlaneQueryValue | null | undefined>;
-  body?: unknown;
+  body?: FormData | object | undefined;
   signal?: AbortSignal;
   fallbackMessage: string;
   basePath?: string;
@@ -54,6 +54,14 @@ export async function requestControlPlane(input: RequestControlPlaneInput): Prom
     ...(input.query === undefined ? {} : { query: input.query }),
   });
 
+  const isMultipartBody = input.body instanceof FormData;
+  let requestBody: BodyInit | null = null;
+  if (input.body instanceof FormData) {
+    requestBody = input.body;
+  } else if (input.body !== undefined) {
+    requestBody = JSON.stringify(input.body);
+  }
+
   const response = await fetch(url, {
     method: input.method,
     credentials: "include",
@@ -63,11 +71,15 @@ export async function requestControlPlane(input: RequestControlPlaneInput): Prom
         ? {
             accept: "application/json",
           }
-        : {
-            accept: "application/json",
-            "content-type": "application/json",
-          },
-    body: input.body === undefined ? null : JSON.stringify(input.body),
+        : isMultipartBody
+          ? {
+              accept: "application/json",
+            }
+          : {
+              accept: "application/json",
+              "content-type": "application/json",
+            },
+    body: requestBody,
   });
 
   if (response.ok) {

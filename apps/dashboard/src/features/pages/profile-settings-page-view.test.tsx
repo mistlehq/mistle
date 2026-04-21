@@ -18,11 +18,13 @@ const baseProps = {
   linkedAccountsEmptyStateMessage: null,
   linkedAccountsLoading: false,
   linkedAccountsLoadErrorMessage: null,
+  onDeleteLinkedAccountCommitSigningKey: async () => {},
   onDeleteProfileImage: async () => {},
   onLinkLinkedAccount: async () => {},
   onSaveChanges: async () => {},
   onUnlinkLinkedAccount: async () => {},
   onUpdateLinkedAccountPreferredEmail: async () => {},
+  onUploadLinkedAccountCommitSigningKey: async () => {},
   onUploadProfileImage: async () => {},
   profileImageBusy: false,
   profileImageErrorMessage: null,
@@ -141,6 +143,7 @@ describe("ProfileSettingsPageView", () => {
             linkedAtLabel: null,
             helperMessage: null,
             emailPreference: null,
+            commitSigning: null,
             primaryActionLabel: "Link account",
             secondaryActionLabel: null,
           },
@@ -181,6 +184,12 @@ describe("ProfileSettingsPageView", () => {
                 },
               ],
               helperText: "Used for sandbox Git identity and commit signing.",
+            },
+            commitSigning: {
+              statusLabel: "Not configured",
+              keySummaryLabel: null,
+              uploadActionLabel: "Upload key",
+              removeActionLabel: null,
             },
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
@@ -242,6 +251,12 @@ describe("ProfileSettingsPageView", () => {
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
             emailPreference: null,
+            commitSigning: {
+              statusLabel: "Not configured",
+              keySummaryLabel: null,
+              uploadActionLabel: "Upload key",
+              removeActionLabel: null,
+            },
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -255,6 +270,7 @@ describe("ProfileSettingsPageView", () => {
             linkedAtLabel: null,
             helperMessage: null,
             emailPreference: null,
+            commitSigning: null,
             primaryActionLabel: "Link account",
             secondaryActionLabel: null,
           },
@@ -286,6 +302,7 @@ describe("ProfileSettingsPageView", () => {
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
             emailPreference: null,
+            commitSigning: null,
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -308,7 +325,7 @@ describe("ProfileSettingsPageView", () => {
     });
   });
 
-  it("renders GitHub commit email controls when selectable emails are available", () => {
+  it("renders GitHub commit email and signing controls when available", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
@@ -336,6 +353,12 @@ describe("ProfileSettingsPageView", () => {
               ],
               helperText: "Used for sandbox Git identity and commit signing.",
             },
+            commitSigning: {
+              statusLabel: "Configured",
+              keySummaryLabel: "SHA256:abc123",
+              uploadActionLabel: "Replace key",
+              removeActionLabel: "Remove key",
+            },
             primaryActionLabel: "Relink",
             secondaryActionLabel: "Unlink",
           },
@@ -344,8 +367,66 @@ describe("ProfileSettingsPageView", () => {
     );
 
     expect(screen.getByText("Commit email")).toBeTruthy();
+    expect(screen.getByText("Commit signing")).toBeTruthy();
     expect(screen.getByRole("combobox")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Replace key" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Remove key" })).toBeTruthy();
     expect(screen.getByText("Used for sandbox Git identity and commit signing.")).toBeTruthy();
+  });
+
+  it("uploads a GitHub commit signing key through the provided handler", async () => {
+    const uploadedFiles: File[] = [];
+
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: null,
+            commitSigning: {
+              statusLabel: "Not configured",
+              keySummaryLabel: null,
+              uploadActionLabel: "Upload key",
+              removeActionLabel: null,
+            },
+            primaryActionLabel: "Relink",
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+        onUploadLinkedAccountCommitSigningKey={async (_providerFamily, file) => {
+          uploadedFiles.push(file);
+        }}
+      />,
+    );
+
+    const uploadInput = screen.getByLabelText("Upload GitHub commit signing key", {
+      selector: "input",
+    });
+    const uploadFile = new File(
+      ["-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n"],
+      "id_signing",
+      {
+        type: "application/octet-stream",
+      },
+    );
+
+    fireEvent.change(uploadInput, {
+      target: {
+        files: [uploadFile],
+      },
+    });
+
+    await waitFor(() => {
+      expect(uploadedFiles).toEqual([uploadFile]);
+    });
   });
 });

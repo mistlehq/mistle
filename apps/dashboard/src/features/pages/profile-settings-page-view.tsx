@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -38,11 +38,13 @@ export type ProfileSettingsPageViewProps = {
   onDeleteProfileImage: () => Promise<void>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onSaveChanges: (displayName: string) => Promise<void>;
+  onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
   onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
     providerFamily: string,
     preferredEmail: string,
   ) => Promise<void>;
+  onUploadLinkedAccountCommitSigningKey: (providerFamily: string, file: File) => Promise<void>;
   onUploadProfileImage: (file: File) => Promise<void>;
   profileImageBusy: boolean;
   profileImageErrorMessage: string | null;
@@ -117,9 +119,15 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
                   key={linkedAccountCard.providerFamily}
                   linkedAccountActionPending={props.linkedAccountActionPending}
                   linkedAccountCard={linkedAccountCard}
+                  onDeleteLinkedAccountCommitSigningKey={
+                    props.onDeleteLinkedAccountCommitSigningKey
+                  }
                   onLinkLinkedAccount={props.onLinkLinkedAccount}
                   onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
                   onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
+                  onUploadLinkedAccountCommitSigningKey={
+                    props.onUploadLinkedAccountCommitSigningKey
+                  }
                 />
               ))
             )}
@@ -137,14 +145,18 @@ export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): Re
 function LinkedAccountCard(input: {
   linkedAccountActionPending: boolean;
   linkedAccountCard: LinkedAccountCardViewModel;
+  onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
     providerFamily: string,
     preferredEmail: string,
   ) => Promise<void>;
+  onUploadLinkedAccountCommitSigningKey: (providerFamily: string, file: File) => Promise<void>;
 }): React.JSX.Element {
   const emailPreference = input.linkedAccountCard.emailPreference;
+  const commitSigning = input.linkedAccountCard.commitSigning;
+  const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedEmail, setSelectedEmail] = useState(emailPreference?.selectedEmail ?? "");
   const selectedOptionLabel = emailPreference?.options.find(
     (option) => option.value === selectedEmail,
@@ -259,6 +271,76 @@ function LinkedAccountCard(input: {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{emailPreference.helperText}</p>
+            </FieldContent>
+          </Field>
+        </div>
+      )}
+
+      {commitSigning === null ? null : (
+        <div className="mt-4">
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel>Commit signing</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm">{commitSigning.statusLabel}</p>
+                  {commitSigning.keySummaryLabel === null ? null : (
+                    <p className="truncate text-xs text-muted-foreground">
+                      {commitSigning.keySummaryLabel}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    aria-label={`Upload ${input.linkedAccountCard.displayName} commit signing key`}
+                    className="hidden"
+                    ref={commitSigningUploadInputRef}
+                    onChange={(event) => {
+                      const selectedFile = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (selectedFile === null || selectedFile === undefined) {
+                        return;
+                      }
+
+                      void input.onUploadLinkedAccountCommitSigningKey(
+                        input.linkedAccountCard.providerFamily,
+                        selectedFile,
+                      );
+                    }}
+                    type="file"
+                  />
+                  <Button
+                    disabled={input.linkedAccountActionPending}
+                    onClick={() => {
+                      commitSigningUploadInputRef.current?.click();
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    {input.linkedAccountActionPending
+                      ? "Working..."
+                      : commitSigning.uploadActionLabel}
+                  </Button>
+                  {commitSigning.removeActionLabel === null ? null : (
+                    <Button
+                      disabled={input.linkedAccountActionPending}
+                      onClick={() => {
+                        void input.onDeleteLinkedAccountCommitSigningKey(
+                          input.linkedAccountCard.providerFamily,
+                        );
+                      }}
+                      type="button"
+                      variant="outline"
+                    >
+                      {input.linkedAccountActionPending
+                        ? "Working..."
+                        : commitSigning.removeActionLabel}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </FieldContent>
           </Field>
         </div>
