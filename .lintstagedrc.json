@@ -1,3 +1,4 @@
 {
-  "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,md,mdx,yaml,yml,toml,css,html}": ["oxfmt"]
+  "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc,md,mdx,yaml,yml,toml,css,html}": ["oxfmt"],
+  "packages/sandboxd/**/*.rs": ["pnpm --filter @mistle/sandboxd format"]
 }
