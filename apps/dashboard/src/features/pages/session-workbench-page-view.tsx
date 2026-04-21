@@ -43,25 +43,6 @@ export type {
   SessionWorkbenchPageViewProps,
 };
 
-function resolveBottomPanelDefaultSizes(input: {
-  bottomPanelSize: number;
-  isBottomPanelVisible: boolean;
-}): {
-  bottomPanelDefaultSize: string;
-  mainPanelDefaultSize?: number | string;
-} {
-  if (!input.isBottomPanelVisible) {
-    return {
-      bottomPanelDefaultSize: "0px",
-      mainPanelDefaultSize: "100%",
-    };
-  }
-
-  return {
-    bottomPanelDefaultSize: `${String(input.bottomPanelSize)}px`,
-  };
-}
-
 export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alert,
@@ -71,21 +52,17 @@ export function SessionWorkbenchPageView({
   mainContent,
   primaryBottomPanel,
   bottomPanel,
-  bottomPanelSize,
+  bottomPanelSize: _bottomPanelSize,
   onBottomPanelResize,
   isBottomPanelVisible,
   secondaryPanel,
-  secondaryPanelSize,
+  secondaryPanelSize: _secondaryPanelSize,
   onSecondaryPanelResize,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   const bottomPanelRef = useRef<PanelImperativeHandle | null>(null);
   const hasAppliedBottomPanelVisibilityRef = useRef(false);
   const previousBottomPanelVisibilityRef = useRef<boolean | null>(null);
-  const bottomPanelDefaultSizes = resolveBottomPanelDefaultSizes({
-    bottomPanelSize,
-    isBottomPanelVisible,
-  });
 
   useLayoutEffect(() => {
     const bottomPanel = bottomPanelRef.current;
@@ -162,14 +139,7 @@ export function SessionWorkbenchPageView({
       orientation="vertical"
       resizeTargetMinimumSize={{ coarse: 36, fine: 18 }}
     >
-      <ResizablePanel
-        minSize="40%"
-        {...(bottomPanelDefaultSizes.mainPanelDefaultSize === undefined
-          ? {}
-          : { defaultSize: bottomPanelDefaultSizes.mainPanelDefaultSize })}
-      >
-        {mainWorkspace}
-      </ResizablePanel>
+      <ResizablePanel minSize="40%">{mainWorkspace}</ResizablePanel>
       <ResizableHandle
         className={
           isBottomPanelVisible
@@ -180,7 +150,6 @@ export function SessionWorkbenchPageView({
       <ResizablePanel
         collapsedSize={0}
         collapsible
-        defaultSize={bottomPanelDefaultSizes.bottomPanelDefaultSize}
         minSize={`${String(MIN_TERMINAL_PANEL_SIZE)}px`}
         onResize={(panelSize) => {
           if (panelSize.inPixels > 0) {
@@ -212,18 +181,13 @@ export function SessionWorkbenchPageView({
         key={sandboxInstanceId}
         orientation="horizontal"
       >
-        <ResizablePanel
-          defaultSize={isSecondaryPanelVisible ? `${String(100 - secondaryPanelSize)}%` : "100%"}
-          id="session-workbench-primary-panel"
-          minSize="25%"
-        >
+        <ResizablePanel id="session-workbench-primary-panel" minSize="25%">
           {workspaceWithBottomPanel}
         </ResizablePanel>
         {!isSecondaryPanelVisible ? null : (
           <>
             <ResizableHandle id="session-workbench-secondary-handle" />
             <ResizablePanel
-              defaultSize={`${String(secondaryPanelSize)}%`}
               id="session-workbench-secondary-panel"
               minSize="20%"
               onResize={(panelSize) => {
@@ -240,5 +204,3 @@ export function SessionWorkbenchPageView({
     </div>
   );
 }
-
-export { resolveBottomPanelDefaultSizes };

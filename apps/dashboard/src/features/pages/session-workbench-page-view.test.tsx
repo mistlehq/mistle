@@ -3,10 +3,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import {
-  resolveBottomPanelDefaultSizes,
-  SessionWorkbenchPageView,
-} from "./session-workbench-page-view.js";
+import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 describe("SessionWorkbenchPageView", () => {
@@ -73,29 +70,6 @@ describe("SessionWorkbenchPageView", () => {
     expect(
       within(container).getByRole("region", { name: "Conversation chat" }).className,
     ).not.toContain("scrollbar-gutter");
-  });
-
-  it("uses pixel sizing only for the terminal panel when visible", () => {
-    expect(
-      resolveBottomPanelDefaultSizes({
-        bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
-        isBottomPanelVisible: true,
-      }),
-    ).toEqual({
-      bottomPanelDefaultSize: `${String(DEFAULT_TERMINAL_PANEL_SIZE)}px`,
-    });
-  });
-
-  it("keeps the main panel at full height while the terminal panel is hidden", () => {
-    expect(
-      resolveBottomPanelDefaultSizes({
-        bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
-        isBottomPanelVisible: false,
-      }),
-    ).toEqual({
-      bottomPanelDefaultSize: "0px",
-      mainPanelDefaultSize: "100%",
-    });
   });
 
   it("keeps the bottom panel mounted while hidden", () => {
