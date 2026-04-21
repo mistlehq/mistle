@@ -9,6 +9,7 @@ const DefaultRequestTimeoutMs = 3000;
 
 const InternalErrorSchema = z
   .object({
+    code: z.string().optional(),
     message: z.string().optional(),
   })
   .catchall(z.unknown());
@@ -32,6 +33,10 @@ export type ResolveIdentityLinkPrincipalCredentialInput =
   paths["/internal/identity-linking/resolve-principal-credential"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveIdentityLinkPrincipalCredentialOutput =
   paths["/internal/identity-linking/resolve-principal-credential"]["post"]["responses"]["200"]["content"]["application/json"];
+export type SignIdentityLinkCommitPayloadInput =
+  paths["/internal/identity-linking/sign-commit-payload"]["post"]["requestBody"]["content"]["application/json"];
+export type SignIdentityLinkCommitPayloadOutput =
+  paths["/internal/identity-linking/sign-commit-payload"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export type StartSandboxProfileInstanceInput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["requestBody"]["content"]["application/json"];
@@ -83,6 +88,28 @@ function extractErrorMessage(input: unknown): string {
   }
 
   return message;
+}
+
+function extractErrorCode(input: unknown): string | undefined {
+  const parsedError = InternalErrorSchema.safeParse(input);
+  if (!parsedError.success) {
+    return undefined;
+  }
+
+  const code = parsedError.data.code;
+  return typeof code === "string" && code.length > 0 ? code : undefined;
+}
+
+export class ControlPlaneInternalClientRequestError extends Error {
+  readonly status: number;
+  readonly code: string | undefined;
+
+  constructor(input: { status: number; message: string; code: string | undefined }) {
+    super(input.message);
+    this.name = "ControlPlaneInternalClientRequestError";
+    this.status = input.status;
+    this.code = input.code;
+  }
 }
 
 export class ControlPlaneInternalClient {
@@ -154,6 +181,25 @@ export class ControlPlaneInternalClient {
     throw new Error(
       `Control-plane internal linked-principal credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
+  }
+
+  async signIdentityLinkCommitPayload(
+    input: SignIdentityLinkCommitPayloadInput,
+  ): Promise<SignIdentityLinkCommitPayloadOutput> {
+    const result = await this.#client.POST("/internal/identity-linking/sign-commit-payload", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal linked-principal commit signing failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
   }
 
   async startSandboxProfileInstance(

@@ -16,6 +16,7 @@ const EnvironmentSchema = z
       SandboxStorageBackend.ARCHIL,
       SandboxStorageBackend.DOCKER_VOLUME,
     ]),
+    MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: z.string().min(1),
   })
   .strict();
 
@@ -33,6 +34,8 @@ function readEnvironment(): z.infer<typeof EnvironmentSchema> {
       process.env.MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN,
     MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND:
       process.env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
+    MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH:
+      process.env.MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH,
   });
 }
 
@@ -62,6 +65,9 @@ async function main(): Promise<void> {
       },
       dataPlaneApi: {
         baseUrl: env.MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL,
+      },
+      commitSign: {
+        binaryPath: env.MISTLE_TEST_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH,
       },
       integrations: {
         activeMasterEncryptionKeyVersion: 1,
@@ -99,6 +105,11 @@ async function main(): Promise<void> {
     sandbox: {
       defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
       gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-bootstrap-token-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-data-plane-gateway",
+      },
       storageBackend: env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
     },
   });

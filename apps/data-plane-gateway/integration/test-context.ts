@@ -6,6 +6,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
+import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   DockerIntegrationConfigPathInContainer,
@@ -22,6 +23,8 @@ import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
+import { getCommitSignBinaryPath } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { startControlPlaneApiProcess } from "../../data-plane-worker/integration/helpers/control-plane-api.js";
 import { createDataPlaneGatewayRuntime } from "../src/runtime/index.js";
 import type { DataPlaneGatewayRuntime, DataPlaneGatewayRuntimeConfig } from "../src/types.js";
 
@@ -65,6 +68,8 @@ export type DataPlaneGatewayIntegrationFixture = {
   baseUrl: string;
   websocketBaseUrl: string;
   config: DataPlaneGatewayRuntimeConfig;
+  controlPlaneBaseUrl: string;
+  controlPlaneDb: ControlPlaneDatabase;
   databaseStack: DataPlaneGatewayIntegrationDatabaseStack;
   db: DataPlaneDatabase;
   dbPool: Pool;
@@ -324,6 +329,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             await dbPool.end();
           });
           const db = createDataPlaneDatabase(dbPool);
+          const controlPlaneDb = createControlPlaneDatabase(dbPool);
 
           const dataPlaneApi = await startDataPlaneApi({
             buildContextHostPath: PROJECT_ROOT_HOST_PATH,
@@ -376,6 +382,21 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             await dataPlaneApi.stop();
           });
 
+          const controlPlanePort = await reserveAvailablePort({ host: "127.0.0.1" });
+          const controlPlaneApi = await startControlPlaneApiProcess({
+            host: "127.0.0.1",
+            port: controlPlanePort,
+            databaseUrl: runtimeDatabaseUrl,
+            dataPlaneApiBaseUrl: dataPlaneApi.hostBaseUrl,
+            workflowNamespaceId,
+            internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
+            sandboxStorageBackend: "archil",
+            commitSignBinaryPath: getCommitSignBinaryPath(),
+          });
+          cleanupTasks.unshift(async () => {
+            await controlPlaneApi.stop();
+          });
+
           const runtimeConfig: DataPlaneGatewayRuntimeConfig = {
             app: {
               server: {
@@ -392,6 +413,9 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
               }),
               dataPlaneApi: {
                 baseUrl: dataPlaneApi.hostBaseUrl,
+              },
+              controlPlaneApi: {
+                baseUrl: controlPlaneApi.baseUrl,
               },
             },
             internalAuth: {
@@ -467,6 +491,8 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             baseUrl: `http://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
             websocketBaseUrl: `ws://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
             config: runtimeConfig,
+            controlPlaneBaseUrl: controlPlaneApi.baseUrl,
+            controlPlaneDb,
             databaseStack: {
               directUrl: runtimeDatabaseUrl,
               pooledUrl: runtimeDatabaseUrl,

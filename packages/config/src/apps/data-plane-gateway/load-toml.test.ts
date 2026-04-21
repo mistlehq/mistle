@@ -25,6 +25,9 @@ describe("loadDataPlaneGatewayFromToml", () => {
             data_plane_api: {
               base_url: "http://127.0.0.1:5200",
             },
+            control_plane_api: {
+              base_url: "http://127.0.0.1:5100",
+            },
           },
         },
       }),
@@ -45,6 +48,9 @@ describe("loadDataPlaneGatewayFromToml", () => {
       },
       dataPlaneApi: {
         baseUrl: "http://127.0.0.1:5200",
+      },
+      controlPlaneApi: {
+        baseUrl: "http://127.0.0.1:5100",
       },
     });
   });

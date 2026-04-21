@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { mintSigningGrant } from "@mistle/sandbox-signing-auth";
 import { describe, expect, it } from "vitest";
 
@@ -11,55 +12,19 @@ const BootstrapTokenConfig = {
   tokenAudience: "data-plane-gateway",
 } as const;
 
-describe("SandboxSigningRequestService", () => {
-  it("verifies the signing grant before returning the not-implemented backend error", async () => {
-    const service = new SandboxSigningRequestService(BootstrapTokenConfig);
-    const grant = await mintSigningGrant({
-      config: {
-        tokenSecret: BootstrapTokenConfig.bootstrapTokenSecret,
-        tokenIssuer: BootstrapTokenConfig.tokenIssuer,
-        tokenAudience: BootstrapTokenConfig.tokenAudience,
-      },
-      claims: {
-        sub: "sbi_123",
-        jti: randomUUID(),
-        organizationId: "org_123",
-        actingUserId: "usr_123",
-        providerFamily: "github",
-        format: "ssh",
-        keyRef: "key::ssh-ed25519 AAAA",
-      },
-      ttlSeconds: 60,
-    });
-
-    await expect(
-      service.handleBootstrapSigningRequest({
-        liveSandboxInstanceId: "sbi_123",
-        request: {
-          type: "signing.request",
-          requestId: "sign_req_123",
-          organizationId: "org_123",
-          sandboxInstanceId: "sbi_123",
-          actingUserId: "usr_123",
-          providerFamily: "github",
-          format: "ssh",
-          keyRef: "key::ssh-ed25519 AAAA",
-          grant,
-          payload: "c2lnbi1tZQ==",
-          encoding: "base64",
-        },
-      }),
-    ).resolves.toEqual({
-      type: "signing.result",
-      requestId: "sign_req_123",
-      ok: false,
-      code: "signing_backend_not_implemented",
-      message: "Git signing backend is not implemented yet.",
-    });
+function createService(): SandboxSigningRequestService {
+  return new SandboxSigningRequestService({
+    ...BootstrapTokenConfig,
+    controlPlaneClient: new ControlPlaneInternalClient({
+      baseUrl: "http://127.0.0.1:1",
+      internalAuthServiceToken: "integration-service-token",
+    }),
   });
+}
 
+describe("SandboxSigningRequestService", () => {
   it("rejects requests whose verified grant claims do not match the request payload", async () => {
-    const service = new SandboxSigningRequestService(BootstrapTokenConfig);
+    const service = createService();
     const grant = await mintSigningGrant({
       config: {
         tokenSecret: BootstrapTokenConfig.bootstrapTokenSecret,
@@ -105,7 +70,7 @@ describe("SandboxSigningRequestService", () => {
   });
 
   it("rejects requests whose signing grant cannot be verified", async () => {
-    const service = new SandboxSigningRequestService(BootstrapTokenConfig);
+    const service = createService();
 
     await expect(
       service.handleBootstrapSigningRequest({
@@ -134,7 +99,7 @@ describe("SandboxSigningRequestService", () => {
   });
 
   it("rejects requests whose live sandbox does not match the verified grant subject", async () => {
-    const service = new SandboxSigningRequestService(BootstrapTokenConfig);
+    const service = createService();
     const grant = await mintSigningGrant({
       config: {
         tokenSecret: BootstrapTokenConfig.bootstrapTokenSecret,

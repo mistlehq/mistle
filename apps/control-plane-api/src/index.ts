@@ -25,6 +25,11 @@ async function startControlPlaneApi(): Promise<void> {
     sandbox: {
       defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
       gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
+      bootstrap: {
+        tokenSecret: globalConfig.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: globalConfig.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: globalConfig.sandbox.bootstrap.tokenAudience,
+      },
       storageBackend: globalConfig.sandbox.storage?.backend,
     },
   });

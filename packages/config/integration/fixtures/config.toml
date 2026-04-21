@@ -87,6 +87,9 @@ namespace_id = "fixture"
 [apps.control_plane_api.data_plane_api]
 base_url = "http://127.0.0.1:5300"
 
+[apps.control_plane_api.commit_sign]
+binary_path = "/usr/local/bin/commit-sign"
+
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 2
 
@@ -151,6 +154,9 @@ key_prefix = "mistle:runtime-state:fixture"
 
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://127.0.0.1:5300"
+
+[apps.data_plane_gateway.control_plane_api]
+base_url = "http://127.0.0.1:5100"
 
 [apps.data_plane_gateway.lifecycle]
 idle_timeout_ms = 300000

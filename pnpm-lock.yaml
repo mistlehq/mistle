@@ -113,6 +113,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-signing-auth':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-signing-auth
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -480,6 +483,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/data-plane-internal-client':
         specifier: workspace:*
         version: link:../../packages/data-plane-internal-client

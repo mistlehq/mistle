@@ -110,6 +110,109 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/identity-linking/sign-commit-payload": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            actingUserId: string;
+            /** @enum {string} */
+            encoding: "base64";
+            /** @enum {string} */
+            format: "ssh";
+            grant: string;
+            keyRef: string;
+            organizationId: string;
+            payload: string;
+            providerFamily: string;
+            sandboxInstanceId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Sign a Git commit payload for a linked-principal credential. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              format: "ssh";
+              signature: string;
+              /** @enum {string} */
+              signatureEncoding: "pem";
+            };
+          };
+        };
+        /** @description Invalid linked-principal commit signing request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Linked-principal signing dependency was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/integration-connections/refresh-resource": {
     parameters: {
       query?: never;

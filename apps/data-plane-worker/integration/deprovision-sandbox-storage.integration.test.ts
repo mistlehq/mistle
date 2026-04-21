@@ -28,6 +28,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { getCommitSignBinaryPath } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { getSandboxInstanceStorageBySandboxInstanceId } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
@@ -203,6 +204,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
       sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
+      commitSignBinaryPath: getCommitSignBinaryPath(),
     });
   }, IntegrationTestTimeoutMs);
 

@@ -17,6 +17,7 @@ export function loadControlPlaneApiFromToml(
   const dashboard = asObjectRecord(controlPlaneApi.dashboard);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
   const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
+  const commitSign = asObjectRecord(controlPlaneApi.commit_sign);
   const integrations = asObjectRecord(controlPlaneApi.integrations);
 
   let partialConfig: Record<string, unknown> = {
@@ -61,6 +62,9 @@ export function loadControlPlaneApiFromToml(
     },
     dataPlaneApi: {
       baseUrl: dataPlaneApi.base_url,
+    },
+    commitSign: {
+      binaryPath: commitSign.binary_path,
     },
   };
 

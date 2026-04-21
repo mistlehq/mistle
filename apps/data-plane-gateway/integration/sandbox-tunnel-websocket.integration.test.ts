@@ -3,7 +3,23 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
+import {
+  integrationConnections,
+  IntegrationConnectionStatuses,
+  integrationTargets,
+  organizationIdentityLinkProviderConfigs,
+  OrganizationIdentityLinkProviderConfigStatus,
+  userExternalPrincipalCredentialSecrets,
+  UserExternalPrincipalCredentialSecretKinds,
+  type UserExternalPrincipalCredentialSecretKind,
+  userExternalPrincipalCredentials,
+  UserExternalPrincipalCredentialStatuses,
+  userExternalPrincipals,
+  UserExternalPrincipalStatuses,
+} from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
@@ -22,9 +38,17 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { mintSigningGrant } from "@mistle/sandbox-signing-auth";
 import { typeid } from "typeid-js";
-import { describe, expect } from "vitest";
+import { beforeAll, describe, expect } from "vitest";
 import WebSocket from "ws";
 
+import { createAuthenticatedSession } from "../../control-plane-api/integration/helpers/auth-session.js";
+import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import {
+  encryptCredentialUtf8,
+  resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
+} from "../../control-plane-api/src/lib/crypto.js";
+import { insertInitialOrganizationCredentialKey } from "../../data-plane-worker/integration/helpers/organization-credential-keys.js";
 import { waitForRuntimeState } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
@@ -38,6 +62,17 @@ import {
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 60_000;
+const TestPrivateKeyPath = fileURLToPath(
+  new URL("../../../packages/commit-sign/tests/fixtures/ed25519_private_key", import.meta.url),
+);
+const TestPrivateKey = readFileSync(TestPrivateKeyPath, "utf8");
+const TestPublicKey =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILM+rvN+ot98qgEN796jTiQfZfG1KaT0PtFDJ/XFSqti user@example.com";
+const GitHubAppInstallationConnectionMethodId = "github-app-installation";
+
+beforeAll(async () => {
+  await ensureCommitSignBinary();
+});
 
 function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   if (typeof data !== "string") {
@@ -125,7 +160,154 @@ async function waitForTunnelPeersAttached(input: {
       snapshot.presence.activeCount === 1,
   });
 }
+async function upsertGitHubTarget(fixture: DataPlaneGatewayIntegrationFixture): Promise<void> {
+  await fixture.controlPlaneDb
+    .insert(integrationTargets)
+    .values({
+      targetKey: "github-cloud",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      },
+    });
+}
 
+async function insertGitHubSigningContext(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  organizationId: string;
+  userId: string;
+  principalId: string;
+  providerConfigId: string;
+  connectionId: string;
+  credentialId: string;
+  publicKey: string;
+  privateKey: string;
+}): Promise<void> {
+  await insertInitialOrganizationCredentialKey({
+    db: input.fixture.controlPlaneDb,
+    organizationId: input.organizationId,
+    organizationCredentialKeyVersion: 1,
+    masterEncryptionKeyVersion: 1,
+    masterEncryptionKeys: {
+      "1": "integration-master-key-testing",
+    },
+  });
+  await upsertGitHubTarget(input.fixture);
+  await input.fixture.controlPlaneDb.insert(integrationConnections).values({
+    id: input.connectionId,
+    organizationId: input.organizationId,
+    targetKey: "github-cloud",
+    displayName: "GitHub Identity",
+    status: IntegrationConnectionStatuses.ACTIVE,
+    config: {
+      connection_method: GitHubAppInstallationConnectionMethodId,
+    },
+  });
+  await input.fixture.controlPlaneDb.insert(organizationIdentityLinkProviderConfigs).values({
+    id: input.providerConfigId,
+    organizationId: input.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    integrationTargetKey: "github-cloud",
+    integrationConnectionId: input.connectionId,
+    createdByUserId: input.userId,
+    updatedByUserId: input.userId,
+  });
+  await input.fixture.controlPlaneDb.insert(userExternalPrincipals).values({
+    id: input.principalId,
+    organizationId: input.organizationId,
+    userId: input.userId,
+    providerFamily: "github",
+    providerSubjectId: randomUUID(),
+    organizationProviderConfigId: input.providerConfigId,
+    integrationConnectionId: input.connectionId,
+    status: UserExternalPrincipalStatuses.ACTIVE,
+    profile: {
+      login: "mistle-user",
+      preferredEmail: "mistle-user@example.com",
+    },
+  });
+  await input.fixture.controlPlaneDb.insert(userExternalPrincipalCredentials).values({
+    id: input.credentialId,
+    organizationId: input.organizationId,
+    principalId: input.principalId,
+    providerFamily: "github",
+    credentialKind: "git_ssh_signing_key",
+    status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+  });
+  await insertPrincipalCredentialSecret({
+    fixture: input.fixture,
+    organizationId: input.organizationId,
+    credentialId: input.credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
+    plaintext: input.privateKey,
+    metadata: {
+      publicKey: input.publicKey,
+    },
+  });
+}
+
+async function insertPrincipalCredentialSecret(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  organizationId: string;
+  credentialId: string;
+  secretKind: UserExternalPrincipalCredentialSecretKind;
+  plaintext: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.fixture.controlPlaneDb.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+    });
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: {
+      "1": "integration-master-key-testing",
+    },
+  });
+  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    const encryptedSecret = encryptCredentialUtf8({
+      plaintext: input.plaintext,
+      organizationCredentialKey: organizationCredentialKeyMaterial,
+    });
+
+    await input.fixture.controlPlaneDb.insert(userExternalPrincipalCredentialSecrets).values({
+      organizationId: input.organizationId,
+      credentialId: input.credentialId,
+      secretKind: input.secretKind,
+      ciphertext: encryptedSecret.ciphertext,
+      nonce: encryptedSecret.nonce,
+      organizationCredentialKeyVersion: organizationCredentialKey.version,
+      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+    });
+  } finally {
+    organizationCredentialKeyMaterial.fill(0);
+  }
+}
 async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
   if (socket === undefined) {
     return;
@@ -139,12 +321,29 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
 
 describe("sandbox tunnel websocket integration", () => {
   it(
-    "returns an explicit not-yet-implemented signing result for valid bootstrap signing requests",
+    "returns a signed result for valid bootstrap signing requests",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      const authenticatedSession = await createAuthenticatedSession({
+        request: (path, init) => fetch(`${fixture.controlPlaneBaseUrl}${path}`, init),
+        db: fixture.controlPlaneDb,
+        otpLength: 6,
+        email: "data-plane-gateway-signing-success@example.com",
+      });
       await insertSandboxInstanceRow({
         fixture,
         sandboxInstanceId,
+      });
+      await insertGitHubSigningContext({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        userId: authenticatedSession.userId,
+        principalId: "uep_gateway_signing_success",
+        providerConfigId: "ilp_gateway_signing_success",
+        connectionId: "icn_gateway_signing_success",
+        credentialId: "upc_gateway_signing_success",
+        publicKey: TestPublicKey,
+        privateKey: TestPrivateKey,
       });
       const bootstrapToken = await mintBootstrapToken({
         config: {
@@ -165,11 +364,11 @@ describe("sandbox tunnel websocket integration", () => {
         claims: {
           sub: sandboxInstanceId,
           jti: randomUUID(),
-          organizationId: "org_data_plane_gateway_integration",
-          actingUserId: "usr_data_plane_gateway_integration",
+          organizationId: authenticatedSession.organizationId,
+          actingUserId: authenticatedSession.userId,
           providerFamily: "github",
           format: "ssh",
-          keyRef: "key::ssh-ed25519 AAAA",
+          keyRef: `key::${TestPublicKey}`,
         },
         ttlSeconds: 120,
       });
@@ -187,12 +386,12 @@ describe("sandbox tunnel websocket integration", () => {
           JSON.stringify({
             type: "signing.request",
             requestId: "sign_req_123",
-            organizationId: "org_data_plane_gateway_integration",
+            organizationId: authenticatedSession.organizationId,
             sandboxInstanceId,
-            actingUserId: "usr_data_plane_gateway_integration",
+            actingUserId: authenticatedSession.userId,
             providerFamily: "github",
             format: "ssh",
-            keyRef: "key::ssh-ed25519 AAAA",
+            keyRef: `key::${TestPublicKey}`,
             grant: signingGrant,
             payload: "c2lnbi1tZQ==",
             encoding: "base64",
@@ -201,13 +400,21 @@ describe("sandbox tunnel websocket integration", () => {
         const signingResult = await signingResultPromise;
 
         expect(signingResult.isBinary).toBe(false);
-        expect(parseSigningMessage(signingResult.data)).toEqual({
+        const parsedSigningResult = parseSigningMessage(signingResult.data);
+        expect(parsedSigningResult).toEqual({
           type: "signing.result",
           requestId: "sign_req_123",
-          ok: false,
-          code: "signing_backend_not_implemented",
-          message: "Git signing backend is not implemented yet.",
+          ok: true,
+          signature: expect.any(String),
+          encoding: "base64",
         });
+        if (parsedSigningResult.type !== "signing.result" || !parsedSigningResult.ok) {
+          throw new Error("Expected signing result to succeed.");
+        }
+        const signature = Buffer.from(parsedSigningResult.signature, "base64").toString("utf8");
+        expect(signature).toMatch(
+          /^-----BEGIN SSH SIGNATURE-----\n[\s\S]+-----END SSH SIGNATURE-----\n$/,
+        );
       } finally {
         await closeWebSocketIfOpen(bootstrapSocket);
       }

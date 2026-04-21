@@ -8,6 +8,12 @@ const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/config/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/control-plane-internal-client$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/control-plane-internal-client/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/data-plane-gateway$/,
     replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
   },
@@ -15,6 +21,12 @@ const WorkspaceAliases = [
     find: /^@mistle\/data-plane-internal-client$/,
     replacement: fileURLToPath(
       new URL("../../packages/data-plane-internal-client/src/index.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/db\/control-plane$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/db/src/control-plane/index.ts", import.meta.url),
     ),
   },
   {
@@ -60,6 +72,12 @@ const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/sandbox/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/sandbox-runtime-contract$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/sandbox-runtime-contract/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/sandbox-session-protocol$/,
     replacement: fileURLToPath(
       new URL("../../packages/sandbox-session-protocol/src/index.ts", import.meta.url),
@@ -74,6 +92,12 @@ const WorkspaceAliases = [
   {
     find: /^@mistle\/telemetry$/,
     replacement: fileURLToPath(new URL("../../packages/telemetry/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/test-harness$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/test-harness/src/index.ts", import.meta.url),
+    ),
   },
   {
     find: /^@mistle\/time$/,

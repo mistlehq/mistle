@@ -14,6 +14,7 @@ export function loadDataPlaneGatewayFromToml(
   const runtimeState = asObjectRecord(dataPlaneGateway.runtime_state);
   const runtimeStateValkey = asObjectRecord(runtimeState.valkey);
   const dataPlaneApi = asObjectRecord(dataPlaneGateway.data_plane_api);
+  const controlPlaneApi = asObjectRecord(dataPlaneGateway.control_plane_api);
   const lifecycle = asObjectRecord(dataPlaneGateway.lifecycle);
 
   return PartialDataPlaneGatewayConfigSchema.parse({
@@ -37,6 +38,9 @@ export function loadDataPlaneGatewayFromToml(
     },
     dataPlaneApi: {
       baseUrl: dataPlaneApi.base_url,
+    },
+    controlPlaneApi: {
+      baseUrl: controlPlaneApi.base_url,
     },
     ...(Object.keys(lifecycle).length > 0
       ? {

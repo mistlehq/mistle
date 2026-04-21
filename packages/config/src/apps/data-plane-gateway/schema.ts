@@ -80,12 +80,19 @@ export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
 export const DataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema,
     database: DataPlaneGatewayDatabaseConfigSchema,
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
+    controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     lifecycle: DataPlaneGatewayLifecycleConfigSchema.optional(),
   })
   .strict();
@@ -96,6 +103,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     database: DataPlaneGatewayDatabaseConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
+    controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema.partial().optional(),
     lifecycle: PartialDataPlaneGatewayLifecycleConfigSchema.optional(),
   })
   .strict();

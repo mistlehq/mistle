@@ -32,6 +32,7 @@
     "@mistle/object-store": "workspace:*",
     "@mistle/port-access-auth": "workspace:*",
     "@mistle/sandbox": "workspace:*",
+    "@mistle/sandbox-signing-auth": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/webhooks": "workspace:*",

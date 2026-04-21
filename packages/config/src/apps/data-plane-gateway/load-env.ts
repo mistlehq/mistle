@@ -1,5 +1,6 @@
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
+  DataPlaneGatewayControlPlaneApiConfigSchema,
   DataPlaneGatewayDatabaseConfigSchema,
   DataPlaneGatewayDataPlaneApiConfigSchema,
   PartialDataPlaneGatewayLifecycleConfigSchema,
@@ -58,6 +59,13 @@ const loadDataPlaneApiEnv = createEnvLoader<typeof DataPlaneGatewayDataPlaneApiC
   },
 ]);
 
+const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneGatewayControlPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL",
+  },
+]);
+
 const loadLifecycleEnv = createEnvLoader<typeof PartialDataPlaneGatewayLifecycleConfigSchema>([
   {
     key: "idleTimeoutMs",
@@ -102,6 +110,11 @@ export function loadDataPlaneGatewayFromEnv(
   const dataPlaneApi = loadDataPlaneApiEnv(env);
   if (hasEntries(dataPlaneApi)) {
     partialConfig.dataPlaneApi = dataPlaneApi;
+  }
+
+  const controlPlaneApi = loadControlPlaneApiEnv(env);
+  if (hasEntries(controlPlaneApi)) {
+    partialConfig.controlPlaneApi = controlPlaneApi;
   }
 
   const lifecycle = loadLifecycleEnv(env);

@@ -8,6 +8,12 @@ const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/config/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/control-plane-internal-client$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/control-plane-internal-client/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/data-plane-gateway$/,
     replacement: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
   },

@@ -6,6 +6,7 @@ import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../constants.js";
 import { INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH } from "./constants.js";
 import * as resolvePrincipalCredential from "./resolve-principal-credential/index.js";
 import { InternalIdentityLinkingErrorCodes } from "./services/errors.js";
+import * as signCommitPayload from "./sign-commit-payload/index.js";
 
 export function createInternalIdentityLinkingRoutes(): AppRoutes<
   typeof INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH
@@ -21,6 +22,7 @@ export function createInternalIdentityLinkingRoutes(): AppRoutes<
   );
 
   routes.openapi(resolvePrincipalCredential.route, resolvePrincipalCredential.handler);
+  routes.openapi(signCommitPayload.route, signCommitPayload.handler);
 
   return {
     basePath: INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH,

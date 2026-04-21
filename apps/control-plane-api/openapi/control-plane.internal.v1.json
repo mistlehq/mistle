@@ -670,6 +670,176 @@
         }
       }
     },
+    "/internal/identity-linking/sign-commit-payload": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxInstanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "actingUserId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "providerFamily": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": ["ssh"]
+                  },
+                  "keyRef": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "grant": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "payload": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "enum": ["base64"]
+                  }
+                },
+                "required": [
+                  "organizationId",
+                  "sandboxInstanceId",
+                  "actingUserId",
+                  "providerFamily",
+                  "format",
+                  "keyRef",
+                  "grant",
+                  "payload",
+                  "encoding"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sign a Git commit payload for a linked-principal credential.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": ["ssh"]
+                    },
+                    "signature": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "signatureEncoding": {
+                      "type": "string",
+                      "enum": ["pem"]
+                    }
+                  },
+                  "required": ["format", "signature", "signatureEncoding"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid linked-principal commit signing request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Linked-principal signing dependency was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox-storage/resolve-persistence-mode": {
       "post": {
         "tags": ["Internal"],

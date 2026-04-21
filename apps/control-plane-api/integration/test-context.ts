@@ -15,6 +15,7 @@ import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
+import { getCommitSignBinaryPath } from "./helpers/commit-sign.js";
 
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_runtime";
 const TestContextId = "control-plane-api.integration";
@@ -215,6 +216,9 @@ export const it = vitestIt.extend<{
           dataPlaneApi: {
             baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
           },
+          commitSign: {
+            binaryPath: getCommitSignBinaryPath(),
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -254,6 +258,11 @@ export const it = vitestIt.extend<{
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrap: {
+              tokenSecret: "integration-bootstrap-token-secret",
+              tokenIssuer: "integration-data-plane-worker",
+              tokenAudience: "integration-data-plane-gateway",
+            },
           },
         });
         cleanupTasks.unshift(async () => {

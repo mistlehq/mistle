@@ -1,3 +1,7 @@
+import {
+  ControlPlaneInternalClient,
+  ControlPlaneInternalClientRequestError,
+} from "@mistle/control-plane-internal-client";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { SigningRequest, SigningResult } from "@mistle/sandbox-session-protocol";
 import { SigningGrantError, verifySigningGrant } from "@mistle/sandbox-signing-auth";
@@ -6,7 +10,7 @@ const SandboxSigningResultCode = {
   INVALID_GRANT: "invalid_grant",
   SANDBOX_INSTANCE_MISMATCH: "sandbox_instance_mismatch",
   REQUEST_CLAIMS_MISMATCH: "signing_request_claim_mismatch",
-  BACKEND_NOT_IMPLEMENTED: "signing_backend_not_implemented",
+  BACKEND_FAILED: "signing_backend_failed",
 } as const;
 
 function createFailureResult(input: {
@@ -24,7 +28,11 @@ function createFailureResult(input: {
 }
 
 export class SandboxSigningRequestService {
-  public constructor(private readonly config: BootstrapTokenConfig) {}
+  public constructor(
+    private readonly config: BootstrapTokenConfig & {
+      controlPlaneClient: ControlPlaneInternalClient;
+    },
+  ) {}
 
   public async handleBootstrapSigningRequest(input: {
     liveSandboxInstanceId: string;
@@ -91,10 +99,43 @@ export class SandboxSigningRequestService {
       });
     }
 
-    return createFailureResult({
-      requestId: input.request.requestId,
-      code: SandboxSigningResultCode.BACKEND_NOT_IMPLEMENTED,
-      message: "Git signing backend is not implemented yet.",
-    });
+    try {
+      const signedPayload = await this.config.controlPlaneClient.signIdentityLinkCommitPayload({
+        organizationId: input.request.organizationId,
+        sandboxInstanceId: input.request.sandboxInstanceId,
+        actingUserId: input.request.actingUserId,
+        providerFamily: input.request.providerFamily,
+        format: input.request.format,
+        keyRef: input.request.keyRef,
+        grant: input.request.grant,
+        payload: input.request.payload,
+        encoding: input.request.encoding,
+      });
+
+      return {
+        type: "signing.result",
+        requestId: input.request.requestId,
+        ok: true,
+        signature: Buffer.from(signedPayload.signature, "utf8").toString("base64"),
+        encoding: "base64",
+      };
+    } catch (error) {
+      if (error instanceof ControlPlaneInternalClientRequestError) {
+        return createFailureResult({
+          requestId: input.request.requestId,
+          code: error.code?.toLowerCase() ?? SandboxSigningResultCode.BACKEND_FAILED,
+          message: error.message,
+        });
+      }
+
+      return createFailureResult({
+        requestId: input.request.requestId,
+        code: SandboxSigningResultCode.BACKEND_FAILED,
+        message:
+          error instanceof Error
+            ? `Git signing backend failed: ${error.message}`
+            : "Git signing backend failed.",
+      });
+    }
   }
 }

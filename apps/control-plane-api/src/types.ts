@@ -33,6 +33,11 @@ export type ControlPlaneApiPortAccessConfig = {
 export type ControlPlaneApiSandboxRuntimeConfig = {
   defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
   gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
+  bootstrap?: {
+    tokenSecret: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenSecret"];
+    tokenIssuer: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenIssuer"];
+    tokenAudience: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenAudience"];
+  };
   storageBackend?: NonNullable<ControlPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"];
 };
 export type ControlPlaneApiRuntimeConfig = {

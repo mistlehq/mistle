@@ -94,6 +94,9 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          commitSign: {
+            binaryPath: "/usr/local/bin/commit-sign",
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -194,6 +197,9 @@ describe("parseConfigRecord", () => {
           },
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5000",
           },
         },
         tokenizer_proxy: {
@@ -303,6 +309,9 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          commitSign: {
+            binaryPath: "/usr/local/bin/commit-sign",
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -403,6 +412,9 @@ describe("parseConfigRecord", () => {
           },
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5000",
           },
         },
         tokenizer_proxy: {
@@ -512,6 +524,9 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          commitSign: {
+            binaryPath: "/usr/local/bin/commit-sign",
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -608,6 +623,9 @@ describe("parseConfigRecord", () => {
           },
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5000",
           },
         },
         tokenizer_proxy: {

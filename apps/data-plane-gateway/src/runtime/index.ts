@@ -1,4 +1,5 @@
 import { createNodeWebSocket } from "@hono/node-ws";
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
@@ -146,6 +147,10 @@ export function createDataPlaneGatewayRuntime(
     bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
     tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
     tokenAudience: config.sandbox.bootstrap.tokenAudience,
+    controlPlaneClient: new ControlPlaneInternalClient({
+      baseUrl: config.app.controlPlaneApi.baseUrl,
+      internalAuthServiceToken: config.internalAuth.serviceToken,
+    }),
   });
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
