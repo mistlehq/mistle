@@ -5,6 +5,7 @@ import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflow-regi
 import type { AppContextBindings } from "../../types.js";
 import { createImmediateWebhookResponse } from "../create-immediate-webhook-response.js";
 import { receiveIntegrationWebhook } from "../services/receive-webhook.js";
+import { logIntegrationWebhookEvent, withIntegrationWebhookSpan } from "../telemetry.js";
 import { route } from "./route.js";
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
@@ -16,45 +17,117 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const rawBody = new Uint8Array(await ctx.req.arrayBuffer());
   const headers = Object.fromEntries(ctx.req.raw.headers.entries());
 
-  const receivedWebhook = await receiveIntegrationWebhook(
+  return await withIntegrationWebhookSpan(
     {
-      db,
-      integrationRegistry,
-      integrationsConfig,
-    },
-    {
-      targetKey,
-      endpointKey,
-      headers,
-      rawBody,
-    },
-  );
-
-  if (receivedWebhook.kind === "response") {
-    return createImmediateWebhookResponse(receivedWebhook.response);
-  }
-
-  if (!receivedWebhook.duplicate) {
-    const { webhookEventId } = receivedWebhook;
-
-    if (webhookEventId === undefined) {
-      throw new Error("Expected webhook event id for a non-duplicate webhook.");
-    }
-
-    await openWorkflow.runWorkflow(
-      HandleIntegrationWebhookEventWorkflowSpec,
-      { webhookEventId },
-      {
-        idempotencyKey: webhookEventId,
+      name: "integration_webhook.receive",
+      telemetryContext: {
+        endpointKey,
+        targetKey,
       },
-    );
-  }
-
-  return ctx.json(
-    {
-      status: receivedWebhook.duplicate ? "duplicate" : "received",
     },
-    202,
+    async (span) => {
+      logIntegrationWebhookEvent({
+        eventName: "webhook.received",
+        message: "Received inbound integration webhook request",
+        telemetryContext: {
+          endpointKey,
+          targetKey,
+        },
+      });
+
+      const receivedWebhook = await receiveIntegrationWebhook(
+        {
+          db,
+          integrationRegistry,
+          integrationsConfig,
+        },
+        {
+          targetKey,
+          endpointKey,
+          headers,
+          rawBody,
+        },
+      );
+
+      if (receivedWebhook.kind === "response") {
+        logIntegrationWebhookEvent({
+          eventName: "webhook.immediate_response",
+          message: "Returning immediate integration webhook response",
+          telemetryContext: {
+            endpointKey,
+            targetKey,
+          },
+        });
+
+        return createImmediateWebhookResponse(receivedWebhook.response);
+      }
+
+      const telemetryContext = {
+        webhookEventId: receivedWebhook.webhookEventId,
+        externalDeliveryId: receivedWebhook.externalDeliveryId ?? undefined,
+        integrationConnectionId: receivedWebhook.integrationConnectionId,
+        targetKey: receivedWebhook.targetKey,
+      };
+
+      span.setAttributes({
+        "mistle.integration.connection_id": receivedWebhook.integrationConnectionId,
+        ...(receivedWebhook.webhookEventId === undefined
+          ? {}
+          : { "mistle.webhook.event_id": receivedWebhook.webhookEventId }),
+        ...(receivedWebhook.externalDeliveryId === null
+          ? {}
+          : { "mistle.webhook.external_delivery_id": receivedWebhook.externalDeliveryId }),
+      });
+
+      logIntegrationWebhookEvent({
+        eventName: receivedWebhook.duplicate ? "webhook.duplicate" : "webhook.accepted",
+        message: receivedWebhook.duplicate
+          ? "Skipped duplicate inbound integration webhook event"
+          : "Accepted inbound integration webhook event",
+        telemetryContext,
+      });
+
+      if (!receivedWebhook.duplicate) {
+        const { webhookEventId } = receivedWebhook;
+
+        if (webhookEventId === undefined) {
+          throw new Error("Expected webhook event id for a non-duplicate webhook.");
+        }
+
+        await withIntegrationWebhookSpan(
+          {
+            name: "integration_webhook.schedule_workflow",
+            telemetryContext,
+          },
+          async () => {
+            await openWorkflow.runWorkflow(
+              HandleIntegrationWebhookEventWorkflowSpec,
+              { webhookEventId },
+              {
+                idempotencyKey: webhookEventId,
+              },
+            );
+          },
+        );
+
+        span.addEvent("integration_webhook.workflow_scheduled", {
+          "mistle.webhook.event_id": webhookEventId,
+        });
+
+        logIntegrationWebhookEvent({
+          eventName: "webhook.workflow_scheduled",
+          message: "Scheduled integration webhook workflow",
+          telemetryContext,
+        });
+      }
+
+      return ctx.json(
+        {
+          status: receivedWebhook.duplicate ? "duplicate" : "received",
+        },
+        202,
+      );
+    },
   );
 };
 

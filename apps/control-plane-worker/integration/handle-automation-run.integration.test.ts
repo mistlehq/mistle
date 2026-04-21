@@ -187,7 +187,7 @@ describe("handleAutomationRun integration", () => {
         },
         workflowInput,
       );
-      await handoffAutomationRunDelivery(
+      const deliveryHandoff = await handoffAutomationRunDelivery(
         {
           db: input.db,
         },
@@ -195,7 +195,10 @@ describe("handleAutomationRun integration", () => {
           preparedAutomationRun,
         },
       );
-      return preparedAutomationRun;
+      return {
+        ...preparedAutomationRun,
+        deliveryTaskId: deliveryHandoff.deliveryTaskId,
+      };
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
       await markAutomationRunFailed(
@@ -1217,6 +1220,7 @@ describe("handleAutomationRun integration", () => {
           status: AutomationConversationDeliveryTaskStatuses.QUEUED,
           failureCode: null,
         });
+        expect(persistedTask?.id).toBe(preparedAutomationRun?.deliveryTaskId);
         expect(persistedProcessor).toMatchObject({
           conversationId: persistedRun.conversationId,
           status: AutomationConversationDeliveryProcessorStatuses.RUNNING,

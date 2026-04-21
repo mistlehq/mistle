@@ -18,10 +18,11 @@ import {
   userExternalPrincipals,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
+import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
-import { describe, expect } from "vitest";
+import { beforeEach, describe, expect } from "vitest";
 
 import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
@@ -42,6 +43,11 @@ const InstallationId = "123456";
 const ControlPlaneWorkflowNamespaceId = "integration";
 const HandleIntegrationWebhookEventWorkflowName = "control-plane.integration-webhooks.handle-event";
 const SlackThreadRootTimestampField = "mistle_thread_root_ts";
+const tracing = installInMemoryTracing();
+
+function findSpan(input: { name: string }) {
+  return tracing.getFinishedSpans().find((span) => span.name === input.name);
+}
 
 function createGitHubWebhookPayload(): Record<string, unknown> {
   return {
@@ -516,6 +522,10 @@ async function listWebhookWorkflowRuns(input: {
 }
 
 describe("integration webhooks ingest integration", () => {
+  beforeEach(() => {
+    tracing.reset();
+  });
+
   it("accepts a valid GitHub webhook and stores the event", async ({ fixture }) => {
     const targetKey = "github-cloud-webhook-ingest-success";
     const webhookSecret = "whsec_test_valid";
@@ -600,6 +610,30 @@ describe("integration webhooks ingest integration", () => {
     }
     expect(workflowRun.workflowName).toBe(HandleIntegrationWebhookEventWorkflowName);
     expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
+
+    await tracing.forceFlush();
+
+    const receiveSpan = findSpan({ name: "integration_webhook.receive" });
+    const persistSpan = findSpan({ name: "integration_webhook.persist" });
+    const scheduleSpan = findSpan({ name: "integration_webhook.schedule_workflow" });
+
+    expect(receiveSpan).toBeDefined();
+    expect(receiveSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+    expect(receiveSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
+    expect(receiveSpan?.attributes["mistle.webhook.event_id"]).toBe(persistedEvent.id);
+    expect(
+      receiveSpan?.events.some((event) => event.name === "integration_webhook.workflow_scheduled"),
+    ).toBe(true);
+
+    expect(persistSpan).toBeDefined();
+    expect(persistSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+    expect(persistSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
+    expect(persistSpan?.attributes["mistle.webhook.event_id"]).toBe(persistedEvent.id);
+
+    expect(scheduleSpan).toBeDefined();
+    expect(scheduleSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+    expect(scheduleSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
+    expect(scheduleSpan?.attributes["mistle.webhook.event_id"]).toBe(persistedEvent.id);
   });
 
   it("returns 400 when webhook signature verification fails", async ({ fixture }) => {

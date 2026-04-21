@@ -35,7 +35,8 @@
     "@opentelemetry/instrumentation-pg": "^0.66.0",
     "@opentelemetry/sdk-logs": "^0.215.0",
     "@opentelemetry/sdk-metrics": "^2.7.0",
-    "@opentelemetry/sdk-node": "^0.215.0"
+    "@opentelemetry/sdk-node": "^0.215.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0"
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "^2.6.1"

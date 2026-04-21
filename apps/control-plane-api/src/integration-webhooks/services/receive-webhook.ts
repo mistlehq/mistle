@@ -36,6 +36,7 @@ import {
   IntegrationWebhooksBadRequestCodes,
   IntegrationWebhooksNotFoundCodes,
 } from "../constants.js";
+import { logIntegrationWebhookEvent, withIntegrationWebhookSpan } from "../telemetry.js";
 import { resolveWebhookActingUser } from "./resolve-webhook-acting-user.js";
 
 export type ReceiveIntegrationWebhookInput = {
@@ -49,6 +50,9 @@ export type ReceivedIntegrationWebhook =
   | {
       kind: "accepted";
       duplicate: boolean;
+      externalDeliveryId: string | null;
+      integrationConnectionId: string;
+      targetKey: string;
       webhookEventId?: string;
     }
   | {
@@ -353,60 +357,71 @@ export async function receiveIntegrationWebhook(
       }),
   );
 
-  let resolvedWebhookRequest:
-    | Awaited<ReturnType<typeof verifyAndResolveWebhookRequestOrThrow>>
-    | undefined;
+  const resolvedWebhookRequest = await withIntegrationWebhookSpan(
+    {
+      name: "integration_webhook.verify_and_resolve",
+      telemetryContext: {
+        endpointKey: input.endpointKey,
+        targetKey: input.targetKey,
+      },
+    },
+    async (span) => {
+      try {
+        const verifiedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
+          definition,
+          targetKey: input.targetKey,
+          target: resolvedTarget,
+          connections: webhookConnections,
+          resolveConnectionSecrets: async ({ connectionId }) => {
+            const activeConnection = activeConnectionsById.get(connectionId);
+            if (activeConnection === undefined) {
+              assertConnectionCandidateExistsOrThrow({
+                connectionId,
+                connectionsById: activeConnectionsById,
+              });
+              throw new Error(`Expected active webhook connection '${connectionId}' to exist.`);
+            }
 
-  try {
-    resolvedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
-      definition,
-      targetKey: input.targetKey,
-      target: resolvedTarget,
-      connections: webhookConnections,
-      resolveConnectionSecrets: async ({ connectionId }) => {
-        const activeConnection = activeConnectionsById.get(connectionId);
-        if (activeConnection === undefined) {
-          assertConnectionCandidateExistsOrThrow({
-            connectionId,
-            connectionsById: activeConnectionsById,
-          });
-          throw new Error(`Expected active webhook connection '${connectionId}' to exist.`);
+            return resolveConnectionOwnedWebhookSecrets({
+              db,
+              integrationRegistry,
+              integrationsConfig,
+              organizationId: activeConnection.organizationId,
+              connectionId,
+            });
+          },
+          webhookSourceSecrets,
+          webhookRequest,
+          headers: normalizedHeaders,
+          rawBody: input.rawBody,
+        });
+
+        span.addEvent("integration_webhook.verification_succeeded");
+
+        return verifiedWebhookRequest;
+      } catch (error) {
+        span.addEvent("integration_webhook.verification_failed", {
+          "mistle.error.message": error instanceof Error ? error.message : String(error),
+        });
+
+        if (error instanceof IntegrationWebhookError) {
+          if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
+            throw new NotFoundError(
+              IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
+              error.message,
+            );
+          }
+
+          throw new BadRequestError(
+            IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
+            error.message,
+          );
         }
 
-        return resolveConnectionOwnedWebhookSecrets({
-          db,
-          integrationRegistry,
-          integrationsConfig,
-          organizationId: activeConnection.organizationId,
-          connectionId,
-        });
-      },
-      webhookSourceSecrets,
-      webhookRequest,
-      headers: normalizedHeaders,
-      rawBody: input.rawBody,
-    });
-  } catch (error) {
-    if (error instanceof IntegrationWebhookError) {
-      if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
-        throw new NotFoundError(
-          IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
-          error.message,
-        );
+        throw error;
       }
-
-      throw new BadRequestError(
-        IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
-        error.message,
-      );
-    }
-
-    throw error;
-  }
-
-  if (resolvedWebhookRequest === undefined) {
-    throw new Error("Expected webhook request to be resolved.");
-  }
+    },
+  );
 
   if (resolvedWebhookRequest.kind === "response") {
     return resolvedWebhookRequest;
@@ -433,41 +448,103 @@ export async function receiveIntegrationWebhook(
     },
   );
 
-  const insertedRows = await db
-    .insert(integrationWebhookEvents)
-    .values({
-      organizationId: resolvedConnection.organizationId,
-      integrationConnectionId: resolvedConnection.id,
-      integrationWebhookSourceId: webhookSource.id,
-      targetKey: input.targetKey,
-      externalEventId: resolvedWebhookRequest.event.externalEventId,
-      externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,
-      eventType: resolvedWebhookRequest.event.eventType,
-      providerEventType: resolvedWebhookRequest.event.providerEventType,
-      payload: resolvedWebhookRequest.event.payload,
-      sourceOccurredAt: resolvedWebhookRequest.event.occurredAt,
-      sourceOrderKey: resolvedWebhookRequest.event.sourceOrderKey,
-      status: IntegrationWebhookEventStatuses.RECEIVED,
-      ...(resolvedActingUser === null
-        ? {}
-        : {
-            resolvedUserId: resolvedActingUser.userId,
-            resolvedPrincipalId: resolvedActingUser.principalId,
-          }),
-    })
-    .onConflictDoNothing({
-      target: [
-        integrationWebhookEvents.integrationWebhookSourceId,
-        integrationWebhookEvents.externalEventId,
-      ],
-    })
-    .returning({
-      id: integrationWebhookEvents.id,
-    });
+  const insertedRows = await withIntegrationWebhookSpan(
+    {
+      name: "integration_webhook.persist",
+      telemetryContext: {
+        endpointKey: input.endpointKey,
+        externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId ?? undefined,
+        integrationConnectionId: resolvedConnection.id,
+        targetKey: input.targetKey,
+      },
+    },
+    async (span) => {
+      span.setAttribute("mistle.webhook.event_type", resolvedWebhookRequest.event.eventType);
+
+      const persistedRows = await db
+        .insert(integrationWebhookEvents)
+        .values({
+          organizationId: resolvedConnection.organizationId,
+          integrationConnectionId: resolvedConnection.id,
+          integrationWebhookSourceId: webhookSource.id,
+          targetKey: input.targetKey,
+          externalEventId: resolvedWebhookRequest.event.externalEventId,
+          externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,
+          eventType: resolvedWebhookRequest.event.eventType,
+          providerEventType: resolvedWebhookRequest.event.providerEventType,
+          payload: resolvedWebhookRequest.event.payload,
+          sourceOccurredAt: resolvedWebhookRequest.event.occurredAt,
+          sourceOrderKey: resolvedWebhookRequest.event.sourceOrderKey,
+          status: IntegrationWebhookEventStatuses.RECEIVED,
+          ...(resolvedActingUser === null
+            ? {}
+            : {
+                resolvedUserId: resolvedActingUser.userId,
+                resolvedPrincipalId: resolvedActingUser.principalId,
+              }),
+        })
+        .onConflictDoNothing({
+          target: [
+            integrationWebhookEvents.integrationWebhookSourceId,
+            integrationWebhookEvents.externalEventId,
+          ],
+        })
+        .returning({
+          id: integrationWebhookEvents.id,
+        });
+
+      const insertedWebhookEvent = persistedRows[0];
+      const persistedWebhookEventId =
+        insertedWebhookEvent?.id ??
+        (
+          await db.query.integrationWebhookEvents.findFirst({
+            columns: {
+              id: true,
+            },
+            where: (table, { and: whereAnd, eq: whereEq }) =>
+              whereAnd(
+                whereEq(table.integrationWebhookSourceId, webhookSource.id),
+                whereEq(table.externalEventId, resolvedWebhookRequest.event.externalEventId),
+              ),
+          })
+        )?.id;
+
+      if (persistedWebhookEventId !== undefined) {
+        span.setAttribute("mistle.webhook.event_id", persistedWebhookEventId);
+      }
+
+      if (insertedWebhookEvent !== undefined) {
+        span.addEvent("integration_webhook.persisted", {
+          "mistle.webhook.event_id": persistedWebhookEventId ?? insertedWebhookEvent.id,
+        });
+
+        logIntegrationWebhookEvent({
+          eventName: "webhook.persisted",
+          message: "Persisted inbound integration webhook event",
+          telemetryContext: {
+            webhookEventId: persistedWebhookEventId ?? insertedWebhookEvent.id,
+            externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId ?? undefined,
+            integrationConnectionId: resolvedConnection.id,
+            targetKey: input.targetKey,
+          },
+        });
+      }
+
+      return {
+        insertedWebhookEventId: insertedWebhookEvent?.id,
+        persistedWebhookEventId,
+      };
+    },
+  );
 
   return {
     kind: "accepted",
-    duplicate: insertedRows.length === 0,
-    ...(insertedRows[0] === undefined ? {} : { webhookEventId: insertedRows[0].id }),
+    duplicate: insertedRows.insertedWebhookEventId === undefined,
+    externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId ?? null,
+    integrationConnectionId: resolvedConnection.id,
+    targetKey: input.targetKey,
+    ...(insertedRows.persistedWebhookEventId === undefined
+      ? {}
+      : { webhookEventId: insertedRows.persistedWebhookEventId }),
   };
 }

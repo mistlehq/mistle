@@ -2,12 +2,17 @@ import {
   HandleAutomationConversationDeliveryWorkflowSpec,
   HandleAutomationRunWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
+import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { prepareAutomationRun, resolveAutomationRunFailure } from "../shared/automation-run.js";
 import { markAutomationRunFailed } from "../shared/automation-run.js";
 import { setAutomationConversationDeliveryProcessorIdle } from "../shared/set-conversation-delivery-processor-idle.js";
+import {
+  createWebhookDeliveryTelemetryAttributes,
+  logWebhookDeliveryEvent,
+} from "../shared/webhook-delivery-telemetry.js";
 import { handoffAutomationRunDelivery } from "./handoff-automation-run-delivery.js";
 import { transitionAutomationRunToRunning } from "./transition-automation-run-to-running.js";
 
@@ -43,6 +48,18 @@ export const HandleAutomationRunWorkflow = defineTracedControlPlaneWorkflow(
       );
 
       await step.run({ name: "handoff-automation-run-delivery" }, async () => {
+        const stepSpan = trace.getActiveSpan();
+
+        stepSpan?.setAttributes(
+          createWebhookDeliveryTelemetryAttributes({
+            webhookEventId: preparedAutomationRun.webhookEventId,
+            externalDeliveryId: preparedAutomationRun.webhookExternalDeliveryId ?? undefined,
+            automationRunId: preparedAutomationRun.automationRunId,
+            integrationConnectionId: preparedAutomationRun.integrationConnectionId,
+            targetKey: preparedAutomationRun.targetKey,
+          }),
+        );
+
         const deliveryHandoff = await handoffAutomationRunDelivery(
           {
             db,
@@ -51,6 +68,50 @@ export const HandleAutomationRunWorkflow = defineTracedControlPlaneWorkflow(
             preparedAutomationRun,
           },
         );
+
+        stepSpan?.setAttributes(
+          createWebhookDeliveryTelemetryAttributes({
+            webhookEventId: preparedAutomationRun.webhookEventId,
+            externalDeliveryId: preparedAutomationRun.webhookExternalDeliveryId ?? undefined,
+            automationRunId: preparedAutomationRun.automationRunId,
+            conversationId: deliveryHandoff.conversationId,
+            deliveryTaskId: deliveryHandoff.deliveryTaskId,
+            integrationConnectionId: preparedAutomationRun.integrationConnectionId,
+            targetKey: preparedAutomationRun.targetKey,
+          }),
+        );
+
+        logWebhookDeliveryEvent({
+          eventName: "delivery_task.queued",
+          message: "Queued automation conversation delivery task",
+          telemetryContext: {
+            webhookEventId: preparedAutomationRun.webhookEventId,
+            externalDeliveryId: preparedAutomationRun.webhookExternalDeliveryId ?? undefined,
+            automationRunId: preparedAutomationRun.automationRunId,
+            conversationId: deliveryHandoff.conversationId,
+            deliveryTaskId: deliveryHandoff.deliveryTaskId,
+            integrationConnectionId: preparedAutomationRun.integrationConnectionId,
+            targetKey: preparedAutomationRun.targetKey,
+          },
+          attributes: {
+            "mistle.delivery.processor_generation": deliveryHandoff.generation,
+            "mistle.delivery.processor_started": deliveryHandoff.shouldStart,
+          },
+        });
+
+        stepSpan?.addEvent("delivery_task.queued", {
+          ...createWebhookDeliveryTelemetryAttributes({
+            webhookEventId: preparedAutomationRun.webhookEventId,
+            externalDeliveryId: preparedAutomationRun.webhookExternalDeliveryId ?? undefined,
+            automationRunId: preparedAutomationRun.automationRunId,
+            conversationId: deliveryHandoff.conversationId,
+            deliveryTaskId: deliveryHandoff.deliveryTaskId,
+            integrationConnectionId: preparedAutomationRun.integrationConnectionId,
+            targetKey: preparedAutomationRun.targetKey,
+          }),
+          "mistle.delivery.processor_generation": deliveryHandoff.generation,
+          "mistle.delivery.processor_started": deliveryHandoff.shouldStart,
+        });
 
         if (!deliveryHandoff.shouldStart) {
           return;
@@ -66,6 +127,19 @@ export const HandleAutomationRunWorkflow = defineTracedControlPlaneWorkflow(
             {
               idempotencyKey: `automation-conversation-delivery:${deliveryHandoff.conversationId}:${String(deliveryHandoff.generation)}`,
             },
+          );
+
+          stepSpan?.addEvent(
+            "delivery_workflow.scheduled",
+            createWebhookDeliveryTelemetryAttributes({
+              webhookEventId: preparedAutomationRun.webhookEventId,
+              externalDeliveryId: preparedAutomationRun.webhookExternalDeliveryId ?? undefined,
+              automationRunId: preparedAutomationRun.automationRunId,
+              conversationId: deliveryHandoff.conversationId,
+              deliveryTaskId: deliveryHandoff.deliveryTaskId,
+              integrationConnectionId: preparedAutomationRun.integrationConnectionId,
+              targetKey: preparedAutomationRun.targetKey,
+            }),
           );
         } catch (error) {
           await setAutomationConversationDeliveryProcessorIdle(

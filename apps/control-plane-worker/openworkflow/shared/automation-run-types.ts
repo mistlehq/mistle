@@ -10,6 +10,8 @@ export type PreparedAutomationRun = {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
+  integrationConnectionId: string;
+  targetKey: string;
   webhookEventId: string;
   webhookEventType: string;
   webhookProviderEventType: string;

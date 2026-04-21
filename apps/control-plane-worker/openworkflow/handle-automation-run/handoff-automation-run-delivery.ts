@@ -6,6 +6,7 @@ import { ensureAutomationConversationDeliveryProcessor } from "../shared/ensure-
 
 export type HandoffAutomationRunDeliveryOutput = {
   conversationId: string;
+  deliveryTaskId: string;
   generation: number;
   shouldStart: boolean;
 };
@@ -28,7 +29,7 @@ export async function handoffAutomationRunDelivery(
     },
   );
 
-  return ensureAutomationConversationDeliveryProcessor(
+  const deliveryProcessor = await ensureAutomationConversationDeliveryProcessor(
     {
       db: ctx.db,
     },
@@ -36,4 +37,11 @@ export async function handoffAutomationRunDelivery(
       conversationId: enqueuedTask.conversationId,
     },
   );
+
+  return {
+    conversationId: deliveryProcessor.conversationId,
+    deliveryTaskId: enqueuedTask.id,
+    generation: deliveryProcessor.generation,
+    shouldStart: deliveryProcessor.shouldStart,
+  };
 }

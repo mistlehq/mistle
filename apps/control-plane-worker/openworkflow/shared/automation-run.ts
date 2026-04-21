@@ -211,6 +211,8 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
   };
   webhookEvent: {
     id: string;
+    integrationConnectionId: string;
+    targetKey: string;
     eventType: string;
     providerEventType: string;
     externalEventId: string;
@@ -250,6 +252,8 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     sandboxProfileId: input.automationTarget.sandboxProfileId,
     sandboxProfileVersion: input.automationTarget.sandboxProfileVersion,
     primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    integrationConnectionId: input.webhookEvent.integrationConnectionId,
+    targetKey: input.webhookEvent.targetKey,
     webhookEventId: input.webhookEvent.id,
     webhookEventType: input.webhookEvent.eventType,
     webhookProviderEventType: input.webhookEvent.providerEventType,
@@ -493,6 +497,8 @@ export async function prepareAutomationRun(
     },
     webhookEvent: {
       id: webhookEvent.id,
+      integrationConnectionId: webhookEvent.integrationConnectionId,
+      targetKey: webhookEvent.targetKey,
       eventType: webhookEvent.eventType,
       providerEventType: webhookEvent.providerEventType,
       externalEventId: webhookEvent.externalEventId,
@@ -614,6 +620,8 @@ export async function prepareAutomationRun(
     sandboxProfileId: automationTarget.sandboxProfileId,
     sandboxProfileVersion,
     primaryRepositoryId: automationTarget.primaryRepositoryId,
+    integrationConnectionId: webhookEvent.integrationConnectionId,
+    targetKey: webhookEvent.targetKey,
     webhookEventId: webhookEvent.id,
     webhookEventType: webhookEvent.eventType,
     webhookProviderEventType: webhookEvent.providerEventType,
