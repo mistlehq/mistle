@@ -118,4 +118,26 @@ describe("SessionWorkbenchPageView", () => {
 
     expect(screen.getByText("Terminal workspace")).toBeDefined();
   });
+
+  it("keeps the outer horizontal group mounted when the secondary panel is hidden", () => {
+    const { container } = render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<div>Terminal workspace</div>}
+        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        onBottomPanelResize={function onBottomPanelResize() {}}
+        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Secondary panel</div>}
+        secondaryPanelSize={40}
+      />,
+    );
+
+    expect(container.querySelector("#session-workbench-main-group")).not.toBeNull();
+    expect(container.querySelector("#session-workbench-secondary-panel")).toBeNull();
+  });
 });

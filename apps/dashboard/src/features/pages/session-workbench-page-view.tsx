@@ -206,31 +206,37 @@ export function SessionWorkbenchPageView({
         </div>
       )}
 
-      {isSecondaryPanelVisible ? (
-        <ResizablePanelGroup
-          className="min-h-0 flex-1"
-          key={sandboxInstanceId}
-          orientation="horizontal"
+      <ResizablePanelGroup
+        className="min-h-0 flex-1"
+        id="session-workbench-main-group"
+        key={sandboxInstanceId}
+        orientation="horizontal"
+      >
+        <ResizablePanel
+          defaultSize={isSecondaryPanelVisible ? `${String(100 - secondaryPanelSize)}%` : "100%"}
+          id="session-workbench-primary-panel"
+          minSize="25%"
         >
-          <ResizablePanel defaultSize={`${String(100 - secondaryPanelSize)}%`} minSize="25%">
-            {workspaceWithBottomPanel}
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel
-            defaultSize={`${String(secondaryPanelSize)}%`}
-            minSize="20%"
-            onResize={(panelSize) => {
-              onSecondaryPanelResize(panelSize.asPercentage);
-            }}
-          >
-            <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
-              <div className="h-full w-full">{secondaryPanel}</div>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        workspaceWithBottomPanel
-      )}
+          {workspaceWithBottomPanel}
+        </ResizablePanel>
+        {!isSecondaryPanelVisible ? null : (
+          <>
+            <ResizableHandle id="session-workbench-secondary-handle" />
+            <ResizablePanel
+              defaultSize={`${String(secondaryPanelSize)}%`}
+              id="session-workbench-secondary-panel"
+              minSize="20%"
+              onResize={(panelSize) => {
+                onSecondaryPanelResize(panelSize.asPercentage);
+              }}
+            >
+              <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
+                <div className="h-full w-full">{secondaryPanel}</div>
+              </div>
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
     </div>
   );
 }
