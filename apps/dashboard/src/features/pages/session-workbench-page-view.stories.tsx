@@ -91,7 +91,6 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
         bottomPanel={
           <SessionTerminalWorkspaceView
             cwd={null}
-            isVisible={isBottomPanelVisible}
             onWorkspaceEmpty={noop}
             renderTerminalPanel={(panelInput) => (
               <StoryTerminalSurfaceBody
@@ -267,7 +266,6 @@ export const CliSplitWithTerminal: Story = {
     bottomPanel: (
       <SessionTerminalWorkspaceView
         cwd={null}
-        isVisible={true}
         onWorkspaceEmpty={noop}
         renderTerminalPanel={(panelInput) => (
           <StoryTerminalSurfaceBody
@@ -278,6 +276,43 @@ export const CliSplitWithTerminal: Story = {
       />
     ),
     bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
+  },
+};
+
+export const CliSplitWithTerminalAndSecondaryPane: Story = {
+  args: {
+    isBottomPanelVisible: true,
+    isSecondaryPanelVisible: true,
+    mainContent: (
+      <SessionCliPanel
+        ptyState={createStoryWorkbenchCliPtyState(createStoryLongCliOutput("task"))}
+      />
+    ),
+    mainContentLayout: { scroll: "contained", width: "full" },
+    primaryBottomPanel: null,
+    bottomPanel: (
+      <SessionTerminalWorkspaceView
+        cwd={null}
+        onWorkspaceEmpty={noop}
+        renderTerminalPanel={(panelInput) => (
+          <StoryTerminalSurfaceBody
+            initialOutput={buildPageViewTerminalOutput(panelInput.cwd)}
+            isVisible={panelInput.isPanelVisible}
+          />
+        )}
+      />
+    ),
+    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
+    secondaryPanel: (
+      <div className="h-full w-full border-l bg-stone-50 p-4">
+        <div className="text-sm font-medium text-stone-900">Current changes</div>
+        <div className="mt-2 text-sm text-stone-600">
+          Secondary diff pane enabled to exercise the nested horizontal and vertical resizable
+          layout together.
+        </div>
+      </div>
+    ),
+    secondaryPanelSize: 38,
   },
 };
 

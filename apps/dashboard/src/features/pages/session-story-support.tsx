@@ -23,6 +23,7 @@ import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
+import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 export const StorySandboxInstanceId = "sbi_storybook";
 const textEncoder = new TextEncoder();
@@ -167,7 +168,7 @@ export function renderSessionWorkbenchStory(input: {
     <SessionWorkbenchPageView
       alert={input.alert ?? null}
       bottomPanel={input.bottomPanel ?? <></>}
-      bottomPanelSize={input.bottomPanelSize ?? 32}
+      bottomPanelSize={input.bottomPanelSize ?? DEFAULT_TERMINAL_PANEL_SIZE}
       isBottomPanelVisible={input.isBottomPanelVisible ?? false}
       isSecondaryPanelVisible={input.isSecondaryPanelVisible ?? false}
       mainContent={input.mainContent}

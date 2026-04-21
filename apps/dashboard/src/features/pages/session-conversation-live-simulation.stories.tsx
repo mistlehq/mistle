@@ -19,6 +19,7 @@ import {
   StorySessionConversationPaneArgs,
 } from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 type SessionWorkbenchLiveSimulationStoryArgs = React.ComponentProps<
   typeof SessionWorkbenchPageView
@@ -446,7 +447,7 @@ function SessionConversationWorkbenchHarness(input: {
     <SessionWorkbenchPageView
       alert={null}
       bottomPanel={<></>}
-      bottomPanelSize={32}
+      bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
       isBottomPanelVisible={false}
       isSecondaryPanelVisible={true}
       mainContent={
@@ -659,7 +660,7 @@ const meta = {
     sandboxInstanceId: null,
     alert: null,
     bottomPanel: <></>,
-    bottomPanelSize: 28,
+    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     isBottomPanelVisible: true,
     isSecondaryPanelVisible: false,
     mainContent: <></>,

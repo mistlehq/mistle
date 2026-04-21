@@ -29,6 +29,7 @@ import {
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
+import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -333,7 +334,7 @@ function SessionWorkbenchPageContent(input: {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<></>}
-        bottomPanelSize={32}
+        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         onBottomPanelResize={function onBottomPanelResize() {}}

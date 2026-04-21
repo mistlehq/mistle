@@ -92,7 +92,6 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
       bottomPanel: (
         <SessionTerminalWorkspaceView
           cwd={input.initialCwd}
-          isVisible={isBottomPanelVisible}
           onApiReady={(api) => {
             seedSplitTerminalExample({
               api,

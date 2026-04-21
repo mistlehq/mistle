@@ -208,4 +208,4 @@ export function useSessionTerminalWorkbenchState(input: {
   };
 }
 
-export { DEFAULT_TERMINAL_PANEL_SIZE };
+export { DEFAULT_TERMINAL_PANEL_SIZE, MIN_TERMINAL_PANEL_SIZE };

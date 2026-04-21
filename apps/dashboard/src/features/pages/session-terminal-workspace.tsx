@@ -54,7 +54,6 @@ type SessionTerminalWorkspaceProps = {
 
 type SessionTerminalWorkspaceViewProps = {
   cwd: string | null;
-  isVisible: boolean;
   onApiReady?: (api: DockviewApi) => void;
   onWorkspaceEmpty: () => void;
   renderTerminalPanel: (input: {
@@ -385,7 +384,6 @@ export const SessionTerminalWorkspace = forwardRef<
   return (
     <SessionTerminalWorkspaceView
       cwd={props.cwd}
-      isVisible={props.isVisible}
       onWorkspaceEmpty={props.onWorkspaceEmpty}
       ref={forwardedRef}
       renderTerminalPanel={({ closePanel, cwd, isPanelVisible, panelId }) => (
@@ -410,7 +408,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
   SessionTerminalWorkspaceHandle,
   SessionTerminalWorkspaceViewProps
 >(function SessionTerminalWorkspaceView(
-  { cwd, isVisible, onApiReady, onWorkspaceEmpty, renderTerminalPanel },
+  { cwd, onApiReady, onWorkspaceEmpty, renderTerminalPanel },
   forwardedRef,
 ): ReactElement {
   const apiRef = useRef<DockviewApi>(null!);
@@ -507,7 +505,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
               apiRef.current = event.api;
               setReadyApi(event.api);
 
-              if (shouldEnsureWorkspaceRef.current || (isVisible && event.api.totalPanels === 0)) {
+              if (shouldEnsureWorkspaceRef.current || event.api.totalPanels === 0) {
                 shouldEnsureWorkspaceRef.current = false;
                 createTerminal({
                   ...(event.api.activeGroup === undefined
