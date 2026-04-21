@@ -673,6 +673,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
 
+  packages/commit-sign: {}
+
   packages/config:
     dependencies:
       smol-toml:
