@@ -1,5 +1,5 @@
 import { BadRequestError } from "@mistle/http/errors.js";
-import * as sshpk from "sshpk";
+import sshpk from "sshpk";
 import { z } from "zod";
 
 import { IdentityLinkingBadRequestCodes } from "./constants.js";
@@ -28,6 +28,10 @@ function createInvalidSigningKeyError(message: string): BadRequestError {
   );
 }
 
+function isNamedError(error: unknown, expectedName: string): boolean {
+  return error instanceof Error && error.name === expectedName;
+}
+
 export function parseGitSshSigningPrivateKeyOrThrow(
   rawPrivateKey: string,
 ): ParsedGitSshSigningPrivateKey {
@@ -44,13 +48,13 @@ export function parseGitSshSigningPrivateKeyOrThrow(
   try {
     privateKey = sshpk.parsePrivateKey(normalizedPrivateKey, "auto");
   } catch (error) {
-    if (error instanceof sshpk.KeyEncryptedError) {
+    if (isNamedError(error, "KeyEncryptedError")) {
       throw createInvalidSigningKeyError(
         "GitHub signing key must be uploaded without a passphrase.",
       );
     }
 
-    if (error instanceof sshpk.KeyParseError) {
+    if (isNamedError(error, "KeyParseError")) {
       throw createInvalidSigningKeyError("GitHub signing key must be a valid SSH private key.");
     }
 
