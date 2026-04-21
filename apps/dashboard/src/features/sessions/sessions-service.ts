@@ -143,7 +143,7 @@ export async function listSessionSidebarGroups(input: {
 }): Promise<SessionSidebarGroupsResult> {
   try {
     const client = getControlPlaneApiClient();
-    const { data } = await client.GET("/v1/sandbox/instances/sidebar", {
+    const { data } = await client.GET("/v1/sandbox/instances/recent", {
       credentials: "include",
       params: {
         query: {

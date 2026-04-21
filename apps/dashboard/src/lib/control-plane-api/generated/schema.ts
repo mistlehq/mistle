@@ -6128,7 +6128,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/v1/sandbox/instances/sidebar": {
+  "/v1/sandbox/instances/recent": {
     parameters: {
       query?: never;
       header?: never;

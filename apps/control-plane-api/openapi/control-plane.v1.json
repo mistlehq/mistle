@@ -10127,7 +10127,7 @@
         }
       }
     },
-    "/v1/sandbox/instances/sidebar": {
+    "/v1/sandbox/instances/recent": {
       "get": {
         "tags": ["Sandbox Instances"],
         "parameters": [

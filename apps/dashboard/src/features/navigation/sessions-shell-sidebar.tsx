@@ -28,7 +28,7 @@ export function buildSessionsShellSidebarItems(
   const sourceGroups: SessionsSidebarSourceGroup[] = groups.map((group) => ({
     profileId: group.profileId,
     profileName: group.profileName,
-    items: group.items.map((item) => ({
+    items: group.items.map((item: SessionSidebarGroup["items"][number]) => ({
       id: item.id,
       title: item.title,
       status: item.status,
@@ -83,7 +83,9 @@ export function SessionsShellSidebar(): React.JSX.Element {
     queryKey: sessionSidebarGroupsQueryKey({
       limit: requestedLimit,
     }),
-    placeholderData: (previousData) => previousData,
+    placeholderData: (
+      previousData: SessionSidebarGroupsResult | undefined,
+    ): SessionSidebarGroupsResult | undefined => previousData,
     queryFn: async ({ signal }) =>
       listSessionSidebarGroups({
         limit: requestedLimit,

@@ -9,7 +9,7 @@ import { badRequestResponseSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/sidebar",
+  path: "/recent",
   tags: ["Sandbox Instances"],
   request: {
     query: listSessionSidebarGroupsQuerySchema,
