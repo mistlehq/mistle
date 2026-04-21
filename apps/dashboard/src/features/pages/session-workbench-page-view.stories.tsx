@@ -90,6 +90,7 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
         bottomPanel={
           <SessionTerminalWorkspaceView
             cwd={null}
+            isVisible={isBottomPanelVisible}
             onWorkspaceEmpty={noop}
             renderTerminalPanel={(panelInput) => (
               <StoryTerminalSurfaceBody
@@ -257,6 +258,7 @@ export const CliSplitWithTerminal: Story = {
     bottomPanel: (
       <SessionTerminalWorkspaceView
         cwd={null}
+        isVisible
         onWorkspaceEmpty={noop}
         renderTerminalPanel={(panelInput) => (
           <StoryTerminalSurfaceBody
@@ -283,6 +285,7 @@ export const CliSplitWithTerminalAndSecondaryPane: Story = {
     bottomPanel: (
       <SessionTerminalWorkspaceView
         cwd={null}
+        isVisible
         onWorkspaceEmpty={noop}
         renderTerminalPanel={(panelInput) => (
           <StoryTerminalSurfaceBody
