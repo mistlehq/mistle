@@ -108,6 +108,9 @@ type SessionWorkbenchState = {
 
 type SessionConversationPaneState = {
   chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
+  dismissUserMessageAction: ReturnType<
+    typeof useCodexSessionState
+  >["chat"]["dismissUserMessageAction"];
   composerStateInput: SessionComposerStateInput;
   serverRequestsState: {
     isRespondingToServerRequest: boolean;
@@ -304,6 +307,7 @@ export function useSessionWorkbenchController(input: {
     },
     conversationPane: {
       chatState: chat.chatState,
+      dismissUserMessageAction: chat.dismissUserMessageAction,
       composerStateInput: {
         bootstrap: sessionState.bootstrap,
         configControl,

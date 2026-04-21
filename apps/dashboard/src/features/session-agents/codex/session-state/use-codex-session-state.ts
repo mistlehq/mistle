@@ -97,6 +97,7 @@ type CodexSessionChatState = {
     displayAttachments?: readonly CodexTurnInputLocalImageItem[];
   }) => Promise<void>;
   interruptTurn: () => void;
+  dismissUserMessageAction: (actionId: string) => void;
   steerTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
@@ -190,6 +191,7 @@ export function useCodexSessionState(input: {
     startTurn,
     reloadChat,
     interruptTurn,
+    dismissUserMessageAction,
     steerTurn,
   } = useCodexChatController({
     rpcClientRef: input.rpcClientRef,
@@ -827,6 +829,7 @@ export function useCodexSessionState(input: {
       hydrateChatFromThread,
       startTurn,
       interruptTurn,
+      dismissUserMessageAction,
       steerTurn,
       reloadChat,
     };
@@ -834,6 +837,7 @@ export function useCodexSessionState(input: {
     canInterruptTurn,
     canSteerTurn,
     hydrateChatFromThread,
+    dismissUserMessageAction,
     interruptTurn,
     isInterruptingTurn,
     isReloadingChat,

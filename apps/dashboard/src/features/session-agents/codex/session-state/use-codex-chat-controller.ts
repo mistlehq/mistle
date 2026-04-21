@@ -7,7 +7,7 @@ import {
   type CodexJsonRpcClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useReducer, type RefObject } from "react";
+import { useCallback, useReducer, useRef, useState, type RefObject } from "react";
 
 import {
   createInitialCodexChatState,
@@ -19,6 +19,17 @@ import { readCodexThreadState } from "./codex-thread-read-state.js";
 function createPendingTurnId(): string {
   return `pending:${crypto.randomUUID()}`;
 }
+
+function createSteerEntryId(): string {
+  return `steer:${crypto.randomUUID()}`;
+}
+
+type QueuedSteerRequest = {
+  entryId: string;
+  threadId: string;
+  turnId: string;
+  request: ReturnType<typeof buildTurnRequest>;
+};
 
 function buildTurnRequest(input: {
   submittedPrompt: string;
@@ -59,10 +70,24 @@ export function useCodexChatController(input: {
     undefined,
     createInitialCodexChatState,
   );
+  const activeTurnIdRef = useRef<string | null>(chatState.activeTurnId);
+  const chatStatusRef = useRef<string | null>(chatState.status);
+  const queuedSteerRequestsRef = useRef<QueuedSteerRequest[]>([]);
+  const isProcessingSteerQueueRef = useRef(false);
+  const [pendingSteerCount, setPendingSteerCount] = useState(0);
+  activeTurnIdRef.current = chatState.activeTurnId;
+  chatStatusRef.current = chatState.status;
+
+  const syncPendingSteerCount = useCallback(() => {
+    setPendingSteerCount(queuedSteerRequestsRef.current.length);
+  }, []);
 
   const resetChat = useCallback((): void => {
+    queuedSteerRequestsRef.current = [];
+    isProcessingSteerQueueRef.current = false;
+    syncPendingSteerCount();
     dispatchChatAction({ type: "reset" });
-  }, []);
+  }, [syncPendingSteerCount]);
 
   const handleNotificationReceived = useCallback(
     (notification: { method: string; params?: unknown }): void => {
@@ -210,31 +235,81 @@ export function useCodexChatController(input: {
     },
   });
 
-  const steerTurnMutation = useMutation({
-    mutationFn: async (turnInput: {
-      submittedPrompt: string;
-      submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
-      transcriptPrompt?: string;
-      displayAttachments?: readonly CodexTurnInputLocalImageItem[];
-    }) => {
-      const rpcClient = input.rpcClientRef.current;
-      const threadId = input.threadIdRef.current;
-      const turnId = chatState.activeTurnId;
+  const processSteerQueue = useCallback((): void => {
+    if (isProcessingSteerQueueRef.current) {
+      return;
+    }
 
-      if (rpcClient === null || threadId === null || turnId === null) {
-        throw new Error("No active turn is available to steer.");
+    isProcessingSteerQueueRef.current = true;
+
+    void (async () => {
+      try {
+        while (queuedSteerRequestsRef.current.length > 0) {
+          const queuedRequest = queuedSteerRequestsRef.current[0];
+          if (queuedRequest === undefined) {
+            break;
+          }
+
+          const rpcClient = input.rpcClientRef.current;
+          const threadId = input.threadIdRef.current;
+          const isQueuedTurnStillActive =
+            activeTurnIdRef.current === queuedRequest.turnId &&
+            chatStatusRef.current === "inProgress";
+
+          if (
+            rpcClient === null ||
+            threadId === null ||
+            threadId !== queuedRequest.threadId ||
+            !isQueuedTurnStillActive
+          ) {
+            dispatchChatAction({
+              type: "steer_turn_failed",
+              entryId: queuedRequest.entryId,
+              turnId: queuedRequest.turnId,
+            });
+            queuedSteerRequestsRef.current = queuedSteerRequestsRef.current.filter(
+              (request) => request.entryId !== queuedRequest.entryId,
+            );
+            syncPendingSteerCount();
+            continue;
+          }
+
+          try {
+            await steerCodexTurn({
+              rpcClient,
+              threadId,
+              turnId: queuedRequest.turnId,
+              input: queuedRequest.request.items,
+            });
+            dispatchChatAction({
+              type: "steer_turn_processed",
+              entryId: queuedRequest.entryId,
+              turnId: queuedRequest.turnId,
+            });
+          } catch (error) {
+            dispatchChatAction({
+              type: "steer_turn_failed",
+              entryId: queuedRequest.entryId,
+              turnId: queuedRequest.turnId,
+            });
+            input.setSessionErrorMessage(
+              error instanceof Error ? error.message : "Could not steer turn.",
+            );
+          } finally {
+            queuedSteerRequestsRef.current = queuedSteerRequestsRef.current.filter(
+              (request) => request.entryId !== queuedRequest.entryId,
+            );
+            syncPendingSteerCount();
+          }
+        }
+      } finally {
+        isProcessingSteerQueueRef.current = false;
+        if (queuedSteerRequestsRef.current.length > 0) {
+          processSteerQueue();
+        }
       }
-
-      const turnRequest = buildTurnRequest(turnInput);
-
-      await steerCodexTurn({
-        rpcClient,
-        threadId,
-        turnId,
-        input: turnRequest.items,
-      });
-    },
-  });
+    })();
+  }, [input.rpcClientRef, input.setSessionErrorMessage, input.threadIdRef, syncPendingSteerCount]);
 
   const hasActiveThread = input.threadIdRef.current !== null;
   const canInterruptTurn =
@@ -243,10 +318,7 @@ export function useCodexChatController(input: {
     chatState.status === "inProgress" &&
     !interruptTurnMutation.isPending;
   const canSteerTurn =
-    hasActiveThread &&
-    chatState.activeTurnId !== null &&
-    chatState.status === "inProgress" &&
-    !steerTurnMutation.isPending;
+    hasActiveThread && chatState.activeTurnId !== null && chatState.status === "inProgress";
 
   return {
     chatState,
@@ -257,7 +329,7 @@ export function useCodexChatController(input: {
     isStartingTurn: startTurnMutation.isPending,
     isReloadingChat: reloadChatMutation.isPending,
     isInterruptingTurn: interruptTurnMutation.isPending,
-    isSteeringTurn: steerTurnMutation.isPending,
+    isSteeringTurn: pendingSteerCount > 0,
     canInterruptTurn,
     canSteerTurn,
     startTurn: useCallback(
@@ -277,6 +349,28 @@ export function useCodexChatController(input: {
     interruptTurn: useCallback(() => {
       interruptTurnMutation.mutate();
     }, [interruptTurnMutation]),
+    dismissUserMessageAction: useCallback(
+      (actionId: string) => {
+        const matchingQueuedRequest = queuedSteerRequestsRef.current.find(
+          (request) => request.entryId === actionId,
+        );
+        const turnId = matchingQueuedRequest?.turnId ?? activeTurnIdRef.current;
+        if (turnId === null || actionId.length === 0) {
+          return;
+        }
+
+        queuedSteerRequestsRef.current = queuedSteerRequestsRef.current.filter(
+          (request) => request.entryId !== actionId,
+        );
+        syncPendingSteerCount();
+        dispatchChatAction({
+          type: "dismiss_client_user_entry",
+          entryId: actionId,
+          turnId,
+        });
+      },
+      [syncPendingSteerCount],
+    ),
     steerTurn: useCallback(
       async (turnInput: {
         submittedPrompt: string;
@@ -284,9 +378,37 @@ export function useCodexChatController(input: {
         transcriptPrompt?: string;
         displayAttachments?: readonly CodexTurnInputLocalImageItem[];
       }): Promise<void> => {
-        await steerTurnMutation.mutateAsync(turnInput);
+        const rpcClient = input.rpcClientRef.current;
+        const threadId = input.threadIdRef.current;
+        const turnId = activeTurnIdRef.current;
+
+        if (rpcClient === null || threadId === null || turnId === null) {
+          throw new Error("No active turn is available to steer.");
+        }
+
+        const turnRequest = buildTurnRequest(turnInput);
+        const steerEntryId = createSteerEntryId();
+
+        dispatchChatAction({
+          type: "steer_turn_requested",
+          entryId: steerEntryId,
+          turnId,
+          prompt: turnRequest.transcriptPrompt,
+          attachments: turnRequest.displayAttachments,
+        });
+        queuedSteerRequestsRef.current = [
+          ...queuedSteerRequestsRef.current,
+          {
+            entryId: steerEntryId,
+            threadId,
+            turnId,
+            request: turnRequest,
+          },
+        ];
+        syncPendingSteerCount();
+        processSteerQueue();
       },
-      [steerTurnMutation],
+      [input.rpcClientRef, input.threadIdRef, processSteerQueue, syncPendingSteerCount],
     ),
   };
 }

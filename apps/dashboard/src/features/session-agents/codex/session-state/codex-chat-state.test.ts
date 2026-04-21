@@ -96,6 +96,108 @@ describe("reduceCodexChatState", () => {
     expect(failed.entries).toEqual([]);
   });
 
+  it("shows steer as a transient user message and normalizes it after processing", () => {
+    const activeTurn = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "start_turn_requested",
+        clientTurnId: "pending:turn_123",
+        prompt: "Test prompt",
+      }),
+      {
+        type: "turn_started_response",
+        clientTurnId: "pending:turn_123",
+        turnId: "turn_123",
+        status: "inProgress",
+      },
+    );
+    const steering = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: "steer_1",
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const processed = reduceCodexChatState(steering, {
+      type: "steer_turn_processed",
+      entryId: "steer_1",
+      turnId: "turn_123",
+    });
+
+    expect(steering.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        label: "Steer",
+        labelAction: {
+          ariaLabel: "Remove steer message",
+          actionId: "steer_1",
+        },
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+    ]);
+    expect(processed.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("removes a transient steer message when steering fails", () => {
+    const activeTurn = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "start_turn_requested",
+        clientTurnId: "pending:turn_123",
+        prompt: "Test prompt",
+      }),
+      {
+        type: "turn_started_response",
+        clientTurnId: "pending:turn_123",
+        turnId: "turn_123",
+        status: "inProgress",
+      },
+    );
+    const steering = reduceCodexChatState(activeTurn, {
+      type: "steer_turn_requested",
+      entryId: "steer_1",
+      turnId: "turn_123",
+      prompt: "Focus on the reducer",
+    });
+    const failed = reduceCodexChatState(steering, {
+      type: "steer_turn_failed",
+      entryId: "steer_1",
+      turnId: "turn_123",
+    });
+
+    expect(failed.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("hydrates user image attachments from thread/read items", () => {
     const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
       type: "hydrate_from_thread_read",

@@ -1,6 +1,10 @@
 import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+  Kbd,
   Select,
   SelectContent,
   SelectItem,
@@ -25,6 +29,27 @@ const ReasoningEffortLabels: Readonly<Record<string, string>> = OpenAiReasoningE
 
 function formatReasoningEffortLabel(value: string): string {
   return ReasoningEffortLabels[value] ?? value;
+}
+
+function isApplePlatform(): boolean {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  const platform = navigator.platform || navigator.userAgent;
+  return /Mac|iPhone|iPad|iPod/i.test(platform);
+}
+
+function resolveShortcutDisplayLabel(shortcut: string): string {
+  if (shortcut === "enter") {
+    return "Enter";
+  }
+
+  if (shortcut === "mod-enter") {
+    return isApplePlatform() ? "⌘Enter" : "Ctrl+Enter";
+  }
+
+  return shortcut;
 }
 
 export type ChatComposerStatusMessage = {
@@ -308,24 +333,7 @@ export function ChatComposer({
           </Select>
         </div>
 
-        <div className="group/submit relative shrink-0">
-          {keyboardShortcuts === undefined || keyboardShortcuts.length === 0 ? null : (
-            <div className="bg-background/95 pointer-events-none absolute right-0 bottom-full mb-3 min-w-[10.5rem] translate-y-1 rounded-[1.35rem] border px-4 py-3 opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover/submit:translate-y-0 group-hover/submit:opacity-100 group-focus-within/submit:translate-y-0 group-focus-within/submit:opacity-100 backdrop-blur-xs">
-              <div className="space-y-2">
-                {keyboardShortcuts.map((shortcutHint) => (
-                  <div
-                    className="flex items-center justify-between gap-4 text-sm"
-                    key={`${shortcutHint.action}:${shortcutHint.shortcut}`}
-                  >
-                    <span>{shortcutHint.action}</span>
-                    <span className="bg-muted text-muted-foreground rounded-full px-2.5 py-0.5 font-medium">
-                      {shortcutHint.shortcut}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        {keyboardShortcuts === undefined || keyboardShortcuts.length === 0 ? (
           <Button
             aria-label={submitLabel}
             className={[
@@ -335,13 +343,50 @@ export function ChatComposer({
             disabled={submitDisabled}
             onClick={onSubmit}
             size="icon-fill"
-            title={submitLabel}
             type="button"
             variant="ghost"
           >
             {composerActionIcon}
           </Button>
-        </div>
+        ) : (
+          <HoverCard>
+            <HoverCardTrigger closeDelay={0} delay={0}>
+              <Button
+                aria-label={submitLabel}
+                className={[
+                  "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
+                  isSubmitPending ? "disabled:opacity-100" : null,
+                ].join(" ")}
+                disabled={submitDisabled}
+                onClick={onSubmit}
+                size="icon-fill"
+                type="button"
+                variant="ghost"
+              >
+                {composerActionIcon}
+              </Button>
+            </HoverCardTrigger>
+            <HoverCardContent
+              align="end"
+              alignOffset={0}
+              className="w-fit min-w-0 p-3"
+              side="top"
+              sideOffset={12}
+            >
+              <div className="space-y-1.5">
+                {keyboardShortcuts.map((shortcutHint) => (
+                  <div
+                    className="flex items-center justify-between gap-3 text-sm"
+                    key={`${shortcutHint.action}:${shortcutHint.shortcut}`}
+                  >
+                    <span>{shortcutHint.action}</span>
+                    <Kbd>{resolveShortcutDisplayLabel(shortcutHint.shortcut)}</Kbd>
+                  </div>
+                ))}
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        )}
       </div>
     </div>
   );

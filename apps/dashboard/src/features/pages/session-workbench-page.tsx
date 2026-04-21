@@ -409,6 +409,7 @@ function SessionWorkbenchPageContent(input: {
           pendingTurnId: conversationPane.chatState.pendingTurnId,
           scrollBehavior: "follow-streaming-at-bottom",
           chatEntries: conversationPane.chatState.entries,
+          onUserMessageAction: conversationPane.dismissUserMessageAction,
           isRespondingToServerRequest:
             conversationPane.serverRequestsState.isRespondingToServerRequest,
           onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
@@ -478,6 +479,7 @@ type PrimaryPanelConversationContent = Pick<
   | "pendingTurnId"
   | "scrollBehavior"
   | "chatEntries"
+  | "onUserMessageAction"
   | "isRespondingToServerRequest"
   | "onRespondToServerRequest"
   | "scrollContainerRef"

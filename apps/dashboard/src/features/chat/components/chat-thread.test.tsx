@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
@@ -9,7 +10,7 @@ describe("ChatThread", () => {
   it("renders command approvals inline with the matching command block", () => {
     const submittedResults: unknown[] = [];
 
-    render(
+    const rendered = render(
       <ChatThread
         entries={[
           {
@@ -59,8 +60,9 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("Approve command")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "accept" }));
+    expect(within(rendered.container).getAllByText("Approve command").length).toBeGreaterThan(0);
+    const acceptButton = within(rendered.container).getByRole("button", { name: "accept" });
+    fireEvent.click(acceptButton);
 
     expect(submittedResults).toEqual([
       {
@@ -172,7 +174,7 @@ describe("ChatThread", () => {
   it("renders command approvals inline for grouped command items", () => {
     const submittedResults: unknown[] = [];
 
-    render(
+    const rendered = render(
       <ChatThread
         entries={[
           {
@@ -234,8 +236,9 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("Approve command")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "accept" }));
+    expect(within(rendered.container).getAllByText("Approve command").length).toBeGreaterThan(0);
+    const acceptButton = within(rendered.container).getByRole("button", { name: "accept" });
+    fireEvent.click(acceptButton);
 
     expect(submittedResults).toEqual([{ decision: "accept" }]);
   });
@@ -315,5 +318,104 @@ describe("ChatThread", () => {
     );
 
     expect(screen.getByText("Image attached: screenshot.png")).toBeTruthy();
+  });
+
+  it("renders trailing user actions and routes their action id", () => {
+    const invokedActionIds: string[] = [];
+
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "start here",
+            status: "completed",
+          },
+          {
+            id: "assistant_1",
+            turnId: "turn_1",
+            kind: "assistant-message",
+            text: "drafting response",
+            phase: null,
+            status: "streaming",
+          },
+          {
+            id: "steer_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            label: "Steer",
+            labelAction: {
+              ariaLabel: "Remove steer message",
+              actionId: "steer_1",
+            },
+            text: "tighten the scope",
+            status: "completed",
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        onUserMessageAction={(actionId) => {
+          invokedActionIds.push(actionId);
+        }}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("tighten the scope")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remove steer message" }));
+
+    expect(invokedActionIds).toEqual(["steer_1"]);
+  });
+
+  it("renders assistant streaming that arrives after a steer below the accepted steer message", () => {
+    const { container } = render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "start here",
+            status: "completed",
+          },
+          {
+            id: "assistant_1",
+            turnId: "turn_1",
+            kind: "assistant-message",
+            text: "first pass",
+            phase: null,
+            status: "completed",
+          },
+          {
+            id: "steer_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "tighten the scope",
+            status: "completed",
+          },
+          {
+            id: "assistant_2",
+            turnId: "turn_1",
+            kind: "assistant-message",
+            text: "second pass after steer",
+            phase: null,
+            status: "streaming",
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    const textContent = container.textContent ?? "";
+    expect(textContent.indexOf("first pass")).toBeLessThan(
+      textContent.indexOf("tighten the scope"),
+    );
+    expect(textContent.indexOf("tighten the scope")).toBeLessThan(
+      textContent.indexOf("second pass after steer"),
+    );
   });
 });

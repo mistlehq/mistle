@@ -55,22 +55,27 @@ describe("buildChatTurnGroups", () => {
           text: "tell me a story",
           status: "completed",
         },
-        assistantBlocks: [
+        contentSegments: [
           {
-            id: "assistant-1",
-            turnId: "turn-1",
-            kind: "assistant-message",
-            text: "Once upon a time",
-            phase: "final_answer",
-            status: "completed",
-          },
-          {
-            id: "reasoning-1",
-            turnId: "turn-1",
-            kind: "reasoning",
-            summary: "Considering structure",
-            source: "summary",
-            status: "completed",
+            kind: "assistant-blocks",
+            blocks: [
+              {
+                id: "assistant-1",
+                turnId: "turn-1",
+                kind: "assistant-message",
+                text: "Once upon a time",
+                phase: "final_answer",
+                status: "completed",
+              },
+              {
+                id: "reasoning-1",
+                turnId: "turn-1",
+                kind: "reasoning",
+                summary: "Considering structure",
+                source: "summary",
+                status: "completed",
+              },
+            ],
           },
         ],
       },
@@ -83,14 +88,19 @@ describe("buildChatTurnGroups", () => {
           text: "what is in the main directory",
           status: "completed",
         },
-        assistantBlocks: [
+        contentSegments: [
           {
-            id: "assistant-2",
-            turnId: "turn-2",
-            kind: "assistant-message",
-            text: "I'm checking the workspace root contents.",
-            phase: "commentary",
-            status: "streaming",
+            kind: "assistant-blocks",
+            blocks: [
+              {
+                id: "assistant-2",
+                turnId: "turn-2",
+                kind: "assistant-message",
+                text: "I'm checking the workspace root contents.",
+                phase: "commentary",
+                status: "streaming",
+              },
+            ],
           },
         ],
       },
@@ -113,14 +123,115 @@ describe("buildChatTurnGroups", () => {
       {
         turnId: "turn-1",
         userEntry: null,
-        assistantBlocks: [
+        contentSegments: [
           {
-            id: "assistant-1",
-            turnId: "turn-1",
-            kind: "assistant-message",
-            text: "Streaming reply",
-            phase: null,
-            status: "streaming",
+            kind: "assistant-blocks",
+            blocks: [
+              {
+                id: "assistant-1",
+                turnId: "turn-1",
+                kind: "assistant-message",
+                text: "Streaming reply",
+                phase: null,
+                status: "streaming",
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps later user messages in sequence with later assistant content in the same turn", () => {
+    const groups = buildChatTurnGroups([
+      {
+        id: "user-1",
+        turnId: "turn-1",
+        kind: "user-message",
+        text: "initial request",
+        status: "completed",
+      },
+      {
+        id: "assistant-1",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        text: "working on it",
+        phase: null,
+        status: "streaming",
+      },
+      {
+        id: "user-2",
+        turnId: "turn-1",
+        kind: "user-message",
+        label: "Steer",
+        labelAction: {
+          ariaLabel: "Remove steer message",
+          actionId: "steer-1",
+        },
+        text: "focus on the reducer",
+        status: "completed",
+      },
+      {
+        id: "assistant-2",
+        turnId: "turn-1",
+        kind: "assistant-message",
+        text: "reshaping the reducer now",
+        phase: null,
+        status: "streaming",
+      },
+    ]);
+
+    expect(groups).toEqual([
+      {
+        turnId: "turn-1",
+        userEntry: {
+          id: "user-1",
+          turnId: "turn-1",
+          kind: "user-message",
+          text: "initial request",
+          status: "completed",
+        },
+        contentSegments: [
+          {
+            kind: "assistant-blocks",
+            blocks: [
+              {
+                id: "assistant-1",
+                turnId: "turn-1",
+                kind: "assistant-message",
+                text: "working on it",
+                phase: null,
+                status: "streaming",
+              },
+            ],
+          },
+          {
+            kind: "user-message",
+            entry: {
+              id: "user-2",
+              turnId: "turn-1",
+              kind: "user-message",
+              label: "Steer",
+              labelAction: {
+                ariaLabel: "Remove steer message",
+                actionId: "steer-1",
+              },
+              text: "focus on the reducer",
+              status: "completed",
+            },
+          },
+          {
+            kind: "assistant-blocks",
+            blocks: [
+              {
+                id: "assistant-2",
+                turnId: "turn-1",
+                kind: "assistant-message",
+                text: "reshaping the reducer now",
+                phase: null,
+                status: "streaming",
+              },
+            ],
           },
         ],
       },

@@ -88,6 +88,7 @@ type CodexRawTurnState = {
   completedErrorMessage: string | null;
   planSnapshot: CodexTurnPlanSnapshot | null;
   userEntry: ChatUserEntry | null;
+  clientUserEntries: readonly ChatUserEntry[];
   itemOrder: readonly string[];
   rawItemsById: Readonly<Record<string, unknown>>;
 };
@@ -124,6 +125,28 @@ export type CodexChatAction =
       status: string;
     }
   | {
+      type: "steer_turn_requested";
+      entryId: string;
+      turnId: string;
+      prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
+    }
+  | {
+      type: "steer_turn_processed";
+      entryId: string;
+      turnId: string;
+    }
+  | {
+      type: "steer_turn_failed";
+      entryId: string;
+      turnId: string;
+    }
+  | {
+      type: "dismiss_client_user_entry";
+      entryId: string;
+      turnId: string;
+    }
+  | {
       type: "hydrate_from_thread_read";
       turns: readonly CodexThreadReadTurn[];
     }
@@ -149,6 +172,7 @@ function createTurnState(turnId: string): CodexRawTurnState {
     completedErrorMessage: null,
     planSnapshot: null,
     userEntry: null,
+    clientUserEntries: [],
     itemOrder: [],
     rawItemsById: {},
   };
@@ -676,6 +700,8 @@ function buildEntries(input: {
         }),
       );
     }
+
+    entries.push(...turn.clientUserEntries);
   }
 
   return entries;
@@ -713,12 +739,15 @@ function buildUserEntry(
   text: string,
   attachments: NonNullable<ChatUserEntry["attachments"]> = [],
   id?: string,
+  options?: Pick<ChatUserEntry, "label" | "labelAction">,
 ): ChatUserEntry {
   return {
     id: id ?? `user:${turnId}`,
     turnId,
     kind: "user-message",
     text,
+    ...(options?.label === undefined ? {} : { label: options.label }),
+    ...(options?.labelAction === undefined ? {} : { labelAction: options.labelAction }),
     ...(attachments.length === 0 ? {} : { attachments }),
     status: "completed",
   };
@@ -728,6 +757,11 @@ function buildChatUserAttachments(
   attachments: readonly CodexTurnInputLocalImageItem[] | undefined,
 ): NonNullable<ChatUserEntry["attachments"]> {
   return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
+}
+
+function clearEntrySteerPresentation(entry: ChatUserEntry): ChatUserEntry {
+  const { label: _label, labelAction: _labelAction, ...nextEntry } = entry;
+  return nextEntry;
 }
 
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
@@ -916,6 +950,7 @@ function reconcileHydratedTurns(
       completedErrorMessage: existingTurn?.completedErrorMessage ?? null,
       planSnapshot: existingTurn?.planSnapshot ?? null,
       userEntry: serverUserEntry ?? existingTurn?.userEntry ?? null,
+      clientUserEntries: existingTurn?.clientUserEntries ?? [],
       itemOrder: nextItemOrder,
       rawItemsById: nextRawItemsById,
     };
@@ -975,6 +1010,7 @@ export function reduceCodexChatState(
             action.prompt,
             buildChatUserAttachments(action.attachments),
           ),
+          clientUserEntries: [],
           itemOrder: [],
           rawItemsById: {},
         },
@@ -1023,6 +1059,7 @@ export function reduceCodexChatState(
               id: `user:${action.turnId}`,
               turnId: action.turnId,
             },
+      clientUserEntries: [...pendingTurn.clientUserEntries, ...existingTurn.clientUserEntries],
       itemOrder: [...pendingTurn.itemOrder, ...existingTurn.itemOrder].filter(
         (itemId, index, itemOrder) => itemOrder.indexOf(itemId) === index,
       ),
@@ -1043,6 +1080,77 @@ export function reduceCodexChatState(
 
   if (action.type === "hydrate_from_thread_read") {
     return reconcileHydratedTurns(state, action.turns);
+  }
+
+  if (action.type === "steer_turn_requested") {
+    const ensured = ensureTurn(state.turnsById, state.turnOrder, action.turnId);
+    const turn = ensured.turnsById[action.turnId] ?? createTurnState(action.turnId);
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: ensured.turnOrder,
+      turnsById: {
+        ...ensured.turnsById,
+        [action.turnId]: {
+          ...turn,
+          clientUserEntries: [
+            ...turn.clientUserEntries,
+            buildUserEntry(
+              action.turnId,
+              action.prompt,
+              buildChatUserAttachments(action.attachments),
+              action.entryId,
+              {
+                label: "Steer",
+                labelAction: {
+                  ariaLabel: "Remove steer message",
+                  actionId: action.entryId,
+                },
+              },
+            ),
+          ],
+        },
+      },
+    });
+  }
+
+  if (action.type === "steer_turn_processed") {
+    const turn = state.turnsById[action.turnId];
+    if (turn === undefined) {
+      return state;
+    }
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: state.turnOrder,
+      turnsById: {
+        ...state.turnsById,
+        [action.turnId]: {
+          ...turn,
+          clientUserEntries: turn.clientUserEntries.map((entry) =>
+            entry.id !== action.entryId ? entry : clearEntrySteerPresentation(entry),
+          ),
+        },
+      },
+    });
+  }
+
+  if (action.type === "steer_turn_failed" || action.type === "dismiss_client_user_entry") {
+    const turn = state.turnsById[action.turnId];
+    if (turn === undefined) {
+      return state;
+    }
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: state.turnOrder,
+      turnsById: {
+        ...state.turnsById,
+        [action.turnId]: {
+          ...turn,
+          clientUserEntries: turn.clientUserEntries.filter((entry) => entry.id !== action.entryId),
+        },
+      },
+    });
   }
 
   const turnStartedNotification = TurnStartedNotificationSchema.safeParse(action.notification);

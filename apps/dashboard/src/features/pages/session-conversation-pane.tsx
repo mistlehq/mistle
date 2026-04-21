@@ -28,6 +28,7 @@ type SessionConversationMainContentProps = {
   pendingTurnId: string | null;
   scrollBehavior?: SessionConversationScrollBehavior;
   chatEntries: readonly ChatEntry[];
+  onUserMessageAction?: (actionId: string) => void;
   serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
@@ -59,6 +60,7 @@ export function SessionConversationMainContent({
   pendingTurnId,
   scrollBehavior = "pin-active-turn-to-top",
   chatEntries,
+  onUserMessageAction,
   serverRequestPanelEntries,
   isRespondingToServerRequest,
   onRespondToServerRequest,
@@ -89,6 +91,7 @@ export function SessionConversationMainContent({
         entries={chatEntries}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}
+        {...(onUserMessageAction === undefined ? {} : { onUserMessageAction })}
         pendingServerRequests={serverRequestPanelEntries}
       />
       {pinnedTurnScrollBehavior.pinnedTurnId === null ? null : (

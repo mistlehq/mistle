@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { expect, userEvent, within } from "storybook/test";
 
 import {
   SessionComposerFixtureProps,
@@ -9,6 +10,56 @@ import {
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
 import { noop } from "./chat-story-support.js";
+
+type ShortcutPreviewPlatform = "linux" | "macos" | "windows";
+type ChatComposerStoryArgs = React.ComponentProps<typeof ChatComposer> & {
+  shortcutPreviewPlatform: ShortcutPreviewPlatform;
+};
+
+function detectShortcutPreviewPlatform(): ShortcutPreviewPlatform {
+  if (typeof navigator === "undefined") {
+    return "macos";
+  }
+
+  if (/Mac|iPhone|iPad|iPod/i.test(navigator.platform)) {
+    return "macos";
+  }
+
+  if (/Win/i.test(navigator.platform)) {
+    return "windows";
+  }
+
+  return "linux";
+}
+
+function resolveStoryShortcutLabel(
+  shortcut: string,
+  shortcutPreviewPlatform: ShortcutPreviewPlatform,
+): string {
+  if (shortcut === "enter") {
+    return "Enter";
+  }
+
+  if (shortcut === "mod-enter") {
+    return shortcutPreviewPlatform === "macos" ? "⌘Enter" : "Ctrl+Enter";
+  }
+
+  return shortcut;
+}
+
+function PlatformAwareChatComposerStory(props: ChatComposerStoryArgs): React.JSX.Element {
+  const { keyboardShortcuts, shortcutPreviewPlatform, ...chatComposerProps } = props;
+
+  return (
+    <InteractiveChatComposerStory
+      {...chatComposerProps}
+      keyboardShortcuts={keyboardShortcuts?.map((shortcutHint) => ({
+        ...shortcutHint,
+        shortcut: resolveStoryShortcutLabel(shortcutHint.shortcut, shortcutPreviewPlatform),
+      }))}
+    />
+  );
+}
 
 function InteractiveChatComposerStory(
   props: React.ComponentProps<typeof ChatComposer>,
@@ -57,18 +108,25 @@ function InteractiveChatComposerStory(
 
 const meta = {
   title: "Dashboard/Chat/Composer",
-  component: ChatComposer,
+  component: PlatformAwareChatComposerStory,
   tags: ["autodocs"],
   parameters: {
     layout: "padded",
+  },
+  argTypes: {
+    shortcutPreviewPlatform: {
+      control: "inline-radio",
+      options: ["macos", "windows", "linux"],
+    },
   },
   args: {
     ...SessionComposerFixtureProps,
     modelOptions: CodexFixtureSessionModelOptions,
     onSubmit: noop,
+    shortcutPreviewPlatform: detectShortcutPreviewPlatform(),
   },
-  render: (args) => <InteractiveChatComposerStory {...args} />,
-} satisfies Meta<typeof ChatComposer>;
+  render: (args) => <PlatformAwareChatComposerStory {...args} />,
+} satisfies Meta<typeof PlatformAwareChatComposerStory>;
 
 export default meta;
 
@@ -85,6 +143,43 @@ export const SteeringTurn: Story = {
     composerText: "Focus only on Storybook asset ownership.",
     submitMode: "steer",
     submitLabel: "Steer",
+  },
+};
+
+export const SteeringTurnShortcutHover: Story = {
+  args: {
+    composerText: "Focus only on Storybook asset ownership.",
+    keyboardShortcuts: [
+      { action: "Steer", shortcut: "enter" },
+      { action: "Queue", shortcut: "mod-enter" },
+    ],
+    onSecondarySubmit: noop,
+    secondarySubmitDisabled: false,
+    submitMode: "steer",
+    submitLabel: "Steer",
+  },
+  parameters: {
+    controls: {
+      include: [
+        "shortcutPreviewPlatform",
+        "composerText",
+        "submitMode",
+        "submitLabel",
+        "secondarySubmitDisabled",
+      ],
+    },
+  },
+  render: (args) => <PlatformAwareChatComposerStory {...args} />,
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const submitButton = canvas.getByRole("button", { name: "Steer" });
+
+    await userEvent.hover(submitButton);
+
+    await expect(canvas.getByText("Steer")).toBeVisible();
+    await expect(canvas.getByText("Queue")).toBeVisible();
+    await expect(canvas.getByText("Enter")).toBeVisible();
+    await expect(canvas.getByText(/(⌘Enter|Ctrl\+Enter)/)).toBeVisible();
   },
 };
 

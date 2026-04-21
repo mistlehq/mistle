@@ -5,7 +5,7 @@ export type ChatUserEntry = {
   label?: string;
   labelAction?: {
     ariaLabel: string;
-    onClick: () => void;
+    actionId: string;
   };
   text: string;
   attachments?: readonly {

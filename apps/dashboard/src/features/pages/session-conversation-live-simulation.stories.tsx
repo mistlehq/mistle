@@ -102,6 +102,22 @@ function removeSteerEntryById(input: {
   );
 }
 
+function acceptSteerEntryById(input: {
+  entryId: string;
+  setEntries: React.Dispatch<React.SetStateAction<readonly ChatEntry[]>>;
+}): void {
+  input.setEntries((currentEntries) =>
+    currentEntries.map((entry) => {
+      if (entry.kind !== "user-message" || entry.id !== input.entryId) {
+        return entry;
+      }
+
+      const { label: _label, labelAction: _labelAction, ...acceptedEntry } = entry;
+      return acceptedEntry;
+    }),
+  );
+}
+
 function createLiveHarnessStartedTurnEntries(input: {
   assistantText: string;
   turnId: string;
@@ -144,10 +160,57 @@ function replaceTurnIdInEntries(input: {
   });
 }
 
+function appendAssistantTextAfterLatestTurnEntry(input: {
+  activeTurnId: string;
+  addedText: string;
+  currentEntries: readonly ChatEntry[];
+}): readonly ChatEntry[] {
+  let lastEntryIndex = -1;
+  for (let index = input.currentEntries.length - 1; index >= 0; index -= 1) {
+    const entry = input.currentEntries[index];
+    if (entry?.turnId === input.activeTurnId) {
+      lastEntryIndex = index;
+      break;
+    }
+  }
+
+  if (lastEntryIndex === -1) {
+    return input.currentEntries;
+  }
+
+  const lastEntry = input.currentEntries[lastEntryIndex];
+  if (lastEntry?.kind === "assistant-message") {
+    return input.currentEntries.map((entry, index) => {
+      if (index !== lastEntryIndex || entry.kind !== "assistant-message") {
+        return entry;
+      }
+
+      return {
+        ...entry,
+        status: "streaming",
+        text: `${entry.text}\n\n${input.addedText}`,
+      };
+    });
+  }
+
+  return [
+    ...input.currentEntries,
+    {
+      id: `${input.activeTurnId}:assistant-followup:${crypto.randomUUID()}`,
+      turnId: input.activeTurnId,
+      kind: "assistant-message",
+      phase: null,
+      status: "streaming",
+      text: input.addedText,
+    },
+  ];
+}
+
 function SessionConversationWorkbenchHarness(input: {
   scrollBehavior: SessionConversationScrollBehaviorStoryArg["scrollBehavior"];
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const pendingSteerAcceptanceFrameIdsRef = useRef<number[]>([]);
   const [entries, setEntries] = useState<readonly ChatEntry[]>(LiveHarnessSeedEntries);
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
   const [pendingTurnId, setPendingTurnId] = useState<string | null>(null);
@@ -220,22 +283,31 @@ function SessionConversationWorkbenchHarness(input: {
       ...currentEntries,
       {
         id: steerEntryId,
-        turnId: `steer-turn-${crypto.randomUUID()}`,
+        turnId: activeTurnId,
         kind: "user-message",
         label: "Steer",
         labelAction: {
           ariaLabel: "Remove steer message",
-          onClick: () => {
-            removeSteerEntryById({
-              entryId: steerEntryId,
-              setEntries,
-            });
-          },
+          actionId: steerEntryId,
         },
         status: "completed",
         text: formatSteerMessage(steeringPrompt),
       },
     ]);
+    const outerFrameId = requestAnimationFrame(() => {
+      const innerFrameId = requestAnimationFrame(() => {
+        acceptSteerEntryById({
+          entryId: steerEntryId,
+          setEntries,
+        });
+        pendingSteerAcceptanceFrameIdsRef.current =
+          pendingSteerAcceptanceFrameIdsRef.current.filter(
+            (frameId) => frameId !== outerFrameId && frameId !== innerFrameId,
+          );
+      });
+      pendingSteerAcceptanceFrameIdsRef.current.push(innerFrameId);
+    });
+    pendingSteerAcceptanceFrameIdsRef.current.push(outerFrameId);
     setComposerText("");
   }
 
@@ -307,6 +379,15 @@ function SessionConversationWorkbenchHarness(input: {
     });
   }, [activeTurnId, autoStartingQueuedPromptId, pendingTurnId, queuedPrompts]);
 
+  useEffect(() => {
+    return () => {
+      for (const frameId of pendingSteerAcceptanceFrameIdsRef.current) {
+        cancelAnimationFrame(frameId);
+      }
+      pendingSteerAcceptanceFrameIdsRef.current = [];
+    };
+  }, []);
+
   function streamNextChunk(): void {
     if (activeTurnId === null || pendingTurnId !== null) {
       return;
@@ -316,16 +397,10 @@ function SessionConversationWorkbenchHarness(input: {
 
     setStreamChunkIndex(nextChunkIndex);
     setEntries((currentEntries) =>
-      currentEntries.map((entry) => {
-        if (entry.kind !== "assistant-message" || entry.turnId !== activeTurnId) {
-          return entry;
-        }
-
-        return {
-          ...entry,
-          status: "streaming",
-          text: `${entry.text}\n\n${createStreamingChunk(nextChunkIndex)}`,
-        };
+      appendAssistantTextAfterLatestTurnEntry({
+        activeTurnId,
+        addedText: createStreamingChunk(nextChunkIndex),
+        currentEntries,
       }),
     );
   }
@@ -341,21 +416,19 @@ function SessionConversationWorkbenchHarness(input: {
 
     setStreamChunkIndex(nextChunkIndex);
     setEntries((currentEntries) =>
-      currentEntries.map((entry) => {
-        if (entry.kind !== "assistant-message" || entry.turnId !== activeTurnId) {
-          return entry;
-        }
-
-        return {
-          ...entry,
-          status: "streaming",
-          text: `${entry.text}\n\n${createLargeAssistantBlock(startingChunkIndex, chunkCount)}`,
-        };
+      appendAssistantTextAfterLatestTurnEntry({
+        activeTurnId,
+        addedText: createLargeAssistantBlock(startingChunkIndex, chunkCount),
+        currentEntries,
       }),
     );
   }
 
   function resetHarness(): void {
+    for (const frameId of pendingSteerAcceptanceFrameIdsRef.current) {
+      cancelAnimationFrame(frameId);
+    }
+    pendingSteerAcceptanceFrameIdsRef.current = [];
     setEntries(LiveHarnessSeedEntries);
     setActiveTurnId(null);
     setPendingTurnId(null);
@@ -382,6 +455,12 @@ function SessionConversationWorkbenchHarness(input: {
           chatEntries={entries}
           isRespondingToServerRequest={false}
           isTurnInProgress={activeTurnId !== null}
+          onUserMessageAction={(actionId) => {
+            removeSteerEntryById({
+              entryId: actionId,
+              setEntries,
+            });
+          }}
           onRespondToServerRequest={StorySessionConversationPaneArgs.onRespondToServerRequest}
           pendingTurnId={pendingTurnId}
           scrollContainerRef={scrollContainerRef}
@@ -425,8 +504,8 @@ function SessionConversationWorkbenchHarness(input: {
               keyboardShortcuts:
                 hasRunningTurn && composerText.trim().length > 0
                   ? [
-                      { action: "Steer", shortcut: "Enter" },
-                      { action: "Queue", shortcut: "⌘Enter" },
+                      { action: "Steer", shortcut: "enter" },
+                      { action: "Queue", shortcut: "mod-enter" },
                     ]
                   : [],
               modelOptions: CodexFixtureSessionModelOptions,
