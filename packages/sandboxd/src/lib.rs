@@ -8,6 +8,12 @@
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::{Once, OnceLock};
+
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_sdk::trace::SdkTracerProvider;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 pub mod bootstrap;
 pub mod cgroups;
@@ -34,6 +40,26 @@ pub mod time;
 pub mod tunnel;
 
 use crate::time::ThreadSleeper;
+
+static TRACING_INIT: Once = Once::new();
+static TRACER_PROVIDER: OnceLock<SdkTracerProvider> = OnceLock::new();
+
+fn initialize_sandboxd_tracing() {
+    TRACING_INIT.call_once(|| {
+        let tracer_provider = TRACER_PROVIDER.get_or_init(SdkTracerProvider::default);
+        let tracer = tracer_provider.tracer("sandboxd");
+        let fmt_layer = tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .with_target(false)
+            .with_writer(std::io::stderr);
+        let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        let _ = tracing_subscriber::registry()
+            .with(otel_layer)
+            .with(fmt_layer)
+            .try_init();
+    });
+}
 
 /// Enumerates the top-level `sandboxd` subcommands the CLI currently supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,6 +136,8 @@ where
     W: io::Write,
     E: io::Write,
 {
+    initialize_sandboxd_tracing();
+
     let parsed_args: Vec<String> = args.into_iter().map(Into::into).collect();
     let command = if is_signer_alias(program_name) {
         SandboxdCommand::Sign

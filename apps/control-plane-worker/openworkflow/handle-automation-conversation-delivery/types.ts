@@ -35,6 +35,15 @@ export type ExecuteConversationProviderDeliveryInput = {
   runtimeId: string;
   connectionUrl: string;
   inputText: string;
+  deliveryContext: {
+    webhookEventId: string;
+    deliveryTaskId: string;
+    externalDeliveryId?: string | undefined;
+    automationRunId: string;
+    conversationId: string;
+    sandboxInstanceId: string;
+    routeId?: string | undefined;
+  };
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   providerConversationId: string | null;
   providerExecutionId: string | null;

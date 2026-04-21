@@ -490,6 +490,9 @@ async function initializeProviderConnection(
       request: async (requestInput) => {
         return await sendJsonRpcRequest(rpcClient, requestInput);
       },
+      notify: async (notificationInput) => {
+        await rpcClient.notify(notificationInput.method, notificationInput.params);
+      },
       close: async () => {
         rpcClient.dispose();
         await connection.close();

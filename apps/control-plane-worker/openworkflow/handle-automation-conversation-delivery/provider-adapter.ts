@@ -39,6 +39,7 @@ export type ProviderConnectInput = {
 
 export type ProviderConnection = {
   request: (input: { method: string; params?: unknown }) => Promise<unknown>;
+  notify?: (input: { method: string; params?: unknown }) => Promise<void>;
   close: () => Promise<void>;
 };
 

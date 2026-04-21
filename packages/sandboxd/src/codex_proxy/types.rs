@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::oneshot;
 use tungstenite::Message;
@@ -67,9 +68,56 @@ pub enum ProxyClientKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeliveryContext {
+    pub traceparent: String,
+    pub tracestate: Option<String>,
+    pub baggage: Option<String>,
+    pub webhook_event_id: String,
+    pub delivery_task_id: String,
+    pub external_delivery_id: Option<String>,
+    pub automation_run_id: String,
+    pub conversation_id: String,
+    pub sandbox_instance_id: String,
+    pub route_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeliveryContextPayload {
+    pub traceparent: String,
+    pub tracestate: Option<String>,
+    pub baggage: Option<String>,
+    pub webhook_event_id: String,
+    pub delivery_task_id: String,
+    pub external_delivery_id: Option<String>,
+    pub automation_run_id: String,
+    pub conversation_id: String,
+    pub sandbox_instance_id: String,
+    pub route_id: Option<String>,
+}
+
+impl From<DeliveryContextPayload> for DeliveryContext {
+    fn from(value: DeliveryContextPayload) -> Self {
+        Self {
+            traceparent: value.traceparent,
+            tracestate: value.tracestate,
+            baggage: value.baggage,
+            webhook_event_id: value.webhook_event_id,
+            delivery_task_id: value.delivery_task_id,
+            external_delivery_id: value.external_delivery_id,
+            automation_run_id: value.automation_run_id,
+            conversation_id: value.conversation_id,
+            sandbox_instance_id: value.sandbox_instance_id,
+            route_id: value.route_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PendingClientRequest {
     pub method: String,
     pub thread_id: Option<String>,
+    pub delivery_context: Option<DeliveryContext>,
 }
 
 #[derive(Debug)]

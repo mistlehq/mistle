@@ -1,3 +1,5 @@
+import { extractActiveW3cTraceCarrier } from "@mistle/telemetry/trace-context.js";
+
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,
@@ -12,6 +14,36 @@ import {
 } from "./types.js";
 
 class ConversationDeliveryExecutionError extends Error {}
+
+const DeliveryContextNotificationMethod = "mistle/setDeliveryContext";
+
+type DeliveryTraceCarrier = {
+  traceparent: string;
+  tracestate?: string;
+  baggage?: string;
+};
+
+type DeliveryContextNotificationParams =
+  ExecuteConversationProviderDeliveryInput["deliveryContext"] & DeliveryTraceCarrier;
+
+function readActiveDeliveryTraceCarrier(): DeliveryTraceCarrier {
+  const activeTraceCarrier = extractActiveW3cTraceCarrier();
+  if (activeTraceCarrier === null) {
+    throw new ConversationDeliveryExecutionError(
+      "Automation conversation delivery requires an active OpenTelemetry trace context before sending delivery context to Codex proxy.",
+    );
+  }
+  return activeTraceCarrier;
+}
+
+export function resolveDeliveryContextNotificationParams(
+  deliveryContext: ExecuteConversationProviderDeliveryInput["deliveryContext"],
+): DeliveryContextNotificationParams {
+  return {
+    ...deliveryContext,
+    ...readActiveDeliveryTraceCarrier(),
+  };
+}
 
 async function steerConversationExecution(input: {
   adapter: ReturnType<typeof getConversationProviderAdapter>;
@@ -103,6 +135,17 @@ export async function executeConversationProviderDelivery(
   });
 
   try {
+    if (connection.notify === undefined) {
+      throw new ConversationDeliveryExecutionError(
+        `Agent runtime '${input.runtimeId}' does not support sending delivery context notifications before conversation delivery.`,
+      );
+    }
+
+    await connection.notify({
+      method: DeliveryContextNotificationMethod,
+      params: resolveDeliveryContextNotificationParams(input.deliveryContext),
+    });
+
     let providerConversationId = input.providerConversationId;
     let createdConversationState: unknown;
     if (providerConversationId === null) {

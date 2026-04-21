@@ -167,6 +167,19 @@ export async function deliverConversationAutomationPayload(
         runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
         connectionUrl: input.acquiredAutomationConnection.url,
         inputText: input.preparedAutomationRun.renderedInput,
+        deliveryContext: {
+          webhookEventId: input.preparedAutomationRun.webhookEventId,
+          deliveryTaskId: input.taskId,
+          ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+            ? {}
+            : {
+                externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,
+              }),
+          automationRunId: input.preparedAutomationRun.automationRunId,
+          conversationId: input.preparedAutomationRun.conversationId,
+          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+          routeId: activeRoute.id,
+        },
         ...(input.preparedAutomationRun.instructions === null ||
         input.preparedAutomationRun.collaborationModeSettings === null
           ? {}

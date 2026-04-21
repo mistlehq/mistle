@@ -1,18 +1,28 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::io::ErrorKind;
+use std::sync::OnceLock;
 
 use futures_util::{SinkExt, StreamExt};
+use opentelemetry::Context as OtelContext;
+use opentelemetry::propagation::{Extractor, TextMapCompositePropagator, TextMapPropagator};
+use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 use serde_json::{Value, json};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{accept_async, connect_async};
+use tracing::{field, info, info_span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tungstenite::Message;
 
-use crate::codex_proxy::types::{BufferedSuccessResponse, PendingClientRequest, ProxyClientKind};
+use crate::codex_proxy::types::{
+    BufferedSuccessResponse, DeliveryContext, DeliveryContextPayload, PendingClientRequest,
+    ProxyClientKind,
+};
 use crate::codex_proxy::{
     CodexProxyError, CodexSessionManagerError, CodexSessionManagerHandle,
     MISTLE_AGENT_CLIENT_TITLE, RetainReason, is_connection_termination_error,
 };
+const SET_DELIVERY_CONTEXT_METHOD: &str = "mistle/setDeliveryContext";
 const TURN_START_METHOD: &str = "turn/start";
 const TURN_STEER_METHOD: &str = "turn/steer";
 const RETENTION_FAILURE_ERROR_CODE: i64 = -32000;
@@ -22,6 +32,132 @@ const RETENTION_FAILURE_ERROR_MESSAGE: &str =
 struct RetentionResult {
     request_key: String,
     result: Result<(), CodexSessionManagerError>,
+}
+
+struct MatchedRetentionTarget {
+    request_key: String,
+    thread_id: String,
+    turn_id: String,
+    delivery_context: Option<DeliveryContext>,
+}
+
+static DELIVERY_CONTEXT_PROPAGATOR: OnceLock<TextMapCompositePropagator> = OnceLock::new();
+
+fn read_trace_id(traceparent: &str) -> Option<&str> {
+    let mut parts = traceparent.split('-');
+    let _version = parts.next()?;
+    let trace_id = parts.next()?;
+    let _parent_span_id = parts.next()?;
+    let _trace_flags = parts.next()?;
+    if parts.next().is_some() || trace_id.len() != 32 {
+        return None;
+    }
+
+    Some(trace_id)
+}
+
+fn delivery_trace_id(delivery_context: &DeliveryContext) -> &str {
+    read_trace_id(delivery_context.traceparent.as_str()).unwrap_or("unknown")
+}
+
+fn start_delivery_proxy_span(
+    method: &str,
+    delivery_context: &DeliveryContext,
+    thread_id: Option<&str>,
+) -> tracing::Span {
+    let delivery_span = info_span!(
+        "sandboxd.codex_proxy.delivery_request",
+        "otel.trace_id" = %delivery_trace_id(delivery_context),
+        "mistle.traceparent" = %delivery_context.traceparent,
+        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
+        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.conversation_id" = %delivery_context.conversation_id,
+        "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
+        "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
+        "rpc.method" = %method,
+        "thread.id" = field::display(thread_id.unwrap_or("")),
+    );
+    let _ = delivery_span.set_parent(extract_delivery_parent_context(delivery_context));
+    delivery_span
+}
+
+fn log_delivery_context_received(delivery_context: &DeliveryContext) {
+    info!(
+        event = "codex_proxy.delivery_context.received",
+        "otel.trace_id" = %delivery_trace_id(delivery_context),
+        "mistle.traceparent" = %delivery_context.traceparent,
+        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
+        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.conversation_id" = %delivery_context.conversation_id,
+        "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
+        "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
+        "mistle.external_delivery_id" =
+            field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
+        "mistle.tracestate" = field::display(delivery_context.tracestate.as_deref().unwrap_or("")),
+        "mistle.baggage" = field::display(delivery_context.baggage.as_deref().unwrap_or("")),
+        "rpc.method" = SET_DELIVERY_CONTEXT_METHOD,
+        "sandboxd.codex_proxy.delivery_context" = "updated",
+    );
+}
+
+fn log_delivery_context_mapping(
+    delivery_context: &DeliveryContext,
+    thread_id: &str,
+    turn_id: &str,
+) {
+    info!(
+        event = "codex_proxy.delivery_context.mapped",
+        "otel.trace_id" = %delivery_trace_id(delivery_context),
+        "mistle.traceparent" = %delivery_context.traceparent,
+        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
+        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.conversation_id" = %delivery_context.conversation_id,
+        "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
+        "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
+        "thread.id" = %thread_id,
+        "turn.id" = %turn_id,
+    );
+}
+
+struct DeliveryContextExtractor<'a> {
+    delivery_context: &'a DeliveryContext,
+}
+
+impl Extractor for DeliveryContextExtractor<'_> {
+    fn get(&self, key: &str) -> Option<&str> {
+        match key {
+            "traceparent" => Some(self.delivery_context.traceparent.as_str()),
+            "tracestate" => self.delivery_context.tracestate.as_deref(),
+            "baggage" => self.delivery_context.baggage.as_deref(),
+            _ => None,
+        }
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        let mut keys = vec!["traceparent"];
+        if self.delivery_context.tracestate.is_some() {
+            keys.push("tracestate");
+        }
+        if self.delivery_context.baggage.is_some() {
+            keys.push("baggage");
+        }
+
+        keys
+    }
+}
+
+fn extract_delivery_parent_context(delivery_context: &DeliveryContext) -> OtelContext {
+    DELIVERY_CONTEXT_PROPAGATOR
+        .get_or_init(|| {
+            TextMapCompositePropagator::new(vec![
+                Box::new(TraceContextPropagator::new()),
+                Box::new(BaggagePropagator::new()),
+            ])
+        })
+        .extract(&DeliveryContextExtractor { delivery_context })
 }
 
 pub async fn relay_codex_proxy_connection(
@@ -39,7 +175,10 @@ pub async fn relay_codex_proxy_connection(
 
     let (retention_result_sender, mut retention_result_receiver) = mpsc::unbounded_channel();
     let mut client_kind = ProxyClientKind::Unknown;
+    let mut current_delivery_context: Option<DeliveryContext> = None;
     let mut pending_requests = BTreeMap::<String, PendingClientRequest>::new();
+    let mut thread_delivery_contexts = BTreeMap::<String, DeliveryContext>::new();
+    let mut turn_delivery_contexts = BTreeMap::<String, DeliveryContext>::new();
     let mut buffered_success_responses = VecDeque::<BufferedSuccessResponse>::new();
     let mut next_response_sequence = 0_u64;
 
@@ -64,11 +203,17 @@ pub async fn relay_codex_proxy_connection(
                             return Ok(());
                         }
 
-                        track_client_message(&message, &mut client_kind, &mut pending_requests)?;
-                        raw_socket
-                            .send(message)
-                            .await
-                            .map_err(CodexProxyError::WriteSocket)?;
+                        if should_forward_client_message(
+                            &message,
+                            &mut client_kind,
+                            &mut current_delivery_context,
+                            &mut pending_requests,
+                        )? {
+                            raw_socket
+                                .send(message)
+                                .await
+                                .map_err(CodexProxyError::WriteSocket)?;
+                        }
                     }
                     Some(Err(error)) if is_connection_termination_error(&error) => return Ok(()),
                     Some(Err(error)) => return Err(CodexProxyError::ReadSocket(error)),
@@ -86,9 +231,32 @@ pub async fn relay_codex_proxy_connection(
                             return Ok(());
                         }
 
-                        if let Some((request_key, thread_id)) =
+                        if let Some(retention_target) =
                             matched_retention_target(&message, &client_kind, &mut pending_requests)?
                         {
+                            if let Some(delivery_context) = retention_target.delivery_context.clone()
+                            {
+                                thread_delivery_contexts
+                                    .insert(retention_target.thread_id.clone(), delivery_context.clone());
+                                turn_delivery_contexts
+                                    .insert(retention_target.turn_id.clone(), delivery_context);
+                                if let (Some(thread_delivery_context), Some(turn_delivery_context)) = (
+                                    thread_delivery_contexts
+                                        .get(retention_target.thread_id.as_str()),
+                                    turn_delivery_contexts
+                                        .get(retention_target.turn_id.as_str()),
+                                ) {
+                                    debug_assert_eq!(
+                                        thread_delivery_context.delivery_task_id,
+                                        turn_delivery_context.delivery_task_id
+                                    );
+                                    log_delivery_context_mapping(
+                                        turn_delivery_context,
+                                        retention_target.thread_id.as_str(),
+                                        retention_target.turn_id.as_str(),
+                                    );
+                                }
+                            }
                             next_response_sequence = next_response_sequence.saturating_add(1);
                             buffered_success_responses.push_back(BufferedSuccessResponse {
                                 request_id: parse_json_rpc_id_from_message(&message)?,
@@ -101,12 +269,12 @@ pub async fn relay_codex_proxy_connection(
                             tokio::spawn(async move {
                                 let result = session_manager_handle
                                     .retain_thread(
-                                        thread_id,
+                                        retention_target.thread_id,
                                         RetainReason::MistleAgentBackgroundExecution,
                                     )
                                     .await;
                                 let _ = retention_result_sender.send(RetentionResult {
-                                    request_key,
+                                    request_key: retention_target.request_key,
                                     result,
                                 });
                             });
@@ -129,17 +297,18 @@ pub async fn relay_codex_proxy_connection(
     }
 }
 
-fn track_client_message(
+fn should_forward_client_message(
     message: &Message,
     client_kind: &mut ProxyClientKind,
+    current_delivery_context: &mut Option<DeliveryContext>,
     pending_requests: &mut BTreeMap<String, PendingClientRequest>,
-) -> Result<(), CodexProxyError> {
+) -> Result<bool, CodexProxyError> {
     let Some(value) = parse_json_value_from_message(message)? else {
-        return Ok(());
+        return Ok(true);
     };
 
     let Some(method) = value.get("method").and_then(Value::as_str) else {
-        return Ok(());
+        return Ok(true);
     };
 
     if method == "initialize" {
@@ -148,12 +317,18 @@ fn track_client_message(
             _ => ProxyClientKind::Other,
         };
     }
+    if method == SET_DELIVERY_CONTEXT_METHOD {
+        let delivery_context = parse_delivery_context_payload(&value)?;
+        log_delivery_context_received(&delivery_context);
+        *current_delivery_context = Some(delivery_context);
+        return Ok(false);
+    }
 
     let Some(request_id) = value.get("id").cloned() else {
-        return Ok(());
+        return Ok(true);
     };
     let Some(request_key) = json_rpc_id_key(&request_id) else {
-        return Ok(());
+        return Ok(true);
     };
     let thread_id = match method {
         TURN_START_METHOD | TURN_STEER_METHOD => value["params"]["threadId"]
@@ -165,18 +340,33 @@ fn track_client_message(
         request_key,
         PendingClientRequest {
             method: method.to_string(),
-            thread_id,
+            thread_id: thread_id.clone(),
+            delivery_context: current_delivery_context.clone(),
         },
     );
 
-    Ok(())
+    if let Some(delivery_context) = current_delivery_context.as_ref() {
+        let delivery_span =
+            start_delivery_proxy_span(method, delivery_context, thread_id.as_deref());
+        let _entered = delivery_span.enter();
+        info!(
+            event = "codex_proxy.delivery_request.forwarded",
+            "otel.trace_id" = %delivery_trace_id(delivery_context),
+            "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
+            "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+            "rpc.method" = %method,
+            "thread.id" = field::display(thread_id.as_deref().unwrap_or("")),
+        );
+    }
+
+    Ok(true)
 }
 
 fn matched_retention_target(
     message: &Message,
     client_kind: &ProxyClientKind,
     pending_requests: &mut BTreeMap<String, PendingClientRequest>,
-) -> Result<Option<(String, String)>, CodexProxyError> {
+) -> Result<Option<MatchedRetentionTarget>, CodexProxyError> {
     let Some(value) = parse_json_value_from_message(message)? else {
         return Ok(None);
     };
@@ -200,16 +390,31 @@ fn matched_retention_target(
     let Some(thread_id) = pending_request.thread_id else {
         return Ok(None);
     };
-    let has_turn_id = match pending_request.method.as_str() {
-        TURN_START_METHOD => value["result"]["turn"]["id"].as_str().is_some(),
-        TURN_STEER_METHOD => value["result"]["turnId"].as_str().is_some(),
-        _ => false,
+    let turn_id = match pending_request.method.as_str() {
+        TURN_START_METHOD => value["result"]["turn"]["id"]
+            .as_str()
+            .map(ToString::to_string),
+        TURN_STEER_METHOD => value["result"]["turnId"].as_str().map(ToString::to_string),
+        _ => None,
     };
-    if !has_turn_id {
+    let Some(turn_id) = turn_id else {
         return Ok(None);
-    }
+    };
 
-    Ok(Some((request_key, thread_id)))
+    Ok(Some(MatchedRetentionTarget {
+        request_key,
+        thread_id,
+        turn_id,
+        delivery_context: pending_request.delivery_context,
+    }))
+}
+
+fn parse_delivery_context_payload(value: &Value) -> Result<DeliveryContext, CodexProxyError> {
+    let payload = serde_json::from_value::<DeliveryContextPayload>(
+        value.get("params").cloned().unwrap_or(Value::Null),
+    )
+    .map_err(CodexProxyError::InvalidJson)?;
+    Ok(payload.into())
 }
 
 fn record_retention_result(
@@ -345,24 +550,93 @@ fn json_rpc_id_key(request_id: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
+    use std::io;
+    use std::sync::{Arc, Mutex};
 
+    use opentelemetry::trace::{TraceContextExt, TracerProvider as _};
+    use opentelemetry_sdk::trace::SdkTracerProvider;
     use serde_json::json;
+    use tracing::info;
+    use tracing_opentelemetry::OpenTelemetrySpanExt;
+    use tracing_subscriber::layer::SubscriberExt;
     use tungstenite::Message;
 
-    use crate::codex_proxy::{
-        BufferedSuccessResponse, CodexSessionManagerError, PendingClientRequest, ProxyClientKind,
+    use crate::codex_proxy::CodexSessionManagerError;
+    use crate::codex_proxy::types::{
+        BufferedSuccessResponse, DeliveryContext, PendingClientRequest, ProxyClientKind,
     };
 
     use super::{
-        matched_retention_target, take_ready_buffered_success_responses, track_client_message,
+        log_delivery_context_mapping, matched_retention_target, should_forward_client_message,
+        start_delivery_proxy_span, take_ready_buffered_success_responses,
     };
+
+    #[derive(Clone, Default)]
+    struct SharedLogWriter {
+        buffer: Arc<Mutex<Vec<u8>>>,
+    }
+
+    struct SharedLogWriterHandle {
+        buffer: Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl SharedLogWriter {
+        fn contents(&self) -> String {
+            let bytes = self
+                .buffer
+                .lock()
+                .expect("shared log buffer should not be poisoned")
+                .clone();
+            String::from_utf8(bytes).expect("shared log buffer should contain utf8")
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedLogWriter {
+        type Writer = SharedLogWriterHandle;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            SharedLogWriterHandle {
+                buffer: self.buffer.clone(),
+            }
+        }
+    }
+
+    impl io::Write for SharedLogWriterHandle {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.buffer
+                .lock()
+                .expect("shared log buffer should not be poisoned")
+                .extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn test_delivery_context() -> DeliveryContext {
+        DeliveryContext {
+            traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
+            tracestate: Some("vendor=value".to_string()),
+            baggage: Some("automation=webhook".to_string()),
+            webhook_event_id: "iwe_123".to_string(),
+            delivery_task_id: "cdt_123".to_string(),
+            external_delivery_id: Some("slack_delivery_123".to_string()),
+            automation_run_id: "aru_123".to_string(),
+            conversation_id: "acv_123".to_string(),
+            sandbox_instance_id: "sbi_123".to_string(),
+            route_id: Some("acr_123".to_string()),
+        }
+    }
 
     #[test]
     fn classifies_mistle_agent_client_initialize_requests() {
         let mut client_kind = ProxyClientKind::Unknown;
+        let mut current_delivery_context = None;
         let mut pending_requests = std::collections::BTreeMap::new();
 
-        track_client_message(
+        let should_forward = should_forward_client_message(
             &Message::Text(
                 json!({
                     "id": 1,
@@ -379,11 +653,60 @@ mod tests {
                 .into(),
             ),
             &mut client_kind,
+            &mut current_delivery_context,
             &mut pending_requests,
         )
         .expect("initialize request should parse");
 
+        assert!(should_forward);
         assert_eq!(client_kind, ProxyClientKind::MistleAgentClient);
+    }
+
+    #[test]
+    fn intercepts_delivery_context_notifications_and_stores_context() {
+        let mut client_kind = ProxyClientKind::MistleAgentClient;
+        let mut current_delivery_context = None;
+        let mut pending_requests = std::collections::BTreeMap::new();
+
+        let should_forward = should_forward_client_message(
+            &Message::Text(
+                json!({
+                    "method": "mistle/setDeliveryContext",
+                    "params": {
+                        "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+                        "webhookEventId": "iwe_123",
+                        "deliveryTaskId": "cdt_123",
+                        "automationRunId": "aru_123",
+                        "conversationId": "acv_123",
+                        "sandboxInstanceId": "sbi_123"
+                    }
+                })
+                .to_string()
+                .into(),
+            ),
+            &mut client_kind,
+            &mut current_delivery_context,
+            &mut pending_requests,
+        )
+        .expect("delivery context notification should parse");
+
+        assert!(!should_forward);
+        assert!(pending_requests.is_empty());
+        assert_eq!(
+            current_delivery_context,
+            Some(DeliveryContext {
+                traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
+                tracestate: None,
+                baggage: None,
+                webhook_event_id: "iwe_123".to_string(),
+                delivery_task_id: "cdt_123".to_string(),
+                external_delivery_id: None,
+                automation_run_id: "aru_123".to_string(),
+                conversation_id: "acv_123".to_string(),
+                sandbox_instance_id: "sbi_123".to_string(),
+                route_id: None,
+            })
+        );
     }
 
     #[test]
@@ -393,6 +716,7 @@ mod tests {
             PendingClientRequest {
                 method: "turn/steer".to_string(),
                 thread_id: Some("thr_123".to_string()),
+                delivery_context: Some(test_delivery_context()),
             },
         )]);
 
@@ -412,7 +736,53 @@ mod tests {
         )
         .expect("turn/steer response should parse");
 
-        assert_eq!(matched, Some(("17".to_string(), "thr_123".to_string())));
+        let matched = matched.expect("turn/steer response should match retention target");
+        assert_eq!(matched.request_key, "17");
+        assert_eq!(matched.thread_id, "thr_123");
+        assert_eq!(matched.turn_id, "turn_123");
+        assert_eq!(
+            matched
+                .delivery_context
+                .map(|context| context.delivery_task_id),
+            Some("cdt_123".to_string())
+        );
+    }
+
+    #[test]
+    fn delivery_proxy_spans_join_parent_trace_and_logs_expose_delivery_mapping() {
+        let log_writer = SharedLogWriter::default();
+        let tracer_provider = SdkTracerProvider::default();
+        let tracer = tracer_provider.tracer("sandboxd-test");
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_opentelemetry::layer().with_tracer(tracer))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .without_time()
+                    .with_target(false)
+                    .with_writer(log_writer.clone()),
+            );
+        let delivery_context = test_delivery_context();
+
+        tracing::subscriber::with_default(subscriber, || {
+            let delivery_span =
+                start_delivery_proxy_span("turn/start", &delivery_context, Some("thr_123"));
+            let span_context = delivery_span.context();
+            let _entered = delivery_span.enter();
+            info!(event = "codex_proxy.test.forwarded");
+            log_delivery_context_mapping(&delivery_context, "thr_123", "turn_123");
+
+            assert_eq!(
+                span_context.span().span_context().trace_id().to_string(),
+                "0123456789abcdef0123456789abcdef"
+            );
+        });
+
+        let output = log_writer.contents();
+        assert!(output.contains("cdt_123"));
+        assert!(output.contains("iwe_123"));
+        assert!(output.contains("thr_123"));
+        assert!(output.contains("turn_123"));
+        assert!(output.contains("0123456789abcdef0123456789abcdef"));
     }
 
     #[test]

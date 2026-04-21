@@ -5,8 +5,14 @@ export type AgentConversationRequest = {
   params?: unknown;
 };
 
+export type AgentConversationNotification = {
+  method: string;
+  params?: unknown;
+};
+
 export type AgentConversationConnection = {
   request(this: void, input: AgentConversationRequest): Promise<unknown>;
+  notify?(this: void, input: AgentConversationNotification): Promise<void>;
   close(this: void): Promise<void>;
 };
 

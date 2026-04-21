@@ -19,6 +19,8 @@ hyper-util = { version = "0.1.17", features = [
   "tokio",
 ] }
 nix = { version = "0.31.2", features = ["fs", "process", "signal", "socket", "user"] }
+opentelemetry = { version = "0.31", features = ["trace"] }
+opentelemetry_sdk = { version = "0.31", features = ["trace"] }
 portable-pty = "0.9.0"
 rcgen = "0.13.2"
 reqwest = { version = "0.13.2", default-features = false, features = [
@@ -42,5 +44,8 @@ tokio = { version = "1.47.1", features = [
 ] }
 tokio-rustls = "0.26.4"
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-native-roots"] }
+tracing = "0.1.44"
+tracing-opentelemetry = "0.32.1"
+tracing-subscriber = { version = "0.3.20", features = ["fmt", "std"] }
 tungstenite = "0.28.0"
 url = "2.5.7"
