@@ -9,6 +9,7 @@ import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 import { systemClock, systemSleeper } from "@mistle/time";
 
+import { logger } from "../../../logger.js";
 import {
   SandboxInstancesConflictCodes,
   SandboxInstancesConflictError,
@@ -16,6 +17,7 @@ import {
   SandboxInstancesNotFoundError,
 } from "../../../sandbox-instances/errors.js";
 import { resolveActingUserGitIdentity } from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
+import { withSandboxRuntimeSpan } from "../telemetry.js";
 
 const ConnectionWaitTimeoutMs = 30_000;
 const ConnectionWaitPollIntervalMs = 250;
@@ -107,26 +109,54 @@ async function waitForRunningSandboxInstance(
     instanceId: string;
   },
 ): Promise<ExistingSandboxInstance> {
-  const deadlineMs = systemClock.nowMs() + ConnectionWaitTimeoutMs;
+  return await withSandboxRuntimeSpan(
+    {
+      name: "sandbox_runtime.connection.wait_running",
+      telemetryContext: {
+        sandboxInstanceId: input.instanceId,
+      },
+    },
+    async (span) => {
+      const waitStartedAt = systemClock.nowMs();
+      const deadlineMs = waitStartedAt + ConnectionWaitTimeoutMs;
+      let pollCount = 0;
 
-  while (true) {
-    const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, input);
+      while (true) {
+        const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, input);
+        pollCount += 1;
 
-    if (sandboxInstance.status === "running") {
-      return sandboxInstance;
-    }
+        span.setAttributes({
+          "mistle.sandbox.poll_count": pollCount,
+          "mistle.sandbox.status": sandboxInstance.status,
+        });
 
-    if (sandboxInstance.status === "failed") {
-      throw createInstanceFailedError(sandboxInstance);
-    }
+        if (sandboxInstance.status === "running") {
+          span.setAttribute("mistle.sandbox.wait_ms", systemClock.nowMs() - waitStartedAt);
+          logger.info(
+            {
+              eventName: "sandbox.running",
+              "mistle.sandbox.instance_id": input.instanceId,
+              "mistle.sandbox.poll_count": pollCount,
+              "mistle.sandbox.wait_ms": systemClock.nowMs() - waitStartedAt,
+            },
+            "Sandbox instance became running while minting a connection token",
+          );
+          return sandboxInstance;
+        }
 
-    const remainingMs = deadlineMs - systemClock.nowMs();
-    if (remainingMs <= 0) {
-      throw createInstanceNotResumableError(sandboxInstance);
-    }
+        if (sandboxInstance.status === "failed") {
+          throw createInstanceFailedError(sandboxInstance);
+        }
 
-    await systemSleeper.sleep(Math.min(remainingMs, ConnectionWaitPollIntervalMs));
-  }
+        const remainingMs = deadlineMs - systemClock.nowMs();
+        if (remainingMs <= 0) {
+          throw createInstanceNotResumableError(sandboxInstance);
+        }
+
+        await systemSleeper.sleep(Math.min(remainingMs, ConnectionWaitPollIntervalMs));
+      }
+    },
+  );
 }
 
 export async function mintConnectionToken(
@@ -157,58 +187,109 @@ export async function mintConnectionToken(
   token: string;
   expiresAt: string;
 }> {
-  let sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
-    organizationId: input.organizationId,
-    instanceId: input.instanceId,
-  });
+  return await withSandboxRuntimeSpan(
+    {
+      name: "sandbox_runtime.connection.mint",
+      telemetryContext: {
+        sandboxInstanceId: input.instanceId,
+      },
+    },
+    async (span) => {
+      logger.info(
+        {
+          eventName: "connection_token.mint_started",
+          "mistle.sandbox.instance_id": input.instanceId,
+        },
+        "Minting sandbox connection token",
+      );
 
-  if (sandboxInstance.status === "failed") {
-    throw createInstanceFailedError(sandboxInstance);
-  }
+      const mintStartedAt = systemClock.nowMs();
 
-  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-    });
-  } else if (sandboxInstance.status === "stopped") {
-    const gitIdentity =
-      input.actingUserId === undefined
-        ? undefined
-        : await resolveActingUserGitIdentity(db, {
+      try {
+        let sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, {
+          organizationId: input.organizationId,
+          instanceId: input.instanceId,
+        });
+
+        if (sandboxInstance.status === "failed") {
+          throw createInstanceFailedError(sandboxInstance);
+        }
+
+        if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
+          sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
             organizationId: input.organizationId,
-            actingUser: {
-              userId: input.actingUserId,
-            },
+            instanceId: input.instanceId,
           });
+        } else if (sandboxInstance.status === "stopped") {
+          logger.info(
+            {
+              eventName: "sandbox.resume_requested",
+              "mistle.sandbox.instance_id": input.instanceId,
+            },
+            "Requested sandbox resume while minting a connection token",
+          );
 
-    await dataPlaneClient.resumeSandboxInstance({
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-      ...(gitIdentity === undefined ? {} : { gitIdentity }),
-    });
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
-      organizationId: input.organizationId,
-      instanceId: input.instanceId,
-    });
-  }
+          const gitIdentity =
+            input.actingUserId === undefined
+              ? undefined
+              : await resolveActingUserGitIdentity(db, {
+                  organizationId: input.organizationId,
+                  actingUser: {
+                    userId: input.actingUserId,
+                  },
+                });
 
-  const token = await mintGatewayConnectionToken({
-    config: tokenConfig,
-    jti: createTokenJti(sandboxInstance.id),
-    sandboxInstanceId: sandboxInstance.id,
-    ttlSeconds: tokenTtlSeconds,
-  });
+          await dataPlaneClient.resumeSandboxInstance({
+            organizationId: input.organizationId,
+            instanceId: input.instanceId,
+            ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+            ...(gitIdentity === undefined ? {} : { gitIdentity }),
+          });
+          sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
+            organizationId: input.organizationId,
+            instanceId: input.instanceId,
+          });
+        }
 
-  return {
-    instanceId: sandboxInstance.id,
-    url: createConnectionUrl({
-      gatewayWebsocketUrl,
-      sandboxInstanceId: sandboxInstance.id,
-      token,
-    }),
-    token,
-    expiresAt: createExpirationIso(tokenTtlSeconds),
-  };
+        const token = await mintGatewayConnectionToken({
+          config: tokenConfig,
+          jti: createTokenJti(sandboxInstance.id),
+          sandboxInstanceId: sandboxInstance.id,
+          ttlSeconds: tokenTtlSeconds,
+        });
+        const mintDurationMs = systemClock.nowMs() - mintStartedAt;
+
+        span.setAttribute("mistle.connection.mint_ms", mintDurationMs);
+        logger.info(
+          {
+            eventName: "connection_token.minted",
+            "mistle.connection.mint_ms": mintDurationMs,
+            "mistle.sandbox.instance_id": sandboxInstance.id,
+          },
+          "Minted sandbox connection token",
+        );
+
+        return {
+          instanceId: sandboxInstance.id,
+          url: createConnectionUrl({
+            gatewayWebsocketUrl,
+            sandboxInstanceId: sandboxInstance.id,
+            token,
+          }),
+          token,
+          expiresAt: createExpirationIso(tokenTtlSeconds),
+        };
+      } catch (error) {
+        logger.error(
+          {
+            err: error,
+            eventName: "connection_token.failed",
+            "mistle.sandbox.instance_id": input.instanceId,
+          },
+          "Failed to mint sandbox connection token",
+        );
+        throw error;
+      }
+    },
+  );
 }

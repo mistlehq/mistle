@@ -22,6 +22,10 @@ import {
 } from "./conversation-delivery-planning.js";
 import { executeConversationProviderDelivery } from "./execute-conversation-provider-delivery.js";
 import { seedSandboxInstanceTitle } from "./seed-sandbox-instance-title.js";
+import {
+  logAutomationConversationDeliveryEvent,
+  withAutomationConversationDeliverySpan,
+} from "./telemetry.js";
 import type {
   AcquiredAutomationConnection,
   ResolvedAutomationConversationDeliveryRoute,
@@ -42,6 +46,7 @@ export async function deliverConversationAutomationPayload(
     resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
     ensuredAutomationSandbox: EnsuredAutomationSandbox;
     acquiredAutomationConnection: AcquiredAutomationConnection;
+    workflowRunId: string;
   },
 ): Promise<void> {
   const task = await ctx.db.query.automationConversationDeliveryTasks.findFirst({
@@ -85,7 +90,7 @@ export async function deliverConversationAutomationPayload(
   );
 
   const persistedRouteId = input.resolvedAutomationConversationRoute.routeId;
-  let route;
+  let route: Awaited<ReturnType<typeof createAutomationConversationRoute>> | undefined;
   if (persistedRouteId === null) {
     route = await createAutomationConversationRoute(
       {
@@ -108,45 +113,94 @@ export async function deliverConversationAutomationPayload(
       message: `AutomationConversation route for conversation '${input.preparedAutomationRun.conversationId}' was not found.`,
     });
   }
+  const activeRoute = route;
 
   const routeBindingAction = resolveAutomationConversationRouteBindingAction({
-    routeId: route.id,
-    routeSandboxInstanceId: route.sandboxInstanceId,
-    providerConversationId: route.providerConversationId,
+    routeId: activeRoute.id,
+    routeSandboxInstanceId: activeRoute.sandboxInstanceId,
+    providerConversationId: activeRoute.providerConversationId,
     ensuredSandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
   });
 
   if (routeBindingAction === AutomationConversationRouteBindingActions.FAIL_SANDBOX_MISMATCH) {
     throw new Error(
-      `AutomationConversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${route.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredAutomationSandbox.sandboxInstanceId}'.`,
+      `AutomationConversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${activeRoute.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredAutomationSandbox.sandboxInstanceId}'.`,
     );
   }
 
-  const deliveryResult = await executeConversationProviderDelivery({
-    conversationId: input.preparedAutomationRun.conversationId,
-    runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
-    connectionUrl: input.acquiredAutomationConnection.url,
-    inputText: input.preparedAutomationRun.renderedInput,
-    ...(input.preparedAutomationRun.instructions === null ||
-    input.preparedAutomationRun.collaborationModeSettings === null
-      ? {}
-      : {
-          collaborationModeSettings: {
-            model: input.preparedAutomationRun.collaborationModeSettings.model,
-            reasoningEffort: input.preparedAutomationRun.collaborationModeSettings.reasoningEffort,
-            developerInstructions: input.preparedAutomationRun.instructions,
-          },
-        }),
-    providerConversationId: route.providerConversationId,
-    providerExecutionId: route.providerExecutionId,
+  logAutomationConversationDeliveryEvent({
+    eventName: "delivery_task.delivering",
+    message: "Delivering automation conversation payload",
+    telemetryContext: {
+      automationRunId: input.preparedAutomationRun.automationRunId,
+      conversationId: input.preparedAutomationRun.conversationId,
+      deliveryTaskId: input.taskId,
+      routeId: activeRoute.id,
+      sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+      webhookEventId: input.preparedAutomationRun.webhookEventId,
+      workflowRunId: input.workflowRunId,
+    },
+    attributes: {
+      "mistle.route.binding_action": routeBindingAction,
+    },
   });
 
+  const deliveryResult = await withAutomationConversationDeliverySpan(
+    {
+      name: "automation_conversation_delivery.provider.execute",
+      telemetryContext: {
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        conversationId: input.preparedAutomationRun.conversationId,
+        deliveryTaskId: input.taskId,
+        routeId: activeRoute.id,
+        sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+        webhookEventId: input.preparedAutomationRun.webhookEventId,
+        workflowRunId: input.workflowRunId,
+      },
+    },
+    async (span) => {
+      span.setAttribute("mistle.route.binding_action", routeBindingAction);
+
+      const deliveryStartedAt = Date.now();
+      const result = await executeConversationProviderDelivery({
+        conversationId: input.preparedAutomationRun.conversationId,
+        runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
+        connectionUrl: input.acquiredAutomationConnection.url,
+        inputText: input.preparedAutomationRun.renderedInput,
+        ...(input.preparedAutomationRun.instructions === null ||
+        input.preparedAutomationRun.collaborationModeSettings === null
+          ? {}
+          : {
+              collaborationModeSettings: {
+                model: input.preparedAutomationRun.collaborationModeSettings.model,
+                reasoningEffort:
+                  input.preparedAutomationRun.collaborationModeSettings.reasoningEffort,
+                developerInstructions: input.preparedAutomationRun.instructions,
+              },
+            }),
+        providerConversationId: activeRoute.providerConversationId,
+        providerExecutionId: activeRoute.providerExecutionId,
+      });
+      const deliveryDurationMs = Date.now() - deliveryStartedAt;
+
+      span.setAttributes({
+        "mistle.provider.execute_ms": deliveryDurationMs,
+        "mistle.provider.conversation_id": result.providerConversationId,
+        ...(result.providerExecutionId === null
+          ? {}
+          : { "mistle.provider.execution_id": result.providerExecutionId }),
+      });
+
+      return result;
+    },
+  );
+
   if (
-    route.providerConversationId !== null &&
-    deliveryResult.providerConversationId !== route.providerConversationId
+    activeRoute.providerConversationId !== null &&
+    deliveryResult.providerConversationId !== activeRoute.providerConversationId
   ) {
     throw new Error(
-      `AutomationConversation '${input.preparedAutomationRun.conversationId}' changed provider conversation from '${route.providerConversationId}' to '${deliveryResult.providerConversationId}' during delivery.`,
+      `AutomationConversation '${input.preparedAutomationRun.conversationId}' changed provider conversation from '${activeRoute.providerConversationId}' to '${deliveryResult.providerConversationId}' during delivery.`,
     );
   }
 
@@ -157,7 +211,7 @@ export async function deliverConversationAutomationPayload(
       },
       {
         conversationId: input.preparedAutomationRun.conversationId,
-        routeId: route.id,
+        routeId: activeRoute.id,
         sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
         providerConversationId: deliveryResult.providerConversationId,
         providerState: deliveryResult.providerState,
@@ -170,7 +224,7 @@ export async function deliverConversationAutomationPayload(
       db: ctx.db,
     },
     {
-      routeId: route.id,
+      routeId: activeRoute.id,
       providerExecutionId: deliveryResult.providerExecutionId,
       providerState: deliveryResult.providerState,
     },

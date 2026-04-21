@@ -2,6 +2,7 @@ import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workfl
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
+import type { PreparedAutomationRun } from "../shared/automation-run-types.js";
 import { prepareAutomationRun, resolveAutomationRunFailure } from "../shared/automation-run.js";
 import {
   markAutomationRunCompleted,
@@ -16,6 +17,11 @@ import { finalizeAutomationConversationDeliveryTask } from "./finalize-automatio
 import { idleAutomationConversationDeliveryProcessorIfEmpty } from "./idle-automation-conversation-delivery-processor-if-empty.js";
 import { resolveAutomationConversationDeliveryRoute } from "./resolve-automation-conversation-delivery-route.js";
 import { resolveAutomationConversationDeliveryTaskAction } from "./resolve-automation-conversation-delivery-task-action.js";
+import {
+  logAutomationConversationDeliveryEvent,
+  resolveAutomationConversationDeliveryTaskLifecycleEvent,
+  withAutomationConversationDeliverySpan,
+} from "./telemetry.js";
 
 function getConversationDeliveryStepName(input: { prefix: string; taskId: string }) {
   return `${input.prefix}:${input.taskId}`;
@@ -23,8 +29,9 @@ function getConversationDeliveryStepName(input: { prefix: string; taskId: string
 
 export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlPlaneWorkflow(
   HandleAutomationConversationDeliveryWorkflowSpec,
-  async ({ input, step }) => {
+  async ({ input, run, step }) => {
     const { controlPlaneInternalClient, dataPlaneClient, db } = await getWorkflowContext();
+    const workflowRunId = run.id;
 
     let iteration = 0;
 
@@ -61,6 +68,21 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
         iteration += 1;
         continue;
       }
+
+      const taskLifecycleEvent = resolveAutomationConversationDeliveryTaskLifecycleEvent({
+        status: activeTask.status,
+      });
+      logAutomationConversationDeliveryEvent({
+        eventName: taskLifecycleEvent.eventName,
+        message: taskLifecycleEvent.message,
+        telemetryContext: {
+          automationRunId: activeTask.automationRunId,
+          conversationId: input.conversationId,
+          deliveryTaskId: activeTask.taskId,
+          workflowRunId,
+        },
+        attributes: taskLifecycleEvent.attributes,
+      });
 
       const taskAction = await step.run(
         {
@@ -126,6 +148,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
         continue;
       }
 
+      let preparedAutomationRunForTelemetry: PreparedAutomationRun | null = null;
+
       try {
         const preparedAutomationRun = await step.run(
           {
@@ -144,6 +168,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               },
             ),
         );
+        preparedAutomationRunForTelemetry = preparedAutomationRun;
 
         const resolvedAutomationConversationRoute = await step.run(
           {
@@ -153,12 +178,48 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
             }),
           },
           async () =>
-            resolveAutomationConversationDeliveryRoute(
+            withAutomationConversationDeliverySpan(
               {
-                db,
+                name: "automation_conversation_delivery.route.resolve",
+                telemetryContext: {
+                  automationRunId: activeTask.automationRunId,
+                  conversationId: preparedAutomationRun.conversationId,
+                  deliveryTaskId: activeTask.taskId,
+                  webhookEventId: preparedAutomationRun.webhookEventId,
+                  workflowRunId,
+                },
               },
-              {
-                conversationId: preparedAutomationRun.conversationId,
+              async (span) => {
+                const resolvedRoute = await resolveAutomationConversationDeliveryRoute(
+                  {
+                    db,
+                  },
+                  {
+                    conversationId: preparedAutomationRun.conversationId,
+                  },
+                );
+
+                span.setAttributes({
+                  ...(resolvedRoute.routeId === null
+                    ? {}
+                    : { "mistle.route.id": resolvedRoute.routeId }),
+                  ...(resolvedRoute.sandboxInstanceId === null
+                    ? {}
+                    : { "mistle.sandbox.instance_id": resolvedRoute.sandboxInstanceId }),
+                  ...(resolvedRoute.providerConversationId === null
+                    ? {}
+                    : {
+                        "mistle.provider.conversation_id": resolvedRoute.providerConversationId,
+                      }),
+                  ...(resolvedRoute.providerExecutionId === null
+                    ? {}
+                    : {
+                        "mistle.provider.execution_id": resolvedRoute.providerExecutionId,
+                      }),
+                  "mistle.route.has_existing_route": resolvedRoute.routeId !== null,
+                });
+
+                return resolvedRoute;
               },
             ),
         );
@@ -179,6 +240,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               {
                 preparedAutomationRun,
                 resolvedAutomationConversationRoute,
+                deliveryTaskId: activeTask.taskId,
+                workflowRunId,
               },
             ),
         );
@@ -198,6 +261,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               {
                 preparedAutomationRun,
                 ensuredAutomationSandbox,
+                deliveryTaskId: activeTask.taskId,
+                workflowRunId,
               },
             ),
         );
@@ -222,6 +287,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
                 resolvedAutomationConversationRoute,
                 ensuredAutomationSandbox,
                 acquiredAutomationConnection,
+                workflowRunId,
               },
             ),
         );
@@ -265,6 +331,19 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               },
             ),
         );
+
+        logAutomationConversationDeliveryEvent({
+          eventName: "delivery_task.completed",
+          message: "Completed automation conversation delivery task",
+          telemetryContext: {
+            automationRunId: activeTask.automationRunId,
+            conversationId:
+              preparedAutomationRunForTelemetry?.conversationId ?? input.conversationId,
+            deliveryTaskId: activeTask.taskId,
+            webhookEventId: preparedAutomationRunForTelemetry?.webhookEventId,
+            workflowRunId,
+          },
+        });
       } catch (error) {
         const failure = resolveAutomationRunFailure(error);
 
@@ -309,6 +388,24 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               },
             ),
         );
+
+        logAutomationConversationDeliveryEvent({
+          eventName: "delivery_task.failed",
+          message: "Failed automation conversation delivery task",
+          telemetryContext: {
+            automationRunId: activeTask.automationRunId,
+            conversationId:
+              preparedAutomationRunForTelemetry?.conversationId ?? input.conversationId,
+            deliveryTaskId: activeTask.taskId,
+            webhookEventId: preparedAutomationRunForTelemetry?.webhookEventId,
+            workflowRunId,
+          },
+          attributes: {
+            "mistle.delivery.failure_code": failure.code,
+          },
+          err: error,
+          level: "error",
+        });
       }
 
       iteration += 1;
