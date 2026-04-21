@@ -6626,6 +6626,7 @@ mod tests {
                 .port()
         );
         let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let (gateway_close_sender, gateway_close_receiver) = mpsc::channel::<()>();
         let gateway_thread = thread::spawn(move || {
             let (stream, _) = bootstrap_listener
                 .accept()
@@ -6666,12 +6667,15 @@ mod tests {
                 ))
                 .expect("gateway should return a signing result");
 
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the signing result was sent");
+            gateway_close_receiver
+                .recv()
+                .expect("gateway should wait until the signing result is observed");
             websocket
                 .close(None)
                 .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the tunnel session finished");
         });
 
         let startup_input = StartupInput {
@@ -6735,6 +6739,9 @@ mod tests {
         gateway_done_receiver
             .recv()
             .expect("gateway should complete the signing interaction");
+        gateway_close_sender
+            .send(())
+            .expect("gateway should close after the signing response is observed");
 
         tunnel_session.close();
         gateway_thread
@@ -6754,6 +6761,7 @@ mod tests {
                 .port()
         );
         let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let (gateway_close_sender, gateway_close_receiver) = mpsc::channel::<()>();
         let gateway_thread = thread::spawn(move || {
             let (stream, _) = bootstrap_listener
                 .accept()
@@ -6777,12 +6785,15 @@ mod tests {
                 ))
                 .expect("gateway should return an authorization failure");
 
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the signing result was sent");
+            gateway_close_receiver
+                .recv()
+                .expect("gateway should wait until the signing result is observed");
             websocket
                 .close(None)
                 .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the tunnel session finished");
         });
 
         let startup_input = StartupInput {
@@ -6846,6 +6857,9 @@ mod tests {
         gateway_done_receiver
             .recv()
             .expect("gateway should complete the signing interaction");
+        gateway_close_sender
+            .send(())
+            .expect("gateway should close after the signing response is observed");
 
         tunnel_session.close();
         gateway_thread
