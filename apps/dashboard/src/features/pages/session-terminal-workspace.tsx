@@ -413,14 +413,14 @@ export const SessionTerminalWorkspaceView = forwardRef<
   { cwd, isVisible, onApiReady, onWorkspaceEmpty, renderTerminalPanel },
   forwardedRef,
 ): ReactElement {
-  const apiRef = useRef<DockviewApi | null>(null);
-  const [readyApi, setReadyApi] = useState<DockviewApi | null>(null);
+  const apiRef = useRef<DockviewApi>(null!);
+  const [readyApi, setReadyApi] = useState<DockviewApi>();
   const shouldEnsureWorkspaceRef = useRef(false);
 
   const createTerminal = useCallback(
     (input: { referenceGroup?: DockviewGroupPanel }): void => {
       const api = apiRef.current;
-      if (api === null) {
+      if (api == null) {
         shouldEnsureWorkspaceRef.current = true;
         return;
       }
@@ -448,7 +448,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
     () => ({
       disconnectAllTerminals: async (): Promise<void> => {
         const api = apiRef.current;
-        if (api === null) {
+        if (api == null) {
           shouldEnsureWorkspaceRef.current = false;
           return;
         }
@@ -457,7 +457,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
       },
       ensureTerminalWorkspace: (): void => {
         const api = apiRef.current;
-        if (api === null) {
+        if (api == null) {
           shouldEnsureWorkspaceRef.current = true;
           return;
         }
@@ -473,7 +473,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
   );
 
   useEffect(() => {
-    if (readyApi === null) {
+    if (readyApi == null) {
       return;
     }
 
