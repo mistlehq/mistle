@@ -147,6 +147,97 @@ function RenderedComposerPaneHarness(input: {
   );
 }
 
+function QueuedPromptComposerHarness(): React.JSX.Element {
+  const [activeTurnState, setActiveTurnState] = useState<"idle" | "running">("running");
+  const [startedPrompts, setStartedPrompts] = useState<readonly string[]>([]);
+
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setActiveTurnState("idle");
+        }}
+        type="button"
+      >
+        Complete turn
+      </button>
+      <div data-testid="started-prompts">{startedPrompts.join(" | ")}</div>
+      <SessionConversationBottomPanelController
+        chatEntries={[]}
+        composerStateInput={{
+          bootstrap: {
+            phase: { status: "ready" },
+            establishedSnapshot: {
+              availableModels: [ComposerModelFixture],
+              configSnapshot: {
+                model: ComposerModelFixture.model,
+                modelReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+              },
+            },
+          },
+          clearSessionErrorMessage: () => {
+            return;
+          },
+          configControl: {
+            selectedModel: ComposerModelFixture.model,
+            selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+            modelOptions: [
+              {
+                value: ComposerModelFixture.model,
+                label: ComposerModelFixture.displayName,
+              },
+            ],
+            canChangeModel: true,
+            canChangeReasoningEffort: true,
+            isUpdating: false,
+            setModel: () => {
+              return;
+            },
+            setReasoningEffort: () => {
+              return;
+            },
+          },
+          attachmentControl: {
+            canUploadAttachments: true,
+            isUploadingAttachments: false,
+            prepareAttachments: async ({ prompt }) => ({
+              displayAttachments: [],
+              prompt,
+              submittedAttachments: [],
+            }),
+          },
+          sessionErrorMessage: null,
+          turnControl: {
+            activeTurnState,
+            canSteer: activeTurnState === "running",
+            canInterrupt: activeTurnState === "running",
+            isStarting: false,
+            isSteering: false,
+            isInterrupting: false,
+            completedTurnErrorMessage: null,
+            startTurn: async ({ transcriptPrompt }) => {
+              setStartedPrompts((currentStartedPrompts) => [
+                ...currentStartedPrompts,
+                transcriptPrompt ?? "",
+              ]);
+              setActiveTurnState("running");
+            },
+            steerTurn: async () => {
+              return;
+            },
+            interruptTurn: () => {
+              return;
+            },
+          },
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={[]}
+      />
+    </div>
+  );
+}
+
 function ConversationScrollHarness(input: {
   activeTurnId: string | null;
   isTurnInProgress?: boolean;
@@ -388,6 +479,49 @@ describe("SessionConversationBottomPanel", () => {
     await waitFor(() => {
       expect(screen.queryByText("That image file could not be validated.")).toBeNull();
       expect(screen.queryByText("screenshot.png")).toBeNull();
+    });
+  });
+
+  it("queues the next prompt and starts it automatically after the active turn completes", async () => {
+    render(<QueuedPromptComposerHarness />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Queue this follow-up prompt." },
+    });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      ctrlKey: true,
+      key: "Enter",
+    });
+
+    expect(screen.getByText("Queue this follow-up prompt.")).toBeTruthy();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("started-prompts").textContent).toContain(
+        "Queue this follow-up prompt.",
+      );
+      expect(screen.queryByRole("button", { name: "Remove queued message" })).toBeNull();
+    });
+  });
+
+  it("allows removing a queued prompt before the next turn auto-starts", async () => {
+    render(<QueuedPromptComposerHarness />);
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Remove this queued prompt." },
+    });
+    fireEvent.keyDown(screen.getByRole("textbox"), {
+      ctrlKey: true,
+      key: "Enter",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove queued message" }));
+    fireEvent.click(screen.getByRole("button", { name: "Complete turn" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("started-prompts").textContent).toBe("");
     });
   });
 

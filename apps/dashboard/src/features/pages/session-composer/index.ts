@@ -1,5 +1,6 @@
 export {
   useSessionComposerState,
+  type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
   type SessionComposerStateInput,
   type SessionComposerUiState,

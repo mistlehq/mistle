@@ -7,12 +7,14 @@ import {
   type ChatComposerViewModel,
 } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
+import { ChatUserMessage } from "../chat/components/chat-user-message.js";
 import { CodexApprovalRequestsPanel } from "../session-agents/codex/approvals/index.js";
 import type { CodexApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
 import {
   ComposerStatusBanner,
   SessionComposerActivityRow,
   useSessionComposerState,
+  type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
@@ -44,6 +46,8 @@ type SessionConversationSharedPanelProps = {
 
 type SessionConversationBottomPanelProps = SessionConversationSharedPanelProps & {
   composerViewModel: ChatComposerViewModel;
+  queuedPrompts?: readonly QueuedComposerPromptViewModel[];
+  onRemoveQueuedPrompt?: (queuedPromptId: string) => void;
   showWorkingIndicator?: boolean;
   statusMessage: ChatComposerStatusMessage | null;
 };
@@ -110,6 +114,8 @@ export function SessionConversationBottomPanel({
   isRespondingToServerRequest,
   onRespondToServerRequest,
   composerViewModel,
+  queuedPrompts = [],
+  onRemoveQueuedPrompt,
   showWorkingIndicator = false,
   statusMessage,
 }: SessionConversationBottomPanelProps): React.JSX.Element {
@@ -124,6 +130,28 @@ export function SessionConversationBottomPanel({
       {showWorkingIndicator ? (
         <SessionComposerActivityRow active ariaLabel="Working" text="Working..." />
       ) : null}
+      {queuedPrompts.length === 0 ? null : (
+        <div className="max-h-40 space-y-2 overflow-y-auto px-1 pr-2">
+          {queuedPrompts.map((queuedPrompt) => (
+            <ChatUserMessage
+              attachments={queuedPrompt.attachments}
+              key={queuedPrompt.id}
+              label="Queue"
+              {...(onRemoveQueuedPrompt === undefined || !queuedPrompt.isRemovable
+                ? {}
+                : {
+                    labelAction: {
+                      ariaLabel: "Remove queued message",
+                      onClick: () => {
+                        onRemoveQueuedPrompt(queuedPrompt.id);
+                      },
+                    },
+                  })}
+              text={queuedPrompt.text}
+            />
+          ))}
+        </div>
+      )}
       <ChatComposer {...composerViewModel} />
     </>
   );
@@ -144,6 +172,8 @@ export function SessionConversationBottomPanelController({
     <SessionConversationBottomPanel
       {...bottomPanelProps}
       composerViewModel={composerUiState.composerViewModel}
+      onRemoveQueuedPrompt={composerUiState.removeQueuedPrompt}
+      queuedPrompts={composerUiState.queuedPrompts}
       statusMessage={composerUiState.statusMessage}
       {...(showWorkingIndicator === undefined ? {} : { showWorkingIndicator })}
     />

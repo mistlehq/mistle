@@ -1,5 +1,5 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
 import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
@@ -27,6 +27,25 @@ type PendingComposerAttachment = {
   id: string;
   file: File;
   name: string;
+};
+
+type QueuedComposerPrompt = {
+  id: string;
+  prompt: string;
+  attachments: readonly PendingComposerAttachment[];
+  pendingDiffComments: readonly PendingSessionDiffComment[];
+  status: "failed" | "queued" | "submitting";
+};
+
+export type QueuedComposerPromptViewModel = {
+  id: string;
+  text: string;
+  attachments: readonly {
+    kind: "image";
+    name: string;
+    path: string;
+  }[];
+  isRemovable: boolean;
 };
 
 export type SessionTurnControl = {
@@ -70,6 +89,8 @@ export type SessionComposerDraftState = {
 
 export type SessionComposerUiState = {
   composerViewModel: ChatComposerViewModel;
+  queuedPrompts: readonly QueuedComposerPromptViewModel[];
+  removeQueuedPrompt: (queuedPromptId: string) => void;
   statusMessage: ComposerStatusMessage | null;
 };
 
@@ -84,6 +105,8 @@ export function useSessionComposerState(input: {
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
     readonly PendingComposerAttachment[]
   >([]);
+  const [queuedPrompts, setQueuedPrompts] = useState<readonly QueuedComposerPrompt[]>([]);
+  const [isSubmittingQueuedPrompt, setIsSubmittingQueuedPrompt] = useState(false);
 
   const activeComposerModel = useMemo(
     () =>
@@ -189,6 +212,166 @@ export function useSessionComposerState(input: {
       composerStateInput.turnControl.activeTurnState,
       draftState.pendingDiffComments.length,
       pendingComposerAttachments.length,
+    ],
+  );
+
+  const queuePrompt = useCallback((): void => {
+    const trimmedComposerText = composerText.trim();
+    const hasSubmissionContent =
+      trimmedComposerText.length > 0 ||
+      pendingComposerAttachments.length > 0 ||
+      draftState.pendingDiffComments.length > 0;
+
+    if (!hasSubmissionContent) {
+      return;
+    }
+
+    clearSessionErrorMessage();
+    setComposerErrorMessage(null);
+    setQueuedPrompts((currentQueuedPrompts) => [
+      ...currentQueuedPrompts,
+      {
+        id: `queued-prompt-${crypto.randomUUID()}`,
+        prompt: trimmedComposerText,
+        attachments: pendingComposerAttachments,
+        pendingDiffComments: draftState.pendingDiffComments,
+        status: "queued",
+      },
+    ]);
+    draftState.setComposerText("");
+    draftState.clearPendingDiffComments();
+    setPendingComposerAttachments([]);
+  }, [
+    clearSessionErrorMessage,
+    composerText,
+    draftState,
+    pendingComposerAttachments,
+  ]);
+
+  const removeQueuedPrompt = useCallback((queuedPromptId: string): void => {
+    setQueuedPrompts((currentQueuedPrompts) =>
+      currentQueuedPrompts.filter((queuedPrompt) => queuedPrompt.id !== queuedPromptId),
+    );
+  }, []);
+
+  const submitQueuedPrompt = useCallback(
+    async (queuedPrompt: QueuedComposerPrompt): Promise<void> => {
+      clearSessionErrorMessage();
+      setComposerErrorMessage(null);
+      setQueuedPrompts((currentQueuedPrompts) =>
+        currentQueuedPrompts.map((currentQueuedPrompt) =>
+          currentQueuedPrompt.id !== queuedPrompt.id
+            ? currentQueuedPrompt
+            : {
+                ...currentQueuedPrompt,
+                status: "submitting",
+              },
+        ),
+      );
+
+      const submittedPrompt = buildSessionComposerPrompt({
+        composerText: queuedPrompt.prompt,
+        pendingDiffComments: queuedPrompt.pendingDiffComments,
+      });
+
+      if (composerStateInput.bootstrap.phase.status !== "ready") {
+        if (composerStateInput.bootstrap.phase.status === "failed") {
+          setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
+        }
+        setQueuedPrompts((currentQueuedPrompts) =>
+          currentQueuedPrompts.map((currentQueuedPrompt) =>
+            currentQueuedPrompt.id !== queuedPrompt.id
+              ? currentQueuedPrompt
+              : {
+                  ...currentQueuedPrompt,
+                  status: "failed",
+                },
+          ),
+        );
+        return;
+      }
+
+      if (activeComposerModel === null) {
+        const missingModelMessage =
+          composerStateInput.configControl.selectedModel === null
+            ? buildModelSelectionRequiredMessage()
+            : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel);
+        setComposerErrorMessage(missingModelMessage);
+        setQueuedPrompts((currentQueuedPrompts) =>
+          currentQueuedPrompts.map((currentQueuedPrompt) =>
+            currentQueuedPrompt.id !== queuedPrompt.id
+              ? currentQueuedPrompt
+              : {
+                  ...currentQueuedPrompt,
+                  status: "failed",
+                },
+          ),
+        );
+        return;
+      }
+
+      let preparedAttachments;
+      try {
+        preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
+          files: queuedPrompt.attachments.map((attachment) => attachment.file),
+          prompt: submittedPrompt,
+          supportsImageInspection: supportsImageInspection(activeComposerModel),
+        });
+      } catch (error) {
+        setComposerErrorMessage(
+          error instanceof Error ? error.message : "Could not upload attachments.",
+        );
+        setQueuedPrompts((currentQueuedPrompts) =>
+          currentQueuedPrompts.map((currentQueuedPrompt) =>
+            currentQueuedPrompt.id !== queuedPrompt.id
+              ? currentQueuedPrompt
+              : {
+                  ...currentQueuedPrompt,
+                  status: "failed",
+                },
+          ),
+        );
+        return;
+      }
+
+      try {
+        await composerStateInput.turnControl.startTurn({
+          submittedPrompt: preparedAttachments.prompt,
+          submittedAttachments: preparedAttachments.submittedAttachments,
+          displayAttachments: preparedAttachments.displayAttachments,
+          transcriptPrompt: submittedPrompt,
+        });
+      } catch (error) {
+        setComposerErrorMessage(
+          error instanceof Error ? error.message : "Could not submit chat message.",
+        );
+        setQueuedPrompts((currentQueuedPrompts) =>
+          currentQueuedPrompts.map((currentQueuedPrompt) =>
+            currentQueuedPrompt.id !== queuedPrompt.id
+              ? currentQueuedPrompt
+              : {
+                  ...currentQueuedPrompt,
+                  status: "failed",
+                },
+          ),
+        );
+        return;
+      }
+
+      setQueuedPrompts((currentQueuedPrompts) =>
+        currentQueuedPrompts.filter(
+          (currentQueuedPrompt) => currentQueuedPrompt.id !== queuedPrompt.id,
+        ),
+      );
+      setComposerErrorMessage(null);
+    },
+    [
+      activeComposerModel,
+      clearSessionErrorMessage,
+      composerStateInput.attachmentControl,
+      composerStateInput.bootstrap.phase,
+      composerStateInput.configControl.selectedModel,
+      composerStateInput.turnControl,
     ],
   );
 
@@ -339,6 +522,74 @@ export function useSessionComposerState(input: {
     submitAction.submitMode,
   ]);
 
+  const queuePromptDisabled = useMemo(
+    () =>
+      composerStateInput.turnControl.activeTurnState !== "running" ||
+      composerStateInput.attachmentControl.isUploadingAttachments ||
+      composerStateInput.bootstrap.phase.status !== "ready" ||
+      activeComposerModel === null ||
+      (composerText.trim().length === 0 &&
+        pendingComposerAttachments.length === 0 &&
+        draftState.pendingDiffComments.length === 0),
+    [
+      activeComposerModel,
+      composerText,
+      composerStateInput.attachmentControl.isUploadingAttachments,
+      composerStateInput.bootstrap.phase.status,
+      composerStateInput.turnControl.activeTurnState,
+      draftState.pendingDiffComments.length,
+      pendingComposerAttachments.length,
+    ],
+  );
+
+  const queuedPromptViewModels = useMemo(
+    () =>
+      queuedPrompts.map((queuedPrompt) => ({
+        id: queuedPrompt.id,
+        text:
+          queuedPrompt.prompt.length > 0
+            ? queuedPrompt.prompt
+            : buildPendingSessionDiffCommentSummaryLabel(queuedPrompt.pendingDiffComments.length),
+        attachments: queuedPrompt.attachments.map((attachment) => ({
+          kind: "image" as const,
+          name: attachment.name,
+          path: attachment.id,
+        })),
+        isRemovable: queuedPrompt.status !== "submitting",
+      })),
+    [queuedPrompts],
+  );
+
+  useEffect(() => {
+    if (
+      composerStateInput.turnControl.activeTurnState === "running" ||
+      composerStateInput.turnControl.isStarting ||
+      isSubmittingQueuedPrompt
+    ) {
+      return;
+    }
+
+    const nextQueuedPrompt = queuedPrompts.find((queuedPrompt) => queuedPrompt.status === "queued");
+    if (nextQueuedPrompt === undefined) {
+      return;
+    }
+
+    setIsSubmittingQueuedPrompt(true);
+    void (async () => {
+      try {
+        await submitQueuedPrompt(nextQueuedPrompt);
+      } finally {
+        setIsSubmittingQueuedPrompt(false);
+      }
+    })();
+  }, [
+    composerStateInput.turnControl.activeTurnState,
+    composerStateInput.turnControl.isStarting,
+    isSubmittingQueuedPrompt,
+    queuedPrompts,
+    submitQueuedPrompt,
+  ]);
+
   return {
     composerViewModel: {
       composerText,
@@ -366,18 +617,32 @@ export function useSessionComposerState(input: {
       submitDisabledReason: null,
       canUploadAttachments: composerStateInput.attachmentControl.canUploadAttachments,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
+      keyboardShortcuts:
+        composerStateInput.turnControl.activeTurnState === "running" &&
+        (composerText.trim().length > 0 ||
+          pendingComposerAttachments.length > 0 ||
+          draftState.pendingDiffComments.length > 0)
+          ? [
+              { action: "Steer", shortcut: "enter" },
+              { action: "Queue", shortcut: "mod-enter" },
+            ]
+          : [],
+      secondarySubmitDisabled: queuePromptDisabled,
       configControlsDisabled:
         composerStateInput.bootstrap.phase.status !== "ready" ||
         composerStateInput.configControl.isUpdating ||
         composerStateInput.attachmentControl.isUploadingAttachments,
       onComposerTextChange: handleComposerTextChange,
       onSubmit: submitComposer,
+      onSecondarySubmit: queuePrompt,
       onModelChange: handleModelChange,
       onReasoningEffortChange: handleReasoningEffortChange,
       onPendingImageFilesAdded: addPendingComposerFiles,
       onRemovePendingAttachment: removePendingComposerAttachment,
       onClearPendingDiffComments: draftState.clearPendingDiffComments,
     },
+    queuedPrompts: queuedPromptViewModels,
+    removeQueuedPrompt,
     statusMessage: composerStatusMessage,
   };
 }
