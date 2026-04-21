@@ -150,8 +150,8 @@ export function SessionWorkbenchPageView({
         defaultSize={isBottomPanelVisible ? bottomPanelSize : 0}
         minSize={15}
         onResize={(panelSize) => {
-          if (panelSize.asPercentage > 0) {
-            onBottomPanelResize(panelSize.asPercentage);
+          if (panelSize.inPixels > 0) {
+            onBottomPanelResize(panelSize.inPixels);
           }
         }}
         panelRef={bottomPanelRef}

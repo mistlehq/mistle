@@ -24,12 +24,11 @@ import {
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
+import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
   headerStatusUi: SandboxStatusBadgeUi;
 };
-
-const StoryTerminalPanelHeightPx = 320;
 
 function buildPageViewTerminalOutput(cwd: string | null): string {
   return [
@@ -102,7 +101,7 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
             )}
           />
         }
-        bottomPanelSize={StoryTerminalPanelHeightPx}
+        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={isBottomPanelVisible}
         isSecondaryPanelVisible={false}
         mainContent={
@@ -133,7 +132,7 @@ const meta = {
     sandboxInstanceId: StorySandboxInstanceId,
     alert: null,
     bottomPanel: <div className="h-full w-full border-t bg-white" />,
-    bottomPanelSize: StoryTerminalPanelHeightPx,
+    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     isBottomPanelVisible: false,
     isSecondaryPanelVisible: false,
     mainContent: createStorySessionMainContent(),
@@ -278,7 +277,7 @@ export const CliSplitWithTerminal: Story = {
         )}
       />
     ),
-    bottomPanelSize: StoryTerminalPanelHeightPx,
+    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
   },
 };
 

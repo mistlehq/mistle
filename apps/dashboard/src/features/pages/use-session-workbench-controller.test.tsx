@@ -428,14 +428,15 @@ describe("useSessionWorkbenchController", () => {
       queryClient,
       sandboxInstanceId: sandboxInstanceIdOne,
     });
+    const persistedTerminalPanelSize = 420;
 
     act(() => {
       result.current.workbench.terminalPanelState.openPanel();
-      result.current.workbench.terminalPanelState.setPanelSize(52);
+      result.current.workbench.terminalPanelState.setPanelSize(persistedTerminalPanelSize);
     });
 
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(true);
-    expect(result.current.workbench.terminalPanelState.panelSize).toBe(52);
+    expect(result.current.workbench.terminalPanelState.panelSize).toBe(persistedTerminalPanelSize);
 
     rerender({
       sandboxInstanceId: sandboxInstanceIdTwo,
@@ -449,7 +450,9 @@ describe("useSessionWorkbenchController", () => {
     });
 
     const expectedVisibility = hasStorageApi;
-    const expectedPanelSize = hasStorageApi ? 52 : DEFAULT_TERMINAL_PANEL_SIZE;
+    const expectedPanelSize = hasStorageApi
+      ? persistedTerminalPanelSize
+      : DEFAULT_TERMINAL_PANEL_SIZE;
 
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(expectedVisibility);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(expectedPanelSize);

@@ -6,8 +6,11 @@ import {
   writeBrowserStorageJson,
 } from "../shared/browser-storage.js";
 
-const DEFAULT_TERMINAL_PANEL_SIZE = 38;
+const DEFAULT_TERMINAL_PANEL_SIZE = 320;
 const TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX = "dashboard:session-terminal-workbench:";
+const LEGACY_TERMINAL_PANEL_PERCENTAGE_MAX = 75;
+const MAX_TERMINAL_PANEL_SIZE = 960;
+const MIN_TERMINAL_PANEL_SIZE = 160;
 
 type PersistedTerminalWorkbenchState = {
   isVisible: boolean;
@@ -46,7 +49,11 @@ function isPersistedTerminalWorkbenchState(
 }
 
 function normalizePanelSize(size: number): number {
-  return Math.min(75, Math.max(20, size));
+  if (size <= LEGACY_TERMINAL_PANEL_PERCENTAGE_MAX) {
+    return DEFAULT_TERMINAL_PANEL_SIZE;
+  }
+
+  return Math.min(MAX_TERMINAL_PANEL_SIZE, Math.max(MIN_TERMINAL_PANEL_SIZE, Math.round(size)));
 }
 
 function readPersistedTerminalWorkbenchState(
