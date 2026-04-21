@@ -1,4 +1,10 @@
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup, Notice } from "@mistle/ui";
+import {
+  type PanelImperativeHandle,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+  Notice,
+} from "@mistle/ui";
 import { useLayoutEffect, useRef } from "react";
 
 import { MIN_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
@@ -37,17 +43,6 @@ export type {
   SessionWorkbenchPageViewProps,
 };
 
-type BottomResizablePanelHandle = {
-  collapse: () => void;
-  expand: () => void;
-  getSize: () => {
-    asPercentage: number;
-    inPixels: number;
-  };
-  isCollapsed: () => boolean;
-  resize: (size: number | string) => void;
-};
-
 function resolveBottomPanelDefaultSizes(input: {
   bottomPanelSize: number;
   isBottomPanelVisible: boolean;
@@ -84,7 +79,7 @@ export function SessionWorkbenchPageView({
   onSecondaryPanelResize,
   isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
-  const bottomPanelRef = useRef<BottomResizablePanelHandle | null>(null);
+  const bottomPanelRef = useRef<PanelImperativeHandle | null>(null);
   const hasAppliedBottomPanelVisibilityRef = useRef(false);
   const previousBottomPanelVisibilityRef = useRef<boolean | null>(null);
   const bottomPanelDefaultSizes = resolveBottomPanelDefaultSizes({
