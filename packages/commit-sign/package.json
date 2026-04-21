@@ -1,0 +1,12 @@
+{
+  "name": "@mistle/commit-sign",
+  "private": true,
+  "scripts": {
+    "build": "rm -rf dist && cargo build --locked --bin commit-sign && mkdir -p dist && cp target/debug/commit-sign dist/commit-sign",
+    "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "typecheck": "cargo check --locked --all-targets",
+    "test": "cargo test --locked",
+    "format": "node ./scripts/cargo-fmt.mjs",
+    "format:check": "node ./scripts/cargo-fmt.mjs --check"
+  }
+}
