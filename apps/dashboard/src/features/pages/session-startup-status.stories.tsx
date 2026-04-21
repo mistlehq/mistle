@@ -19,7 +19,7 @@ const StartupStateStepMs = 1_800;
 
 function SessionStartupStatusStory(): React.JSX.Element {
   const [startupStateIndex, setStartupStateIndex] = useState(0);
-  const startupState = StartupStates[startupStateIndex] ?? StartupStates[0];
+  const startupState = StartupStates.at(startupStateIndex) ?? "loading_status";
 
   useEffect(() => {
     if (startupStateIndex >= StartupStates.length - 1) {

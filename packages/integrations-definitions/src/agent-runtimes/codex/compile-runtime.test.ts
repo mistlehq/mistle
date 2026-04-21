@@ -198,7 +198,7 @@ describe("compileCodexRuntime", () => {
         readiness: {
           type: "ws",
           url: "ws://127.0.0.1:4501",
-          timeoutMs: 5_000,
+          timeoutMs: 60_000,
         },
         stop: {
           signal: "sigterm",

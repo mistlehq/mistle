@@ -31,7 +31,7 @@ const CodexGitHubAssets = {
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
-const RuntimeClientProcessReadinessTimeoutMs = 5_000;
+const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 type CodexProviderMetadata = {
