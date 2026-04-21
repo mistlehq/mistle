@@ -82,8 +82,6 @@ type SessionWorkbenchState = {
     closePanel: () => void;
     isVisible: boolean;
     openPanel: () => void;
-    panelSize: number;
-    setPanelSize: (size: number) => void;
     togglePanel: () => void;
   };
   diffPanelState: {
@@ -92,9 +90,7 @@ type SessionWorkbenchState = {
     isLoading: boolean;
     isVisible: boolean;
     openPanel: () => void;
-    panelSize: number;
     patch: string;
-    setPanelSize: (size: number) => void;
     togglePanel: () => void;
   };
   primaryRepositoryState: ReturnType<typeof useSessionPrimaryRepositoryState>;
@@ -290,9 +286,7 @@ export function useSessionWorkbenchController(input: {
         isLoading: branchDiffState.isLoading,
         isVisible: diffPanelState.isVisible,
         openPanel: diffPanelState.openPanel,
-        panelSize: diffPanelState.panelSize,
         patch: branchDiffState.patch,
-        setPanelSize: diffPanelState.setPanelSize,
         togglePanel: diffPanelState.togglePanel,
       },
       primaryRepositoryState,

@@ -4,7 +4,6 @@ import { render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 describe("SessionWorkbenchPageView", () => {
   beforeAll(() => {
@@ -24,16 +23,12 @@ describe("SessionWorkbenchPageView", () => {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<div>Terminal</div>}
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
-        onBottomPanelResize={function onBottomPanelResize() {}}
-        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
         secondaryPanel={<div>Secondary</div>}
-        secondaryPanelSize={40}
       />,
     );
 
@@ -53,17 +48,13 @@ describe("SessionWorkbenchPageView", () => {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<div>Terminal</div>}
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
         mainContentLayout={{ scroll: "contained", width: "full" }}
-        onBottomPanelResize={function onBottomPanelResize() {}}
-        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
         secondaryPanel={<div>Secondary</div>}
-        secondaryPanelSize={40}
       />,
     );
 
@@ -77,16 +68,12 @@ describe("SessionWorkbenchPageView", () => {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<div>Terminal workspace</div>}
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
-        onBottomPanelResize={function onBottomPanelResize() {}}
-        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
         secondaryPanel={<div>Secondary</div>}
-        secondaryPanelSize={40}
       />,
     );
 
@@ -98,20 +85,16 @@ describe("SessionWorkbenchPageView", () => {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<div>Terminal workspace</div>}
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
         mainContent={<div>Conversation body</div>}
-        onBottomPanelResize={function onBottomPanelResize() {}}
-        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={<div>Composer</div>}
         sandboxInstanceId="sbi_test"
         secondaryPanel={<div>Secondary panel</div>}
-        secondaryPanelSize={40}
       />,
     );
 
-    expect(container.querySelector("#session-workbench-main-group")).not.toBeNull();
-    expect(container.querySelector("#session-workbench-secondary-panel")).toBeNull();
+    expect(within(container).queryAllByTestId("session-workbench-main-group")).toHaveLength(1);
+    expect(within(container).queryByTestId("session-workbench-secondary-panel")).toBeNull();
   });
 });

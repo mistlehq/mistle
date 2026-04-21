@@ -24,7 +24,6 @@ import {
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
   headerStatusUi: SandboxStatusBadgeUi;
@@ -100,7 +99,6 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
             )}
           />
         }
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={isBottomPanelVisible}
         isSecondaryPanelVisible={false}
         mainContent={
@@ -109,12 +107,9 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
           />
         }
         mainContentLayout={{ scroll: "contained", width: "full" }}
-        onBottomPanelResize={noop}
-        onSecondaryPanelResize={noop}
         primaryBottomPanel={null}
         sandboxInstanceId={StorySandboxInstanceId}
         secondaryPanel={<></>}
-        secondaryPanelSize={38}
       />
     </SessionWorkbenchStoryChrome>
   );
@@ -131,15 +126,11 @@ const meta = {
     sandboxInstanceId: StorySandboxInstanceId,
     alert: null,
     bottomPanel: <div className="h-full w-full border-t bg-white" />,
-    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     isBottomPanelVisible: false,
     isSecondaryPanelVisible: false,
     mainContent: createStorySessionMainContent(),
-    onBottomPanelResize: noop,
     primaryBottomPanel: createStorySessionBottomPanel(),
     secondaryPanel: <div className="h-full w-full border-t bg-white" />,
-    secondaryPanelSize: 38,
-    onSecondaryPanelResize: noop,
     headerStatusUi: {
       label: "Connected",
       variant: "secondary",
@@ -275,7 +266,6 @@ export const CliSplitWithTerminal: Story = {
         )}
       />
     ),
-    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
   },
 };
 
@@ -302,7 +292,6 @@ export const CliSplitWithTerminalAndSecondaryPane: Story = {
         )}
       />
     ),
-    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     secondaryPanel: (
       <div className="h-full w-full border-l bg-stone-50 p-4">
         <div className="text-sm font-medium text-stone-900">Current changes</div>
@@ -312,7 +301,6 @@ export const CliSplitWithTerminalAndSecondaryPane: Story = {
         </div>
       </div>
     ),
-    secondaryPanelSize: 38,
   },
 };
 

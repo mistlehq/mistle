@@ -19,7 +19,6 @@ import {
   StorySessionConversationPaneArgs,
 } from "./session-story-support.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 type SessionWorkbenchLiveSimulationStoryArgs = React.ComponentProps<
   typeof SessionWorkbenchPageView
@@ -447,7 +446,6 @@ function SessionConversationWorkbenchHarness(input: {
     <SessionWorkbenchPageView
       alert={null}
       bottomPanel={<></>}
-      bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
       isBottomPanelVisible={false}
       isSecondaryPanelVisible={true}
       mainContent={
@@ -474,8 +472,6 @@ function SessionConversationWorkbenchHarness(input: {
         />
       }
       mainContentScrollContainerRef={scrollContainerRef}
-      onBottomPanelResize={() => {}}
-      onSecondaryPanelResize={() => {}}
       primaryBottomPanel={
         <div className="space-y-3">
           {hasRunningTurn && queuedPrompts.length > 0 ? (
@@ -644,7 +640,6 @@ function SessionConversationWorkbenchHarness(input: {
           )}
         </div>
       }
-      secondaryPanelSize={28}
     />
   );
 }
@@ -660,16 +655,12 @@ const meta = {
     sandboxInstanceId: null,
     alert: null,
     bottomPanel: <></>,
-    bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     isBottomPanelVisible: true,
     isSecondaryPanelVisible: false,
     mainContent: <></>,
-    onBottomPanelResize: () => {},
-    onSecondaryPanelResize: () => {},
     scrollBehavior: "follow-streaming-at-bottom",
     primaryBottomPanel: <></>,
     secondaryPanel: <></>,
-    secondaryPanelSize: 28,
   },
   argTypes: {
     scrollBehavior: SessionConversationScrollBehaviorArgType,

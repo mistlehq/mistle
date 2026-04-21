@@ -14,7 +14,6 @@ import {
 } from "./session-story-support.js";
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
@@ -117,7 +116,6 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
           )}
         />
       ),
-      bottomPanelSize: DEFAULT_TERMINAL_PANEL_SIZE,
       isBottomPanelVisible,
       mainContent: createStorySessionMainContent(),
       primaryBottomPanel: createStorySessionBottomPanel(),

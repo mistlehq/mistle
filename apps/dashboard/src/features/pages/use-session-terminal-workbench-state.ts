@@ -6,22 +6,17 @@ import {
   writeBrowserStorageJson,
 } from "../shared/browser-storage.js";
 
-const DEFAULT_TERMINAL_PANEL_SIZE = 320;
 const TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX = "dashboard:session-terminal-workbench:";
-const MAX_TERMINAL_PANEL_SIZE = 960;
 const MIN_TERMINAL_PANEL_SIZE = 160;
 
 type PersistedTerminalWorkbenchState = {
   isVisible: boolean;
-  panelSize: number;
 };
 
 type SessionTerminalWorkbenchState = {
   closePanel: () => void;
   isVisible: boolean;
   openPanel: () => void;
-  panelSize: number;
-  setPanelSize: (size: number) => void;
   togglePanel: () => void;
 };
 
@@ -41,14 +36,7 @@ function isPersistedTerminalWorkbenchState(
     return false;
   }
 
-  const isVisible = Reflect.get(value, "isVisible");
-  const panelSize = Reflect.get(value, "panelSize");
-
-  return typeof isVisible === "boolean" && typeof panelSize === "number";
-}
-
-function normalizePanelSize(size: number): number {
-  return Math.min(MAX_TERMINAL_PANEL_SIZE, Math.max(MIN_TERMINAL_PANEL_SIZE, Math.round(size)));
+  return typeof Reflect.get(value, "isVisible") === "boolean";
 }
 
 function readPersistedTerminalWorkbenchState(
@@ -57,7 +45,6 @@ function readPersistedTerminalWorkbenchState(
   if (sandboxInstanceId === null) {
     return {
       isVisible: false,
-      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     };
   }
 
@@ -65,7 +52,6 @@ function readPersistedTerminalWorkbenchState(
   if (storage === null) {
     return {
       isVisible: false,
-      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     };
   }
 
@@ -77,13 +63,11 @@ function readPersistedTerminalWorkbenchState(
   if (storedValue === null) {
     return {
       isVisible: false,
-      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     };
   }
 
   return {
     isVisible: storedValue.isVisible,
-    panelSize: normalizePanelSize(storedValue.panelSize),
   };
 }
 
@@ -161,11 +145,10 @@ export function useSessionTerminalWorkbenchState(input: {
       key: getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
       value: {
         isVisible: resolvedState.isVisible,
-        panelSize: resolvedState.panelSize,
       },
       storage,
     });
-  }, [input.sandboxInstanceId, resolvedState]);
+  }, [input.sandboxInstanceId, resolvedState, storage]);
 
   const openPanel = useCallback((): void => {
     updateCurrentState((currentState) => ({
@@ -188,24 +171,12 @@ export function useSessionTerminalWorkbenchState(input: {
     }));
   }, [updateCurrentState]);
 
-  const setPanelSize = useCallback(
-    (size: number): void => {
-      updateCurrentState((currentState) => ({
-        ...currentState,
-        panelSize: normalizePanelSize(size),
-      }));
-    },
-    [updateCurrentState],
-  );
-
   return {
     closePanel,
     isVisible: resolvedState.isVisible,
     openPanel,
-    panelSize: resolvedState.panelSize,
-    setPanelSize,
     togglePanel,
   };
 }
 
-export { DEFAULT_TERMINAL_PANEL_SIZE, MIN_TERMINAL_PANEL_SIZE };
+export { MIN_TERMINAL_PANEL_SIZE };

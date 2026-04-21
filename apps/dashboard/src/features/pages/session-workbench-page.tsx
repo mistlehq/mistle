@@ -29,7 +29,6 @@ import {
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
-import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
@@ -334,11 +333,8 @@ function SessionWorkbenchPageContent(input: {
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<></>}
-        bottomPanelSize={DEFAULT_TERMINAL_PANEL_SIZE}
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={false}
-        onBottomPanelResize={function onBottomPanelResize() {}}
-        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={
           <SessionConversationBottomPanel
             chatEntries={[]}
@@ -350,7 +346,6 @@ function SessionWorkbenchPageContent(input: {
           />
         }
         secondaryPanel={<></>}
-        secondaryPanelSize={38}
         mainContent={
           <SessionConversationMainContent
             activeTurnId={null}
@@ -393,7 +388,6 @@ function SessionWorkbenchPageContent(input: {
           sandboxInstanceId={input.sandboxInstanceId}
         />
       }
-      bottomPanelSize={workbench.terminalPanelState.panelSize}
       isBottomPanelVisible={workbench.terminalPanelState.isVisible}
       isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
       mainContentLayout={
@@ -426,8 +420,6 @@ function SessionWorkbenchPageContent(input: {
         transitionState: workbench.primaryPanelState.transitionState,
       })}
       mainContentScrollContainerRef={conversationScrollContainerRef}
-      onBottomPanelResize={workbench.terminalPanelState.setPanelSize}
-      onSecondaryPanelResize={workbench.diffPanelState.setPanelSize}
       primaryBottomPanel={
         workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
           <SessionConversationBottomPanelController
@@ -466,7 +458,6 @@ function SessionWorkbenchPageContent(input: {
           title="Current changes"
         />
       }
-      secondaryPanelSize={workbench.diffPanelState.panelSize}
       sandboxInstanceId={input.sandboxInstanceId}
     />
   );

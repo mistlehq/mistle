@@ -1,6 +1,6 @@
 import * as React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 
 import { cn } from "../../lib/utils.js";
 
@@ -41,5 +41,5 @@ function ResizableHandle({
   );
 }
 
-export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+export { ResizablePanelGroup, ResizablePanel, ResizableHandle, useDefaultLayout };
 export type { PanelImperativeHandle };

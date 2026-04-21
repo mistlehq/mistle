@@ -77,7 +77,6 @@ const StoryBranchPatch = [
   "+  args: {",
   "+    isSecondaryPanelVisible: true,",
   "+    secondaryPanel: <SessionDiffPanel /> ,",
-  "+    secondaryPanelSize: 42,",
   "+  },",
   " };",
 ].join("\n");
@@ -389,7 +388,6 @@ function StoryDiffWorkbench({
             onAddComment={addComment}
           />
         ),
-        secondaryPanelSize: 42,
       })}
     </div>
   );
