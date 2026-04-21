@@ -164,7 +164,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       release: {
         kind: "tag",
         match: "exact",
-        tag: "rust-v0.120.0",
+        tag: "rust-v0.122.0",
       },
       asset: {
         kind: "by_arch",
