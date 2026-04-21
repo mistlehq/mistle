@@ -109,6 +109,86 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
   };
 }
 
+function buildRecentlyUpdatedOrderingList(): SandboxInstancesListResult {
+  return {
+    items: [
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_finance_newest",
+        title: "Investigate failing payout reconciliation worker",
+        sandboxProfileId: "sbp_finance",
+        sandboxProfileDisplayName: "Finance Investigator",
+        status: "stopped",
+        createdAt: "2026-04-10T08:00:00.000Z",
+        updatedAt: "2026-04-20T11:45:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_repo_newest",
+        title: "Fix flaky gateway lease handoff test",
+        sandboxProfileId: "sbp_repo_maintainer",
+        sandboxProfileDisplayName: "Repo Maintainer",
+        status: "running",
+        createdAt: "2026-04-09T12:00:00.000Z",
+        updatedAt: "2026-04-20T09:30:00.000Z",
+        keepaliveActive: true,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_ops_newest",
+        title: "Validate release checklist after CI drift",
+        sandboxProfileId: "sbp_ops",
+        sandboxProfileDisplayName: "Ops Coordinator",
+        status: "running",
+        createdAt: "2026-04-11T07:30:00.000Z",
+        updatedAt: "2026-04-19T14:00:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_repo_older_update",
+        title: "Trace Codex thread persistence in dashboard",
+        sandboxProfileId: "sbp_repo_maintainer",
+        sandboxProfileDisplayName: "Repo Maintainer",
+        status: "running",
+        createdAt: "2026-04-08T09:30:00.000Z",
+        updatedAt: "2026-04-18T16:00:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_finance_older_update",
+        title: "Audit invoice export retries after webhook timeout",
+        sandboxProfileId: "sbp_finance",
+        sandboxProfileDisplayName: "Finance Investigator",
+        status: "stopped",
+        createdAt: "2026-04-06T08:00:00.000Z",
+        updatedAt: "2026-04-17T10:15:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_docs_newest",
+        title: "Draft setup guide for sandbox session recovery",
+        sandboxProfileId: "sbp_docs",
+        sandboxProfileDisplayName: "Docs Maintainer",
+        status: "starting",
+        createdAt: "2026-04-12T09:45:00.000Z",
+        updatedAt: "2026-04-16T08:00:00.000Z",
+        keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_docs_oldest",
+        title: "Tidy release note wording for session sidebar rollout",
+        sandboxProfileId: "sbp_docs",
+        sandboxProfileDisplayName: "Docs Maintainer",
+        status: "stopped",
+        createdAt: "2026-04-08T09:45:00.000Z",
+        updatedAt: "2026-04-13T08:00:00.000Z",
+        keepaliveActive: false,
+      }),
+    ],
+    nextPage: null,
+    previousPage: null,
+    totalResults: 7,
+  };
+}
+
 const meta = {
   title: "Dashboard/Sessions/Sidebar",
   component: SessionsStoryHarness,
@@ -171,21 +251,21 @@ export const EmptyState: Story = {
   },
 };
 
-export const NoLaunchableProfiles: Story = {
+export const OrderedByMostRecentlyUpdated: Story = {
   args: {
     initialEntries: ["/sessions/new"],
     showSessionsSidebar: true,
-    launchableProfiles: [],
-    sandboxInstancesList: {
-      items: [],
-      nextPage: null,
-      previousPage: null,
-      totalResults: 0,
+    sandboxInstancesList: buildRecentlyUpdatedOrderingList(),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shows sidebar grouping kept in the frontend while both groups and items are ordered by descending updatedAt. Expected group order: Finance Investigator, Repo Maintainer, Ops Coordinator, Docs Maintainer.",
+      },
     },
   },
 };
-
-export const ActivityIndicatorOnly: Story = {};
 
 export const LoadingState: Story = {
   args: {
@@ -204,19 +284,5 @@ export const LoadError: Story = {
       kind: "error",
     },
     showSessionsSidebar: true,
-  },
-};
-
-export const SessionSelected: Story = {
-  args: {
-    initialEntries: ["/sessions/sbi_working_alpha"],
-    showSessionsSidebar: true,
-  },
-};
-
-export const ToggleRoundTripFromAutomations: Story = {
-  args: {
-    initialEntries: ["/automations"],
-    showSessionsSidebar: false,
   },
 };

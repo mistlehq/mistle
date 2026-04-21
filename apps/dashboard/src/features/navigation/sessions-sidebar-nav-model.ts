@@ -19,6 +19,7 @@ export type SessionsSidebarNavItem = {
   metadataLabel: string;
   to: string;
   showActivityIndicator: boolean;
+  updatedAt: string;
 };
 
 export type SessionsSidebarNavGroup = {
@@ -64,12 +65,11 @@ function resolveMetadataLabel(
   });
 }
 
-function resolveActivityRank(input: boolean): number {
-  if (input) {
-    return 0;
-  }
-
-  return 1;
+function compareUpdatedAtDescending(
+  left: { updatedAt: string },
+  right: { updatedAt: string },
+): number {
+  return right.updatedAt.localeCompare(left.updatedAt);
 }
 
 export function buildSessionsSidebarNavGroups(
@@ -109,6 +109,7 @@ export function buildSessionsSidebarNavGroups(
       }),
       to: `/sessions/${encodeURIComponent(item.id)}`,
       showActivityIndicator,
+      updatedAt: item.updatedAt,
     });
 
     if (existingGroup === undefined) {
@@ -120,17 +121,27 @@ export function buildSessionsSidebarNavGroups(
     .map((group) => ({
       ...group,
       items: [...group.items].sort((left, right) => {
-        const activityDifference =
-          resolveActivityRank(left.showActivityIndicator) -
-          resolveActivityRank(right.showActivityIndicator);
-        if (activityDifference !== 0) {
-          return activityDifference;
+        const updatedAtDifference = compareUpdatedAtDescending(left, right);
+        if (updatedAtDifference !== 0) {
+          return updatedAtDifference;
         }
 
         return left.label.localeCompare(right.label);
       }),
     }))
-    .sort((left, right) => left.profileName.localeCompare(right.profileName));
+    .sort((left, right) => {
+      const leftNewestItem = left.items[0];
+      const rightNewestItem = right.items[0];
+
+      if (leftNewestItem !== undefined && rightNewestItem !== undefined) {
+        const updatedAtDifference = compareUpdatedAtDescending(leftNewestItem, rightNewestItem);
+        if (updatedAtDifference !== 0) {
+          return updatedAtDifference;
+        }
+      }
+
+      return left.profileName.localeCompare(right.profileName);
+    });
 }
 
 export function filterSessionsSidebarNavGroups(input: {

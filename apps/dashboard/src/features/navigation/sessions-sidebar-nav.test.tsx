@@ -19,6 +19,7 @@ const groups: SessionsSidebarNavGroup[] = [
         metadataLabel: "Working",
         to: "/sessions/sbi_active",
         showActivityIndicator: true,
+        updatedAt: "2026-04-08T00:00:00.000Z",
       },
       {
         id: "sbi_idle",
@@ -26,6 +27,7 @@ const groups: SessionsSidebarNavGroup[] = [
         metadataLabel: "Idle",
         to: "/sessions/sbi_idle",
         showActivityIndicator: false,
+        updatedAt: "2026-04-07T00:00:00.000Z",
       },
     ],
   },
@@ -39,6 +41,7 @@ const groups: SessionsSidebarNavGroup[] = [
         metadataLabel: "1h",
         to: "/sessions/sbi_docs",
         showActivityIndicator: false,
+        updatedAt: "2026-04-09T23:00:00.000Z",
       },
     ],
   },

@@ -148,16 +148,38 @@ export function createSessionsPageStoryQueryClient(input?: {
       },
     );
   } else if (sessionsSidebarQueryState.kind === "pending") {
-    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+    const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sessionsSidebarQueryKey,
       queryFn: async () => await new Promise<SandboxInstancesListResult>(() => undefined),
     });
+
+    sessionsSidebarQuery.setState({
+      ...sessionsSidebarQuery.state,
+      data: undefined,
+      error: null,
+      fetchStatus: "fetching",
+      status: "pending",
+    });
   } else {
-    queryClient.setQueryDefaults(sessionsSidebarQueryKey, {
+    const sessionsSidebarQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sessionsSidebarQueryKey,
       queryFn: async () => {
         throw new Error(
           sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
         );
       },
+    });
+
+    sessionsSidebarQuery.setState({
+      ...sessionsSidebarQuery.state,
+      data: undefined,
+      error: new Error(
+        sessionsSidebarQueryState.errorMessage ?? "Could not load sandbox instances.",
+      ),
+      errorUpdateCount: 1,
+      errorUpdatedAt: Date.now(),
+      fetchStatus: "idle",
+      status: "error",
     });
   }
 

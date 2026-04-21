@@ -33,7 +33,7 @@ export const InvalidPaginationCursorErrorCode = "INVALID_PAGINATION_CURSOR";
 
 const SandboxInstancesCursorSchema = z
   .object({
-    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
     id: z.string().min(1),
   })
   .strict();
@@ -234,7 +234,7 @@ export async function listSandboxInstances(
         }),
       encodeCursor: encodeKeysetCursor,
       getCursor: (item) => ({
-        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
         id: item.id,
       }),
       fetchPage: async ({ direction, cursor, limitPlusOne }) =>
@@ -266,8 +266,8 @@ export async function listSandboxInstances(
               return and(
                 organizationScope,
                 or(
-                  lt(table.createdAt, cursor.createdAt),
-                  and(eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)),
+                  lt(table.updatedAt, cursor.updatedAt),
+                  and(eq(table.updatedAt, cursor.updatedAt), lt(table.id, cursor.id)),
                 ),
               );
             }
@@ -275,15 +275,15 @@ export async function listSandboxInstances(
             return and(
               organizationScope,
               or(
-                gt(table.createdAt, cursor.createdAt),
-                and(eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)),
+                gt(table.updatedAt, cursor.updatedAt),
+                and(eq(table.updatedAt, cursor.updatedAt), gt(table.id, cursor.id)),
               ),
             );
           },
           orderBy:
             direction === KeysetPaginationDirections.BACKWARD
-              ? (table, { asc }) => [asc(table.createdAt), asc(table.id)]
-              : (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+              ? (table, { asc }) => [asc(table.updatedAt), asc(table.id)]
+              : (table, { desc }) => [desc(table.updatedAt), desc(table.id)],
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
