@@ -465,12 +465,16 @@ export function useSessionWorkbenchLifecycleState(input: {
   };
 }
 
-function resolveInitialEntryStartupState(input: {
+export function resolveInitialEntryStartupState(input: {
   mainPanelTransitionState: MainPanelTransitionState;
   rawSandboxStatus: SandboxInstanceStatusResult["status"] | null;
   sandboxStatusReadState: "error" | "loading" | "ready";
   sessionSnapshot: ReturnType<typeof useCodexSessionState>["lifecycle"]["sessionSnapshot"];
 }): SessionStartupState | null {
+  if (input.sessionSnapshot !== null && input.mainPanelTransitionState === "stable_chat") {
+    return null;
+  }
+
   if (input.sandboxStatusReadState === "loading") {
     return "loading_status";
   }
