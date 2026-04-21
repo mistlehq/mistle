@@ -178,6 +178,234 @@ function BindingConnectionField(input: {
   );
 }
 
+function resolveAvailableConnectionsForBindingKind(input: {
+  kind: SandboxIntegrationBindingKind;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): readonly IntegrationConnectionSummary[] {
+  return input.availableConnections.filter((connection) => {
+    const target = input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    return resolveBindingKindFromTarget(target) === input.kind;
+  });
+}
+
+function SchemaBindingConnectionPicker(input: {
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  disabled: boolean;
+  onCreateBindingFromConnection:
+    | ((input: {
+        kind: SandboxIntegrationBindingKind;
+        connectionId: string;
+      }) => Promise<void> | void)
+    | undefined;
+  kind: SandboxIntegrationBindingKind;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <BindingConnectionField
+        ariaLabel="Connection"
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        disabled={input.disabled}
+        onValueChange={(nextValue) => {
+          if (input.onCreateBindingFromConnection === undefined) {
+            return;
+          }
+          void input.onCreateBindingFromConnection({
+            kind: input.kind,
+            connectionId: nextValue,
+          });
+        }}
+        placeholder="Select a connection"
+        selectedConnectionId={null}
+      />
+    </div>
+  );
+}
+
+function renderSchemaBindingRemoveAction(input: {
+  kind: SandboxIntegrationBindingKind;
+  row: SandboxProfileBindingEditorRow;
+  onRemove: (clientId: string) => void;
+}): React.ReactNode {
+  if (input.kind !== "git") {
+    return undefined;
+  }
+
+  return (
+    <Button
+      aria-label="Remove binding"
+      className="mt-6 h-7 w-7 shrink-0"
+      onClick={() => {
+        input.onRemove(input.row.clientId);
+      }}
+      type="button"
+      variant="ghost"
+    >
+      <TrashIcon aria-hidden className="size-4" />
+    </Button>
+  );
+}
+
+function SchemaBindingRowEditor(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnectionsForKind: readonly IntegrationConnectionSummary[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowError: string | undefined;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+  removeAction?: React.ReactNode;
+  fieldId: string;
+}): React.JSX.Element {
+  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
+
+  React.useEffect(() => {
+    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
+
+    return () => {
+      input.onDraftDirtyChange?.(input.row.clientId, false);
+    };
+  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
+
+  return (
+    <div className="flex flex-col gap-4 py-2">
+      <div className="flex flex-col gap-4">
+        <BindingConnectionField
+          ariaLabel="Connection"
+          availableConnections={input.availableConnectionsForKind}
+          availableTargets={input.availableTargets}
+          id={input.fieldId}
+          onValueChange={(nextValue) => {
+            const nextConnection = input.availableConnectionsForKind.find(
+              (connection) => connection.id === nextValue,
+            );
+            const nextTarget = input.availableTargets.find(
+              (candidate) => candidate.targetKey === nextConnection?.targetKey,
+            );
+
+            setDraftRow((currentRow) => ({
+              ...currentRow,
+              connectionId: nextValue,
+              config:
+                nextConnection === undefined || nextTarget === undefined
+                  ? {}
+                  : createDefaultBindingConfig({
+                      connection: nextConnection,
+                      target: nextTarget,
+                    }),
+            }));
+          }}
+          placeholder="Select integration connection"
+          selectedConnectionId={draftRow.connectionId}
+          trailingAction={input.removeAction}
+        />
+
+        <SandboxProfileBindingConfigEditor
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          formContext={{
+            columns: 2,
+            labelTone: "detail",
+            layout: "vertical",
+          }}
+          onIntegrationBindingRowChange={(clientId, changes) => {
+            setDraftRow((currentRow) =>
+              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
+            );
+          }}
+          row={draftRow}
+        />
+
+        <BindingDraftActions
+          isDirty={isDirty}
+          onCancel={resetDraftRow}
+          onSave={() => {
+            input.onChange(input.row.clientId, {
+              connectionId: draftRow.connectionId,
+              kind: draftRow.kind,
+              config: draftRow.config,
+            });
+          }}
+        />
+
+        {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
+      </div>
+    </div>
+  );
+}
+
+function SchemaBindingRows(input: {
+  kind: Extract<SandboxIntegrationBindingKind, "agent" | "git">;
+  rows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  rowErrorsByClientId: Readonly<Record<string, string>>;
+  onChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  onRemove: (clientId: string) => void;
+  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
+  onCreateBindingFromConnection?: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+  }) => Promise<void> | void;
+}): React.JSX.Element {
+  const availableConnectionsForKind = resolveAvailableConnectionsForBindingKind({
+    kind: input.kind,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
+
+  return (
+    <div className="flex flex-col divide-y">
+      {input.rows.length === 0 ? (
+        <SchemaBindingConnectionPicker
+          availableConnections={availableConnectionsForKind}
+          availableTargets={input.availableTargets}
+          disabled={
+            availableConnectionsForKind.length === 0 ||
+            input.onCreateBindingFromConnection === undefined
+          }
+          kind={input.kind}
+          onCreateBindingFromConnection={input.onCreateBindingFromConnection}
+        />
+      ) : null}
+      {input.rows.map((row) => (
+        <SchemaBindingRowEditor
+          availableConnections={input.availableConnections}
+          availableConnectionsForKind={availableConnectionsForKind}
+          availableTargets={input.availableTargets}
+          fieldId={`${input.kind}-binding-connection-${row.clientId}`}
+          key={row.clientId}
+          onChange={input.onChange}
+          row={row}
+          rowError={input.rowErrorsByClientId[row.clientId]}
+          {...(input.onDraftDirtyChange === undefined
+            ? {}
+            : { onDraftDirtyChange: input.onDraftDirtyChange })}
+          {...(input.kind !== "git"
+            ? {}
+            : {
+                removeAction: renderSchemaBindingRemoveAction({
+                  kind: input.kind,
+                  onRemove: input.onRemove,
+                  row,
+                }),
+              })}
+        />
+      ))}
+    </div>
+  );
+}
+
 function ConnectorBindingRows(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -494,373 +722,6 @@ function ConnectorBindingRows(input: {
   );
 }
 
-function AgentHarnessConnectionPicker(input: {
-  availableAgentConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  onCreateBindingFromConnection:
-    | ((input: {
-        kind: SandboxIntegrationBindingKind;
-        connectionId: string;
-      }) => Promise<void> | void)
-    | undefined;
-}): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <BindingConnectionField
-        ariaLabel="Connection"
-        availableConnections={input.availableAgentConnections}
-        availableTargets={input.availableTargets}
-        disabled={
-          input.availableAgentConnections.length === 0 ||
-          input.onCreateBindingFromConnection === undefined
-        }
-        onValueChange={(nextValue) => {
-          if (input.onCreateBindingFromConnection === undefined) {
-            return;
-          }
-          void input.onCreateBindingFromConnection({
-            kind: "agent",
-            connectionId: nextValue,
-          });
-        }}
-        placeholder="Select a connection"
-        selectedConnectionId={null}
-      />
-    </div>
-  );
-}
-
-function AgentHarnessRowEditor(input: {
-  row: SandboxProfileBindingEditorRow;
-  availableAgentConnections: readonly IntegrationConnectionSummary[];
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  rowError: string | undefined;
-  onChange: (
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ) => void;
-  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
-}): React.JSX.Element {
-  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
-
-  React.useEffect(() => {
-    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
-
-    return () => {
-      input.onDraftDirtyChange?.(input.row.clientId, false);
-    };
-  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
-
-  const fieldId = `agent-binding-connection-${input.row.clientId}`;
-
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <div className="flex flex-col gap-4">
-        <BindingConnectionField
-          ariaLabel="Connection"
-          availableConnections={input.availableAgentConnections}
-          availableTargets={input.availableTargets}
-          id={fieldId}
-          onValueChange={(nextValue) => {
-            const nextConnection = input.availableAgentConnections.find(
-              (connection) => connection.id === nextValue,
-            );
-            const nextTarget = input.availableTargets.find(
-              (candidate) => candidate.targetKey === nextConnection?.targetKey,
-            );
-
-            setDraftRow((currentRow) => ({
-              ...currentRow,
-              connectionId: nextValue,
-              config:
-                nextConnection === undefined || nextTarget === undefined
-                  ? {}
-                  : createDefaultBindingConfig({
-                      connection: nextConnection,
-                      target: nextTarget,
-                    }),
-            }));
-          }}
-          placeholder="Select integration connection"
-          selectedConnectionId={draftRow.connectionId}
-        />
-
-        <SandboxProfileBindingConfigEditor
-          availableConnections={input.availableConnections}
-          availableTargets={input.availableTargets}
-          formContext={{
-            columns: 2,
-            labelTone: "detail",
-            layout: "vertical",
-          }}
-          onIntegrationBindingRowChange={(clientId, changes) => {
-            setDraftRow((currentRow) =>
-              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
-            );
-          }}
-          row={draftRow}
-        />
-
-        <BindingDraftActions
-          isDirty={isDirty}
-          onCancel={resetDraftRow}
-          onSave={() => {
-            input.onChange(input.row.clientId, {
-              connectionId: draftRow.connectionId,
-              kind: draftRow.kind,
-              config: draftRow.config,
-            });
-          }}
-        />
-
-        {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
-      </div>
-    </div>
-  );
-}
-
-function AgentHarnessRows(input: {
-  rows: readonly SandboxProfileBindingEditorRow[];
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  rowErrorsByClientId: Readonly<Record<string, string>>;
-  onChange: (
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ) => void;
-  onRemove: (clientId: string) => void;
-  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
-  onCreateBindingFromConnection?: (input: {
-    kind: SandboxIntegrationBindingKind;
-    connectionId: string;
-  }) => Promise<void> | void;
-}): React.JSX.Element {
-  const availableAgentConnections = input.availableConnections.filter((connection) => {
-    const target = input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    );
-    return resolveBindingKindFromTarget(target) === "agent";
-  });
-
-  return (
-    <div className="flex flex-col divide-y">
-      {input.rows.length === 0 ? (
-        <AgentHarnessConnectionPicker
-          availableAgentConnections={availableAgentConnections}
-          availableTargets={input.availableTargets}
-          onCreateBindingFromConnection={input.onCreateBindingFromConnection}
-        />
-      ) : null}
-      {input.rows.map((row) => (
-        <AgentHarnessRowEditor
-          availableAgentConnections={availableAgentConnections}
-          availableConnections={input.availableConnections}
-          availableTargets={input.availableTargets}
-          key={row.clientId}
-          onChange={input.onChange}
-          row={row}
-          rowError={input.rowErrorsByClientId[row.clientId]}
-          {...(input.onDraftDirtyChange === undefined
-            ? {}
-            : { onDraftDirtyChange: input.onDraftDirtyChange })}
-        />
-      ))}
-    </div>
-  );
-}
-
-function GitProviderConnectionPicker(input: {
-  availableGitConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  onCreateBindingFromConnection:
-    | ((input: {
-        kind: SandboxIntegrationBindingKind;
-        connectionId: string;
-      }) => Promise<void> | void)
-    | undefined;
-}): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <BindingConnectionField
-        ariaLabel="Connection"
-        availableConnections={input.availableGitConnections}
-        availableTargets={input.availableTargets}
-        disabled={
-          input.availableGitConnections.length === 0 ||
-          input.onCreateBindingFromConnection === undefined
-        }
-        onValueChange={(nextValue) => {
-          if (input.onCreateBindingFromConnection === undefined) {
-            return;
-          }
-          void input.onCreateBindingFromConnection({
-            kind: "git",
-            connectionId: nextValue,
-          });
-        }}
-        placeholder="Select a connection"
-        selectedConnectionId={null}
-      />
-    </div>
-  );
-}
-
-function GitProviderRowEditor(input: {
-  row: SandboxProfileBindingEditorRow;
-  availableGitConnections: readonly IntegrationConnectionSummary[];
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  rowError: string | undefined;
-  onChange: (
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ) => void;
-  onRemove: (clientId: string) => void;
-  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
-}): React.JSX.Element {
-  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
-
-  React.useEffect(() => {
-    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
-
-    return () => {
-      input.onDraftDirtyChange?.(input.row.clientId, false);
-    };
-  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
-
-  const fieldId = `git-binding-connection-${input.row.clientId}`;
-
-  return (
-    <div className="flex flex-col gap-4 py-2">
-      <div className="flex flex-col gap-4">
-        <BindingConnectionField
-          ariaLabel="Connection"
-          availableConnections={input.availableGitConnections}
-          availableTargets={input.availableTargets}
-          id={fieldId}
-          onValueChange={(nextValue) => {
-            const nextConnection = input.availableGitConnections.find(
-              (connection) => connection.id === nextValue,
-            );
-            const nextTarget = input.availableTargets.find(
-              (candidate) => candidate.targetKey === nextConnection?.targetKey,
-            );
-
-            setDraftRow((currentRow) => ({
-              ...currentRow,
-              connectionId: nextValue,
-              config:
-                nextConnection === undefined || nextTarget === undefined
-                  ? {}
-                  : createDefaultBindingConfig({
-                      connection: nextConnection,
-                      target: nextTarget,
-                    }),
-            }));
-          }}
-          placeholder="Select integration connection"
-          selectedConnectionId={draftRow.connectionId}
-          trailingAction={
-            <Button
-              aria-label="Remove binding"
-              className="mt-6 h-7 w-7 shrink-0"
-              onClick={() => {
-                input.onRemove(input.row.clientId);
-              }}
-              type="button"
-              variant="ghost"
-            >
-              <TrashIcon aria-hidden className="size-4" />
-            </Button>
-          }
-        />
-
-        <SandboxProfileBindingConfigEditor
-          availableConnections={input.availableConnections}
-          availableTargets={input.availableTargets}
-          formContext={{
-            columns: 2,
-            labelTone: "detail",
-            layout: "vertical",
-          }}
-          onIntegrationBindingRowChange={(clientId, changes) => {
-            setDraftRow((currentRow) =>
-              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
-            );
-          }}
-          row={draftRow}
-        />
-
-        <BindingDraftActions
-          isDirty={isDirty}
-          onCancel={resetDraftRow}
-          onSave={() => {
-            input.onChange(input.row.clientId, {
-              connectionId: draftRow.connectionId,
-              kind: draftRow.kind,
-              config: draftRow.config,
-            });
-          }}
-        />
-
-        {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
-      </div>
-    </div>
-  );
-}
-
-function GitProviderRows(input: {
-  rows: readonly SandboxProfileBindingEditorRow[];
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  rowErrorsByClientId: Readonly<Record<string, string>>;
-  onChange: (
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ) => void;
-  onRemove: (clientId: string) => void;
-  onDraftDirtyChange?: (clientId: string, isDirty: boolean) => void;
-  onCreateBindingFromConnection?: (input: {
-    kind: SandboxIntegrationBindingKind;
-    connectionId: string;
-  }) => Promise<void> | void;
-}): React.JSX.Element {
-  const availableGitConnections = input.availableConnections.filter((connection) => {
-    const target = input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    );
-    return resolveBindingKindFromTarget(target) === "git";
-  });
-
-  return (
-    <div className="flex flex-col divide-y">
-      {input.rows.length === 0 ? (
-        <GitProviderConnectionPicker
-          availableGitConnections={availableGitConnections}
-          availableTargets={input.availableTargets}
-          onCreateBindingFromConnection={input.onCreateBindingFromConnection}
-        />
-      ) : null}
-      {input.rows.map((row) => (
-        <GitProviderRowEditor
-          availableConnections={input.availableConnections}
-          availableGitConnections={availableGitConnections}
-          availableTargets={input.availableTargets}
-          key={row.clientId}
-          onChange={input.onChange}
-          onRemove={input.onRemove}
-          row={row}
-          rowError={input.rowErrorsByClientId[row.clientId]}
-          {...(input.onDraftDirtyChange === undefined
-            ? {}
-            : { onDraftDirtyChange: input.onDraftDirtyChange })}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function SandboxProfileBindingSection(input: {
   kind: SandboxIntegrationBindingKind;
   rows: readonly SandboxProfileBindingEditorRow[];
@@ -918,9 +779,10 @@ export function SandboxProfileBindingSection(input: {
         rows={input.rows}
       />
     ) : input.kind === "agent" ? (
-      <AgentHarnessRows
+      <SchemaBindingRows
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
+        kind="agent"
         onChange={input.onRowChange}
         onRemove={input.onRemove}
         rowErrorsByClientId={input.rowErrorsByClientId}
@@ -933,9 +795,10 @@ export function SandboxProfileBindingSection(input: {
           : { onCreateBindingFromConnection: input.onCreateBindingFromConnection })}
       />
     ) : input.kind === "git" ? (
-      <GitProviderRows
+      <SchemaBindingRows
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
+        kind="git"
         onChange={input.onRowChange}
         onRemove={input.onRemove}
         rowErrorsByClientId={input.rowErrorsByClientId}
