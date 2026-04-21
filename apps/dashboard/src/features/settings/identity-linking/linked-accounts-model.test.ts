@@ -110,7 +110,9 @@ describe("linked-accounts-model", () => {
       commitSigning: {
         statusLabel: "Not configured",
         keySummaryLabel: null,
-        uploadActionLabel: "Upload key",
+        helperLabel: "SSH private key",
+        helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+        uploadActionLabel: "Upload private key",
         removeActionLabel: null,
       },
       primaryActionLabel: "Relink",
@@ -201,7 +203,9 @@ describe("linked-accounts-model", () => {
       commitSigning: {
         statusLabel: "Configured",
         keySummaryLabel: "SHA256:abc123",
-        uploadActionLabel: "Replace key",
+        helperLabel: "SSH private key",
+        helperCommand: null,
+        uploadActionLabel: "Replace private key",
         removeActionLabel: "Remove key",
       },
     });

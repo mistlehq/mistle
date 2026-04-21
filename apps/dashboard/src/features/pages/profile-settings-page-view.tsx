@@ -1,6 +1,11 @@
 import {
   Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   FieldContent,
   FieldHeader,
@@ -12,7 +17,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from "@mistle/ui";
+import type { SyntheticEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
@@ -157,6 +164,8 @@ function LinkedAccountCard(input: {
   const emailPreference = input.linkedAccountCard.emailPreference;
   const commitSigning = input.linkedAccountCard.commitSigning;
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
+  const [pastedCommitSigningKey, setPastedCommitSigningKey] = useState("");
   const [selectedEmail, setSelectedEmail] = useState(emailPreference?.selectedEmail ?? "");
   const selectedOptionLabel = emailPreference?.options.find(
     (option) => option.value === selectedEmail,
@@ -165,6 +174,40 @@ function LinkedAccountCard(input: {
   useEffect(() => {
     setSelectedEmail(emailPreference?.selectedEmail ?? "");
   }, [emailPreference?.selectedEmail, input.linkedAccountCard.providerFamily]);
+
+  function closeCommitSigningDialog(): void {
+    if (input.linkedAccountActionPending) {
+      return;
+    }
+
+    setIsCommitSigningDialogOpen(false);
+    setPastedCommitSigningKey("");
+  }
+
+  async function uploadCommitSigningKeyFile(file: File): Promise<void> {
+    await input.onUploadLinkedAccountCommitSigningKey(input.linkedAccountCard.providerFamily, file);
+    setIsCommitSigningDialogOpen(false);
+    setPastedCommitSigningKey("");
+  }
+
+  async function handleCommitSigningDialogSubmit(
+    event: SyntheticEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault();
+
+    const normalizedPrivateKey = pastedCommitSigningKey.trim();
+    if (input.linkedAccountActionPending || normalizedPrivateKey.length === 0) {
+      return;
+    }
+
+    try {
+      await uploadCommitSigningKeyFile(
+        new File([normalizedPrivateKey], "my-signing-key", {
+          type: "text/plain",
+        }),
+      );
+    } catch {}
+  }
 
   return (
     <div className="rounded border bg-background p-4">
@@ -291,10 +334,18 @@ function LinkedAccountCard(input: {
                       {commitSigning.keySummaryLabel}
                     </p>
                   )}
+                  {commitSigning.helperLabel === null ? null : (
+                    <p className="text-xs text-muted-foreground">{commitSigning.helperLabel}</p>
+                  )}
+                  {commitSigning.helperCommand === null ? null : (
+                    <code className="mt-1 inline-block max-w-full overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs select-all">
+                      {commitSigning.helperCommand}
+                    </code>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <input
-                    aria-label={`Upload ${input.linkedAccountCard.displayName} commit signing key`}
+                    aria-label={`Upload ${input.linkedAccountCard.displayName} commit signing private key`}
                     className="hidden"
                     ref={commitSigningUploadInputRef}
                     onChange={(event) => {
@@ -314,7 +365,7 @@ function LinkedAccountCard(input: {
                   <Button
                     disabled={input.linkedAccountActionPending}
                     onClick={() => {
-                      commitSigningUploadInputRef.current?.click();
+                      setIsCommitSigningDialogOpen(true);
                     }}
                     type="button"
                     variant="outline"
@@ -350,6 +401,95 @@ function LinkedAccountCard(input: {
         <p className="mt-3 text-sm text-muted-foreground">
           {input.linkedAccountCard.helperMessage}
         </p>
+      )}
+
+      {commitSigning === null ? null : (
+        <Dialog
+          isBusy={input.linkedAccountActionPending}
+          isDismissible={!input.linkedAccountActionPending}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              closeCommitSigningDialog();
+            }
+          }}
+          open={isCommitSigningDialogOpen}
+        >
+          {isCommitSigningDialogOpen ? (
+            <DialogContent
+              className="sm:max-w-2xl"
+              formProps={{
+                className: "grid gap-6",
+                onSubmit: (event) => {
+                  void handleCommitSigningDialogSubmit(event);
+                },
+              }}
+            >
+              <DialogHeader variant="sectioned">
+                <DialogTitle>{`${input.linkedAccountCard.displayName} commit signing`}</DialogTitle>
+              </DialogHeader>
+
+              <div className="flex flex-col gap-3">
+                <Textarea
+                  className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs"
+                  onChange={(event) => {
+                    setPastedCommitSigningKey(event.currentTarget.value);
+                  }}
+                  placeholder="Paste your SSH private key"
+                  rows={12}
+                  value={pastedCommitSigningKey}
+                  wrap="soft"
+                />
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-muted-foreground">Or choose a private key file</p>
+                  <input
+                    aria-label={`Choose ${input.linkedAccountCard.displayName} commit signing private key file`}
+                    className="hidden"
+                    ref={commitSigningUploadInputRef}
+                    onChange={(event) => {
+                      const selectedFile = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (selectedFile === null || selectedFile === undefined) {
+                        return;
+                      }
+
+                      void uploadCommitSigningKeyFile(selectedFile).catch(() => undefined);
+                    }}
+                    type="file"
+                  />
+                  <Button
+                    disabled={input.linkedAccountActionPending}
+                    onClick={() => {
+                      commitSigningUploadInputRef.current?.click();
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    Choose file
+                  </Button>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  disabled={input.linkedAccountActionPending}
+                  onClick={closeCommitSigningDialog}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    input.linkedAccountActionPending || pastedCommitSigningKey.trim().length === 0
+                  }
+                  type="submit"
+                >
+                  Upload private key
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          ) : null}
+        </Dialog>
       )}
     </div>
   );

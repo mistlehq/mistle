@@ -73,7 +73,9 @@ export const WithGitHubLinkedAccount: Story = {
         commitSigning: {
           statusLabel: "Configured",
           keySummaryLabel: "SHA256:abc123",
-          uploadActionLabel: "Replace key",
+          helperLabel: "SSH private key",
+          helperCommand: null,
+          uploadActionLabel: "Replace private key",
           removeActionLabel: "Remove key",
         },
         primaryActionLabel: "Relink",

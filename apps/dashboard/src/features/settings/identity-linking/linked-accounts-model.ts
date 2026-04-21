@@ -23,6 +23,8 @@ export type LinkedAccountEmailPreferenceViewModel = {
 export type LinkedAccountCommitSigningViewModel = {
   statusLabel: string;
   keySummaryLabel: string | null;
+  helperLabel: string | null;
+  helperCommand: string | null;
   uploadActionLabel: string;
   removeActionLabel: string | null;
 };
@@ -173,7 +175,9 @@ function resolveLinkedAccountCommitSigningViewModel(
     return {
       statusLabel: "Not configured",
       keySummaryLabel: null,
-      uploadActionLabel: "Upload key",
+      helperLabel: "SSH private key",
+      helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+      uploadActionLabel: "Upload private key",
       removeActionLabel: null,
     };
   }
@@ -181,7 +185,9 @@ function resolveLinkedAccountCommitSigningViewModel(
   return {
     statusLabel: "Configured",
     keySummaryLabel: linkedAccount.commitSigning.publicKeyFingerprint,
-    uploadActionLabel: "Replace key",
+    helperLabel: "SSH private key",
+    helperCommand: null,
+    uploadActionLabel: "Replace private key",
     removeActionLabel: "Remove key",
   };
 }
