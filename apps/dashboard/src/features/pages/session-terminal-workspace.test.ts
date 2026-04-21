@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNextTerminalPanelDefinition } from "./session-terminal-dockview-workspace.js";
+import { buildNextTerminalPanelDefinition } from "./session-terminal-workspace.js";
 
 describe("buildNextTerminalPanelDefinition", () => {
   it("uses the legacy terminal id for the first terminal", () => {

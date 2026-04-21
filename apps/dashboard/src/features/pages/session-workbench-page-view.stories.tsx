@@ -20,7 +20,7 @@ import {
   StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
-import { SessionTerminalDockviewWorkspaceView } from "./session-terminal-dockview-workspace.js";
+import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
@@ -181,7 +181,7 @@ export const CliSplitWithTerminal: Story = {
     mainContentLayout: { scroll: "contained", width: "full" },
     primaryBottomPanel: null,
     bottomPanel: (
-      <SessionTerminalDockviewWorkspaceView
+      <SessionTerminalWorkspaceView
         cwd={null}
         isVisible={true}
         onWorkspaceEmpty={noop}

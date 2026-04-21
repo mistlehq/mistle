@@ -10,7 +10,7 @@ import {
   StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
-import { SessionTerminalDockviewWorkspaceView } from "./session-terminal-dockview-workspace.js";
+import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 
 type TerminalWorkspaceStoryArgs = {
   initialCwd: string | null;
@@ -25,7 +25,7 @@ function buildInitialTerminalOutput(input: { cwd: string | null }): string {
     "terminal ready",
     `root@sandbox:${promptCwd}# git status --short`,
     " M apps/dashboard/src/features/pages/session-terminal-workspace.stories.tsx",
-    " M apps/dashboard/src/features/pages/session-terminal-dockview-workspace.tsx",
+    " M apps/dashboard/src/features/pages/session-terminal-workspace.tsx",
     "",
   ].join("\n");
 }
@@ -35,7 +35,7 @@ function StoryTerminalWorkspace(input: TerminalWorkspaceStoryArgs): React.JSX.El
 
   return renderSessionWorkbenchContentStory({
     bottomPanel: (
-      <SessionTerminalDockviewWorkspaceView
+      <SessionTerminalWorkspaceView
         cwd={input.initialCwd}
         isVisible={true}
         onApiReady={(api) => {
