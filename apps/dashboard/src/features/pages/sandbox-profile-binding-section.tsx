@@ -139,6 +139,45 @@ function BindingDraftActions(input: {
   );
 }
 
+function BindingConnectionField(input: {
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  selectedConnectionId: string | null;
+  onValueChange: (nextConnectionId: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  disabled?: boolean;
+  id?: string;
+  trailingAction?: React.ReactNode;
+}): React.JSX.Element {
+  const field = (
+    <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+      <DetailLabel as="p">Connection</DetailLabel>
+      <IntegrationConnectionSelect
+        ariaLabel={input.ariaLabel}
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        onValueChange={input.onValueChange}
+        placeholder={input.placeholder}
+        selectedConnectionId={input.selectedConnectionId}
+        {...(input.id === undefined ? {} : { id: input.id })}
+        {...(input.disabled === undefined ? {} : { disabled: input.disabled })}
+      />
+    </div>
+  );
+
+  if (input.trailingAction === undefined) {
+    return field;
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-4">
+      {field}
+      {input.trailingAction}
+    </div>
+  );
+}
+
 function ConnectorBindingRows(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -467,29 +506,26 @@ function AgentHarnessConnectionPicker(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 py-2">
-      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-        <DetailLabel as="p">Connection</DetailLabel>
-        <IntegrationConnectionSelect
-          ariaLabel="Connection"
-          availableConnections={input.availableAgentConnections}
-          availableTargets={input.availableTargets}
-          disabled={
-            input.availableAgentConnections.length === 0 ||
-            input.onCreateBindingFromConnection === undefined
+      <BindingConnectionField
+        ariaLabel="Connection"
+        availableConnections={input.availableAgentConnections}
+        availableTargets={input.availableTargets}
+        disabled={
+          input.availableAgentConnections.length === 0 ||
+          input.onCreateBindingFromConnection === undefined
+        }
+        onValueChange={(nextValue) => {
+          if (input.onCreateBindingFromConnection === undefined) {
+            return;
           }
-          onValueChange={(nextValue) => {
-            if (input.onCreateBindingFromConnection === undefined) {
-              return;
-            }
-            void input.onCreateBindingFromConnection({
-              kind: "agent",
-              connectionId: nextValue,
-            });
-          }}
-          placeholder="Select a connection"
-          selectedConnectionId={null}
-        />
-      </div>
+          void input.onCreateBindingFromConnection({
+            kind: "agent",
+            connectionId: nextValue,
+          });
+        }}
+        placeholder="Select a connection"
+        selectedConnectionId={null}
+      />
     </div>
   );
 }
@@ -521,39 +557,34 @@ function AgentHarnessRowEditor(input: {
   return (
     <div className="flex flex-col gap-4 py-2">
       <div className="flex flex-col gap-4">
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-            <DetailLabel as="p">Connection</DetailLabel>
-            <IntegrationConnectionSelect
-              ariaLabel="Connection"
-              availableConnections={input.availableAgentConnections}
-              availableTargets={input.availableTargets}
-              id={fieldId}
-              onValueChange={(nextValue) => {
-                const nextConnection = input.availableAgentConnections.find(
-                  (connection) => connection.id === nextValue,
-                );
-                const nextTarget = input.availableTargets.find(
-                  (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                );
+        <BindingConnectionField
+          ariaLabel="Connection"
+          availableConnections={input.availableAgentConnections}
+          availableTargets={input.availableTargets}
+          id={fieldId}
+          onValueChange={(nextValue) => {
+            const nextConnection = input.availableAgentConnections.find(
+              (connection) => connection.id === nextValue,
+            );
+            const nextTarget = input.availableTargets.find(
+              (candidate) => candidate.targetKey === nextConnection?.targetKey,
+            );
 
-                setDraftRow((currentRow) => ({
-                  ...currentRow,
-                  connectionId: nextValue,
-                  config:
-                    nextConnection === undefined || nextTarget === undefined
-                      ? {}
-                      : createDefaultBindingConfig({
-                          connection: nextConnection,
-                          target: nextTarget,
-                        }),
-                }));
-              }}
-              placeholder="Select integration connection"
-              selectedConnectionId={draftRow.connectionId}
-            />
-          </div>
-        </div>
+            setDraftRow((currentRow) => ({
+              ...currentRow,
+              connectionId: nextValue,
+              config:
+                nextConnection === undefined || nextTarget === undefined
+                  ? {}
+                  : createDefaultBindingConfig({
+                      connection: nextConnection,
+                      target: nextTarget,
+                    }),
+            }));
+          }}
+          placeholder="Select integration connection"
+          selectedConnectionId={draftRow.connectionId}
+        />
 
         <SandboxProfileBindingConfigEditor
           availableConnections={input.availableConnections}
@@ -651,29 +682,26 @@ function GitProviderConnectionPicker(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4 py-2">
-      <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-        <DetailLabel as="p">Connection</DetailLabel>
-        <IntegrationConnectionSelect
-          ariaLabel="Connection"
-          availableConnections={input.availableGitConnections}
-          availableTargets={input.availableTargets}
-          disabled={
-            input.availableGitConnections.length === 0 ||
-            input.onCreateBindingFromConnection === undefined
+      <BindingConnectionField
+        ariaLabel="Connection"
+        availableConnections={input.availableGitConnections}
+        availableTargets={input.availableTargets}
+        disabled={
+          input.availableGitConnections.length === 0 ||
+          input.onCreateBindingFromConnection === undefined
+        }
+        onValueChange={(nextValue) => {
+          if (input.onCreateBindingFromConnection === undefined) {
+            return;
           }
-          onValueChange={(nextValue) => {
-            if (input.onCreateBindingFromConnection === undefined) {
-              return;
-            }
-            void input.onCreateBindingFromConnection({
-              kind: "git",
-              connectionId: nextValue,
-            });
-          }}
-          placeholder="Select a connection"
-          selectedConnectionId={null}
-        />
-      </div>
+          void input.onCreateBindingFromConnection({
+            kind: "git",
+            connectionId: nextValue,
+          });
+        }}
+        placeholder="Select a connection"
+        selectedConnectionId={null}
+      />
     </div>
   );
 }
@@ -706,50 +734,47 @@ function GitProviderRowEditor(input: {
   return (
     <div className="flex flex-col gap-4 py-2">
       <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
-            <DetailLabel as="p">Connection</DetailLabel>
-            <IntegrationConnectionSelect
-              ariaLabel="Connection"
-              availableConnections={input.availableGitConnections}
-              availableTargets={input.availableTargets}
-              id={fieldId}
-              onValueChange={(nextValue) => {
-                const nextConnection = input.availableGitConnections.find(
-                  (connection) => connection.id === nextValue,
-                );
-                const nextTarget = input.availableTargets.find(
-                  (candidate) => candidate.targetKey === nextConnection?.targetKey,
-                );
+        <BindingConnectionField
+          ariaLabel="Connection"
+          availableConnections={input.availableGitConnections}
+          availableTargets={input.availableTargets}
+          id={fieldId}
+          onValueChange={(nextValue) => {
+            const nextConnection = input.availableGitConnections.find(
+              (connection) => connection.id === nextValue,
+            );
+            const nextTarget = input.availableTargets.find(
+              (candidate) => candidate.targetKey === nextConnection?.targetKey,
+            );
 
-                setDraftRow((currentRow) => ({
-                  ...currentRow,
-                  connectionId: nextValue,
-                  config:
-                    nextConnection === undefined || nextTarget === undefined
-                      ? {}
-                      : createDefaultBindingConfig({
-                          connection: nextConnection,
-                          target: nextTarget,
-                        }),
-                }));
+            setDraftRow((currentRow) => ({
+              ...currentRow,
+              connectionId: nextValue,
+              config:
+                nextConnection === undefined || nextTarget === undefined
+                  ? {}
+                  : createDefaultBindingConfig({
+                      connection: nextConnection,
+                      target: nextTarget,
+                    }),
+            }));
+          }}
+          placeholder="Select integration connection"
+          selectedConnectionId={draftRow.connectionId}
+          trailingAction={
+            <Button
+              aria-label="Remove binding"
+              className="mt-6 h-7 w-7 shrink-0"
+              onClick={() => {
+                input.onRemove(input.row.clientId);
               }}
-              placeholder="Select integration connection"
-              selectedConnectionId={draftRow.connectionId}
-            />
-          </div>
-          <Button
-            aria-label="Remove binding"
-            className="mt-6 h-7 w-7 shrink-0"
-            onClick={() => {
-              input.onRemove(input.row.clientId);
-            }}
-            type="button"
-            variant="ghost"
-          >
-            <TrashIcon aria-hidden className="size-4" />
-          </Button>
-        </div>
+              type="button"
+              variant="ghost"
+            >
+              <TrashIcon aria-hidden className="size-4" />
+            </Button>
+          }
+        />
 
         <SandboxProfileBindingConfigEditor
           availableConnections={input.availableConnections}
