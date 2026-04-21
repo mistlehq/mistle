@@ -20,7 +20,6 @@ export const SandboxdGitIdentitySchema = z
     email: z.email(),
     signing: z
       .object({
-        enabled: z.literal(true),
         format: z.literal("ssh"),
         program: z.string().min(1),
         keyRef: z.string().min(1),

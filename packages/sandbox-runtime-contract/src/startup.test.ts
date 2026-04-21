@@ -83,7 +83,6 @@ describe("startup contracts", () => {
           name: "Mistle User",
           email: "mistle-user@example.com",
           signing: {
-            enabled: true,
             format: "ssh",
             program: "/opt/mistle/bin/mistle-ssh-sign",
             keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
@@ -100,7 +99,6 @@ describe("startup contracts", () => {
         name: "Mistle User",
         email: "mistle-user@example.com",
         signing: {
-          enabled: true,
           format: "ssh",
           program: "/opt/mistle/bin/mistle-ssh-sign",
           keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",

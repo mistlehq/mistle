@@ -1228,10 +1228,6 @@
                       "signing": {
                         "type": "object",
                         "properties": {
-                          "enabled": {
-                            "type": "boolean",
-                            "enum": [true]
-                          },
                           "format": {
                             "type": "string",
                             "enum": ["ssh"]
@@ -1258,7 +1254,6 @@
                           }
                         },
                         "required": [
-                          "enabled",
                           "format",
                           "program",
                           "keyRef",
@@ -3243,10 +3238,6 @@
                       "signing": {
                         "type": "object",
                         "properties": {
-                          "enabled": {
-                            "type": "boolean",
-                            "enum": [true]
-                          },
                           "format": {
                             "type": "string",
                             "enum": ["ssh"]
@@ -3273,7 +3264,6 @@
                           }
                         },
                         "required": [
-                          "enabled",
                           "format",
                           "program",
                           "keyRef",

@@ -12,7 +12,6 @@ pub enum StartupMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GitSigningConfig {
-    pub enabled: bool,
     pub format: String,
     pub program: String,
     pub key_ref: String,

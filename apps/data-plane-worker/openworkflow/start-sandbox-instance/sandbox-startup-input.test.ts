@@ -261,7 +261,6 @@ const SandboxStartupInputSchema = z.object({
       email: z.email(),
       signing: z
         .object({
-          enabled: z.literal(true),
           format: z.literal("ssh"),
           program: z.string().min(1),
           keyRef: z.string().min(1),
@@ -396,7 +395,6 @@ describe("encodeSandboxStartupInput", () => {
         name: "Mistle User",
         email: "mistle-user@example.com",
         signing: {
-          enabled: true,
           format: "ssh",
           program: "/opt/mistle/bin/mistle-ssh-sign",
           keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",
@@ -413,7 +411,6 @@ describe("encodeSandboxStartupInput", () => {
       name: "Mistle User",
       email: "mistle-user@example.com",
       signing: {
-        enabled: true,
         format: "ssh",
         program: "/opt/mistle/bin/mistle-ssh-sign",
         keyRef: "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE",

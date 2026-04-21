@@ -32,7 +32,6 @@ export type SandboxWorkflowGitIdentityInput = {
   name: string;
   email: string;
   signing?: {
-    enabled: true;
     format: "ssh";
     program: string;
     keyRef: string;

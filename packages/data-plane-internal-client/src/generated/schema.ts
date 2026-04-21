@@ -125,8 +125,6 @@ export interface paths {
               name: string;
               signing?: {
                 actingUserId: string;
-                /** @enum {boolean} */
-                enabled: true;
                 /** @enum {string} */
                 format: "ssh";
                 keyRef: string;
@@ -1301,8 +1299,6 @@ export interface paths {
               name: string;
               signing?: {
                 actingUserId: string;
-                /** @enum {boolean} */
-                enabled: true;
                 /** @enum {string} */
                 format: "ssh";
                 keyRef: string;

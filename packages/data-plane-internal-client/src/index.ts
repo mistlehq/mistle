@@ -38,7 +38,6 @@ export type StartSandboxInstanceInput = {
     name: string;
     email: string;
     signing?: {
-      enabled: true;
       format: "ssh";
       program: string;
       keyRef: string;
@@ -61,7 +60,6 @@ export type ResumeSandboxInstanceInput = {
     name: string;
     email: string;
     signing?: {
-      enabled: true;
       format: "ssh";
       program: string;
       keyRef: string;

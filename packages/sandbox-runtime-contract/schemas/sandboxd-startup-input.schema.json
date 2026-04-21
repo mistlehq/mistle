@@ -1229,13 +1229,9 @@
         "signing": {
           "type": "object",
           "properties": {
-            "enabled": {
-              "const": true,
-              "type": "boolean"
-            },
             "format": {
-              "const": "ssh",
-              "type": "string"
+              "type": "string",
+              "const": "ssh"
             },
             "program": {
               "type": "string",
@@ -1263,7 +1259,6 @@
             }
           },
           "required": [
-            "enabled",
             "format",
             "program",
             "keyRef",
