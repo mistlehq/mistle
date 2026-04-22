@@ -513,6 +513,9 @@ function createValidationPlan(
   const packageSelection = selectWorkspacePackages(normalizedChangedFiles, workspacePackages);
 
   extraCommands.lint.push(...getLintRepoCheckCommands(normalizedChangedFiles, steps));
+  if (steps.includes("typecheck")) {
+    extraCommands.typecheck.push(["pnpm", "--dir", "packages/storybook", "run", "typecheck"]);
+  }
 
   return {
     changedFiles: normalizedChangedFiles,

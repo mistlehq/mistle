@@ -49,16 +49,17 @@ function resolveStoryShortcutLabel(
 
 function PlatformAwareChatComposerStory(props: ChatComposerStoryArgs): React.JSX.Element {
   const { keyboardShortcuts, shortcutPreviewPlatform, ...chatComposerProps } = props;
+  const resolvedKeyboardShortcuts =
+    keyboardShortcuts === undefined
+      ? {}
+      : {
+          keyboardShortcuts: keyboardShortcuts.map((shortcutHint) => ({
+            ...shortcutHint,
+            shortcut: resolveStoryShortcutLabel(shortcutHint.shortcut, shortcutPreviewPlatform),
+          })),
+        };
 
-  return (
-    <InteractiveChatComposerStory
-      {...chatComposerProps}
-      keyboardShortcuts={keyboardShortcuts?.map((shortcutHint) => ({
-        ...shortcutHint,
-        shortcut: resolveStoryShortcutLabel(shortcutHint.shortcut, shortcutPreviewPlatform),
-      }))}
-    />
-  );
+  return <InteractiveChatComposerStory {...chatComposerProps} {...resolvedKeyboardShortcuts} />;
 }
 
 function InteractiveChatComposerStory(
