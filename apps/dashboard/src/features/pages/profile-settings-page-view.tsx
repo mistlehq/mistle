@@ -12,8 +12,10 @@ import {
   FieldLabel,
   Input,
   Notice,
+  Spinner,
   Textarea,
 } from "@mistle/ui";
+import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import type { SyntheticEvent } from "react";
 import { useRef, useState } from "react";
 
@@ -297,19 +299,23 @@ function LinkedAccountCard(input: {
         <div className="flex flex-wrap gap-2">
           {input.linkedAccountCard.primaryActionLabel === null ? null : (
             <Button
+              aria-label={input.linkedAccountCard.primaryActionLabel}
               disabled={input.linkedAccountActionPending}
               onClick={() => {
                 void input.onLinkLinkedAccount(input.linkedAccountCard.providerFamily);
               }}
               type="button"
             >
-              {input.linkedAccountActionPending
-                ? "Working..."
-                : input.linkedAccountCard.primaryActionLabel}
+              {input.linkedAccountActionPending ? (
+                <Spinner aria-hidden className="size-4" />
+              ) : (
+                input.linkedAccountCard.primaryActionLabel
+              )}
             </Button>
           )}
           {input.linkedAccountCard.secondaryActionLabel === null ? null : (
             <Button
+              aria-label={input.linkedAccountCard.secondaryActionLabel}
               disabled={input.linkedAccountActionPending}
               onClick={() => {
                 void input.onUnlinkLinkedAccount(input.linkedAccountCard.providerFamily);
@@ -317,9 +323,11 @@ function LinkedAccountCard(input: {
               type="button"
               variant="outline"
             >
-              {input.linkedAccountActionPending
-                ? "Working..."
-                : input.linkedAccountCard.secondaryActionLabel}
+              {input.linkedAccountActionPending ? (
+                <Spinner aria-hidden className="size-4" />
+              ) : (
+                input.linkedAccountCard.secondaryActionLabel
+              )}
             </Button>
           )}
         </div>
@@ -389,19 +397,25 @@ function LinkedAccountCard(input: {
                     type="file"
                   />
                   <Button
+                    aria-label={commitSigning.uploadActionLabel}
+                    className="h-7 w-7"
                     disabled={input.linkedAccountActionPending}
                     onClick={() => {
                       setIsCommitSigningDialogOpen(true);
                     }}
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                   >
-                    {input.linkedAccountActionPending
-                      ? "Working..."
-                      : commitSigning.uploadActionLabel}
+                    {input.linkedAccountActionPending ? (
+                      <Spinner aria-hidden className="size-4" />
+                    ) : (
+                      <PencilSimpleIcon aria-hidden className="size-4" />
+                    )}
                   </Button>
                   {commitSigning.removeActionLabel === null ? null : (
                     <Button
+                      aria-label={commitSigning.removeActionLabel}
+                      className="h-7 w-7"
                       disabled={input.linkedAccountActionPending}
                       onClick={() => {
                         void input.onDeleteLinkedAccountCommitSigningKey(
@@ -409,11 +423,13 @@ function LinkedAccountCard(input: {
                         );
                       }}
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                     >
-                      {input.linkedAccountActionPending
-                        ? "Working..."
-                        : commitSigning.removeActionLabel}
+                      {input.linkedAccountActionPending ? (
+                        <Spinner aria-hidden className="size-4" />
+                      ) : (
+                        <TrashIcon aria-hidden className="size-4" />
+                      )}
                     </Button>
                   )}
                 </div>
