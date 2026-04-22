@@ -88,6 +88,13 @@ async function main(): Promise<void> {
         otpExpiresInSeconds: 300,
         otpAllowedAttempts: 3,
       },
+      ...(process.env.MISTLE_TEST_COMMIT_SIGN_BINARY_PATH === undefined
+        ? {}
+        : {
+            commitSign: {
+              binaryPath: process.env.MISTLE_TEST_COMMIT_SIGN_BINARY_PATH,
+            },
+          }),
     },
     internalAuthServiceToken: env.MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN,
     connectionToken: {

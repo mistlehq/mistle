@@ -13,6 +13,9 @@ type PutSandboxInstanceDeadlineContext = {
   openWorkflow: AppRuntimeResources["openWorkflow"];
 };
 
+type DataPlaneTransaction = Parameters<Parameters<DataPlaneDatabase["transaction"]>[0]>[0];
+type DeadlineDatabase = DataPlaneDatabase | DataPlaneTransaction;
+
 export type PutSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
@@ -35,6 +38,9 @@ type PersistedSandboxInstanceDeadline = {
   clearedAt: string | null;
 };
 
+// Keep same-key deadline writes serialized without blocking other deadline kinds.
+export const SandboxInstanceDeadlineAdvisoryLockNamespace = 1_934_824_227;
+
 function createDeadlineWorkflowIdempotencyKey(input: {
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
@@ -47,6 +53,13 @@ function createDeadlineWorkflowIdempotencyKey(input: {
 
 function canonicalizePersistedDueAt(dueAt: string): string {
   return new Date(dueAt).toISOString();
+}
+
+export function createSandboxInstanceDeadlineAdvisoryLockResourceKey(input: {
+  sandboxInstanceId: string;
+  kind: SandboxInstanceDeadlineKind;
+}): string {
+  return `sandbox-instance-deadline:${input.sandboxInstanceId}:${input.kind}`;
 }
 
 function computeNextGeneration(input: {
@@ -70,7 +83,7 @@ function computeNextGeneration(input: {
 }
 
 async function readCurrentSandboxInstanceDeadline(ctx: {
-  db: DataPlaneDatabase;
+  db: DeadlineDatabase;
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
 }): Promise<PersistedSandboxInstanceDeadline | undefined> {
@@ -89,50 +102,82 @@ async function readCurrentSandboxInstanceDeadline(ctx: {
 }
 
 async function persistSandboxInstanceDeadline(ctx: {
-  db: DataPlaneDatabase;
+  db: DeadlineDatabase;
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
   ownerLeaseId: string;
   dueAt: string;
   generation: number;
 }): Promise<void> {
-  await ctx.db.transaction(async (tx) => {
-    await tx
-      .insert(sandboxInstanceDeadlines)
-      .values({
-        sandboxInstanceId: ctx.sandboxInstanceId,
-        kind: ctx.kind,
+  await ctx.db
+    .insert(sandboxInstanceDeadlines)
+    .values({
+      sandboxInstanceId: ctx.sandboxInstanceId,
+      kind: ctx.kind,
+      ownerLeaseId: ctx.ownerLeaseId,
+      dueAt: ctx.dueAt,
+      generation: ctx.generation,
+      clearedAt: null,
+    })
+    .onConflictDoUpdate({
+      target: [sandboxInstanceDeadlines.sandboxInstanceId, sandboxInstanceDeadlines.kind],
+      set: {
         ownerLeaseId: ctx.ownerLeaseId,
         dueAt: ctx.dueAt,
         generation: ctx.generation,
         clearedAt: null,
-      })
-      .onConflictDoUpdate({
-        target: [sandboxInstanceDeadlines.sandboxInstanceId, sandboxInstanceDeadlines.kind],
-        set: {
-          ownerLeaseId: ctx.ownerLeaseId,
-          dueAt: ctx.dueAt,
-          generation: ctx.generation,
-          clearedAt: null,
-          updatedAt: sql`now()`,
-        },
-      });
+        updatedAt: sql`now()`,
+      },
+    });
+}
+
+async function acquireSandboxInstanceDeadlineWriteLock(ctx: {
+  db: DataPlaneTransaction;
+  sandboxInstanceId: string;
+  kind: SandboxInstanceDeadlineKind;
+}): Promise<void> {
+  const resourceKey = createSandboxInstanceDeadlineAdvisoryLockResourceKey({
+    sandboxInstanceId: ctx.sandboxInstanceId,
+    kind: ctx.kind,
   });
+
+  await ctx.db.execute(
+    sql`select pg_advisory_xact_lock(${SandboxInstanceDeadlineAdvisoryLockNamespace}, hashtext(${resourceKey}))`,
+  );
 }
 
 export async function putSandboxInstanceDeadline(
   ctx: PutSandboxInstanceDeadlineContext,
   input: PutSandboxInstanceDeadlineInput,
 ): Promise<PutSandboxInstanceDeadlineAcceptedResponse> {
-  const currentDeadline = await readCurrentSandboxInstanceDeadline({
-    db: ctx.db,
-    sandboxInstanceId: input.sandboxInstanceId,
-    kind: input.kind,
-  });
-  const generation = computeNextGeneration({
-    currentDeadline,
-    ownerLeaseId: input.ownerLeaseId,
-    dueAt: input.dueAt,
+  const generation = await ctx.db.transaction(async (tx) => {
+    await acquireSandboxInstanceDeadlineWriteLock({
+      db: tx,
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+    });
+
+    const currentDeadline = await readCurrentSandboxInstanceDeadline({
+      db: tx,
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+    });
+    const nextGeneration = computeNextGeneration({
+      currentDeadline,
+      ownerLeaseId: input.ownerLeaseId,
+      dueAt: input.dueAt,
+    });
+
+    await persistSandboxInstanceDeadline({
+      db: tx,
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      ownerLeaseId: input.ownerLeaseId,
+      dueAt: input.dueAt,
+      generation: nextGeneration,
+    });
+
+    return nextGeneration;
   });
 
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
@@ -155,15 +200,6 @@ export async function putSandboxInstanceDeadline(
       }),
     },
   );
-
-  await persistSandboxInstanceDeadline({
-    db: ctx.db,
-    sandboxInstanceId: input.sandboxInstanceId,
-    kind: input.kind,
-    ownerLeaseId: input.ownerLeaseId,
-    dueAt: input.dueAt,
-    generation,
-  });
 
   return {
     status: "accepted",

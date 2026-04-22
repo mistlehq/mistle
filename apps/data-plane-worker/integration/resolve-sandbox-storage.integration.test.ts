@@ -29,7 +29,7 @@ import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-h
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ensureCommitSignBinaryInstalled } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { insertSandboxInstanceStorage } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
@@ -52,6 +52,15 @@ type DatabaseStack = {
 let databaseStack: DatabaseStack | undefined;
 let dbPool: Pool | undefined;
 let controlPlaneApi: Awaited<ReturnType<typeof startControlPlaneApiProcess>> | undefined;
+let commitSignBinaryPath: string | undefined;
+
+function getCommitSignBinaryPath(): string {
+  if (commitSignBinaryPath === undefined) {
+    throw new Error("Expected commit-sign binary path to be initialized.");
+  }
+
+  return commitSignBinaryPath;
+}
 
 function getDbPool(): Pool {
   if (dbPool === undefined) {
@@ -133,7 +142,7 @@ async function seedOrganizationWithCredentialKey(input: { organizationId: string
 
 describe("resolve ready Archil sandbox storage integration", () => {
   beforeAll(async () => {
-    await ensureCommitSignBinaryInstalled();
+    commitSignBinaryPath = await ensureCommitSignBinary();
     databaseStack = await startPostgresWithPgBouncer();
 
     await runControlPlaneMigrations({
@@ -165,6 +174,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
       sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
+      commitSignBinaryPath: getCommitSignBinaryPath(),
     });
   }, IntegrationTestTimeoutMs);
 

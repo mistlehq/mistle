@@ -28,7 +28,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ensureCommitSignBinaryInstalled } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { getSandboxInstanceStorageBySandboxInstanceId } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
@@ -143,6 +143,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
   let databaseStack: DatabaseStack | undefined;
   let dbPool: Pool | undefined;
   let controlPlaneApi: Awaited<ReturnType<typeof startControlPlaneApiProcess>> | undefined;
+  let commitSignBinaryPath: string | undefined;
   const createdDiskIds = new Set<string>();
 
   const archilEnvironment = archilIntegrationEnvironment;
@@ -172,8 +173,16 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
     return createDataPlaneDatabase(dbPool);
   }
 
+  function getCommitSignBinaryPath(): string {
+    if (commitSignBinaryPath === undefined) {
+      throw new Error("Expected commit-sign binary path to be initialized.");
+    }
+
+    return commitSignBinaryPath;
+  }
+
   beforeAll(async () => {
-    await ensureCommitSignBinaryInstalled();
+    commitSignBinaryPath = await ensureCommitSignBinary();
     databaseStack = await startPostgresWithPgBouncer();
 
     await runControlPlaneMigrations({
@@ -205,6 +214,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       workflowNamespaceId: "integration",
       internalAuthServiceToken: InternalAuthServiceToken,
       sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
+      commitSignBinaryPath: getCommitSignBinaryPath(),
     });
   }, IntegrationTestTimeoutMs);
 

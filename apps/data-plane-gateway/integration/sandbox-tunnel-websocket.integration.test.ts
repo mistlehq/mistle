@@ -43,12 +43,12 @@ import WebSocket from "ws";
 
 import { createAuthenticatedSession } from "../../control-plane-api/integration/helpers/auth-session.js";
 import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import { parseGitSshSigningPrivateKeyOrThrow } from "../../control-plane-api/src/identity-linking/github-signing.js";
 import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../control-plane-api/src/lib/crypto.js";
-import { insertInitialOrganizationCredentialKey } from "../../data-plane-worker/integration/helpers/organization-credential-keys.js";
 import { waitForRuntimeState } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
@@ -198,15 +198,12 @@ async function insertGitHubSigningContext(input: {
   publicKey: string;
   privateKey: string;
 }): Promise<void> {
-  await insertInitialOrganizationCredentialKey({
-    db: input.fixture.controlPlaneDb,
-    organizationId: input.organizationId,
-    organizationCredentialKeyVersion: 1,
-    masterEncryptionKeyVersion: 1,
-    masterEncryptionKeys: {
-      "1": "integration-master-key-testing",
-    },
-  });
+  const parsedSigningKey = parseGitSshSigningPrivateKeyOrThrow(input.privateKey);
+
+  if (parsedSigningKey.publicKey !== input.publicKey) {
+    throw new Error("Expected test Git SSH public key to match the supplied private key.");
+  }
+
   await upsertGitHubTarget(input.fixture);
   await input.fixture.controlPlaneDb.insert(integrationConnections).values({
     id: input.connectionId,
@@ -255,9 +252,10 @@ async function insertGitHubSigningContext(input: {
     organizationId: input.organizationId,
     credentialId: input.credentialId,
     secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
-    plaintext: input.privateKey,
+    plaintext: parsedSigningKey.privateKey,
     metadata: {
-      publicKey: input.publicKey,
+      publicKey: parsedSigningKey.publicKey,
+      publicKeyFingerprint: parsedSigningKey.publicKeyFingerprint,
     },
   });
 }

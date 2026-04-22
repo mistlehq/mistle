@@ -15,7 +15,7 @@ import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
-import { ensureCommitSignBinaryInstalled } from "./helpers/commit-sign.js";
+import { ensureCommitSignBinary } from "./helpers/commit-sign.js";
 
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_runtime";
 const TestContextId = "control-plane-api.integration";
@@ -170,7 +170,7 @@ export const it = vitestIt.extend<{
       });
 
       try {
-        await ensureCommitSignBinaryInstalled();
+        const commitSignBinaryPath = await ensureCommitSignBinary();
         await resetWorkerDatabaseFromTemplate({
           username: sharedInfraConfig.databaseUsername,
           password: sharedInfraConfig.databasePassword,
@@ -233,6 +233,9 @@ export const it = vitestIt.extend<{
             otpLength: 6,
             otpExpiresInSeconds: 300,
             otpAllowedAttempts: 3,
+          },
+          commitSign: {
+            binaryPath: commitSignBinaryPath,
           },
         };
 

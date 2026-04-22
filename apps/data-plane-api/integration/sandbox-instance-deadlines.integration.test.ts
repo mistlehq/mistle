@@ -15,6 +15,10 @@ import {
 } from "../../../packages/data-plane-internal-client/src/index.js";
 import { createDataPlaneSandboxInstancesClient } from "../../../packages/data-plane-internal-client/src/index.js";
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
+import {
+  createSandboxInstanceDeadlineAdvisoryLockResourceKey,
+  SandboxInstanceDeadlineAdvisoryLockNamespace,
+} from "../src/internal/sandbox-instances/services/put-sandbox-instance-deadline.js";
 import { it, type DataPlaneApiIntegrationFixture } from "./test-context.js";
 
 type WorkflowRunRow = {
@@ -90,20 +94,9 @@ async function waitForWorkflowRuns(input: {
   const minimumCount = input.minimumCount ?? 1;
 
   while (Date.now() < deadlineMs) {
-    const result = await input.fixture.dbPool.query<WorkflowRunRow>(
-      `
-        select id, namespace_id, workflow_name, status, input, output, idempotency_key, available_at
-        from data_plane_openworkflow.workflow_runs
-        where
-          namespace_id = $1
-          and workflow_name = $2
-          and input->>'sandboxInstanceId' = $3
-        order by created_at asc
-      `,
-      [input.fixture.config.workflow.namespaceId, WorkflowName, input.sandboxInstanceId],
-    );
-    if (result.rows.length >= minimumCount) {
-      return result.rows;
+    const workflowRuns = await listWorkflowRuns(input);
+    if (workflowRuns.length >= minimumCount) {
+      return workflowRuns;
     }
 
     await systemSleeper.sleep(WorkflowQueuePollIntervalMs);
@@ -111,6 +104,66 @@ async function waitForWorkflowRuns(input: {
 
   throw new Error(
     `Timed out waiting for queued deadline workflow runs for sandbox '${input.sandboxInstanceId}'.`,
+  );
+}
+
+async function listWorkflowRuns(input: {
+  fixture: DataPlaneApiIntegrationFixture;
+  sandboxInstanceId: string;
+}): Promise<WorkflowRunRow[]> {
+  const result = await input.fixture.dbPool.query<WorkflowRunRow>(
+    `
+      select id, namespace_id, workflow_name, status, input, output, idempotency_key, available_at
+      from data_plane_openworkflow.workflow_runs
+      where
+        namespace_id = $1
+        and workflow_name = $2
+        and input->>'sandboxInstanceId' = $3
+      order by created_at asc
+    `,
+    [input.fixture.config.workflow.namespaceId, WorkflowName, input.sandboxInstanceId],
+  );
+
+  return result.rows;
+}
+
+async function waitForPendingDeadlineWriteLockWaiters(input: {
+  fixture: DataPlaneApiIntegrationFixture;
+  sandboxInstanceId: string;
+  kind: "idle" | "disconnect";
+  minimumCount?: number;
+}): Promise<void> {
+  const deadlineMs = Date.now() + WorkflowQueueWaitTimeoutMs;
+  const minimumCount = input.minimumCount ?? 1;
+  const resourceKey = createSandboxInstanceDeadlineAdvisoryLockResourceKey({
+    sandboxInstanceId: input.sandboxInstanceId,
+    kind: input.kind,
+  });
+
+  while (Date.now() < deadlineMs) {
+    const result = await input.fixture.dbPool.query<{ waiters: number }>(
+      `
+        select count(*)::int as waiters
+        from pg_locks
+        where
+          locktype = 'advisory'
+          and classid = $1
+          and objid = hashtext($2)
+          and objsubid = 2
+          and granted = false
+      `,
+      [SandboxInstanceDeadlineAdvisoryLockNamespace, resourceKey],
+    );
+
+    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
+      return;
+    }
+
+    await systemSleeper.sleep(WorkflowQueuePollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${String(minimumCount)} pending deadline lock waiter(s) for sandbox '${input.sandboxInstanceId}' and kind '${input.kind}'.`,
   );
 }
 
@@ -327,7 +380,9 @@ describe("sandbox instance deadlines integration", () => {
     });
   }, 60_000);
 
-  it("schedules the workflow before persisting the deadline row", async ({ fixture }) => {
+  it("does not schedule the workflow when persisting the deadline row fails", async ({
+    fixture,
+  }) => {
     const sandboxInstanceId = "sbi_dp_api_deadline_schedule_first";
     const response = await fetch(
       createDeadlineRouteUrl({
@@ -350,18 +405,11 @@ describe("sandbox instance deadlines integration", () => {
 
     expect(response.status).toBe(500);
 
-    const workflowRuns = await waitForWorkflowRuns({
+    const workflowRuns = await listWorkflowRuns({
       fixture,
       sandboxInstanceId,
     });
-    expect(workflowRuns).toHaveLength(1);
-    expect(WorkflowRunInputSchema.parse(workflowRuns[0]?.input)).toEqual({
-      sandboxInstanceId,
-      kind: "idle",
-      ownerLeaseId: "sol_dp_api_deadline_schedule_first",
-      dueAt: CanonicalDueAt,
-      generation: 1,
-    });
+    expect(workflowRuns).toHaveLength(0);
 
     const persistedDeadline = await fixture.db.query.sandboxInstanceDeadlines.findFirst({
       columns: {
@@ -450,19 +498,32 @@ describe("sandbox instance deadlines integration", () => {
     const lockClient = await fixture.dbPool.connect();
     try {
       await lockClient.query("BEGIN");
-      await lockClient.query("LOCK TABLE data_plane.sandbox_instance_deadlines IN SHARE MODE");
+      await lockClient.query(
+        `
+          select pg_advisory_xact_lock($1, hashtext($2))
+        `,
+        [
+          SandboxInstanceDeadlineAdvisoryLockNamespace,
+          createSandboxInstanceDeadlineAdvisoryLockResourceKey({
+            sandboxInstanceId,
+            kind: "disconnect",
+          }),
+        ],
+      );
 
       const firstRequestPromise = client.putSandboxInstanceDeadline(firstInput);
-      await waitForWorkflowRuns({
+      await waitForPendingDeadlineWriteLockWaiters({
         fixture,
         sandboxInstanceId,
+        kind: "disconnect",
       });
 
       const secondRequestPromise = client.putSandboxInstanceDeadline(secondInput);
-      await waitForWorkflowRuns({
+      await waitForPendingDeadlineWriteLockWaiters({
         fixture,
         sandboxInstanceId,
         minimumCount: 2,
+        kind: "disconnect",
       });
 
       await lockClient.query("COMMIT");
@@ -497,7 +558,7 @@ describe("sandbox instance deadlines integration", () => {
             kind: "disconnect",
             ownerLeaseId: secondInput.ownerLeaseId,
             dueAt: secondInput.dueAt,
-            generation: 1,
+            generation: 2,
           },
         ]),
       );
@@ -516,7 +577,7 @@ describe("sandbox instance deadlines integration", () => {
       expect(persistedDeadline).toEqual({
         ownerLeaseId: secondInput.ownerLeaseId,
         dueAt: expect.any(String),
-        generation: 1,
+        generation: 2,
         clearedAt: null,
       });
       expect(canonicalizePersistedDueAt(persistedDeadline?.dueAt ?? "")).toBe(secondInput.dueAt);

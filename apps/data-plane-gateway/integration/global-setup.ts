@@ -1,6 +1,9 @@
+import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
 import {
+  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
   MigrationTracking,
+  runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import {
@@ -13,6 +16,8 @@ import {
   writeTestContext,
 } from "@mistle/test-harness";
 import { Client as PgClient } from "pg";
+
+import { createControlPlaneBackend } from "../../control-plane-api/src/openworkflow.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_template";
@@ -131,6 +136,21 @@ export default async function setup(): Promise<() => Promise<void>> {
       migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
       migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
     });
+
+    await runControlPlaneMigrations({
+      connectionString: templateDirectUrl,
+      schemaName: CONTROL_PLANE_SCHEMA_NAME,
+      migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
+      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    });
+
+    const controlPlaneWorkflowBackend = await createControlPlaneBackend({
+      url: templateDirectUrl,
+      namespaceId: "integration",
+      runMigrations: true,
+    });
+    await controlPlaneWorkflowBackend.stop();
 
     await writeTestContext({
       id: TestContextId,
