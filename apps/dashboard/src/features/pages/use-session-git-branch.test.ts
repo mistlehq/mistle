@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -151,5 +151,41 @@ describe("useSessionGitBranch helpers", () => {
     );
 
     expect(result.current.branchLabel).toBeNull();
+  });
+
+  it("clears the branch label when a refetch fails after cached data exists", async () => {
+    const queryClient = createTestQueryClient({
+      retry: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    queryClient.setQueryData(
+      ["session-git-branch", "sbi_test", "/root/acme/repo-1", "2026-04-22T00:00:00.000Z"],
+      {
+        branchLabel: "main",
+        headWatchPath: "/root/acme/repo-1/.git/HEAD",
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useSessionGitBranch({
+          connectedAtIso: "2026-04-22T00:00:00.000Z",
+          cwd: "/root/acme/repo-1",
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("transport unavailable");
+          },
+          rpcClient: null,
+          sandboxInstanceId: "sbi_test",
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.branchLabel).toBeNull();
+    });
   });
 });

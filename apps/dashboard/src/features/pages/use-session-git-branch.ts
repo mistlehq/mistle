@@ -236,14 +236,18 @@ export function useSessionGitBranch(input: {
 
     return () => {
       unsubscribeNotification();
-      void rpcClient.call("fs/unwatch", {
-        watchId,
-      });
+      void rpcClient
+        .call("fs/unwatch", {
+          watchId,
+        })
+        .catch(() => {
+          // The session stream may already be closed during normal workbench teardown.
+        });
     };
   }, [input.enabled, input.rpcClient, query.data?.headWatchPath, queryClient, queryKey]);
 
   return {
-    branchLabel: input.enabled ? (query.data?.branchLabel ?? null) : null,
+    branchLabel: input.enabled && !query.isError ? (query.data?.branchLabel ?? null) : null,
   };
 }
 
