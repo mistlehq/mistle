@@ -16,6 +16,7 @@ const localCacheRootPath = path.join(repositoryRootPath, ".local", "sandboxd-tes
 const cargoHomeHostPath = path.join(localCacheRootPath, "cargo-home");
 const tempDirectoryHostPath = path.join(localCacheRootPath, "tmp");
 const gitCommonDirectoryPath = readGitPath("rev-parse", "--git-common-dir");
+const resolvedGitCommonDirectoryPath = path.resolve(repositoryRootPath, gitCommonDirectoryPath);
 const repositoryMountPath = repositoryRootPath;
 const packageMountPath = packageRootPath;
 const cargoTargetDirectoryPath = path.join(
@@ -135,11 +136,14 @@ function createUserArguments() {
 }
 
 function createGitMountArguments() {
-  if (gitCommonDirectoryPath.startsWith(`${repositoryRootPath}${path.sep}`)) {
+  if (
+    resolvedGitCommonDirectoryPath === repositoryRootPath ||
+    resolvedGitCommonDirectoryPath.startsWith(`${repositoryRootPath}${path.sep}`)
+  ) {
     return [];
   }
 
-  return ["--volume", `${gitCommonDirectoryPath}:${gitCommonDirectoryPath}`];
+  return ["--volume", `${resolvedGitCommonDirectoryPath}:${resolvedGitCommonDirectoryPath}`];
 }
 
 /**
