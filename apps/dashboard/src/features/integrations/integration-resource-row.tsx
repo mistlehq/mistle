@@ -1,13 +1,18 @@
 import { BadgeListField, Button, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
 import { ArrowClockwiseIcon, CaretDownIcon, CaretRightIcon, InfoIcon } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   formatResourceLabel,
   formatResourceMetadata,
   formatSyncStateLabel,
 } from "./integration-connection-detail-formatters.js";
-import type { IntegrationConnectionResource } from "./integrations-service.js";
+import {
+  listIntegrationConnectionResources,
+  type IntegrationConnectionResource,
+} from "./integrations-service.js";
 
 export type IntegrationResourceListItemResourceSummary = {
   count: number;
@@ -137,9 +142,7 @@ export function IntegrationResourceListItem(
           </Button>
         ) : null}
       </div>
-      {isExpanded && input.resourceItems !== null
-        ? renderExpandedResourceItems(input.resourceItems)
-        : null}
+      {renderExpandedResourceSection({ input, isExpanded })}
       {statusContent === null ? null : (
         <div className="mt-1 pt-1 sm:hidden">
           <div
@@ -154,6 +157,62 @@ export function IntegrationResourceListItem(
       )}
     </div>
   );
+}
+
+function renderExpandedResourceSection(input: {
+  input: IntegrationResourceListItemProps;
+  isExpanded: boolean;
+}): React.JSX.Element | null {
+  if (input.isExpanded === false) {
+    return null;
+  }
+
+  if (input.input.resourceItems !== null) {
+    return renderExpandedResourceItems(input.input.resourceItems);
+  }
+
+  if (input.input.resource.syncState === "never-synced") {
+    return null;
+  }
+
+  return (
+    <LazyExpandedResourceItems
+      connectionId={input.input.connectionId}
+      kind={input.input.resource.kind}
+      syncState={input.input.resource.syncState}
+    />
+  );
+}
+
+function LazyExpandedResourceItems(input: {
+  connectionId: string;
+  kind: string;
+  syncState: IntegrationResourceListItemResourceSummary["syncState"];
+}): React.JSX.Element {
+  const resourceItemsQuery = useQuery({
+    queryKey: ["settings", "integrations", "connection-resources", input.connectionId, input.kind],
+    queryFn: async ({ signal }) =>
+      listIntegrationConnectionResources({
+        connectionId: input.connectionId,
+        kind: input.kind,
+        signal,
+      }),
+    retry: false,
+    refetchInterval: input.syncState === "syncing" ? 3_000 : false,
+  });
+
+  return renderExpandedResourceItems({
+    errorMessage:
+      resourceItemsQuery.isError === true
+        ? resolveApiErrorMessage({
+            error: resourceItemsQuery.error,
+            fallbackMessage: `Could not load ${input.kind}.`,
+          })
+        : null,
+    isLoading: resourceItemsQuery.isPending,
+    items: resourceItemsQuery.data?.items ?? [],
+    kind: input.kind,
+  });
 }
 
 function renderExpandedResourceItems(

@@ -1,31 +1,16 @@
-import { useMutation, useMutationState, useQueries, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
 
-import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
-  listIntegrationConnectionResources,
   listIntegrationDirectory,
   refreshIntegrationConnectionResources,
-  type IntegrationConnection,
 } from "../integrations/integrations-service.js";
 import {
-  buildIntegrationConnectionResourceItemsByKey,
-  buildIntegrationConnectionResourceRequests,
   createIntegrationConnectionResourceKey,
   shouldPollIntegrationDetailResources,
 } from "./integrations-page-view-model.js";
 
 type IntegrationDirectoryData = Awaited<ReturnType<typeof listIntegrationDirectory>>;
-type IntegrationConnectionResourcesResult = Awaited<
-  ReturnType<typeof listIntegrationConnectionResources>
->;
-type IntegrationResourceQueryState = {
-  data: IntegrationConnectionResourcesResult | undefined;
-  error: Error | null;
-  isError: boolean;
-  isPending: boolean;
-};
 
 const RefreshIntegrationConnectionResourcesMutationKey = [
   "settings",
@@ -61,33 +46,6 @@ function createRefreshingResourceKeys(pendingMutationVariables: readonly unknown
   );
 }
 
-function buildResourceItemsByKey(input: {
-  resourceRequests: ReturnType<typeof buildIntegrationConnectionResourceRequests>;
-  resourceQueries: readonly IntegrationResourceQueryState[];
-}) {
-  return buildIntegrationConnectionResourceItemsByKey(
-    input.resourceRequests.map((resource, index) => {
-      const query = input.resourceQueries[index];
-
-      return {
-        connectionId: resource.connectionId,
-        state: {
-          errorMessage:
-            query?.isError === true
-              ? resolveApiErrorMessage({
-                  error: query.error,
-                  fallbackMessage: `Could not load ${resource.kind}.`,
-                })
-              : null,
-          isLoading: query?.isPending ?? false,
-          items: query?.data?.items ?? [],
-          kind: resource.kind,
-        },
-      };
-    }),
-  );
-}
-
 export function shouldPollIntegrationDirectory(input: {
   activeDetailConnectionId: string | null;
   detailTargetKey: string | null;
@@ -105,7 +63,6 @@ export function shouldPollIntegrationDirectory(input: {
 }
 
 export function useIntegrationResourceState(input: {
-  detailConnections: readonly IntegrationConnection[];
   queryKey: readonly ["settings", "integrations", "directory"];
 }) {
   const queryClient = useQueryClient();
@@ -134,38 +91,8 @@ export function useIntegrationResourceState(input: {
 
   const refreshingResourceKeys = createRefreshingResourceKeys(pendingRefreshMutationVariables);
 
-  const resourceRequests = useMemo(
-    () => buildIntegrationConnectionResourceRequests(input.detailConnections),
-    [input.detailConnections],
-  );
-
-  const resourceQueries = useQueries({
-    queries: resourceRequests.map((resource) => ({
-      queryKey: [
-        ...SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX,
-        resource.connectionId,
-        resource.kind,
-      ],
-      queryFn: async ({ signal }) =>
-        listIntegrationConnectionResources({
-          connectionId: resource.connectionId,
-          kind: resource.kind,
-          signal,
-        }),
-      enabled: resource.syncState !== "never-synced",
-      retry: false,
-      refetchInterval: resource.syncState === "syncing" ? 3_000 : false,
-    })),
-  });
-
-  const resourceItemsByKey = buildResourceItemsByKey({
-    resourceRequests,
-    resourceQueries,
-  });
-
   return {
     onRefreshResource: refreshResourceMutation.mutate,
     refreshingResourceKeys,
-    resourceItemsByKey,
   };
 }

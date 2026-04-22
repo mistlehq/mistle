@@ -60,7 +60,6 @@ export function useIntegrationsDirectoryState(input: {
   activeDetailConnectionIdRef.current = activeDetailConnectionId;
 
   const resourceState = useIntegrationResourceState({
-    detailConnections: selectedDetailConnections,
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
 
@@ -87,7 +86,6 @@ export function useIntegrationsDirectoryState(input: {
     setActiveDetailConnectionId,
     onRefreshResource: resourceState.onRefreshResource,
     refreshingResourceKeys: resourceState.refreshingResourceKeys,
-    resourceItemsByKey: resourceState.resourceItemsByKey,
     selectedDetailCard,
     selectedDetailConnections,
   };
