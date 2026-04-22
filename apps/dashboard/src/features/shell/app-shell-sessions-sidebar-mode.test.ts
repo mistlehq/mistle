@@ -6,6 +6,7 @@ import {
   resolveSidebarModeDisableNavigationTarget,
   isNewSessionPath,
   isSessionsPath,
+  resolveSessionsSidebarModeEnabled,
   resolveSessionsNavHref,
   resolveSidebarModeEnableNavigationTarget,
   SessionsRoutes,
@@ -43,6 +44,27 @@ describe("app shell sessions sidebar mode routing", () => {
   it("resolves the sessions nav href from the sidebar mode state", () => {
     expect(resolveSessionsNavHref(false)).toBe(SessionsRoutes.INDEX);
     expect(resolveSessionsNavHref(true)).toBe(SessionsRoutes.NEW);
+  });
+
+  it("keeps the persisted sessions sidebar mode scoped to sessions routes", () => {
+    expect(
+      resolveSessionsSidebarModeEnabled({
+        pathname: SessionsRoutes.NEW,
+        persistedEnabled: true,
+      }),
+    ).toBe(true);
+    expect(
+      resolveSessionsSidebarModeEnabled({
+        pathname: "/",
+        persistedEnabled: true,
+      }),
+    ).toBe(false);
+    expect(
+      resolveSessionsSidebarModeEnabled({
+        pathname: SessionsRoutes.INDEX,
+        persistedEnabled: false,
+      }),
+    ).toBe(false);
   });
 
   it("builds a navigation href from pathname, search, and hash", () => {

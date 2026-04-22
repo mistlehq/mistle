@@ -18,6 +18,13 @@ export function isExistingSandboxSessionPath(pathname: string): boolean {
   return pathname.startsWith(`${SessionsRoutes.INDEX}/`) && !isNewSessionPath(pathname);
 }
 
+export function resolveSessionsSidebarModeEnabled(input: {
+  pathname: string;
+  persistedEnabled: boolean;
+}): boolean {
+  return input.persistedEnabled && isSessionsPath(input.pathname);
+}
+
 export function resolveSessionsNavHref(showSessionsSidebar: boolean): string {
   return showSessionsSidebar ? SessionsRoutes.NEW : SessionsRoutes.INDEX;
 }
