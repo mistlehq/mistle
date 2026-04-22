@@ -33,6 +33,11 @@ import {
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredOrganizationId, useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
+import {
+  decrementPendingLinkedAccountProviderFamilyCount,
+  incrementPendingLinkedAccountProviderFamilyCount,
+  resolvePendingLinkedAccountProviderFamilies,
+} from "./pending-linked-account-provider-families.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 const PROFILE_IMAGE_QUERY_KEY: readonly ["settings", "profile-image"] = [
@@ -157,8 +162,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
   const updateGitHubLinkedAccountPreferredEmailMutation = useMutation({
-    mutationFn: async (input: { preferredEmail: string; providerFamily: string }) =>
-      updateGitHubLinkedAccountPreferredEmail({ preferredEmail: input.preferredEmail }),
+    mutationFn: async (preferredEmail: string) =>
+      updateGitHubLinkedAccountPreferredEmail({ preferredEmail }),
     onMutate: async () => {
       setLinkedAccountOperationErrorMessage(null);
     },
@@ -177,8 +182,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
   const uploadGitHubLinkedAccountSigningKeyMutation = useMutation({
-    mutationFn: async (input: { file: File; providerFamily: string }) =>
-      uploadGitHubLinkedAccountSigningKey({ file: input.file }),
+    mutationFn: async (file: File) => uploadGitHubLinkedAccountSigningKey({ file }),
     onMutate: async () => {
       setLinkedAccountOperationErrorMessage(null);
     },
@@ -190,7 +194,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
   const deleteGitHubLinkedAccountSigningKeyMutation = useMutation({
-    mutationFn: async (_input: { providerFamily: string }) => deleteGitHubLinkedAccountSigningKey(),
+    mutationFn: deleteGitHubLinkedAccountSigningKey,
     onMutate: async () => {
       setLinkedAccountOperationErrorMessage(null);
     },
@@ -301,7 +305,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         }}
         onDeleteLinkedAccountCommitSigningKey={async (providerFamily) => {
           await runLinkedAccountAction(providerFamily, async () =>
-            deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync({ providerFamily }),
+            deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync(),
           );
         }}
         onSaveChanges={async (displayNameDraft) => {
@@ -314,15 +318,12 @@ export function ProfileSettingsPage(): React.JSX.Element {
         }}
         onUpdateLinkedAccountPreferredEmail={async (providerFamily, preferredEmail) => {
           await runLinkedAccountAction(providerFamily, async () =>
-            updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync({
-              preferredEmail,
-              providerFamily,
-            }),
+            updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync(preferredEmail),
           );
         }}
         onUploadLinkedAccountCommitSigningKey={async (providerFamily, file) => {
           await runLinkedAccountAction(providerFamily, async () =>
-            uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync({ file, providerFamily }),
+            uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync(file),
           );
         }}
         onUploadProfileImage={async (file) => {
@@ -333,38 +334,4 @@ export function ProfileSettingsPage(): React.JSX.Element {
       />
     </FormPageFrame>
   );
-}
-
-export function incrementPendingLinkedAccountProviderFamilyCount(
-  currentCounts: Readonly<Record<string, number>>,
-  providerFamily: string,
-): Record<string, number> {
-  return {
-    ...currentCounts,
-    [providerFamily]: (currentCounts[providerFamily] ?? 0) + 1,
-  };
-}
-
-export function decrementPendingLinkedAccountProviderFamilyCount(
-  currentCounts: Readonly<Record<string, number>>,
-  providerFamily: string,
-): Record<string, number> {
-  const nextCount = (currentCounts[providerFamily] ?? 0) - 1;
-  if (nextCount > 0) {
-    return {
-      ...currentCounts,
-      [providerFamily]: nextCount,
-    };
-  }
-
-  const { [providerFamily]: _removedProviderFamily, ...remainingCounts } = currentCounts;
-  return remainingCounts;
-}
-
-export function resolvePendingLinkedAccountProviderFamilies(
-  providerFamilyCounts: Readonly<Record<string, number>>,
-): string[] {
-  return Object.entries(providerFamilyCounts)
-    .filter(([, count]) => count > 0)
-    .map(([providerFamily]) => providerFamily);
 }

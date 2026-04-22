@@ -4,7 +4,7 @@ import {
   decrementPendingLinkedAccountProviderFamilyCount,
   incrementPendingLinkedAccountProviderFamilyCount,
   resolvePendingLinkedAccountProviderFamilies,
-} from "./profile-settings-page.js";
+} from "./pending-linked-account-provider-families.js";
 
 describe("profile-settings pending linked-account providers", () => {
   it("keeps multiple providers pending when overlapping actions are in flight", () => {
