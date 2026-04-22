@@ -1,0 +1,24 @@
+FROM node:25-bookworm AS node
+
+FROM rust:1.93-bookworm
+
+ARG CODEX_CLI_VERSION=0.122.0
+ARG MISE_VERSION=v2026.3.13
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+  && ln -sf /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+  && ln -sf /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    libssl-dev \
+    pkg-config \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise MISE_VERSION=${MISE_VERSION} sh
+RUN npm install -g @openai/codex@${CODEX_CLI_VERSION}

@@ -338,6 +338,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
@@ -350,6 +353,15 @@ jobs:
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
           save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Restore sandboxd container cargo cache
+        id: test-rust-sandboxd-container-cargo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/sandboxd-test/cargo-home
+          key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-sandboxd-test-cargo-home-
 
       - name: Restore pnpm store cache
         id: test-rust-pnpm-store-cache
@@ -383,8 +395,28 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
+      - name: Build sandboxd test runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/sandboxd/Dockerfile.test
+          tags: mistle/sandboxd-test-runner:ci
+          load: true
+          cache-from: type=gha,scope=sandboxd-test-runner
+          cache-to: type=gha,mode=max,scope=sandboxd-test-runner
+
       - name: Run Rust tests in Nix shell
+        env:
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:ci
+          MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm test:rust
+
+      - name: Save sandboxd container cargo cache
+        if: steps.test-rust-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/sandboxd-test/cargo-home
+          key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-rust-turbo-cache.outputs.cache-hit != 'true' }}

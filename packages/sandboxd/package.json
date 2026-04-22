@@ -5,8 +5,8 @@
     "build": "rm -rf dist && cargo build --locked --bin sandboxd && mkdir -p dist && cp target/debug/sandboxd dist/sandboxd",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "cargo check --locked --all-targets",
-    "test": "cargo test --locked",
-    "test:integration": "cargo test --locked applies_github_release_artifact_install_steps_from_pinned_public_release -- --ignored",
+    "test": "node ./scripts/run-cargo-in-container.mjs test --locked -- --skip applies_typed_mise_install_steps --skip applies_github_release_artifact_install_steps_from_pinned_public_release",
+    "test:integration": "node ./scripts/run-cargo-in-container.mjs test --locked --test runtime_plan_external_artifact_installs",
     "format": "node ./scripts/cargo-fmt.mjs",
     "format:check": "node ./scripts/cargo-fmt.mjs --check"
   }
