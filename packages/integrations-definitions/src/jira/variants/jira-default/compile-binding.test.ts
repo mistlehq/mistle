@@ -151,8 +151,8 @@ describe("compileJiraBinding", () => {
           repository: "mistlehq/tools",
           release: {
             kind: "tag",
-            match: "latest_matching_prefix",
-            prefix: "jira/",
+            match: "exact",
+            tag: "jira/v0.4.0",
           },
           asset: {
             kind: "exact",

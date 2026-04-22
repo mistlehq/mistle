@@ -158,8 +158,8 @@ describe("compileSlackBinding", () => {
           repository: "mistlehq/tools",
           release: {
             kind: "tag",
-            match: "latest_matching_prefix",
-            prefix: "slack/",
+            match: "exact",
+            tag: "slack/v0.2.1",
           },
           asset: {
             kind: "exact",

@@ -21,6 +21,7 @@ use super::plan::{
 use super::{RuntimeArtifactInstallStep, RuntimeExecCommand};
 
 const GITHUB_API_BASE_URL: &str = "https://api.github.com";
+const GITHUB_RELEASES_BASE_URL: &str = "https://github.com";
 const GITHUB_API_ACCEPT_HEADER: &str = "application/vnd.github+json";
 const GITHUB_INSTALLER_USER_AGENT: &str = "mistle-sandboxd-artifact-installer";
 const GITHUB_RELEASE_ATTEMPTS: usize = 3;
@@ -134,27 +135,17 @@ where
     let budget = StepBudget::new(timeout_ms, clock);
     let selector_description = describe_release_selector(release);
     let workspace = InstallWorkspace::new(install_path)?;
-    let resolved_release = resolve_github_release(
+    let asset_shape = select_release_asset_shape(asset)?;
+    let asset_name = github_release_asset_shape_file_name(asset_shape);
+    let download_url = resolve_github_release_asset_download_url(
         &client,
         repository,
         release,
         &selector_description,
+        asset_name,
         &budget,
         sleeper,
     )?;
-    let asset_shape = select_release_asset_shape(asset)?;
-    let asset_name = github_release_asset_shape_file_name(asset_shape);
-    let download_url = resolved_release
-        .assets
-        .iter()
-        .find(|release_asset| release_asset.name == asset_name)
-        .map(|release_asset| release_asset.browser_download_url.clone())
-        .ok_or_else(|| {
-            format!(
-                "github release asset lookup failed for {repository} release {selector_description} resolved tag {}: asset {asset_name} not found",
-                resolved_release.tag_name
-            )
-        })?;
 
     let download_failure_context = format!(
         "github release asset download failed for {repository} release {selector_description} asset {asset_name}"
@@ -174,6 +165,48 @@ where
             "github release asset install failed for {repository} release {selector_description} asset {asset_name} installPath={install_path}: {error}"
         )
     })
+}
+
+fn resolve_github_release_asset_download_url<C, S>(
+    client: &Client,
+    repository: &str,
+    release: &RuntimeArtifactGitHubReleaseSelector,
+    selector_description: &str,
+    asset_name: &str,
+    budget: &StepBudget<'_, C>,
+    sleeper: &S,
+) -> Result<String, String>
+where
+    C: Clock,
+    S: Sleeper,
+{
+    match release {
+        RuntimeArtifactGitHubReleaseSelector::Tag {
+            selector: RuntimeArtifactGitHubReleaseTagSelector::Exact { tag },
+        } => github_release_asset_download_url(repository, tag, asset_name)
+            .map(|url| url.to_string()),
+        _ => {
+            let resolved_release = resolve_github_release(
+                client,
+                repository,
+                release,
+                selector_description,
+                budget,
+                sleeper,
+            )?;
+            resolved_release
+                .assets
+                .iter()
+                .find(|release_asset| release_asset.name == asset_name)
+                .map(|release_asset| release_asset.browser_download_url.clone())
+                .ok_or_else(|| {
+                    format!(
+                        "github release asset lookup failed for {repository} release {selector_description} resolved tag {}: asset {asset_name} not found",
+                        resolved_release.tag_name
+                    )
+                })
+        }
+    }
 }
 
 fn build_github_client() -> Result<Client, String> {
@@ -529,6 +562,32 @@ fn github_api_url(
     Ok(url)
 }
 
+fn github_release_asset_download_url(
+    repository: &str,
+    tag: &str,
+    asset_name: &str,
+) -> Result<Url, String> {
+    let mut url = Url::parse(GITHUB_RELEASES_BASE_URL)
+        .expect("github releases base url should always parse successfully");
+    {
+        let mut path_segments = url
+            .path_segments_mut()
+            .map_err(|_| "github releases base url does not support path mutation".to_string())?;
+        for repository_segment in repository.split('/') {
+            if repository_segment.is_empty() {
+                return Err(format!("github repository path is invalid: {repository}"));
+            }
+            path_segments.push(repository_segment);
+        }
+        path_segments.push("releases");
+        path_segments.push("download");
+        path_segments.push(tag);
+        path_segments.push(asset_name);
+    }
+
+    Ok(url)
+}
+
 fn describe_release_selector(selector: &RuntimeArtifactGitHubReleaseSelector) -> String {
     match selector {
         RuntimeArtifactGitHubReleaseSelector::Latest => "kind=latest".to_string(),
@@ -754,8 +813,9 @@ mod tests {
         GitHubReleaseAssetResponse, GitHubReleaseResponse, InstallWorkspace, RetryableFailure,
         RuntimeArtifactGitHubReleaseAssetShape, RuntimeArtifactGitHubReleaseInstallAsset,
         StepBudget, build_mise_install_command, find_first_matching_published_release,
-        is_retryable_http_status, materialize_github_release_asset, run_with_retry,
-        select_release_asset_shape_for_arch, stream_download_to_path_with_retry,
+        github_release_asset_download_url, is_retryable_http_status,
+        materialize_github_release_asset, run_with_retry, select_release_asset_shape_for_arch,
+        stream_download_to_path_with_retry,
     };
 
     #[test]
@@ -847,6 +907,21 @@ mod tests {
             .expect("published release with matching prefix should be selected");
 
         assert_eq!(selected_release.tag_name, "slack/v1.2.3");
+    }
+
+    #[test]
+    fn builds_direct_download_urls_for_exact_tag_assets() {
+        let url = github_release_asset_download_url(
+            "openai/codex",
+            "rust-v0.122.0",
+            "codex-x86_64-unknown-linux-musl.tar.gz",
+        )
+        .expect("exact tag asset url should build");
+
+        assert_eq!(
+            url.as_str(),
+            "https://github.com/openai/codex/releases/download/rust-v0.122.0/codex-x86_64-unknown-linux-musl.tar.gz"
+        );
     }
 
     #[test]

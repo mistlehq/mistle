@@ -22,6 +22,9 @@ export type JiraCompileBindingInput = CompileBindingInput<JiraTargetConfig, Jira
 const JiraCliArtifactKey = "jira-cli";
 const JiraCliArtifactName = "Jira CLI";
 const ArtifactCommandTimeoutMs = 120_000;
+// Pin exact release tags for sandbox startup to avoid live upstream version
+// resolution and the associated rate-limit / availability failures.
+const JiraCliReleaseTag = "jira/v0.4.0";
 
 function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["artifacts"][number] {
   return {
@@ -36,8 +39,8 @@ function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["a
           repository: "mistlehq/tools",
           release: {
             kind: "tag",
-            match: "latest_matching_prefix",
-            prefix: "jira/",
+            match: "exact",
+            tag: JiraCliReleaseTag,
           },
           asset: {
             kind: "exact",

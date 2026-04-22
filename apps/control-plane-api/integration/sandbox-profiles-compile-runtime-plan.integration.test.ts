@@ -644,8 +644,8 @@ describe("sandbox profile compile runtime plan integration", () => {
       repository: "mistlehq/tools",
       release: {
         kind: "tag",
-        match: "latest_matching_prefix",
-        prefix: "jira/",
+        match: "exact",
+        tag: "jira/v0.4.0",
       },
       asset: {
         kind: "exact",
@@ -667,8 +667,8 @@ describe("sandbox profile compile runtime plan integration", () => {
       repository: "mistlehq/tools",
       release: {
         kind: "tag",
-        match: "latest_matching_prefix",
-        prefix: "slack/",
+        match: "exact",
+        tag: "slack/v0.2.1",
       },
       asset: {
         kind: "exact",

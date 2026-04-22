@@ -1265,6 +1265,13 @@ export type RuntimeArtifactGitHubReleaseSelector =
       match: "exact";
       tag: string;
     }
+  /**
+   * Avoid using `latest_matching_prefix` for sandbox-startup installs.
+   *
+   * It requires live upstream release discovery during sandbox initialization,
+   * which is sensitive to provider rate limits and upstream availability.
+   * Prefer exact pinned tags whenever possible.
+   */
   | {
       kind: "tag";
       match: "latest_matching_prefix";
