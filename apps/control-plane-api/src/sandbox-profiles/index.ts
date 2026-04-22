@@ -6,11 +6,13 @@ export {
   sandboxProfileSchema as SandboxProfileSchema,
   launchableSandboxProfileSchema as LaunchableSandboxProfileSchema,
   sandboxProfileVersionIntegrationBindingSchema as SandboxProfileVersionIntegrationBindingSchema,
+  sandboxProfileRepositoryOptionSchema as SandboxProfileRepositoryOptionSchema,
   sandboxProfileVersionSchema as SandboxProfileVersionSchema,
   listSandboxProfileVersionsResponseSchema as ListSandboxProfileVersionsResponseSchema,
   putSandboxProfileVersionIntegrationBindingsBodySchema as PutSandboxProfileVersionIntegrationBindingsBodySchema,
   putSandboxProfileVersionIntegrationBindingsResponseSchema as PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   getSandboxProfileVersionIntegrationBindingsResponseSchema as GetSandboxProfileVersionIntegrationBindingsResponseSchema,
+  getSandboxProfileVersionAutomationConfigResponseSchema as GetSandboxProfileVersionAutomationConfigResponseSchema,
   createSandboxProfileBodySchema as CreateSandboxProfileBodySchema,
   updateSandboxProfileBodySchema as UpdateSandboxProfileBodySchema,
   sandboxProfileIdParamsSchema as SandboxProfileIdParamsSchema,
@@ -29,6 +31,7 @@ export { route as getSandboxProfileRoute } from "./get-sandbox-profile/route.js"
 export { route as updateSandboxProfileRoute } from "./update-sandbox-profile/route.js";
 export { route as deleteSandboxProfileRoute } from "./delete-sandbox-profile/route.js";
 export { route as listSandboxProfileVersionsRoute } from "./list-sandbox-profile-versions/route.js";
+export { route as getSandboxProfileVersionAutomationConfigRoute } from "./get-sandbox-profile-version-automation-config/route.js";
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
 export { route as putSandboxProfileVersionIntegrationBindingsRoute } from "./put-sandbox-profile-version-integration-bindings/route.js";
 export { route as startSandboxProfileInstanceRoute } from "./start-sandbox-profile-instance/route.js";

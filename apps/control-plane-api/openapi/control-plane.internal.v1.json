@@ -1447,6 +1447,10 @@
                     "type": "integer",
                     "minimum": 1
                   },
+                  "primaryRepositoryId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
                   "startedBy": {
                     "type": "object",
                     "properties": {

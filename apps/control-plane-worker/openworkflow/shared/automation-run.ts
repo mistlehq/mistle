@@ -204,6 +204,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     id: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
+    primaryRepositoryId: string | null;
   };
   automation: {
     organizationId: string;
@@ -248,6 +249,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     organizationId: input.automation.organizationId,
     sandboxProfileId: input.automationTarget.sandboxProfileId,
     sandboxProfileVersion: input.automationTarget.sandboxProfileVersion,
+    primaryRepositoryId: input.automationTarget.primaryRepositoryId,
     webhookEventId: input.webhookEvent.id,
     webhookEventType: input.webhookEvent.eventType,
     webhookProviderEventType: input.webhookEvent.providerEventType,
@@ -484,6 +486,7 @@ export async function prepareAutomationRun(
       id: automationTarget.id,
       sandboxProfileId: automationTarget.sandboxProfileId,
       sandboxProfileVersion,
+      primaryRepositoryId: automationTarget.primaryRepositoryId,
     },
     automation: {
       organizationId: automation.organizationId,
@@ -610,6 +613,7 @@ export async function prepareAutomationRun(
     organizationId: automation.organizationId,
     sandboxProfileId: automationTarget.sandboxProfileId,
     sandboxProfileVersion,
+    primaryRepositoryId: automationTarget.primaryRepositoryId,
     webhookEventId: webhookEvent.id,
     webhookEventType: webhookEvent.eventType,
     webhookProviderEventType: webhookEvent.providerEventType,
@@ -655,6 +659,7 @@ export async function ensureAutomationSandbox(
     organizationId: input.preparedAutomationRun.organizationId,
     profileId: input.preparedAutomationRun.sandboxProfileId,
     profileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+    primaryRepositoryId: input.preparedAutomationRun.primaryRepositoryId,
     startedBy: {
       kind: "system",
       id: input.preparedAutomationRun.automationRunId,

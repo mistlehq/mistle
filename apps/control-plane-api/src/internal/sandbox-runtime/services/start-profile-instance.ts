@@ -1,20 +1,14 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
-import { compileProfileVersionRuntimePlan } from "../../../sandbox-profiles/compile-profile-version-runtime-plan.js";
-import {
-  SandboxProfilesCompileError,
-  SandboxProfilesCompileErrorCodes,
-} from "../../../sandbox-profiles/errors.js";
-import {
-  resolveActingUserGitIdentity,
-  type SandboxActingUser,
-} from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
+import type { SandboxActingUser } from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
+import { startProfileInstance as startSandboxProfileInstance } from "../../../sandbox-profiles/services/start-profile-instance.js";
 import type { AppContext } from "../../../types.js";
 
 type StartProfileInstanceInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  primaryRepositoryId?: string | null;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;
@@ -41,50 +35,26 @@ export async function startProfileInstance(
   workflowRunId: string;
   sandboxInstanceId: string;
 }> {
-  const runtimePlan = await compileProfileVersionRuntimePlan(
+  return startSandboxProfileInstance(
     {
       db,
       integrationsConfig,
+      dataPlaneClient,
     },
     {
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      ...(input.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: input.primaryRepositoryId }),
+      startedBy: input.startedBy,
+      ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
+      source: input.source,
       image: {
-        source: "base",
-        imageRef: defaultBaseImage,
+        imageId: defaultBaseImage,
+        createdAt: new Date().toISOString(),
       },
     },
   );
-  if (runtimePlan.agentRuntimes.length === 0) {
-    throw new SandboxProfilesCompileError(
-      SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
-    );
-  }
-  const gitIdentity = await resolveActingUserGitIdentity(db, {
-    organizationId: input.organizationId,
-    ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
-  });
-
-  const startedSandbox = await dataPlaneClient.startSandboxInstance({
-    organizationId: input.organizationId,
-    sandboxProfileId: input.profileId,
-    sandboxProfileVersion: input.profileVersion,
-    runtimePlan,
-    startedBy: input.startedBy,
-    ...(input.actingUser === undefined ? {} : { actingUserId: input.actingUser.userId }),
-    ...(gitIdentity === undefined ? {} : { gitIdentity }),
-    source: input.source,
-    image: {
-      imageId: defaultBaseImage,
-      createdAt: new Date().toISOString(),
-    },
-  });
-
-  return {
-    status: startedSandbox.status,
-    workflowRunId: startedSandbox.workflowRunId,
-    sandboxInstanceId: startedSandbox.sandboxInstanceId,
-  };
 }
