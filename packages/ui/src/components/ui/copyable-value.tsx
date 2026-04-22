@@ -55,6 +55,29 @@ function isLoadingCopyableValue(input: CopyableValueProps): input is LoadingCopy
 }
 
 export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>({ state: "idle" });
+  const isLoading = isLoadingCopyableValue(input);
+
+  useEffect(() => {
+    if (isLoading || copyFeedback.state !== "copied") {
+      return;
+    }
+
+    const handle = systemScheduler.schedule(() => {
+      setCopyFeedback((currentFeedback) => {
+        if (currentFeedback.state !== "copied" || currentFeedback.value !== copyFeedback.value) {
+          return currentFeedback;
+        }
+
+        return { state: "idle" };
+      });
+    }, COPY_SUCCESS_DISPLAY_MS);
+
+    return () => {
+      systemScheduler.cancel(handle);
+    };
+  }, [copyFeedback, isLoading]);
+
   if (isLoadingCopyableValue(input)) {
     return (
       <div className="gap-1.5 flex flex-col">
@@ -74,7 +97,6 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   }
 
   const readyInput = input;
-  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>({ state: "idle" });
 
   const copyAriaLabel =
     readyInput.copyAriaLabel ??
@@ -105,26 +127,6 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
       });
     }
   }
-
-  useEffect(() => {
-    if (copyFeedback.state !== "copied") {
-      return;
-    }
-
-    const handle = systemScheduler.schedule(() => {
-      setCopyFeedback((currentFeedback) => {
-        if (currentFeedback.state !== "copied" || currentFeedback.value !== copyFeedback.value) {
-          return currentFeedback;
-        }
-
-        return { state: "idle" };
-      });
-    }, COPY_SUCCESS_DISPLAY_MS);
-
-    return () => {
-      systemScheduler.cancel(handle);
-    };
-  }, [copyFeedback]);
 
   const button = (
     <Button
