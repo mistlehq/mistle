@@ -851,8 +851,7 @@ fn begin_sign(
         } => {
             if response_request_id != request_id {
                 return Err(ControlError::ResponseError(format!(
-                    "signing response request id '{}' did not match '{}'",
-                    response_request_id, request_id
+                    "signing response request id '{response_request_id}' did not match '{request_id}'"
                 )));
             }
             Ok(signature_base64)
@@ -866,8 +865,7 @@ fn begin_sign(
                 format!("{code}: {message}")
             } else {
                 format!(
-                    "signing response request id '{}' did not match '{}': {code}: {message}",
-                    response_request_id, request_id
+                    "signing response request id '{response_request_id}' did not match '{request_id}': {code}: {message}"
                 )
             },
         )),
