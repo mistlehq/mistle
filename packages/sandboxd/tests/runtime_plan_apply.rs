@@ -774,7 +774,11 @@ fn create_runtime_plan_apply_input(
 }
 
 fn run_command(args: &[&str], cwd: &Path) {
-    let status = Command::new(args[0])
+    let mut command = Command::new(args[0]);
+    if args[0] == "git" {
+        command.args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]);
+    }
+    let status = command
         .args(&args[1..])
         .current_dir(cwd)
         .status()
