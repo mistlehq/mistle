@@ -105,11 +105,14 @@ function createBinding() {
   };
 }
 
-function createAutomationConfig(input?: { repositoryIds?: readonly string[] }) {
+function createAutomationConfig(input?: {
+  repositoryIds?: readonly string[];
+  bindings?: ReturnType<typeof createBinding>[];
+}) {
   const repositoryIds = input?.repositoryIds ?? ["mistlehq/platform"];
 
   return {
-    bindings: [],
+    bindings: input?.bindings ?? [],
     repositoryOptions: repositoryIds.map((repositoryId) => ({
       id: repositoryId,
       label: repositoryId,
@@ -338,16 +341,9 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         profileId: "sbp_123",
         version: 1,
       }),
-      {
+      createAutomationConfig({
         bindings: [createBinding()],
-        repositoryOptions: [
-          {
-            id: "mistlehq/platform",
-            label: "mistlehq/platform",
-            path: "/root/mistlehq/platform",
-          },
-        ],
-      },
+      }),
     );
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
       versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
@@ -475,16 +471,9 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         profileId: "sbp_123",
         version: 1,
       }),
-      {
+      createAutomationConfig({
         bindings: [createBinding()],
-        repositoryOptions: [
-          {
-            id: "mistlehq/platform",
-            label: "mistlehq/platform",
-            path: "/root/mistlehq/platform",
-          },
-        ],
-      },
+      }),
     );
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
       versions: [{ sandboxProfileId: "sbp_456", version: 2 }],
@@ -494,16 +483,10 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         profileId: "sbp_456",
         version: 2,
       }),
-      {
+      createAutomationConfig({
+        repositoryIds: ["mistlehq/mistle"],
         bindings: [createBinding()],
-        repositoryOptions: [
-          {
-            id: "mistlehq/mistle",
-            label: "mistlehq/mistle",
-            path: "/root/mistlehq/mistle",
-          },
-        ],
-      },
+      }),
     );
 
     const { result } = renderHook(

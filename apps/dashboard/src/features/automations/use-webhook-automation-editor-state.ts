@@ -71,7 +71,6 @@ const InvalidProfileBindingMessage =
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
 const RequiredTriggerSelectionMessage = "Please add a trigger";
-const UnselectedProfileQueryId = "__unselected__";
 const MissingProfileVersionQueryId = 0;
 
 function hasRequiredFieldErrors(
@@ -141,10 +140,6 @@ export function resolveSelectedProfileTriggerState(input: {
   };
 }
 
-function resolveSelectedProfileQueryId(selectedProfileId: string): string {
-  return selectedProfileId.length === 0 ? UnselectedProfileQueryId : selectedProfileId;
-}
-
 function resolveSelectedProfileBindingsErrorMessage(input: {
   versionError: unknown;
   bindingsError: unknown;
@@ -158,35 +153,6 @@ function resolveSelectedProfileBindingsErrorMessage(input: {
     error: selectedProfileBindingsError,
     fallbackMessage: LoadProfileBindingsErrorMessage,
   });
-}
-
-function useSelectedProfileTriggerState(input: {
-  selectedProfileId: string;
-  hasBindingData: boolean;
-  isBindingDataPending: boolean;
-  bindingErrorMessage: string | null;
-  bindings: readonly SandboxProfileVersionIntegrationBinding[];
-  directoryData: DirectoryData;
-}): SelectedProfileTriggerState {
-  return useMemo(
-    () =>
-      resolveSelectedProfileTriggerState({
-        selectedProfileId: input.selectedProfileId,
-        hasBindingData: input.hasBindingData,
-        isBindingDataPending: input.isBindingDataPending,
-        bindingErrorMessage: input.bindingErrorMessage,
-        bindings: input.bindings,
-        directoryData: input.directoryData,
-      }),
-    [
-      input.bindingErrorMessage,
-      input.bindings,
-      input.directoryData,
-      input.hasBindingData,
-      input.isBindingDataPending,
-      input.selectedProfileId,
-    ],
-  );
 }
 
 function resolveAutomationMutationErrorMessage(input: {
@@ -269,6 +235,31 @@ type SelectedSandboxProfileVersion = {
   profileId: string;
   version: number;
 };
+
+function resolvePrimaryRepositorySelectionNormalization(input: {
+  currentValues: WebhookAutomationFormValues;
+  selectedProfileId: string;
+  hasLoadedAutomationConfig: boolean;
+  primaryRepositoryOptions: readonly WebhookAutomationOption[];
+}): string | null {
+  if (!input.hasLoadedAutomationConfig) {
+    return null;
+  }
+
+  if (input.currentValues.sandboxProfileId.trim() !== input.selectedProfileId) {
+    return null;
+  }
+
+  if (input.primaryRepositoryOptions.length === 0) {
+    return input.currentValues.primaryRepositoryId.trim().length === 0 ? null : "";
+  }
+
+  return input.primaryRepositoryOptions.some(
+    (option) => option.value === input.currentValues.primaryRepositoryId,
+  )
+    ? null
+    : WebhookAutomationWorkspaceRootRepositoryOptionValue;
+}
 
 function resolveNormalizedConversationKeyTemplate(input: {
   values: WebhookAutomationFormValues;
@@ -374,7 +365,7 @@ export function useLoadedWebhookAutomationEditorState(
   const isUsingPinnedSelectedProfileVersion =
     selectedSandboxProfileVersion?.profileId === selectedProfileId;
   const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(resolveSelectedProfileQueryId(selectedProfileId)),
+    queryKey: sandboxProfileVersionsQueryKey(selectedProfileId),
     queryFn: async ({ signal }) =>
       listSandboxProfileVersions({
         profileId: selectedProfileId,
@@ -392,7 +383,7 @@ export function useLoadedWebhookAutomationEditorState(
     : latestSelectedProfileVersion;
   const selectedProfileAutomationConfigQuery = useQuery({
     queryKey: sandboxProfileVersionAutomationConfigQueryKey({
-      profileId: resolveSelectedProfileQueryId(selectedProfileId),
+      profileId: selectedProfileId,
       version: effectiveSelectedProfileVersion ?? MissingProfileVersionQueryId,
     }),
     queryFn: async ({ signal }) => {
@@ -413,8 +404,9 @@ export function useLoadedWebhookAutomationEditorState(
     versionError: isUsingPinnedSelectedProfileVersion ? null : selectedProfileVersionsQuery.error,
     bindingsError: selectedProfileAutomationConfigQuery.error,
   });
-  const selectedProfileRepositoryOptions =
-    selectedProfileAutomationConfigQuery.data?.repositoryOptions ?? [];
+  const selectedProfileAutomationConfig = selectedProfileAutomationConfigQuery.data;
+  const hasLoadedSelectedProfileAutomationConfig = selectedProfileAutomationConfig !== undefined;
+  const selectedProfileRepositoryOptions = selectedProfileAutomationConfig?.repositoryOptions ?? [];
   const primaryRepositoryOptions = useMemo(
     () =>
       buildWebhookAutomationPrimaryRepositoryOptions({
@@ -422,19 +414,32 @@ export function useLoadedWebhookAutomationEditorState(
       }),
     [selectedProfileRepositoryOptions],
   );
-  const selectedProfileTriggerState = useSelectedProfileTriggerState({
-    selectedProfileId,
-    hasBindingData:
-      effectiveSelectedProfileVersion === null ||
-      selectedProfileAutomationConfigQuery.data !== undefined,
-    isBindingDataPending:
-      selectedProfileId.length > 0 &&
-      ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
-        selectedProfileAutomationConfigQuery.isPending),
-    bindingErrorMessage: selectedProfileBindingsErrorMessage,
-    bindings: selectedProfileAutomationConfigQuery.data?.bindings ?? [],
-    directoryData: input.directoryData,
-  });
+  const selectedProfileTriggerState = useMemo(
+    () =>
+      resolveSelectedProfileTriggerState({
+        selectedProfileId,
+        hasBindingData:
+          effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
+        isBindingDataPending:
+          selectedProfileId.length > 0 &&
+          ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
+            selectedProfileAutomationConfigQuery.isPending),
+        bindingErrorMessage: selectedProfileBindingsErrorMessage,
+        bindings: selectedProfileAutomationConfig?.bindings ?? [],
+        directoryData: input.directoryData,
+      }),
+    [
+      effectiveSelectedProfileVersion,
+      hasLoadedSelectedProfileAutomationConfig,
+      input.directoryData,
+      isUsingPinnedSelectedProfileVersion,
+      selectedProfileAutomationConfig,
+      selectedProfileAutomationConfigQuery.isPending,
+      selectedProfileBindingsErrorMessage,
+      selectedProfileId,
+      selectedProfileVersionsQuery.isPending,
+    ],
+  );
   const preservedConnectionId =
     input.preservedWebhookSourceId === undefined
       ? undefined
@@ -461,48 +466,26 @@ export function useLoadedWebhookAutomationEditorState(
   );
 
   useEffect(() => {
-    if (selectedProfileAutomationConfigQuery.data === undefined) {
-      return;
-    }
-
-    if (primaryRepositoryOptions.length === 0) {
-      setFormValues((currentValues) => {
-        if (
-          currentValues.sandboxProfileId.trim() !== selectedProfileId ||
-          currentValues.primaryRepositoryId.trim().length === 0
-        ) {
-          return currentValues;
-        }
-
-        return {
-          ...currentValues,
-          primaryRepositoryId: "",
-        };
-      });
-      return;
-    }
-
-    const matchingRepository = primaryRepositoryOptions.find(
-      (option) => option.value === formValues.primaryRepositoryId,
-    );
-    if (matchingRepository !== undefined) {
-      return;
-    }
-
     setFormValues((currentValues) => {
-      if (currentValues.sandboxProfileId.trim() !== selectedProfileId) {
+      const normalizedPrimaryRepositoryId = resolvePrimaryRepositorySelectionNormalization({
+        currentValues,
+        selectedProfileId,
+        hasLoadedAutomationConfig: hasLoadedSelectedProfileAutomationConfig,
+        primaryRepositoryOptions,
+      });
+      if (normalizedPrimaryRepositoryId === null) {
         return currentValues;
       }
 
       return {
         ...currentValues,
-        primaryRepositoryId: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+        primaryRepositoryId: normalizedPrimaryRepositoryId,
       };
     });
   }, [
-    formValues.primaryRepositoryId,
     primaryRepositoryOptions,
-    selectedProfileAutomationConfigQuery.data,
+    hasLoadedSelectedProfileAutomationConfig,
+    selectedProfileAutomationConfig,
     selectedProfileId,
   ]);
 
