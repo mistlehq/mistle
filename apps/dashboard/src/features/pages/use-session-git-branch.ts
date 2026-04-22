@@ -202,7 +202,7 @@ export function useSessionGitBranch(input: {
   }, [input.enabled, input.rpcClient, query.data?.headWatchPath, queryClient, queryKey]);
 
   return {
-    branchLabel: query.data?.branchLabel ?? null,
+    branchLabel: input.enabled ? (query.data?.branchLabel ?? null) : null,
   };
 }
 

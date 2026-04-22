@@ -1,11 +1,24 @@
+// @vitest-environment jsdom
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderHook } from "@testing-library/react";
+import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
+import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
   GitBranchCommandTimeoutMs,
   buildGitBranchExecRequest,
   getSessionGitBranchQueryKey,
   isFsChangedNotification,
+  useSessionGitBranch,
 } from "./use-session-git-branch.js";
+
+function createWrapper(queryClient: QueryClient) {
+  return function Wrapper({ children }: PropsWithChildren): React.JSX.Element {
+    return createElement(QueryClientProvider, { client: queryClient }, children);
+  };
+}
 
 describe("useSessionGitBranch helpers", () => {
   it("builds git exec requests with the selected repository cwd", () => {
@@ -71,5 +84,39 @@ describe("useSessionGitBranch helpers", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("clears the branch label when tracking is disabled", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    queryClient.setQueryData(
+      ["session-git-branch", "sbi_test", "/root/acme/repo-1", "2026-04-22T00:00:00.000Z"],
+      {
+        branchLabel: "main",
+        headWatchPath: "/root/acme/repo-1/.git/HEAD",
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useSessionGitBranch({
+          connectedAtIso: "2026-04-22T00:00:00.000Z",
+          cwd: "/root/acme/repo-1",
+          enabled: false,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          rpcClient: null,
+          sandboxInstanceId: "sbi_test",
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    expect(result.current.branchLabel).toBeNull();
   });
 });
