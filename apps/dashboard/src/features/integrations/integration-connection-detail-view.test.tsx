@@ -18,6 +18,43 @@ const ImplicitWebhookPolicy = {
   showWebhookSources: true,
 } as const;
 
+function renderNeverSyncedResourceDetail(input: { isLoading: boolean }): void {
+  render(
+    <IntegrationConnectionDetailView
+      connections={[
+        {
+          id: "icn_github_primary",
+          bindingCount: 0,
+          canDelete: true,
+          displayName: "Engineering GitHub",
+          authMethodLabel: "GitHub App installation",
+          status: "active",
+          resources: [
+            {
+              kind: "repositories",
+              count: 0,
+              syncState: "never-synced",
+            },
+          ],
+        },
+      ]}
+      resourceItemsByKey={
+        new Map([
+          [
+            "icn_github_primary:repositories",
+            {
+              isLoading: input.isLoading,
+              items: [],
+              kind: "repositories",
+              errorMessage: null,
+            },
+          ],
+        ])
+      }
+    />,
+  );
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -345,40 +382,7 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("suppresses expanded item states for never-synced resources", () => {
-    render(
-      <IntegrationConnectionDetailView
-        connections={[
-          {
-            id: "icn_github_primary",
-            bindingCount: 0,
-            canDelete: true,
-            displayName: "Engineering GitHub",
-            authMethodLabel: "GitHub App installation",
-            status: "active",
-            resources: [
-              {
-                kind: "repositories",
-                count: 0,
-                syncState: "never-synced",
-              },
-            ],
-          },
-        ]}
-        resourceItemsByKey={
-          new Map([
-            [
-              "icn_github_primary:repositories",
-              {
-                isLoading: false,
-                items: [],
-                kind: "repositories",
-                errorMessage: null,
-              },
-            ],
-          ])
-        }
-      />,
-    );
+    renderNeverSyncedResourceDetail({ isLoading: false });
 
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View sync failure details")).toBeNull();
@@ -389,40 +393,7 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("does not show loading items for never-synced resources", () => {
-    render(
-      <IntegrationConnectionDetailView
-        connections={[
-          {
-            id: "icn_github_primary",
-            bindingCount: 0,
-            canDelete: true,
-            displayName: "Engineering GitHub",
-            authMethodLabel: "GitHub App installation",
-            status: "active",
-            resources: [
-              {
-                kind: "repositories",
-                count: 0,
-                syncState: "never-synced",
-              },
-            ],
-          },
-        ]}
-        resourceItemsByKey={
-          new Map([
-            [
-              "icn_github_primary:repositories",
-              {
-                isLoading: true,
-                items: [],
-                kind: "repositories",
-                errorMessage: null,
-              },
-            ],
-          ])
-        }
-      />,
-    );
+    renderNeverSyncedResourceDetail({ isLoading: true });
 
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.queryByText("Loading items...")).toBeNull();
