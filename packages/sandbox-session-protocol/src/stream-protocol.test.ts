@@ -825,6 +825,28 @@ describe("ports transport message parser", () => {
     expect(
       parsePortsTransportMessage(
         JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 42,
+          status: 200,
+          headers: {
+            "content-type": [""],
+            etag: ['W/"favicon"'],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.response.start",
+      streamId: 42,
+      status: 200,
+      headers: {
+        "content-type": [""],
+        etag: ['W/"favicon"'],
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
           type: "ports.http.body.chunk",
           streamId: 41,
           direction: "response",
@@ -992,6 +1014,24 @@ describe("ports transport message parser", () => {
       type: "ports.ws.close",
       streamId: 56,
       direction: "response",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.close",
+          streamId: 57,
+          direction: "response",
+          code: 1000,
+          reason: "",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.ws.close",
+      streamId: 57,
+      direction: "response",
+      code: 1000,
+      reason: "",
     });
   });
 

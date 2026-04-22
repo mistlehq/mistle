@@ -127,7 +127,7 @@ const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
   ProcessesSnapshotSchema,
 ]);
 
-const RepeatedHeaderValuesSchema = z.record(NonEmptyStringSchema, z.array(NonEmptyStringSchema));
+const RepeatedHeaderValuesSchema = z.record(NonEmptyStringSchema, z.array(z.string()));
 
 const PortAccessTargetSchema = z.object({
   kind: z.literal("port"),
@@ -232,7 +232,7 @@ const PortsWsCloseSchema = z
     streamId: PositiveIntegerSchema,
     direction: z.enum(["request", "response"]),
     code: PositiveIntegerSchema.optional(),
-    reason: NonEmptyStringSchema.optional(),
+    reason: z.string().optional(),
   })
   .refine((message) => message.reason === undefined || message.code !== undefined, {
     message: "ports.ws.close reason requires a close code",
