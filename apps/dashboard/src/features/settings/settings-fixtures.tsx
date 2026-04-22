@@ -25,7 +25,7 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       displayName="Mistle Developer"
       email="developer@mistle.so"
       imageUrl={null}
-      linkedAccountActionPending={false}
+      pendingLinkedAccountProviderFamilies={[]}
       linkedAccountCallbackNotice={null}
       linkedAccountCards={[]}
       linkedAccountErrorMessage={null}

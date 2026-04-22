@@ -34,7 +34,7 @@ export type ProfileSettingsPageViewProps = {
   displayName: string;
   email: string;
   imageUrl: string | null;
-  linkedAccountActionPending: boolean;
+  pendingLinkedAccountProviderFamilies: readonly string[];
   linkedAccountCallbackNotice: LinkedAccountCallbackNotice | null;
   linkedAccountCards: readonly LinkedAccountCardViewModel[];
   linkedAccountErrorMessage: string | null;
@@ -72,7 +72,6 @@ export type ProfileSettingsUserSectionProps = Pick<
 
 export type ProfileSettingsLinkedAccountsSectionProps = Pick<
   ProfileSettingsPageViewProps,
-  | "linkedAccountActionPending"
   | "linkedAccountCallbackNotice"
   | "linkedAccountCards"
   | "linkedAccountErrorMessage"
@@ -84,6 +83,7 @@ export type ProfileSettingsLinkedAccountsSectionProps = Pick<
   | "onUnlinkLinkedAccount"
   | "onUpdateLinkedAccountPreferredEmail"
   | "onUploadLinkedAccountCommitSigningKey"
+  | "pendingLinkedAccountProviderFamilies"
 >;
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
@@ -164,13 +164,13 @@ export function ProfileSettingsLinkedAccountsSection(
         : props.linkedAccountCards.map((linkedAccountCard) => (
             <LinkedAccountCard
               key={linkedAccountCard.providerFamily}
-              linkedAccountActionPending={props.linkedAccountActionPending}
               linkedAccountCard={linkedAccountCard}
               onDeleteLinkedAccountCommitSigningKey={props.onDeleteLinkedAccountCommitSigningKey}
               onLinkLinkedAccount={props.onLinkLinkedAccount}
               onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
               onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
               onUploadLinkedAccountCommitSigningKey={props.onUploadLinkedAccountCommitSigningKey}
+              pendingLinkedAccountProviderFamilies={props.pendingLinkedAccountProviderFamilies}
             />
           ))}
     </div>
@@ -227,7 +227,6 @@ function LinkedAccountsFeedbackStack(
 }
 
 function LinkedAccountCard(input: {
-  linkedAccountActionPending: boolean;
   linkedAccountCard: LinkedAccountCardViewModel;
   onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
@@ -237,9 +236,13 @@ function LinkedAccountCard(input: {
     preferredEmail: string,
   ) => Promise<void>;
   onUploadLinkedAccountCommitSigningKey: (providerFamily: string, file: File) => Promise<void>;
+  pendingLinkedAccountProviderFamilies: readonly string[];
 }): React.JSX.Element {
   const emailPreference = input.linkedAccountCard.emailPreference;
   const commitSigning = input.linkedAccountCard.commitSigning;
+  const linkedAccountActionPending = input.pendingLinkedAccountProviderFamilies.includes(
+    input.linkedAccountCard.providerFamily,
+  );
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
   const [pastedCommitSigningKey, setPastedCommitSigningKey] = useState("");
@@ -248,7 +251,7 @@ function LinkedAccountCard(input: {
   >(null);
 
   function closeCommitSigningDialog(): void {
-    if (input.linkedAccountActionPending) {
+    if (linkedAccountActionPending) {
       return;
     }
 
@@ -282,7 +285,7 @@ function LinkedAccountCard(input: {
     event.preventDefault();
 
     const normalizedPrivateKey = pastedCommitSigningKey.trim();
-    if (input.linkedAccountActionPending || normalizedPrivateKey.length === 0) {
+    if (linkedAccountActionPending || normalizedPrivateKey.length === 0) {
       return;
     }
 
@@ -316,13 +319,13 @@ function LinkedAccountCard(input: {
           {input.linkedAccountCard.primaryActionLabel === null ? null : (
             <Button
               aria-label={input.linkedAccountCard.primaryActionLabel}
-              disabled={input.linkedAccountActionPending}
+              disabled={linkedAccountActionPending}
               onClick={() => {
                 void input.onLinkLinkedAccount(input.linkedAccountCard.providerFamily);
               }}
               type="button"
             >
-              {input.linkedAccountActionPending ? (
+              {linkedAccountActionPending ? (
                 <Spinner aria-hidden className="size-4" />
               ) : (
                 input.linkedAccountCard.primaryActionLabel
@@ -332,14 +335,14 @@ function LinkedAccountCard(input: {
           {input.linkedAccountCard.secondaryActionLabel === null ? null : (
             <Button
               aria-label={input.linkedAccountCard.secondaryActionLabel}
-              disabled={input.linkedAccountActionPending}
+              disabled={linkedAccountActionPending}
               onClick={() => {
                 void input.onUnlinkLinkedAccount(input.linkedAccountCard.providerFamily);
               }}
               type="button"
               variant="outline"
             >
-              {input.linkedAccountActionPending ? (
+              {linkedAccountActionPending ? (
                 <Spinner aria-hidden className="size-4" />
               ) : (
                 input.linkedAccountCard.secondaryActionLabel
@@ -352,7 +355,7 @@ function LinkedAccountCard(input: {
       {emailPreference === null ? null : (
         <div className="mt-4">
           <AutoSaveSelectField
-            disabled={input.linkedAccountActionPending}
+            disabled={linkedAccountActionPending}
             id={`linked-account-preferred-email-${input.linkedAccountCard.providerFamily}`}
             label="Commit email"
             noneLabel="None"
@@ -396,7 +399,7 @@ function LinkedAccountCard(input: {
                   {commitSigning.removeActionLabel === null &&
                   commitSigning.keySummaryLabel === null ? (
                     <Button
-                      disabled={input.linkedAccountActionPending}
+                      disabled={linkedAccountActionPending}
                       onClick={() => {
                         openCommitSigningDialog();
                       }}
@@ -404,7 +407,7 @@ function LinkedAccountCard(input: {
                       type="button"
                       variant="ghost"
                     >
-                      {input.linkedAccountActionPending ? (
+                      {linkedAccountActionPending ? (
                         <Spinner aria-hidden className="size-4" />
                       ) : (
                         <>
@@ -425,7 +428,7 @@ function LinkedAccountCard(input: {
                       </div>
                       <Button
                         aria-label={commitSigning.uploadActionLabel}
-                        disabled={input.linkedAccountActionPending}
+                        disabled={linkedAccountActionPending}
                         onClick={() => {
                           openCommitSigningDialog();
                         }}
@@ -433,7 +436,7 @@ function LinkedAccountCard(input: {
                         type="button"
                         variant="ghost"
                       >
-                        {input.linkedAccountActionPending ? (
+                        {linkedAccountActionPending ? (
                           <Spinner aria-hidden className="size-4" />
                         ) : (
                           <PencilSimpleIcon aria-hidden className="size-4" />
@@ -444,7 +447,7 @@ function LinkedAccountCard(input: {
                   {commitSigning.removeActionLabel === null ? null : (
                     <Button
                       aria-label={commitSigning.removeActionLabel}
-                      disabled={input.linkedAccountActionPending}
+                      disabled={linkedAccountActionPending}
                       onClick={() => {
                         void input.onDeleteLinkedAccountCommitSigningKey(
                           input.linkedAccountCard.providerFamily,
@@ -454,7 +457,7 @@ function LinkedAccountCard(input: {
                       type="button"
                       variant="ghost"
                     >
-                      {input.linkedAccountActionPending ? (
+                      {linkedAccountActionPending ? (
                         <Spinner aria-hidden className="size-4" />
                       ) : (
                         <TrashIcon aria-hidden className="size-4" />
@@ -469,8 +472,8 @@ function LinkedAccountCard(input: {
       )}
       {commitSigning === null ? null : (
         <Dialog
-          isBusy={input.linkedAccountActionPending}
-          isDismissible={!input.linkedAccountActionPending}
+          isBusy={linkedAccountActionPending}
+          isDismissible={!linkedAccountActionPending}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) {
               closeCommitSigningDialog();
@@ -526,7 +529,7 @@ function LinkedAccountCard(input: {
                     type="file"
                   />
                   <Button
-                    disabled={input.linkedAccountActionPending}
+                    disabled={linkedAccountActionPending}
                     onClick={() => {
                       commitSigningUploadInputRef.current?.click();
                     }}
@@ -540,7 +543,7 @@ function LinkedAccountCard(input: {
 
               <DialogFooter>
                 <Button
-                  disabled={input.linkedAccountActionPending}
+                  disabled={linkedAccountActionPending}
                   onClick={closeCommitSigningDialog}
                   type="button"
                   variant="outline"
@@ -549,7 +552,7 @@ function LinkedAccountCard(input: {
                 </Button>
                 <Button
                   disabled={
-                    input.linkedAccountActionPending || pastedCommitSigningKey.trim().length === 0
+                    linkedAccountActionPending || pastedCommitSigningKey.trim().length === 0
                   }
                   type="submit"
                 >

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type React from "react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,7 +11,7 @@ const baseProps = {
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
-  linkedAccountActionPending: false,
+  pendingLinkedAccountProviderFamilies: [],
   linkedAccountCallbackNotice: null,
   linkedAccountCards: [],
   linkedAccountErrorMessage: null,
@@ -320,6 +320,57 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.getByRole("button", { name: "Link account" })).toBeTruthy();
   });
 
+  it("only shows linked-account pending state for the provider with an in-flight action", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            helperMessage: null,
+            emailPreference: null,
+            commitSigning: null,
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          },
+          {
+            providerFamily: "slack",
+            displayName: "Slack",
+            logoKey: "slack",
+            statusLabel: "Not linked",
+            statusTone: "warning",
+            accountLabel: "No linked account yet",
+            helperMessage: null,
+            emailPreference: null,
+            commitSigning: null,
+            primaryActionLabel: "Link account",
+            secondaryActionLabel: null,
+          },
+        ]}
+        pendingLinkedAccountProviderFamilies={["github"]}
+      />,
+    );
+
+    const githubCard = screen.getByText("GitHub").closest(".rounded");
+    const slackCard = screen.getByText("Slack").closest(".rounded");
+
+    if (!(githubCard instanceof HTMLElement) || !(slackCard instanceof HTMLElement)) {
+      throw new Error("Expected linked account cards to render.");
+    }
+
+    expect(
+      within(githubCard).getByRole("button", { name: "Link account" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      within(slackCard).getByRole("button", { name: "Link account" }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
   it("triggers link and unlink handlers through the linked-account actions", async () => {
     let linkCount = 0;
     let unlinkCount = 0;
@@ -444,7 +495,7 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountActionPending={true}
+        pendingLinkedAccountProviderFamilies={["github"]}
         linkedAccountCards={[
           {
             providerFamily: "github",
@@ -475,7 +526,9 @@ describe("ProfileSettingsPageView", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Commit email" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("combobox", { name: "Commit email" }).hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 
   it("uploads a pasted GitHub commit signing key through the provided handler", async () => {
