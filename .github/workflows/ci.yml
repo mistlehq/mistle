@@ -38,6 +38,7 @@ jobs:
             ts:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'apps/**'
               - 'packages/**'
@@ -54,6 +55,7 @@ jobs:
             rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'packages/commit-sign/**'
               - 'packages/sandboxd/**'
@@ -73,6 +75,7 @@ jobs:
             sandbox_base_linux:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
               - '.dockerignore'
               - 'packages/sandboxd/**'
               - 'packages/sandboxd/Dockerfile'

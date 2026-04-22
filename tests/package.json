@@ -9,6 +9,7 @@
     "test:system": "pnpm run test:system:prepare && vitest -c vitest.system.config.ts --run --passWithNoTests",
     "test:system:docker": "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=docker pnpm run test:system",
     "test:system:e2b": "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=e2b pnpm run test:system",
+    "test:system:all": "pnpm run test:system:docker && pnpm run test:system:e2b",
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
   },
   "devDependencies": {
