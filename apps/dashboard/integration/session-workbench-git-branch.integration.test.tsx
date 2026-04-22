@@ -102,6 +102,8 @@ async function startGitBranchTunnelServer(): Promise<{
   emitTurnStarted: (turnId: string) => void;
   getBranchCommandCount: () => number;
   getHeadWatchCount: () => number;
+  getHeadWatchRegistrationCount: () => number;
+  failNextGitDirectoryLookup: () => void;
   notifyHeadChanged: () => void;
   setCurrentBranch: (branch: string) => void;
   url: string;
@@ -110,6 +112,8 @@ async function startGitBranchTunnelServer(): Promise<{
   let agentStreamId: number | null = null;
   let branchCommandCount = 0;
   let currentBranch = "main";
+  let gitDirectoryLookupFailureCount = 0;
+  let headWatchRegistrationCount = 0;
   const headWatchIds = new Set<string>();
   const repoRoot = "/root/mistlehq/mistle";
   const gitDir = `${repoRoot}/.git`;
@@ -191,7 +195,13 @@ async function startGitBranchTunnelServer(): Promise<{
             args[0] === "rev-parse" &&
             args[1] === "--absolute-git-dir"
           ) {
-            stdout = `${gitDir}\n`;
+            if (gitDirectoryLookupFailureCount > 0) {
+              gitDirectoryLookupFailureCount -= 1;
+              exitCode = 124;
+              stderr = "command timed out after 5000ms";
+            } else {
+              stdout = `${gitDir}\n`;
+            }
           } else {
             exitCode = 1;
             stderr = `unsupported exec command: ${command} ${args.join(" ")}`.trim();
@@ -299,6 +309,7 @@ async function startGitBranchTunnelServer(): Promise<{
 
           if (params.path === headPath && typeof params.watchId === "string") {
             headWatchIds.add(params.watchId);
+            headWatchRegistrationCount += 1;
           }
 
           sendAgentJson({
@@ -392,6 +403,10 @@ async function startGitBranchTunnelServer(): Promise<{
     },
     getBranchCommandCount: () => branchCommandCount,
     getHeadWatchCount: () => headWatchIds.size,
+    getHeadWatchRegistrationCount: () => headWatchRegistrationCount,
+    failNextGitDirectoryLookup: () => {
+      gitDirectoryLookupFailureCount += 1;
+    },
     notifyHeadChanged: () => {
       for (const watchId of headWatchIds) {
         sendNotification({
@@ -487,6 +502,7 @@ describe("SessionWorkbenchPage git branch label", () => {
       await waitFor(() => {
         expect(tunnelServer.getHeadWatchCount()).toBe(1);
       });
+      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
 
       tunnelServer.emitTurnStarted("turn_1");
@@ -494,12 +510,14 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
 
       tunnelServer.emitTurnCompleted("turn_1");
       await waitFor(() => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
     } finally {
       await rendered.close();
       await tunnelServer.close();
@@ -541,6 +559,38 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("feature/from-terminal")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(2);
+    } finally {
+      await rendered.close();
+      await tunnelServer.close();
+      restoreWebSocket();
+    }
+  }, 45_000);
+
+  it("recovers from a transient git directory lookup failure", async () => {
+    const restoreWebSocket = installNodeWebSocket();
+    const tunnelServer = await startGitBranchTunnelServer();
+    tunnelServer.failNextGitDirectoryLookup();
+    const rendered = await renderDashboardPageIntegration({
+      handler: createWorkbenchRequestHandler({
+        tunnelUrl: tunnelServer.url,
+      }),
+      ui: (
+        <HeaderActionsHost>
+          <MemoryRouter initialEntries={["/sessions/sbi_repo_page"]}>
+            <Routes>
+              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
+            </Routes>
+          </MemoryRouter>
+        </HeaderActionsHost>
+      ),
+    });
+
+    try {
+      await waitFor(() => {
+        expect(screen.getByText("main")).toBeTruthy();
+      });
+      expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
     } finally {
       await rendered.close();
       await tunnelServer.close();

@@ -7,10 +7,12 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
+  GitBranchCommandError,
   GitBranchCommandTimeoutMs,
   buildGitBranchExecRequest,
   getSessionGitBranchQueryKey,
   isFsChangedNotification,
+  isNotGitRepositoryResult,
   useSessionGitBranch,
 } from "./use-session-git-branch.js";
 
@@ -84,6 +86,37 @@ describe("useSessionGitBranch helpers", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("recognizes not-a-git-repository exec failures", () => {
+    expect(
+      isNotGitRepositoryResult({
+        exitCode: 128,
+        stderr: "fatal: not a git repository (or any of the parent directories): .git",
+      }),
+    ).toBe(true);
+  });
+
+  it("does not treat unrelated git failures as not-a-git-repository", () => {
+    expect(
+      isNotGitRepositoryResult({
+        exitCode: 124,
+        stderr: "command timed out after 5000ms",
+      }),
+    ).toBe(false);
+  });
+
+  it("records command failure details for transient git errors", () => {
+    const error = new GitBranchCommandError({
+      command: "git rev-parse --absolute-git-dir",
+      exitCode: 124,
+      stderr: "command timed out after 5000ms",
+    });
+
+    expect(error.message).toBe("Git command failed: git rev-parse --absolute-git-dir");
+    expect(error.command).toBe("git rev-parse --absolute-git-dir");
+    expect(error.exitCode).toBe(124);
+    expect(error.stderr).toBe("command timed out after 5000ms");
   });
 
   it("clears the branch label when tracking is disabled", () => {

@@ -1,7 +1,7 @@
 import type { CodexJsonRpcClient } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { ExecStreamClient, type ExecCommandRequest } from "@mistle/sandbox-session-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
@@ -20,6 +20,19 @@ type FsChangedNotification = {
   changedPaths: readonly string[];
   watchId: string;
 };
+
+class GitBranchCommandError extends Error {
+  command: string;
+  exitCode: number;
+  stderr: string;
+
+  constructor(input: { command: string; exitCode: number; stderr: string }) {
+    super(`Git command failed: ${input.command}`);
+    this.command = input.command;
+    this.exitCode = input.exitCode;
+    this.stderr = input.stderr;
+  }
+}
 
 export function buildGitBranchExecRequest(input: {
   args: string[];
@@ -64,8 +77,15 @@ function isFsChangedNotification(value: unknown): value is {
   );
 }
 
+function isNotGitRepositoryResult(input: { exitCode: number; stderr: string }): boolean {
+  return (
+    input.exitCode === 128 && /not a git repository|not in a git directory/i.test(input.stderr)
+  );
+}
+
 async function runGitCommand(input: {
   args: string[];
+  classifyNotGitRepositoryResult?: boolean;
   cwd: string;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
@@ -84,7 +104,21 @@ async function runGitCommand(input: {
   );
 
   if (result.exitCode !== 0) {
-    return null;
+    if (
+      input.classifyNotGitRepositoryResult === true &&
+      isNotGitRepositoryResult({
+        exitCode: result.exitCode,
+        stderr: result.stderr,
+      })
+    ) {
+      return null;
+    }
+
+    throw new GitBranchCommandError({
+      command: ["git", ...input.args].join(" "),
+      exitCode: result.exitCode,
+      stderr: result.stderr,
+    });
   }
 
   const output = result.stdout.trim();
@@ -98,6 +132,7 @@ async function loadSessionGitBranch(input: {
 }): Promise<GitBranchSnapshot> {
   const gitDirectory = await runGitCommand({
     args: ["rev-parse", "--absolute-git-dir"],
+    classifyNotGitRepositoryResult: true,
     cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -132,11 +167,15 @@ export function useSessionGitBranch(input: {
   sandboxInstanceId: string | null;
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
-  const queryKey = getSessionGitBranchQueryKey({
-    connectedAtIso: input.connectedAtIso,
-    sandboxInstanceId: input.sandboxInstanceId,
-    cwd: input.cwd,
-  });
+  const queryKey = useMemo(
+    () =>
+      getSessionGitBranchQueryKey({
+        connectedAtIso: input.connectedAtIso,
+        sandboxInstanceId: input.sandboxInstanceId,
+        cwd: input.cwd,
+      }),
+    [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
+  );
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null && input.cwd !== null,
     queryFn: async () => {
@@ -157,7 +196,8 @@ export function useSessionGitBranch(input: {
       });
     },
     queryKey,
-    retry: false,
+    retry: 2,
+    retryDelay: 200,
     staleTime: Number.POSITIVE_INFINITY,
   });
 
@@ -206,5 +246,10 @@ export function useSessionGitBranch(input: {
   };
 }
 
-export { GitBranchCommandTimeoutMs, isFsChangedNotification };
+export {
+  GitBranchCommandError,
+  GitBranchCommandTimeoutMs,
+  isFsChangedNotification,
+  isNotGitRepositoryResult,
+};
 export type { FsChangedNotification, GitBranchSnapshot, SessionGitBranchState };
