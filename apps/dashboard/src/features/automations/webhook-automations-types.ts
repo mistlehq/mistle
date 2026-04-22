@@ -19,6 +19,7 @@ const WebhookAutomationTargetSchema = z
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -107,6 +108,7 @@ export type CreateWebhookAutomationInput = {
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion?: number;
+    primaryRepositoryId?: string | null;
   };
 };
 
@@ -123,6 +125,7 @@ export type UpdateWebhookAutomationPatch = {
   target?: {
     sandboxProfileId?: string;
     sandboxProfileVersion?: number;
+    primaryRepositoryId?: string | null;
   };
 };
 

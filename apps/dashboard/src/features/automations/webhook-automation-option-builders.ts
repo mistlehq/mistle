@@ -5,14 +5,19 @@ import type {
   IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  SandboxProfile,
+  SandboxProfileRepositoryOption,
+  SandboxProfileVersionIntegrationBinding,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { createSyntheticWebhookAutomationEventOption } from "./webhook-automation-event-option-availability.js";
 import type { WebhookAutomationFormOption } from "./webhook-automation-form-types.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationEventOptionAvailability,
 } from "./webhook-automation-trigger-types.js";
+
+export const WebhookAutomationWorkspaceRootRepositoryOptionValue = "__workspace_root__";
 
 function sortOptionsByLabel<T extends { label: string }>(items: readonly T[]): T[] {
   return [...items].sort((left, right) => left.label.localeCompare(right.label));
@@ -204,6 +209,31 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
       label: profile.displayName,
     })),
   );
+}
+
+export function buildWebhookAutomationPrimaryRepositoryOptions(input: {
+  repositoryOptions: readonly SandboxProfileRepositoryOption[];
+}): readonly WebhookAutomationFormOption[] {
+  if (input.repositoryOptions.length === 0) {
+    return [];
+  }
+
+  const repositoryOptions = sortOptionsByLabel(
+    input.repositoryOptions.map((option) => ({
+      value: option.id,
+      label: option.label,
+      path: option.path,
+    })),
+  );
+
+  return [
+    {
+      value: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      label: "None",
+      path: "workspace root",
+    },
+    ...repositoryOptions,
+  ];
 }
 
 export function resolveEligibleProfileAutomationConnectionIds(input: {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -55,6 +55,7 @@ const WebhookEventOptions = [
 const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   sandboxProfileId: RepoMaintainerSandboxProfileId,
+  primaryRepositoryId: "mistlehq/platform",
   enabled: true,
   inputTemplate: "Please review the changes made.\n\nPayload:\n{{payload}}",
   instructions: "Reply tersely and mention the review checklist.",
@@ -70,8 +71,22 @@ const FormValues: WebhookAutomationFormValues = {
 
 const TestQueryClient = createTestQueryClient();
 
+const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
+  {
+    value: "__workspace_root__",
+    label: "None",
+    path: "workspace root",
+  },
+  {
+    value: "mistlehq/platform",
+    label: "mistlehq/platform",
+    path: "/root/mistlehq/platform",
+  },
+];
+
 afterEach(() => {
   TestQueryClient.clear();
+  cleanup();
 });
 
 describe("WebhookAutomationForm", () => {
@@ -93,6 +108,7 @@ describe("WebhookAutomationForm", () => {
               ...FormValues,
               name: "",
               sandboxProfileId: "",
+              primaryRepositoryId: "",
               inputTemplate: "",
               instructions: "",
               conversationKeyTemplate: "",
@@ -108,6 +124,7 @@ describe("WebhookAutomationForm", () => {
     values?: WebhookAutomationFormValues;
     triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
     webhookEventOptions?: typeof WebhookEventOptions;
+    primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
     onValueChange?: (
       key: keyof WebhookAutomationFormValues,
       value:
@@ -131,6 +148,9 @@ describe("WebhookAutomationForm", () => {
           onDelete={(input.mode ?? "create") === "edit" ? () => {} : null}
           onSubmit={() => {}}
           onValueChange={input.onValueChange ?? (() => {})}
+          {...(input.primaryRepositoryOptions === undefined
+            ? {}
+            : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
           sandboxProfileOptions={SandboxProfileOptions}
           triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
           webhookEventOptions={input.webhookEventOptions ?? WebhookEventOptions}
@@ -143,12 +163,42 @@ describe("WebhookAutomationForm", () => {
   it("shows selected option labels in the select triggers instead of raw ids", () => {
     renderFormWithOptions({
       mode: "create",
+      primaryRepositoryOptions: PrimaryRepositoryOptions,
       values: buildFormValues(),
     });
 
     expect(screen.getByText("Repo Maintainer")).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Primary repository" })).toHaveProperty(
+      "value",
+      "mistlehq/platform",
+    );
+    expect(screen.getByText("/root/mistlehq/platform")).toBeDefined();
     expect(screen.queryByText(GitHubConnectionId)).toBeNull();
     expect(screen.queryByText(RepoMaintainerSandboxProfileId)).toBeNull();
+  });
+
+  it("shows the primary repository field once a sandbox profile is selected", () => {
+    renderFormWithOptions({
+      mode: "create",
+      primaryRepositoryOptions: PrimaryRepositoryOptions,
+      values: buildFormValues(),
+    });
+
+    expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
+    expect(screen.getByText("/root/mistlehq/platform")).toBeDefined();
+  });
+
+  it("hides the primary repository field when no sandbox profile is selected", () => {
+    renderFormWithOptions({
+      mode: "create",
+      primaryRepositoryOptions: PrimaryRepositoryOptions,
+      values: buildFormValues({
+        sandboxProfileId: "",
+        primaryRepositoryId: "",
+      }),
+    });
+
+    expect(screen.queryByRole("combobox", { name: "Primary repository" })).toBeNull();
   });
 
   it("shows selected trigger event labels instead of raw event types", () => {
@@ -363,6 +413,7 @@ describe("WebhookAutomationForm", () => {
             ...FormValues,
             name: "",
             sandboxProfileId: "",
+            primaryRepositoryId: "",
             triggerIds: [],
             inputTemplate: "",
             instructions: "",

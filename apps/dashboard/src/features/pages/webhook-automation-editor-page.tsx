@@ -178,6 +178,7 @@ function EditWebhookAutomationEditor(input: {
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       directoryData={prerequisites.directoryData}
+      initialSandboxProfileVersion={automationQuery.data.target.sandboxProfileVersion}
     />
   );
 }
@@ -193,6 +194,7 @@ function LoadedWebhookAutomationEditor(input: {
   >["sandboxProfileOptions"];
   directoryData: NonNullable<ReturnType<typeof useWebhookAutomationPrerequisites>["directoryData"]>;
   preservedWebhookSourceId?: string;
+  initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedWebhookAutomationEditorState(input);
 
@@ -209,6 +211,7 @@ function LoadedWebhookAutomationEditor(input: {
         onDelete={state.onRequestDelete}
         onSubmit={state.onSubmit}
         onValueChange={state.onValueChange}
+        primaryRepositoryOptions={state.primaryRepositoryOptions}
         sandboxProfileOptions={state.sandboxProfileOptions}
         triggerPickerDisabledState={state.triggerPickerDisabledState}
         webhookEventOptions={state.webhookEventOptions}

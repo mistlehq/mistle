@@ -73,6 +73,24 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   },
 ];
 
+const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
+  {
+    value: "__workspace_root__",
+    label: "None",
+    path: "workspace root",
+  },
+  {
+    value: "mistlehq/platform",
+    label: "mistlehq/platform",
+    path: "/root/mistlehq/platform",
+  },
+  {
+    value: "mistlehq/dashboard",
+    label: "mistlehq/dashboard",
+    path: "/root/mistlehq/dashboard",
+  },
+];
+
 const StoryGithubRepositoryResources: IntegrationConnectionResources = {
   connectionId: GitHubConnectionId,
   familyId: "github",
@@ -294,6 +312,7 @@ const SlackWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
 const EmptyCreateValues: WebhookAutomationFormValues = {
   name: "",
   sandboxProfileId: "",
+  primaryRepositoryId: "",
   enabled: true,
   inputTemplate: DefaultWebhookAutomationMessageTemplate,
   instructions: "",
@@ -305,6 +324,7 @@ const EmptyCreateValues: WebhookAutomationFormValues = {
 const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   sandboxProfileId: "sbp_repo_maintainer",
+  primaryRepositoryId: "mistlehq/platform",
   enabled: true,
   inputTemplate: [
     "Please review the changes made.",
@@ -328,6 +348,7 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
 const ExistingSlackAutomationValues: WebhookAutomationFormValues = {
   name: "Slack mention triage",
   sandboxProfileId: "sbp_repo_maintainer",
+  primaryRepositoryId: "mistlehq/platform",
   enabled: true,
   inputTemplate: [
     "Investigate this Slack mention.",
@@ -367,6 +388,7 @@ function StoryHarness(input: {
   triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
+  primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
   enableSubmitValidation?: boolean;
 }): React.JSX.Element {
@@ -420,6 +442,9 @@ function StoryHarness(input: {
               setValidationSummaryError(null);
             }
           }}
+          {...(input.primaryRepositoryOptions === undefined
+            ? {}
+            : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
           sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
           triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
           webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
@@ -510,6 +535,30 @@ export const NoTriggersAvailable: Story = {
       sandboxProfileId: "sbp_repo_maintainer",
     },
     webhookEventOptions: [],
+  },
+};
+
+export const WithPrimaryRepositorySelection: Story = {
+  args: {
+    mode: "create",
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+      primaryRepositoryId: "mistlehq/platform",
+    },
+  },
+};
+
+export const WithWorkspaceRootSelection: Story = {
+  args: {
+    mode: "create",
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+      primaryRepositoryId: "__workspace_root__",
+    },
   },
 };
 

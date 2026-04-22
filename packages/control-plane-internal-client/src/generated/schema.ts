@@ -748,6 +748,7 @@ export interface paths {
               userId: string;
             };
             organizationId: string;
+            primaryRepositoryId?: string | null;
             profileId: string;
             profileVersion: number;
             source: "dashboard" | "webhook";

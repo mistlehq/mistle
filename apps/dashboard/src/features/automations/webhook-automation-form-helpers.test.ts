@@ -8,7 +8,10 @@ import {
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createWebhookAutomationTriggerId,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
+} from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
@@ -146,6 +149,7 @@ const SampleAutomation: WebhookAutomation = {
     id: "target_123",
     sandboxProfileId: "sbp_repo",
     sandboxProfileVersion: 3,
+    primaryRepositoryId: "mistlehq/platform",
   },
   createdAt: "2026-03-11T10:00:00.000Z",
   updatedAt: "2026-03-11T10:05:00.000Z",
@@ -154,6 +158,7 @@ const SampleAutomation: WebhookAutomation = {
 const BaseFormValues: WebhookAutomationFormValues = {
   name: "Pull request routing",
   sandboxProfileId: "sbp_repo",
+  primaryRepositoryId: "",
   enabled: true,
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   instructions: "",
@@ -167,6 +172,7 @@ describe("toWebhookAutomationFormValues", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
       name: "",
       sandboxProfileId: "",
+      primaryRepositoryId: "",
       enabled: true,
       inputTemplate: DefaultWebhookAutomationMessageTemplate,
       instructions: "",
@@ -180,6 +186,7 @@ describe("toWebhookAutomationFormValues", () => {
     expect(toWebhookAutomationFormValues(SampleAutomation)).toEqual({
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",
+      primaryRepositoryId: "mistlehq/platform",
       enabled: true,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       instructions: "Use the repository conventions.",
@@ -315,6 +322,7 @@ describe("validateWebhookAutomationFormValues", () => {
         {
           name: "",
           sandboxProfileId: "",
+          primaryRepositoryId: "",
           enabled: true,
           inputTemplate: "",
           instructions: "",
@@ -442,6 +450,7 @@ describe("automation payload transforms", () => {
       payloadFilter: null,
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });
@@ -469,6 +478,41 @@ describe("automation payload transforms", () => {
       payloadFilter: null,
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
+      },
+    });
+  });
+
+  it("maps a selected primary repository into the submission payload", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          primaryRepositoryId: "mistlehq/platform",
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      target: {
+        sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: "mistlehq/platform",
+      },
+    });
+  });
+
+  it("maps the workspace-root selection to a null primary repository id", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          primaryRepositoryId: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+        },
+        GitHubEventOptions,
+      ),
+    ).toMatchObject({
+      target: {
+        sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });
@@ -515,6 +559,7 @@ describe("automation payload transforms", () => {
       },
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });
@@ -551,6 +596,7 @@ describe("automation payload transforms", () => {
       },
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });
@@ -586,6 +632,7 @@ describe("automation payload transforms", () => {
       },
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });
@@ -622,6 +669,7 @@ describe("automation payload transforms", () => {
       },
       target: {
         sandboxProfileId: "sbp_repo",
+        primaryRepositoryId: null,
       },
     });
   });

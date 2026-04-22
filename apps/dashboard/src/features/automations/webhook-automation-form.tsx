@@ -18,6 +18,7 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
+import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import { resolveWebhookAutomationFormState } from "./webhook-automation-form-state.js";
@@ -27,6 +28,7 @@ import {
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
+import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { type WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 import {
@@ -50,6 +52,7 @@ type WebhookAutomationFormProps = {
   values: WebhookAutomationFormValues;
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
+  primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
@@ -143,6 +146,15 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   const inputTemplateLabelId = "automation-input-template-label";
   const instructionsLabelId = "automation-instructions-label";
   const submitLabel = input.mode === "create" ? "Create" : "Save";
+  const selectedPrimaryRepositoryOption = input.primaryRepositoryOptions?.find(
+    (option) => option.value === input.values.primaryRepositoryId,
+  );
+  const selectedPrimaryRepositoryPath = selectedPrimaryRepositoryOption?.path ?? null;
+  const selectedWorkspaceRoot =
+    selectedPrimaryRepositoryOption?.value === WebhookAutomationWorkspaceRootRepositoryOptionValue;
+  const shouldShowPrimaryRepositoryField =
+    input.values.sandboxProfileId.trim().length > 0 &&
+    (input.primaryRepositoryOptions?.length ?? 0) > 0;
   const formState = resolveWebhookAutomationFormState({
     webhookEventOptions: input.webhookEventOptions,
     selectedTriggerIds: input.values.triggerIds,
@@ -256,6 +268,60 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             value={input.values.sandboxProfileId}
           />
         </div>
+        {shouldShowPrimaryRepositoryField ? (
+          <div className="border-t p-4">
+            <Field contentWidth="fill" orientation="horizontal">
+              <FieldHeader>
+                <FieldLabel htmlFor="automation-primary-repository-combobox">
+                  Primary repository
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <SingleSelectStringComboboxField
+                  disabled={input.isDeleting || input.isSaving}
+                  emptyMessage="No matching repositories."
+                  inputId="automation-primary-repository-combobox"
+                  inputLabel="Primary repository"
+                  invalid={input.fieldErrors.primaryRepositoryId !== undefined}
+                  onChange={(value) => {
+                    input.onValueChange("primaryRepositoryId", value ?? "");
+                  }}
+                  options={
+                    input.primaryRepositoryOptions?.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    })) ?? []
+                  }
+                  placeholder="Select a repository"
+                  showClear={false}
+                  value={
+                    input.values.primaryRepositoryId.trim().length === 0
+                      ? undefined
+                      : input.values.primaryRepositoryId
+                  }
+                />
+                {selectedPrimaryRepositoryPath === null ? null : (
+                  <div className="text-muted-foreground mt-2 flex flex-col gap-1 text-sm">
+                    <p>
+                      {selectedWorkspaceRoot ? (
+                        "The agent will start its session at the workspace root."
+                      ) : (
+                        <>
+                          The agent will start its session in{" "}
+                          <span className="font-mono text-foreground">
+                            {selectedPrimaryRepositoryPath}
+                          </span>
+                          .
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
+                <FieldError message={input.fieldErrors.primaryRepositoryId} />
+              </FieldContent>
+            </Field>
+          </div>
+        ) : null}
       </FormPageSection>
 
       <FormPageSection

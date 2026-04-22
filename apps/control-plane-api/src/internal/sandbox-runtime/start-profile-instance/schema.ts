@@ -5,6 +5,7 @@ export const InternalSandboxRuntimeStartProfileInstanceRequestSchema = z
     organizationId: z.string().min(1),
     profileId: z.string().min(1),
     profileVersion: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
     startedBy: z
       .object({
         kind: z.union([z.literal("user"), z.literal("system")]),
