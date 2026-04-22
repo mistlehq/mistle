@@ -23,6 +23,9 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       organizationId: body.organizationId,
       profileId: body.profileId,
       profileVersion: body.profileVersion,
+      ...(body.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: body.primaryRepositoryId }),
       startedBy: body.startedBy,
       ...(body.actingUser === undefined ? {} : { actingUser: body.actingUser }),
       source: body.source,

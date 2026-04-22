@@ -437,4 +437,170 @@ describe("internal sandbox runtime", () => {
       await dataPlaneFixture.stop();
     }
   }, 60_000);
+
+  it("starts the sandbox in the selected primary repository for internal callers", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_internal_start_primary_repository",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-internal-start-profile-instance-primary-repository@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_internal_start_primary_repository",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Internal Start Primary Repository Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_internal_start_primary_repository",
+      version: 1,
+    });
+    await fixture.db.insert(integrationTargets).values([
+      {
+        targetKey: "openai-internal-start-primary-repository",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        },
+      },
+      {
+        targetKey: "github-internal-start-primary-repository",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      },
+    ]);
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_internal_start_primary_repository_agent",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-internal-start-primary-repository",
+        displayName: "Internal start primary repository agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+      {
+        id: "icn_internal_start_primary_repository_git",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-internal-start-primary-repository",
+        displayName: "Internal start primary repository git connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_internal_start_primary_repository_agent",
+        sandboxProfileId: "sbp_internal_start_primary_repository",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_internal_start_primary_repository_agent",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
+        },
+      },
+      {
+        id: "ibd_internal_start_primary_repository_git",
+        sandboxProfileId: "sbp_internal_start_primary_repository",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_internal_start_primary_repository_git",
+        kind: IntegrationBindingKinds.GIT,
+        config: {
+          repositories: ["mistlehq/mistle", "mistlehq/platform"],
+          tools: [],
+        },
+      },
+    ]);
+
+    try {
+      const response = await fixture.request(
+        `${INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH}/start-profile-instance`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+          },
+          body: JSON.stringify({
+            organizationId: authenticatedSession.organizationId,
+            profileId: "sbp_internal_start_primary_repository",
+            profileVersion: 1,
+            primaryRepositoryId: "mistlehq/platform",
+            startedBy: {
+              kind: "system",
+              id: "aru_internal_start_primary_repository",
+            },
+            source: "webhook",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      const parsedBody = z
+        .object({
+          sandboxInstanceId: z.string().min(1),
+        })
+        .parse(body);
+
+      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: parsedBody.sandboxInstanceId,
+      });
+      const runtimePlan = z
+        .object({
+          agentRuntimes: z.array(
+            z.object({
+              ptyLaunch: z.object({
+                newLaunch: z.object({
+                  cwd: z.string().min(1),
+                }),
+                resumeLaunch: z.object({
+                  cwd: z.string().min(1),
+                }),
+              }),
+            }),
+          ),
+        })
+        .parse(queuedWorkflowInput.runtimePlan);
+
+      expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe("/root/mistlehq/platform");
+      expect(runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
+        "/root/mistlehq/platform",
+      );
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
 });

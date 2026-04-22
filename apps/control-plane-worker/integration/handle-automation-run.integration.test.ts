@@ -495,6 +495,7 @@ describe("handleAutomationRun integration", () => {
           automationId,
           sandboxProfileId,
           sandboxProfileVersion: 7,
+          primaryRepositoryId: "mistlehq/platform",
         });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,
@@ -551,6 +552,7 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           sandboxProfileId,
           sandboxProfileVersion: 7,
+          primaryRepositoryId: "mistlehq/platform",
           webhookEventId,
           webhookEventType: "github.issue_comment.created",
           webhookProviderEventType: "issue_comment",

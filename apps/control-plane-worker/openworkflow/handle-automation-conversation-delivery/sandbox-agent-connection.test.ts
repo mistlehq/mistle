@@ -269,6 +269,7 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadInpu
       organizationId: "org_test_001",
       sandboxProfileId: "sbp_test_001",
       sandboxProfileVersion: 1,
+      primaryRepositoryId: null,
       webhookEventId: "iwe_test_001",
       webhookEventType: "github.issue_comment.created",
       webhookProviderEventType: "issue_comment",
