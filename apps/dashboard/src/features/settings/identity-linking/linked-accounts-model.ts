@@ -1,4 +1,3 @@
-import { formatDateTime } from "../../shared/date-formatters.js";
 import type { LinkedAccount } from "./linked-accounts-service.js";
 
 export type LinkedAccountStatusTone = "active" | "warning" | "disabled";
@@ -22,8 +21,6 @@ export type LinkedAccountEmailPreferenceViewModel = {
 export type LinkedAccountCommitSigningViewModel = {
   statusLabel: string;
   keySummaryLabel: string | null;
-  helperLabel: string | null;
-  helperCommand: string | null;
   uploadActionLabel: string;
   removeActionLabel: string | null;
 };
@@ -35,7 +32,6 @@ export type LinkedAccountCardViewModel = {
   statusLabel: string;
   statusTone: LinkedAccountStatusTone;
   accountLabel: string;
-  linkedAtLabel: string | null;
   helperMessage: string | null;
   emailPreference: LinkedAccountEmailPreferenceViewModel | null;
   commitSigning: LinkedAccountCommitSigningViewModel | null;
@@ -90,10 +86,6 @@ export function resolveLinkedAccountCardViewModel(
       statusLabel: "Disabled",
       statusTone: "disabled",
       accountLabel: resolveLinkedAccountLabel(linkedAccount),
-      linkedAtLabel:
-        linkedAccount.principal === null
-          ? null
-          : `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
       helperMessage:
         linkedAccount.principal === null
           ? `Your organization has disabled ${providerDisplayName} identity linking.`
@@ -113,7 +105,6 @@ export function resolveLinkedAccountCardViewModel(
       statusLabel: "Not linked",
       statusTone: "warning",
       accountLabel: "No linked account yet",
-      linkedAtLabel: null,
       helperMessage: null,
       emailPreference: null,
       commitSigning: null,
@@ -130,7 +121,6 @@ export function resolveLinkedAccountCardViewModel(
       statusLabel: "Relink required",
       statusTone: "warning",
       accountLabel: resolveLinkedAccountLabel(linkedAccount),
-      linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
       helperMessage: null,
       emailPreference: null,
       commitSigning: null,
@@ -146,7 +136,6 @@ export function resolveLinkedAccountCardViewModel(
     statusLabel: "Linked",
     statusTone: "active",
     accountLabel: resolveLinkedAccountLabel(linkedAccount),
-    linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
     helperMessage: null,
     emailPreference,
     commitSigning,
@@ -171,8 +160,6 @@ function resolveLinkedAccountCommitSigningViewModel(
     return {
       statusLabel: "Add private key",
       keySummaryLabel: null,
-      helperLabel: null,
-      helperCommand: null,
       uploadActionLabel: "Upload private key",
       removeActionLabel: null,
     };
@@ -181,8 +168,6 @@ function resolveLinkedAccountCommitSigningViewModel(
   return {
     statusLabel: "Private key added",
     keySummaryLabel: linkedAccount.commitSigning.publicKeyFingerprint,
-    helperLabel: null,
-    helperCommand: null,
     uploadActionLabel: "Replace private key",
     removeActionLabel: "Remove key",
   };

@@ -4,79 +4,82 @@ import type {
   ProfileSettingsUserSectionProps,
 } from "./profile-settings-page-view.js";
 
-export const GitHubLinkedWithConfiguredSigningCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
-  statusLabel: "Linked",
-  statusTone: "active",
-  accountLabel: "@mistle-user",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
+type LinkedAccountCard = NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+
+function createGitHubCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
+  return {
+    providerFamily: "github",
+    displayName: "GitHub",
+    logoKey: "github",
+    statusLabel: "Linked",
+    statusTone: "active",
+    accountLabel: "@mistle-user",
+    helperMessage: null,
+    emailPreference: null,
+    commitSigning: null,
+    primaryActionLabel: null,
+    secondaryActionLabel: "Unlink",
+    ...overrides,
+  };
+}
+
+function createSlackCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
+  return {
+    providerFamily: "slack",
+    displayName: "Slack",
+    logoKey: "slack",
+    statusLabel: "Linked",
+    statusTone: "active",
+    accountLabel: "Mistle Workspace",
+    helperMessage: null,
+    emailPreference: null,
+    commitSigning: null,
+    primaryActionLabel: null,
+    secondaryActionLabel: "Unlink",
+    ...overrides,
+  };
+}
+
+const GitHubEmailOptions = [
+  {
+    value: "mistle-user@example.com",
+    label: "mistle-user@example.com (Primary)",
+  },
+  {
+    value: "engineering@example.com",
+    label: "engineering@example.com",
+  },
+] satisfies NonNullable<NonNullable<LinkedAccountCard["emailPreference"]>["options"]>;
+
+export const GitHubLinkedWithConfiguredSigningCard = createGitHubCard({
   emailPreference: {
     selectedEmail: "mistle-user@example.com",
-    options: [
-      {
-        value: "mistle-user@example.com",
-        label: "mistle-user@example.com (Primary)",
-      },
-      {
-        value: "engineering@example.com",
-        label: "engineering@example.com",
-      },
-    ],
+    options: GitHubEmailOptions,
   },
   commitSigning: {
     statusLabel: "Private key added",
     keySummaryLabel: "SHA256:abc123",
-    helperLabel: null,
-    helperCommand: null,
     uploadActionLabel: "Replace private key",
     removeActionLabel: "Remove key",
   },
-  primaryActionLabel: null,
-  secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const GitHubNotLinkedCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
+export const GitHubNotLinkedCard = createGitHubCard({
   statusLabel: "Not linked",
   statusTone: "warning",
   accountLabel: "No linked account yet",
-  linkedAtLabel: null,
-  helperMessage: null,
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: "Link account",
   secondaryActionLabel: null,
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const GitHubRelinkRequiredCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
+export const GitHubRelinkRequiredCard = createGitHubCard({
   statusLabel: "Relink required",
   statusTone: "warning",
-  accountLabel: "@mistle-user",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: "Relink",
   secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const GitHubLinkedWithoutSelectableEmailsCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
-  statusLabel: "Linked",
-  statusTone: "active",
-  accountLabel: "@mistle-user",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
+export const GitHubLinkedWithoutSelectableEmailsCard = createGitHubCard({
   emailPreference: {
     selectedEmail: "",
     options: [],
@@ -84,125 +87,58 @@ export const GitHubLinkedWithoutSelectableEmailsCard = {
   commitSigning: {
     statusLabel: "Add private key",
     keySummaryLabel: null,
-    helperLabel: null,
-    helperCommand: null,
     uploadActionLabel: "Upload private key",
     removeActionLabel: null,
   },
-  primaryActionLabel: null,
-  secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const GitHubLinkedWithSigningNotConfiguredCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
-  statusLabel: "Linked",
-  statusTone: "active",
-  accountLabel: "@mistle-user",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
+export const GitHubLinkedWithSigningNotConfiguredCard = createGitHubCard({
   emailPreference: {
     selectedEmail: "mistle-user@example.com",
-    options: [
-      {
-        value: "mistle-user@example.com",
-        label: "mistle-user@example.com (Primary)",
-      },
-      {
-        value: "engineering@example.com",
-        label: "engineering@example.com",
-      },
-    ],
+    options: GitHubEmailOptions,
   },
   commitSigning: {
     statusLabel: "Add private key",
     keySummaryLabel: null,
-    helperLabel: null,
-    helperCommand: null,
     uploadActionLabel: "Upload private key",
     removeActionLabel: null,
   },
-  primaryActionLabel: null,
-  secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const GitHubDisabledButStillLinkedCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
+export const GitHubDisabledButStillLinkedCard = createGitHubCard({
   statusLabel: "Disabled",
   statusTone: "disabled",
-  accountLabel: "@mistle-user",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
   helperMessage:
     "Your organization has disabled GitHub identity linking. You can still unlink this account.",
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: null,
   secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const SlackNotLinkedCard = {
-  providerFamily: "slack",
-  displayName: "Slack",
-  logoKey: "slack",
+export const SlackNotLinkedCard = createSlackCard({
   statusLabel: "Not linked",
   statusTone: "warning",
   accountLabel: "No linked account yet",
-  linkedAtLabel: null,
-  helperMessage: null,
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: "Link account",
   secondaryActionLabel: null,
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const SlackLinkedCard = {
-  providerFamily: "slack",
-  displayName: "Slack",
-  logoKey: "slack",
-  statusLabel: "Linked",
-  statusTone: "active",
-  accountLabel: "Mistle Workspace",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
-  emailPreference: null,
-  commitSigning: null,
-  primaryActionLabel: null,
-  secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+export const SlackLinkedCard = createSlackCard();
 
-export const SlackRelinkRequiredCard = {
-  providerFamily: "slack",
-  displayName: "Slack",
-  logoKey: "slack",
+export const SlackRelinkRequiredCard = createSlackCard({
   statusLabel: "Relink required",
   statusTone: "warning",
-  accountLabel: "Mistle Workspace",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-  helperMessage: null,
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: "Relink",
   secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
-export const SlackDisabledButStillLinkedCard = {
-  providerFamily: "slack",
-  displayName: "Slack",
-  logoKey: "slack",
+export const SlackDisabledButStillLinkedCard = createSlackCard({
   statusLabel: "Disabled",
   statusTone: "disabled",
-  accountLabel: "Mistle Workspace",
-  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
   helperMessage:
     "Your organization has disabled Slack identity linking. You can still unlink this account.",
-  emailPreference: null,
-  commitSigning: null,
   primaryActionLabel: null,
   secondaryActionLabel: "Unlink",
-} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+});
 
 export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps = {
   displayName: "Mistle Developer",

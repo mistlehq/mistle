@@ -425,16 +425,6 @@ function LinkedAccountCard(input: {
                             {commitSigning.keySummaryLabel}
                           </p>
                         )}
-                        {commitSigning.helperLabel === null ? null : (
-                          <p className="text-xs text-muted-foreground">
-                            {commitSigning.helperLabel}
-                          </p>
-                        )}
-                        {commitSigning.helperCommand === null ? null : (
-                          <code className="mt-1 inline-block max-w-full overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs select-all">
-                            {commitSigning.helperCommand}
-                          </code>
-                        )}
                       </div>
                       <Button
                         aria-label={commitSigning.uploadActionLabel}

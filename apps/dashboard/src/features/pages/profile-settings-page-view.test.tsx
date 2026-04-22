@@ -31,6 +31,41 @@ const baseProps = {
   saving: false,
 } satisfies React.ComponentProps<typeof ProfileSettingsPageView>;
 
+type LinkedAccountCard = NonNullable<
+  React.ComponentProps<typeof ProfileSettingsPageView>["linkedAccountCards"]
+>[number];
+
+function createGitHubLinkedCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
+  return {
+    providerFamily: "github",
+    displayName: "GitHub",
+    logoKey: "github",
+    statusLabel: "Linked",
+    statusTone: "active",
+    accountLabel: "@mistle-user",
+    helperMessage: null,
+    emailPreference: null,
+    commitSigning: null,
+    primaryActionLabel: null,
+    secondaryActionLabel: "Unlink",
+    ...overrides,
+  };
+}
+
+function createGitHubSigningNotConfiguredCard(
+  overrides: Partial<LinkedAccountCard> = {},
+): LinkedAccountCard {
+  return createGitHubLinkedCard({
+    commitSigning: {
+      statusLabel: "Add private key",
+      keySummaryLabel: null,
+      uploadActionLabel: "Upload private key",
+      removeActionLabel: null,
+    },
+    ...overrides,
+  });
+}
+
 describe("ProfileSettingsPageView", () => {
   afterEach(() => {
     cleanup();
@@ -144,7 +179,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Not linked",
             statusTone: "warning",
             accountLabel: "No linked account yet",
-            linkedAtLabel: null,
             helperMessage: null,
             emailPreference: null,
             commitSigning: null,
@@ -166,15 +200,7 @@ describe("ProfileSettingsPageView", () => {
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
+          createGitHubSigningNotConfiguredCard({
             emailPreference: {
               selectedEmail: "mistle-user@example.com",
               options: [
@@ -188,17 +214,7 @@ describe("ProfileSettingsPageView", () => {
                 },
               ],
             },
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
+          }),
         ]}
       />,
     );
@@ -214,30 +230,12 @@ describe("ProfileSettingsPageView", () => {
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
+          createGitHubSigningNotConfiguredCard({
             emailPreference: {
               selectedEmail: "",
               options: [],
             },
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
+          }),
         ]}
       />,
     );
@@ -294,14 +292,11 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Linked",
             statusTone: "active",
             accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
             emailPreference: null,
             commitSigning: {
               statusLabel: "Add private key",
               keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
               uploadActionLabel: "Upload private key",
               removeActionLabel: null,
             },
@@ -315,7 +310,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Not linked",
             statusTone: "warning",
             accountLabel: "No linked account yet",
-            linkedAtLabel: null,
             helperMessage: null,
             emailPreference: null,
             commitSigning: null,
@@ -347,7 +341,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Relink required",
             statusTone: "warning",
             accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
             emailPreference: null,
             commitSigning: null,
@@ -385,7 +378,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Disabled",
             statusTone: "disabled",
             accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage:
               "Your organization has disabled GitHub identity linking. You can still unlink this account.",
             emailPreference: null,
@@ -417,7 +409,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Linked",
             statusTone: "active",
             accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
             emailPreference: {
               selectedEmail: "mistle-user@example.com",
@@ -435,8 +426,6 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Private key added",
               keySummaryLabel: "SHA256:abc123",
-              helperLabel: null,
-              helperCommand: null,
               uploadActionLabel: "Replace private key",
               removeActionLabel: "Remove key",
             },
@@ -470,7 +459,6 @@ describe("ProfileSettingsPageView", () => {
             statusLabel: "Linked",
             statusTone: "active",
             accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
             helperMessage: null,
             emailPreference: {
               selectedEmail: "mistle-user@example.com",
@@ -502,29 +490,7 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
-        ]}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
         onUploadLinkedAccountCommitSigningKey={async (_providerFamily, file) => {
           uploadedFiles.push(file);
         }}
@@ -553,29 +519,7 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
-        ]}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
         onUploadLinkedAccountCommitSigningKey={async (_providerFamily, file) => {
           uploadedFiles.push(file);
         }}
@@ -610,29 +554,7 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
-        ]}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
         onUploadLinkedAccountCommitSigningKey={async () => {
           throw new Error("Invalid private key.");
         }}
@@ -655,29 +577,7 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        linkedAccountCards={[
-          {
-            providerFamily: "github",
-            displayName: "GitHub",
-            logoKey: "github",
-            statusLabel: "Linked",
-            statusTone: "active",
-            accountLabel: "@mistle-user",
-            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: null,
-            emailPreference: null,
-            commitSigning: {
-              statusLabel: "Add private key",
-              keySummaryLabel: null,
-              helperLabel: null,
-              helperCommand: null,
-              uploadActionLabel: "Upload private key",
-              removeActionLabel: null,
-            },
-            primaryActionLabel: null,
-            secondaryActionLabel: "Unlink",
-          },
-        ]}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
         onUploadLinkedAccountCommitSigningKey={async () => {
           throw new Error("Upload failed.");
         }}

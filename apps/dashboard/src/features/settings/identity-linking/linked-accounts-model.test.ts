@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDateTime } from "../../shared/date-formatters.js";
 import {
   clearLinkedAccountCallbackSearchParams,
   findLinkedAccount,
@@ -104,7 +103,6 @@ describe("linked-accounts-model", () => {
       statusLabel: "Linked",
       statusTone: "active",
       accountLabel: "@mistle-user",
-      linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
       helperMessage: null,
       emailPreference: {
         selectedEmail: "",
@@ -113,8 +111,6 @@ describe("linked-accounts-model", () => {
       commitSigning: {
         statusLabel: "Add private key",
         keySummaryLabel: null,
-        helperLabel: null,
-        helperCommand: null,
         uploadActionLabel: "Upload private key",
         removeActionLabel: null,
       },
@@ -136,7 +132,6 @@ describe("linked-accounts-model", () => {
       statusLabel: "Not linked",
       statusTone: "warning",
       accountLabel: "No linked account yet",
-      linkedAtLabel: null,
       helperMessage: null,
       emailPreference: null,
       commitSigning: null,
@@ -181,7 +176,6 @@ describe("linked-accounts-model", () => {
       statusLabel: "Disabled",
       statusTone: "disabled",
       accountLabel: "@mistle-user",
-      linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
       helperMessage:
         "Your organization has disabled GitHub identity linking. You can still unlink this account.",
       emailPreference: null,
@@ -206,8 +200,6 @@ describe("linked-accounts-model", () => {
       commitSigning: {
         statusLabel: "Private key added",
         keySummaryLabel: "SHA256:abc123",
-        helperLabel: null,
-        helperCommand: null,
         uploadActionLabel: "Replace private key",
         removeActionLabel: "Remove key",
       },
