@@ -5,22 +5,16 @@ description: Draft or update GitHub pull requests for this repository in the req
 
 # Github Pr Authoring
 
-## Overview
-
-Produce a GitHub PR that is ready for reviewers and matches the repository PR contract. Keep the workflow narrow: gather change context, fill the required sections well, and use `gh` in a way that preserves formatting.
-
-## Workflow
-
 1. Base the PR on the actual diff, changed files, and checks. Do not invent tests, commands, or implications.
 2. Use this exact body structure:
    - `## What was changed`
    - `## How to review`
    - `## What the implication was`
    - `## Checks and tests performed`
-3. For bug fixes, include the original symptom in `## What was changed` as a short fenced `text` block. Use the exact error, failing output, or brief repro.
-4. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
-5. Use a conventional-commit PR title that summarizes the change.
-6. If using `gh`, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
+3. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
+4. Use a conventional-commit PR title that summarizes the change.
+5. If using `gh`, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
+6. Match the PR body to the size and complexity of the change. For small changes, prefer short prose over diagrams, long review checklists, or padded bullet lists.
 
 ## Section Expectations
 
@@ -38,15 +32,20 @@ Describe the recommended review path for this PR. Include:
 - suggested review order across files or commits
 - local setup or commands needed to validate behavior
 
+Keep this section proportional to the diff. For trivial changes, a short sentence pointing to the relevant file or section is enough.
+
 ### What the implication was
 
 Based on the changes, describe what the exact implications are. Where relevant, use Mermaid diagrams to help illustrate flows or other visual concepts.
 
 ### Checks and tests performed
 
-List of checks and tests performed to validate the changes. When listing tests, each test must cover:
+List only checks that add reviewer signal. Prefer:
 
-- What is being tested
-- What is the expected outcome
-- How the test is implemented
 - For property-based tests, what invariants are asserted, what generator bounds are used, and how failures can be replayed from seed/path
+- tests added or updated for this change
+- targeted commands that validate behavior not already covered by the normal local hook flow
+- meaningful manual testing with concrete scenarios and outcomes
+- broader publish gates like `pnpm run ci` when they materially exceed the default hook coverage
+
+Do not restate generic command behavior that is already obvious from the command name. If a routine command simply passed, say that directly.
