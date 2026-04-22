@@ -5,6 +5,10 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["DOM", "ES2022"],
+    "paths": {
+      "@mistle/time": ["../time/src/index.ts"],
+      "@mistle/time/testing": ["../time/src/testing/index.ts"]
+    },
     "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
     "jsx": "react-jsx",
     "noEmit": true
