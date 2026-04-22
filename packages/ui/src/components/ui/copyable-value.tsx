@@ -22,32 +22,31 @@ type LoadingCopyableValueProps = {
   variant?: "field";
 };
 
+type ReadyCopyableValueBaseProps = {
+  copiedTitle?: string;
+  copyAriaLabel?: string;
+  copyTitle?: string;
+  failureMessage?: string;
+  value: string;
+};
+
+type ReadyFieldCopyableValueProps = ReadyCopyableValueBaseProps & {
+  label: string;
+  variant?: "field";
+};
+
+type ReadyInlineCopyableValueProps = ReadyCopyableValueBaseProps & {
+  variant: "inline";
+};
+
+type ReadyPanelCopyableValueProps = ReadyCopyableValueBaseProps & {
+  variant: "panel";
+};
+
 type ReadyCopyableValueProps =
-  | {
-      copiedTitle?: string;
-      copyAriaLabel?: string;
-      copyTitle?: string;
-      failureMessage?: string;
-      label: string;
-      value: string;
-      variant?: "field";
-    }
-  | {
-      copiedTitle?: string;
-      copyAriaLabel?: string;
-      copyTitle?: string;
-      failureMessage?: string;
-      value: string;
-      variant: "inline";
-    }
-  | {
-      copiedTitle?: string;
-      copyAriaLabel?: string;
-      copyTitle?: string;
-      failureMessage?: string;
-      value: string;
-      variant: "panel";
-    };
+  | ReadyFieldCopyableValueProps
+  | ReadyInlineCopyableValueProps
+  | ReadyPanelCopyableValueProps;
 
 export type CopyableValueProps = LoadingCopyableValueProps | ReadyCopyableValueProps;
 
@@ -74,7 +73,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     );
   }
 
-  const readyInput: ReadyCopyableValueProps = input;
+  const readyInput = input;
   const [copyFeedback, setCopyFeedback] = useState<CopyFeedback>({ state: "idle" });
 
   const copyAriaLabel =
