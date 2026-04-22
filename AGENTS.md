@@ -97,7 +97,8 @@
 ## Workflows
 
 - Always run `pnpm validate:changed`, which runs repo-level `format` and `typecheck` plus scoped workspace `lint` and `test` based on the current changed files.
-- Before pushing, run `pnpm run ci` to mirror CI's end-to-end checks locally.
+- Treat `pnpm validate:changed` as the default pre-push validation step.
+- Run `pnpm run ci` before pushing only when the change is high risk or touches shared/build/test infrastructure.
 - Do not use `--no-verify` for commits or pushes; fix the underlying hook failure instead.
 - Always commit using Conventional Commits (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`). Do not use any other format.
 - Prefer small commits; break changes up into multiple commits if you need to, group related work together.
