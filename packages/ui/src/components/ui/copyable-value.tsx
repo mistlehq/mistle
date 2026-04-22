@@ -78,7 +78,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     };
   }, [copyFeedback, isLoading]);
 
-  if (isLoadingCopyableValue(input)) {
+  if (isLoading) {
     return (
       <div className="gap-1.5 flex flex-col">
         <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>

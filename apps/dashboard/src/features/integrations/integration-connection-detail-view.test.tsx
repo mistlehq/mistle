@@ -344,7 +344,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("keeps the never-synced status separate from the expanded empty contents", () => {
+  it("suppresses expanded item states for never-synced resources", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -384,7 +384,49 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
-    expect(screen.getByText("No items available.")).toBeTruthy();
+    expect(screen.queryByText("No items available.")).toBeNull();
+    expect(screen.queryByText("Loading items...")).toBeNull();
+  });
+
+  it("does not show loading items for never-synced resources", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Engineering GitHub",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "never-synced",
+              },
+            ],
+          },
+        ]}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                isLoading: true,
+                items: [],
+                kind: "repositories",
+                errorMessage: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
+    expect(screen.queryByText("Loading items...")).toBeNull();
+    expect(screen.queryByText("No items available.")).toBeNull();
   });
 
   it("shows a loading state instead of an empty state while resource items are loading", () => {

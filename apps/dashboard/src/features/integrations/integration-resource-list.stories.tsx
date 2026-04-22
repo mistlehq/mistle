@@ -81,15 +81,6 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
       },
     ],
     [
-      "icn_story:branch",
-      {
-        isLoading: false,
-        items: [],
-        kind: "branch",
-        errorMessage: null,
-      },
-    ],
-    [
       "icn_story:user",
       {
         isLoading: false,
