@@ -1,6 +1,6 @@
 import { ExecStreamClient, type ExecCommandRequest } from "@mistle/sandbox-session-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
@@ -14,15 +14,12 @@ type SessionGitBranchState = {
   branchLabel: string | null;
 };
 
-function shouldInvalidateForRefreshKey(input: {
-  previousRefreshKey: string | null | undefined;
-  refreshKey: string | null;
-}): boolean {
-  return (
-    input.refreshKey !== null &&
-    input.previousRefreshKey !== undefined &&
-    input.previousRefreshKey !== input.refreshKey
-  );
+function toSessionGitBranchIdentity(input: {
+  connectedAtIso: string | null;
+  sandboxInstanceId: string | null;
+  cwd: string | null;
+}): string {
+  return `${input.sandboxInstanceId ?? ""}::${input.cwd ?? ""}::${input.connectedAtIso ?? ""}`;
 }
 
 export function buildGitBranchExecRequest(input: {
@@ -125,13 +122,12 @@ export function useSessionGitBranch(input: {
   cwd: string | null;
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
-  refreshKey: string | null;
   sandboxInstanceId: string | null;
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
-  const lastRefreshKeyRef = useRef<string | null | undefined>(undefined);
   const isBranchTrackingEnabled =
     input.enabled && input.sandboxInstanceId !== null && input.cwd !== null;
+  const lastSelectionIdentityRef = useRef<string | null>(null);
   const queryKey = useMemo(
     () =>
       getSessionGitBranchQueryKey({
@@ -141,6 +137,16 @@ export function useSessionGitBranch(input: {
       }),
     [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
   );
+  const selectionIdentity = useMemo(
+    () =>
+      toSessionGitBranchIdentity({
+        connectedAtIso: input.connectedAtIso,
+        sandboxInstanceId: input.sandboxInstanceId,
+        cwd: input.cwd,
+      }),
+    [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
+  );
+  const [hasFreshSelectionData, setHasFreshSelectionData] = useState(false);
   const query = useQuery({
     enabled: isBranchTrackingEnabled,
     refetchOnMount: "always",
@@ -168,30 +174,44 @@ export function useSessionGitBranch(input: {
 
   useEffect(() => {
     if (!isBranchTrackingEnabled) {
-      lastRefreshKeyRef.current = input.refreshKey;
+      setHasFreshSelectionData(false);
+      lastSelectionIdentityRef.current = selectionIdentity;
       return;
     }
 
-    if (
-      shouldInvalidateForRefreshKey({
-        previousRefreshKey: lastRefreshKeyRef.current,
-        refreshKey: input.refreshKey,
-      })
-    ) {
-      void queryClient.invalidateQueries({
-        queryKey,
-      });
+    setHasFreshSelectionData(false);
+  }, [isBranchTrackingEnabled, selectionIdentity]);
+
+  useEffect(() => {
+    if (!isBranchTrackingEnabled) {
+      return;
     }
 
-    lastRefreshKeyRef.current = input.refreshKey;
-  }, [input.refreshKey, isBranchTrackingEnabled, queryClient, queryKey]);
+    const previousSelectionIdentity = lastSelectionIdentityRef.current;
+    lastSelectionIdentityRef.current = selectionIdentity;
+    const hasCachedSelectionData =
+      queryClient.getQueryData<GitBranchSnapshot>(queryKey) !== undefined;
+    if (
+      previousSelectionIdentity !== null &&
+      previousSelectionIdentity !== selectionIdentity &&
+      hasCachedSelectionData
+    ) {
+      void query.refetch();
+    }
+  }, [isBranchTrackingEnabled, query, queryClient, queryKey, selectionIdentity]);
 
-  const shouldHideBranchLabel =
-    !isBranchTrackingEnabled || query.isError || (query.isFetching && !query.isFetchedAfterMount);
+  useEffect(() => {
+    if (!isBranchTrackingEnabled || (!query.isFetchedAfterMount && !query.isError)) {
+      return;
+    }
+
+    setHasFreshSelectionData(true);
+  }, [isBranchTrackingEnabled, query.isError, query.isFetchedAfterMount, selectionIdentity]);
+
+  const shouldHideBranchLabel = !isBranchTrackingEnabled || query.isError || !hasFreshSelectionData;
 
   return {
     branchLabel: shouldHideBranchLabel ? null : (query.data?.branchLabel ?? null),
   };
 }
-
-export { GitBranchCommandTimeoutMs, shouldInvalidateForRefreshKey };
+export { GitBranchCommandTimeoutMs };

@@ -266,9 +266,9 @@ async function startGitBranchTunnelServer(): Promise<{
             result: {
               data: [
                 {
-                  id: "mdl_gpt54",
-                  model: "gpt-5.4",
-                  displayName: "GPT-5.4",
+                  id: "mdl_gpt53",
+                  model: "gpt-5.3-codex",
+                  displayName: "GPT-5.3 Codex",
                   hidden: false,
                   isDefault: true,
                   inputModalities: ["text", "image"],
@@ -287,16 +287,23 @@ async function startGitBranchTunnelServer(): Promise<{
             },
           });
           return;
-        case "thread/start":
+        case "thread/start": {
+          const requestParameters =
+            request.params !== undefined &&
+            request.params !== null &&
+            typeof request.params === "object"
+              ? (request.params as { cwd?: string })
+              : {};
           sendAgentJson({
             id: requestId,
             result: {
               thread: {
-                id: "thread_started_1",
+                id: `thread_started_${requestParameters.cwd ?? "default"}`,
               },
             },
           });
           return;
+        }
         default:
           sendAgentJson({
             id: requestId,
@@ -526,20 +533,29 @@ describe("SessionWorkbenchPage git branch label", () => {
         name: "Primary repository",
       });
 
-      fireEvent.focus(repositoryCombobox);
+      fireEvent.click(repositoryCombobox);
       let repositoryListbox = await screen.findByRole("listbox");
-      fireEvent.click(within(repositoryListbox).getByRole("option", { name: "company-os" }));
+      const companyRepositoryOption = within(repositoryListbox).getByRole("option", {
+        name: "mistlehq/company-os",
+      });
+      fireEvent.mouseMove(companyRepositoryOption);
+      fireEvent.click(companyRepositoryOption);
       await waitFor(() => {
         expect(screen.getByText("company-main")).toBeTruthy();
       });
 
       tunnelServer.setCurrentBranchForCwd("/root/mistlehq/mistle", "feature/returned-repo");
-
-      fireEvent.focus(repositoryCombobox);
+      fireEvent.click(repositoryCombobox);
       repositoryListbox = await screen.findByRole("listbox");
-      fireEvent.click(within(repositoryListbox).getByRole("option", { name: "mistle" }));
+      const mistleRepositoryOption = within(repositoryListbox).getByRole("option", {
+        name: "mistlehq/mistle",
+      });
+      fireEvent.mouseMove(mistleRepositoryOption);
+      fireEvent.click(mistleRepositoryOption);
 
-      expect(screen.queryByText("main")).toBeNull();
+      await waitFor(() => {
+        expect(screen.queryByText("main")).toBeNull();
+      });
 
       await waitFor(() => {
         expect(screen.getByText("feature/returned-repo")).toBeTruthy();

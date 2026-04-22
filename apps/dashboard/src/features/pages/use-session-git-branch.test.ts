@@ -10,7 +10,6 @@ import {
   GitBranchCommandTimeoutMs,
   buildGitBranchExecRequest,
   getSessionGitBranchQueryKey,
-  shouldInvalidateForRefreshKey,
   useSessionGitBranch,
 } from "./use-session-git-branch.js";
 
@@ -69,24 +68,6 @@ describe("useSessionGitBranch helpers", () => {
     );
   });
 
-  it("does not invalidate from an initial hydrated completion key", () => {
-    expect(
-      shouldInvalidateForRefreshKey({
-        previousRefreshKey: undefined,
-        refreshKey: "turn_123:completed",
-      }),
-    ).toBe(false);
-  });
-
-  it("invalidates when a new completed turn is observed after mount", () => {
-    expect(
-      shouldInvalidateForRefreshKey({
-        previousRefreshKey: "turn_123:completed",
-        refreshKey: "turn_456:completed",
-      }),
-    ).toBe(true);
-  });
-
   it("clears the branch label when tracking is disabled", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
@@ -106,7 +87,6 @@ describe("useSessionGitBranch helpers", () => {
           ensureTransportConnected: async () => {
             throw new Error("ensureTransportConnected should not be called in this test.");
           },
-          refreshKey: null,
           sandboxInstanceId: "sbi_test",
         }),
       {
@@ -136,7 +116,6 @@ describe("useSessionGitBranch helpers", () => {
           ensureTransportConnected: async () => {
             throw new Error("transport unavailable");
           },
-          refreshKey: null,
           sandboxInstanceId: "sbi_test",
         }),
       {
@@ -166,7 +145,6 @@ describe("useSessionGitBranch helpers", () => {
           cwd: "/root/acme/repo-1",
           enabled: true,
           ensureTransportConnected: async () => await new Promise<never>(() => {}),
-          refreshKey: null,
           sandboxInstanceId: "sbi_test",
         }),
       {
