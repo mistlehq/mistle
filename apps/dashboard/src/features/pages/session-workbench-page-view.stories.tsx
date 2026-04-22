@@ -1,3 +1,4 @@
+import { Button, Notice } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
@@ -10,6 +11,7 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { ActionTile } from "../shared/action-tile.js";
 import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -37,6 +39,25 @@ function buildPageViewTerminalOutput(cwd: string | null): string {
     "apps  packages  README.md",
     "",
   ].join("\n");
+}
+
+const FailedSandboxSetupMessage =
+  "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.122.0: http 403";
+
+function FailedSetupWithRestartActionStoryContent(): React.JSX.Element {
+  return (
+    <div className="mx-auto flex h-full w-full max-w-3xl flex-col gap-4 px-4 py-6">
+      <ActionTile
+        action={<Button type="button">Start new session</Button>}
+        className="border-primary/40 bg-primary/5"
+        description="Start a new session to try again"
+        title="Session failed to start"
+      />
+      <Notice title="Sandbox failed" variant="alert">
+        {FailedSandboxSetupMessage}
+      </Notice>
+    </div>
+  );
 }
 
 function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
@@ -197,6 +218,21 @@ export const WithChatRestoreFailureNotice: Story = {
       title: "Could not restore chat",
       description: "Minting sandbox connection token failed: Could not mint connection token.",
     },
+  },
+};
+
+export const FailedSetupWithRestartAction: Story = {
+  args: {
+    headerStatusUi: {
+      label: "Error",
+      variant: "destructive",
+    },
+    alert: null,
+    mainContent: <FailedSetupWithRestartActionStoryContent />,
+    mainContentLayout: { scroll: "contained", width: "full" },
+    primaryBottomPanel: null,
+    isBottomPanelVisible: false,
+    bottomPanel: <></>,
   },
 };
 

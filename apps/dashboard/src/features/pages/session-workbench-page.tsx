@@ -39,6 +39,24 @@ export function SessionWorkbenchPage(): React.JSX.Element {
   return <SessionWorkbenchPageContent key={location.key} sandboxInstanceId={sandboxInstanceId} />;
 }
 
+function resolvePrimaryPanelErrorAlert(input: {
+  error: NonNullable<
+    ReturnType<typeof useSessionWorkbenchController>["workbench"]["primaryPanelState"]["error"]
+  >;
+}): SessionWorkbenchAlert {
+  return {
+    title:
+      input.error.kind === "chat_restore_failed"
+        ? "Could not restore chat"
+        : "Could not start Codex TUI",
+    description:
+      input.error.message ??
+      (input.error.kind === "chat_restore_failed"
+        ? "Could not restore chat."
+        : "Could not start Codex TUI."),
+  };
+}
+
 function SessionWorkbenchPageContent(input: {
   sandboxInstanceId: string | null;
 }): React.JSX.Element {
@@ -306,13 +324,9 @@ function SessionWorkbenchPageContent(input: {
       ? workbench.workbenchStatus.alert
       : workbench.primaryPanelState.transitionState === "stable_chat" &&
           workbench.primaryPanelState.error !== null
-        ? {
-            title:
-              workbench.primaryPanelState.error.kind === "chat_restore_failed"
-                ? "Could not restore chat"
-                : "Could not start Codex TUI",
-            description: workbench.primaryPanelState.error.message ?? "Could not start Codex TUI.",
-          }
+        ? resolvePrimaryPanelErrorAlert({
+            error: workbench.primaryPanelState.error,
+          })
         : null;
   useEffect(() => {
     if (
