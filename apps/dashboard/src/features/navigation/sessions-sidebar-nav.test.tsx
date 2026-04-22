@@ -147,6 +147,23 @@ describe("SessionsSidebarNav", () => {
     expect(screen.getByRole("textbox", { name: "Search sessions" })).toBeDefined();
   });
 
+  it("renders a head refresh action when newer sessions are available", () => {
+    render(
+      <SidebarProvider>
+        <MemoryRouter initialEntries={["/sessions"]}>
+          <SessionsSidebarNav
+            items={items}
+            headRefresh={{
+              label: "Show newer sessions",
+            }}
+          />
+        </MemoryRouter>
+      </SidebarProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Show newer sessions" })).toBeDefined();
+  });
+
   it("marks the new session link active on the dedicated new-session route", () => {
     renderSidebarNav({
       initialEntries: ["/sessions/new"],

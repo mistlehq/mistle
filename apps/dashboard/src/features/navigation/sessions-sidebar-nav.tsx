@@ -21,6 +21,11 @@ import { filterSessionsSidebarNavItems } from "./sessions-sidebar-nav-model.js";
 export function SessionsSidebarNav(input: {
   items: readonly SessionsSidebarNavItem[];
   emptyMessage?: string;
+  headRefresh?: {
+    isRefreshing?: boolean;
+    label: string;
+    onRefresh?: () => void;
+  };
   infiniteScroll?: {
     hasMore: boolean;
     onReachEnd?: () => void;
@@ -118,6 +123,9 @@ export function SessionsSidebarNav(input: {
           />
         </SidebarGroupContent>
       </SidebarGroup>
+      {input.headRefresh === undefined ? null : (
+        <SessionsSidebarHeadRefreshBanner headRefresh={input.headRefresh} />
+      )}
       {visibleItems.length === 0 ? (
         <>
           <div className="px-4 py-2 text-muted-foreground text-sm">
@@ -173,6 +181,31 @@ export function SessionsSidebarNav(input: {
         </SidebarGroup>
       )}
     </>
+  );
+}
+
+function SessionsSidebarHeadRefreshBanner(input: {
+  headRefresh: {
+    isRefreshing?: boolean;
+    label: string;
+    onRefresh?: () => void;
+  };
+}): React.JSX.Element {
+  return (
+    <div className="px-2 pt-0.5 pb-0.5">
+      <button
+        className="flex w-full items-center justify-between rounded-md border border-sidebar-border/80 px-2 py-1.5 text-left text-[11px] text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
+        type="button"
+        onClick={() => {
+          input.headRefresh.onRefresh?.();
+        }}
+      >
+        <span className="truncate font-medium">{input.headRefresh.label}</span>
+        {input.headRefresh.isRefreshing ? (
+          <Spinner aria-hidden className="size-3 shrink-0" />
+        ) : null}
+      </button>
+    </div>
   );
 }
 

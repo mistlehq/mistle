@@ -310,6 +310,20 @@ export const Default: Story = {
   },
 };
 
+export const NewerSessionsAvailable: Story = {
+  render: function RenderNewerSessionsAvailableStory(): React.JSX.Element {
+    return <HeadRefreshSidebarPreview />;
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Shows the updated head-of-feed model. A few newer sessions have already been merged into the list automatically, while a larger unseen head change now surfaces a hard-refresh control instead of another incremental merge.",
+      },
+    },
+  },
+};
+
 function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
   const [visiblePageCount, setVisiblePageCount] = useState(1);
   const [statusBanner, setStatusBanner] = useState<
@@ -362,6 +376,86 @@ function InteractiveInfiniteScrollSidebarPreview(): React.JSX.Element {
                   });
                 },
                 ...(statusBanner === undefined ? {} : { statusBanner }),
+              }}
+            />
+          </MemoryRouter>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function HeadRefreshSidebarPreview(): React.JSX.Element {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const items = buildSidebarSessionNavItems({
+    items: buildSandboxInstancesListFromRecords(
+      sortRecordsByCreatedAtDesc([
+        {
+          id: "sbi_newly_merged_1",
+          profileId: "sbp_platform",
+          profileName: "Platform Debugger",
+          title: "Investigate webhook retry fanout after queue rebalance",
+          status: "running",
+          createdAt: "2026-04-20T11:58:00.000Z",
+          updatedAt: "2026-04-20T11:58:00.000Z",
+          keepaliveActive: true,
+        },
+        {
+          id: "sbi_newly_merged_2",
+          profileId: "sbp_repo_maintainer",
+          profileName: "Repo Maintainer",
+          title: "Verify branch cleanup after fast-forward release merge",
+          status: "running",
+          createdAt: "2026-04-20T11:54:00.000Z",
+          updatedAt: "2026-04-20T11:54:00.000Z",
+          keepaliveActive: false,
+        },
+        {
+          id: "sbi_newly_merged_3",
+          profileId: "sbp_docs",
+          profileName: "Docs Maintainer",
+          title: "Patch onboarding note after sandbox restore regression",
+          status: "stopped",
+          createdAt: "2026-04-20T11:49:00.000Z",
+          updatedAt: "2026-04-20T11:49:00.000Z",
+          keepaliveActive: false,
+        },
+        ...buildSidebarStoryRecords(),
+      ]),
+    ).items,
+    nowEpochMs: Date.parse("2026-04-20T12:00:00.000Z"),
+  });
+
+  useEffect(() => {
+    if (!isRefreshing) {
+      return;
+    }
+
+    const timeoutId: TimerHandle = systemScheduler.schedule(() => {
+      setIsRefreshing(false);
+    }, 900);
+
+    return () => {
+      systemScheduler.cancel(timeoutId);
+    };
+  }, [isRefreshing]);
+
+  return (
+    <SidebarProvider>
+      <div className="h-screen bg-background">
+        <div className="h-full w-56 overflow-y-auto border-r bg-sidebar py-3">
+          <MemoryRouter initialEntries={["/sessions/new"]}>
+            <SessionsSidebarNav
+              items={items}
+              headRefresh={{
+                label: isRefreshing ? "Refreshing list" : "Refresh list",
+                isRefreshing,
+                onRefresh: () => {
+                  setIsRefreshing(true);
+                },
+              }}
+              infiniteScroll={{
+                hasMore: false,
               }}
             />
           </MemoryRouter>
