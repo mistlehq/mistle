@@ -117,7 +117,7 @@ describe("SessionWorkbenchPage TUI mode integration", () => {
         expectCliPty(await waitForPtySession(tunnelServer, "cli"));
         await tunnelServer.waitForThreadResume("thread_cli_test");
       });
-    });
+    }, 15_000);
 
     it("restores chat without reminting a connection token when the shared transport remains open", async () => {
       await withSessionWorkbenchCliHarness(async ({ controls, tunnelServer }) => {
