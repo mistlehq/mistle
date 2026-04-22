@@ -125,40 +125,6 @@ type CodexRawTurnState = {
   rawItemsById: Readonly<Record<string, unknown>>;
 };
 
-type TurnRenderEvent =
-  | {
-      kind: "user-message";
-      entry: ChatUserEntry;
-    }
-  | {
-      kind: "assistant-message";
-      entry: ChatAssistantEntry;
-    }
-  | {
-      kind: "reasoning";
-      entry: ChatReasoningEntry;
-    }
-  | {
-      kind: "command-execution";
-      entry: ChatCommandEntry;
-    }
-  | {
-      kind: "plan";
-      entry: ChatPlanEntry;
-    }
-  | {
-      kind: "file-change";
-      entry: ChatFileChangeEntry;
-    }
-  | {
-      kind: "generic-item";
-      entry: ChatGenericItemEntry;
-    }
-  | {
-      kind: "semantic-group";
-      entry: ChatSemanticGroupEntry;
-    };
-
 export type CodexChatState = {
   activeTurnId: string | null;
   pendingTurnId: string | null;
@@ -277,12 +243,6 @@ function isTerminalTurnStatus(status: string | null): boolean {
     status === "cancelled" ||
     status === "interrupted"
   );
-}
-
-function buildNormalizedItems(turn: CodexRawTurnState): readonly NormalizedCodexThreadItem[] {
-  return turn.itemOrder.flatMap((itemId) => {
-    return buildNormalizedItemsForRawItem(turn, itemId);
-  });
 }
 
 function buildNormalizedItemsForRawItem(
@@ -773,67 +733,11 @@ function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly Chat
   return [];
 }
 
-function mapEntryToRenderEvent(entry: ChatEntry): TurnRenderEvent {
-  switch (entry.kind) {
-    case "user-message":
-      return {
-        kind: "user-message",
-        entry,
-      };
-    case "assistant-message":
-      return {
-        kind: "assistant-message",
-        entry,
-      };
-    case "reasoning":
-      return {
-        kind: "reasoning",
-        entry,
-      };
-    case "command-execution":
-      return {
-        kind: "command-execution",
-        entry,
-      };
-    case "plan":
-      return {
-        kind: "plan",
-        entry,
-      };
-    case "file-change":
-      return {
-        kind: "file-change",
-        entry,
-      };
-    case "generic-item":
-      return {
-        kind: "generic-item",
-        entry,
-      };
-    case "semantic-group":
-      return {
-        kind: "semantic-group",
-        entry,
-      };
-  }
-}
-
-function flattenTurnRenderEvents(events: readonly TurnRenderEvent[]): readonly ChatEntry[] {
-  return events.map((event) => event.entry);
-}
-
-function projectItemsToRenderEvents(input: {
+function projectItemsToEntries(input: {
   turnId: string;
   items: readonly NormalizedCodexThreadItem[];
-}): readonly TurnRenderEvent[] {
-  return mapRenderedItemsToEntries(input).map((entry) => mapEntryToRenderEvent(entry));
-}
-
-function createSteerRenderEvent(entry: ChatUserEntry): TurnRenderEvent {
-  return {
-    kind: "user-message",
-    entry,
-  };
+}): readonly ChatEntry[] {
+  return mapRenderedItemsToEntries(input);
 }
 
 function isTurnStartSteerEntry(steerEntry: ClientSteerEntry): steerEntry is TurnStartSteerEntry {
@@ -850,8 +754,143 @@ function isAfterAssistantTextSteerEntry(
   return steerEntry.anchor.kind === "after-assistant-text";
 }
 
-function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEvent[] {
-  const events: TurnRenderEvent[] = [];
+function appendProjectedItems(
+  entries: ChatEntry[],
+  input: {
+    turnId: string;
+    items: readonly NormalizedCodexThreadItem[];
+  },
+): void {
+  entries.push(...projectItemsToEntries(input));
+}
+
+function appendAssistantItemEntries(input: {
+  entries: ChatEntry[];
+  turnId: string;
+  assistantItem: Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }>;
+  siblingItems: readonly NormalizedCodexThreadItem[];
+  steerEntriesAfterAssistantText: readonly AfterAssistantTextSteerEntry[];
+  steerEntriesAfterWholeRawItem: readonly AfterItemSteerEntry[];
+  steerOrderIndexByEntryId: ReadonlyMap<string, number>;
+}): void {
+  const {
+    entries,
+    turnId,
+    assistantItem,
+    siblingItems,
+    steerEntriesAfterAssistantText,
+    steerEntriesAfterWholeRawItem,
+    steerOrderIndexByEntryId,
+  } = input;
+  let nextWholeRawItemSteerIndex = 0;
+
+  function flushWholeRawItemSteersBefore(entryId: string): void {
+    const entryOrderIndex = steerOrderIndexByEntryId.get(entryId);
+    if (entryOrderIndex === undefined) {
+      throw new Error(`Missing steer order index for entry '${entryId}'.`);
+    }
+
+    while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
+      const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
+      if (wholeRawItemSteerEntry === undefined) {
+        break;
+      }
+
+      const wholeRawItemOrderIndex = steerOrderIndexByEntryId.get(wholeRawItemSteerEntry.entry.id);
+      if (wholeRawItemOrderIndex === undefined) {
+        throw new Error(
+          `Missing steer order index for entry '${wholeRawItemSteerEntry.entry.id}'.`,
+        );
+      }
+
+      if (wholeRawItemOrderIndex >= entryOrderIndex) {
+        break;
+      }
+
+      entries.push(wholeRawItemSteerEntry.entry);
+      nextWholeRawItemSteerIndex += 1;
+    }
+  }
+
+  function flushRemainingWholeRawItemSteers(): void {
+    while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
+      const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
+      if (wholeRawItemSteerEntry === undefined) {
+        break;
+      }
+
+      entries.push(wholeRawItemSteerEntry.entry);
+      nextWholeRawItemSteerIndex += 1;
+    }
+  }
+
+  const canSplitAssistantItem = steerEntriesAfterAssistantText.every((steerEntry) =>
+    assistantItem.text.startsWith(steerEntry.anchor.text),
+  );
+
+  if (!canSplitAssistantItem) {
+    appendProjectedItems(entries, {
+      turnId,
+      items: [assistantItem],
+    });
+    appendProjectedItems(entries, {
+      turnId,
+      items: siblingItems,
+    });
+
+    for (const steerEntry of steerEntriesAfterAssistantText) {
+      flushWholeRawItemSteersBefore(steerEntry.entry.id);
+      entries.push(steerEntry.entry);
+    }
+    flushRemainingWholeRawItemSteers();
+    return;
+  }
+
+  let consumedTextLength = 0;
+  for (const steerEntry of steerEntriesAfterAssistantText) {
+    const anchoredText = steerEntry.anchor.text;
+    const nextSegmentText = anchoredText.slice(consumedTextLength);
+    if (nextSegmentText.length > 0) {
+      appendProjectedItems(entries, {
+        turnId,
+        items: [
+          buildRenderedAssistantItemSegment({
+            item: assistantItem,
+            startOffset: consumedTextLength,
+            text: nextSegmentText,
+          }),
+        ],
+      });
+    }
+
+    flushWholeRawItemSteersBefore(steerEntry.entry.id);
+    entries.push(steerEntry.entry);
+    consumedTextLength = anchoredText.length;
+  }
+
+  const trailingAssistantText = assistantItem.text.slice(consumedTextLength);
+  if (trailingAssistantText.length > 0) {
+    appendProjectedItems(entries, {
+      turnId,
+      items: [
+        buildRenderedAssistantItemSegment({
+          item: assistantItem,
+          startOffset: consumedTextLength,
+          text: trailingAssistantText,
+        }),
+      ],
+    });
+  }
+
+  appendProjectedItems(entries, {
+    turnId,
+    items: siblingItems,
+  });
+  flushRemainingWholeRawItemSteers();
+}
+
+function buildTurnEntries(turn: CodexRawTurnState): readonly ChatEntry[] {
+  const entries: ChatEntry[] = [];
   const steerOrderIndexByEntryId = new Map(
     turn.clientSteerEntries.map((steerEntry, index) => [steerEntry.entry.id, index]),
   );
@@ -880,15 +919,10 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
   }
 
   if (turn.userEntry !== null) {
-    events.push({
-      kind: "user-message",
-      entry: turn.userEntry,
-    });
+    entries.push(turn.userEntry);
   }
 
-  events.push(
-    ...steerEntriesAtTurnStart.map((steerEntry) => createSteerRenderEvent(steerEntry.entry)),
-  );
+  entries.push(...steerEntriesAtTurnStart.map((steerEntry) => steerEntry.entry));
 
   let bufferedItems: NormalizedCodexThreadItem[] = [];
 
@@ -897,12 +931,10 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
       return;
     }
 
-    events.push(
-      ...projectItemsToRenderEvents({
-        turnId: turn.id,
-        items: bufferedItems,
-      }),
-    );
+    appendProjectedItems(entries, {
+      turnId: turn.id,
+      items: bufferedItems,
+    });
     bufferedItems = [];
   }
 
@@ -918,151 +950,25 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
 
     if (assistantItem !== undefined && steerEntriesAfterAssistantSegments.length > 0) {
       flushBufferedItems();
-
-      let nextWholeRawItemSteerIndex = 0;
-      function flushWholeRawItemSteersBefore(entryId: string): void {
-        const entryOrderIndex = steerOrderIndexByEntryId.get(entryId);
-        if (entryOrderIndex === undefined) {
-          throw new Error(`Missing steer order index for entry '${entryId}'.`);
-        }
-
-        while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
-          const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
-          if (wholeRawItemSteerEntry === undefined) {
-            break;
-          }
-
-          const wholeRawItemOrderIndex = steerOrderIndexByEntryId.get(
-            wholeRawItemSteerEntry.entry.id,
-          );
-          if (wholeRawItemOrderIndex === undefined) {
-            throw new Error(
-              `Missing steer order index for entry '${wholeRawItemSteerEntry.entry.id}'.`,
-            );
-          }
-
-          if (wholeRawItemOrderIndex >= entryOrderIndex) {
-            break;
-          }
-
-          events.push(createSteerRenderEvent(wholeRawItemSteerEntry.entry));
-          nextWholeRawItemSteerIndex += 1;
-        }
-      }
-
-      function flushRemainingWholeRawItemSteers(): void {
-        while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
-          const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
-          if (wholeRawItemSteerEntry === undefined) {
-            break;
-          }
-
-          events.push(createSteerRenderEvent(wholeRawItemSteerEntry.entry));
-          nextWholeRawItemSteerIndex += 1;
-        }
-      }
-
-      let consumedTextLength = 0;
-      let canSplitAssistantItem = true;
-      for (const steerEntry of steerEntriesAfterAssistantSegments) {
-        const anchoredText = steerEntry.anchor.text;
-        if (!assistantItem.text.startsWith(anchoredText)) {
-          canSplitAssistantItem = false;
-          break;
-        }
-      }
-
-      if (!canSplitAssistantItem) {
-        events.push(
-          ...projectItemsToRenderEvents({
-            turnId: turn.id,
-            items: [assistantItem],
-          }),
-        );
-        const nonAssistantItems = normalizedItemsForRawItem.filter(
-          (item) => item.id !== assistantItem.id && item.kind !== "assistant-message",
-        );
-        if (nonAssistantItems.length > 0) {
-          events.push(
-            ...projectItemsToRenderEvents({
-              turnId: turn.id,
-              items: nonAssistantItems,
-            }),
-          );
-        }
-
-        for (const steerEntry of steerEntriesAfterAssistantSegments) {
-          flushWholeRawItemSteersBefore(steerEntry.entry.id);
-          events.push(createSteerRenderEvent(steerEntry.entry));
-        }
-        flushRemainingWholeRawItemSteers();
-
-        continue;
-      }
-
-      for (const steerEntry of steerEntriesAfterAssistantSegments) {
-        const anchoredText = steerEntry.anchor.text;
-        const nextSegmentText = anchoredText.slice(consumedTextLength);
-        if (nextSegmentText.length > 0) {
-          events.push(
-            ...projectItemsToRenderEvents({
-              turnId: turn.id,
-              items: [
-                buildRenderedAssistantItemSegment({
-                  item: assistantItem,
-                  startOffset: consumedTextLength,
-                  text: nextSegmentText,
-                }),
-              ],
-            }),
-          );
-        }
-
-        flushWholeRawItemSteersBefore(steerEntry.entry.id);
-        events.push(createSteerRenderEvent(steerEntry.entry));
-        consumedTextLength = anchoredText.length;
-      }
-
-      const trailingAssistantText = assistantItem.text.slice(consumedTextLength);
-      if (trailingAssistantText.length > 0) {
-        events.push(
-          ...projectItemsToRenderEvents({
-            turnId: turn.id,
-            items: [
-              buildRenderedAssistantItemSegment({
-                item: assistantItem,
-                startOffset: consumedTextLength,
-                text: trailingAssistantText,
-              }),
-            ],
-          }),
-        );
-      }
-
-      const nonAssistantItems = normalizedItemsForRawItem.filter(
+      const siblingItems = normalizedItemsForRawItem.filter(
         (item) => item.id !== assistantItem.id && item.kind !== "assistant-message",
       );
-      if (nonAssistantItems.length > 0) {
-        events.push(
-          ...projectItemsToRenderEvents({
-            turnId: turn.id,
-            items: nonAssistantItems,
-          }),
-        );
-      }
-
-      flushRemainingWholeRawItemSteers();
+      appendAssistantItemEntries({
+        entries,
+        turnId: turn.id,
+        assistantItem,
+        siblingItems,
+        steerEntriesAfterAssistantText: steerEntriesAfterAssistantSegments,
+        steerEntriesAfterWholeRawItem,
+        steerOrderIndexByEntryId,
+      });
       continue;
     }
 
     bufferedItems.push(...normalizedItemsForRawItem);
     if (steerEntriesAfterWholeRawItem.length > 0) {
       flushBufferedItems();
-      events.push(
-        ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
-          createSteerRenderEvent(steerEntry.entry),
-        ),
-      );
+      entries.push(...steerEntriesAfterWholeRawItem.map((steerEntry) => steerEntry.entry));
     }
   }
 
@@ -1097,19 +1003,18 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
   }
 
   if (turn.planSnapshot !== null) {
-    events.push({
-      kind: "plan",
-      entry: buildPlanEntry({
+    entries.push(
+      buildPlanEntry({
         id: `${turn.id}:plan-snapshot`,
         turnId: turn.id,
         text: null,
         status: turn.status === "inProgress" ? "streaming" : "completed",
         planSnapshot: turn.planSnapshot,
       }),
-    });
+    );
   }
 
-  return events;
+  return entries;
 }
 
 function buildEntries(input: {
@@ -1124,7 +1029,7 @@ function buildEntries(input: {
       continue;
     }
 
-    entries.push(...flattenTurnRenderEvents(buildTurnRenderEvents(turn)));
+    entries.push(...buildTurnEntries(turn));
   }
 
   return entries;
