@@ -5,6 +5,7 @@ export const AutomationWebhookTargetSchema = z
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
+    primaryRepositoryId: z.string().min(1).nullable(),
   })
   .strict();
 

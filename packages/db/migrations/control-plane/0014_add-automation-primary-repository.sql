@@ -1,0 +1,1 @@
+ALTER TABLE "control_plane"."automation_targets" ADD COLUMN "primary_repository_id" text;

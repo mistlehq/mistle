@@ -8,6 +8,7 @@ import {
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
+import { assertPrimaryRepositoryReferenceOrThrow } from "./assert-primary-repository-reference-or-throw.js";
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
@@ -33,6 +34,7 @@ export type UpdateWebhookAutomationInput = {
     | {
         sandboxProfileId?: string | undefined;
         sandboxProfileVersion?: number | undefined;
+        primaryRepositoryId?: string | null | undefined;
       }
     | undefined;
 };
@@ -66,6 +68,10 @@ export async function updateAutomationWebhook(
     input.target?.sandboxProfileVersion === undefined
       ? existingAutomation.target.sandboxProfileVersion
       : input.target.sandboxProfileVersion;
+  const primaryRepositoryId =
+    input.target?.primaryRepositoryId === undefined
+      ? existingAutomation.target.primaryRepositoryId
+      : input.target.primaryRepositoryId;
 
   const resolvedWebhookSource = await assertWebhookSourceReferenceOrThrow(
     { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
@@ -93,6 +99,15 @@ export async function updateAutomationWebhook(
       integrationConnectionId: resolvedWebhookSource.integrationConnectionId,
     },
   );
+  await assertPrimaryRepositoryReferenceOrThrow(
+    { db: ctx.db },
+    {
+      organizationId: input.organizationId,
+      sandboxProfileId,
+      sandboxProfileVersion: resolvedSandboxProfileVersion,
+      primaryRepositoryId,
+    },
+  );
 
   return ctx.db.transaction(async (tx) => {
     await updateAutomationBaseRow(tx, input);
@@ -108,6 +123,7 @@ export async function updateAutomationWebhook(
         : {
             sandboxProfileId,
             sandboxProfileVersion: resolvedSandboxProfileVersion,
+            primaryRepositoryId,
           },
     );
 
@@ -198,6 +214,7 @@ async function updateAutomationTargetRow(
     | {
         sandboxProfileId: string;
         sandboxProfileVersion: number;
+        primaryRepositoryId: string | null;
       }
     | undefined,
 ): Promise<void> {
@@ -210,6 +227,7 @@ async function updateAutomationTargetRow(
     .set({
       sandboxProfileId: nextTarget.sandboxProfileId,
       sandboxProfileVersion: nextTarget.sandboxProfileVersion,
+      primaryRepositoryId: nextTarget.primaryRepositoryId,
       updatedAt: sql`now()`,
     })
     .where(eq(automationTargets.id, automationTargetId));

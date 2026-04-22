@@ -312,6 +312,10 @@
                       "sandboxProfileVersion": {
                         "type": "integer",
                         "minimum": 1
+                      },
+                      "primaryRepositoryId": {
+                        "type": ["string", "null"],
+                        "minLength": 1
                       }
                     },
                     "required": ["sandboxProfileId"],
@@ -398,9 +402,18 @@
                         "sandboxProfileVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
-                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
                       "additionalProperties": false
                     },
                     "createdAt": {
@@ -448,7 +461,8 @@
                             "INVALID_WEBHOOK_SOURCE_REFERENCE",
                             "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
-                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE",
+                            "INVALID_PRIMARY_REPOSITORY"
                           ]
                         },
                         "message": {
@@ -609,9 +623,18 @@
                         "sandboxProfileVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
-                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
                       "additionalProperties": false
                     },
                     "createdAt": {
@@ -804,6 +827,10 @@
                       "sandboxProfileVersion": {
                         "type": "integer",
                         "minimum": 1
+                      },
+                      "primaryRepositoryId": {
+                        "type": ["string", "null"],
+                        "minLength": 1
                       }
                     },
                     "additionalProperties": false
@@ -882,9 +909,18 @@
                         "sandboxProfileVersion": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
-                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
                       "additionalProperties": false
                     },
                     "createdAt": {
@@ -932,7 +968,8 @@
                             "INVALID_WEBHOOK_SOURCE_REFERENCE",
                             "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
                             "INVALID_SANDBOX_PROFILE_REFERENCE",
-                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                            "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE",
+                            "INVALID_PRIMARY_REPOSITORY"
                           ]
                         },
                         "message": {

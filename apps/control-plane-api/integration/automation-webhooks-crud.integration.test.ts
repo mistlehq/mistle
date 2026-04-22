@@ -125,6 +125,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(body.instructions).toBe("Prefer concise triage summaries.");
     expect(body.target.sandboxProfileId).toBe("sbp_webhook_create_001");
     expect(body.target.sandboxProfileVersion).toBe(3);
+    expect(body.target.primaryRepositoryId).toBeNull();
 
     const persistedAutomation = await fixture.db.query.automations.findFirst({
       where: (table, { eq }) => eq(table.id, body.id),
@@ -165,6 +166,80 @@ describe("automation webhooks CRUD integration", () => {
     }
     expect(persistedTarget.sandboxProfileId).toBe("sbp_webhook_create_001");
     expect(persistedTarget.sandboxProfileVersion).toBe(3);
+    expect(persistedTarget.primaryRepositoryId).toBeNull();
+  });
+
+  it("creates a webhook automation aggregate with a persisted primary repository selection", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-create-primary-repository@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_create_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_create_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_create_primary_repo_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_create_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_create_primary_repo_001",
+      version: 3,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_create_primary_repo_001",
+      version: 3,
+      connectionId: "icn_webhook_create_primary_repo_001",
+    });
+    await insertSandboxProfileGitBinding(fixture, {
+      profileId: "sbp_webhook_create_primary_repo_001",
+      version: 3,
+      connectionId: "icn_webhook_create_primary_repo_001",
+      repositories: ["mistlehq/mistle", "mistlehq/platform"],
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub repo scoped triage",
+        enabled: true,
+        integrationWebhookSourceId: "iws_webhook_create_primary_repo_001",
+        eventTypes: ["issue_comment.created"],
+        inputTemplate: "Handle {{payload.comment.body}}",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_create_primary_repo_001",
+          sandboxProfileVersion: 3,
+          primaryRepositoryId: "mistlehq/platform",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = AutomationWebhookSchema.parse(await response.json());
+    expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
+
+    const persistedTarget = await fixture.db.query.automationTargets.findFirst({
+      where: (table, { eq }) => eq(table.automationId, body.id),
+    });
+    if (persistedTarget === undefined) {
+      throw new Error("Expected automation target row to exist.");
+    }
+    expect(persistedTarget.primaryRepositoryId).toBe("mistlehq/platform");
   });
 
   it("persists the latest sandbox profile version when webhook target version is omitted", async ({
@@ -228,6 +303,7 @@ describe("automation webhooks CRUD integration", () => {
     const body = AutomationWebhookSchema.parse(await response.json());
     expect(body.instructions).toBeNull();
     expect(body.target.sandboxProfileVersion).toBe(5);
+    expect(body.target.primaryRepositoryId).toBeNull();
 
     const persistedTarget = await fixture.db.query.automationTargets.findFirst({
       where: (table, { eq }) => eq(table.automationId, body.id),
@@ -236,6 +312,7 @@ describe("automation webhooks CRUD integration", () => {
       throw new Error("Expected automation target row to exist.");
     }
     expect(persistedTarget.sandboxProfileVersion).toBe(5);
+    expect(persistedTarget.primaryRepositoryId).toBeNull();
   });
 
   it("lists webhook automations with keyset pagination scoped to the active organization", async ({
@@ -839,6 +916,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(getBody.integrationWebhookSourceId).toBe("iws_webhook_update_001");
     expect(getBody.instructions).toBe("Prefer deterministic reproduction steps.");
     expect(getBody.target.sandboxProfileVersion).toBe(7);
+    expect(getBody.target.primaryRepositoryId).toBeNull();
 
     const patchResponse = await fixture.request("/v1/automations/webhooks/atm_webhook_update_001", {
       method: "PATCH",
@@ -865,6 +943,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(patchBody.instructions).toBeNull();
     expect(patchBody.idempotencyKeyTemplate).toBeNull();
     expect(patchBody.target.sandboxProfileVersion).toBe(7);
+    expect(patchBody.target.primaryRepositoryId).toBeNull();
     expect(patchBody.updatedAt).not.toBe("2026-02-05T00:00:00.000Z");
 
     const persistedWebhook = await fixture.db.query.webhookAutomations.findFirst({
@@ -885,6 +964,116 @@ describe("automation webhooks CRUD integration", () => {
       throw new Error("Expected updated automation target row.");
     }
     expect(persistedTarget.sandboxProfileVersion).toBe(7);
+    expect(persistedTarget.primaryRepositoryId).toBeNull();
+  });
+
+  it("updates a webhook automation target to set and clear the primary repository selection", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-update-primary-repository@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_update_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_update_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_update_primary_repo_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_update_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_update_primary_repo_001",
+      version: 4,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_update_primary_repo_001",
+      version: 4,
+      connectionId: "icn_webhook_update_primary_repo_001",
+    });
+    await insertSandboxProfileGitBinding(fixture, {
+      profileId: "sbp_webhook_update_primary_repo_001",
+      version: 4,
+      connectionId: "icn_webhook_update_primary_repo_001",
+      repositories: ["mistlehq/mistle", "mistlehq/platform"],
+    });
+
+    await fixture.db.insert(automations).values({
+      id: "atm_webhook_update_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "Primary repo update",
+      enabled: true,
+    });
+    await fixture.db.insert(webhookAutomations).values({
+      ...createPersistedWebhookAutomationConfig(
+        "atm_webhook_update_primary_repo_001",
+        "iws_webhook_update_primary_repo_001",
+      ),
+    });
+    await fixture.db.insert(automationTargets).values({
+      ...createPersistedAutomationTarget(
+        "atg_webhook_update_primary_repo_001",
+        "atm_webhook_update_primary_repo_001",
+        "sbp_webhook_update_primary_repo_001",
+        4,
+      ),
+      primaryRepositoryId: null,
+    });
+
+    const setResponse = await fixture.request(
+      "/v1/automations/webhooks/atm_webhook_update_primary_repo_001",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          target: {
+            primaryRepositoryId: "mistlehq/platform",
+          },
+        }),
+      },
+    );
+    expect(setResponse.status).toBe(200);
+    const setBody = AutomationWebhookSchema.parse(await setResponse.json());
+    expect(setBody.target.primaryRepositoryId).toBe("mistlehq/platform");
+
+    const clearResponse = await fixture.request(
+      "/v1/automations/webhooks/atm_webhook_update_primary_repo_001",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          target: {
+            primaryRepositoryId: null,
+          },
+        }),
+      },
+    );
+    expect(clearResponse.status).toBe(200);
+    const clearBody = AutomationWebhookSchema.parse(await clearResponse.json());
+    expect(clearBody.target.primaryRepositoryId).toBeNull();
+
+    const persistedTarget = await fixture.db.query.automationTargets.findFirst({
+      where: (table, { eq }) => eq(table.id, "atg_webhook_update_primary_repo_001"),
+    });
+    if (persistedTarget === undefined) {
+      throw new Error("Expected updated automation target row.");
+    }
+    expect(persistedTarget.primaryRepositoryId).toBeNull();
   });
 
   it("deletes a webhook automation aggregate and cascades child rows", async ({ fixture }) => {
@@ -1052,6 +1241,70 @@ describe("automation webhooks CRUD integration", () => {
     expect(response.status).toBe(400);
     const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE");
+  });
+
+  it("returns 400 when creating a webhook automation with an unavailable primary repository", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-webhooks-invalid-primary-repository@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await insertIntegrationConnection(fixture, {
+      id: "icn_webhook_invalid_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertIntegrationWebhookSource(fixture, {
+      id: "iws_webhook_invalid_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+      connectionId: "icn_webhook_invalid_primary_repo_001",
+      targetKey: GitHubTarget.targetKey,
+    });
+    await insertSandboxProfile(fixture, {
+      id: "sbp_webhook_invalid_primary_repo_001",
+      organizationId: authenticatedSession.organizationId,
+    });
+    await insertSandboxProfileVersion(fixture, {
+      profileId: "sbp_webhook_invalid_primary_repo_001",
+      version: 1,
+    });
+    await insertSandboxProfileBinding(fixture, {
+      profileId: "sbp_webhook_invalid_primary_repo_001",
+      version: 1,
+      connectionId: "icn_webhook_invalid_primary_repo_001",
+    });
+    await insertSandboxProfileGitBinding(fixture, {
+      profileId: "sbp_webhook_invalid_primary_repo_001",
+      version: 1,
+      connectionId: "icn_webhook_invalid_primary_repo_001",
+      repositories: ["mistlehq/mistle"],
+    });
+
+    const response = await fixture.request("/v1/automations/webhooks", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "GitHub issue triage",
+        integrationWebhookSourceId: "iws_webhook_invalid_primary_repo_001",
+        eventTypes: ["issue_comment.created"],
+        inputTemplate: "Handle payload",
+        conversationKeyTemplate: "{{payload.issue.node_id}}",
+        target: {
+          sandboxProfileId: "sbp_webhook_invalid_primary_repo_001",
+          sandboxProfileVersion: 1,
+          primaryRepositoryId: "mistlehq/platform",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const body = CreateAutomationWebhookBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INVALID_PRIMARY_REPOSITORY");
   });
 
   it("returns 400 when creating a webhook automation with a non-event-scoped payload filter", async ({
@@ -1371,6 +1624,28 @@ async function insertSandboxProfileBinding(
     connectionId: input.connectionId,
     kind: IntegrationBindingKinds.CONNECTOR,
     config: {},
+    createdAt: "2026-02-01T00:00:00.000Z",
+    updatedAt: "2026-02-01T00:00:00.000Z",
+  });
+}
+
+async function insertSandboxProfileGitBinding(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    profileId: string;
+    version: number;
+    connectionId: string;
+    repositories: string[];
+  },
+) {
+  await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.version,
+    connectionId: input.connectionId,
+    kind: IntegrationBindingKinds.GIT,
+    config: {
+      repositories: input.repositories,
+    },
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
   });

@@ -504,6 +504,7 @@ export interface paths {
               [key: string]: unknown;
             } | null;
             target: {
+              primaryRepositoryId?: string | null;
               sandboxProfileId: string;
               sandboxProfileVersion?: number;
             };
@@ -535,6 +536,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                primaryRepositoryId: string | null;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
               };
@@ -555,7 +557,8 @@ export interface paths {
                     | "INVALID_WEBHOOK_SOURCE_REFERENCE"
                     | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
                   message: string;
                 }
               | {
@@ -641,6 +644,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                primaryRepositoryId: string | null;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
               };
@@ -806,6 +810,7 @@ export interface paths {
               [key: string]: unknown;
             } | null;
             target?: {
+              primaryRepositoryId?: string | null;
               sandboxProfileId?: string;
               sandboxProfileVersion?: number;
             };
@@ -837,6 +842,7 @@ export interface paths {
               } | null;
               target: {
                 id: string;
+                primaryRepositoryId: string | null;
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
               };
@@ -857,7 +863,8 @@ export interface paths {
                     | "INVALID_WEBHOOK_SOURCE_REFERENCE"
                     | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
                     | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE";
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
                   message: string;
                 }
               | {

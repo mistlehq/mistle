@@ -21,6 +21,7 @@ export const CreateAutomationWebhookBodySchema = z
       .object({
         sandboxProfileId: z.string().min(1),
         sandboxProfileVersion: z.number().int().min(1).optional(),
+        primaryRepositoryId: z.string().min(1).nullable().optional(),
       })
       .strict(),
   })
@@ -31,6 +32,7 @@ const CreateAutomationWebhookBadRequestCodeSchema = z.enum([
   AutomationWebhooksBadRequestCodes.WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE,
   AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
   AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
+  AutomationWebhooksBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
 ]);
 
 export const CreateAutomationWebhookBadRequestResponseSchema = z.union([

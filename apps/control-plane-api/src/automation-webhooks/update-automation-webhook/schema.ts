@@ -21,11 +21,14 @@ export const UpdateAutomationWebhookBodySchema = z
       .object({
         sandboxProfileId: z.string().min(1).optional(),
         sandboxProfileVersion: z.number().int().min(1).optional(),
+        primaryRepositoryId: z.string().min(1).nullable().optional(),
       })
       .strict()
       .refine(
         (value) =>
-          value.sandboxProfileId !== undefined || value.sandboxProfileVersion !== undefined,
+          value.sandboxProfileId !== undefined ||
+          value.sandboxProfileVersion !== undefined ||
+          value.primaryRepositoryId !== undefined,
         {
           message: "At least one target field must be provided.",
         },
@@ -57,6 +60,7 @@ export const UpdateAutomationWebhookBadRequestResponseSchema = z.union([
       AutomationWebhooksBadRequestCodes.WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE,
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
+      AutomationWebhooksBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
     ]),
   ),
   ValidationErrorResponseSchema,

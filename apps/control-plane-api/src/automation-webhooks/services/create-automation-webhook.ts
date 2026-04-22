@@ -8,6 +8,7 @@ import {
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
+import { assertPrimaryRepositoryReferenceOrThrow } from "./assert-primary-repository-reference-or-throw.js";
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
@@ -31,6 +32,7 @@ export type CreateWebhookAutomationInput = {
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion?: number | undefined;
+    primaryRepositoryId?: string | null | undefined;
   };
 };
 
@@ -38,6 +40,7 @@ type CreateWebhookAutomationPersistenceInput = Omit<CreateWebhookAutomationInput
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion: number;
+    primaryRepositoryId: string | null;
   };
 };
 
@@ -76,6 +79,15 @@ export async function createAutomationWebhook(
       integrationConnectionId: resolvedWebhookSource.integrationConnectionId,
     },
   );
+  await assertPrimaryRepositoryReferenceOrThrow(
+    { db: ctx.db },
+    {
+      organizationId: input.organizationId,
+      sandboxProfileId: input.target.sandboxProfileId,
+      sandboxProfileVersion,
+      primaryRepositoryId: input.target.primaryRepositoryId ?? null,
+    },
+  );
 
   return ctx.db.transaction(async (tx) => {
     const automation = await createAutomationAggregate(tx, {
@@ -84,6 +96,7 @@ export async function createAutomationWebhook(
       target: {
         sandboxProfileId: input.target.sandboxProfileId,
         sandboxProfileVersion,
+        primaryRepositoryId: input.target.primaryRepositoryId ?? null,
       },
     });
     return loadWebhookAutomationAggregateOrThrow(
@@ -133,6 +146,7 @@ async function createAutomationAggregate(
     automationId: insertedAutomation.id,
     sandboxProfileId: input.target.sandboxProfileId,
     sandboxProfileVersion: input.target.sandboxProfileVersion,
+    primaryRepositoryId: input.target.primaryRepositoryId,
   });
 
   return insertedAutomation;

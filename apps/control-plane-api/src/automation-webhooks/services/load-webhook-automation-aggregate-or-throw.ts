@@ -22,6 +22,7 @@ export type AutomationWebhookAggregate = {
     id: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
+    primaryRepositoryId: string | null;
   };
 };
 
@@ -85,6 +86,7 @@ export async function loadWebhookAutomationAggregateOrThrow(
       id: target.id,
       sandboxProfileId: target.sandboxProfileId,
       sandboxProfileVersion: target.sandboxProfileVersion,
+      primaryRepositoryId: target.primaryRepositoryId,
     },
   };
 }
