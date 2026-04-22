@@ -54,10 +54,14 @@ export function AppShell(): React.JSX.Element {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [switchOrganizationError, setSwitchOrganizationError] = useState<string | null>(null);
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
-  const [showSessionsSidebar, setShowSessionsSidebar] = useState(() =>
-    readSessionsSidebarEnabledPreference(location.pathname),
+  const [sessionsSidebarPreferenceEnabled, setSessionsSidebarPreferenceEnabled] = useState(() =>
+    readSessionsSidebarEnabledPreference(),
   );
   const routeState = resolveAppShellRouteState(location.pathname);
+  const showSessionsSidebar = resolveSessionsSidebarModeEnabled({
+    pathname: location.pathname,
+    persistedEnabled: sessionsSidebarPreferenceEnabled,
+  });
 
   useEffect(() => {
     if (!routeState.inSettings) {
@@ -66,17 +70,31 @@ export function AppShell(): React.JSX.Element {
   }, [location.pathname, routeState.inSettings]);
 
   useEffect(() => {
-    persistSessionsSidebarEnabledPreference(showSessionsSidebar);
-  }, [showSessionsSidebar]);
+    persistSessionsSidebarEnabledPreference(sessionsSidebarPreferenceEnabled);
+  }, [sessionsSidebarPreferenceEnabled]);
 
   useEffect(() => {
-    if (showSessionsSidebar && !routeState.inSessions) {
+    const currentLocationHref = resolveLocationHref({
+      pathname: location.pathname,
+      search: location.search,
+      hash: location.hash,
+    });
+
+    if (
+      sessionsSidebarPreferenceEnabled &&
+      !routeState.inSessions &&
+      previousSessionsSidebarToggleUrlRef.current !== null &&
+      previousSessionsSidebarToggleUrlRef.current !== currentLocationHref
+    ) {
       previousSessionsSidebarToggleUrlRef.current = null;
-      clearSessionsSidebarEnabledPreference();
-      setShowSessionsSidebar(false);
-      return;
     }
-  }, [location.pathname, routeState.inSessions, showSessionsSidebar]);
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    routeState.inSessions,
+    sessionsSidebarPreferenceEnabled,
+  ]);
 
   const organizationOptionsQuery = useQuery({
     queryKey: ORGANIZATION_SWITCHER_QUERY_KEY,
@@ -146,7 +164,7 @@ export function AppShell(): React.JSX.Element {
       hash: location.hash,
     });
 
-    setShowSessionsSidebar(nextChecked);
+    setSessionsSidebarPreferenceEnabled(nextChecked);
 
     if (!nextChecked) {
       const navigationTarget = resolveSidebarModeDisableNavigationTarget({
@@ -234,17 +252,14 @@ export function AppShell(): React.JSX.Element {
   );
 }
 
-function readSessionsSidebarEnabledPreference(pathname: string): boolean {
+function readSessionsSidebarEnabledPreference(): boolean {
   const storage = getBestEffortBrowserStorage("local");
   const storedValue = readBrowserStorageItem({
     key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
     storage,
   });
 
-  return resolveSessionsSidebarModeEnabled({
-    pathname,
-    persistedEnabled: storedValue === "true",
-  });
+  return storedValue === "true";
 }
 
 function persistSessionsSidebarEnabledPreference(enabled: boolean): void {
@@ -260,14 +275,6 @@ function persistSessionsSidebarEnabledPreference(enabled: boolean): void {
   writeBrowserStorageItem({
     key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
     value: "true",
-    storage,
-  });
-}
-
-function clearSessionsSidebarEnabledPreference(): void {
-  const storage = getBestEffortBrowserStorage("local");
-  removeBrowserStorageItem({
-    key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
     storage,
   });
 }
