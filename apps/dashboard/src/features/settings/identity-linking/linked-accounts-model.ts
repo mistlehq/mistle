@@ -17,7 +17,6 @@ export type LinkedAccountEmailOptionViewModel = {
 export type LinkedAccountEmailPreferenceViewModel = {
   selectedEmail: string;
   options: readonly LinkedAccountEmailOptionViewModel[];
-  helperText: string;
 };
 
 export type LinkedAccountCommitSigningViewModel = {
@@ -251,7 +250,6 @@ function resolveLinkedAccountEmailPreferenceViewModel(
     return {
       selectedEmail: "",
       options: [],
-      helperText: "",
     };
   }
 
@@ -261,7 +259,6 @@ function resolveLinkedAccountEmailPreferenceViewModel(
     return {
       selectedEmail: "",
       options: [],
-      helperText: "",
     };
   }
 
@@ -299,14 +296,12 @@ function resolveLinkedAccountEmailPreferenceViewModel(
     return {
       selectedEmail: "",
       options: [],
-      helperText: "",
     };
   }
 
   return {
     selectedEmail: preferredEmail,
     options,
-    helperText: "Used for sandbox Git identity and commit signing.",
   };
 }
 

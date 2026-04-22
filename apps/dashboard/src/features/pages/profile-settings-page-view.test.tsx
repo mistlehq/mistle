@@ -187,7 +187,6 @@ describe("ProfileSettingsPageView", () => {
                   label: "engineering@example.com",
                 },
               ],
-              helperText: "Used for sandbox Git identity and commit signing.",
             },
             commitSigning: {
               statusLabel: "Add private key",
@@ -227,7 +226,6 @@ describe("ProfileSettingsPageView", () => {
             emailPreference: {
               selectedEmail: "",
               options: [],
-              helperText: "",
             },
             commitSigning: {
               statusLabel: "Add private key",
@@ -433,7 +431,6 @@ describe("ProfileSettingsPageView", () => {
                   label: "engineering@example.com",
                 },
               ],
-              helperText: "Used for sandbox Git identity and commit signing.",
             },
             commitSigning: {
               statusLabel: "Private key added",
@@ -487,7 +484,6 @@ describe("ProfileSettingsPageView", () => {
                   label: "engineering@example.com",
                 },
               ],
-              helperText: "Used for sandbox Git identity and commit signing.",
             },
             commitSigning: null,
             primaryActionLabel: null,
@@ -608,5 +604,102 @@ describe("ProfileSettingsPageView", () => {
     await waitFor(() => {
       expect(uploadedFiles).toEqual([uploadFile]);
     });
+  });
+
+  it("shows a dialog error when a pasted GitHub commit signing key upload fails", async () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: null,
+            commitSigning: {
+              statusLabel: "Add private key",
+              keySummaryLabel: null,
+              helperLabel: null,
+              helperCommand: null,
+              uploadActionLabel: "Upload private key",
+              removeActionLabel: null,
+            },
+            primaryActionLabel: null,
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+        onUploadLinkedAccountCommitSigningKey={async () => {
+          throw new Error("Invalid private key.");
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+    fireEvent.change(screen.getByPlaceholderText("Paste your SSH private key"), {
+      target: {
+        value: "-----BEGIN OPENSSH PRIVATE KEY-----\ninvalid\n-----END OPENSSH PRIVATE KEY-----\n",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Upload private key" }));
+
+    expect(await screen.findByText("Invalid private key.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("shows a dialog error when a file-based GitHub commit signing key upload fails", async () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: null,
+            commitSigning: {
+              statusLabel: "Add private key",
+              keySummaryLabel: null,
+              helperLabel: null,
+              helperCommand: null,
+              uploadActionLabel: "Upload private key",
+              removeActionLabel: null,
+            },
+            primaryActionLabel: null,
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+        onUploadLinkedAccountCommitSigningKey={async () => {
+          throw new Error("Upload failed.");
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+
+    const uploadInput = screen.getByLabelText("Choose GitHub commit signing private key file", {
+      selector: "input",
+    });
+    const uploadFile = new File(["bad"], "bad-key", {
+      type: "application/octet-stream",
+    });
+
+    fireEvent.change(uploadInput, {
+      target: {
+        files: [uploadFile],
+      },
+    });
+
+    expect(await screen.findByText("Upload failed.")).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });

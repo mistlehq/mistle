@@ -25,7 +25,6 @@ export const GitHubLinkedWithConfiguredSigningCard = {
         label: "engineering@example.com",
       },
     ],
-    helperText: "Used for sandbox Git identity and commit signing.",
   },
   commitSigning: {
     statusLabel: "Private key added",
@@ -81,7 +80,6 @@ export const GitHubLinkedWithoutSelectableEmailsCard = {
   emailPreference: {
     selectedEmail: "",
     options: [],
-    helperText: "",
   },
   commitSigning: {
     statusLabel: "Add private key",
@@ -116,7 +114,6 @@ export const GitHubLinkedWithSigningNotConfiguredCard = {
         label: "engineering@example.com",
       },
     ],
-    helperText: "Used for sandbox Git identity and commit signing.",
   },
   commitSigning: {
     statusLabel: "Add private key",

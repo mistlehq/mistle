@@ -26,6 +26,7 @@ import type {
   LinkedAccountCallbackNotice,
   LinkedAccountCardViewModel,
 } from "../settings/identity-linking/linked-accounts-model.js";
+import { getErrorMessage } from "../shared/auto-save-behavior.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SettingsImageField } from "../shared/settings-image-field.js";
 
@@ -242,6 +243,9 @@ function LinkedAccountCard(input: {
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
   const [pastedCommitSigningKey, setPastedCommitSigningKey] = useState("");
+  const [commitSigningDialogErrorMessage, setCommitSigningDialogErrorMessage] = useState<
+    string | null
+  >(null);
 
   function closeCommitSigningDialog(): void {
     if (input.linkedAccountActionPending) {
@@ -250,12 +254,26 @@ function LinkedAccountCard(input: {
 
     setIsCommitSigningDialogOpen(false);
     setPastedCommitSigningKey("");
+    setCommitSigningDialogErrorMessage(null);
+  }
+
+  function openCommitSigningDialog(): void {
+    setCommitSigningDialogErrorMessage(null);
+    setIsCommitSigningDialogOpen(true);
   }
 
   async function uploadCommitSigningKeyFile(file: File): Promise<void> {
-    await input.onUploadLinkedAccountCommitSigningKey(input.linkedAccountCard.providerFamily, file);
-    setIsCommitSigningDialogOpen(false);
-    setPastedCommitSigningKey("");
+    try {
+      await input.onUploadLinkedAccountCommitSigningKey(
+        input.linkedAccountCard.providerFamily,
+        file,
+      );
+      setIsCommitSigningDialogOpen(false);
+      setPastedCommitSigningKey("");
+      setCommitSigningDialogErrorMessage(null);
+    } catch (error) {
+      setCommitSigningDialogErrorMessage(getErrorMessage(error));
+    }
   }
 
   async function handleCommitSigningDialogSubmit(
@@ -268,13 +286,11 @@ function LinkedAccountCard(input: {
       return;
     }
 
-    try {
-      await uploadCommitSigningKeyFile(
-        new File([normalizedPrivateKey], "my-signing-key", {
-          type: "text/plain",
-        }),
-      );
-    } catch {}
+    await uploadCommitSigningKeyFile(
+      new File([normalizedPrivateKey], "my-signing-key", {
+        type: "text/plain",
+      }),
+    );
   }
 
   return (
@@ -385,7 +401,7 @@ function LinkedAccountCard(input: {
                     <Button
                       disabled={input.linkedAccountActionPending}
                       onClick={() => {
-                        setIsCommitSigningDialogOpen(true);
+                        openCommitSigningDialog();
                       }}
                       size="sm"
                       type="button"
@@ -424,7 +440,7 @@ function LinkedAccountCard(input: {
                         aria-label={commitSigning.uploadActionLabel}
                         disabled={input.linkedAccountActionPending}
                         onClick={() => {
-                          setIsCommitSigningDialogOpen(true);
+                          openCommitSigningDialog();
                         }}
                         size="icon-sm"
                         type="button"
@@ -493,6 +509,7 @@ function LinkedAccountCard(input: {
                 <Textarea
                   className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs"
                   onChange={(event) => {
+                    setCommitSigningDialogErrorMessage(null);
                     setPastedCommitSigningKey(event.currentTarget.value);
                   }}
                   placeholder="Paste your SSH private key"
@@ -500,6 +517,9 @@ function LinkedAccountCard(input: {
                   value={pastedCommitSigningKey}
                   wrap="soft"
                 />
+                {commitSigningDialogErrorMessage === null ? null : (
+                  <Notice variant="alert">{commitSigningDialogErrorMessage}</Notice>
+                )}
                 <div className="flex flex-col gap-2">
                   <p className="text-xs text-muted-foreground">Or choose a private key file</p>
                   <input
@@ -513,7 +533,8 @@ function LinkedAccountCard(input: {
                         return;
                       }
 
-                      void uploadCommitSigningKeyFile(selectedFile).catch(() => undefined);
+                      setCommitSigningDialogErrorMessage(null);
+                      void uploadCommitSigningKeyFile(selectedFile);
                     }}
                     type="file"
                   />

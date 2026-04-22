@@ -109,7 +109,6 @@ describe("linked-accounts-model", () => {
       emailPreference: {
         selectedEmail: "",
         options: [],
-        helperText: "",
       },
       commitSigning: {
         statusLabel: "Add private key",
@@ -342,7 +341,6 @@ describe("linked-accounts-model", () => {
             label: "engineering@example.com",
           },
         ],
-        helperText: "Used for sandbox Git identity and commit signing.",
       },
     });
   });

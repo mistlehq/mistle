@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
@@ -60,5 +61,26 @@ export const LinkedSigningNotConfigured: Story = {
 export const DisabledButStillLinked: Story = {
   args: {
     linkedAccountCards: [GitHubDisabledButStillLinkedCard],
+  },
+};
+
+export const SigningUploadFailureDialog: Story = {
+  args: {
+    linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],
+    onUploadLinkedAccountCommitSigningKey: async () => {
+      throw new Error("Invalid private key.");
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Add private key" }));
+    await userEvent.type(
+      canvas.getByPlaceholderText("Paste your SSH private key"),
+      "-----BEGIN OPENSSH PRIVATE KEY-----\ninvalid\n-----END OPENSSH PRIVATE KEY-----\n",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Upload private key" }));
+
+    await expect(canvas.getByText("Invalid private key.")).toBeTruthy();
   },
 };
