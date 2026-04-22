@@ -175,7 +175,12 @@ function renderExpandedResourceSection(
   }
 
   if (resource.syncState === "never-synced") {
-    return null;
+    return renderExpandedResourceItems({
+      errorMessage: null,
+      isLoading: false,
+      items: [],
+      kind: resource.kind,
+    });
   }
 
   if (resourceItems !== null) {

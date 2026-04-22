@@ -381,23 +381,23 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("mistle/dashboard")).toBeTruthy();
   });
 
-  it("suppresses expanded item states for never-synced resources", () => {
+  it("shows an empty state instead of item substate for never-synced resources", () => {
     renderNeverSyncedResourceDetail({ isLoading: false });
 
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
     expect(screen.queryByLabelText("View sync failure details")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.queryAllByText("Not synced yet")).not.toHaveLength(0);
-    expect(screen.queryByText("No items available.")).toBeNull();
+    expect(screen.getByText("No items available.")).toBeTruthy();
     expect(screen.queryByText("Loading items...")).toBeNull();
   });
 
-  it("does not show loading items for never-synced resources", () => {
+  it("does not show loading items for never-synced resources even if item data says loading", () => {
     renderNeverSyncedResourceDetail({ isLoading: true });
 
     fireEvent.click(screen.getByRole("button", { name: "Expand repository resources" }));
     expect(screen.queryByText("Loading items...")).toBeNull();
-    expect(screen.queryByText("No items available.")).toBeNull();
+    expect(screen.getByText("No items available.")).toBeTruthy();
   });
 
   it("shows a loading state instead of an empty state while resource items are loading", () => {
