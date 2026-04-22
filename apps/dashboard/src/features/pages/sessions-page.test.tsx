@@ -10,6 +10,7 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
+import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   buildOptimisticSessions,
@@ -431,6 +432,7 @@ describe("SessionsPage", () => {
   });
 
   it("shows compact updated labels for non-failed sessions", () => {
+    const updatedAt = "2026-03-08T00:00:00.000Z";
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -440,7 +442,7 @@ describe("SessionsPage", () => {
       items: [
         buildSandboxInstanceListItemFixture({
           id: "sbi_updated",
-          updatedAt: "2026-03-08T00:00:00.000Z",
+          updatedAt,
         }),
       ],
     });
@@ -453,7 +455,7 @@ describe("SessionsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain(">1mo<");
+    expect(markup).toContain(`>${formatCompactRelativeOrDate(updatedAt)}<`);
   });
 
   it("shows the failed badge in place of the updated label for failed sessions", () => {

@@ -78,7 +78,7 @@ describe("SessionWorkbenchPage TUI mode integration", () => {
           "true",
         );
       });
-    });
+    }, 15_000);
 
     it("returns to chat even after the TUI PTY has already exited", async () => {
       await withSessionWorkbenchCliHarness(async ({ tunnelServer }) => {

@@ -36,8 +36,16 @@ function readEnvironment(): z.infer<typeof EnvironmentSchema> {
   });
 }
 
+function buildControlPlaneBaseUrl(input: { host: string; port: number }): string {
+  return `http://${input.host}:${String(input.port)}`;
+}
+
 async function main(): Promise<void> {
   const env = readEnvironment();
+  const controlPlaneBaseUrl = buildControlPlaneBaseUrl({
+    host: env.MISTLE_TEST_CONTROL_PLANE_API_HOST,
+    port: env.MISTLE_TEST_CONTROL_PLANE_API_PORT,
+  });
   const runtime = await createControlPlaneApiRuntime({
     app: {
       server: {
@@ -73,9 +81,9 @@ async function main(): Promise<void> {
         baseUrl: "http://localhost:5173",
       },
       auth: {
-        baseUrl: "http://localhost:3000",
+        baseUrl: controlPlaneBaseUrl,
         secret: "integration-auth-secret",
-        trustedOrigins: ["http://localhost:3000"],
+        trustedOrigins: [controlPlaneBaseUrl],
         otpLength: 6,
         otpExpiresInSeconds: 300,
         otpAllowedAttempts: 3,
