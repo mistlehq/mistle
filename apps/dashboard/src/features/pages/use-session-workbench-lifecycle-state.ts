@@ -129,7 +129,9 @@ export function useSessionWorkbenchLifecycleState(input: {
       });
     },
     enabled: input.sandboxInstanceId !== null,
+    refetchOnWindowFocus: false,
     retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
     refetchInterval: (query) => {
       return resolveSandboxStatusRefetchInterval({
         automationConversation: query.state.data?.automationConversation ?? null,
