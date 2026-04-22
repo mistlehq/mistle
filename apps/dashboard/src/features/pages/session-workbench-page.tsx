@@ -311,11 +311,7 @@ function SessionWorkbenchPageContent(input: {
               workbench.primaryPanelState.error.kind === "chat_restore_failed"
                 ? "Could not restore chat"
                 : "Could not start Codex TUI",
-            description:
-              workbench.primaryPanelState.error.message ??
-              (workbench.primaryPanelState.error.kind === "chat_restore_failed"
-                ? "The workbench could not reconnect chat automatically. Please try again later or contact support if the problem continues."
-                : "Could not start Codex TUI."),
+            description: workbench.primaryPanelState.error.message ?? "Could not start Codex TUI.",
           }
         : null;
   useEffect(() => {
