@@ -150,6 +150,8 @@ export function useSessionGitBranch(input: {
   sandboxInstanceId: string | null;
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
+  const isBranchTrackingEnabled =
+    input.enabled && input.sandboxInstanceId !== null && input.cwd !== null;
   const queryKey = useMemo(
     () =>
       getSessionGitBranchQueryKey({
@@ -160,7 +162,7 @@ export function useSessionGitBranch(input: {
     [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
   );
   const query = useQuery({
-    enabled: input.enabled && input.sandboxInstanceId !== null && input.cwd !== null,
+    enabled: isBranchTrackingEnabled,
     refetchOnMount: "always",
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;
@@ -189,7 +191,7 @@ export function useSessionGitBranch(input: {
     const rpcClient = input.rpcClient;
     const headWatchPath = query.data?.headWatchPath ?? null;
 
-    if (!input.enabled || rpcClient === null || headWatchPath === null) {
+    if (!isBranchTrackingEnabled || rpcClient === null || headWatchPath === null) {
       return;
     }
 
@@ -227,10 +229,11 @@ export function useSessionGitBranch(input: {
           // The session stream may already be closed during normal workbench teardown.
         });
     };
-  }, [input.enabled, input.rpcClient, query.data?.headWatchPath, queryClient, queryKey]);
+  }, [isBranchTrackingEnabled, input.rpcClient, query.data?.headWatchPath, queryClient, queryKey]);
 
   return {
-    branchLabel: input.enabled && !query.isError ? (query.data?.branchLabel ?? null) : null,
+    branchLabel:
+      isBranchTrackingEnabled && !query.isError ? (query.data?.branchLabel ?? null) : null,
   };
 }
 

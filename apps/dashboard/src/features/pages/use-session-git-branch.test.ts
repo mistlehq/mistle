@@ -20,6 +20,14 @@ function createWrapper(queryClient: QueryClient) {
   };
 }
 
+function createBranchQueryKey(): ReturnType<typeof getSessionGitBranchQueryKey> {
+  return getSessionGitBranchQueryKey({
+    connectedAtIso: "2026-04-22T00:00:00.000Z",
+    sandboxInstanceId: "sbi_test",
+    cwd: "/root/acme/repo-1",
+  });
+}
+
 describe("useSessionGitBranch helpers", () => {
   it("builds git exec requests with the selected repository cwd", () => {
     expect(
@@ -92,13 +100,10 @@ describe("useSessionGitBranch helpers", () => {
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    queryClient.setQueryData(
-      ["session-git-branch", "sbi_test", "/root/acme/repo-1", "2026-04-22T00:00:00.000Z"],
-      {
-        branchLabel: "main",
-        headWatchPath: "/root/acme/repo-1/.git/HEAD",
-      },
-    );
+    queryClient.setQueryData(createBranchQueryKey(), {
+      branchLabel: "main",
+      headWatchPath: "/root/acme/repo-1/.git/HEAD",
+    });
 
     const { result } = renderHook(
       () =>
@@ -126,13 +131,10 @@ describe("useSessionGitBranch helpers", () => {
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    queryClient.setQueryData(
-      ["session-git-branch", "sbi_test", "/root/acme/repo-1", "2026-04-22T00:00:00.000Z"],
-      {
-        branchLabel: "main",
-        headWatchPath: "/root/acme/repo-1/.git/HEAD",
-      },
-    );
+    queryClient.setQueryData(createBranchQueryKey(), {
+      branchLabel: "main",
+      headWatchPath: "/root/acme/repo-1/.git/HEAD",
+    });
 
     const { result } = renderHook(
       () =>
