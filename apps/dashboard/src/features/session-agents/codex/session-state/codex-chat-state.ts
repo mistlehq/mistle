@@ -852,6 +852,9 @@ function isAfterAssistantTextSteerEntry(
 
 function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEvent[] {
   const events: TurnRenderEvent[] = [];
+  const steerOrderIndexByEntryId = new Map(
+    turn.clientSteerEntries.map((steerEntry, index) => [steerEntry.entry.id, index]),
+  );
   const steerEntriesAtTurnStart: TurnStartSteerEntry[] = [];
   const steerEntriesAfterRawItemId = new Map<string, AfterItemSteerEntry[]>();
   const steerEntriesAfterAssistantText = new Map<string, AfterAssistantTextSteerEntry[]>();
@@ -916,6 +919,49 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
     if (assistantItem !== undefined && steerEntriesAfterAssistantSegments.length > 0) {
       flushBufferedItems();
 
+      let nextWholeRawItemSteerIndex = 0;
+      function flushWholeRawItemSteersBefore(entryId: string): void {
+        const entryOrderIndex = steerOrderIndexByEntryId.get(entryId);
+        if (entryOrderIndex === undefined) {
+          throw new Error(`Missing steer order index for entry '${entryId}'.`);
+        }
+
+        while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
+          const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
+          if (wholeRawItemSteerEntry === undefined) {
+            break;
+          }
+
+          const wholeRawItemOrderIndex = steerOrderIndexByEntryId.get(
+            wholeRawItemSteerEntry.entry.id,
+          );
+          if (wholeRawItemOrderIndex === undefined) {
+            throw new Error(
+              `Missing steer order index for entry '${wholeRawItemSteerEntry.entry.id}'.`,
+            );
+          }
+
+          if (wholeRawItemOrderIndex >= entryOrderIndex) {
+            break;
+          }
+
+          events.push(createSteerRenderEvent(wholeRawItemSteerEntry.entry));
+          nextWholeRawItemSteerIndex += 1;
+        }
+      }
+
+      function flushRemainingWholeRawItemSteers(): void {
+        while (nextWholeRawItemSteerIndex < steerEntriesAfterWholeRawItem.length) {
+          const wholeRawItemSteerEntry = steerEntriesAfterWholeRawItem[nextWholeRawItemSteerIndex];
+          if (wholeRawItemSteerEntry === undefined) {
+            break;
+          }
+
+          events.push(createSteerRenderEvent(wholeRawItemSteerEntry.entry));
+          nextWholeRawItemSteerIndex += 1;
+        }
+      }
+
       let consumedTextLength = 0;
       let canSplitAssistantItem = true;
       for (const steerEntry of steerEntriesAfterAssistantSegments) {
@@ -945,16 +991,12 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
           );
         }
 
-        events.push(
-          ...steerEntriesAfterAssistantSegments.map((steerEntry) =>
-            createSteerRenderEvent(steerEntry.entry),
-          ),
-        );
-        events.push(
-          ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
-            createSteerRenderEvent(steerEntry.entry),
-          ),
-        );
+        for (const steerEntry of steerEntriesAfterAssistantSegments) {
+          flushWholeRawItemSteersBefore(steerEntry.entry.id);
+          events.push(createSteerRenderEvent(steerEntry.entry));
+        }
+        flushRemainingWholeRawItemSteers();
+
         continue;
       }
 
@@ -976,6 +1018,7 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
           );
         }
 
+        flushWholeRawItemSteersBefore(steerEntry.entry.id);
         events.push(createSteerRenderEvent(steerEntry.entry));
         consumedTextLength = anchoredText.length;
       }
@@ -1008,11 +1051,7 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
         );
       }
 
-      events.push(
-        ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
-          createSteerRenderEvent(steerEntry.entry),
-        ),
-      );
+      flushRemainingWholeRawItemSteers();
       continue;
     }
 

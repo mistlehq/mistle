@@ -468,6 +468,109 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("preserves steer request order when one steer anchors before assistant text and a later steer anchors after text", () => {
+    const activeTurn = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "start_turn_requested",
+        clientTurnId: "pending:turn_123",
+        prompt: "Test prompt",
+      }),
+      {
+        type: "turn_started_response",
+        clientTurnId: "pending:turn_123",
+        turnId: "turn_123",
+        status: "inProgress",
+      },
+    );
+
+    const startedAssistantItem = reduceCodexChatState(activeTurn, {
+      type: "notification_received",
+      notification: {
+        method: "item/started",
+        params: {
+          turnId: "turn_123",
+          item: {
+            type: "agentMessage",
+            id: "msg_1",
+            phase: null,
+          },
+        },
+      },
+    });
+
+    const firstSteerProcessed = reduceCodexChatState(
+      reduceCodexChatState(startedAssistantItem, {
+        type: "steer_turn_requested",
+        entryId: "steer_a",
+        turnId: "turn_123",
+        prompt: "First steer",
+      }),
+      {
+        type: "steer_turn_processed",
+        entryId: "steer_a",
+        turnId: "turn_123",
+      },
+    );
+
+    const assistantText = reduceCodexChatState(firstSteerProcessed, {
+      type: "notification_received",
+      notification: {
+        method: "item/agentMessage/delta",
+        params: {
+          turnId: "turn_123",
+          itemId: "msg_1",
+          delta: "abc",
+        },
+      },
+    });
+
+    const secondSteerProcessed = reduceCodexChatState(
+      reduceCodexChatState(assistantText, {
+        type: "steer_turn_requested",
+        entryId: "steer_b",
+        turnId: "turn_123",
+        prompt: "Second steer",
+      }),
+      {
+        type: "steer_turn_processed",
+        entryId: "steer_b",
+        turnId: "turn_123",
+      },
+    );
+
+    expect(secondSteerProcessed.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "msg_1:segment:0",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "abc",
+        phase: null,
+        status: "streaming",
+      },
+      {
+        id: "steer_a",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "First steer",
+        status: "completed",
+      },
+      {
+        id: "steer_b",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Second steer",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("keeps accepted steers behind later-normalized content from the same reasoning item", () => {
     const activeTurn = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
