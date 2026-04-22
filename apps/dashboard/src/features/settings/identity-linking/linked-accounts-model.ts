@@ -132,7 +132,7 @@ export function resolveLinkedAccountCardViewModel(
       statusTone: "warning",
       accountLabel: resolveLinkedAccountLabel(linkedAccount),
       linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
-      helperMessage: `${providerDisplayName} needs to be linked again before Mistle can act as you.`,
+      helperMessage: null,
       emailPreference: null,
       commitSigning: null,
       primaryActionLabel: "Relink",
@@ -148,13 +148,10 @@ export function resolveLinkedAccountCardViewModel(
     statusTone: "active",
     accountLabel: resolveLinkedAccountLabel(linkedAccount),
     linkedAtLabel: `Linked ${formatDateTime(linkedAccount.principal.linkedAt)}`,
-    helperMessage:
-      linkedAccount.providerFamily === "github" && emailPreference === null
-        ? "GitHub has not provided selectable commit emails for this link."
-        : null,
+    helperMessage: null,
     emailPreference,
     commitSigning,
-    primaryActionLabel: "Relink",
+    primaryActionLabel: null,
     secondaryActionLabel: "Unlink",
   };
 }
@@ -175,8 +172,8 @@ function resolveLinkedAccountCommitSigningViewModel(
     return {
       statusLabel: "Not configured",
       keySummaryLabel: null,
-      helperLabel: "SSH private key",
-      helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+      helperLabel: null,
+      helperCommand: null,
       uploadActionLabel: "Upload private key",
       removeActionLabel: null,
     };
@@ -185,7 +182,7 @@ function resolveLinkedAccountCommitSigningViewModel(
   return {
     statusLabel: "Configured",
     keySummaryLabel: linkedAccount.commitSigning.publicKeyFingerprint,
-    helperLabel: "SSH private key",
+    helperLabel: null,
     helperCommand: null,
     uploadActionLabel: "Replace private key",
     removeActionLabel: "Remove key",
@@ -251,13 +248,21 @@ function resolveLinkedAccountEmailPreferenceViewModel(
 
   const profile = linkedAccount.principal.profile;
   if (profile === null) {
-    return null;
+    return {
+      selectedEmail: "",
+      options: [],
+      helperText: "",
+    };
   }
 
   const preferredEmail = profile["preferredEmail"];
   const availableEmails = profile["availableEmails"];
   if (typeof preferredEmail !== "string" || !Array.isArray(availableEmails)) {
-    return null;
+    return {
+      selectedEmail: "",
+      options: [],
+      helperText: "",
+    };
   }
 
   const options: LinkedAccountEmailOptionViewModel[] = [];
@@ -291,7 +296,11 @@ function resolveLinkedAccountEmailPreferenceViewModel(
   }
 
   if (options.length === 0 || !options.some((option) => option.value === preferredEmail)) {
-    return null;
+    return {
+      selectedEmail: "",
+      options: [],
+      helperText: "",
+    };
   }
 
   return {

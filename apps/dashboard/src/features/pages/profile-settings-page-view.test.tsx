@@ -157,7 +157,7 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.queryByRole("button", { name: "Unlink" })).toBeNull();
   });
 
-  it("renders linked GitHub account details with relink and unlink actions", () => {
+  it("renders linked GitHub account details with only the unlink action", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
@@ -188,12 +188,12 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Not configured",
               keySummaryLabel: null,
-              helperLabel: "SSH private key",
-              helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+              helperLabel: null,
+              helperCommand: null,
               uploadActionLabel: "Upload private key",
               removeActionLabel: null,
             },
-            primaryActionLabel: "Relink",
+            primaryActionLabel: null,
             secondaryActionLabel: "Unlink",
           },
         ]}
@@ -201,9 +201,51 @@ describe("ProfileSettingsPageView", () => {
     );
 
     expect(screen.getByText("@mistle-user")).toBeTruthy();
-    expect(screen.getByText("Linked Apr 19, 2026, 6:15 PM")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Relink" })).toBeTruthy();
+    expect(screen.queryByText("Linked Apr 19, 2026, 6:15 PM")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Relink" })).toBeNull();
     expect(screen.getByRole("button", { name: "Unlink" })).toBeTruthy();
+  });
+
+  it("shows commit email as none when GitHub does not provide selectable emails", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: {
+              selectedEmail: "",
+              options: [],
+              helperText: "",
+            },
+            commitSigning: {
+              statusLabel: "Not configured",
+              keySummaryLabel: null,
+              helperLabel: null,
+              helperCommand: null,
+              uploadActionLabel: "Upload private key",
+              removeActionLabel: null,
+            },
+            primaryActionLabel: null,
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Commit email")).toBeTruthy();
+    expect(screen.getByText("None")).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(
+      screen.queryByText("GitHub has not provided selectable commit emails for this link."),
+    ).toBeNull();
   });
 
   it("renders a callback notice when a linked-account result is present", () => {
@@ -256,12 +298,12 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Not configured",
               keySummaryLabel: null,
-              helperLabel: "SSH private key",
-              helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+              helperLabel: null,
+              helperCommand: null,
               uploadActionLabel: "Upload private key",
               removeActionLabel: null,
             },
-            primaryActionLabel: "Relink",
+            primaryActionLabel: null,
             secondaryActionLabel: "Unlink",
           },
           {
@@ -284,7 +326,7 @@ describe("ProfileSettingsPageView", () => {
 
     expect(screen.getByText("GitHub")).toBeTruthy();
     expect(screen.getByText("Slack")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Relink" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unlink" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Link account" })).toBeTruthy();
   });
 
@@ -360,12 +402,12 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Configured",
               keySummaryLabel: "SHA256:abc123",
-              helperLabel: "SSH private key",
+              helperLabel: null,
               helperCommand: null,
               uploadActionLabel: "Replace private key",
               removeActionLabel: "Remove key",
             },
-            primaryActionLabel: "Relink",
+            primaryActionLabel: null,
             secondaryActionLabel: "Unlink",
           },
         ]}
@@ -378,8 +420,9 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Replace private key" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove key" })).toBeTruthy();
-    expect(screen.getByText("SSH private key")).toBeTruthy();
-    expect(screen.getByText("Used for sandbox Git identity and commit signing.")).toBeTruthy();
+    expect(screen.getByText("Configured")).toBeTruthy();
+    expect(screen.queryByText("SSH private key")).toBeNull();
+    expect(screen.queryByText("Used for sandbox Git identity and commit signing.")).toBeNull();
   });
 
   it("uploads a pasted GitHub commit signing key through the provided handler", async () => {
@@ -402,12 +445,12 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Not configured",
               keySummaryLabel: null,
-              helperLabel: "SSH private key",
-              helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+              helperLabel: null,
+              helperCommand: null,
               uploadActionLabel: "Upload private key",
               removeActionLabel: null,
             },
-            primaryActionLabel: "Relink",
+            primaryActionLabel: null,
             secondaryActionLabel: "Unlink",
           },
         ]}
@@ -453,12 +496,12 @@ describe("ProfileSettingsPageView", () => {
             commitSigning: {
               statusLabel: "Not configured",
               keySummaryLabel: null,
-              helperLabel: "SSH private key",
-              helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+              helperLabel: null,
+              helperCommand: null,
               uploadActionLabel: "Upload private key",
               removeActionLabel: null,
             },
-            primaryActionLabel: "Relink",
+            primaryActionLabel: null,
             secondaryActionLabel: "Unlink",
           },
         ]}

@@ -105,17 +105,21 @@ describe("linked-accounts-model", () => {
       statusTone: "active",
       accountLabel: "@mistle-user",
       linkedAtLabel: `Linked ${formatDateTime("2026-04-19T10:15:00.000Z")}`,
-      helperMessage: "GitHub has not provided selectable commit emails for this link.",
-      emailPreference: null,
+      helperMessage: null,
+      emailPreference: {
+        selectedEmail: "",
+        options: [],
+        helperText: "",
+      },
       commitSigning: {
         statusLabel: "Not configured",
         keySummaryLabel: null,
-        helperLabel: "SSH private key",
-        helperCommand: "ssh-keygen -t ed25519 -f ~/.ssh/my-signing-key",
+        helperLabel: null,
+        helperCommand: null,
         uploadActionLabel: "Upload private key",
         removeActionLabel: null,
       },
-      primaryActionLabel: "Relink",
+      primaryActionLabel: null,
       secondaryActionLabel: "Unlink",
     });
   });
@@ -158,7 +162,7 @@ describe("linked-accounts-model", () => {
     expect(resolveLinkedAccountCardViewModel(linkedAccount)).toMatchObject({
       statusLabel: "Relink required",
       statusTone: "warning",
-      helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+      helperMessage: null,
       emailPreference: null,
       commitSigning: null,
       primaryActionLabel: "Relink",
@@ -203,7 +207,7 @@ describe("linked-accounts-model", () => {
       commitSigning: {
         statusLabel: "Configured",
         keySummaryLabel: "SHA256:abc123",
-        helperLabel: "SSH private key",
+        helperLabel: null,
         helperCommand: null,
         uploadActionLabel: "Replace private key",
         removeActionLabel: "Remove key",

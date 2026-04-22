@@ -58,94 +58,133 @@ export type ProfileSettingsPageViewProps = {
   saving: boolean;
 };
 
+export type ProfileSettingsUserSectionProps = Pick<
+  ProfileSettingsPageViewProps,
+  | "displayName"
+  | "email"
+  | "imageUrl"
+  | "onDeleteProfileImage"
+  | "onSaveChanges"
+  | "onUploadProfileImage"
+  | "profileImageBusy"
+  | "profileImageErrorMessage"
+  | "saving"
+>;
+
+export type ProfileSettingsLinkedAccountsSectionProps = Pick<
+  ProfileSettingsPageViewProps,
+  | "linkedAccountActionPending"
+  | "linkedAccountCallbackNotice"
+  | "linkedAccountCards"
+  | "linkedAccountErrorMessage"
+  | "linkedAccountsEmptyStateMessage"
+  | "linkedAccountsLoading"
+  | "linkedAccountsLoadErrorMessage"
+  | "onDeleteLinkedAccountCommitSigningKey"
+  | "onLinkLinkedAccount"
+  | "onUnlinkLinkedAccount"
+  | "onUpdateLinkedAccountPreferredEmail"
+  | "onUploadLinkedAccountCommitSigningKey"
+>;
+
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
   return (
     <FormPageStack>
-      <FormPageSection>
-        <div className="flex flex-col gap-4 p-4">
-          <SettingsImageField
-            alt={`${props.displayName} profile image`}
-            busy={props.profileImageBusy}
-            errorMessage={props.profileImageErrorMessage}
-            fallbackInitial="U"
-            imageUrl={props.imageUrl}
-            imageName="profile image"
-            label="Avatar"
-            name={props.displayName}
-            onDelete={props.onDeleteProfileImage}
-            onUpload={props.onUploadProfileImage}
-          />
-          <AutoSaveTextField
-            disabled={props.saving}
-            id="display-name"
-            label="Display name"
-            onSave={props.onSaveChanges}
-            validate={() => null}
-            value={props.displayName}
-          />
-          <Field contentWidth="fill" orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel>Email</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <Input disabled readOnly value={props.email} />
-            </FieldContent>
-          </Field>
-        </div>
-      </FormPageSection>
+      <ProfileSettingsUserSection {...props} />
       {shouldRenderLinkedAccountsSection(props) ? (
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-base font-semibold">Linked Accounts</h2>
-              <p className="text-sm text-muted-foreground">
-                Link external accounts so Mistle can attribute work to you.
-              </p>
-            </div>
-
-            {props.linkedAccountCallbackNotice === null ? null : (
-              <Notice
-                title={props.linkedAccountCallbackNotice.title}
-                variant={props.linkedAccountCallbackNotice.variant}
-              >
-                {props.linkedAccountCallbackNotice.message}
-              </Notice>
-            )}
-
-            {props.linkedAccountsLoading ? (
-              <div className="text-sm text-muted-foreground">Loading linked accounts…</div>
-            ) : props.linkedAccountsLoadErrorMessage !== null ? (
-              <Notice variant="alert">
-                {props.linkedAccountsLoadErrorMessage} Please try again later.
-              </Notice>
-            ) : props.linkedAccountsEmptyStateMessage !== null ? (
-              <Notice>{props.linkedAccountsEmptyStateMessage}</Notice>
-            ) : props.linkedAccountCards.length === 0 ? null : (
-              props.linkedAccountCards.map((linkedAccountCard) => (
-                <LinkedAccountCard
-                  key={linkedAccountCard.providerFamily}
-                  linkedAccountActionPending={props.linkedAccountActionPending}
-                  linkedAccountCard={linkedAccountCard}
-                  onDeleteLinkedAccountCommitSigningKey={
-                    props.onDeleteLinkedAccountCommitSigningKey
-                  }
-                  onLinkLinkedAccount={props.onLinkLinkedAccount}
-                  onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
-                  onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
-                  onUploadLinkedAccountCommitSigningKey={
-                    props.onUploadLinkedAccountCommitSigningKey
-                  }
-                />
-              ))
-            )}
-
-            {props.linkedAccountErrorMessage === null ? null : (
-              <Notice variant="alert">{props.linkedAccountErrorMessage}</Notice>
-            )}
-          </div>
-        </FormPageSection>
+        <ProfileSettingsLinkedAccountsSection {...props} />
       ) : null}
     </FormPageStack>
+  );
+}
+
+export function ProfileSettingsUserSection(
+  props: ProfileSettingsUserSectionProps,
+): React.JSX.Element {
+  return (
+    <FormPageSection>
+      <div className="flex flex-col gap-4 p-4">
+        <SettingsImageField
+          alt={`${props.displayName} profile image`}
+          busy={props.profileImageBusy}
+          errorMessage={props.profileImageErrorMessage}
+          fallbackInitial="U"
+          imageUrl={props.imageUrl}
+          imageName="profile image"
+          label="Avatar"
+          name={props.displayName}
+          onDelete={props.onDeleteProfileImage}
+          onUpload={props.onUploadProfileImage}
+        />
+        <AutoSaveTextField
+          disabled={props.saving}
+          id="display-name"
+          label="Display name"
+          onSave={props.onSaveChanges}
+          validate={() => null}
+          value={props.displayName}
+        />
+        <Field contentWidth="fill" orientation="horizontal">
+          <FieldHeader>
+            <FieldLabel>Email</FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Input disabled readOnly value={props.email} />
+          </FieldContent>
+        </Field>
+      </div>
+    </FormPageSection>
+  );
+}
+
+export function ProfileSettingsLinkedAccountsSection(
+  props: ProfileSettingsLinkedAccountsSectionProps,
+): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold">Linked Accounts</h2>
+        <p className="text-sm text-muted-foreground">
+          Link accounts to enable Mistle to attribute actions it takes on your behalf to you.
+        </p>
+      </div>
+
+      {props.linkedAccountCallbackNotice === null ? null : (
+        <Notice
+          title={props.linkedAccountCallbackNotice.title}
+          variant={props.linkedAccountCallbackNotice.variant}
+        >
+          {props.linkedAccountCallbackNotice.message}
+        </Notice>
+      )}
+
+      {props.linkedAccountsLoading ? (
+        <div className="text-sm text-muted-foreground">Loading linked accounts…</div>
+      ) : props.linkedAccountsLoadErrorMessage !== null ? (
+        <Notice variant="alert">
+          {props.linkedAccountsLoadErrorMessage} Please try again later.
+        </Notice>
+      ) : props.linkedAccountsEmptyStateMessage !== null ? (
+        <Notice>{props.linkedAccountsEmptyStateMessage}</Notice>
+      ) : props.linkedAccountCards.length === 0 ? null : (
+        props.linkedAccountCards.map((linkedAccountCard) => (
+          <LinkedAccountCard
+            key={linkedAccountCard.providerFamily}
+            linkedAccountActionPending={props.linkedAccountActionPending}
+            linkedAccountCard={linkedAccountCard}
+            onDeleteLinkedAccountCommitSigningKey={props.onDeleteLinkedAccountCommitSigningKey}
+            onLinkLinkedAccount={props.onLinkLinkedAccount}
+            onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
+            onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
+            onUploadLinkedAccountCommitSigningKey={props.onUploadLinkedAccountCommitSigningKey}
+          />
+        ))
+      )}
+
+      {props.linkedAccountErrorMessage === null ? null : (
+        <Notice variant="alert">{props.linkedAccountErrorMessage}</Notice>
+      )}
+    </div>
   );
 }
 
@@ -226,11 +265,6 @@ function LinkedAccountCard(input: {
               </LinkedAccountStatusBadge>
             </div>
             <p className="text-sm">{input.linkedAccountCard.accountLabel}</p>
-            {input.linkedAccountCard.linkedAtLabel === null ? null : (
-              <p className="text-xs text-muted-foreground">
-                {input.linkedAccountCard.linkedAtLabel}
-              </p>
-            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -271,49 +305,52 @@ function LinkedAccountCard(input: {
               <FieldLabel>Commit email</FieldLabel>
             </FieldHeader>
             <FieldContent>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Select
-                  onValueChange={(nextValue) => {
-                    setSelectedEmail(nextValue ?? "");
-                  }}
-                  value={selectedEmail}
-                >
-                  <SelectTrigger
-                    className="w-full"
-                    id={`linked-account-preferred-email-${input.linkedAccountCard.providerFamily}`}
-                    style={{ width: "100%", maxWidth: "32rem" }}
+              {emailPreference.options.length === 0 ? (
+                <p className="text-sm text-muted-foreground">None</p>
+              ) : (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <Select
+                    onValueChange={(nextValue) => {
+                      setSelectedEmail(nextValue ?? "");
+                    }}
+                    value={selectedEmail}
                   >
-                    <SelectValue placeholder="Select commit email">
-                      {selectedOptionLabel}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {emailPreference.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  disabled={
-                    input.linkedAccountActionPending ||
-                    selectedEmail.length === 0 ||
-                    selectedEmail === emailPreference.selectedEmail
-                  }
-                  onClick={() => {
-                    void input.onUpdateLinkedAccountPreferredEmail(
-                      input.linkedAccountCard.providerFamily,
-                      selectedEmail,
-                    );
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  {input.linkedAccountActionPending ? "Working..." : "Save"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">{emailPreference.helperText}</p>
+                    <SelectTrigger
+                      className="w-full"
+                      id={`linked-account-preferred-email-${input.linkedAccountCard.providerFamily}`}
+                      style={{ width: "100%", maxWidth: "32rem" }}
+                    >
+                      <SelectValue placeholder="Select commit email">
+                        {selectedOptionLabel}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {emailPreference.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    disabled={
+                      input.linkedAccountActionPending ||
+                      selectedEmail.length === 0 ||
+                      selectedEmail === emailPreference.selectedEmail
+                    }
+                    onClick={() => {
+                      void input.onUpdateLinkedAccountPreferredEmail(
+                        input.linkedAccountCard.providerFamily,
+                        selectedEmail,
+                      );
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    {input.linkedAccountActionPending ? "Working..." : "Save"}
+                  </Button>
+                </div>
+              )}
             </FieldContent>
           </Field>
         </div>
