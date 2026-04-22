@@ -2,7 +2,7 @@
 
 import { type IncomingMessage, type ServerResponse } from "node:http";
 
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import React, { useState, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -105,13 +105,18 @@ async function startGitBranchTunnelServer(): Promise<{
   getHeadWatchRegistrationCount: () => number;
   failNextGitDirectoryLookup: () => void;
   notifyHeadChanged: () => void;
+  setCurrentBranchForCwd: (cwd: string, branch: string) => void;
   setCurrentBranch: (branch: string) => void;
   url: string;
 }> {
   let agentSocket: SocketSender | null = null;
   let agentStreamId: number | null = null;
   let branchCommandCount = 0;
-  let currentBranch = "main";
+  const currentBranchByCwd = new Map<string, string>([
+    ["/root/mistlehq/mistle", "main"],
+    ["/root/mistlehq/company-os", "company-main"],
+    ["/root/mistlehq/e2e-test-repo", "e2e-main"],
+  ]);
   let gitDirectoryLookupFailureCount = 0;
   let headWatchRegistrationCount = 0;
   const headWatchIds = new Set<string>();
@@ -188,7 +193,7 @@ async function startGitBranchTunnelServer(): Promise<{
             args[1] === "--show-current"
           ) {
             branchCommandCount += 1;
-            stdout = `${currentBranch}\n`;
+            stdout = `${currentBranchByCwd.get(controlMessage.channel.cwd) ?? ""}\n`;
           } else if (
             command === "git" &&
             args.length === 2 &&
@@ -418,8 +423,11 @@ async function startGitBranchTunnelServer(): Promise<{
         });
       }
     },
+    setCurrentBranchForCwd: (cwd: string, branch: string) => {
+      currentBranchByCwd.set(cwd, branch);
+    },
     setCurrentBranch: (branch: string) => {
-      currentBranch = branch;
+      currentBranchByCwd.set("/root/mistlehq/mistle", branch);
     },
     url: `ws://127.0.0.1:${String(address.port)}`,
   };
@@ -591,6 +599,55 @@ describe("SessionWorkbenchPage git branch label", () => {
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
       expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
+    } finally {
+      await rendered.close();
+      await tunnelServer.close();
+      restoreWebSocket();
+    }
+  }, 45_000);
+
+  it("refetches the branch when returning to a previously selected repository", async () => {
+    const restoreWebSocket = installNodeWebSocket();
+    const tunnelServer = await startGitBranchTunnelServer();
+    const rendered = await renderDashboardPageIntegration({
+      handler: createWorkbenchRequestHandler({
+        tunnelUrl: tunnelServer.url,
+      }),
+      ui: (
+        <HeaderActionsHost>
+          <MemoryRouter initialEntries={["/sessions/sbi_repo_page"]}>
+            <Routes>
+              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
+            </Routes>
+          </MemoryRouter>
+        </HeaderActionsHost>
+      ),
+    });
+
+    try {
+      await waitFor(() => {
+        expect(screen.getByText("main")).toBeTruthy();
+      });
+      const repositoryCombobox = await screen.findByRole("combobox", {
+        name: "Primary repository",
+      });
+
+      fireEvent.focus(repositoryCombobox);
+      let repositoryListbox = await screen.findByRole("listbox");
+      fireEvent.click(within(repositoryListbox).getByRole("option", { name: "company-os" }));
+      await waitFor(() => {
+        expect(screen.getByText("company-main")).toBeTruthy();
+      });
+
+      tunnelServer.setCurrentBranchForCwd("/root/mistlehq/mistle", "feature/returned-repo");
+
+      fireEvent.focus(repositoryCombobox);
+      repositoryListbox = await screen.findByRole("listbox");
+      fireEvent.click(within(repositoryListbox).getByRole("option", { name: "mistle" }));
+
+      await waitFor(() => {
+        expect(screen.getByText("feature/returned-repo")).toBeTruthy();
+      });
     } finally {
       await rendered.close();
       await tunnelServer.close();

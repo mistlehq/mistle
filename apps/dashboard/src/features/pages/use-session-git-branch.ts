@@ -178,6 +178,7 @@ export function useSessionGitBranch(input: {
   );
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null && input.cwd !== null,
+    refetchOnMount: "always",
     queryFn: async () => {
       const sandboxInstanceId = input.sandboxInstanceId;
       const cwd = input.cwd;

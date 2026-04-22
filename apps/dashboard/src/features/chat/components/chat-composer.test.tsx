@@ -170,6 +170,29 @@ describe("ChatComposer", () => {
     expect(screen.getByText("feature/show-branch")).toBeTruthy();
   });
 
+  it("accepts dropped image files on the git branch footer row", () => {
+    const droppedFiles: File[][] = [];
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        gitBranchLabel="feature/show-branch"
+        onPendingImageFilesAdded={(files) => {
+          droppedFiles.push([...files]);
+        }}
+      />,
+    );
+
+    const imageFile = new File(["image-bytes"], "branch-footer-drop.png", { type: "image/png" });
+    fireEvent.drop(screen.getByText("feature/show-branch"), {
+      dataTransfer: {
+        files: [imageFile],
+      },
+    });
+
+    expect(droppedFiles).toHaveLength(1);
+    expect(droppedFiles[0]?.[0]?.name).toBe("branch-footer-drop.png");
+  });
+
   it("clears the pending diff comment badge when the remove action is pressed", () => {
     function Harness(): React.JSX.Element {
       const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState<{

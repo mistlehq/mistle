@@ -158,17 +158,17 @@ export function ChatComposer({
   }
 
   return (
-    <>
-      <div
-        className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs"
-        onDragOver={(event) => {
-          event.preventDefault();
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          addPendingFiles(Array.from(event.dataTransfer.files));
-        }}
-      >
+    <div
+      className="flex flex-col"
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        addPendingFiles(Array.from(event.dataTransfer.files));
+      }}
+    >
+      <div className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs">
         <input
           accept="image/*"
           className="hidden"
@@ -399,6 +399,6 @@ export function ChatComposer({
           <span>{gitBranchLabel}</span>
         </div>
       )}
-    </>
+    </div>
   );
 }
