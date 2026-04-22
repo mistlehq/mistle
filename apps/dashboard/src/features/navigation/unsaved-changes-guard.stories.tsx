@@ -9,7 +9,7 @@ import { UnsavedChangesGuard } from "./unsaved-changes-guard.js";
 function UnsavedChangesGuardStoryShell(input: { initialDirty?: boolean }): React.JSX.Element {
   const navigate = useNavigate();
   const [isDirty, setIsDirty] = useState(input.initialDirty ?? false);
-  const [value, setValue] = useState(input.initialDirty ? "Unsaved example" : "");
+  const [value, setValue] = useState((input.initialDirty ?? false) ? "Unsaved example" : "");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -25,9 +25,7 @@ function UnsavedChangesGuardStoryShell(input: { initialDirty?: boolean }): React
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <DetailLabel as="label" htmlFor="storybook-unsaved-input">
-              Example field
-            </DetailLabel>
+            <DetailLabel>Example field</DetailLabel>
             <Input
               id="storybook-unsaved-input"
               onChange={(event) => {
@@ -57,13 +55,12 @@ function UnsavedChangesGuardStoryShell(input: { initialDirty?: boolean }): React
 
 function UnsavedChangesGuardStoryRoutes(input: { initialDirty?: boolean }): React.JSX.Element {
   const navigate = useNavigate();
+  const storyShellProps =
+    input.initialDirty === undefined ? {} : { initialDirty: input.initialDirty };
 
   return (
     <Routes>
-      <Route
-        element={<UnsavedChangesGuardStoryShell initialDirty={input.initialDirty} />}
-        path="/"
-      />
+      <Route element={<UnsavedChangesGuardStoryShell {...storyShellProps} />} path="/" />
       <Route
         element={
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
