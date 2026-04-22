@@ -281,16 +281,23 @@ function isTerminalTurnStatus(status: string | null): boolean {
 
 function buildNormalizedItems(turn: CodexRawTurnState): readonly NormalizedCodexThreadItem[] {
   return turn.itemOrder.flatMap((itemId) => {
-    const rawItem = turn.rawItemsById[itemId];
-    if (rawItem === undefined) {
-      return [];
-    }
-
-    return normalizeCodexThreadItem({
-      turnId: turn.id,
-      item: rawItem,
-    }).filter((item) => item.kind !== "user-message");
+    return buildNormalizedItemsForRawItem(turn, itemId);
   });
+}
+
+function buildNormalizedItemsForRawItem(
+  turn: CodexRawTurnState,
+  rawItemId: string,
+): readonly NormalizedCodexThreadItem[] {
+  const rawItem = turn.rawItemsById[rawItemId];
+  if (rawItem === undefined) {
+    return [];
+  }
+
+  return normalizeCodexThreadItem({
+    turnId: turn.id,
+    item: rawItem,
+  }).filter((item) => item.kind !== "user-message");
 }
 
 function buildRenderedAssistantItemSegment(input: {
@@ -845,9 +852,8 @@ function isAfterAssistantTextSteerEntry(
 
 function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEvent[] {
   const events: TurnRenderEvent[] = [];
-  const normalizedItems = buildNormalizedItems(turn);
   const steerEntriesAtTurnStart: TurnStartSteerEntry[] = [];
-  const steerEntriesAfterItemId = new Map<string, AfterItemSteerEntry[]>();
+  const steerEntriesAfterRawItemId = new Map<string, AfterItemSteerEntry[]>();
   const steerEntriesAfterAssistantText = new Map<string, AfterAssistantTextSteerEntry[]>();
 
   for (const steerEntry of turn.clientSteerEntries) {
@@ -857,9 +863,9 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
     }
 
     if (isAfterItemSteerEntry(steerEntry)) {
-      const anchoredEntries = steerEntriesAfterItemId.get(steerEntry.anchor.itemId) ?? [];
+      const anchoredEntries = steerEntriesAfterRawItemId.get(steerEntry.anchor.itemId) ?? [];
       anchoredEntries.push(steerEntry);
-      steerEntriesAfterItemId.set(steerEntry.anchor.itemId, anchoredEntries);
+      steerEntriesAfterRawItemId.set(steerEntry.anchor.itemId, anchoredEntries);
       continue;
     }
 
@@ -897,20 +903,25 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
     bufferedItems = [];
   }
 
-  for (const item of normalizedItems) {
+  for (const rawItemId of turn.itemOrder) {
+    const normalizedItemsForRawItem = buildNormalizedItemsForRawItem(turn, rawItemId);
+    const assistantItem = normalizedItemsForRawItem.find(
+      (item): item is Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }> =>
+        item.kind === "assistant-message",
+    );
     const steerEntriesAfterAssistantSegments =
-      item.kind === "assistant-message" ? (steerEntriesAfterAssistantText.get(item.id) ?? []) : [];
-    const steerEntriesAfterWholeItem = steerEntriesAfterItemId.get(item.id) ?? [];
+      assistantItem === undefined ? [] : (steerEntriesAfterAssistantText.get(rawItemId) ?? []);
+    const steerEntriesAfterWholeRawItem = steerEntriesAfterRawItemId.get(rawItemId) ?? [];
 
-    if (item.kind === "assistant-message" && steerEntriesAfterAssistantSegments.length > 0) {
+    if (assistantItem !== undefined && steerEntriesAfterAssistantSegments.length > 0) {
       flushBufferedItems();
 
       let consumedTextLength = 0;
       for (const steerEntry of steerEntriesAfterAssistantSegments) {
         const anchoredText = steerEntry.anchor.text;
-        if (!item.text.startsWith(anchoredText)) {
+        if (!assistantItem.text.startsWith(anchoredText)) {
           throw new Error(
-            `Assistant steer anchor text is not a prefix of assistant item '${item.id}'.`,
+            `Assistant steer anchor text is not a prefix of assistant item '${assistantItem.id}'.`,
           );
         }
 
@@ -921,7 +932,7 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
               turnId: turn.id,
               items: [
                 buildRenderedAssistantItemSegment({
-                  item,
+                  item: assistantItem,
                   startOffset: consumedTextLength,
                   text: nextSegmentText,
                 }),
@@ -934,14 +945,14 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
         consumedTextLength = anchoredText.length;
       }
 
-      const trailingAssistantText = item.text.slice(consumedTextLength);
+      const trailingAssistantText = assistantItem.text.slice(consumedTextLength);
       if (trailingAssistantText.length > 0) {
         events.push(
           ...projectItemsToRenderEvents({
             turnId: turn.id,
             items: [
               buildRenderedAssistantItemSegment({
-                item,
+                item: assistantItem,
                 startOffset: consumedTextLength,
                 text: trailingAssistantText,
               }),
@@ -950,17 +961,33 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
         );
       }
 
+      const nonAssistantItems = normalizedItemsForRawItem.filter(
+        (item) => item.id !== assistantItem.id && item.kind !== "assistant-message",
+      );
+      if (nonAssistantItems.length > 0) {
+        events.push(
+          ...projectItemsToRenderEvents({
+            turnId: turn.id,
+            items: nonAssistantItems,
+          }),
+        );
+      }
+
       events.push(
-        ...steerEntriesAfterWholeItem.map((steerEntry) => createSteerRenderEvent(steerEntry.entry)),
+        ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
+          createSteerRenderEvent(steerEntry.entry),
+        ),
       );
       continue;
     }
 
-    bufferedItems.push(item);
-    if (steerEntriesAfterWholeItem.length > 0) {
+    bufferedItems.push(...normalizedItemsForRawItem);
+    if (steerEntriesAfterWholeRawItem.length > 0) {
       flushBufferedItems();
       events.push(
-        ...steerEntriesAfterWholeItem.map((steerEntry) => createSteerRenderEvent(steerEntry.entry)),
+        ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
+          createSteerRenderEvent(steerEntry.entry),
+        ),
       );
     }
   }
@@ -973,7 +1000,7 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
     }
 
     if (isAfterItemSteerEntry(steerEntry)) {
-      if (normalizedItems.some((item) => item.id === steerEntry.anchor.itemId)) {
+      if (turn.rawItemsById[steerEntry.anchor.itemId] !== undefined) {
         continue;
       }
 
@@ -986,7 +1013,7 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
       throw new Error(`Unsupported steer anchor kind in turn '${turn.id}'.`);
     }
 
-    if (normalizedItems.some((item) => item.id === steerEntry.anchor.itemId)) {
+    if (turn.rawItemsById[steerEntry.anchor.itemId] !== undefined) {
       continue;
     }
 
@@ -1092,24 +1119,30 @@ function clearEntryAction(entry: ChatUserEntry): ChatUserEntry {
 }
 
 function getCurrentTurnSteerAnchor(turn: CodexRawTurnState): ClientSteerAnchor {
-  const lastNormalizedItem = buildNormalizedItems(turn).at(-1);
-  if (lastNormalizedItem === undefined) {
+  const lastRawItemId = turn.itemOrder.at(-1);
+  if (lastRawItemId === undefined) {
     return {
       kind: "turn-start",
     };
   }
 
-  if (lastNormalizedItem.kind === "assistant-message" && lastNormalizedItem.text.length > 0) {
+  const normalizedItemsForLastRawItem = buildNormalizedItemsForRawItem(turn, lastRawItemId);
+  const assistantItem = normalizedItemsForLastRawItem.find(
+    (item): item is Extract<NormalizedCodexThreadItem, { kind: "assistant-message" }> =>
+      item.kind === "assistant-message",
+  );
+
+  if (assistantItem !== undefined && assistantItem.text.length > 0) {
     return {
       kind: "after-assistant-text",
-      itemId: lastNormalizedItem.id,
-      text: lastNormalizedItem.text,
+      itemId: lastRawItemId,
+      text: assistantItem.text,
     };
   }
 
   return {
     kind: "after-item",
-    itemId: lastNormalizedItem.id,
+    itemId: lastRawItemId,
   };
 }
 

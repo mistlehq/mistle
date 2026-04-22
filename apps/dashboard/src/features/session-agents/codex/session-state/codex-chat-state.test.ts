@@ -385,6 +385,123 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("keeps accepted steers behind later-normalized content from the same reasoning item", () => {
+    const activeTurn = reduceCodexChatState(
+      reduceCodexChatState(createInitialCodexChatState(), {
+        type: "start_turn_requested",
+        clientTurnId: "pending:turn_123",
+        prompt: "Test prompt",
+      }),
+      {
+        type: "turn_started_response",
+        clientTurnId: "pending:turn_123",
+        turnId: "turn_123",
+        status: "inProgress",
+      },
+    );
+
+    const reasoningSummary = reduceCodexChatState(
+      reduceCodexChatState(activeTurn, {
+        type: "notification_received",
+        notification: {
+          method: "item/reasoning/summaryTextDelta",
+          params: {
+            turnId: "turn_123",
+            itemId: "reasoning_1",
+            delta: "Inspect files",
+          },
+        },
+      }),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/reasoning/summaryPartAdded",
+          params: {
+            turnId: "turn_123",
+            itemId: "reasoning_1",
+          },
+        },
+      },
+    );
+
+    const processed = reduceCodexChatState(
+      reduceCodexChatState(reasoningSummary, {
+        type: "steer_turn_requested",
+        entryId: "steer_1",
+        turnId: "turn_123",
+        prompt: "Focus on the reducer",
+      }),
+      {
+        type: "steer_turn_processed",
+        entryId: "steer_1",
+        turnId: "turn_123",
+      },
+    );
+
+    const afterReasoningContent = reduceCodexChatState(processed, {
+      type: "notification_received",
+      notification: {
+        method: "item/reasoning/textDelta",
+        params: {
+          turnId: "turn_123",
+          itemId: "reasoning_1",
+          delta: "Detailed chain",
+        },
+      },
+    });
+
+    expect(afterReasoningContent.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "turn_123:thinking:reasoning_1",
+        turnId: "turn_123",
+        kind: "semantic-group",
+        semanticKind: "thinking",
+        status: "streaming",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Inspect files",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+          {
+            id: "reasoning_1:content",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Detailed chain",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+        ],
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("removes a transient steer message when steering fails", () => {
     const activeTurn = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
