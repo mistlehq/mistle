@@ -37,8 +37,19 @@ export function resolveLocationHref(input: {
   return `${input.pathname}${input.search}${input.hash}`;
 }
 
-export function resolveSidebarModeEnableNavigationTarget(pathname: string): string | null {
-  return isExistingSandboxSessionPath(pathname) ? null : SessionsRoutes.NEW;
+export function resolveSidebarModeEnableNavigationTarget(input: {
+  lastInteractedSessionHref: string | null;
+  pathname: string;
+}): string | null {
+  if (isExistingSandboxSessionPath(input.pathname)) {
+    return null;
+  }
+
+  if (!isSessionsPath(input.pathname) && input.lastInteractedSessionHref !== null) {
+    return input.lastInteractedSessionHref;
+  }
+
+  return SessionsRoutes.NEW;
 }
 
 export function resolveSidebarModeDisableNavigationTarget(input: {

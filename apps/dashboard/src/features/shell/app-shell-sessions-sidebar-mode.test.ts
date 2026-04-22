@@ -23,22 +23,60 @@ describe("app shell sessions sidebar mode routing", () => {
 
   it("treats existing sandbox session detail routes as in-place sidebar toggles", () => {
     expect(isExistingSandboxSessionPath("/sessions/sbi_123")).toBe(true);
-    expect(resolveSidebarModeEnableNavigationTarget("/sessions/sbi_123")).toBeNull();
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: null,
+        pathname: "/sessions/sbi_123",
+      }),
+    ).toBeNull();
   });
 
   it("routes the sessions index into the new-session page when enabling sidebar mode", () => {
     expect(isExistingSandboxSessionPath("/sessions")).toBe(false);
-    expect(resolveSidebarModeEnableNavigationTarget("/sessions")).toBe(SessionsRoutes.NEW);
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: null,
+        pathname: "/sessions",
+      }),
+    ).toBe(SessionsRoutes.NEW);
   });
 
   it("keeps the dedicated new-session route as the landing target when enabling sidebar mode", () => {
     expect(isExistingSandboxSessionPath("/sessions/new")).toBe(false);
-    expect(resolveSidebarModeEnableNavigationTarget("/sessions/new")).toBe(SessionsRoutes.NEW);
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: null,
+        pathname: "/sessions/new",
+      }),
+    ).toBe(SessionsRoutes.NEW);
   });
 
   it("routes non-session pages into the new-session page when enabling sidebar mode", () => {
     expect(isExistingSandboxSessionPath("/automations")).toBe(false);
-    expect(resolveSidebarModeEnableNavigationTarget("/automations")).toBe(SessionsRoutes.NEW);
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: null,
+        pathname: "/automations",
+      }),
+    ).toBe(SessionsRoutes.NEW);
+  });
+
+  it("restores the last interacted session after toggling sidebar mode back on", () => {
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: "/sessions/sbi_123",
+        pathname: "/automations",
+      }),
+    ).toBe("/sessions/sbi_123");
+  });
+
+  it("does not restore the last interacted session when re-enabling from within sessions", () => {
+    expect(
+      resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: "/sessions/sbi_123",
+        pathname: "/sessions",
+      }),
+    ).toBe(SessionsRoutes.NEW);
   });
 
   it("resolves the sessions nav href from the sidebar mode state", () => {

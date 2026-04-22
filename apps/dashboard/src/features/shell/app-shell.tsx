@@ -23,6 +23,7 @@ import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 import {
+  isExistingSandboxSessionPath,
   resolveLocationHref,
   resolveSidebarModeDisableNavigationTarget,
   resolveSidebarModeEnableNavigationTarget,
@@ -48,6 +49,7 @@ export function AppShell(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const previousNonSettingsPathRef = useRef<string>("/");
+  const previousSessionDetailUrlRef = useRef<string | null>(null);
   const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
@@ -86,6 +88,7 @@ export function AppShell(): React.JSX.Element {
       previousSessionsSidebarToggleUrlRef.current !== null &&
       previousSessionsSidebarToggleUrlRef.current !== currentLocationHref
     ) {
+      previousSessionDetailUrlRef.current = null;
       previousSessionsSidebarToggleUrlRef.current = null;
     }
   }, [
@@ -167,6 +170,10 @@ export function AppShell(): React.JSX.Element {
     setSessionsSidebarPreferenceEnabled(nextChecked);
 
     if (!nextChecked) {
+      if (isExistingSandboxSessionPath(location.pathname)) {
+        previousSessionDetailUrlRef.current = currentLocationHref;
+      }
+
       const navigationTarget = resolveSidebarModeDisableNavigationTarget({
         currentLocationHref,
         currentPathname: location.pathname,
@@ -184,7 +191,10 @@ export function AppShell(): React.JSX.Element {
 
     previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
 
-    const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
+    const navigationTarget = resolveSidebarModeEnableNavigationTarget({
+      lastInteractedSessionHref: previousSessionDetailUrlRef.current,
+      pathname: location.pathname,
+    });
 
     if (navigationTarget === null) {
       return;

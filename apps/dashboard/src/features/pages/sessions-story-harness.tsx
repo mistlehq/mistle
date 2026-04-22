@@ -20,6 +20,7 @@ import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
 import {
+  isExistingSandboxSessionPath,
   resolveLocationHref,
   resolveSidebarModeDisableNavigationTarget,
   resolveSidebarModeEnableNavigationTarget,
@@ -131,6 +132,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   const navigate = useNavigate();
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const headerLeadingModel = useAppHeaderLeadingModel();
+  const previousSessionDetailUrlRef = useRef<string | null>(null);
   const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
     input.initialShowSessionsSidebar === true,
@@ -176,6 +178,10 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
       setShowSessionsSidebar(checked);
 
       if (!checked) {
+        if (isExistingSandboxSessionPath(location.pathname)) {
+          previousSessionDetailUrlRef.current = currentLocationHref;
+        }
+
         const navigationTarget = resolveSidebarModeDisableNavigationTarget({
           currentLocationHref,
           currentPathname: location.pathname,
@@ -192,7 +198,10 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
 
       previousSessionsSidebarToggleUrlRef.current = currentLocationHref;
 
-      const navigationTarget = resolveSidebarModeEnableNavigationTarget(location.pathname);
+      const navigationTarget = resolveSidebarModeEnableNavigationTarget({
+        lastInteractedSessionHref: previousSessionDetailUrlRef.current,
+        pathname: location.pathname,
+      });
 
       if (navigationTarget !== null) {
         void navigate(navigationTarget);
