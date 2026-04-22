@@ -44,7 +44,16 @@ Based on the changes, describe what the exact implications are. Where relevant, 
 
 ### Checks and tests performed
 
-List of checks and tests performed to validate the changes. When listing tests, each test must cover:
+List only checks that add reviewer signal. Prefer:
+
+- tests added or updated for this change
+- targeted commands that validate behavior not already covered by the normal local hook flow
+- meaningful manual testing with concrete scenarios and outcomes
+- broader publish gates like `pnpm run ci` when they materially exceed the default hook coverage
+
+Do not pad this section with generic baseline commands that are already expected from normal local hooks unless they surfaced an issue worth calling out.
+
+When listing a test or manual check, include:
 
 - What is being tested
 - What is the expected outcome
