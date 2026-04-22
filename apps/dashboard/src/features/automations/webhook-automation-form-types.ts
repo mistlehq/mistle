@@ -4,11 +4,13 @@ export type WebhookAutomationFormOption = {
   value: string;
   label: string;
   description?: string;
+  path?: string;
 };
 
 export type WebhookAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
+  primaryRepositoryId: string;
   enabled: boolean;
   inputTemplate: string;
   instructions: string;

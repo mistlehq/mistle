@@ -115,6 +115,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Your automation",
             sandboxProfileId: "",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -140,6 +141,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.values).toEqual({
       name: "Your automation",
       sandboxProfileId: "",
+      primaryRepositoryId: "",
       enabled: true,
       inputTemplate: "",
       instructions: "",
@@ -215,6 +217,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Linear automation",
             sandboxProfileId: "",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "Watch for new Linear issues.",
             instructions: "",
@@ -285,6 +288,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Linear automation",
             sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -353,6 +357,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Linear automation",
             sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -442,6 +447,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Existing automation",
             sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -499,6 +505,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "",
             sandboxProfileId: "",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -549,6 +556,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "GitHub triage",
             sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",
@@ -622,6 +630,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           initialValues: {
             name: "Linear automation",
             sandboxProfileId: "sbp_invalid",
+            primaryRepositoryId: "",
             enabled: true,
             inputTemplate: "",
             instructions: "",

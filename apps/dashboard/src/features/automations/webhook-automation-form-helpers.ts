@@ -87,6 +87,7 @@ export function toWebhookAutomationFormValues(
     return {
       name: "",
       sandboxProfileId: "",
+      primaryRepositoryId: "",
       enabled: true,
       inputTemplate: DefaultWebhookAutomationMessageTemplate,
       instructions: "",
@@ -111,6 +112,7 @@ export function toWebhookAutomationFormValues(
   return {
     name: automation.name,
     sandboxProfileId: automation.target.sandboxProfileId,
+    primaryRepositoryId: "",
     enabled: automation.enabled,
     inputTemplate: automation.inputTemplate,
     instructions: automation.instructions ?? "",

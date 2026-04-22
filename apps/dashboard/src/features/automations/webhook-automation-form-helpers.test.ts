@@ -154,6 +154,7 @@ const SampleAutomation: WebhookAutomation = {
 const BaseFormValues: WebhookAutomationFormValues = {
   name: "Pull request routing",
   sandboxProfileId: "sbp_repo",
+  primaryRepositoryId: "",
   enabled: true,
   inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
   instructions: "",
@@ -167,6 +168,7 @@ describe("toWebhookAutomationFormValues", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
       name: "",
       sandboxProfileId: "",
+      primaryRepositoryId: "",
       enabled: true,
       inputTemplate: DefaultWebhookAutomationMessageTemplate,
       instructions: "",
@@ -180,6 +182,7 @@ describe("toWebhookAutomationFormValues", () => {
     expect(toWebhookAutomationFormValues(SampleAutomation)).toEqual({
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",
+      primaryRepositoryId: "",
       enabled: true,
       inputTemplate: "Please write a review of the changes made.\n\nPayload:\n{{payload}}",
       instructions: "Use the repository conventions.",
@@ -315,6 +318,7 @@ describe("validateWebhookAutomationFormValues", () => {
         {
           name: "",
           sandboxProfileId: "",
+          primaryRepositoryId: "",
           enabled: true,
           inputTemplate: "",
           instructions: "",
