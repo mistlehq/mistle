@@ -171,6 +171,7 @@ describe("SessionsPage", () => {
     expect(markup).toContain("text-[11px] font-semibold tracking-[0.08em] uppercase");
     expect(markup).toContain(">Sessions<");
     expect(markup).toContain(">Sandbox profile<");
+    expect(markup).toContain(">Created<");
     expect(markup).toContain(">Updated<");
   });
 
@@ -431,8 +432,9 @@ describe("SessionsPage", () => {
     expect(rendered.container.innerHTML).toContain("hover:bg-transparent");
   });
 
-  it("shows compact updated labels for non-failed sessions", () => {
+  it("shows compact created and updated labels for non-failed sessions", () => {
     const updatedAt = "2026-03-08T00:00:00.000Z";
+    const createdAt = "2026-03-07T00:00:00.000Z";
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -442,6 +444,7 @@ describe("SessionsPage", () => {
       items: [
         buildSandboxInstanceListItemFixture({
           id: "sbi_updated",
+          createdAt,
           updatedAt,
         }),
       ],
@@ -455,6 +458,7 @@ describe("SessionsPage", () => {
       </QueryClientProvider>,
     );
 
+    expect(markup).toContain(`>${formatCompactRelativeOrDate(createdAt)}<`);
     expect(markup).toContain(`>${formatCompactRelativeOrDate(updatedAt)}<`);
   });
 

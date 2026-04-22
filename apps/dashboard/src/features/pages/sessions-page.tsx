@@ -44,6 +44,7 @@ import {
 
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
+const SessionTitleTooltipSideOffset = 8;
 
 function parseListLimit(rawValue: string | null): number {
   if (rawValue === null) {
@@ -90,25 +91,27 @@ export function shouldClearSelectedProfile(input: {
 }
 
 function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
+  const titleText = (
+    <OverflowTooltipText
+      className={
+        input.href === undefined
+          ? "cursor-default font-medium text-muted-foreground"
+          : "cursor-default font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
+      }
+      containerClassName="flex-1"
+      text={input.title}
+      tooltipSide="right"
+      tooltipSideOffset={SessionTitleTooltipSideOffset}
+    />
+  );
+
   if (input.href === undefined) {
-    return (
-      <span className="flex max-w-full items-center gap-1">
-        <OverflowTooltipText
-          className="cursor-default font-medium text-muted-foreground"
-          containerClassName="flex-1"
-          text={input.title}
-        />
-      </span>
-    );
+    return <span className="flex max-w-full items-center gap-1">{titleText}</span>;
   }
 
   return (
     <Link className="flex max-w-full items-center gap-1" to={input.href}>
-      <OverflowTooltipText
-        className="cursor-default font-medium group-hover/session-row:underline group-focus-within/session-row:underline"
-        containerClassName="flex-1"
-        text={input.title}
-      />
+      {titleText}
       <ArrowSquareOutIcon
         aria-hidden
         className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
@@ -465,14 +468,17 @@ export function SessionsPage(): React.JSX.Element {
           <Table className="min-w-[40rem] table-fixed">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
-                <TableHead className="text-foreground w-[44%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                   Sessions
                 </TableHead>
-                <TableHead className="text-foreground w-[24%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                   Sandbox profile
                 </TableHead>
-                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                   Started by
+                </TableHead>
+                <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  Created
                 </TableHead>
                 <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                   Updated
@@ -482,7 +488,7 @@ export function SessionsPage(): React.JSX.Element {
             <TableBody>
               {!isLoadingSessions && !hasSessions ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={4}>
+                  <TableCell className="text-muted-foreground" colSpan={5}>
                     No sessions yet.
                   </TableCell>
                 </TableRow>
@@ -520,6 +526,11 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="align-top text-sm whitespace-normal">
                         <span className="break-words text-sm text-foreground/80">
                           {formatStartedByLabel(session.startedBy)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top whitespace-nowrap">
+                        <span className="text-muted-foreground text-sm">
+                          {formatCompactRelativeOrDate(session.createdAt)}
                         </span>
                       </TableCell>
                       <TableCell className="align-top text-right whitespace-nowrap">

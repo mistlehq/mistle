@@ -46,14 +46,16 @@ const meta = {
         }),
         buildSandboxInstanceListItemFixture({
           id: "sbi_starting",
-          title: "Reconcile Q2 variance report",
+          title:
+            "Investigate why the billing reconciliation job stalls after sandbox reconnect and document the exact operator runbook for the next on-call handoff",
           sandboxProfileDisplayName: "Finance Investigator",
           status: "starting",
           updatedAt: "2026-04-01T08:55:00.000Z",
         }),
         buildSandboxInstanceListItemFixture({
           id: "sbi_stopped",
-          title: "Draft migration guide",
+          title:
+            "Compare the current sidebar truncation behavior with the sessions table so long conversation names stay compact but still reveal the full title on hover",
           sandboxProfileDisplayName: "Docs Maintainer",
           status: "stopped",
           updatedAt: "2026-03-31T15:30:00.000Z",
@@ -93,34 +95,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MixedStates: Story = {};
-
-export const LongTitles: Story = {
-  args: {
-    sandboxInstancesList: {
-      items: [
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_long_title_running",
-          title:
-            "Investigate why the billing reconciliation job stalls after sandbox reconnect and document the exact operator runbook for the next on-call handoff",
-          sandboxProfileDisplayName: "Repo Maintainer",
-          status: "running",
-          updatedAt: "2026-04-01T09:00:00.000Z",
-        }),
-        buildSandboxInstanceListItemFixture({
-          id: "sbi_long_title_stopped",
-          title:
-            "Compare the current sidebar truncation behavior with the sessions table so long conversation names stay compact but still reveal the full title on hover",
-          sandboxProfileDisplayName: "Docs Maintainer",
-          status: "stopped",
-          updatedAt: "2026-03-31T15:30:00.000Z",
-        }),
-      ],
-      nextPage: null,
-      previousPage: null,
-      totalResults: 2,
-    },
-  },
-};
 
 export const EmptyState: Story = {
   args: {
