@@ -146,7 +146,7 @@ export function useSessionGitBranch(input: {
       }),
     [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
   );
-  const [hasFreshSelectionData, setHasFreshSelectionData] = useState(false);
+  const [freshSelectionIdentity, setFreshSelectionIdentity] = useState<string | null>(null);
   const query = useQuery({
     enabled: isBranchTrackingEnabled,
     refetchOnMount: "always",
@@ -174,12 +174,12 @@ export function useSessionGitBranch(input: {
 
   useEffect(() => {
     if (!isBranchTrackingEnabled) {
-      setHasFreshSelectionData(false);
+      setFreshSelectionIdentity(null);
       lastSelectionIdentityRef.current = selectionIdentity;
       return;
     }
 
-    setHasFreshSelectionData(false);
+    setFreshSelectionIdentity(null);
   }, [isBranchTrackingEnabled, selectionIdentity]);
 
   useEffect(() => {
@@ -205,10 +205,11 @@ export function useSessionGitBranch(input: {
       return;
     }
 
-    setHasFreshSelectionData(true);
+    setFreshSelectionIdentity(selectionIdentity);
   }, [isBranchTrackingEnabled, query.isError, query.isFetchedAfterMount, selectionIdentity]);
 
-  const shouldHideBranchLabel = !isBranchTrackingEnabled || query.isError || !hasFreshSelectionData;
+  const shouldHideBranchLabel =
+    !isBranchTrackingEnabled || query.isError || freshSelectionIdentity !== selectionIdentity;
 
   return {
     branchLabel: shouldHideBranchLabel ? null : (query.data?.branchLabel ?? null),

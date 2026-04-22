@@ -96,6 +96,19 @@ function HeaderActionsHost(input: { children: ReactNode }): React.JSX.Element {
   );
 }
 
+async function selectPrimaryRepositoryOption(optionName: string): Promise<void> {
+  const repositoryCombobox = await screen.findByRole("combobox", {
+    name: "Primary repository",
+  });
+  fireEvent.click(repositoryCombobox);
+  const repositoryListbox = await screen.findByRole("listbox");
+  const repositoryOption = within(repositoryListbox).getByRole("option", {
+    name: optionName,
+  });
+  fireEvent.mouseMove(repositoryOption);
+  fireEvent.click(repositoryOption);
+}
+
 async function startGitBranchTunnelServer(): Promise<{
   close: () => Promise<void>;
   emitTurnCompleted: (turnId: string) => void;
@@ -529,29 +542,13 @@ describe("SessionWorkbenchPage git branch label", () => {
       await waitFor(() => {
         expect(screen.getByText("main")).toBeTruthy();
       });
-      const repositoryCombobox = await screen.findByRole("combobox", {
-        name: "Primary repository",
-      });
-
-      fireEvent.click(repositoryCombobox);
-      let repositoryListbox = await screen.findByRole("listbox");
-      const companyRepositoryOption = within(repositoryListbox).getByRole("option", {
-        name: "mistlehq/company-os",
-      });
-      fireEvent.mouseMove(companyRepositoryOption);
-      fireEvent.click(companyRepositoryOption);
+      await selectPrimaryRepositoryOption("mistlehq/company-os");
       await waitFor(() => {
         expect(screen.getByText("company-main")).toBeTruthy();
       });
 
       tunnelServer.setCurrentBranchForCwd("/root/mistlehq/mistle", "feature/returned-repo");
-      fireEvent.click(repositoryCombobox);
-      repositoryListbox = await screen.findByRole("listbox");
-      const mistleRepositoryOption = within(repositoryListbox).getByRole("option", {
-        name: "mistlehq/mistle",
-      });
-      fireEvent.mouseMove(mistleRepositoryOption);
-      fireEvent.click(mistleRepositoryOption);
+      await selectPrimaryRepositoryOption("mistlehq/mistle");
 
       await waitFor(() => {
         expect(screen.queryByText("main")).toBeNull();
