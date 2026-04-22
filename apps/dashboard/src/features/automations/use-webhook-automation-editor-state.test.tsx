@@ -338,9 +338,16 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         profileId: "sbp_123",
         version: 1,
       }),
-      createAutomationConfig({
-        repositoryIds: ["mistlehq/platform"],
-      }),
+      {
+        bindings: [createBinding()],
+        repositoryOptions: [
+          {
+            id: "mistlehq/platform",
+            label: "mistlehq/platform",
+            path: "/root/mistlehq/platform",
+          },
+        ],
+      },
     );
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
       versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
@@ -402,12 +409,6 @@ describe("useLoadedWebhookAutomationEditorState", () => {
 
   it("uses the pinned sandbox profile version when hydrating repository options in edit mode", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
-    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
-      versions: [
-        { sandboxProfileId: "sbp_123", version: 1 },
-        { sandboxProfileId: "sbp_123", version: 2 },
-      ],
-    });
     queryClient.setQueryData(
       sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_123",
@@ -464,6 +465,90 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.primaryRepositoryOptions.map((option) => option.value)).toEqual([
       WebhookAutomationWorkspaceRootRepositoryOptionValue,
       "mistlehq/platform",
+    ]);
+  });
+
+  it("falls back to latest-version automation config after the profile changes in edit mode", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      {
+        bindings: [createBinding()],
+        repositoryOptions: [
+          {
+            id: "mistlehq/platform",
+            label: "mistlehq/platform",
+            path: "/root/mistlehq/platform",
+          },
+        ],
+      },
+    );
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
+      versions: [{ sandboxProfileId: "sbp_456", version: 2 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_456",
+        version: 2,
+      }),
+      {
+        bindings: [createBinding()],
+        repositoryOptions: [
+          {
+            id: "mistlehq/mistle",
+            label: "mistlehq/mistle",
+            path: "/root/mistlehq/mistle",
+          },
+        ],
+      },
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "edit",
+          automationId: "atm_123",
+          navigate: async () => {},
+          initialValues: {
+            name: "Pinned automation",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "mistlehq/platform",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          initialSandboxProfileVersion: 1,
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            webhookSources: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_456");
+    });
+
+    expect(result.current.values.primaryRepositoryId).toBe(
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+    );
+    expect(result.current.primaryRepositoryOptions.map((option) => option.value)).toEqual([
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      "mistlehq/mistle",
     ]);
   });
 

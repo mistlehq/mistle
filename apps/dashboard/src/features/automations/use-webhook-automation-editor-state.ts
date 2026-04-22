@@ -371,6 +371,8 @@ export function useLoadedWebhookAutomationEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
+  const isUsingPinnedSelectedProfileVersion =
+    selectedSandboxProfileVersion?.profileId === selectedProfileId;
   const selectedProfileVersionsQuery = useQuery({
     queryKey: sandboxProfileVersionsQueryKey(resolveSelectedProfileQueryId(selectedProfileId)),
     queryFn: async ({ signal }) =>
@@ -378,17 +380,16 @@ export function useLoadedWebhookAutomationEditorState(
         profileId: selectedProfileId,
         signal,
       }),
-    enabled: selectedProfileId.length > 0,
+    enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
     retry: false,
   });
   const latestSelectedProfileVersion = useMemo(
     () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
     [selectedProfileVersionsQuery.data],
   );
-  const effectiveSelectedProfileVersion =
-    selectedSandboxProfileVersion?.profileId === selectedProfileId
-      ? selectedSandboxProfileVersion.version
-      : latestSelectedProfileVersion;
+  const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
+    ? selectedSandboxProfileVersion.version
+    : latestSelectedProfileVersion;
   const selectedProfileAutomationConfigQuery = useQuery({
     queryKey: sandboxProfileVersionAutomationConfigQueryKey({
       profileId: resolveSelectedProfileQueryId(selectedProfileId),
@@ -409,7 +410,7 @@ export function useLoadedWebhookAutomationEditorState(
     retry: false,
   });
   const selectedProfileBindingsErrorMessage = resolveSelectedProfileBindingsErrorMessage({
-    versionError: selectedProfileVersionsQuery.error,
+    versionError: isUsingPinnedSelectedProfileVersion ? null : selectedProfileVersionsQuery.error,
     bindingsError: selectedProfileAutomationConfigQuery.error,
   });
   const selectedProfileRepositoryOptions =
@@ -428,7 +429,8 @@ export function useLoadedWebhookAutomationEditorState(
       selectedProfileAutomationConfigQuery.data !== undefined,
     isBindingDataPending:
       selectedProfileId.length > 0 &&
-      (selectedProfileVersionsQuery.isPending || selectedProfileAutomationConfigQuery.isPending),
+      ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
+        selectedProfileAutomationConfigQuery.isPending),
     bindingErrorMessage: selectedProfileBindingsErrorMessage,
     bindings: selectedProfileAutomationConfigQuery.data?.bindings ?? [],
     directoryData: input.directoryData,
