@@ -170,7 +170,7 @@ function resolveLinkedAccountCommitSigningViewModel(
 
   if (linkedAccount.commitSigning === null) {
     return {
-      statusLabel: "Not configured",
+      statusLabel: "Add private key",
       keySummaryLabel: null,
       helperLabel: null,
       helperCommand: null,
@@ -180,7 +180,7 @@ function resolveLinkedAccountCommitSigningViewModel(
   }
 
   return {
-    statusLabel: "Configured",
+    statusLabel: "Private key added",
     keySummaryLabel: linkedAccount.commitSigning.publicKeyFingerprint,
     helperLabel: null,
     helperCommand: null,

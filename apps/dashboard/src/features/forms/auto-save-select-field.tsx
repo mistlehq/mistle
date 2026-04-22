@@ -185,7 +185,7 @@ export function AutoSaveSelectField(input: AutoSaveSelectFieldProps): React.JSX.
           </p>
           {input.options.length === 0 ? (
             <div
-              className="text-muted-foreground flex h-9 w-full max-w-[32rem] items-center text-sm"
+              className="text-muted-foreground ml-auto flex h-9 w-full max-w-[32rem] items-center justify-end text-right text-sm"
               id={input.id}
             >
               {input.noneLabel ?? "None"}

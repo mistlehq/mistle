@@ -28,7 +28,7 @@ export const GitHubLinkedWithConfiguredSigningCard = {
     helperText: "Used for sandbox Git identity and commit signing.",
   },
   commitSigning: {
-    statusLabel: "Configured",
+    statusLabel: "Private key added",
     keySummaryLabel: "SHA256:abc123",
     helperLabel: null,
     helperCommand: null,
@@ -84,7 +84,7 @@ export const GitHubLinkedWithoutSelectableEmailsCard = {
     helperText: "",
   },
   commitSigning: {
-    statusLabel: "Not configured",
+    statusLabel: "Add private key",
     keySummaryLabel: null,
     helperLabel: null,
     helperCommand: null,
@@ -119,7 +119,7 @@ export const GitHubLinkedWithSigningNotConfiguredCard = {
     helperText: "Used for sandbox Git identity and commit signing.",
   },
   commitSigning: {
-    statusLabel: "Not configured",
+    statusLabel: "Add private key",
     keySummaryLabel: null,
     helperLabel: null,
     helperCommand: null,

@@ -360,23 +360,7 @@ function LinkedAccountCard(input: {
               <FieldLabel>Commit signing</FieldLabel>
             </FieldHeader>
             <FieldContent>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="text-sm">{commitSigning.statusLabel}</p>
-                  {commitSigning.keySummaryLabel === null ? null : (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {commitSigning.keySummaryLabel}
-                    </p>
-                  )}
-                  {commitSigning.helperLabel === null ? null : (
-                    <p className="text-xs text-muted-foreground">{commitSigning.helperLabel}</p>
-                  )}
-                  {commitSigning.helperCommand === null ? null : (
-                    <code className="mt-1 inline-block max-w-full overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs select-all">
-                      {commitSigning.helperCommand}
-                    </code>
-                  )}
-                </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
                 <div className="flex flex-wrap gap-2">
                   <input
                     aria-label={`Upload ${input.linkedAccountCard.displayName} commit signing private key`}
@@ -396,32 +380,74 @@ function LinkedAccountCard(input: {
                     }}
                     type="file"
                   />
-                  <Button
-                    aria-label={commitSigning.uploadActionLabel}
-                    className="h-7 w-7"
-                    disabled={input.linkedAccountActionPending}
-                    onClick={() => {
-                      setIsCommitSigningDialogOpen(true);
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    {input.linkedAccountActionPending ? (
-                      <Spinner aria-hidden className="size-4" />
-                    ) : (
-                      <PencilSimpleIcon aria-hidden className="size-4" />
-                    )}
-                  </Button>
+                  {commitSigning.removeActionLabel === null &&
+                  commitSigning.keySummaryLabel === null ? (
+                    <Button
+                      disabled={input.linkedAccountActionPending}
+                      onClick={() => {
+                        setIsCommitSigningDialogOpen(true);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {input.linkedAccountActionPending ? (
+                        <Spinner aria-hidden className="size-4" />
+                      ) : (
+                        <>
+                          <span>{commitSigning.statusLabel}</span>
+                          <PencilSimpleIcon aria-hidden className="size-4" />
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <>
+                      <div className="min-w-0 text-left sm:text-right">
+                        <p className="text-sm">{commitSigning.statusLabel}</p>
+                        {commitSigning.keySummaryLabel === null ? null : (
+                          <p className="truncate text-xs text-muted-foreground">
+                            {commitSigning.keySummaryLabel}
+                          </p>
+                        )}
+                        {commitSigning.helperLabel === null ? null : (
+                          <p className="text-xs text-muted-foreground">
+                            {commitSigning.helperLabel}
+                          </p>
+                        )}
+                        {commitSigning.helperCommand === null ? null : (
+                          <code className="mt-1 inline-block max-w-full overflow-x-auto rounded bg-muted px-2 py-1 font-mono text-xs select-all">
+                            {commitSigning.helperCommand}
+                          </code>
+                        )}
+                      </div>
+                      <Button
+                        aria-label={commitSigning.uploadActionLabel}
+                        disabled={input.linkedAccountActionPending}
+                        onClick={() => {
+                          setIsCommitSigningDialogOpen(true);
+                        }}
+                        size="icon-sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        {input.linkedAccountActionPending ? (
+                          <Spinner aria-hidden className="size-4" />
+                        ) : (
+                          <PencilSimpleIcon aria-hidden className="size-4" />
+                        )}
+                      </Button>
+                    </>
+                  )}
                   {commitSigning.removeActionLabel === null ? null : (
                     <Button
                       aria-label={commitSigning.removeActionLabel}
-                      className="h-7 w-7"
                       disabled={input.linkedAccountActionPending}
                       onClick={() => {
                         void input.onDeleteLinkedAccountCommitSigningKey(
                           input.linkedAccountCard.providerFamily,
                         );
                       }}
+                      size="icon-sm"
                       type="button"
                       variant="ghost"
                     >

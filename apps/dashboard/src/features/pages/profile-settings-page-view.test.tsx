@@ -190,7 +190,7 @@ describe("ProfileSettingsPageView", () => {
               helperText: "Used for sandbox Git identity and commit signing.",
             },
             commitSigning: {
-              statusLabel: "Not configured",
+              statusLabel: "Add private key",
               keySummaryLabel: null,
               helperLabel: null,
               helperCommand: null,
@@ -230,7 +230,7 @@ describe("ProfileSettingsPageView", () => {
               helperText: "",
             },
             commitSigning: {
-              statusLabel: "Not configured",
+              statusLabel: "Add private key",
               keySummaryLabel: null,
               helperLabel: null,
               helperCommand: null,
@@ -300,7 +300,7 @@ describe("ProfileSettingsPageView", () => {
             helperMessage: null,
             emailPreference: null,
             commitSigning: {
-              statusLabel: "Not configured",
+              statusLabel: "Add private key",
               keySummaryLabel: null,
               helperLabel: null,
               helperCommand: null,
@@ -436,7 +436,7 @@ describe("ProfileSettingsPageView", () => {
               helperText: "Used for sandbox Git identity and commit signing.",
             },
             commitSigning: {
-              statusLabel: "Configured",
+              statusLabel: "Private key added",
               keySummaryLabel: "SHA256:abc123",
               helperLabel: null,
               helperCommand: null,
@@ -455,7 +455,7 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.getByRole("combobox")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Replace private key" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove key" })).toBeTruthy();
-    expect(screen.getByText("Configured")).toBeTruthy();
+    expect(screen.getByText("Private key added")).toBeTruthy();
     expect(screen.queryByText("SSH private key")).toBeNull();
     expect(screen.queryByText("Used for sandbox Git identity and commit signing.")).toBeNull();
   });
@@ -518,7 +518,7 @@ describe("ProfileSettingsPageView", () => {
             helperMessage: null,
             emailPreference: null,
             commitSigning: {
-              statusLabel: "Not configured",
+              statusLabel: "Add private key",
               keySummaryLabel: null,
               helperLabel: null,
               helperCommand: null,
@@ -535,7 +535,7 @@ describe("ProfileSettingsPageView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Upload private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
 
     fireEvent.change(screen.getByPlaceholderText("Paste your SSH private key"), {
       target: {
@@ -569,7 +569,7 @@ describe("ProfileSettingsPageView", () => {
             helperMessage: null,
             emailPreference: null,
             commitSigning: {
-              statusLabel: "Not configured",
+              statusLabel: "Add private key",
               keySummaryLabel: null,
               helperLabel: null,
               helperCommand: null,
@@ -586,7 +586,7 @@ describe("ProfileSettingsPageView", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Upload private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
 
     const uploadInput = screen.getByLabelText("Choose GitHub commit signing private key file", {
       selector: "input",

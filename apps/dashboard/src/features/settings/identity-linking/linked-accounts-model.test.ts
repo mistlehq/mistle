@@ -112,7 +112,7 @@ describe("linked-accounts-model", () => {
         helperText: "",
       },
       commitSigning: {
-        statusLabel: "Not configured",
+        statusLabel: "Add private key",
         keySummaryLabel: null,
         helperLabel: null,
         helperCommand: null,
@@ -205,7 +205,7 @@ describe("linked-accounts-model", () => {
       ),
     ).toMatchObject({
       commitSigning: {
-        statusLabel: "Configured",
+        statusLabel: "Private key added",
         keySummaryLabel: "SHA256:abc123",
         helperLabel: null,
         helperCommand: null,
