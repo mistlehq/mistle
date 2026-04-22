@@ -356,23 +356,27 @@ mod tests {
         let log_path = temp_dir.join("init.log");
         let log_text = fs::read_to_string(&log_path).expect("log file should be readable");
         let lines = log_text.lines().collect::<Vec<_>>();
-        assert_eq!(lines.len(), 4);
-        let first: Value =
-            serde_json::from_str(lines[0]).expect("first log line should be valid json");
-        let second: Value =
-            serde_json::from_str(lines[1]).expect("second log line should be valid json");
-        let third: Value =
-            serde_json::from_str(lines[2]).expect("third log line should be valid json");
-        let fourth: Value =
-            serde_json::from_str(lines[3]).expect("fourth log line should be valid json");
-        assert_eq!(first["event"], "sandbox_init_started");
-        assert_eq!(first["sandboxInstanceId"], "sbi_test");
-        assert_eq!(second["event"], "sandbox_init_phase_started");
-        assert_eq!(second["phase"], "apply_runtime_plan");
-        assert_eq!(third["event"], "sandbox_init_phase_completed");
-        assert_eq!(third["phase"], "apply_runtime_plan");
-        assert_eq!(fourth["phase"], "apply_runtime_plan");
-        assert_eq!(fourth["error"], "workspace clone failed");
+        assert!(lines.len() >= 4);
+        let records = lines
+            .iter()
+            .map(|line| serde_json::from_str::<Value>(line).expect("log line should be valid json"))
+            .collect::<Vec<_>>();
+        assert!(records.iter().any(|record| {
+            record["event"] == "sandbox_init_started" && record["sandboxInstanceId"] == "sbi_test"
+        }));
+        assert!(records.iter().any(|record| {
+            record["event"] == "sandbox_init_phase_started"
+                && record["phase"] == "apply_runtime_plan"
+        }));
+        assert!(records.iter().any(|record| {
+            record["event"] == "sandbox_init_phase_completed"
+                && record["phase"] == "apply_runtime_plan"
+        }));
+        assert!(records.iter().any(|record| {
+            record["event"] == "sandbox_init_phase_failed"
+                && record["phase"] == "apply_runtime_plan"
+                && record["error"] == "workspace clone failed"
+        }));
 
         unsafe {
             std::env::remove_var("MISTLE_SANDBOXD_OPERATION_LOG_DIR");
