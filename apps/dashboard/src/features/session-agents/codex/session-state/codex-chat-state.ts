@@ -917,14 +917,49 @@ function buildTurnRenderEvents(turn: CodexRawTurnState): readonly TurnRenderEven
       flushBufferedItems();
 
       let consumedTextLength = 0;
+      let canSplitAssistantItem = true;
       for (const steerEntry of steerEntriesAfterAssistantSegments) {
         const anchoredText = steerEntry.anchor.text;
         if (!assistantItem.text.startsWith(anchoredText)) {
-          throw new Error(
-            `Assistant steer anchor text is not a prefix of assistant item '${assistantItem.id}'.`,
+          canSplitAssistantItem = false;
+          break;
+        }
+      }
+
+      if (!canSplitAssistantItem) {
+        events.push(
+          ...projectItemsToRenderEvents({
+            turnId: turn.id,
+            items: [assistantItem],
+          }),
+        );
+        const nonAssistantItems = normalizedItemsForRawItem.filter(
+          (item) => item.id !== assistantItem.id && item.kind !== "assistant-message",
+        );
+        if (nonAssistantItems.length > 0) {
+          events.push(
+            ...projectItemsToRenderEvents({
+              turnId: turn.id,
+              items: nonAssistantItems,
+            }),
           );
         }
 
+        events.push(
+          ...steerEntriesAfterAssistantSegments.map((steerEntry) =>
+            createSteerRenderEvent(steerEntry.entry),
+          ),
+        );
+        events.push(
+          ...steerEntriesAfterWholeRawItem.map((steerEntry) =>
+            createSteerRenderEvent(steerEntry.entry),
+          ),
+        );
+        continue;
+      }
+
+      for (const steerEntry of steerEntriesAfterAssistantSegments) {
+        const anchoredText = steerEntry.anchor.text;
         const nextSegmentText = anchoredText.slice(consumedTextLength);
         if (nextSegmentText.length > 0) {
           events.push(

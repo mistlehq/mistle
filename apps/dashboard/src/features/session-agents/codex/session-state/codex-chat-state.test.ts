@@ -385,6 +385,89 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("falls back to the full assistant item when a completed payload rewrites streamed text after steer", () => {
+    const streaming = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(createInitialCodexChatState(), {
+          type: "start_turn_requested",
+          clientTurnId: "pending:turn_123",
+          prompt: "Test prompt",
+        }),
+        {
+          type: "turn_started_response",
+          clientTurnId: "pending:turn_123",
+          turnId: "turn_123",
+          status: "inProgress",
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/agentMessage/delta",
+          params: {
+            turnId: "turn_123",
+            itemId: "msg_1",
+            delta: "Before steer",
+          },
+        },
+      },
+    );
+    const processed = reduceCodexChatState(
+      reduceCodexChatState(streaming, {
+        type: "steer_turn_requested",
+        entryId: "steer_1",
+        turnId: "turn_123",
+        prompt: "Focus on the reducer",
+      }),
+      {
+        type: "steer_turn_processed",
+        entryId: "steer_1",
+        turnId: "turn_123",
+      },
+    );
+
+    const completedWithRewrite = reduceCodexChatState(processed, {
+      type: "notification_received",
+      notification: {
+        method: "item/completed",
+        params: {
+          turnId: "turn_123",
+          item: {
+            type: "agentMessage",
+            id: "msg_1",
+            text: "Rewritten final response",
+            phase: "commentary",
+          },
+        },
+      },
+    });
+
+    expect(completedWithRewrite.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Test prompt",
+        status: "completed",
+      },
+      {
+        id: "msg_1",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "Rewritten final response",
+        phase: "commentary",
+        status: "completed",
+      },
+      {
+        id: "steer_1",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Focus on the reducer",
+        status: "completed",
+      },
+    ]);
+  });
+
   it("keeps accepted steers behind later-normalized content from the same reasoning item", () => {
     const activeTurn = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
