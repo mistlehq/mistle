@@ -182,6 +182,8 @@ function SessionsSidebarItemLabel(input: {
       <OverflowTooltipText
         className="min-w-0 flex-1 text-[13px] leading-tight"
         text={input.label}
+        tooltipSide="right"
+        tooltipSideOffset={8}
       />
       <div
         className={`pt-px text-[10px] leading-tight font-medium ${

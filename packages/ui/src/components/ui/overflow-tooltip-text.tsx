@@ -11,6 +11,7 @@ type OverflowTooltipTextProps = {
   truncatePosition?: "end" | "start";
   tooltipClassName?: string;
   tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
+  tooltipSideOffset?: React.ComponentProps<typeof TooltipContent>["sideOffset"];
   tooltipVariant?: React.ComponentProps<typeof TooltipContent>["variant"];
   tooltipShowArrow?: boolean;
 };
@@ -23,6 +24,7 @@ function OverflowTooltipText({
   truncatePosition = "end",
   tooltipClassName,
   tooltipSide = "top",
+  tooltipSideOffset,
   tooltipVariant = "light",
   tooltipShowArrow = false,
 }: OverflowTooltipTextProps): React.JSX.Element {
@@ -78,6 +80,7 @@ function OverflowTooltipText({
         className={cn("max-w-80 whitespace-pre-wrap text-left", tooltipClassName)}
         showArrow={tooltipShowArrow}
         side={tooltipSide}
+        sideOffset={tooltipSideOffset}
         variant={tooltipVariant}
       >
         {text}

@@ -59,6 +59,15 @@ export const BottomTooltip: Story = {
   },
 };
 
+export const RightOffsetTooltip: Story = {
+  args: {
+    text: "Opening the tooltip to the right with a slightly larger gap keeps it out of the way when the surrounding panel is scrollable.",
+    tooltipSide: "right",
+    tooltipSideOffset: 8,
+    widthClassName: "max-w-[12rem]",
+  },
+};
+
 export const StartTruncation: Story = {
   args: {
     text: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
