@@ -1,3 +1,4 @@
+import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 
@@ -59,23 +60,25 @@ export function buildSidebarSessionNavItems(
     nowEpochMs?: number;
   },
 ): SessionsSidebarNavItem[] {
-  return items.map((item) => ({
-    id: item.id,
-    label: resolveSessionTitleLabel(item.title),
-    profileName: item.profileName,
-    metadataLabel: resolveMetadataLabel({
-      status: item.status,
-      keepaliveActive: item.keepaliveActive,
+  return items
+    .filter((item) => isSessionPageNavigableSandboxStatus(item.status))
+    .map((item) => ({
+      id: item.id,
+      label: resolveSessionTitleLabel(item.title),
+      profileName: item.profileName,
+      metadataLabel: resolveMetadataLabel({
+        status: item.status,
+        keepaliveActive: item.keepaliveActive,
+        updatedAt: item.updatedAt,
+        ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
+      }),
+      to: `/sessions/${encodeURIComponent(item.id)}`,
+      showActivityIndicator: resolveSessionsSidebarShowActivityIndicator({
+        status: item.status,
+        keepaliveActive: item.keepaliveActive,
+      }),
       updatedAt: item.updatedAt,
-      ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
-    }),
-    to: `/sessions/${encodeURIComponent(item.id)}`,
-    showActivityIndicator: resolveSessionsSidebarShowActivityIndicator({
-      status: item.status,
-      keepaliveActive: item.keepaliveActive,
-    }),
-    updatedAt: item.updatedAt,
-  }));
+    }));
 }
 
 export function filterSessionsSidebarNavItems(input: {

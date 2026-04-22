@@ -432,7 +432,7 @@ describe("SessionsPage", () => {
   });
 
   it("shows compact updated labels for non-failed sessions", () => {
-    const updatedAt = "2026-03-08T00:00:00.000Z";
+    const updatedAt = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,

@@ -130,15 +130,6 @@ describe("buildSidebarSessionNavItems", () => {
         showActivityIndicator: false,
         updatedAt: "2026-04-08T00:00:00.000Z",
       },
-      {
-        id: "sbi_failed",
-        label: "Untitled",
-        profileName: "Alpha Profile",
-        metadataLabel: "Failed",
-        to: "/sessions/sbi_failed",
-        showActivityIndicator: false,
-        updatedAt: "2026-04-08T00:00:00.000Z",
-      },
     ]);
   });
 });

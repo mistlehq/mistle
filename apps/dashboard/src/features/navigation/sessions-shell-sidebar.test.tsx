@@ -7,7 +7,11 @@ import type {
 import {
   buildSidebarSessionItems,
   buildSidebarSessionNavItems,
+  dedupeSidebarSessionItems,
+  filterSidebarPrependedItems,
   flattenSidebarSessionPages,
+  prependSidebarSessionItems,
+  resolveSidebarHeadRefresh,
   resolveSidebarSessionsHasMore,
   resolveSidebarSessionsNextCursor,
 } from "./sessions-shell-sidebar.js";
@@ -109,15 +113,6 @@ describe("buildSidebarSessionNavItems", () => {
         showActivityIndicator: false,
         updatedAt: "2026-04-10T00:00:00.000Z",
       },
-      {
-        id: "sbi_older",
-        label: "Older created session",
-        profileName: "Docs",
-        metadataLabel: "Failed",
-        to: "/sessions/sbi_older",
-        showActivityIndicator: false,
-        updatedAt: "2026-04-09T00:00:00.000Z",
-      },
     ]);
   });
 });
@@ -137,6 +132,59 @@ describe("flattenSidebarSessionPages", () => {
       buildSandboxInstanceListItem({ id: "sbi_page_one" }),
       buildSandboxInstanceListItem({ id: "sbi_page_two" }),
     ]);
+  });
+});
+
+describe("dedupeSidebarSessionItems", () => {
+  it("keeps the first occurrence of each item id", () => {
+    expect(
+      dedupeSidebarSessionItems([
+        buildSandboxInstanceListItem({ id: "sbi_newest" }),
+        buildSandboxInstanceListItem({ id: "sbi_existing" }),
+        buildSandboxInstanceListItem({ id: "sbi_newest", title: "Duplicate" }),
+      ]),
+    ).toStrictEqual([
+      buildSandboxInstanceListItem({ id: "sbi_newest" }),
+      buildSandboxInstanceListItem({ id: "sbi_existing" }),
+    ]);
+  });
+});
+
+describe("prependSidebarSessionItems", () => {
+  it("prepends newer items without duplicating existing ids", () => {
+    expect(
+      prependSidebarSessionItems({
+        currentItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing" }),
+        ],
+        newerItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+          buildSandboxInstanceListItem({ id: "sbi_head", title: "Duplicate head" }),
+        ],
+      }),
+    ).toStrictEqual([
+      buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+      buildSandboxInstanceListItem({ id: "sbi_head", title: "Duplicate head" }),
+      buildSandboxInstanceListItem({ id: "sbi_existing" }),
+    ]);
+  });
+});
+
+describe("filterSidebarPrependedItems", () => {
+  it("drops prepended items once the base feed contains them", () => {
+    expect(
+      filterSidebarPrependedItems({
+        prependedItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+        ],
+        baseItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing" }),
+        ],
+      }),
+    ).toStrictEqual([buildSandboxInstanceListItem({ id: "sbi_new_1" })]);
   });
 });
 
@@ -191,5 +239,95 @@ describe("resolveSidebarSessionsNextCursor", () => {
         }),
       ]),
     ).toBeNull();
+  });
+});
+
+describe("resolveSidebarHeadRefresh", () => {
+  it("does nothing when the current head still matches the latest head", () => {
+    expect(
+      resolveSidebarHeadRefresh({
+        currentItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing" }),
+        ],
+        latestHeadItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing" }),
+        ],
+        maxAutoMergeCount: 10,
+      }),
+    ).toStrictEqual({
+      kind: "noop",
+    });
+  });
+
+  it("merges a small number of newer head items into the loaded list", () => {
+    expect(
+      resolveSidebarHeadRefresh({
+        currentItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing_2" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing_3" }),
+        ],
+        latestHeadItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing_2" }),
+        ],
+        maxAutoMergeCount: 10,
+      }),
+    ).toStrictEqual({
+      kind: "merge",
+      newerItemCount: 2,
+      items: [
+        buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+        buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+        buildSandboxInstanceListItem({ id: "sbi_head" }),
+        buildSandboxInstanceListItem({ id: "sbi_existing_2" }),
+        buildSandboxInstanceListItem({ id: "sbi_existing_3" }),
+      ],
+    });
+  });
+
+  it("requires a hard refresh when the unseen newer set exceeds the merge threshold", () => {
+    expect(
+      resolveSidebarHeadRefresh({
+        currentItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing_2" }),
+        ],
+        latestHeadItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_3" }),
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+        ],
+        maxAutoMergeCount: 2,
+      }),
+    ).toStrictEqual({
+      kind: "refresh",
+      newerItemCount: 3,
+    });
+  });
+
+  it("requires a hard refresh when the current head is missing from the fetched head page", () => {
+    expect(
+      resolveSidebarHeadRefresh({
+        currentItems: [
+          buildSandboxInstanceListItem({ id: "sbi_head" }),
+          buildSandboxInstanceListItem({ id: "sbi_existing_2" }),
+        ],
+        latestHeadItems: [
+          buildSandboxInstanceListItem({ id: "sbi_new_1" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_2" }),
+          buildSandboxInstanceListItem({ id: "sbi_new_3" }),
+        ],
+        maxAutoMergeCount: 10,
+      }),
+    ).toStrictEqual({
+      kind: "refresh",
+      newerItemCount: 3,
+    });
   });
 });

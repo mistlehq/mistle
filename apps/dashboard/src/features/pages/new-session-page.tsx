@@ -17,8 +17,8 @@ import { SingleSelectStringComboboxField } from "../forms/single-select-string-c
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import {
+  SidebarSessionsHeadQueryPrefix,
   SandboxInstancesListQueryPrefix,
-  SidebarSessionsQueryPrefix,
 } from "../sessions/sessions-query-keys.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -104,7 +104,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
           queryKey: SandboxInstancesListQueryPrefix,
         }),
         queryClient.invalidateQueries({
-          queryKey: SidebarSessionsQueryPrefix,
+          queryKey: SidebarSessionsHeadQueryPrefix,
         }),
       ]);
       await navigate(`/sessions/${encodeURIComponent(result.sandboxInstanceId)}`);
