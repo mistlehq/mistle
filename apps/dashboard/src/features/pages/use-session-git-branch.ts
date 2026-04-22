@@ -21,19 +21,6 @@ type FsChangedNotification = {
   watchId: string;
 };
 
-class GitBranchCommandError extends Error {
-  command: string;
-  exitCode: number;
-  stderr: string;
-
-  constructor(input: { command: string; exitCode: number; stderr: string }) {
-    super(`Git command failed: ${input.command}`);
-    this.command = input.command;
-    this.exitCode = input.exitCode;
-    this.stderr = input.stderr;
-  }
-}
-
 export function buildGitBranchExecRequest(input: {
   args: string[];
   cwd: string;
@@ -114,11 +101,7 @@ async function runGitCommand(input: {
       return null;
     }
 
-    throw new GitBranchCommandError({
-      command: ["git", ...input.args].join(" "),
-      exitCode: result.exitCode,
-      stderr: result.stderr,
-    });
+    throw new Error(`Git command failed: ${["git", ...input.args].join(" ")}`);
   }
 
   const output = result.stdout.trim();
@@ -251,10 +234,4 @@ export function useSessionGitBranch(input: {
   };
 }
 
-export {
-  GitBranchCommandError,
-  GitBranchCommandTimeoutMs,
-  isFsChangedNotification,
-  isNotGitRepositoryResult,
-};
-export type { FsChangedNotification, GitBranchSnapshot, SessionGitBranchState };
+export { GitBranchCommandTimeoutMs, isFsChangedNotification };
