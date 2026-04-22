@@ -52,6 +52,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const [linkedAccountOperationErrorMessage, setLinkedAccountOperationErrorMessage] = useState<
     string | null
   >(null);
+  const [pendingLinkedAccountProviderFamilyCounts, setPendingLinkedAccountProviderFamilyCounts] =
+    useState<Record<string, number>>({});
   const [callbackNotice, setCallbackNotice] = useState<LinkedAccountCallbackNotice | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "Profile");
   const profileImageQuery = useQuery({
@@ -252,13 +254,26 @@ export function ProfileSettingsPage(): React.JSX.Element {
     linkedAccountCards.length === 0
       ? "Your organization has not enabled any linked account providers right now."
       : null;
-  const pendingLinkedAccountProviderFamilies = resolvePendingLinkedAccountProviderFamilies({
-    deleteGitHubLinkedAccountSigningKeyMutation,
-    startLinkedAccountAuthorizationMutation,
-    unlinkLinkedAccountMutation,
-    updateGitHubLinkedAccountPreferredEmailMutation,
-    uploadGitHubLinkedAccountSigningKeyMutation,
-  });
+  const pendingLinkedAccountProviderFamilies = resolvePendingLinkedAccountProviderFamilies(
+    pendingLinkedAccountProviderFamilyCounts,
+  );
+
+  async function runLinkedAccountAction<T>(
+    providerFamily: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    setPendingLinkedAccountProviderFamilyCounts((currentCounts) =>
+      incrementPendingLinkedAccountProviderFamilyCount(currentCounts, providerFamily),
+    );
+
+    try {
+      return await action();
+    } finally {
+      setPendingLinkedAccountProviderFamilyCounts((currentCounts) =>
+        decrementPendingLinkedAccountProviderFamilyCount(currentCounts, providerFamily),
+      );
+    }
+  }
 
   return (
     <FormPageFrame description={description} title={title}>
@@ -280,25 +295,35 @@ export function ProfileSettingsPage(): React.JSX.Element {
           await deleteProfileImageMutation.mutateAsync();
         }}
         onLinkLinkedAccount={async (providerFamily) => {
-          await startLinkedAccountAuthorizationMutation.mutateAsync(providerFamily);
+          await runLinkedAccountAction(providerFamily, async () =>
+            startLinkedAccountAuthorizationMutation.mutateAsync(providerFamily),
+          );
         }}
         onDeleteLinkedAccountCommitSigningKey={async (providerFamily) => {
-          await deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync({ providerFamily });
+          await runLinkedAccountAction(providerFamily, async () =>
+            deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync({ providerFamily }),
+          );
         }}
         onSaveChanges={async (displayNameDraft) => {
           await saveMutation.mutateAsync(displayNameDraft.trim());
         }}
         onUnlinkLinkedAccount={async (providerFamily) => {
-          await unlinkLinkedAccountMutation.mutateAsync(providerFamily);
+          await runLinkedAccountAction(providerFamily, async () =>
+            unlinkLinkedAccountMutation.mutateAsync(providerFamily),
+          );
         }}
         onUpdateLinkedAccountPreferredEmail={async (providerFamily, preferredEmail) => {
-          await updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync({
-            preferredEmail,
-            providerFamily,
-          });
+          await runLinkedAccountAction(providerFamily, async () =>
+            updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync({
+              preferredEmail,
+              providerFamily,
+            }),
+          );
         }}
         onUploadLinkedAccountCommitSigningKey={async (providerFamily, file) => {
-          await uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync({ file, providerFamily });
+          await runLinkedAccountAction(providerFamily, async () =>
+            uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync({ file, providerFamily }),
+          );
         }}
         onUploadProfileImage={async (file) => {
           await uploadProfileImageMutation.mutateAsync(file);
@@ -310,67 +335,36 @@ export function ProfileSettingsPage(): React.JSX.Element {
   );
 }
 
-function resolvePendingLinkedAccountProviderFamilies(input: {
-  deleteGitHubLinkedAccountSigningKeyMutation: {
-    isPending: boolean;
-    variables: { providerFamily: string } | undefined;
+export function incrementPendingLinkedAccountProviderFamilyCount(
+  currentCounts: Readonly<Record<string, number>>,
+  providerFamily: string,
+): Record<string, number> {
+  return {
+    ...currentCounts,
+    [providerFamily]: (currentCounts[providerFamily] ?? 0) + 1,
   };
-  startLinkedAccountAuthorizationMutation: {
-    isPending: boolean;
-    variables: string | undefined;
-  };
-  unlinkLinkedAccountMutation: {
-    isPending: boolean;
-    variables: string | undefined;
-  };
-  updateGitHubLinkedAccountPreferredEmailMutation: {
-    isPending: boolean;
-    variables: { preferredEmail: string; providerFamily: string } | undefined;
-  };
-  uploadGitHubLinkedAccountSigningKeyMutation: {
-    isPending: boolean;
-    variables: { file: File; providerFamily: string } | undefined;
-  };
-}): string[] {
-  const pendingProviderFamilies = new Set<string>();
+}
 
-  if (input.startLinkedAccountAuthorizationMutation.isPending) {
-    const providerFamily = input.startLinkedAccountAuthorizationMutation.variables;
-    if (providerFamily !== undefined) {
-      pendingProviderFamilies.add(providerFamily);
-    }
+export function decrementPendingLinkedAccountProviderFamilyCount(
+  currentCounts: Readonly<Record<string, number>>,
+  providerFamily: string,
+): Record<string, number> {
+  const nextCount = (currentCounts[providerFamily] ?? 0) - 1;
+  if (nextCount > 0) {
+    return {
+      ...currentCounts,
+      [providerFamily]: nextCount,
+    };
   }
 
-  if (input.unlinkLinkedAccountMutation.isPending) {
-    const providerFamily = input.unlinkLinkedAccountMutation.variables;
-    if (providerFamily !== undefined) {
-      pendingProviderFamilies.add(providerFamily);
-    }
-  }
+  const { [providerFamily]: _removedProviderFamily, ...remainingCounts } = currentCounts;
+  return remainingCounts;
+}
 
-  if (input.updateGitHubLinkedAccountPreferredEmailMutation.isPending) {
-    const providerFamily =
-      input.updateGitHubLinkedAccountPreferredEmailMutation.variables?.providerFamily;
-    if (providerFamily !== undefined) {
-      pendingProviderFamilies.add(providerFamily);
-    }
-  }
-
-  if (input.uploadGitHubLinkedAccountSigningKeyMutation.isPending) {
-    const providerFamily =
-      input.uploadGitHubLinkedAccountSigningKeyMutation.variables?.providerFamily;
-    if (providerFamily !== undefined) {
-      pendingProviderFamilies.add(providerFamily);
-    }
-  }
-
-  if (input.deleteGitHubLinkedAccountSigningKeyMutation.isPending) {
-    const providerFamily =
-      input.deleteGitHubLinkedAccountSigningKeyMutation.variables?.providerFamily;
-    if (providerFamily !== undefined) {
-      pendingProviderFamilies.add(providerFamily);
-    }
-  }
-
-  return [...pendingProviderFamilies];
+export function resolvePendingLinkedAccountProviderFamilies(
+  providerFamilyCounts: Readonly<Record<string, number>>,
+): string[] {
+  return Object.entries(providerFamilyCounts)
+    .filter(([, count]) => count > 0)
+    .map(([providerFamily]) => providerFamily);
 }
