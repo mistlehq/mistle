@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
-import { buildSessionsShellSidebarGroups } from "./sessions-shell-sidebar.js";
+import { buildSessionsShellSidebarItems } from "./sessions-shell-sidebar.js";
 
 function buildSandboxInstanceListItem(
   overrides: Partial<SandboxInstanceListItem> & Pick<SandboxInstanceListItem, "id">,
@@ -30,10 +30,10 @@ function buildSandboxInstanceListItem(
   };
 }
 
-describe("buildSessionsShellSidebarGroups", () => {
-  it("maps listed sandbox instances into grouped session sidebar items", () => {
+describe("buildSessionsShellSidebarItems", () => {
+  it("maps listed sandbox instances into flat session sidebar items without reordering", () => {
     expect(
-      buildSessionsShellSidebarGroups(
+      buildSessionsShellSidebarItems(
         [
           buildSandboxInstanceListItem({
             id: "sbi_active",
@@ -60,30 +60,27 @@ describe("buildSessionsShellSidebarGroups", () => {
       ),
     ).toStrictEqual([
       {
-        profileId: "sbp_default",
+        id: "sbi_active",
+        label: "Investigate flaky test run",
         profileName: "Default Profile",
-        items: [
-          {
-            id: "sbi_active",
-            label: "Investigate flaky test run",
-            metadataLabel: "Working",
-            to: "/sessions/sbi_active",
-            showActivityIndicator: true,
-          },
-        ],
+        status: "running",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_active",
       },
       {
-        profileId: "sbp_docs",
+        id: "sbi_setup",
+        label: "Draft onboarding guide",
         profileName: "Docs",
-        items: [
-          {
-            id: "sbi_setup",
-            label: "Draft onboarding guide",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_setup",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "starting",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_setup",
+      },
+      {
+        id: "sbi_failed",
+        label: "Untitled",
+        profileName: "Broken",
+        status: "failed",
+        updatedAtLabel: "2d",
       },
     ]);
   });

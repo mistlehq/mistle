@@ -1,66 +1,50 @@
 // @vitest-environment jsdom
 
 import { SidebarProvider } from "@mistle/ui";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { SessionsSidebarNavGroup } from "./sessions-sidebar-nav-model.js";
+import type { SessionsSidebarNavItem } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
-const groups: SessionsSidebarNavGroup[] = [
+const items: SessionsSidebarNavItem[] = [
   {
-    profileId: "sbp_repo",
+    id: "sbi_active",
+    label: "Investigate flaky test run",
     profileName: "Repo Maintainer",
-    items: [
-      {
-        id: "sbi_active",
-        label: "Investigate flaky test run",
-        metadataLabel: "Working",
-        to: "/sessions/sbi_active",
-        showActivityIndicator: true,
-      },
-      {
-        id: "sbi_idle",
-        label: "Review migration draft",
-        metadataLabel: "Idle",
-        to: "/sessions/sbi_idle",
-        showActivityIndicator: false,
-      },
-    ],
+    status: "running",
+    updatedAtLabel: "2m",
+    to: "/sessions/sbi_active",
   },
   {
-    profileId: "sbp_docs",
+    id: "sbi_idle",
+    label: "Review migration draft",
+    profileName: "Repo Maintainer",
+    status: "running",
+    updatedAtLabel: "1h",
+    to: "/sessions/sbi_idle",
+  },
+  {
+    id: "sbi_failed",
+    label: "Broken launch attempt",
     profileName: "Docs Maintainer",
-    items: [
-      {
-        id: "sbi_docs",
-        label: "Draft onboarding guide",
-        metadataLabel: "1h",
-        to: "/sessions/sbi_docs",
-        showActivityIndicator: false,
-      },
-    ],
+    status: "failed",
+    updatedAtLabel: "2d",
   },
 ];
 
 function renderSidebarNav(input?: {
-  groups?: readonly SessionsSidebarNavGroup[];
+  items?: readonly SessionsSidebarNavItem[];
   initialEntries?: string[];
 }): void {
   render(
     <SidebarProvider>
       <MemoryRouter initialEntries={input?.initialEntries ?? ["/sessions"]}>
-        <SessionsSidebarNav groups={input?.groups ?? groups} />
+        <SessionsSidebarNav items={input?.items ?? items} />
       </MemoryRouter>
     </SidebarProvider>,
   );
-}
-
-function getRepoMaintainerTrigger(): HTMLElement {
-  return screen.getByRole("button", {
-    name: "Toggle Repo Maintainer sessions",
-  });
 }
 
 function getSearchInput(): HTMLElement {
@@ -85,6 +69,9 @@ function installMatchMediaStub(): void {
 
 describe("SessionsSidebarNav", () => {
   installMatchMediaStub();
+  afterEach(() => {
+    cleanup();
+  });
 
   it("renders a new session link above the search field", () => {
     renderSidebarNav();
@@ -100,60 +87,51 @@ describe("SessionsSidebarNav", () => {
       initialEntries: ["/sessions/new"],
     });
 
-    expect(
-      screen.getByRole("link", { name: "Create a new session" }).getAttribute("data-active"),
-    ).not.toBeNull();
+    const newSessionLinks = screen.getAllByRole("link", { name: "Create a new session" });
+    expect(newSessionLinks.some((link) => link.getAttribute("data-active") !== null)).toBe(true);
   });
 
-  it("allows sandbox profile groups to be collapsed and expanded", () => {
+  it("renders clickable and non-clickable items in API order", () => {
     renderSidebarNav();
 
-    const trigger = getRepoMaintainerTrigger();
+    const links = screen.getAllByRole("link");
 
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
-
-    fireEvent.click(trigger);
-
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByRole("link", { name: /Review migration draft/ })).toBeNull();
-
-    fireEvent.click(trigger);
-
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
+    expect(links.map((link) => link.getAttribute("href"))).toContain("/sessions/sbi_active");
+    expect(links.map((link) => link.getAttribute("href"))).toContain("/sessions/sbi_idle");
+    expect(screen.queryByRole("link", { name: /Broken launch attempt/ })).toBeNull();
+    expect(screen.getAllByText("Broken launch attempt").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Docs Maintainer").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2d").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Failed").length).toBeGreaterThan(0);
   });
 
-  it("expands matching groups while search is active", () => {
+  it("filters by title and profile name", () => {
     renderSidebarNav();
-
-    const trigger = getRepoMaintainerTrigger();
-
-    fireEvent.click(trigger);
-    expect(trigger.getAttribute("aria-expanded")).toBe("false");
 
     fireEvent.change(getSearchInput(), {
-      target: { value: "migration" },
+      target: { value: "docs" },
     });
 
-    expect(trigger.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("link", { name: /Review migration draft/ })).toBeDefined();
+    expect(screen.queryByText("Investigate flaky test run")).toBeNull();
+    expect(screen.getByText("Broken launch attempt")).toBeDefined();
   });
 
-  it("shows working for active running sessions and idle for inactive running sessions", () => {
+  it("shows the no-results message when search matches nothing", () => {
     renderSidebarNav();
 
-    expect(screen.getByText("Working")).toBeDefined();
-    expect(screen.getAllByText("Working")).toHaveLength(1);
-    expect(screen.getByText("Idle")).toBeDefined();
-  });
-
-  it("keeps the new session action visible when there are no groups", () => {
-    renderSidebarNav({
-      groups: [],
+    fireEvent.change(getSearchInput(), {
+      target: { value: "missing" },
     });
 
-    expect(screen.getByRole("link", { name: "Create a new session" })).toBeDefined();
-    expect(screen.getByText("No openable sessions yet.")).toBeDefined();
+    expect(screen.getByText("No sessions match your search.")).toBeDefined();
+  });
+
+  it("keeps the new session action visible when there are no items", () => {
+    renderSidebarNav({
+      items: [],
+    });
+
+    expect(screen.getAllByRole("link", { name: "Create a new session" }).length).toBeGreaterThan(0);
+    expect(screen.getByText("No sessions yet.")).toBeDefined();
   });
 });

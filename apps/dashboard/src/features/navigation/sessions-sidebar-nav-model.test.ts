@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  buildSessionsSidebarNavGroups,
-  filterSessionsSidebarNavGroups,
-  resolveSessionsSidebarShowActivityIndicator,
+  buildSessionsSidebarNavItems,
+  filterSessionsSidebarNavItems,
   type SessionsSidebarSourceItem,
 } from "./sessions-sidebar-nav-model.js";
 
@@ -25,54 +24,10 @@ function buildSourceItem(
   };
 }
 
-describe("resolveSessionsSidebarShowActivityIndicator", () => {
-  it("shows activity only for running sessions with active keepalive", () => {
+describe("buildSessionsSidebarNavItems", () => {
+  it("preserves API order and only removes navigation from failed sessions", () => {
     expect(
-      resolveSessionsSidebarShowActivityIndicator({
-        status: "running",
-        keepaliveActive: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("hides activity for running sessions without keepalive", () => {
-    expect(
-      resolveSessionsSidebarShowActivityIndicator({
-        status: "running",
-        keepaliveActive: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("hides activity for openable sessions that are not actively running work", () => {
-    expect(
-      resolveSessionsSidebarShowActivityIndicator({
-        status: "stopped",
-        keepaliveActive: false,
-      }),
-    ).toBe(false);
-    expect(
-      resolveSessionsSidebarShowActivityIndicator({
-        status: "starting",
-        keepaliveActive: false,
-      }),
-    ).toBe(false);
-  });
-
-  it("excludes failed sessions from the sidebar", () => {
-    expect(
-      resolveSessionsSidebarShowActivityIndicator({
-        status: "failed",
-        keepaliveActive: false,
-      }),
-    ).toBeNull();
-  });
-});
-
-describe("buildSessionsSidebarNavGroups", () => {
-  it("groups only openable sessions by sandbox profile", () => {
-    expect(
-      buildSessionsSidebarNavGroups(
+      buildSessionsSidebarNavItems(
         [
           buildSourceItem({
             id: "sbi_working",
@@ -103,44 +58,42 @@ describe("buildSessionsSidebarNavGroups", () => {
       ),
     ).toStrictEqual([
       {
-        profileId: "sbp_profile_alpha",
+        id: "sbi_working",
+        label: "Investigate flaky test run",
         profileName: "Alpha Profile",
-        items: [
-          {
-            id: "sbi_working",
-            label: "Investigate flaky test run",
-            metadataLabel: "Working",
-            to: "/sessions/sbi_working",
-            showActivityIndicator: true,
-          },
-          {
-            id: "sbi_ready",
-            label: "Review migration draft",
-            metadataLabel: "Idle",
-            to: "/sessions/sbi_ready",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "running",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_working",
       },
       {
-        profileId: "sbp_profile_beta",
+        id: "sbi_ready",
+        label: "Review migration draft",
+        profileName: "Alpha Profile",
+        status: "running",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_ready",
+      },
+      {
+        id: "sbi_stopped",
+        label: "Untitled",
         profileName: "Beta Profile",
-        items: [
-          {
-            id: "sbi_stopped",
-            label: "Untitled",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_stopped",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "stopped",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_stopped",
+      },
+      {
+        id: "sbi_failed",
+        label: "Untitled",
+        profileName: "Gamma Profile",
+        status: "failed",
+        updatedAtLabel: "2d",
       },
     ]);
   });
 });
 
-describe("filterSessionsSidebarNavGroups", () => {
-  const groups = buildSessionsSidebarNavGroups(
+describe("filterSessionsSidebarNavItems", () => {
+  const items = buildSessionsSidebarNavItems(
     [
       buildSourceItem({
         id: "sbi_docs",
@@ -180,74 +133,59 @@ describe("filterSessionsSidebarNavGroups", () => {
 
   it("returns the original groups when the query is empty", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
           searchQuery: "   ",
         },
       }),
-    ).toStrictEqual(groups);
+    ).toStrictEqual(items);
   });
 
   it("matches items by session title", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
           searchQuery: "draft",
         },
       }),
     ).toStrictEqual([
       {
-        profileId: "sbp_docs",
+        id: "sbi_docs",
+        label: "Draft onboarding guide",
         profileName: "Docs Maintainer",
-        items: [
-          {
-            id: "sbi_docs",
-            label: "Draft onboarding guide",
-            metadataLabel: "1h",
-            to: "/sessions/sbi_docs",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "starting",
+        updatedAtLabel: "1h",
+        to: "/sessions/sbi_docs",
       },
       {
-        profileId: "sbp_repo",
+        id: "sbi_repo_idle",
+        label: "Review migration draft",
         profileName: "Repo Maintainer",
-        items: [
-          {
-            id: "sbi_repo_idle",
-            label: "Review migration draft",
-            metadataLabel: "Idle",
-            to: "/sessions/sbi_repo_idle",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "running",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_repo_idle",
       },
     ]);
   });
 
   it("matches items by profile name", () => {
     expect(
-      filterSessionsSidebarNavGroups({
-        groups,
+      filterSessionsSidebarNavItems({
+        items,
         searchFilter: {
           searchQuery: "finance",
         },
       }),
     ).toStrictEqual([
       {
-        profileId: "sbp_finance",
+        id: "sbi_finance",
+        label: "Untitled",
         profileName: "Finance Investigator",
-        items: [
-          {
-            id: "sbi_finance",
-            label: "Untitled",
-            metadataLabel: "2d",
-            to: "/sessions/sbi_finance",
-            showActivityIndicator: false,
-          },
-        ],
+        status: "stopped",
+        updatedAtLabel: "2d",
+        to: "/sessions/sbi_finance",
       },
     ]);
   });

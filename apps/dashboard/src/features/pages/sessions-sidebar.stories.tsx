@@ -27,7 +27,7 @@ type SessionsSidebarStoryArgs = {
   showSessionsSidebar?: boolean;
 };
 
-function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
+function buildSidebarSessionsList(): SandboxInstancesListResult {
   return {
     items: [
       buildSandboxInstanceListItemFixture({
@@ -39,7 +39,7 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         status: "running",
         createdAt: "2026-04-08T09:00:00.000Z",
         updatedAt: "2026-04-08T09:00:00.000Z",
-        keepaliveActive: true,
+        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_recent_five_min",
@@ -52,16 +52,6 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
-        id: "sbi_recent_forty_five_min",
-        title: "Prepare release notes",
-        sandboxProfileId: "sbp_ops",
-        sandboxProfileDisplayName: "Ops Coordinator",
-        status: "running",
-        createdAt: "2026-04-08T08:20:00.000Z",
-        updatedAt: "2026-04-08T08:15:00.000Z",
-        keepaliveActive: false,
-      }),
-      buildSandboxInstanceListItemFixture({
         id: "sbi_starting_docs",
         title:
           "Draft onboarding guide for new operators working across control plane and gateway runtime flows",
@@ -71,6 +61,18 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         createdAt: "2026-04-08T08:40:00.000Z",
         updatedAt: "2026-04-08T06:00:00.000Z",
         keepaliveActive: false,
+      }),
+      buildSandboxInstanceListItemFixture({
+        id: "sbi_failed_ops",
+        title: "Prepare release notes",
+        sandboxProfileId: "sbp_ops",
+        sandboxProfileDisplayName: "Ops Coordinator",
+        status: "failed",
+        createdAt: "2026-04-08T08:20:00.000Z",
+        updatedAt: "2026-04-08T08:15:00.000Z",
+        keepaliveActive: false,
+        failureCode: "SANDBOX_BOOT_FAILED",
+        failureMessage: "Sandbox boot failed while starting the runtime.",
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_stopped_one_day",
@@ -93,7 +95,7 @@ function buildMixedOpenableSessionsList(): SandboxInstancesListResult {
         keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
-        id: "sbi_stopped_four_day",
+        id: "sbi_stopped_ops",
         title: "Audit webhook retry behavior",
         sandboxProfileId: "sbp_ops",
         sandboxProfileDisplayName: "Ops Coordinator",
@@ -131,7 +133,7 @@ const meta = {
         latestVersion: 7,
       }),
     ],
-    sandboxInstancesList: buildMixedOpenableSessionsList(),
+    sandboxInstancesList: buildSidebarSessionsList(),
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
@@ -185,7 +187,53 @@ export const NoLaunchableProfiles: Story = {
   },
 };
 
-export const ActivityIndicatorOnly: Story = {};
+export const DefaultList: Story = {};
+
+export const FailedSessionVisible: Story = {
+  args: {
+    initialEntries: ["/sessions/new"],
+    showSessionsSidebar: true,
+    sandboxInstancesList: {
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_recent_success",
+          title: "Review migration draft",
+          sandboxProfileId: "sbp_repo_maintainer",
+          sandboxProfileDisplayName: "Repo Maintainer",
+          status: "running",
+          createdAt: "2026-04-08T08:50:00.000Z",
+          updatedAt: "2026-04-08T08:55:00.000Z",
+          keepaliveActive: false,
+        }),
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_failed_visible",
+          title: "Prepare release notes",
+          sandboxProfileId: "sbp_ops",
+          sandboxProfileDisplayName: "Ops Coordinator",
+          status: "failed",
+          createdAt: "2026-04-08T08:20:00.000Z",
+          updatedAt: "2026-04-08T08:15:00.000Z",
+          keepaliveActive: false,
+          failureCode: "SANDBOX_BOOT_FAILED",
+          failureMessage: "Sandbox boot failed while starting the runtime.",
+        }),
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_stopped_visible",
+          title: "Reconcile billing export",
+          sandboxProfileId: "sbp_finance",
+          sandboxProfileDisplayName: "Finance Investigator",
+          status: "stopped",
+          createdAt: "2026-04-07T09:00:00.000Z",
+          updatedAt: "2026-04-07T09:00:00.000Z",
+          keepaliveActive: false,
+        }),
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 3,
+    },
+  },
+};
 
 export const LoadingState: Story = {
   args: {

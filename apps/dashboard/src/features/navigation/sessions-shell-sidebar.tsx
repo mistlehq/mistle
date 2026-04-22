@@ -6,20 +6,20 @@ import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import {
-  buildSessionsSidebarNavGroups,
-  type SessionsSidebarNavGroup,
+  buildSessionsSidebarNavItems,
+  type SessionsSidebarNavItem,
   type SessionsSidebarSourceItem,
 } from "./sessions-sidebar-nav-model.js";
 import { SessionsSidebarNav } from "./sessions-sidebar-nav.js";
 
 const SESSIONS_SIDEBAR_LIST_LIMIT = 100;
 
-export function buildSessionsShellSidebarGroups(
+export function buildSessionsShellSidebarItems(
   items: readonly SandboxInstanceListItem[],
   input?: {
     nowEpochMs?: number;
   },
-): SessionsSidebarNavGroup[] {
+): SessionsSidebarNavItem[] {
   const sourceItems: SessionsSidebarSourceItem[] = items.map((item) => ({
     id: item.id,
     title: item.title,
@@ -31,7 +31,7 @@ export function buildSessionsShellSidebarGroups(
     keepaliveActive: item.keepaliveActive,
   }));
 
-  return buildSessionsSidebarNavGroups(sourceItems, {
+  return buildSessionsSidebarNavItems(sourceItems, {
     ...(input?.nowEpochMs === undefined ? {} : { nowEpochMs: input.nowEpochMs }),
   });
 }
@@ -51,20 +51,18 @@ export function SessionsShellSidebar(): React.JSX.Element {
         signal,
       }),
   });
-  const groups = buildSessionsShellSidebarGroups(sandboxInstancesQuery.data?.items ?? []);
+  const items = buildSessionsShellSidebarItems(sandboxInstancesQuery.data?.items ?? []);
   const errorMessage = sandboxInstancesQuery.isError
     ? resolveApiErrorMessage({
         error: sandboxInstancesQuery.error,
         fallbackMessage: "Could not load sandbox instances.",
       })
     : null;
-  const emptyMessage = sandboxInstancesQuery.isPending
-    ? "Loading sessions..."
-    : "No openable sessions yet.";
+  const emptyMessage = sandboxInstancesQuery.isPending ? "Loading sessions..." : "No sessions yet.";
 
   return (
     <>
-      <SessionsSidebarNav emptyMessage={emptyMessage} groups={groups} />
+      <SessionsSidebarNav emptyMessage={emptyMessage} items={items} />
       {errorMessage === null ? null : (
         <div className="px-2 pb-2">
           <ErrorNotice message={errorMessage} />
