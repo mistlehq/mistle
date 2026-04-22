@@ -2,6 +2,10 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
+    "paths": {
+      "@mistle/time": ["../time/dist/index.d.ts"],
+      "@mistle/time/testing": ["../time/dist/testing/index.d.ts"]
+    },
     "outDir": "./dist",
     "rootDir": "./src"
   },
