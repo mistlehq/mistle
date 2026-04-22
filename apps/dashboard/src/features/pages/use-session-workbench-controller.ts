@@ -207,12 +207,16 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const gitBranchRefreshKey =
+    chat.chatState.activeTurnId === null || chat.chatState.completedStatus === null
+      ? null
+      : `${chat.chatState.activeTurnId}:${chat.chatState.completedStatus}`;
   const gitBranchState = useSessionGitBranch({
     connectedAtIso: workbenchLifecycleState.sessionSnapshot?.connectedAtIso ?? null,
     cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
-    rpcClient: rpcClientRef.current,
+    refreshKey: gitBranchRefreshKey,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const portAccessState = useSessionPortAccess({

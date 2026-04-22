@@ -101,10 +101,7 @@ async function startGitBranchTunnelServer(): Promise<{
   emitTurnCompleted: (turnId: string) => void;
   emitTurnStarted: (turnId: string) => void;
   getBranchCommandCount: () => number;
-  getHeadWatchCount: () => number;
-  getHeadWatchRegistrationCount: () => number;
   failNextGitDirectoryLookup: () => void;
-  notifyHeadChanged: () => void;
   setCurrentBranchForCwd: (cwd: string, branch: string) => void;
   setCurrentBranch: (branch: string) => void;
   url: string;
@@ -118,11 +115,7 @@ async function startGitBranchTunnelServer(): Promise<{
     ["/root/mistlehq/e2e-test-repo", "e2e-main"],
   ]);
   let gitDirectoryLookupFailureCount = 0;
-  let headWatchRegistrationCount = 0;
-  const headWatchIds = new Set<string>();
-  const repoRoot = "/root/mistlehq/mistle";
-  const gitDir = `${repoRoot}/.git`;
-  const headPath = `${gitDir}/HEAD`;
+  const gitDir = "/root/mistlehq/mistle/.git";
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -304,45 +297,6 @@ async function startGitBranchTunnelServer(): Promise<{
             },
           });
           return;
-        case "fs/watch": {
-          const params =
-            request.params !== undefined &&
-            request.params !== null &&
-            typeof request.params === "object"
-              ? (request.params as { path?: string; watchId?: string })
-              : {};
-
-          if (params.path === headPath && typeof params.watchId === "string") {
-            headWatchIds.add(params.watchId);
-            headWatchRegistrationCount += 1;
-          }
-
-          sendAgentJson({
-            id: requestId,
-            result: {
-              path: params.path ?? null,
-            },
-          });
-          return;
-        }
-        case "fs/unwatch": {
-          const params =
-            request.params !== undefined &&
-            request.params !== null &&
-            typeof request.params === "object"
-              ? (request.params as { watchId?: string })
-              : {};
-
-          if (typeof params.watchId === "string") {
-            headWatchIds.delete(params.watchId);
-          }
-
-          sendAgentJson({
-            id: requestId,
-            result: {},
-          });
-          return;
-        }
         default:
           sendAgentJson({
             id: requestId,
@@ -407,21 +361,8 @@ async function startGitBranchTunnelServer(): Promise<{
       });
     },
     getBranchCommandCount: () => branchCommandCount,
-    getHeadWatchCount: () => headWatchIds.size,
-    getHeadWatchRegistrationCount: () => headWatchRegistrationCount,
     failNextGitDirectoryLookup: () => {
       gitDirectoryLookupFailureCount += 1;
-    },
-    notifyHeadChanged: () => {
-      for (const watchId of headWatchIds) {
-        sendNotification({
-          method: "fs/changed",
-          params: {
-            watchId,
-            changedPaths: [headPath],
-          },
-        });
-      }
     },
     setCurrentBranchForCwd: (cwd: string, branch: string) => {
       currentBranchByCwd.set(cwd, branch);
@@ -485,7 +426,7 @@ describe("SessionWorkbenchPage git branch label", () => {
     cleanup();
   });
 
-  it("does not refetch the branch label for unrelated turn lifecycle changes", async () => {
+  it("refreshes the branch label after turn completion but not at turn start", async () => {
     const restoreWebSocket = installNodeWebSocket();
     const tunnelServer = await startGitBranchTunnelServer();
     const rendered = await renderDashboardPageIntegration({
@@ -507,10 +448,6 @@ describe("SessionWorkbenchPage git branch label", () => {
       await waitFor(() => {
         expect(screen.getByText("main")).toBeTruthy();
       });
-      await waitFor(() => {
-        expect(tunnelServer.getHeadWatchCount()).toBe(1);
-      });
-      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
 
       tunnelServer.emitTurnStarted("turn_1");
@@ -518,53 +455,11 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
-      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
 
+      tunnelServer.setCurrentBranch("feature/after-turn");
       tunnelServer.emitTurnCompleted("turn_1");
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
-      });
-      expect(tunnelServer.getBranchCommandCount()).toBe(1);
-      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
-    } finally {
-      await rendered.close();
-      await tunnelServer.close();
-      restoreWebSocket();
-    }
-  }, 45_000);
-
-  it("updates the branch label after a watched HEAD change", async () => {
-    const restoreWebSocket = installNodeWebSocket();
-    const tunnelServer = await startGitBranchTunnelServer();
-    const rendered = await renderDashboardPageIntegration({
-      handler: createWorkbenchRequestHandler({
-        tunnelUrl: tunnelServer.url,
-      }),
-      ui: (
-        <HeaderActionsHost>
-          <MemoryRouter initialEntries={["/sessions/sbi_repo_page"]}>
-            <Routes>
-              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
-            </Routes>
-          </MemoryRouter>
-        </HeaderActionsHost>
-      ),
-    });
-
-    try {
-      await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
-      });
-      await waitFor(() => {
-        expect(tunnelServer.getHeadWatchCount()).toBe(1);
-      });
-      expect(tunnelServer.getBranchCommandCount()).toBe(1);
-
-      tunnelServer.setCurrentBranch("feature/from-terminal");
-      tunnelServer.notifyHeadChanged();
-
-      await waitFor(() => {
-        expect(screen.getByText("feature/from-terminal")).toBeTruthy();
+        expect(screen.getByText("feature/after-turn")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(2);
     } finally {
@@ -598,7 +493,6 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
-      expect(tunnelServer.getHeadWatchRegistrationCount()).toBe(1);
     } finally {
       await rendered.close();
       await tunnelServer.close();
@@ -644,6 +538,8 @@ describe("SessionWorkbenchPage git branch label", () => {
       fireEvent.focus(repositoryCombobox);
       repositoryListbox = await screen.findByRole("listbox");
       fireEvent.click(within(repositoryListbox).getByRole("option", { name: "mistle" }));
+
+      expect(screen.queryByText("main")).toBeNull();
 
       await waitFor(() => {
         expect(screen.getByText("feature/returned-repo")).toBeTruthy();

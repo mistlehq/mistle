@@ -10,7 +10,6 @@ import {
   GitBranchCommandTimeoutMs,
   buildGitBranchExecRequest,
   getSessionGitBranchQueryKey,
-  isFsChangedNotification,
   useSessionGitBranch,
 } from "./use-session-git-branch.js";
 
@@ -69,31 +68,6 @@ describe("useSessionGitBranch helpers", () => {
     );
   });
 
-  it("recognizes fs changed notifications", () => {
-    expect(
-      isFsChangedNotification({
-        method: "fs/changed",
-        params: {
-          watchId: "watch_123",
-          changedPaths: ["/root/acme/repo-1/.git/HEAD"],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it("rejects unrelated notifications", () => {
-    expect(
-      isFsChangedNotification({
-        method: "turn/completed",
-        params: {
-          turn: {
-            id: "turn_123",
-          },
-        },
-      }),
-    ).toBe(false);
-  });
-
   it("clears the branch label when tracking is disabled", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
@@ -102,7 +76,6 @@ describe("useSessionGitBranch helpers", () => {
 
     queryClient.setQueryData(createBranchQueryKey(), {
       branchLabel: "main",
-      headWatchPath: "/root/acme/repo-1/.git/HEAD",
     });
 
     const { result } = renderHook(
@@ -114,7 +87,7 @@ describe("useSessionGitBranch helpers", () => {
           ensureTransportConnected: async () => {
             throw new Error("ensureTransportConnected should not be called in this test.");
           },
-          rpcClient: null,
+          refreshKey: null,
           sandboxInstanceId: "sbi_test",
         }),
       {
@@ -133,7 +106,6 @@ describe("useSessionGitBranch helpers", () => {
 
     queryClient.setQueryData(createBranchQueryKey(), {
       branchLabel: "main",
-      headWatchPath: "/root/acme/repo-1/.git/HEAD",
     });
 
     const { result } = renderHook(
@@ -145,7 +117,7 @@ describe("useSessionGitBranch helpers", () => {
           ensureTransportConnected: async () => {
             throw new Error("transport unavailable");
           },
-          rpcClient: null,
+          refreshKey: null,
           sandboxInstanceId: "sbi_test",
         }),
       {
@@ -156,5 +128,33 @@ describe("useSessionGitBranch helpers", () => {
     await waitFor(() => {
       expect(result.current.branchLabel).toBeNull();
     });
+  });
+
+  it("hides cached branch data until the current selection refetch completes", () => {
+    const queryClient = createTestQueryClient({
+      retry: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    queryClient.setQueryData(createBranchQueryKey(), {
+      branchLabel: "main",
+    });
+
+    const { result } = renderHook(
+      () =>
+        useSessionGitBranch({
+          connectedAtIso: "2026-04-22T00:00:00.000Z",
+          cwd: "/root/acme/repo-1",
+          enabled: true,
+          ensureTransportConnected: async () => await new Promise<never>(() => {}),
+          refreshKey: null,
+          sandboxInstanceId: "sbi_test",
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    expect(result.current.branchLabel).toBeNull();
   });
 });

@@ -1,7 +1,6 @@
-import type { CodexJsonRpcClient } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { ExecStreamClient, type ExecCommandRequest } from "@mistle/sandbox-session-client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
@@ -9,16 +8,10 @@ const GitBranchCommandTimeoutMs = 5_000;
 
 type GitBranchSnapshot = {
   branchLabel: string | null;
-  headWatchPath: string | null;
 };
 
 type SessionGitBranchState = {
   branchLabel: string | null;
-};
-
-type FsChangedNotification = {
-  changedPaths: readonly string[];
-  watchId: string;
 };
 
 export function buildGitBranchExecRequest(input: {
@@ -39,29 +32,6 @@ export function getSessionGitBranchQueryKey(input: {
   cwd: string | null;
 }): readonly ["session-git-branch", string | null, string | null, string | null] {
   return ["session-git-branch", input.sandboxInstanceId, input.cwd, input.connectedAtIso];
-}
-
-function isFsChangedNotification(value: unknown): value is {
-  method: "fs/changed";
-  params: FsChangedNotification;
-} {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const method = Reflect.get(value, "method");
-  const params = Reflect.get(value, "params");
-  if (method !== "fs/changed" || typeof params !== "object" || params === null) {
-    return false;
-  }
-
-  const watchId = Reflect.get(params, "watchId");
-  const changedPaths = Reflect.get(params, "changedPaths");
-  return (
-    typeof watchId === "string" &&
-    Array.isArray(changedPaths) &&
-    changedPaths.every((path) => typeof path === "string")
-  );
 }
 
 function isNotGitRepositoryResult(input: { exitCode: number; stderr: string }): boolean {
@@ -124,7 +94,6 @@ async function loadSessionGitBranch(input: {
   if (gitDirectory === null) {
     return {
       branchLabel: null,
-      headWatchPath: null,
     };
   }
 
@@ -137,7 +106,6 @@ async function loadSessionGitBranch(input: {
 
   return {
     branchLabel,
-    headWatchPath: `${gitDirectory}/HEAD`,
   };
 }
 
@@ -146,10 +114,11 @@ export function useSessionGitBranch(input: {
   cwd: string | null;
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
-  rpcClient: CodexJsonRpcClient | null;
+  refreshKey: string | null;
   sandboxInstanceId: string | null;
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
+  const lastRefreshKeyRef = useRef<string | null>(null);
   const isBranchTrackingEnabled =
     input.enabled && input.sandboxInstanceId !== null && input.cwd !== null;
   const queryKey = useMemo(
@@ -171,7 +140,6 @@ export function useSessionGitBranch(input: {
       if (sandboxInstanceId === null || cwd === null) {
         return {
           branchLabel: null,
-          headWatchPath: null,
         } satisfies GitBranchSnapshot;
       }
 
@@ -188,53 +156,26 @@ export function useSessionGitBranch(input: {
   });
 
   useEffect(() => {
-    const rpcClient = input.rpcClient;
-    const headWatchPath = query.data?.headWatchPath ?? null;
-
-    if (!isBranchTrackingEnabled || rpcClient === null || headWatchPath === null) {
+    if (!isBranchTrackingEnabled) {
+      lastRefreshKeyRef.current = input.refreshKey;
       return;
     }
 
-    const watchId = crypto.randomUUID();
-    const unsubscribeNotification = rpcClient.onNotification((notification) => {
-      if (!isFsChangedNotification(notification)) {
-        return;
-      }
-
-      if (
-        notification.params.watchId !== watchId ||
-        !notification.params.changedPaths.includes(headWatchPath)
-      ) {
-        return;
-      }
-
+    if (input.refreshKey !== null && lastRefreshKeyRef.current !== input.refreshKey) {
       void queryClient.invalidateQueries({
         queryKey,
       });
-    });
+    }
 
-    // This effect synchronizes React with app-server filesystem watch notifications.
-    void rpcClient.call("fs/watch", {
-      watchId,
-      path: headWatchPath,
-    });
+    lastRefreshKeyRef.current = input.refreshKey;
+  }, [input.refreshKey, isBranchTrackingEnabled, queryClient, queryKey]);
 
-    return () => {
-      unsubscribeNotification();
-      void rpcClient
-        .call("fs/unwatch", {
-          watchId,
-        })
-        .catch(() => {
-          // The session stream may already be closed during normal workbench teardown.
-        });
-    };
-  }, [isBranchTrackingEnabled, input.rpcClient, query.data?.headWatchPath, queryClient, queryKey]);
+  const shouldHideBranchLabel =
+    !isBranchTrackingEnabled || query.isError || (query.isFetching && !query.isFetchedAfterMount);
 
   return {
-    branchLabel:
-      isBranchTrackingEnabled && !query.isError ? (query.data?.branchLabel ?? null) : null,
+    branchLabel: shouldHideBranchLabel ? null : (query.data?.branchLabel ?? null),
   };
 }
 
-export { GitBranchCommandTimeoutMs, isFsChangedNotification };
+export { GitBranchCommandTimeoutMs };
