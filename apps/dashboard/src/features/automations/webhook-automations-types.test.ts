@@ -35,12 +35,14 @@ describe("webhook automations types", () => {
         id: "target_123",
         sandboxProfileId: "sbp_123",
         sandboxProfileVersion: 4,
+        primaryRepositoryId: "mistlehq/platform",
       },
       updatedAt: "2026-03-11T10:05:00.000Z",
     });
 
     expect(parsed.name).toBe("GitHub pushes");
     expect(parsed.target.sandboxProfileVersion).toBe(4);
+    expect(parsed.target.primaryRepositoryId).toBe("mistlehq/platform");
   });
 
   it("rejects invalid webhook automation payloads", () => {
@@ -62,6 +64,7 @@ describe("webhook automations types", () => {
           id: "target_123",
           sandboxProfileId: "sbp_123",
           sandboxProfileVersion: 1,
+          primaryRepositoryId: null,
         },
         updatedAt: "2026-03-11T10:05:00.000Z",
       }),

@@ -28,6 +28,7 @@ import {
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
+import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { type WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 import {
@@ -149,7 +150,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     (option) => option.value === input.values.primaryRepositoryId,
   );
   const selectedPrimaryRepositoryPath = selectedPrimaryRepositoryOption?.path ?? null;
-  const selectedWorkspaceRoot = selectedPrimaryRepositoryOption?.value === "__workspace_root__";
+  const selectedWorkspaceRoot =
+    selectedPrimaryRepositoryOption?.value === WebhookAutomationWorkspaceRootRepositoryOptionValue;
   const shouldShowPrimaryRepositoryField =
     input.values.sandboxProfileId.trim().length > 0 &&
     (input.primaryRepositoryOptions?.length ?? 0) > 0;

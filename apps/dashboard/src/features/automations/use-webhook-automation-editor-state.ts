@@ -1,5 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type {
@@ -16,7 +16,10 @@ import {
   getSandboxProfileVersionIntegrationBindings,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  LaunchableSandboxProfile,
+  SandboxProfileVersionIntegrationBinding,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -26,9 +29,11 @@ import {
 } from "./webhook-automation-form-helpers.js";
 import type { WebhookAutomationFormValues } from "./webhook-automation-form-types.js";
 import {
+  buildWebhookAutomationPrimaryRepositoryOptions,
   buildWebhookAutomationEventOptions,
   createWebhookAutomationTriggerId,
   resolveEligibleProfileAutomationConnectionIds,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
 } from "./webhook-automation-option-builders.js";
 import {
   resolveSelectedWebhookAutomationEventOptions,
@@ -55,6 +60,7 @@ type WebhookAutomationOption = {
   value: string;
   label: string;
   description?: string;
+  path?: string;
 };
 
 type SelectedProfileTriggerState = {
@@ -284,6 +290,7 @@ function applySandboxProfileSelectionChange(input: {
 }): WebhookAutomationFormValues {
   return {
     ...input.values,
+    primaryRepositoryId: "",
     conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
       values: input.values,
       eventOptions: input.eventOptions,
@@ -298,6 +305,7 @@ type LoadedWebhookAutomationEditorStateInput = {
   initialValues: WebhookAutomationFormValues;
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
+  launchableSandboxProfiles?: readonly LaunchableSandboxProfile[];
   directoryData: DirectoryData;
   preservedWebhookSourceId?: string;
 };
@@ -363,6 +371,7 @@ export function useLoadedWebhookAutomationEditorState(
 ): {
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
+  primaryRepositoryOptions: readonly WebhookAutomationOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
   values: WebhookAutomationFormValues;
@@ -392,6 +401,14 @@ export function useLoadedWebhookAutomationEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
+  const primaryRepositoryOptions = useMemo(
+    () =>
+      buildWebhookAutomationPrimaryRepositoryOptions({
+        launchableProfiles: input.launchableSandboxProfiles ?? [],
+        selectedProfileId,
+      }),
+    [input.launchableSandboxProfiles, selectedProfileId],
+  );
   const selectedProfileTriggerState = useSelectedProfileTriggerState({
     selectedProfileId,
     directoryData: input.directoryData,
@@ -420,6 +437,30 @@ export function useLoadedWebhookAutomationEditorState(
       selectedProfileTriggerState.selectableConnectionIds,
     ],
   );
+
+  useEffect(() => {
+    if (primaryRepositoryOptions.length === 0) {
+      return;
+    }
+
+    const matchingRepository = primaryRepositoryOptions.find(
+      (option) => option.value === formValues.primaryRepositoryId,
+    );
+    if (matchingRepository !== undefined) {
+      return;
+    }
+
+    setFormValues((currentValues) => {
+      if (currentValues.sandboxProfileId.trim() !== selectedProfileId) {
+        return currentValues;
+      }
+
+      return {
+        ...currentValues,
+        primaryRepositoryId: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      };
+    });
+  }, [formValues.primaryRepositoryId, primaryRepositoryOptions, selectedProfileId]);
 
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>
@@ -567,6 +608,7 @@ export function useLoadedWebhookAutomationEditorState(
   return {
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions: input.sandboxProfileOptions,
+    primaryRepositoryOptions,
     webhookEventOptions,
     triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
     values: formValues,

@@ -7,6 +7,7 @@ import {
 } from "../integrations/integrations-service.js";
 import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import {
   buildWebhookAutomationConnectionOptions,
   buildWebhookAutomationSandboxProfileOptions,
@@ -63,6 +64,9 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
     queryFn: async ({ signal }) => listAllSandboxProfiles({ signal }),
     retry: false,
   });
+  const launchableSandboxProfilesQuery = useLaunchableSandboxProfiles({
+    enabled: true,
+  });
 
   const webhookCapableConnections =
     integrationDirectoryQuery.data?.connections.filter((connection) => {
@@ -113,10 +117,14 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
   const errorMessage =
     integrationDirectoryQuery.isError ||
     sandboxProfilesQuery.isError ||
+    launchableSandboxProfilesQuery.isError ||
     webhookSourceError !== undefined
       ? resolveApiErrorMessage({
           error:
-            integrationDirectoryQuery.error ?? sandboxProfilesQuery.error ?? webhookSourceError,
+            integrationDirectoryQuery.error ??
+            sandboxProfilesQuery.error ??
+            launchableSandboxProfilesQuery.error ??
+            webhookSourceError,
           fallbackMessage: "Could not load automation prerequisites.",
         })
       : null;
@@ -132,13 +140,16 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
   return {
     connectionOptions,
     sandboxProfileOptions,
+    launchableSandboxProfiles: launchableSandboxProfilesQuery.data?.items ?? [],
     integrationDirectoryQuery,
+    launchableSandboxProfilesQuery,
     sandboxProfilesQuery,
     directoryData,
     errorMessage,
     isPending:
       integrationDirectoryQuery.isPending ||
       sandboxProfilesQuery.isPending ||
+      launchableSandboxProfilesQuery.isPending ||
       webhookSourceQueries.some((query) => query.isPending),
   };
 }

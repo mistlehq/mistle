@@ -5,7 +5,10 @@ import type {
   WebhookAutomationFormValues,
 } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createWebhookAutomationTriggerId,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
+} from "./webhook-automation-option-builders.js";
 import {
   extractWebhookAutomationTriggerParameterValues,
   mergeWebhookAutomationPayloadFilter,
@@ -112,7 +115,7 @@ export function toWebhookAutomationFormValues(
   return {
     name: automation.name,
     sandboxProfileId: automation.target.sandboxProfileId,
-    primaryRepositoryId: "",
+    primaryRepositoryId: automation.target.primaryRepositoryId ?? "",
     enabled: automation.enabled,
     inputTemplate: automation.inputTemplate,
     instructions: automation.instructions ?? "",
@@ -205,6 +208,19 @@ function toPayloadFilterValue(input: {
   });
 }
 
+function toPrimaryRepositoryId(value: string): string | null {
+  const trimmedValue = value.trim();
+
+  if (
+    trimmedValue.length === 0 ||
+    trimmedValue === WebhookAutomationWorkspaceRootRepositoryOptionValue
+  ) {
+    return null;
+  }
+
+  return trimmedValue;
+}
+
 function resolveAutomationSubmissionShape(input: {
   values: WebhookAutomationFormValues;
   eventOptions: readonly WebhookAutomationEventOption[];
@@ -260,6 +276,7 @@ export function toCreateWebhookAutomationPayload(
     payloadFilter: toPayloadFilterValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
+      primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),
     },
   };
 }
@@ -285,6 +302,7 @@ export function toUpdateWebhookAutomationPayload(
     payloadFilter: toPayloadFilterValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
+      primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),
     },
   };
 }

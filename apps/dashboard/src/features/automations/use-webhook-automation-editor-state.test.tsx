@@ -13,7 +13,10 @@ import {
   resolveSelectedProfileTriggerState,
   useLoadedWebhookAutomationEditorState,
 } from "./use-webhook-automation-editor-state.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createWebhookAutomationTriggerId,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
+} from "./webhook-automation-option-builders.js";
 
 const LinearConnectionId = "conn_linear";
 const LinearWebhookSourceId = "iws_linear";
@@ -99,6 +102,26 @@ function createBinding() {
     config: {},
     createdAt: "2026-03-24T00:00:00.000Z",
     updatedAt: "2026-03-24T00:00:00.000Z",
+  };
+}
+
+function createLaunchableProfile(input?: { id?: string; repositoryIds?: readonly string[] }) {
+  const profileId = input?.id ?? "sbp_123";
+  const repositoryIds = input?.repositoryIds ?? ["mistlehq/platform"];
+
+  return {
+    id: profileId,
+    organizationId: "org_123",
+    displayName: "Repo Maintainer",
+    status: "active" as const,
+    latestVersion: 1,
+    createdAt: "2026-03-24T00:00:00.000Z",
+    updatedAt: "2026-03-24T00:00:00.000Z",
+    repositoryOptions: repositoryIds.map((repositoryId) => ({
+      id: repositoryId,
+      label: repositoryId,
+      path: `/root/${repositoryId}`,
+    })),
   };
 }
 
@@ -258,6 +281,109 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         team: "eng",
       },
     });
+  });
+
+  it("defaults the primary repository selection to workspace root for launchable profiles", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          launchableSandboxProfiles: [createLaunchableProfile()],
+          directoryData: {
+            connections: [],
+            webhookSources: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.values.primaryRepositoryId).toBe(
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+    );
+    expect(result.current.primaryRepositoryOptions.map((option) => option.value)).toEqual([
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      "mistlehq/platform",
+    ]);
+  });
+
+  it("clears the prior primary repository selection when the sandbox profile changes", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "mistlehq/platform",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          launchableSandboxProfiles: [
+            createLaunchableProfile({
+              id: "sbp_123",
+              repositoryIds: ["mistlehq/platform"],
+            }),
+            createLaunchableProfile({
+              id: "sbp_456",
+              repositoryIds: ["mistlehq/mistle"],
+            }),
+          ],
+          directoryData: {
+            connections: [],
+            webhookSources: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    act(() => {
+      result.current.onValueChange("sandboxProfileId", "sbp_456");
+    });
+
+    expect(result.current.values.primaryRepositoryId).toBe(
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+    );
+    expect(result.current.primaryRepositoryOptions.map((option) => option.value)).toEqual([
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      "mistlehq/mistle",
+    ]);
   });
 
   it("does not apply invocation token defaults when a trigger is selected", () => {
