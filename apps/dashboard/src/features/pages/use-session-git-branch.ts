@@ -14,6 +14,17 @@ type SessionGitBranchState = {
   branchLabel: string | null;
 };
 
+function shouldInvalidateForRefreshKey(input: {
+  previousRefreshKey: string | null | undefined;
+  refreshKey: string | null;
+}): boolean {
+  return (
+    input.refreshKey !== null &&
+    input.previousRefreshKey !== undefined &&
+    input.previousRefreshKey !== input.refreshKey
+  );
+}
+
 export function buildGitBranchExecRequest(input: {
   args: string[];
   cwd: string;
@@ -118,7 +129,7 @@ export function useSessionGitBranch(input: {
   sandboxInstanceId: string | null;
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
-  const lastRefreshKeyRef = useRef<string | null>(null);
+  const lastRefreshKeyRef = useRef<string | null | undefined>(undefined);
   const isBranchTrackingEnabled =
     input.enabled && input.sandboxInstanceId !== null && input.cwd !== null;
   const queryKey = useMemo(
@@ -161,7 +172,12 @@ export function useSessionGitBranch(input: {
       return;
     }
 
-    if (input.refreshKey !== null && lastRefreshKeyRef.current !== input.refreshKey) {
+    if (
+      shouldInvalidateForRefreshKey({
+        previousRefreshKey: lastRefreshKeyRef.current,
+        refreshKey: input.refreshKey,
+      })
+    ) {
       void queryClient.invalidateQueries({
         queryKey,
       });
@@ -178,4 +194,4 @@ export function useSessionGitBranch(input: {
   };
 }
 
-export { GitBranchCommandTimeoutMs };
+export { GitBranchCommandTimeoutMs, shouldInvalidateForRefreshKey };

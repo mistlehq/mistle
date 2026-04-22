@@ -10,6 +10,7 @@ import {
   GitBranchCommandTimeoutMs,
   buildGitBranchExecRequest,
   getSessionGitBranchQueryKey,
+  shouldInvalidateForRefreshKey,
   useSessionGitBranch,
 } from "./use-session-git-branch.js";
 
@@ -66,6 +67,24 @@ describe("useSessionGitBranch helpers", () => {
         cwd: "/root/acme/repo-1",
       }),
     );
+  });
+
+  it("does not invalidate from an initial hydrated completion key", () => {
+    expect(
+      shouldInvalidateForRefreshKey({
+        previousRefreshKey: undefined,
+        refreshKey: "turn_123:completed",
+      }),
+    ).toBe(false);
+  });
+
+  it("invalidates when a new completed turn is observed after mount", () => {
+    expect(
+      shouldInvalidateForRefreshKey({
+        previousRefreshKey: "turn_123:completed",
+        refreshKey: "turn_456:completed",
+      }),
+    ).toBe(true);
   });
 
   it("clears the branch label when tracking is disabled", () => {
