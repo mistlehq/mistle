@@ -126,6 +126,9 @@ key_prefix = "mistle:runtime-state:local"
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://data-plane-api:5200"
 
+[apps.data_plane_gateway.control_plane_api]
+base_url = "http://control-plane-api:5100"
+
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
 
