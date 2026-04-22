@@ -25,10 +25,27 @@ describe("useSessionGitBranch helpers", () => {
   it("keys branch state only by sandbox instance and repository cwd", () => {
     expect(
       getSessionGitBranchQueryKey({
+        connectedAtIso: "2026-04-22T00:00:00.000Z",
         sandboxInstanceId: "sbi_test",
         cwd: "/root/acme/repo-1",
       }),
-    ).toEqual(["session-git-branch", "sbi_test", "/root/acme/repo-1"]);
+    ).toEqual(["session-git-branch", "sbi_test", "/root/acme/repo-1", "2026-04-22T00:00:00.000Z"]);
+  });
+
+  it("changes the query key when the session reconnect timestamp changes", () => {
+    expect(
+      getSessionGitBranchQueryKey({
+        connectedAtIso: "2026-04-22T00:00:00.000Z",
+        sandboxInstanceId: "sbi_test",
+        cwd: "/root/acme/repo-1",
+      }),
+    ).not.toEqual(
+      getSessionGitBranchQueryKey({
+        connectedAtIso: "2026-04-22T00:05:00.000Z",
+        sandboxInstanceId: "sbi_test",
+        cwd: "/root/acme/repo-1",
+      }),
+    );
   });
 
   it("recognizes fs changed notifications", () => {

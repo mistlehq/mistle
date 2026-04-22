@@ -208,6 +208,7 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const gitBranchState = useSessionGitBranch({
+    connectedAtIso: workbenchLifecycleState.sessionSnapshot?.connectedAtIso ?? null,
     cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,

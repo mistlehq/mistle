@@ -34,10 +34,11 @@ export function buildGitBranchExecRequest(input: {
 }
 
 export function getSessionGitBranchQueryKey(input: {
+  connectedAtIso: string | null;
   sandboxInstanceId: string | null;
   cwd: string | null;
-}): readonly ["session-git-branch", string | null, string | null] {
-  return ["session-git-branch", input.sandboxInstanceId, input.cwd];
+}): readonly ["session-git-branch", string | null, string | null, string | null] {
+  return ["session-git-branch", input.sandboxInstanceId, input.cwd, input.connectedAtIso];
 }
 
 function isFsChangedNotification(value: unknown): value is {
@@ -123,6 +124,7 @@ async function loadSessionGitBranch(input: {
 }
 
 export function useSessionGitBranch(input: {
+  connectedAtIso: string | null;
   cwd: string | null;
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -131,6 +133,7 @@ export function useSessionGitBranch(input: {
 }): SessionGitBranchState {
   const queryClient = useQueryClient();
   const queryKey = getSessionGitBranchQueryKey({
+    connectedAtIso: input.connectedAtIso,
     sandboxInstanceId: input.sandboxInstanceId,
     cwd: input.cwd,
   });
