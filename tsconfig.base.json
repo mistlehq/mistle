@@ -14,10 +14,6 @@
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "paths": {
-      "@mistle/time": ["./packages/time/src/index.ts"],
-      "@mistle/time/testing": ["./packages/time/src/testing/index.ts"]
-    },
     "types": ["node"]
   }
 }
