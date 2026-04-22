@@ -225,27 +225,21 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.getByRole("button", { name: "Unlink" })).toBeTruthy();
   });
 
-  it("shows commit email as none when GitHub does not provide selectable emails", () => {
+  it("hides commit email when GitHub metadata is unavailable", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[
           createGitHubSigningNotConfiguredCard({
-            emailPreference: {
-              selectedEmail: "",
-              options: [],
-            },
+            emailPreference: null,
           }),
         ]}
       />,
     );
 
-    expect(screen.getByText("Commit email")).toBeTruthy();
-    expect(screen.getByText("None")).toBeTruthy();
+    expect(screen.queryByText("Commit email")).toBeNull();
+    expect(screen.queryByText("None")).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
-    expect(
-      screen.queryByText("GitHub has not provided selectable commit emails for this link."),
-    ).toBeNull();
   });
 
   it("renders a callback notice when a linked-account result is present", () => {

@@ -79,19 +79,6 @@ export const GitHubRelinkRequiredCard = createGitHubCard({
   secondaryActionLabel: "Unlink",
 });
 
-export const GitHubLinkedWithoutSelectableEmailsCard = createGitHubCard({
-  emailPreference: {
-    selectedEmail: "",
-    options: [],
-  },
-  commitSigning: {
-    statusLabel: "Add private key",
-    keySummaryLabel: null,
-    uploadActionLabel: "Upload private key",
-    removeActionLabel: null,
-  },
-});
-
 export const GitHubLinkedWithSigningNotConfiguredCard = createGitHubCard({
   emailPreference: {
     selectedEmail: "mistle-user@example.com",

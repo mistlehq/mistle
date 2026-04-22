@@ -104,10 +104,7 @@ describe("linked-accounts-model", () => {
       statusTone: "active",
       accountLabel: "@mistle-user",
       helperMessage: null,
-      emailPreference: {
-        selectedEmail: "",
-        options: [],
-      },
+      emailPreference: null,
       commitSigning: {
         statusLabel: "Add private key",
         keySummaryLabel: null,
@@ -203,6 +200,25 @@ describe("linked-accounts-model", () => {
         uploadActionLabel: "Replace private key",
         removeActionLabel: "Remove key",
       },
+    });
+  });
+
+  it("does not render a commit email state when GitHub metadata is missing", () => {
+    expect(
+      resolveLinkedAccountCardViewModel(
+        createGitHubLinkedAccount({
+          principal: {
+            id: "uep_github",
+            status: "active",
+            providerSubjectId: "12345",
+            profile: null,
+            linkedAt: "2026-04-19T10:15:00.000Z",
+            updatedAt: "2026-04-19T10:15:00.000Z",
+          },
+        }),
+      ),
+    ).toMatchObject({
+      emailPreference: null,
     });
   });
 

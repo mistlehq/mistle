@@ -180,17 +180,10 @@ export function ProfileSettingsPage(): React.JSX.Element {
       setLinkedAccountOperationErrorMessage(null);
     },
     onSuccess: async () => {
+      setLinkedAccountOperationErrorMessage(null);
       await queryClient.invalidateQueries({
         queryKey: linkedAccountsQueryKey(activeOrganizationId),
       });
-    },
-    onError: (error) => {
-      setLinkedAccountOperationErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not upload GitHub signing key.",
-        }),
-      );
     },
   });
   const deleteGitHubLinkedAccountSigningKeyMutation = useMutation({

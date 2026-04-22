@@ -11,7 +11,6 @@ import {
   GitHubDisabledButStillLinkedCard,
   GitHubLinkedWithConfiguredSigningCard,
   GitHubLinkedWithSigningNotConfiguredCard,
-  GitHubLinkedWithoutSelectableEmailsCard,
   GitHubNotLinkedCard,
   GitHubRelinkRequiredCard,
 } from "./profile-settings-page-view.story-fixtures.js";
@@ -43,12 +42,6 @@ export const NotLinked: Story = {
 export const RelinkRequired: Story = {
   args: {
     linkedAccountCards: [GitHubRelinkRequiredCard],
-  },
-};
-
-export const LinkedNoSelectableEmails: Story = {
-  args: {
-    linkedAccountCards: [GitHubLinkedWithoutSelectableEmailsCard],
   },
 };
 

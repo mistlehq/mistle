@@ -232,19 +232,13 @@ function resolveLinkedAccountEmailPreferenceViewModel(
 
   const profile = linkedAccount.principal.profile;
   if (profile === null) {
-    return {
-      selectedEmail: "",
-      options: [],
-    };
+    return null;
   }
 
   const preferredEmail = profile["preferredEmail"];
   const availableEmails = profile["availableEmails"];
   if (typeof preferredEmail !== "string" || !Array.isArray(availableEmails)) {
-    return {
-      selectedEmail: "",
-      options: [],
-    };
+    return null;
   }
 
   const options: LinkedAccountEmailOptionViewModel[] = [];
@@ -278,10 +272,7 @@ function resolveLinkedAccountEmailPreferenceViewModel(
   }
 
   if (options.length === 0 || !options.some((option) => option.value === preferredEmail)) {
-    return {
-      selectedEmail: "",
-      options: [],
-    };
+    return null;
   }
 
   return {

@@ -1,0 +1,21 @@
+import { fileURLToPath } from "node:url";
+
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  resolve: {
+    alias: [
+      {
+        find: /^@mistle\/time$/,
+        replacement: fileURLToPath(new URL("./packages/time/src/index.ts", import.meta.url)),
+      },
+      {
+        find: /^@mistle\/time\/testing$/,
+        replacement: fileURLToPath(
+          new URL("./packages/time/src/testing/index.ts", import.meta.url),
+        ),
+      },
+    ],
+    tsconfigPaths: true,
+  },
+});

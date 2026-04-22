@@ -389,10 +389,7 @@ function LinkedAccountCard(input: {
                         return;
                       }
 
-                      void input.onUploadLinkedAccountCommitSigningKey(
-                        input.linkedAccountCard.providerFamily,
-                        selectedFile,
-                      );
+                      void uploadCommitSigningKeyFile(selectedFile);
                     }}
                     type="file"
                   />
