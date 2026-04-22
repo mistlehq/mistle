@@ -15,6 +15,7 @@ use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::process::Command;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
@@ -51,6 +52,9 @@ use crate::time::{Clock, format_rfc3339_timestamp};
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
+const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
+    "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
+const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -80,6 +84,13 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type HyperBody = BoxBody<Bytes, BoxError>;
 type EgressConnector = HttpsConnector<HttpConnector>;
 
+#[derive(Clone, Copy)]
+struct ProxyCaConfig<'a> {
+    runtime_certificate_path: &'a Path,
+    trust_store_certificate_path: &'a Path,
+    refresh_command: &'a Path,
+}
+
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
@@ -87,7 +98,7 @@ pub struct EgressProxy {
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
-    ca_certificate_path: PathBuf,
+    proxy_ca_installation: ProxyCaInstallation,
     supervisor_handle: SandboxdSupervisorHandle,
 }
 
@@ -116,6 +127,13 @@ struct EgressProxyState {
     proxy_ca_private_key_pem: Arc<String>,
     clock: Arc<dyn Clock>,
     next_request_id: Arc<AtomicU64>,
+}
+
+#[derive(Debug)]
+struct ProxyCaInstallation {
+    runtime_certificate_path: PathBuf,
+    trust_store_certificate_path: PathBuf,
+    refresh_command: PathBuf,
 }
 
 struct EgressProxySupervisorConfig {
@@ -182,6 +200,94 @@ impl Display for EgressProxyError {
 }
 
 impl std::error::Error for EgressProxyError {}
+
+impl ProxyCaInstallation {
+    fn install(
+        proxy_ca_certificate_pem: &str,
+        runtime_certificate_path: &Path,
+        trust_store_certificate_path: &Path,
+        refresh_command: &Path,
+    ) -> Result<Self, EgressProxyError> {
+        let runtime_directory = runtime_certificate_path.parent().ok_or_else(|| {
+            EgressProxyError::new("egress proxy CA path must include a parent directory")
+        })?;
+        prepare_proxy_directory(runtime_directory)?;
+
+        let trust_store_directory = trust_store_certificate_path.parent().ok_or_else(|| {
+            EgressProxyError::new("egress proxy trust store path must include a parent directory")
+        })?;
+        prepare_system_trust_store_directory(trust_store_directory)?;
+
+        fs::write(
+            runtime_certificate_path,
+            proxy_ca_certificate_pem.as_bytes(),
+        )
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to write local egress proxy certificate '{}': {error}",
+                runtime_certificate_path.display()
+            ))
+        })?;
+        fs::write(
+            trust_store_certificate_path,
+            proxy_ca_certificate_pem.as_bytes(),
+        )
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to write local egress proxy trust store certificate '{}': {error}",
+                trust_store_certificate_path.display()
+            ))
+        })?;
+
+        let installation = Self {
+            runtime_certificate_path: runtime_certificate_path.to_path_buf(),
+            trust_store_certificate_path: trust_store_certificate_path.to_path_buf(),
+            refresh_command: refresh_command.to_path_buf(),
+        };
+
+        if let Err(error) = installation.refresh_system_trust_store() {
+            let cleanup_error = installation.cleanup().err().map(|cleanup_error| {
+                format!(" cleanup after trust store refresh failure also failed: {cleanup_error}")
+            });
+            let suffix = cleanup_error.unwrap_or_default();
+            return Err(EgressProxyError::new(format!("{error}{suffix}")));
+        }
+
+        Ok(installation)
+    }
+
+    fn cleanup(&self) -> Result<(), EgressProxyError> {
+        match fs::remove_file(&self.trust_store_certificate_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(EgressProxyError::new(format!(
+                    "failed to remove local egress proxy trust store certificate '{}': {error}",
+                    self.trust_store_certificate_path.display()
+                )));
+            }
+        }
+
+        self.refresh_system_trust_store()?;
+
+        match fs::remove_file(&self.runtime_certificate_path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(EgressProxyError::new(format!(
+                    "failed to remove local egress proxy certificate '{}': {error}",
+                    self.runtime_certificate_path.display()
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn refresh_system_trust_store(&self) -> Result<(), EgressProxyError> {
+        run_update_ca_certificates(&self.refresh_command)
+    }
+}
 
 impl EgressProxyRequestContext {
     fn elapsed_ms(&self) -> u64 {
@@ -356,7 +462,11 @@ impl EgressProxy {
             startup_input,
             tokenizer_proxy_egress_base_url,
             default_loopback_proxy_listener_address(),
-            Path::new(RUNTIME_PROXY_CA_CERT_PATH),
+            ProxyCaConfig {
+                runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
+                trust_store_certificate_path: Path::new(RUNTIME_PROXY_CA_TRUST_STORE_PATH),
+                refresh_command: Path::new(UPDATE_CA_CERTIFICATES_COMMAND),
+            },
             clock,
             supervisor_handle,
         )
@@ -367,7 +477,7 @@ impl EgressProxy {
         startup_input: &StartupInput,
         tokenizer_proxy_egress_base_url: &str,
         listener_address: SocketAddr,
-        ca_certificate_path: &Path,
+        proxy_ca_config: ProxyCaConfig<'_>,
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
@@ -381,30 +491,39 @@ impl EgressProxy {
             .map(|route| build_proxy_route(route, startup_input))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let proxy_directory = ca_certificate_path.parent().ok_or_else(|| {
-            EgressProxyError::new("egress proxy CA path must include a parent directory")
-        })?;
-        prepare_proxy_directory(proxy_directory)?;
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
             .map_err(|error| EgressProxyError::new(error.to_string()))?;
-        fs::write(
-            ca_certificate_path,
-            generated_proxy_ca.certificate_pem.as_bytes(),
-        )
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to write local egress proxy certificate '{}': {error}",
-                ca_certificate_path.display()
-            ))
-        })?;
+        let proxy_ca_installation = ProxyCaInstallation::install(
+            &generated_proxy_ca.certificate_pem,
+            proxy_ca_config.runtime_certificate_path,
+            proxy_ca_config.trust_store_certificate_path,
+            proxy_ca_config.refresh_command,
+        )?;
 
-        let std_listener =
-            bind_egress_proxy_listener(listener_address).map_err(EgressProxyError::new)?;
-        let listener_address = std_listener.local_addr().map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to inspect local egress proxy address: {error}"
-            ))
-        })?;
+        let std_listener = match bind_egress_proxy_listener(listener_address) {
+            Ok(std_listener) => std_listener,
+            Err(error) => {
+                let cleanup_suffix = proxy_ca_installation
+                    .cleanup()
+                    .err()
+                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                    .unwrap_or_default();
+                return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+            }
+        };
+        let listener_address = match std_listener.local_addr() {
+            Ok(listener_address) => listener_address,
+            Err(error) => {
+                let cleanup_suffix = proxy_ca_installation
+                    .cleanup()
+                    .err()
+                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                    .unwrap_or_default();
+                return Err(EgressProxyError::new(format!(
+                    "failed to inspect local egress proxy address: {error}{cleanup_suffix}"
+                )));
+            }
+        };
         supervisor_handle.replace_component_details(
             SupervisedComponent::EgressProxy,
             BTreeMap::from([
@@ -418,13 +537,19 @@ impl EgressProxy {
 
         let mut http_connector = HttpConnector::new();
         http_connector.enforce_http(false);
-        let https_connector = HttpsConnectorBuilder::new()
-            .with_native_roots()
-            .map_err(|error| {
-                EgressProxyError::new(format!(
-                    "failed to load system certificate roots for local egress proxy: {error}"
-                ))
-            })?
+        let https_connector = match HttpsConnectorBuilder::new().with_native_roots() {
+            Ok(https_connector_builder) => https_connector_builder,
+            Err(error) => {
+                let cleanup_suffix = proxy_ca_installation
+                    .cleanup()
+                    .err()
+                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                    .unwrap_or_default();
+                return Err(EgressProxyError::new(format!(
+                    "failed to load system certificate roots for local egress proxy: {error}{cleanup_suffix}"
+                )));
+            }
+        }
             .https_or_http()
             .enable_http1()
             .wrap_connector(http_connector);
@@ -439,11 +564,21 @@ impl EgressProxy {
             next_request_id: Arc::new(AtomicU64::new(1)),
         };
 
-        let runtime_env = build_managed_proxy_env(
+        let runtime_env = match build_managed_proxy_env(
             listener_address,
-            ca_certificate_path,
+            proxy_ca_config.runtime_certificate_path,
             tokenizer_proxy_egress_base_url,
-        )?;
+        ) {
+            Ok(runtime_env) => runtime_env,
+            Err(error) => {
+                let cleanup_suffix = proxy_ca_installation
+                    .cleanup()
+                    .err()
+                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                    .unwrap_or_default();
+                return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+            }
+        };
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
         let mut active_server = spawn_active_egress_proxy_server(std_listener, state.clone());
@@ -454,7 +589,12 @@ impl EgressProxy {
         ) {
             active_server.request_shutdown();
             let _ = active_server.join();
-            return Err(error);
+            let cleanup_suffix = proxy_ca_installation
+                .cleanup()
+                .err()
+                .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                .unwrap_or_default();
+            return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
         }
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
@@ -486,7 +626,7 @@ impl EgressProxy {
             supervisor_thread: Some(supervisor_thread),
             #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: Some(supervisor_command_sender),
-            ca_certificate_path: ca_certificate_path.to_path_buf(),
+            proxy_ca_installation,
             supervisor_handle,
         }))
     }
@@ -529,16 +669,7 @@ impl EgressProxy {
             }
         }
 
-        match fs::remove_file(&self.ca_certificate_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(EgressProxyError::new(format!(
-                    "failed to remove local egress proxy certificate '{}': {error}",
-                    self.ca_certificate_path.display()
-                )));
-            }
-        }
+        self.proxy_ca_installation.cleanup()?;
 
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::EgressProxy);
@@ -912,6 +1043,52 @@ fn prepare_proxy_directory(path: &Path) -> Result<(), EgressProxyError> {
                 path.display()
             ))
         })
+}
+
+fn prepare_system_trust_store_directory(path: &Path) -> Result<(), EgressProxyError> {
+    fs::create_dir_all(path).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to create system trust store directory '{}': {error}",
+            path.display()
+        ))
+    })
+}
+
+fn run_update_ca_certificates(command_path: &Path) -> Result<(), EgressProxyError> {
+    let output = Command::new(command_path).output().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to run '{}' to refresh the system trust store: {error}",
+            command_path.display()
+        ))
+    })?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let mut output_parts = Vec::new();
+    if !stdout.is_empty() {
+        output_parts.push(format!("stdout={stdout}"));
+    }
+    if !stderr.is_empty() {
+        output_parts.push(format!("stderr={stderr}"));
+    }
+    let output_suffix = if output_parts.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", output_parts.join(" "))
+    };
+
+    Err(EgressProxyError::new(format!(
+        "'{}' failed while refreshing the system trust store with status {}{}",
+        command_path.display(),
+        output
+            .status
+            .code()
+            .map_or_else(|| "signal".to_string(), |code| code.to_string()),
+        output_suffix
+    )))
 }
 
 fn build_managed_proxy_env(
@@ -1546,8 +1723,10 @@ fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Hyp
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
+    use std::fs;
     use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpListener as StdTcpListener};
+    use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::mpsc;
@@ -1555,7 +1734,7 @@ mod tests {
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use crate::egress_proxy::{
-        EgressProxy, EgressProxyRoute, SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+        EgressProxy, EgressProxyRoute, ProxyCaConfig, SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
         build_direct_forward_uri, build_managed_proxy_env, join_url_path, match_route,
         serialize_egress_proxy_log_line,
     };
@@ -1570,6 +1749,14 @@ mod tests {
     use crate::time::testing::MutableClock;
     use reqwest::Proxy;
     use serde_json::Value;
+
+    struct TestProxyCaPaths {
+        root_directory: PathBuf,
+        runtime_certificate_path: PathBuf,
+        trust_store_certificate_path: PathBuf,
+        refresh_command_path: PathBuf,
+        refresh_marker_path: PathBuf,
+    }
 
     #[test]
     fn joins_proxy_forward_paths_without_duplicate_slashes() {
@@ -1766,7 +1953,7 @@ mod tests {
         });
 
         let listener_address = reserve_test_listener_address();
-        let ca_certificate_path = test_ca_certificate_path();
+        let proxy_ca_paths = test_proxy_ca_paths();
         let runtime_plan = sample_runtime_plan();
         let startup_input = sample_startup_input();
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -1780,7 +1967,11 @@ mod tests {
             &startup_input,
             &format!("http://{tokenizer_address}/tokenizer-proxy/egress"),
             listener_address,
-            &ca_certificate_path,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
             Arc::new(SystemClock),
             supervisor_handle,
         )
@@ -1792,8 +1983,8 @@ mod tests {
             .get("HTTPS_PROXY")
             .cloned()
             .expect("proxy env should include HTTPS_PROXY");
-        let ca_certificate_pem =
-            std::fs::read(&ca_certificate_path).expect("proxy CA certificate should be readable");
+        let ca_certificate_pem = fs::read(&proxy_ca_paths.runtime_certificate_path)
+            .expect("proxy CA certificate should be readable");
         let ca_certificate =
             reqwest::Certificate::from_pem(&ca_certificate_pem).expect("proxy CA should parse");
         let client = reqwest::blocking::Client::builder()
@@ -1856,17 +2047,13 @@ mod tests {
         tokenizer_thread
             .join()
             .expect("tokenizer thread should exit cleanly");
-        let _ = std::fs::remove_dir_all(
-            ca_certificate_path
-                .parent()
-                .expect("test CA path should have a parent directory"),
-        );
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
     }
 
     #[test]
     fn keeps_a_stable_proxy_address_across_close_and_restart() {
         let listener_address = reserve_test_listener_address();
-        let ca_certificate_path = test_ca_certificate_path();
+        let proxy_ca_paths = test_proxy_ca_paths();
         let runtime_plan = sample_runtime_plan();
         let startup_input = sample_startup_input();
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -1880,7 +2067,11 @@ mod tests {
             &startup_input,
             "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
             listener_address,
-            &ca_certificate_path,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
             Arc::new(SystemClock),
             supervisor_handle.clone(),
         )
@@ -1901,7 +2092,11 @@ mod tests {
             &startup_input,
             "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
             listener_address,
-            &ca_certificate_path,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
             Arc::new(SystemClock),
             supervisor_handle.clone(),
         )
@@ -1927,17 +2122,13 @@ mod tests {
         proxy_two
             .close()
             .expect("second egress proxy close should succeed");
-        let _ = std::fs::remove_dir_all(
-            ca_certificate_path
-                .parent()
-                .expect("test CA path should have a parent directory"),
-        );
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
     }
 
     #[test]
     fn restarts_the_proxy_after_the_live_server_exits() {
         let listener_address = reserve_test_listener_address();
-        let ca_certificate_path = test_ca_certificate_path();
+        let proxy_ca_paths = test_proxy_ca_paths();
         let runtime_plan = sample_runtime_plan();
         let startup_input = sample_startup_input();
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -1951,7 +2142,11 @@ mod tests {
             &startup_input,
             "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
             listener_address,
-            &ca_certificate_path,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
             Arc::new(SystemClock),
             supervisor_handle.clone(),
         )
@@ -1977,11 +2172,66 @@ mod tests {
             Some(&stable_proxy_url)
         );
         proxy.close().expect("egress proxy close should succeed");
-        let _ = std::fs::remove_dir_all(
-            ca_certificate_path
-                .parent()
-                .expect("test CA path should have a parent directory"),
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn installs_and_removes_proxy_ca_files_while_refreshing_the_trust_store() {
+        let listener_address = reserve_test_listener_address();
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
         );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+
+        assert_eq!(
+            fs::read(&proxy_ca_paths.runtime_certificate_path)
+                .expect("runtime proxy CA certificate should exist"),
+            fs::read(&proxy_ca_paths.trust_store_certificate_path)
+                .expect("trust store proxy CA certificate should exist")
+        );
+        assert_eq!(
+            count_refresh_events(&proxy_ca_paths.refresh_marker_path),
+            1,
+            "startup should refresh the trust store once"
+        );
+
+        proxy.close().expect("egress proxy close should succeed");
+
+        assert!(
+            !proxy_ca_paths.runtime_certificate_path.exists(),
+            "runtime proxy CA certificate should be removed during cleanup"
+        );
+        assert!(
+            !proxy_ca_paths.trust_store_certificate_path.exists(),
+            "trust store proxy CA certificate should be removed during cleanup"
+        );
+        assert_eq!(
+            count_refresh_events(&proxy_ca_paths.refresh_marker_path),
+            2,
+            "cleanup should refresh the trust store after removing the certificate"
+        );
+
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
     }
 
     fn reserve_test_listener_address() -> SocketAddr {
@@ -2048,14 +2298,54 @@ mod tests {
         }
     }
 
-    fn test_ca_certificate_path() -> PathBuf {
+    fn test_proxy_ca_paths() -> TestProxyCaPaths {
         let unique_id = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after unix epoch")
             .as_nanos();
-        std::env::temp_dir()
-            .join(format!("mistle-egress-proxy-test-{unique_id}"))
-            .join("egress-proxy-ca.pem")
+        let root_directory =
+            std::env::temp_dir().join(format!("mistle-egress-proxy-test-{unique_id}"));
+        let runtime_certificate_path =
+            root_directory.join("run/mistle/sandboxd/egress-proxy-ca.pem");
+        let trust_store_certificate_path =
+            root_directory.join("usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt");
+        let refresh_marker_path = root_directory.join("update-ca-certificates.log");
+        let refresh_command_path = root_directory.join("bin/update-ca-certificates");
+        fs::create_dir_all(
+            refresh_command_path
+                .parent()
+                .expect("refresh command path should have a parent directory"),
+        )
+        .expect("refresh command directory should be creatable");
+        fs::write(
+            &refresh_command_path,
+            format!(
+                "#!/bin/sh\nprintf 'refresh\\n' >> '{}'\n",
+                refresh_marker_path.display()
+            ),
+        )
+        .expect("refresh command script should be writable");
+        let mut permissions = fs::metadata(&refresh_command_path)
+            .expect("refresh command metadata should be readable")
+            .permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&refresh_command_path, permissions)
+            .expect("refresh command should be executable");
+
+        TestProxyCaPaths {
+            root_directory,
+            runtime_certificate_path,
+            trust_store_certificate_path,
+            refresh_command_path,
+            refresh_marker_path,
+        }
+    }
+
+    fn count_refresh_events(marker_path: &std::path::Path) -> usize {
+        fs::read_to_string(marker_path)
+            .unwrap_or_default()
+            .lines()
+            .count()
     }
 
     fn wait_for_egress_snapshot(
