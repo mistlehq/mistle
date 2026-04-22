@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
@@ -32,6 +32,10 @@ const baseProps = {
 } satisfies React.ComponentProps<typeof ProfileSettingsPageView>;
 
 describe("ProfileSettingsPageView", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows edit and remove actions when a profile image is available", () => {
     render(<ProfileSettingsPageView {...baseProps} imageUrl="https://example.com/avatar.webp" />);
 
@@ -253,15 +257,15 @@ describe("ProfileSettingsPageView", () => {
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCallbackNotice={{
-          title: "GitHub linked",
-          message: "Your GitHub account is now linked to Mistle.",
-          variant: "default",
+          title: "GitHub linked successfully",
+          message: "Your GitHub account is now linked on Mistle.",
+          variant: "success",
         }}
       />,
     );
 
-    expect(screen.getByText("GitHub linked")).toBeTruthy();
-    expect(screen.getByText("Your GitHub account is now linked to Mistle.")).toBeTruthy();
+    expect(screen.getByText("GitHub linked successfully")).toBeTruthy();
+    expect(screen.getByText("Your GitHub account is now linked on Mistle.")).toBeTruthy();
   });
 
   it("renders an empty state when no linked account providers are available", () => {
@@ -346,7 +350,7 @@ describe("ProfileSettingsPageView", () => {
             statusTone: "warning",
             accountLabel: "@mistle-user",
             linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
-            helperMessage: "GitHub needs to be linked again before Mistle can act as you.",
+            helperMessage: null,
             emailPreference: null,
             commitSigning: null,
             primaryActionLabel: "Relink",
@@ -369,6 +373,38 @@ describe("ProfileSettingsPageView", () => {
       expect(linkCount).toBe(1);
       expect(unlinkCount).toBe(1);
     });
+  });
+
+  it("renders account-specific helper messages inside the linked account card", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Disabled",
+            statusTone: "disabled",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage:
+              "Your organization has disabled GitHub identity linking. You can still unlink this account.",
+            emailPreference: null,
+            commitSigning: null,
+            primaryActionLabel: null,
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("GitHub")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your organization has disabled GitHub identity linking. You can still unlink this account.",
+      ),
+    ).toBeTruthy();
   });
 
   it("renders GitHub commit email and signing controls when available", () => {
@@ -417,12 +453,51 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.getByText("Commit email")).toBeTruthy();
     expect(screen.getByText("Commit signing")).toBeTruthy();
     expect(screen.getByRole("combobox")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Replace private key" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove key" })).toBeTruthy();
     expect(screen.getByText("Configured")).toBeTruthy();
     expect(screen.queryByText("SSH private key")).toBeNull();
     expect(screen.queryByText("Used for sandbox Git identity and commit signing.")).toBeNull();
+  });
+
+  it("disables the GitHub commit email field while linked-account actions are pending", () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountActionPending={true}
+        linkedAccountCards={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            statusLabel: "Linked",
+            statusTone: "active",
+            accountLabel: "@mistle-user",
+            linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+            helperMessage: null,
+            emailPreference: {
+              selectedEmail: "mistle-user@example.com",
+              options: [
+                {
+                  value: "mistle-user@example.com",
+                  label: "mistle-user@example.com (Primary)",
+                },
+                {
+                  value: "engineering@example.com",
+                  label: "engineering@example.com",
+                },
+              ],
+              helperText: "Used for sandbox Git identity and commit signing.",
+            },
+            commitSigning: null,
+            primaryActionLabel: null,
+            secondaryActionLabel: "Unlink",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Commit email" })).toHaveProperty("disabled", true);
   });
 
   it("uploads a pasted GitHub commit signing key through the provided handler", async () => {

@@ -37,4 +37,11 @@ describe("Notice", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByText("Check this state before continuing.")).toBeTruthy();
   });
+
+  it("does not assign alert semantics to success notices by default", () => {
+    render(<Notice variant="success">GitHub linked successfully.</Notice>);
+
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
+  });
 });

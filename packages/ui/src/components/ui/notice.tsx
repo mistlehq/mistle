@@ -11,6 +11,8 @@ const noticeVariants = cva(
     variants: {
       variant: {
         default: "",
+        success:
+          "[&_[data-slot=notice-description]]:text-emerald-700 [&_[data-slot=notice-icon]]:text-current text-emerald-700",
         warning:
           "[&_[data-slot=notice-description]]:text-amber-950/90 [&_[data-slot=notice-icon]]:text-current text-amber-950",
         alert:
@@ -31,6 +33,16 @@ const noticeVariants = cva(
         variant: "default",
         appearance: "subtle",
         className: "bg-muted/20 text-muted-foreground",
+      },
+      {
+        variant: "success",
+        appearance: "boxed",
+        className: "bg-emerald-600/10 border-emerald-600/30",
+      },
+      {
+        variant: "success",
+        appearance: "subtle",
+        className: "bg-emerald-600/10",
       },
       {
         variant: "warning",

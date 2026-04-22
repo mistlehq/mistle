@@ -6,7 +6,7 @@ export type LinkedAccountStatusTone = "active" | "warning" | "disabled";
 export type LinkedAccountCallbackNotice = {
   title: string;
   message: string;
-  variant: "default" | "alert";
+  variant: "success" | "alert";
 };
 
 export type LinkedAccountEmailOptionViewModel = {
@@ -322,9 +322,9 @@ export function resolveLinkedAccountCallbackNotice(input: {
 
   if (input.result === "success") {
     return {
-      title: `${providerDisplayName} linked`,
-      message: `Your ${providerDisplayName} account is now linked to Mistle.`,
-      variant: "default",
+      title: `${providerDisplayName} linked successfully`,
+      message: `Your ${providerDisplayName} account is now linked on Mistle.`,
+      variant: "success",
     };
   }
 

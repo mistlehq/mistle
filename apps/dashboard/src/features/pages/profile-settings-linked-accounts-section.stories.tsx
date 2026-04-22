@@ -92,9 +92,9 @@ export const Empty: Story = {
 export const CallbackSuccess: Story = {
   args: {
     linkedAccountCallbackNotice: {
-      title: "GitHub linked",
-      message: "Your GitHub account is now linked to Mistle.",
-      variant: "default",
+      title: "GitHub linked successfully",
+      message: "Your GitHub account is now linked on Mistle.",
+      variant: "success",
     },
     linkedAccountCards: [GitHubLinkedWithConfiguredSigningCard],
   },

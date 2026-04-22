@@ -245,9 +245,9 @@ describe("linked-accounts-model", () => {
         code: null,
       }),
     ).toEqual({
-      title: "GitHub linked",
-      message: "Your GitHub account is now linked to Mistle.",
-      variant: "default",
+      title: "GitHub linked successfully",
+      message: "Your GitHub account is now linked on Mistle.",
+      variant: "success",
     });
   });
 
@@ -273,9 +273,9 @@ describe("linked-accounts-model", () => {
         code: null,
       }),
     ).toEqual({
-      title: "Slack linked",
-      message: "Your Slack account is now linked to Mistle.",
-      variant: "default",
+      title: "Slack linked successfully",
+      message: "Your Slack account is now linked on Mistle.",
+      variant: "success",
     });
   });
 
