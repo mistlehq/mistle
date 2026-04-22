@@ -9,7 +9,9 @@
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::fmt::{self, Display};
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use base64::Engine;
 use bytes::Bytes;
@@ -17,23 +19,27 @@ use http_body_util::{
     BodyExt,
     channel::{Channel, Sender},
 };
+use hyper::StatusCode;
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Request, Uri};
 use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio::net::TcpStream;
 use tokio::sync::mpsc;
+use tokio_rustls::TlsConnector;
 use tokio_rustls::rustls::client::danger::{
     HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
 };
 use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
 use tokio_rustls::rustls::{ClientConfig, DigitallySignedStruct, Error, SignatureScheme};
-use tokio_tungstenite::Connector;
-use tokio_tungstenite::connect_async_tls_with_config;
-use tokio_tungstenite::tungstenite::Error as WebSocketError;
+use tokio_tungstenite::MaybeTlsStream;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::handshake::client::{Response, generate_request};
+use tokio_tungstenite::tungstenite::handshake::derive_accept_key;
+use tokio_tungstenite::tungstenite::handshake::machine::TryParse;
 use tokio_tungstenite::tungstenite::http::Request as WebSocketRequest;
 
 use crate::tunnel::protocol::{
@@ -43,6 +49,7 @@ use crate::tunnel::protocol::{
 
 const UPSTREAM_LOCALHOST: &str = "localhost";
 const PORT_ACCESS_HTTP_BODY_CHANNEL_CAPACITY: usize = 16;
+const MAX_WEBSOCKET_HANDSHAKE_RESPONSE_BYTES: usize = 64 * 1024;
 
 type PortAccessHttpClient = Client<HttpsConnector<HttpConnector>, Channel<Bytes, Infallible>>;
 
@@ -309,13 +316,7 @@ async fn run_websocket_transport(
     mut command_receiver: mpsc::UnboundedReceiver<PortAccessWsCommand>,
     event_sender: mpsc::UnboundedSender<PortAccessTransportEvent>,
 ) -> Result<(), PortAccessTransportError> {
-    let request = build_websocket_request(&open)?;
-    let connector = build_websocket_connector(&open.upstream_protocol);
-    let (upstream_socket, response) =
-        connect_async_tls_with_config(request, None, false, connector)
-            .await
-            .map_err(classify_websocket_open_error)?;
-    let upstream_stream = upstream_socket.into_inner();
+    let (upstream_stream, response) = connect_upstream_websocket(&open).await?;
     let (mut upstream_reader, mut upstream_writer) = tokio::io::split(upstream_stream);
 
     event_sender
@@ -331,27 +332,43 @@ async fn run_websocket_transport(
             )
         })?;
 
-    let read_event_sender = event_sender.clone();
-    let stream_id = open.stream_id;
-    let reader_task = tokio::spawn(async move {
-        if let Err(error) =
-            relay_upstream_websocket_frames(stream_id, &mut upstream_reader, &read_event_sender)
-                .await
-        {
-            let _ =
-                read_event_sender.send(PortAccessTransportEvent::StreamError(PortsStreamError {
-                    message_type: "ports.stream.error".to_string(),
-                    stream_id,
-                    code: error.code.to_string(),
-                    message: error.to_string(),
-                }));
-        }
-    });
-
     loop {
-        if handle_websocket_command(command_receiver.recv().await, &mut upstream_writer).await? {
-            reader_task.abort();
-            return Ok(());
+        tokio::select! {
+            command = command_receiver.recv() => {
+                if handle_websocket_command(command, &mut upstream_writer).await? {
+                    return Ok(());
+                }
+            }
+            frame = read_websocket_frame(&mut upstream_reader) => {
+                let Some(frame) = frame? else {
+                    publish_websocket_close(&event_sender, open.stream_id, None, None)?;
+                    return Ok(());
+                };
+                match frame {
+                    ReadWebSocketFrame::Text(bytes) => {
+                        let _ = std::str::from_utf8(&bytes).map_err(|error| {
+                            PortAccessTransportError::new(
+                                "upstream_io_error",
+                                format!("failed to decode upstream websocket text frame as utf-8: {error}"),
+                            )
+                        })?;
+                        publish_websocket_frame(&event_sender, open.stream_id, "text", &bytes)?;
+                    }
+                    ReadWebSocketFrame::Binary(bytes) => {
+                        publish_websocket_frame(&event_sender, open.stream_id, "binary", &bytes)?;
+                    }
+                    ReadWebSocketFrame::Ping(bytes) => {
+                        publish_websocket_frame(&event_sender, open.stream_id, "ping", &bytes)?;
+                    }
+                    ReadWebSocketFrame::Pong(bytes) => {
+                        publish_websocket_frame(&event_sender, open.stream_id, "pong", &bytes)?;
+                    }
+                    ReadWebSocketFrame::Close { code, reason } => {
+                        publish_websocket_close(&event_sender, open.stream_id, code, reason.as_deref())?;
+                        return Ok(());
+                    }
+                }
+            }
         }
     }
 }
@@ -393,44 +410,6 @@ async fn handle_websocket_command(
         }
         Some(PortAccessWsCommand::Terminate) => Ok(true),
         None => Ok(true),
-    }
-}
-
-async fn relay_upstream_websocket_frames(
-    stream_id: u32,
-    upstream_reader: &mut (impl AsyncRead + Unpin),
-    event_sender: &mpsc::UnboundedSender<PortAccessTransportEvent>,
-) -> Result<(), PortAccessTransportError> {
-    loop {
-        let Some(frame) = read_websocket_frame(upstream_reader).await? else {
-            publish_websocket_close(event_sender, stream_id, None, None)?;
-            return Ok(());
-        };
-
-        match frame {
-            ReadWebSocketFrame::Text(bytes) => {
-                let _ = std::str::from_utf8(&bytes).map_err(|error| {
-                    PortAccessTransportError::new(
-                        "upstream_io_error",
-                        format!("failed to decode upstream websocket text frame as utf-8: {error}"),
-                    )
-                })?;
-                publish_websocket_frame(event_sender, stream_id, "text", &bytes)?;
-            }
-            ReadWebSocketFrame::Binary(bytes) => {
-                publish_websocket_frame(event_sender, stream_id, "binary", &bytes)?;
-            }
-            ReadWebSocketFrame::Ping(bytes) => {
-                publish_websocket_frame(event_sender, stream_id, "ping", &bytes)?;
-            }
-            ReadWebSocketFrame::Pong(bytes) => {
-                publish_websocket_frame(event_sender, stream_id, "pong", &bytes)?;
-            }
-            ReadWebSocketFrame::Close { code, reason } => {
-                publish_websocket_close(event_sender, stream_id, code, reason.as_deref())?;
-                return Ok(());
-            }
-        }
     }
 }
 
@@ -891,14 +870,251 @@ fn build_websocket_request_uri(
     Ok(request_uri)
 }
 
-fn build_websocket_connector(upstream_protocol: &str) -> Option<Connector> {
+async fn connect_upstream_websocket(
+    open: &PortsWsOpen,
+) -> Result<(ReplayableStream<MaybeTlsStream<TcpStream>>, Response), PortAccessTransportError> {
+    let request = build_websocket_request(open)?;
+    let requested_subprotocols = extract_requested_subprotocols(&request)?;
+    let (request_bytes, request_key) = generate_request(request).map_err(|error| {
+        PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!("failed to generate upstream websocket handshake request: {error}"),
+        )
+    })?;
+    let mut upstream_stream =
+        connect_upstream_websocket_stream(&open.target, &open.upstream_protocol).await?;
+    upstream_stream
+        .write_all(&request_bytes)
+        .await
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!("failed to write upstream websocket handshake request: {error}"),
+            )
+        })?;
+    upstream_stream.flush().await.map_err(|error| {
+        PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!("failed to flush upstream websocket handshake request: {error}"),
+        )
+    })?;
+    let (response, tail) = read_websocket_handshake_response(&mut upstream_stream).await?;
+    verify_websocket_handshake_response(
+        &response,
+        &derive_accept_key(request_key.as_bytes()),
+        requested_subprotocols.as_deref(),
+    )?;
+    Ok((ReplayableStream::new(upstream_stream, tail), response))
+}
+
+async fn connect_upstream_websocket_stream(
+    target: &PortAccessTarget,
+    upstream_protocol: &str,
+) -> Result<MaybeTlsStream<TcpStream>, PortAccessTransportError> {
+    let tcp_stream = TcpStream::connect((UPSTREAM_LOCALHOST, target.port))
+        .await
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_connect_failed",
+                format!(
+                    "failed to connect to upstream websocket target on port {}: {error}",
+                    target.port
+                ),
+            )
+        })?;
     match upstream_protocol {
-        "http" => None,
-        "https" => Some(Connector::Rustls(Arc::new(
-            build_insecure_tls_client_config(),
-        ))),
-        _ => None,
+        "http" => Ok(MaybeTlsStream::Plain(tcp_stream)),
+        "https" => {
+            let tls_connector = TlsConnector::from(Arc::new(build_insecure_tls_client_config()));
+            let server_name = ServerName::try_from(UPSTREAM_LOCALHOST)
+                .map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_handshake_failed",
+                        format!("failed to build upstream websocket tls server name: {error}"),
+                    )
+                })?
+                .to_owned();
+            let tls_stream = tls_connector
+                .connect(server_name, tcp_stream)
+                .await
+                .map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_handshake_failed",
+                        format!("failed to complete upstream websocket tls handshake: {error}"),
+                    )
+                })?;
+            Ok(MaybeTlsStream::Rustls(tls_stream))
+        }
+        other => Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!("unsupported websocket upstream protocol '{other}'"),
+        )),
     }
+}
+
+async fn read_websocket_handshake_response(
+    upstream_stream: &mut (impl AsyncRead + Unpin),
+) -> Result<(Response, Vec<u8>), PortAccessTransportError> {
+    let mut response_bytes = Vec::new();
+    let mut read_buffer = [0u8; 4096];
+    loop {
+        let bytes_read = upstream_stream
+            .read(&mut read_buffer)
+            .await
+            .map_err(|error| {
+                PortAccessTransportError::new(
+                    "upstream_handshake_failed",
+                    format!("failed to read upstream websocket handshake response: {error}"),
+                )
+            })?;
+        if bytes_read == 0 {
+            return Err(PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                "upstream websocket closed before completing the handshake response",
+            ));
+        }
+
+        response_bytes.extend_from_slice(&read_buffer[..bytes_read]);
+        if response_bytes.len() > MAX_WEBSOCKET_HANDSHAKE_RESPONSE_BYTES {
+            return Err(PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!(
+                    "upstream websocket handshake response exceeded {MAX_WEBSOCKET_HANDSHAKE_RESPONSE_BYTES} bytes",
+                ),
+            ));
+        }
+
+        let Some((consumed_bytes, response)) =
+            Response::try_parse(&response_bytes).map_err(|error| {
+                PortAccessTransportError::new(
+                    "upstream_handshake_failed",
+                    format!("failed to parse upstream websocket handshake response: {error}"),
+                )
+            })?
+        else {
+            continue;
+        };
+
+        let tail = response_bytes.split_off(consumed_bytes);
+        return Ok((response, tail));
+    }
+}
+
+fn verify_websocket_handshake_response(
+    response: &Response,
+    expected_accept_key: &str,
+    requested_subprotocols: Option<&[String]>,
+) -> Result<(), PortAccessTransportError> {
+    if response.status() != StatusCode::SWITCHING_PROTOCOLS {
+        return Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!(
+                "upstream websocket handshake returned unexpected status {}",
+                response.status(),
+            ),
+        ));
+    }
+
+    let headers = response.headers();
+    if !headers
+        .get("Upgrade")
+        .and_then(|header| header.to_str().ok())
+        .is_some_and(|header| header.eq_ignore_ascii_case("websocket"))
+    {
+        return Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            "upstream websocket handshake response is missing 'Upgrade: websocket'",
+        ));
+    }
+
+    if !headers
+        .get("Connection")
+        .and_then(|header| header.to_str().ok())
+        .is_some_and(connection_header_contains_upgrade)
+    {
+        return Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            "upstream websocket handshake response is missing 'Connection: Upgrade'",
+        ));
+    }
+
+    if headers
+        .get("Sec-WebSocket-Accept")
+        .and_then(|header| header.to_str().ok())
+        .is_none_or(|header| header != expected_accept_key)
+    {
+        return Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            "upstream websocket handshake response has an invalid 'Sec-WebSocket-Accept' header",
+        ));
+    }
+
+    let returned_subprotocol = headers
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|header| header.to_str().ok())
+        .map(str::to_string);
+    match (requested_subprotocols, returned_subprotocol.as_deref()) {
+        (Some(_), None) => {
+            return Err(PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                "upstream websocket handshake did not return the requested subprotocol",
+            ));
+        }
+        (None, Some(_)) => {
+            return Err(PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                "upstream websocket handshake returned an unexpected subprotocol",
+            ));
+        }
+        (Some(requested_subprotocols), Some(returned_subprotocol)) => {
+            if !requested_subprotocols
+                .iter()
+                .any(|requested_subprotocol| requested_subprotocol == returned_subprotocol)
+            {
+                return Err(PortAccessTransportError::new(
+                    "upstream_handshake_failed",
+                    format!(
+                        "upstream websocket handshake returned unexpected subprotocol '{returned_subprotocol}'",
+                    ),
+                ));
+            }
+        }
+        (None, None) => {}
+    }
+
+    Ok(())
+}
+
+fn extract_requested_subprotocols(
+    request: &WebSocketRequest<()>,
+) -> Result<Option<Vec<String>>, PortAccessTransportError> {
+    let Some(header_value) = request
+        .headers()
+        .get("Sec-WebSocket-Protocol")
+        .and_then(|header| header.to_str().ok())
+    else {
+        return Ok(None);
+    };
+
+    let requested_subprotocols = header_value
+        .split(',')
+        .map(str::trim)
+        .filter(|subprotocol| !subprotocol.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if requested_subprotocols.is_empty() {
+        return Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            "upstream websocket request declared an empty subprotocol list",
+        ));
+    }
+    Ok(Some(requested_subprotocols))
+}
+
+fn connection_header_contains_upgrade(connection_header: &str) -> bool {
+    connection_header
+        .split(',')
+        .any(|token| token.trim().eq_ignore_ascii_case("upgrade"))
 }
 
 fn collect_repeated_headers(
@@ -961,14 +1177,6 @@ fn classify_open_error(error: hyper_util::client::legacy::Error) -> PortAccessTr
     PortAccessTransportError::new(code, error.to_string())
 }
 
-fn classify_websocket_open_error(error: WebSocketError) -> PortAccessTransportError {
-    let code = match error {
-        WebSocketError::Io(_) => "upstream_connect_failed",
-        _ => "upstream_handshake_failed",
-    };
-    PortAccessTransportError::new(code, error.to_string())
-}
-
 #[derive(Debug)]
 struct AcceptAnyServerCertVerifier;
 
@@ -1014,6 +1222,59 @@ impl ServerCertVerifier for AcceptAnyServerCertVerifier {
             SignatureScheme::RSA_PKCS1_SHA384,
             SignatureScheme::RSA_PKCS1_SHA512,
         ]
+    }
+}
+
+#[derive(Debug)]
+struct ReplayableStream<S> {
+    inner: S,
+    replay_bytes: Vec<u8>,
+    replay_offset: usize,
+}
+
+impl<S> ReplayableStream<S> {
+    fn new(inner: S, replay_bytes: Vec<u8>) -> Self {
+        Self {
+            inner,
+            replay_bytes,
+            replay_offset: 0,
+        }
+    }
+}
+
+impl<S: AsyncRead + Unpin> AsyncRead for ReplayableStream<S> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        if self.replay_offset < self.replay_bytes.len() {
+            let replay_bytes = &self.replay_bytes[self.replay_offset..];
+            let bytes_to_copy = replay_bytes.len().min(buf.remaining());
+            buf.put_slice(&replay_bytes[..bytes_to_copy]);
+            self.replay_offset += bytes_to_copy;
+            return Poll::Ready(Ok(()));
+        }
+
+        Pin::new(&mut self.inner).poll_read(cx, buf)
+    }
+}
+
+impl<S: AsyncWrite + Unpin> AsyncWrite for ReplayableStream<S> {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        Pin::new(&mut self.inner).poll_write(cx, buf)
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_flush(cx)
+    }
+
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }
 
