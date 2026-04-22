@@ -76,6 +76,7 @@ export type SessionComposerStateInput = {
   clearSessionErrorMessage: () => void;
   configControl: SessionComposerConfigControl;
   attachmentControl: SessionComposerAttachmentControl;
+  gitBranchLabel: string | null;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -611,6 +612,7 @@ export function useSessionComposerState(input: {
       submitDisabled,
       submitDisabledReason: null,
       canUploadAttachments: composerStateInput.attachmentControl.canUploadAttachments,
+      gitBranchLabel: composerStateInput.gitBranchLabel,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&

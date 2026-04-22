@@ -29,6 +29,7 @@ import {
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
+import { useSessionGitBranch } from "./use-session-git-branch.js";
 import { useSessionMainPanelHandoff } from "./use-session-main-panel-handoff.js";
 import { useSessionPortAccess } from "./use-session-port-access.js";
 import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
@@ -206,6 +207,13 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const gitBranchState = useSessionGitBranch({
+    cwd: primaryRepositoryState.selectedRepositoryPath,
+    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    rpcClient: rpcClientRef.current,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const portAccessState = useSessionPortAccess({
     canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
@@ -320,6 +328,7 @@ export function useSessionWorkbenchController(input: {
         },
         sessionErrorMessage: sessionMessage.sessionErrorMessage,
         clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
+        gitBranchLabel: gitBranchState.branchLabel,
       },
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,

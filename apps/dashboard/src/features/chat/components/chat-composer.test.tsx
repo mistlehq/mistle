@@ -9,6 +9,7 @@ import { ChatComposer } from "./chat-composer.js";
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerText: "Ship it",
+    gitBranchLabel: null,
     pendingDiffCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
@@ -161,6 +162,12 @@ describe("ChatComposer", () => {
 
     expect(screen.getByText("3 comments")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove all 3 comments" })).toBeTruthy();
+  });
+
+  it("renders the current git branch when provided", () => {
+    render(<ChatComposer {...createBaseComposerProps()} gitBranchLabel="feature/show-branch" />);
+
+    expect(screen.getByText("feature/show-branch")).toBeTruthy();
   });
 
   it("clears the pending diff comment badge when the remove action is pressed", () => {

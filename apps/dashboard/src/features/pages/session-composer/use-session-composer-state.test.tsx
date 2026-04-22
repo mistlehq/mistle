@@ -105,6 +105,7 @@ function SessionComposerStateHarness(input: {
           displayAttachments: [],
         }),
       },
+      gitBranchLabel: null,
       sessionErrorMessage: null,
       turnControl: {
         activeTurnState: "idle",

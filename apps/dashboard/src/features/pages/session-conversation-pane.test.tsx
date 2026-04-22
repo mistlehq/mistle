@@ -110,6 +110,7 @@ function RenderedComposerPaneHarness(input: {
           },
         },
         attachmentControl,
+        gitBranchLabel: null,
         sessionErrorMessage,
         turnControl: {
           activeTurnState: "idle",
@@ -207,6 +208,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
               submittedAttachments: [],
             }),
           },
+          gitBranchLabel: null,
           sessionErrorMessage: null,
           turnControl: {
             activeTurnState,

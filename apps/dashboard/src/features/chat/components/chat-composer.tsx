@@ -16,6 +16,7 @@ import {
   ArrowCircleUpIcon,
   ChatCircleTextIcon,
   CircleNotchIcon,
+  GitBranchIcon,
   PlusIcon,
   StopCircleIcon,
   XIcon,
@@ -60,6 +61,7 @@ export type ChatComposerStatusMessage = {
 
 export type ChatComposerViewModel = {
   composerText: string;
+  gitBranchLabel: string | null;
   pendingDiffCommentSummary: {
     count: number;
     label: string;
@@ -100,6 +102,7 @@ export type ChatComposerViewModel = {
 
 export function ChatComposer({
   composerText,
+  gitBranchLabel,
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
@@ -155,239 +158,247 @@ export function ChatComposer({
   }
 
   return (
-    <div
-      className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs"
-      onDragOver={(event) => {
-        event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        addPendingFiles(Array.from(event.dataTransfer.files));
-      }}
-    >
-      <input
-        accept="image/*"
-        className="hidden"
-        multiple
-        onChange={(event) => {
-          addPendingFiles(Array.from(event.target.files ?? []));
-          event.currentTarget.value = "";
-        }}
-        ref={fileInputRef}
-        type="file"
-      />
-      {pendingAttachments.length === 0 && pendingDiffCommentSummary === null ? null : (
-        <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
-          {pendingDiffCommentSummary === null ? null : (
-            <div
-              className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
-              title={pendingDiffCommentSummary.title}
-            >
-              <ChatCircleTextIcon aria-hidden="true" className="size-3.5" />
-              <span>{pendingDiffCommentSummary.label}</span>
-              <button
-                aria-label={`Remove all ${pendingDiffCommentSummary.label}`}
-                className="text-muted-foreground disabled:cursor-not-allowed"
-                disabled={isUploadingAttachments}
-                onClick={() => {
-                  onClearPendingDiffComments();
-                }}
-                type="button"
-              >
-                <XIcon aria-hidden="true" className="size-3.5" />
-              </button>
-            </div>
-          )}
-          {pendingAttachments.map((attachment) => (
-            <div
-              className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
-              key={attachment.id}
-            >
-              <span>{attachment.name}</span>
-              <button
-                aria-label={`Remove ${attachment.name}`}
-                className="text-muted-foreground disabled:cursor-not-allowed"
-                disabled={isUploadingAttachments}
-                onClick={() => {
-                  onRemovePendingAttachment(attachment.id);
-                }}
-                type="button"
-              >
-                <XIcon aria-hidden="true" className="size-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <Textarea
-        className="min-h-12 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
-        id="session-composer"
-        onChange={(event) => {
-          onComposerTextChange(event.target.value);
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || event.shiftKey) {
-            return;
-          }
-
+    <>
+      <div
+        className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs"
+        onDragOver={(event) => {
           event.preventDefault();
-          if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
-            if (secondarySubmitDisabled) {
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          addPendingFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        <input
+          accept="image/*"
+          className="hidden"
+          multiple
+          onChange={(event) => {
+            addPendingFiles(Array.from(event.target.files ?? []));
+            event.currentTarget.value = "";
+          }}
+          ref={fileInputRef}
+          type="file"
+        />
+        {pendingAttachments.length === 0 && pendingDiffCommentSummary === null ? null : (
+          <div className="flex flex-wrap gap-2 px-1.5 pt-1.5">
+            {pendingDiffCommentSummary === null ? null : (
+              <div
+                className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
+                title={pendingDiffCommentSummary.title}
+              >
+                <ChatCircleTextIcon aria-hidden="true" className="size-3.5" />
+                <span>{pendingDiffCommentSummary.label}</span>
+                <button
+                  aria-label={`Remove all ${pendingDiffCommentSummary.label}`}
+                  className="text-muted-foreground disabled:cursor-not-allowed"
+                  disabled={isUploadingAttachments}
+                  onClick={() => {
+                    onClearPendingDiffComments();
+                  }}
+                  type="button"
+                >
+                  <XIcon aria-hidden="true" className="size-3.5" />
+                </button>
+              </div>
+            )}
+            {pendingAttachments.map((attachment) => (
+              <div
+                className="bg-muted flex items-center gap-2 rounded-full px-3 py-1 text-xs"
+                key={attachment.id}
+              >
+                <span>{attachment.name}</span>
+                <button
+                  aria-label={`Remove ${attachment.name}`}
+                  className="text-muted-foreground disabled:cursor-not-allowed"
+                  disabled={isUploadingAttachments}
+                  onClick={() => {
+                    onRemovePendingAttachment(attachment.id);
+                  }}
+                  type="button"
+                >
+                  <XIcon aria-hidden="true" className="size-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <Textarea
+          className="min-h-12 resize-none border-0 bg-transparent p-1.5 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
+          id="session-composer"
+          onChange={(event) => {
+            onComposerTextChange(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.shiftKey) {
               return;
             }
 
-            onSecondarySubmit();
-            return;
-          }
-
-          if (submitDisabled) {
-            return;
-          }
-
-          onSubmit();
-        }}
-        onPaste={(event) => {
-          const clipboardFiles = Array.from(event.clipboardData.files);
-          if (clipboardFiles.length === 0) {
-            return;
-          }
-
-          event.preventDefault();
-          addPendingFiles(clipboardFiles);
-        }}
-        placeholder={composerPlaceholder}
-        rows={2}
-        value={composerText}
-      />
-      <div className="flex items-center gap-2">
-        <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
-          <Button
-            aria-label="Add images"
-            className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
-            disabled={!canUploadAttachments || isUploadingAttachments}
-            onClick={() => {
-              fileInputRef.current?.click();
-            }}
-            type="button"
-            variant="ghost"
-          >
-            <PlusIcon aria-hidden="true" className="size-4" />
-          </Button>
-
-          <Select
-            disabled={configControlsDisabled}
-            onValueChange={(value) => {
-              if (value === null) {
+            event.preventDefault();
+            if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
+              if (secondarySubmitDisabled) {
                 return;
               }
-              onModelChange(value);
-            }}
-            value={selectableModelValue}
-          >
-            <SelectTrigger
-              aria-label="Model switcher"
-              className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
-              size="sm"
-            >
-              <SelectValue className="text-muted-foreground" placeholder="Model">
-                {selectedModelLabel ?? "Model"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {modelOptions.map((modelOption) => (
-                <SelectItem key={modelOption.value} value={modelOption.value}>
-                  {modelOption.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
-          <Select
-            disabled={configControlsDisabled}
-            onValueChange={(value) => {
-              if (value === null) {
-                return;
-              }
-              onReasoningEffortChange(value);
-            }}
-            value={selectedReasoningEffortValue}
-          >
-            <SelectTrigger
-              aria-label="Reasoning switcher"
-              className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
-              size="sm"
-            >
-              <SelectValue className="text-muted-foreground" placeholder="Reasoning">
-                {selectedReasoningEffortValue === null
-                  ? "Reasoning"
-                  : formatReasoningEffortLabel(selectedReasoningEffortValue)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {REASONING_EFFORT_OPTIONS.map((reasoningOption) => (
-                <SelectItem key={reasoningOption} value={reasoningOption}>
-                  {formatReasoningEffortLabel(reasoningOption)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+              onSecondarySubmit();
+              return;
+            }
 
-        {keyboardShortcuts === undefined || keyboardShortcuts.length === 0 ? (
-          <Button
-            aria-label={submitLabel}
-            className={[
-              "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
-              isSubmitPending ? "disabled:opacity-100" : null,
-            ].join(" ")}
-            disabled={submitDisabled}
-            onClick={onSubmit}
-            size="icon-fill"
-            type="button"
-            variant="ghost"
-          >
-            {composerActionIcon}
-          </Button>
-        ) : (
-          <HoverCard>
-            <HoverCardTrigger closeDelay={0} delay={0}>
-              <Button
-                aria-label={submitLabel}
-                className={[
-                  "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
-                  isSubmitPending ? "disabled:opacity-100" : null,
-                ].join(" ")}
-                disabled={submitDisabled}
-                onClick={onSubmit}
-                size="icon-fill"
-                type="button"
-                variant="ghost"
+            if (submitDisabled) {
+              return;
+            }
+
+            onSubmit();
+          }}
+          onPaste={(event) => {
+            const clipboardFiles = Array.from(event.clipboardData.files);
+            if (clipboardFiles.length === 0) {
+              return;
+            }
+
+            event.preventDefault();
+            addPendingFiles(clipboardFiles);
+          }}
+          placeholder={composerPlaceholder}
+          rows={2}
+          value={composerText}
+        />
+        <div className="flex items-center gap-2">
+          <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
+            <Button
+              aria-label="Add images"
+              className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
+              disabled={!canUploadAttachments || isUploadingAttachments}
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+              type="button"
+              variant="ghost"
+            >
+              <PlusIcon aria-hidden="true" className="size-4" />
+            </Button>
+
+            <Select
+              disabled={configControlsDisabled}
+              onValueChange={(value) => {
+                if (value === null) {
+                  return;
+                }
+                onModelChange(value);
+              }}
+              value={selectableModelValue}
+            >
+              <SelectTrigger
+                aria-label="Model switcher"
+                className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
+                size="sm"
               >
-                {composerActionIcon}
-              </Button>
-            </HoverCardTrigger>
-            <HoverCardContent
-              align="end"
-              alignOffset={0}
-              className="w-fit min-w-0 p-3"
-              side="top"
-              sideOffset={12}
-            >
-              <div className="space-y-1.5">
-                {keyboardShortcuts.map((shortcutHint) => (
-                  <div
-                    className="flex items-center justify-between gap-3 text-sm"
-                    key={`${shortcutHint.action}:${shortcutHint.shortcut}`}
-                  >
-                    <span>{shortcutHint.action}</span>
-                    <Kbd>{resolveShortcutDisplayLabel(shortcutHint.shortcut)}</Kbd>
-                  </div>
+                <SelectValue className="text-muted-foreground" placeholder="Model">
+                  {selectedModelLabel ?? "Model"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {modelOptions.map((modelOption) => (
+                  <SelectItem key={modelOption.value} value={modelOption.value}>
+                    {modelOption.label}
+                  </SelectItem>
                 ))}
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        )}
+              </SelectContent>
+            </Select>
+
+            <Select
+              disabled={configControlsDisabled}
+              onValueChange={(value) => {
+                if (value === null) {
+                  return;
+                }
+                onReasoningEffortChange(value);
+              }}
+              value={selectedReasoningEffortValue}
+            >
+              <SelectTrigger
+                aria-label="Reasoning switcher"
+                className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
+                size="sm"
+              >
+                <SelectValue className="text-muted-foreground" placeholder="Reasoning">
+                  {selectedReasoningEffortValue === null
+                    ? "Reasoning"
+                    : formatReasoningEffortLabel(selectedReasoningEffortValue)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {REASONING_EFFORT_OPTIONS.map((reasoningOption) => (
+                  <SelectItem key={reasoningOption} value={reasoningOption}>
+                    {formatReasoningEffortLabel(reasoningOption)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {keyboardShortcuts === undefined || keyboardShortcuts.length === 0 ? (
+            <Button
+              aria-label={submitLabel}
+              className={[
+                "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
+                isSubmitPending ? "disabled:opacity-100" : null,
+              ].join(" ")}
+              disabled={submitDisabled}
+              onClick={onSubmit}
+              size="icon-fill"
+              type="button"
+              variant="ghost"
+            >
+              {composerActionIcon}
+            </Button>
+          ) : (
+            <HoverCard>
+              <HoverCardTrigger closeDelay={0} delay={0}>
+                <Button
+                  aria-label={submitLabel}
+                  className={[
+                    "shrink-0 rounded-full bg-transparent text-primary hover:bg-transparent",
+                    isSubmitPending ? "disabled:opacity-100" : null,
+                  ].join(" ")}
+                  disabled={submitDisabled}
+                  onClick={onSubmit}
+                  size="icon-fill"
+                  type="button"
+                  variant="ghost"
+                >
+                  {composerActionIcon}
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent
+                align="end"
+                alignOffset={0}
+                className="w-fit min-w-0 p-3"
+                side="top"
+                sideOffset={12}
+              >
+                <div className="space-y-1.5">
+                  {keyboardShortcuts.map((shortcutHint) => (
+                    <div
+                      className="flex items-center justify-between gap-3 text-sm"
+                      key={`${shortcutHint.action}:${shortcutHint.shortcut}`}
+                    >
+                      <span>{shortcutHint.action}</span>
+                      <Kbd>{resolveShortcutDisplayLabel(shortcutHint.shortcut)}</Kbd>
+                    </div>
+                  ))}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          )}
+        </div>
       </div>
-    </div>
+      {gitBranchLabel === null ? null : (
+        <div className="text-muted-foreground flex items-center gap-1.5 px-1.5 pt-2 text-sm">
+          <GitBranchIcon aria-hidden="true" className="size-4" />
+          <span>{gitBranchLabel}</span>
+        </div>
+      )}
+    </>
   );
 }

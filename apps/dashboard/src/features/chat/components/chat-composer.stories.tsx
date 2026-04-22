@@ -147,6 +147,13 @@ export const SteeringTurn: Story = {
   },
 };
 
+export const WithGitBranch: Story = {
+  args: {
+    composerText: "Summarize the current dashboard regression.",
+    gitBranchLabel: "feature/show-session-branch",
+  },
+};
+
 export const SteeringTurnShortcutHover: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",

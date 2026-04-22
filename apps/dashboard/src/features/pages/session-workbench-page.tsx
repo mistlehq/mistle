@@ -519,6 +519,7 @@ function renderPrimaryPanelMainContent(input: {
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
+    gitBranchLabel: null,
     pendingDiffCommentSummary: null,
     isSubmitPending: false,
     pendingAttachments: [],

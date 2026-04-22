@@ -58,6 +58,7 @@ export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEnt
 
 export const SessionComposerFixtureProps: ChatComposerViewModel = {
   composerText: "Focus on dashboard asset ownership next.",
+  gitBranchLabel: null,
   pendingDiffCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
