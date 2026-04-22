@@ -1,0 +1,24 @@
+:root {
+  color: #12321c;
+  background: #f6fbf8;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+#app {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background-image: url("./pattern.svg");
+  background-position: center;
+  background-repeat: repeat;
+}
+
+img {
+  display: block;
+}

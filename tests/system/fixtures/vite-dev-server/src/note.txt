@@ -1,0 +1,1 @@
+This fixture proves CSS, virtual modules, assets, raw text imports, favicon handling, and HMR can all traverse port access without dropping the bootstrap tunnel.
