@@ -48,7 +48,7 @@ use crate::protocol::startup::StartupInput;
 use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
-use crate::time::{Clock, format_rfc3339_timestamp};
+use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
@@ -89,6 +89,12 @@ struct ProxyCaConfig<'a> {
     runtime_certificate_path: &'a Path,
     trust_store_certificate_path: &'a Path,
     refresh_command: &'a Path,
+}
+
+#[derive(Clone, Copy)]
+struct EgressProxyLogContext<'a> {
+    clock: &'a dyn Clock,
+    sandbox_instance_id: &'a str,
 }
 
 #[derive(Debug)]
@@ -207,7 +213,16 @@ impl ProxyCaInstallation {
         runtime_certificate_path: &Path,
         trust_store_certificate_path: &Path,
         refresh_command: &Path,
+        log_context: EgressProxyLogContext<'_>,
     ) -> Result<Self, EgressProxyError> {
+        emit_proxy_ca_lifecycle_log(
+            log_context,
+            "egress_proxy_ca_install_started",
+            runtime_certificate_path,
+            trust_store_certificate_path,
+            refresh_command,
+            None,
+        );
         let runtime_directory = runtime_certificate_path.parent().ok_or_else(|| {
             EgressProxyError::new("egress proxy CA path must include a parent directory")
         })?;
@@ -252,6 +267,15 @@ impl ProxyCaInstallation {
             let suffix = cleanup_error.unwrap_or_default();
             return Err(EgressProxyError::new(format!("{error}{suffix}")));
         }
+
+        emit_proxy_ca_lifecycle_log(
+            log_context,
+            "egress_proxy_ca_install_completed",
+            runtime_certificate_path,
+            trust_store_certificate_path,
+            refresh_command,
+            None,
+        );
 
         Ok(installation)
     }
@@ -484,6 +508,11 @@ impl EgressProxy {
         if runtime_plan.egress_routes.is_empty() {
             return Ok(None);
         }
+        let log_clock = clock.clone();
+        let log_context = EgressProxyLogContext {
+            clock: log_clock.as_ref(),
+            sandbox_instance_id: supervisor_handle.sandbox_instance_id(),
+        };
 
         let routes = runtime_plan
             .egress_routes
@@ -493,32 +522,46 @@ impl EgressProxy {
 
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
             .map_err(|error| EgressProxyError::new(error.to_string()))?;
-        let proxy_ca_installation = ProxyCaInstallation::install(
+        let proxy_ca_installation = match ProxyCaInstallation::install(
             &generated_proxy_ca.certificate_pem,
             proxy_ca_config.runtime_certificate_path,
             proxy_ca_config.trust_store_certificate_path,
             proxy_ca_config.refresh_command,
-        )?;
+            log_context,
+        ) {
+            Ok(proxy_ca_installation) => proxy_ca_installation,
+            Err(error) => {
+                emit_proxy_ca_lifecycle_log(
+                    log_context,
+                    "egress_proxy_ca_install_failed",
+                    proxy_ca_config.runtime_certificate_path,
+                    proxy_ca_config.trust_store_certificate_path,
+                    proxy_ca_config.refresh_command,
+                    Some(error.to_string()),
+                );
+                return Err(error);
+            }
+        };
 
         let std_listener = match bind_egress_proxy_listener(listener_address) {
             Ok(std_listener) => std_listener,
             Err(error) => {
-                let cleanup_suffix = proxy_ca_installation
-                    .cleanup()
-                    .err()
-                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                    .unwrap_or_default();
+                let cleanup_suffix =
+                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                        .err()
+                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                        .unwrap_or_default();
                 return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
             }
         };
         let listener_address = match std_listener.local_addr() {
             Ok(listener_address) => listener_address,
             Err(error) => {
-                let cleanup_suffix = proxy_ca_installation
-                    .cleanup()
-                    .err()
-                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                    .unwrap_or_default();
+                let cleanup_suffix =
+                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                        .err()
+                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                        .unwrap_or_default();
                 return Err(EgressProxyError::new(format!(
                     "failed to inspect local egress proxy address: {error}{cleanup_suffix}"
                 )));
@@ -540,8 +583,7 @@ impl EgressProxy {
         let https_connector = match HttpsConnectorBuilder::new().with_native_roots() {
             Ok(https_connector_builder) => https_connector_builder,
             Err(error) => {
-                let cleanup_suffix = proxy_ca_installation
-                    .cleanup()
+                let cleanup_suffix = cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                     .err()
                     .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
                     .unwrap_or_default();
@@ -571,11 +613,11 @@ impl EgressProxy {
         ) {
             Ok(runtime_env) => runtime_env,
             Err(error) => {
-                let cleanup_suffix = proxy_ca_installation
-                    .cleanup()
-                    .err()
-                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                    .unwrap_or_default();
+                let cleanup_suffix =
+                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                        .err()
+                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                        .unwrap_or_default();
                 return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
             }
         };
@@ -589,8 +631,7 @@ impl EgressProxy {
         ) {
             active_server.request_shutdown();
             let _ = active_server.join();
-            let cleanup_suffix = proxy_ca_installation
-                .cleanup()
+            let cleanup_suffix = cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
                 .err()
                 .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
                 .unwrap_or_default();
@@ -655,6 +696,10 @@ impl EgressProxy {
     }
 
     pub fn close(mut self) -> Result<(), EgressProxyError> {
+        let log_context = EgressProxyLogContext {
+            clock: &SystemClock,
+            sandbox_instance_id: self.supervisor_handle.sandbox_instance_id(),
+        };
         self.shutdown_requested.store(true, Ordering::Relaxed);
 
         if let Some(supervisor_thread) = self.supervisor_thread.take() {
@@ -669,7 +714,7 @@ impl EgressProxy {
             }
         }
 
-        self.proxy_ca_installation.cleanup()?;
+        cleanup_proxy_ca_installation(&self.proxy_ca_installation, log_context)?;
 
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::EgressProxy);
@@ -1683,6 +1728,77 @@ fn emit_egress_proxy_log(
         serialize_egress_proxy_log_line(clock, sandbox_instance_id, event, extra_fields)
     {
         eprintln!("{line}");
+    }
+}
+
+fn emit_proxy_ca_lifecycle_log(
+    log_context: EgressProxyLogContext<'_>,
+    event: &str,
+    runtime_certificate_path: &Path,
+    trust_store_certificate_path: &Path,
+    refresh_command: &Path,
+    error: Option<String>,
+) {
+    let mut fields = vec![
+        (
+            "runtimeCertificatePath",
+            Value::String(runtime_certificate_path.display().to_string()),
+        ),
+        (
+            "trustStoreCertificatePath",
+            Value::String(trust_store_certificate_path.display().to_string()),
+        ),
+        (
+            "refreshCommand",
+            Value::String(refresh_command.display().to_string()),
+        ),
+    ];
+    if let Some(error) = error {
+        fields.push(("error", Value::String(error)));
+    }
+    emit_egress_proxy_log(
+        log_context.clock,
+        log_context.sandbox_instance_id,
+        event,
+        &fields,
+    );
+}
+
+fn cleanup_proxy_ca_installation(
+    installation: &ProxyCaInstallation,
+    log_context: EgressProxyLogContext<'_>,
+) -> Result<(), EgressProxyError> {
+    emit_proxy_ca_lifecycle_log(
+        log_context,
+        "egress_proxy_ca_cleanup_started",
+        &installation.runtime_certificate_path,
+        &installation.trust_store_certificate_path,
+        &installation.refresh_command,
+        None,
+    );
+    match installation.cleanup() {
+        Ok(()) => {
+            emit_proxy_ca_lifecycle_log(
+                log_context,
+                "egress_proxy_ca_cleanup_completed",
+                &installation.runtime_certificate_path,
+                &installation.trust_store_certificate_path,
+                &installation.refresh_command,
+                None,
+            );
+            Ok(())
+        }
+        Err(error) => {
+            emit_proxy_ca_lifecycle_log(
+                log_context,
+                "egress_proxy_ca_cleanup_failed",
+                &installation.runtime_certificate_path,
+                &installation.trust_store_certificate_path,
+                &installation.refresh_command,
+                Some(error.to_string()),
+            );
+            Err(error)
+        }
     }
 }
 
