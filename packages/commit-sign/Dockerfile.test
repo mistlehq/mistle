@@ -1,0 +1,5 @@
+FROM rust:1.89-alpine
+
+RUN apk add --no-cache build-base musl-dev
+
+WORKDIR /work/packages/commit-sign

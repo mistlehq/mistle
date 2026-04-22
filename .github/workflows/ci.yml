@@ -55,6 +55,7 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
               - '.envrc'
+              - 'packages/commit-sign/**'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
               - 'packages/integrations-core/**'
@@ -320,8 +321,8 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
 
-  test-rust:
-    name: Rust Test
+  test-commit-sign:
+    name: Commit Sign Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -330,9 +331,77 @@ jobs:
     if: needs.changes.outputs.rust == 'true'
     env:
       CI: true
-      TURBO_TELEMETRY_DISABLED: "1"
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore commit-sign container cargo cache
+        id: test-commit-sign-container-cargo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/commit-sign-test/cargo-home
+          key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-commit-sign-test-cargo-home-
+
+      - name: Restore pnpm store cache
+        id: test-commit-sign-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.test-commit-sign-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Build commit-sign test runner image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: packages/commit-sign/Dockerfile.test
+          tags: mistle/commit-sign-test-runner:ci
+          load: true
+          cache-from: type=gha,scope=commit-sign-test-runner
+          cache-to: type=gha,mode=max,scope=commit-sign-test-runner
+
+      - name: Run commit-sign tests in Nix shell
+        env:
+          MISTLE_COMMIT_SIGN_TEST_IMAGE: mistle/commit-sign-test-runner:ci
+          MISTLE_COMMIT_SIGN_TEST_RUNNER_BUILD_POLICY: never
+        run: nix develop --command pnpm --filter @mistle/commit-sign test
+
+      - name: Save commit-sign container cargo cache
+        if: steps.test-commit-sign-container-cargo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .local/commit-sign-test/cargo-home
+          key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
+
+  test-sandboxd:
+    name: Sandboxd Test
+    # runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.rust == 'true'
+    env:
+      CI: true
 
     steps:
       - name: Checkout
@@ -344,18 +413,8 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Restore Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: sandbox-rust
-          workspaces: |
-            packages/sandboxd -> target
-          env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
-          cmd-format: nix develop --command {0}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-
       - name: Restore sandboxd container cargo cache
-        id: test-rust-sandboxd-container-cargo-cache
+        id: test-sandboxd-container-cargo-cache
         uses: actions/cache/restore@v5
         with:
           path: .local/sandboxd-test/cargo-home
@@ -364,7 +423,7 @@ jobs:
             ${{ runner.os }}-sandboxd-test-cargo-home-
 
       - name: Restore pnpm store cache
-        id: test-rust-pnpm-store-cache
+        id: test-sandboxd-pnpm-store-cache
         uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -372,21 +431,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Restore Turbo local cache
-        id: test-rust-turbo-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-
-            ${{ runner.os }}-turbo-
-
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
-        if: steps.test-rust-pnpm-store-cache.outputs.cache-hit != 'true'
+        if: steps.test-sandboxd-pnpm-store-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -405,25 +454,24 @@ jobs:
           cache-from: type=gha,scope=sandboxd-test-runner
           cache-to: type=gha,mode=max,scope=sandboxd-test-runner
 
-      - name: Run Rust tests in Nix shell
+      - name: Run sandboxd tests in Nix shell
         env:
           MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:ci
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
-        run: nix develop --command pnpm test:rust
+        run: nix develop --command pnpm --filter @mistle/sandboxd test
+
+      - name: Run sandboxd integration tests in Nix shell
+        env:
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:ci
+          MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
+        run: nix develop --command pnpm --filter @mistle/sandboxd test:integration
 
       - name: Save sandboxd container cargo cache
-        if: steps.test-rust-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
+        if: steps.test-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
-
-      - name: Save Turbo local cache
-        if: ${{ always() && !cancelled() && steps.test-rust-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-rust-${{ github.sha }}
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
@@ -454,7 +502,8 @@ jobs:
       - static-ts
       - static-rust
       - test-ts
-      - test-rust
+      - test-commit-sign
+      - test-sandboxd
       - sandbox-base-linux
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     permissions:
@@ -467,7 +516,8 @@ jobs:
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
-      RUST_TEST_RESULT: ${{ needs.test-rust.result }}
+      COMMIT_SIGN_TEST_RESULT: ${{ needs.test-commit-sign.result }}
+      SANDBOXD_TEST_RESULT: ${{ needs.test-sandboxd.result }}
       SANDBOX_BASE_RESULT: ${{ needs.sandbox-base-linux.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
@@ -495,7 +545,8 @@ jobs:
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
-              os.environ["RUST_TEST_RESULT"],
+              os.environ["COMMIT_SIGN_TEST_RESULT"],
+              os.environ["SANDBOXD_TEST_RESULT"],
           ]
           sandbox_base_result = os.environ["SANDBOX_BASE_RESULT"]
           success_like_results = {"success", "skipped"}

@@ -100,7 +100,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
                       "extractedPath": extracted_path
                     },
                     "installPath": install_path.display().to_string(),
-                    "timeoutMs": 30_000
+                    "timeoutMs": 120_000
                   }
                 ]
               }
