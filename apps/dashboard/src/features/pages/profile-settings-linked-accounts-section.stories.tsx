@@ -7,12 +7,9 @@ import {
 } from "./profile-settings-page-view.js";
 import {
   DefaultProfileSettingsLinkedAccountsSectionProps,
-  GitHubDisabledButStillLinkedCard,
   GitHubLinkedWithConfiguredSigningCard,
   GitHubLinkedWithSigningNotConfiguredCard,
-  GitHubLinkedWithoutSelectableEmailsCard,
   GitHubNotLinkedCard,
-  GitHubRelinkRequiredCard,
   SlackNotLinkedCard,
 } from "./profile-settings-page-view.story-fixtures.js";
 
@@ -31,36 +28,6 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     linkedAccountCards: [GitHubLinkedWithConfiguredSigningCard],
-  },
-};
-
-export const GitHubNotLinked: Story = {
-  args: {
-    linkedAccountCards: [GitHubNotLinkedCard],
-  },
-};
-
-export const GitHubRelinkRequired: Story = {
-  args: {
-    linkedAccountCards: [GitHubRelinkRequiredCard],
-  },
-};
-
-export const GitHubLinkedNoSelectableEmails: Story = {
-  args: {
-    linkedAccountCards: [GitHubLinkedWithoutSelectableEmailsCard],
-  },
-};
-
-export const GitHubLinkedSigningNotConfigured: Story = {
-  args: {
-    linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],
-  },
-};
-
-export const GitHubDisabledButStillLinked: Story = {
-  args: {
-    linkedAccountCards: [GitHubDisabledButStillLinkedCard],
   },
 };
 

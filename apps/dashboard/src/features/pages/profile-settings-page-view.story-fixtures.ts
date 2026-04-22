@@ -161,6 +161,52 @@ export const SlackNotLinkedCard = {
   secondaryActionLabel: null,
 } satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
 
+export const SlackLinkedCard = {
+  providerFamily: "slack",
+  displayName: "Slack",
+  logoKey: "slack",
+  statusLabel: "Linked",
+  statusTone: "active",
+  accountLabel: "Mistle Workspace",
+  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+  helperMessage: null,
+  emailPreference: null,
+  commitSigning: null,
+  primaryActionLabel: null,
+  secondaryActionLabel: "Unlink",
+} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+
+export const SlackRelinkRequiredCard = {
+  providerFamily: "slack",
+  displayName: "Slack",
+  logoKey: "slack",
+  statusLabel: "Relink required",
+  statusTone: "warning",
+  accountLabel: "Mistle Workspace",
+  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+  helperMessage: null,
+  emailPreference: null,
+  commitSigning: null,
+  primaryActionLabel: "Relink",
+  secondaryActionLabel: "Unlink",
+} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+
+export const SlackDisabledButStillLinkedCard = {
+  providerFamily: "slack",
+  displayName: "Slack",
+  logoKey: "slack",
+  statusLabel: "Disabled",
+  statusTone: "disabled",
+  accountLabel: "Mistle Workspace",
+  linkedAtLabel: "Linked Apr 19, 2026, 6:15 PM",
+  helperMessage:
+    "Your organization has disabled Slack identity linking. You can still unlink this account.",
+  emailPreference: null,
+  commitSigning: null,
+  primaryActionLabel: null,
+  secondaryActionLabel: "Unlink",
+} satisfies NonNullable<ProfileSettingsPageViewProps["linkedAccountCards"]>[number];
+
 export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps = {
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
