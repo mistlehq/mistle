@@ -43,6 +43,14 @@ export const launchableSandboxProfileSchema = sandboxProfileSchema
   })
   .strict();
 
+export const sandboxProfileRepositoryOptionSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    path: z.string().min(1),
+  })
+  .strict();
+
 export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
   sandboxProfileVersionIntegrationBindings,
   {
@@ -87,6 +95,13 @@ export const putSandboxProfileVersionIntegrationBindingsResponseSchema = z
 
 export const getSandboxProfileVersionIntegrationBindingsResponseSchema =
   putSandboxProfileVersionIntegrationBindingsResponseSchema;
+
+export const getSandboxProfileVersionAutomationConfigResponseSchema = z
+  .object({
+    bindings: z.array(sandboxProfileVersionIntegrationBindingSchema),
+    repositoryOptions: z.array(sandboxProfileRepositoryOptionSchema),
+  })
+  .strict();
 
 export const createSandboxProfileBodySchema = z
   .object({

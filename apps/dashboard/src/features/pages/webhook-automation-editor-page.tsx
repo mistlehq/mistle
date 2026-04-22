@@ -100,7 +100,6 @@ function CreateWebhookAutomationEditor(input: {
       initialValues={toWebhookAutomationFormValues(null)}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      launchableSandboxProfiles={prerequisites.launchableSandboxProfiles}
       directoryData={prerequisites.directoryData}
     />
   );
@@ -178,8 +177,8 @@ function EditWebhookAutomationEditor(input: {
       preservedWebhookSourceId={automationQuery.data.integrationWebhookSourceId}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      launchableSandboxProfiles={prerequisites.launchableSandboxProfiles}
       directoryData={prerequisites.directoryData}
+      initialSandboxProfileVersion={automationQuery.data.target.sandboxProfileVersion}
     />
   );
 }
@@ -193,11 +192,9 @@ function LoadedWebhookAutomationEditor(input: {
   sandboxProfileOptions: ReturnType<
     typeof useWebhookAutomationPrerequisites
   >["sandboxProfileOptions"];
-  launchableSandboxProfiles: ReturnType<
-    typeof useWebhookAutomationPrerequisites
-  >["launchableSandboxProfiles"];
   directoryData: NonNullable<ReturnType<typeof useWebhookAutomationPrerequisites>["directoryData"]>;
   preservedWebhookSourceId?: string;
+  initialSandboxProfileVersion?: number;
 }): React.JSX.Element {
   const state = useLoadedWebhookAutomationEditorState(input);
 

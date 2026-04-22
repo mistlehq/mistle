@@ -17,7 +17,6 @@ import {
   WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
 } from "../automations/use-webhook-automation-prerequisites.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
-import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { WebhookAutomationEditorPage } from "./webhook-automation-editor-page.js";
 
 describe("WebhookAutomationEditorPage", () => {
@@ -32,9 +31,6 @@ describe("WebhookAutomationEditorPage", () => {
       targets: [],
     });
     queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
-    queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
-      items: [],
-    });
 
     const router = createMemoryRouter(
       createRoutesFromElements(

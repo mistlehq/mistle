@@ -9,17 +9,14 @@ import type {
 } from "../integrations/integrations-service.js";
 import { resolveLatestVersion } from "../pages/sandbox-profile-integrations-state.js";
 import {
-  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
-  getSandboxProfileVersionIntegrationBindings,
+  getSandboxProfileVersionAutomationConfig,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type {
-  LaunchableSandboxProfile,
-  SandboxProfileVersionIntegrationBinding,
-} from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -165,71 +162,29 @@ function resolveSelectedProfileBindingsErrorMessage(input: {
 
 function useSelectedProfileTriggerState(input: {
   selectedProfileId: string;
+  hasBindingData: boolean;
+  isBindingDataPending: boolean;
+  bindingErrorMessage: string | null;
+  bindings: readonly SandboxProfileVersionIntegrationBinding[];
   directoryData: DirectoryData;
 }): SelectedProfileTriggerState {
-  const selectedProfileQueryId = resolveSelectedProfileQueryId(input.selectedProfileId);
-
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(selectedProfileQueryId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: input.selectedProfileId,
-        signal,
-      }),
-    enabled: input.selectedProfileId.length > 0,
-    retry: false,
-  });
-
-  const selectedProfileVersion = useMemo(
-    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-
-  const selectedProfileBindingsQuery = useQuery({
-    queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-      profileId: selectedProfileQueryId,
-      version: selectedProfileVersion ?? MissingProfileVersionQueryId,
-    }),
-    queryFn: async ({ signal }) => {
-      if (selectedProfileVersion === null) {
-        throw new Error("No sandbox profile version is available for this profile.");
-      }
-
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId: input.selectedProfileId,
-        version: selectedProfileVersion,
-        signal,
-      });
-    },
-    enabled: input.selectedProfileId.length > 0 && selectedProfileVersion !== null,
-    retry: false,
-  });
-
   return useMemo(
     () =>
       resolveSelectedProfileTriggerState({
         selectedProfileId: input.selectedProfileId,
-        hasBindingData:
-          selectedProfileVersion === null || selectedProfileBindingsQuery.data !== undefined,
-        isBindingDataPending:
-          input.selectedProfileId.length > 0 &&
-          (selectedProfileVersionsQuery.isPending || selectedProfileBindingsQuery.isPending),
-        bindingErrorMessage: resolveSelectedProfileBindingsErrorMessage({
-          versionError: selectedProfileVersionsQuery.error,
-          bindingsError: selectedProfileBindingsQuery.error,
-        }),
-        bindings: selectedProfileBindingsQuery.data?.bindings ?? [],
+        hasBindingData: input.hasBindingData,
+        isBindingDataPending: input.isBindingDataPending,
+        bindingErrorMessage: input.bindingErrorMessage,
+        bindings: input.bindings,
         directoryData: input.directoryData,
       }),
     [
+      input.bindingErrorMessage,
+      input.bindings,
       input.directoryData,
+      input.hasBindingData,
+      input.isBindingDataPending,
       input.selectedProfileId,
-      selectedProfileBindingsQuery.data,
-      selectedProfileBindingsQuery.error,
-      selectedProfileBindingsQuery.isPending,
-      selectedProfileVersion,
-      selectedProfileVersionsQuery.error,
-      selectedProfileVersionsQuery.isPending,
     ],
   );
 }
@@ -303,11 +258,16 @@ type LoadedWebhookAutomationEditorStateInput = {
   automationId: string | undefined;
   navigate: NavigateFunction;
   initialValues: WebhookAutomationFormValues;
+  initialSandboxProfileVersion?: number;
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
-  launchableSandboxProfiles?: readonly LaunchableSandboxProfile[];
   directoryData: DirectoryData;
   preservedWebhookSourceId?: string;
+};
+
+type SelectedSandboxProfileVersion = {
+  profileId: string;
+  version: number;
 };
 
 function resolveNormalizedConversationKeyTemplate(input: {
@@ -393,6 +353,16 @@ export function useLoadedWebhookAutomationEditorState(
 } {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState(input.initialValues);
+  const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
+    useState<SelectedSandboxProfileVersion | null>(
+      input.initialSandboxProfileVersion === undefined ||
+        input.initialValues.sandboxProfileId.trim().length === 0
+        ? null
+        : {
+            profileId: input.initialValues.sandboxProfileId.trim(),
+            version: input.initialSandboxProfileVersion,
+          },
+    );
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof WebhookAutomationFormValues, string>>
   >({});
@@ -401,16 +371,66 @@ export function useLoadedWebhookAutomationEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
+  const selectedProfileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(resolveSelectedProfileQueryId(selectedProfileId)),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: selectedProfileId,
+        signal,
+      }),
+    enabled: selectedProfileId.length > 0,
+    retry: false,
+  });
+  const latestSelectedProfileVersion = useMemo(
+    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+    [selectedProfileVersionsQuery.data],
+  );
+  const effectiveSelectedProfileVersion =
+    selectedSandboxProfileVersion?.profileId === selectedProfileId
+      ? selectedSandboxProfileVersion.version
+      : latestSelectedProfileVersion;
+  const selectedProfileAutomationConfigQuery = useQuery({
+    queryKey: sandboxProfileVersionAutomationConfigQueryKey({
+      profileId: resolveSelectedProfileQueryId(selectedProfileId),
+      version: effectiveSelectedProfileVersion ?? MissingProfileVersionQueryId,
+    }),
+    queryFn: async ({ signal }) => {
+      if (effectiveSelectedProfileVersion === null) {
+        throw new Error("No sandbox profile version is available for this profile.");
+      }
+
+      return getSandboxProfileVersionAutomationConfig({
+        profileId: selectedProfileId,
+        version: effectiveSelectedProfileVersion,
+        signal,
+      });
+    },
+    enabled: selectedProfileId.length > 0 && effectiveSelectedProfileVersion !== null,
+    retry: false,
+  });
+  const selectedProfileBindingsErrorMessage = resolveSelectedProfileBindingsErrorMessage({
+    versionError: selectedProfileVersionsQuery.error,
+    bindingsError: selectedProfileAutomationConfigQuery.error,
+  });
+  const selectedProfileRepositoryOptions =
+    selectedProfileAutomationConfigQuery.data?.repositoryOptions ?? [];
   const primaryRepositoryOptions = useMemo(
     () =>
       buildWebhookAutomationPrimaryRepositoryOptions({
-        launchableProfiles: input.launchableSandboxProfiles ?? [],
-        selectedProfileId,
+        repositoryOptions: selectedProfileRepositoryOptions,
       }),
-    [input.launchableSandboxProfiles, selectedProfileId],
+    [selectedProfileRepositoryOptions],
   );
   const selectedProfileTriggerState = useSelectedProfileTriggerState({
     selectedProfileId,
+    hasBindingData:
+      effectiveSelectedProfileVersion === null ||
+      selectedProfileAutomationConfigQuery.data !== undefined,
+    isBindingDataPending:
+      selectedProfileId.length > 0 &&
+      (selectedProfileVersionsQuery.isPending || selectedProfileAutomationConfigQuery.isPending),
+    bindingErrorMessage: selectedProfileBindingsErrorMessage,
+    bindings: selectedProfileAutomationConfigQuery.data?.bindings ?? [],
     directoryData: input.directoryData,
   });
   const preservedConnectionId =
@@ -439,7 +459,24 @@ export function useLoadedWebhookAutomationEditorState(
   );
 
   useEffect(() => {
+    if (selectedProfileAutomationConfigQuery.data === undefined) {
+      return;
+    }
+
     if (primaryRepositoryOptions.length === 0) {
+      setFormValues((currentValues) => {
+        if (
+          currentValues.sandboxProfileId.trim() !== selectedProfileId ||
+          currentValues.primaryRepositoryId.trim().length === 0
+        ) {
+          return currentValues;
+        }
+
+        return {
+          ...currentValues,
+          primaryRepositoryId: "",
+        };
+      });
       return;
     }
 
@@ -460,7 +497,12 @@ export function useLoadedWebhookAutomationEditorState(
         primaryRepositoryId: WebhookAutomationWorkspaceRootRepositoryOptionValue,
       };
     });
-  }, [formValues.primaryRepositoryId, primaryRepositoryOptions, selectedProfileId]);
+  }, [
+    formValues.primaryRepositoryId,
+    primaryRepositoryOptions,
+    selectedProfileAutomationConfigQuery.data,
+    selectedProfileId,
+  ]);
 
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>
@@ -468,6 +510,10 @@ export function useLoadedWebhookAutomationEditorState(
         payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
+      setSelectedSandboxProfileVersion({
+        profileId: automation.target.sandboxProfileId,
+        version: automation.target.sandboxProfileVersion,
+      });
       setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
@@ -497,6 +543,10 @@ export function useLoadedWebhookAutomationEditorState(
       });
     },
     onSuccess: async (automation) => {
+      setSelectedSandboxProfileVersion({
+        profileId: automation.target.sandboxProfileId,
+        version: automation.target.sandboxProfileVersion,
+      });
       setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       setFieldErrors({});
       setValidationSummaryError(null);
@@ -547,6 +597,10 @@ export function useLoadedWebhookAutomationEditorState(
       value,
       eventOptions: webhookEventOptions,
     });
+
+    if (key === "sandboxProfileId") {
+      setSelectedSandboxProfileVersion(null);
+    }
 
     setFormValues(nextValues);
     setFieldErrors((currentErrors) => {

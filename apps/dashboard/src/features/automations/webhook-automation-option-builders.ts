@@ -6,8 +6,8 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type {
-  LaunchableSandboxProfile,
   SandboxProfile,
+  SandboxProfileRepositoryOption,
   SandboxProfileVersionIntegrationBinding,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { createSyntheticWebhookAutomationEventOption } from "./webhook-automation-event-option-availability.js";
@@ -212,21 +212,14 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
 }
 
 export function buildWebhookAutomationPrimaryRepositoryOptions(input: {
-  launchableProfiles: readonly LaunchableSandboxProfile[];
-  selectedProfileId: string;
+  repositoryOptions: readonly SandboxProfileRepositoryOption[];
 }): readonly WebhookAutomationFormOption[] {
-  if (input.selectedProfileId.trim().length === 0) {
-    return [];
-  }
-
-  const selectedProfile =
-    input.launchableProfiles.find((profile) => profile.id === input.selectedProfileId) ?? null;
-  if (selectedProfile === null) {
+  if (input.repositoryOptions.length === 0) {
     return [];
   }
 
   const repositoryOptions = sortOptionsByLabel(
-    selectedProfile.repositoryOptions.map((option) => ({
+    input.repositoryOptions.map((option) => ({
       value: option.id,
       label: option.label,
       path: option.path,

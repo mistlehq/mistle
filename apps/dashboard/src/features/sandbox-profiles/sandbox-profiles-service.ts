@@ -7,6 +7,7 @@ import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
   CreateSandboxProfileInput,
   LaunchableSandboxProfilesResult,
+  SandboxProfileRepositoryOption,
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
@@ -261,6 +262,21 @@ const SandboxProfileVersionIntegrationBindingsResponseSchema = z
   })
   .strict();
 
+const SandboxProfileRepositoryOptionSchema = z
+  .object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    path: z.string().min(1),
+  })
+  .strict();
+
+const SandboxProfileVersionAutomationConfigResponseSchema = z
+  .object({
+    bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
+    repositoryOptions: z.array(SandboxProfileRepositoryOptionSchema),
+  })
+  .strict();
+
 export async function listSandboxProfileVersions(input: {
   profileId: string;
   signal?: AbortSignal;
@@ -336,6 +352,49 @@ export async function getSandboxProfileVersionIntegrationBindings(input: {
         operation: "getSandboxProfileVersionIntegrationBindings",
         error,
         fallbackMessage: "Could not load sandbox profile integration bindings.",
+      }),
+    );
+  }
+}
+
+export async function getSandboxProfileVersionAutomationConfig(input: {
+  profileId: string;
+  version: number;
+  signal?: AbortSignal;
+}): Promise<{
+  bindings: SandboxProfileVersionIntegrationBinding[];
+  repositoryOptions: SandboxProfileRepositoryOption[];
+}> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxProfileVersionAutomationConfig",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/automation-config`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load sandbox profile automation config.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SandboxProfileVersionAutomationConfigResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxProfileVersionAutomationConfig",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile automation config response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxProfileVersionAutomationConfig",
+        error,
+        fallbackMessage: "Could not load sandbox profile automation config.",
       }),
     );
   }

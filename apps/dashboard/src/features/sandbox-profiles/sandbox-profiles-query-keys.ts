@@ -37,3 +37,15 @@ export function sandboxProfileVersionIntegrationBindingsQueryKey(input: {
     input.version,
   ];
 }
+
+export function sandboxProfileVersionAutomationConfigQueryKey(input: {
+  profileId: string;
+  version: number;
+}): readonly ["sandbox-profiles", "automation-config", string, number] {
+  return [
+    SANDBOX_PROFILES_QUERY_KEY_PREFIX[0],
+    "automation-config",
+    input.profileId,
+    input.version,
+  ];
+}

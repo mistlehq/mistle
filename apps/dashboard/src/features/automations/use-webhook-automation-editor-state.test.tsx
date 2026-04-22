@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
-  sandboxProfileVersionIntegrationBindingsQueryKey,
+  sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
@@ -105,18 +105,11 @@ function createBinding() {
   };
 }
 
-function createLaunchableProfile(input?: { id?: string; repositoryIds?: readonly string[] }) {
-  const profileId = input?.id ?? "sbp_123";
+function createAutomationConfig(input?: { repositoryIds?: readonly string[] }) {
   const repositoryIds = input?.repositoryIds ?? ["mistlehq/platform"];
 
   return {
-    id: profileId,
-    organizationId: "org_123",
-    displayName: "Repo Maintainer",
-    status: "active" as const,
-    latestVersion: 1,
-    createdAt: "2026-03-24T00:00:00.000Z",
-    updatedAt: "2026-03-24T00:00:00.000Z",
+    bindings: [],
     repositoryOptions: repositoryIds.map((repositoryId) => ({
       id: repositoryId,
       label: repositoryId,
@@ -222,13 +215,11 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_456",
         version: 1,
       }),
-      {
-        bindings: [],
-      },
+      createAutomationConfig({ repositoryIds: [] }),
     );
 
     const { result } = renderHook(
@@ -283,8 +274,18 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
   });
 
-  it("defaults the primary repository selection to workspace root for launchable profiles", () => {
+  it("defaults the primary repository selection to workspace root for the selected profile version", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      createAutomationConfig(),
+    );
 
     const { result } = renderHook(
       () =>
@@ -305,7 +306,6 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
-          launchableSandboxProfiles: [createLaunchableProfile()],
           directoryData: {
             connections: [],
             webhookSources: [],
@@ -330,6 +330,30 @@ describe("useLoadedWebhookAutomationEditorState", () => {
 
   it("clears the prior primary repository selection when the sandbox profile changes", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      createAutomationConfig({
+        repositoryIds: ["mistlehq/platform"],
+      }),
+    );
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_456"), {
+      versions: [{ sandboxProfileId: "sbp_456", version: 1 }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_456",
+        version: 1,
+      }),
+      createAutomationConfig({
+        repositoryIds: ["mistlehq/mistle"],
+      }),
+    );
 
     const { result } = renderHook(
       () =>
@@ -350,16 +374,6 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           },
           connectionOptions: [],
           sandboxProfileOptions: [],
-          launchableSandboxProfiles: [
-            createLaunchableProfile({
-              id: "sbp_123",
-              repositoryIds: ["mistlehq/platform"],
-            }),
-            createLaunchableProfile({
-              id: "sbp_456",
-              repositoryIds: ["mistlehq/mistle"],
-            }),
-          ],
           directoryData: {
             connections: [],
             webhookSources: [],
@@ -386,6 +400,73 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     ]);
   });
 
+  it("uses the pinned sandbox profile version when hydrating repository options in edit mode", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [
+        { sandboxProfileId: "sbp_123", version: 1 },
+        { sandboxProfileId: "sbp_123", version: 2 },
+      ],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      createAutomationConfig({
+        repositoryIds: ["mistlehq/platform"],
+      }),
+    );
+    queryClient.setQueryData(
+      sandboxProfileVersionAutomationConfigQueryKey({
+        profileId: "sbp_123",
+        version: 2,
+      }),
+      createAutomationConfig({
+        repositoryIds: ["mistlehq/mistle"],
+      }),
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "edit",
+          automationId: "atm_123",
+          navigate: async () => {},
+          initialValues: {
+            name: "Pinned automation",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "mistlehq/platform",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          initialSandboxProfileVersion: 1,
+          connectionOptions: [],
+          sandboxProfileOptions: [],
+          directoryData: {
+            connections: [],
+            webhookSources: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.values.primaryRepositoryId).toBe("mistlehq/platform");
+    expect(result.current.primaryRepositoryOptions.map((option) => option.value)).toEqual([
+      WebhookAutomationWorkspaceRootRepositoryOptionValue,
+      "mistlehq/platform",
+    ]);
+  });
+
   it("does not apply invocation token defaults when a trigger is selected", () => {
     const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
     const triggerId = createWebhookAutomationTriggerId({
@@ -396,12 +477,13 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_123",
         version: 1,
       }),
       {
         bindings: [createBinding()],
+        repositoryOptions: [],
       },
     );
 
@@ -465,12 +547,13 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_123",
         version: 1,
       }),
       {
         bindings: [createBinding()],
+        repositoryOptions: [],
       },
     );
 
@@ -555,12 +638,13 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       versions: [{ sandboxProfileId: "sbp_123", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_123",
         version: 1,
       }),
       {
         bindings: [createBinding()],
+        repositoryOptions: [],
       },
     );
 
@@ -726,24 +810,23 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       versions: [{ sandboxProfileId: "sbp_invalid", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_invalid",
         version: 1,
       }),
-      {
-        bindings: [],
-      },
+      createAutomationConfig({ repositoryIds: [] }),
     );
     queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_valid"), {
       versions: [{ sandboxProfileId: "sbp_valid", version: 1 }],
     });
     queryClient.setQueryData(
-      sandboxProfileVersionIntegrationBindingsQueryKey({
+      sandboxProfileVersionAutomationConfigQueryKey({
         profileId: "sbp_valid",
         version: 1,
       }),
       {
         bindings: [createBinding()],
+        repositoryOptions: [],
       },
     );
 
