@@ -27,6 +27,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
     "@fontsource-variable/quicksand": "^5.2.10",
+    "@mistle/time": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

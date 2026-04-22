@@ -7,6 +7,7 @@ import {
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
   createGitHubAppDetailViewStoryProps,
+  createGitHubAppCallbackLoadingDetailViewStoryProps,
   createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
   createJiraWebhookNotConfiguredDetailViewStoryProps,
@@ -94,6 +95,7 @@ export const GitHub: Story = {
     ...withoutStoryHandlers(
       mergeDetailViewStoryProps(
         createGitHubAppDetailViewStoryProps(),
+        createGitHubAppCallbackLoadingDetailViewStoryProps(),
         createGitHubAppSetupIncompleteDetailViewStoryProps(),
       ),
     ),

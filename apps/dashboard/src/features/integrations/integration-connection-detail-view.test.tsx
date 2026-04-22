@@ -1347,6 +1347,56 @@ describe("IntegrationConnectionDetailView", () => {
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
   });
 
+  it("shows a loading callback field in the installation section while GitHub webhook details are loading", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "GitHub Production",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+            installation: {
+              actionLabel: "Install GitHub App",
+              description: "Set the URLs below in your Github App settings, then install the app",
+              fields: [{ label: "Installation", value: "Pending" }],
+              postInstallationSetupUrl:
+                "http://localhost:5100/p/integration/callbacks/github-app-installation",
+            },
+          },
+        ]}
+        webhookPolicy={ImplicitWebhookPolicy}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_github_primary",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: true,
+                items: [],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    expect(screen.getByText("Webhook callback URL")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Loading Webhook callback URL" })).toBeTruthy();
+    expect(screen.getByText("Loading…")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy Webhook callback URL" })).toBeNull();
+    expect(screen.queryByText("Webhook")).toBeNull();
+  });
+
   it("hides the standalone webhook section for installed GitHub App connections", () => {
     render(
       <IntegrationConnectionDetailView

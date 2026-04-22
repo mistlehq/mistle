@@ -633,6 +633,69 @@ export function createGitHubAppSetupIncompleteDetailViewStoryProps(): Integratio
   };
 }
 
+export function createGitHubAppCallbackLoadingDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const connectionId = "icn_github_callback_loading";
+
+  return {
+    connections: [
+      {
+        id: connectionId,
+        ...resolveStoryAuthFields({
+          authMethod: {
+            familyId: "github",
+            methodId: "github-app-installation",
+            variantId: "github-cloud",
+          },
+          connectionId,
+        }),
+        bindingCount: 0,
+        canDelete: true,
+        displayName: "GitHub App (Loading callback URL)",
+        resources: [],
+        installation: {
+          actionLabel: "Install GitHub App",
+          description: "Set the URLs below in your Github App settings, then install the app",
+          fields: [
+            {
+              label: "App ID",
+              value: "3079908",
+            },
+            {
+              label: "App slug",
+              value: "jon-mistle-github-app",
+            },
+            {
+              label: "Installation",
+              value: "Pending",
+            },
+          ],
+          postInstallationSetupUrl:
+            "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
+        },
+        status: "active",
+      },
+    ],
+    webhookPolicy: resolveIntegrationConnectionDetailWebhookPolicy({
+      webhookSource: { lifecycle: "implicit" },
+    }),
+    webhookSourceStateByConnectionId: new Map([
+      [
+        connectionId,
+        {
+          createErrorMessage: null,
+          deleteErrorMessage: null,
+          deletingWebhookSourceId: null,
+          isCreating: false,
+          isLoading: true,
+          items: [],
+          loadErrorMessage: null,
+          revealedWebhookSecret: null,
+        },
+      ],
+    ]),
+  };
+}
+
 export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   const connectionId = "icn_github_not_synced";
 

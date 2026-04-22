@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   BadgeListField,
+  CopyableValue,
   DefinitionList,
   Notice,
   Select,
@@ -20,7 +21,6 @@ import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
-import { CopyableValue } from "../shared/copyable-value.js";
 import {
   formatConnectionStatusLabel,
   formatWebhookSourceStatusLabel,
@@ -60,6 +60,7 @@ export type IntegrationConnectionDetailItem = {
           label: string;
           value: string;
         }[];
+        isCallbackUrlLoading?: boolean;
         isPending?: boolean;
         postInstallationSetupUrl?: string;
       }
@@ -137,12 +138,18 @@ function resolveConnectionDetailPaneViewState(input: {
           input.webhookSourceState?.items[0]?.callbackUrl !== undefined
             ? { callbackUrl: input.webhookSourceState.items[0].callbackUrl }
             : {}),
+          ...(input.connection.authMethodId === "github-app-installation" &&
+          input.webhookSourceState?.isLoading === true &&
+          input.webhookSourceState.items[0]?.callbackUrl === undefined
+            ? { isCallbackUrlLoading: true }
+            : {}),
         };
   const hasInstallationSection =
     installation !== undefined &&
     (installation.description !== undefined ||
       installation.errorMessage !== undefined ||
       installation.fields?.length !== undefined ||
+      installation.isCallbackUrlLoading === true ||
       installation.postInstallationSetupUrl !== undefined ||
       installation.actionLabel !== undefined ||
       ("callbackUrl" in installation && installation.callbackUrl !== undefined));
@@ -436,6 +443,11 @@ function ConnectionDetailPane(input: {
               viewState.installation.callbackUrl === undefined
                 ? {}
                 : { callbackUrl: viewState.installation.callbackUrl })}
+              {...(viewState.installation === undefined ||
+              !("isCallbackUrlLoading" in viewState.installation) ||
+              viewState.installation.isCallbackUrlLoading !== true
+                ? {}
+                : { isCallbackUrlLoading: true })}
               {...(viewState.installation?.postInstallationSetupUrl === undefined
                 ? {}
                 : { postInstallationSetupUrl: viewState.installation.postInstallationSetupUrl })}
@@ -665,11 +677,13 @@ function InstallationSection(input: {
       }[]
     | undefined;
   callbackUrl?: string;
+  isCallbackUrlLoading?: boolean;
   postInstallationSetupUrl?: string;
 }): React.JSX.Element | null {
   if (
     (input.fields === undefined || input.fields.length === 0) &&
     input.callbackUrl === undefined &&
+    input.isCallbackUrlLoading !== true &&
     input.postInstallationSetupUrl === undefined
   ) {
     return null;
@@ -693,7 +707,9 @@ function InstallationSection(input: {
           }))}
         />
       )}
-      {resolvedPostInstallationSetupUrl === undefined && input.callbackUrl === undefined ? null : (
+      {resolvedPostInstallationSetupUrl === undefined &&
+      input.callbackUrl === undefined &&
+      input.isCallbackUrlLoading !== true ? null : (
         <div className="flex flex-col gap-3">
           {resolvedPostInstallationSetupUrl === undefined ? null : (
             <CopyableValue
@@ -701,8 +717,11 @@ function InstallationSection(input: {
               value={resolvedPostInstallationSetupUrl}
             />
           )}
-          {input.callbackUrl === undefined ? null : (
+          {input.callbackUrl === undefined &&
+          input.isCallbackUrlLoading !== true ? null : input.callbackUrl !== undefined ? (
             <CopyableValue label="Webhook callback URL" value={input.callbackUrl} />
+          ) : (
+            <CopyableValue label="Webhook callback URL" loading />
           )}
         </div>
       )}

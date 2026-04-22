@@ -1,9 +1,9 @@
 import { Button } from "@mistle/ui";
+import { CopyableValue } from "@mistle/ui";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
 import { z } from "zod";
 
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
-import { CopyableValue } from "../shared/copyable-value.js";
 
 type RouteErrorDisplay = {
   title: string;

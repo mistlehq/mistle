@@ -1,7 +1,6 @@
 import { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@mistle/ui";
+import { CopyableValue } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
-
-import { CopyableValue } from "../../shared/copyable-value.js";
 
 type ChatExternalLinkDialogProps = {
   isOpen: boolean;
