@@ -35,7 +35,10 @@ import type {
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { SandboxProfileEditorSections } from "./sandbox-profile-editor-sections.js";
+import {
+  SandboxProfileEditorSections,
+  type SandboxProfileEditorSection,
+} from "./sandbox-profile-editor-sections.js";
 import {
   useLoadedSandboxProfileIntegrationsState,
   useSandboxProfileIntegrationsLoader,
@@ -274,53 +277,9 @@ function LoadedSandboxProfileEditorPage(
       onSaveProfileName={metaState.onProfileNameSave}
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
-      sections={[
-        {
-          id: "agent",
-          label: "Agent Harness",
-          panel: (
-            <LoadedSandboxProfileIntegrationsSection
-              key={`agent:${input.profileId}`}
-              kind="agent"
-              loader={integrationsLoader}
-              onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
-              profileId={input.profileId}
-              invalidateVersionBindings={input.invalidateVersionBindings}
-            />
-          ),
-        },
-        {
-          id: "git",
-          label: "Git Provider",
-          panel: (
-            <LoadedSandboxProfileIntegrationsSection
-              key={`git:${input.profileId}`}
-              kind="git"
-              loader={integrationsLoader}
-              onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
-              profileId={input.profileId}
-              invalidateVersionBindings={input.invalidateVersionBindings}
-            />
-          ),
-        },
-        {
-          id: "connector",
-          label: "Connectors",
-          panel: (
-            <LoadedSandboxProfileIntegrationsSection
-              key={`connector:${input.profileId}`}
-              kind="connector"
-              loader={integrationsLoader}
-              onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
-              profileId={input.profileId}
-              invalidateVersionBindings={input.invalidateVersionBindings}
-            />
-          ),
-        },
-        {
-          id: "configurations",
-          label: "Configurations",
-          panel: (
+      renderSectionPanel={(sectionId) => {
+        if (sectionId === "configurations") {
+          return (
             <LoadedSandboxProfileSetupScriptSection
               key={
                 setupScriptLoader.version === null
@@ -331,22 +290,58 @@ function LoadedSandboxProfileEditorPage(
               profileId={input.profileId}
               invalidateVersionSetupScript={input.invalidateVersionSetupScript}
             />
-          ),
-        },
-      ]}
+          );
+        }
+
+        return (
+          <LoadedSandboxProfileIntegrationsSection
+            key={`${sectionId}:${input.profileId}`}
+            kind={resolveIntegrationSectionKind(sectionId)}
+            loader={integrationsLoader}
+            onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
+            profileId={input.profileId}
+            invalidateVersionBindings={input.invalidateVersionBindings}
+          />
+        );
+      }}
+      sections={SandboxProfileEditorTabs}
     />
   );
+}
+
+const SandboxProfileEditorTabs = [
+  {
+    id: "agent",
+    label: "Agent Harness",
+  },
+  {
+    id: "git",
+    label: "Git Provider",
+  },
+  {
+    id: "connector",
+    label: "Connectors",
+  },
+  {
+    id: "configurations",
+    label: "Configurations",
+  },
+] as const satisfies readonly SandboxProfileEditorSection[];
+
+function resolveIntegrationSectionKind(sectionId: string): "agent" | "git" | "connector" {
+  if (sectionId === "agent" || sectionId === "git" || sectionId === "connector") {
+    return sectionId;
+  }
+
+  throw new Error(`Unsupported integration section: ${sectionId}`);
 }
 
 export function SandboxProfileEditorView(input: {
   profileName: string | null;
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
-  sections: readonly {
-    id: string;
-    label: string;
-    panel: React.JSX.Element;
-  }[];
+  sections: readonly SandboxProfileEditorSection[];
+  renderSectionPanel: (sectionId: string) => React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
   isSavingProfileName?: boolean;
 }): React.JSX.Element {
@@ -370,7 +365,10 @@ export function SandboxProfileEditorView(input: {
         />
       </div>
 
-      <SandboxProfileEditorSections sections={input.sections} />
+      <SandboxProfileEditorSections
+        renderPanel={input.renderSectionPanel}
+        sections={input.sections}
+      />
     </div>
   );
 }
@@ -423,6 +421,9 @@ function LoadedSandboxProfileIntegrationsSection(input: {
       kind={input.kind}
       invalidateVersionBindings={input.invalidateVersionBindings}
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
+      {...(input.onHasUnsavedChangesChange === undefined
+        ? {}
+        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
     />
   );
 }

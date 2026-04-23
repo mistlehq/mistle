@@ -1,19 +1,20 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
 import { useState } from "react";
 
-type SandboxProfileEditorSection = {
+export type SandboxProfileEditorSection = {
   id: string;
   label: string;
-  panel: React.JSX.Element;
 };
 
 export function SandboxProfileEditorSections(input: {
   sections: readonly SandboxProfileEditorSection[];
   initialSectionId?: string;
+  renderPanel: (activeSectionId: string) => React.JSX.Element;
 }): React.JSX.Element {
   const [activeSectionId, setActiveSectionId] = useState(
     input.initialSectionId ?? input.sections[0]?.id ?? "",
   );
+  const activeSection = input.sections.find((section) => section.id === activeSectionId);
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,17 +63,21 @@ export function SandboxProfileEditorSections(input: {
         <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
 
         <div className="flex min-w-0 flex-1 flex-col gap-4 md:pl-8">
-          {input.sections.map((section) => (
-            <div
-              aria-labelledby={`sandbox-profile-editor-tab-${section.id}`}
-              hidden={activeSectionId !== section.id}
-              id={`sandbox-profile-editor-panel-${section.id}`}
-              key={section.id}
-              role="tabpanel"
-            >
-              {section.panel}
-            </div>
-          ))}
+          <div
+            aria-labelledby={
+              activeSection === undefined
+                ? undefined
+                : `sandbox-profile-editor-tab-${activeSection.id}`
+            }
+            id={
+              activeSection === undefined
+                ? undefined
+                : `sandbox-profile-editor-panel-${activeSection.id}`
+            }
+            role="tabpanel"
+          >
+            {input.renderPanel(activeSectionId)}
+          </div>
         </div>
       </div>
     </div>

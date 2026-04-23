@@ -29,12 +29,32 @@ import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
+import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 
 type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   setupScript: string | null;
 };
+
+const StorySections = [
+  {
+    id: "agent",
+    label: "Agent Harness",
+  },
+  {
+    id: "git",
+    label: "Git Provider",
+  },
+  {
+    id: "connector",
+    label: "Connectors",
+  },
+  {
+    id: "configurations",
+    label: "Configurations",
+  },
+] as const satisfies readonly SandboxProfileEditorSection[];
 
 const StoryBindings = [
   {
@@ -169,11 +189,9 @@ function SandboxProfileEditorPageStoryView(
         onSaveProfileName={handleProfileNameSave}
         profileName={profileName}
         profileNameFallback={profileName}
-        sections={[
-          {
-            id: "agent",
-            label: "Agent Harness",
-            panel: (
+        renderSectionPanel={(sectionId) => {
+          if (sectionId === "agent") {
+            return (
               <IntegrationsEditorSection
                 availableConnections={StoryIntegrationConnections}
                 availableTargets={StoryIntegrationTargets}
@@ -218,12 +236,11 @@ function SandboxProfileEditorPageStoryView(
                 sectionKinds={["agent"]}
                 showSectionNavigation={false}
               />
-            ),
-          },
-          {
-            id: "git",
-            label: "Git Provider",
-            panel: (
+            );
+          }
+
+          if (sectionId === "git") {
+            return (
               <IntegrationsEditorSection
                 availableConnections={StoryIntegrationConnections}
                 availableTargets={StoryIntegrationTargets}
@@ -268,12 +285,11 @@ function SandboxProfileEditorPageStoryView(
                 sectionKinds={["git"]}
                 showSectionNavigation={false}
               />
-            ),
-          },
-          {
-            id: "connector",
-            label: "Connectors",
-            panel: (
+            );
+          }
+
+          if (sectionId === "connector") {
+            return (
               <IntegrationsEditorSection
                 availableConnections={StoryIntegrationConnections}
                 availableTargets={StoryIntegrationTargets}
@@ -318,21 +334,19 @@ function SandboxProfileEditorPageStoryView(
                 sectionKinds={["connector"]}
                 showSectionNavigation={false}
               />
-            ),
-          },
-          {
-            id: "configurations",
-            label: "Configurations",
-            panel: (
-              <SandboxProfileSetupScriptPanel
-                onBlur={handleSetupScriptBlur}
-                onChange={setSetupScriptDraft}
-                saveStatus={setupScriptSaveStatus}
-                value={setupScriptDraft}
-              />
-            ),
-          },
-        ]}
+            );
+          }
+
+          return (
+            <SandboxProfileSetupScriptPanel
+              onBlur={handleSetupScriptBlur}
+              onChange={setSetupScriptDraft}
+              saveStatus={setupScriptSaveStatus}
+              value={setupScriptDraft}
+            />
+          );
+        }}
+        sections={StorySections}
       />
     </QueryClientProvider>
   );
