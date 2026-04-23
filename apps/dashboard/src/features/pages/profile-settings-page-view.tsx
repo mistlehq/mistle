@@ -515,7 +515,7 @@ function LinkedAccountCard(input: {
                         <>
                           Add the public key via{" "}
                           <a
-                            className="text-primary underline underline-offset-4"
+                            className="text-primary cursor-default underline underline-offset-4"
                             href="https://github.com/settings/keys"
                             rel="noreferrer"
                             target="_blank"
@@ -547,7 +547,7 @@ function LinkedAccountCard(input: {
                   />
                 )}
                 <Textarea
-                  className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs"
+                  className="field-sizing-fixed min-w-0 max-w-full text-sm"
                   onChange={(event) => {
                     setCommitSigningDialogErrorMessage(null);
                     setPastedCommitSigningKey(event.currentTarget.value);
