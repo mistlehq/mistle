@@ -45,8 +45,8 @@
     "better-auth": "1.5.6",
     "dockview": "^5.2.0",
     "openapi-fetch": "^0.17.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
     "react-router": "~7.14.0",
     "streamdown": "^2.5.0"
   },
