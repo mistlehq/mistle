@@ -9,11 +9,8 @@ import {
   formatIdentityLinkEligibleConnectionLabel,
   formatIdentityLinkProviderMemberStatus,
   formatIdentityLinkProviderPrincipalSummary,
-  formatIdentityLinkProviderConfigurationStatus,
   listEligibleIdentityLinkConnections,
-  resolveIdentityLinkConfigureActionLabel,
   resolveReturnedIdentityLinkConnectionSelection,
-  resolveIdentityLinkStatusActionLabel,
 } from "../settings/identity-linking/organization-identity-linking-model.js";
 import {
   configureOrganizationIdentityLinkProvider,
@@ -32,7 +29,7 @@ import {
 import { resolvePageFrameText, PageFrame } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
-  type OrganizationIdentityLinkingProviderCard,
+  type OrganizationIdentityLinkingProviderRow,
   OrganizationIdentityLinkingSettingsPageView,
 } from "./organization-identity-linking-settings-page-view.js";
 
@@ -228,26 +225,35 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           canManage,
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
-        onStatusAction={async ({ providerFamily, status }) => {
+        onEnabledChange={async ({ providerFamily, enabled }) => {
           await statusMutation.mutateAsync({
             providerFamily,
-            status,
+            status: enabled ? "active" : "disabled",
           });
         }}
-        onProviderConnectionChange={({ providerFamily, integrationConnectionId }) => {
+        onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
           setSelectedConnectionIdByProviderFamily((current) => ({
             ...current,
             [providerFamily]: integrationConnectionId,
           }));
-        }}
-        onSaveProvider={async ({ providerFamily, integrationConnectionId }) => {
-          await configureMutation.mutateAsync({
-            providerFamily,
-            integrationConnectionId,
-          });
+
+          try {
+            await configureMutation.mutateAsync({
+              providerFamily,
+              integrationConnectionId,
+            });
+          } catch (error) {
+            setSelectedConnectionIdByProviderFamily((current) => {
+              const next = { ...current };
+              delete next[providerFamily];
+              return next;
+            });
+
+            throw error;
+          }
         }}
         providers={providers.map((provider) =>
-          buildProviderCard({
+          buildProviderRow({
             actionErrorMessageByProviderFamily,
             configuringProviderFamily,
             statusUpdatingProviderFamily,
@@ -291,7 +297,23 @@ export function buildProviderCard(input: {
     error: unknown;
   } | null;
   selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
-}): OrganizationIdentityLinkingProviderCard {
+}): OrganizationIdentityLinkingProviderRow {
+  return buildProviderRow(input);
+}
+
+export function buildProviderRow(input: {
+  actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>;
+  configuringProviderFamily: string | null;
+  statusUpdatingProviderFamily: string | null;
+  provider: OrganizationIdentityLinkProvider;
+  providerLinksQuery: {
+    data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
+    isPending: boolean;
+    isError: boolean;
+    error: unknown;
+  } | null;
+  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
+}): OrganizationIdentityLinkingProviderRow {
   const eligibleConnections = listEligibleIdentityLinkConnections({
     provider: input.provider,
   });
@@ -302,38 +324,19 @@ export function buildProviderCard(input: {
     eligibleConnections,
     selectedConnectionId: input.provider.selectedConnection?.id ?? null,
   });
-  const hasUnsavedConnectionSelection =
-    input.provider.selectedConnection !== null &&
-    selectedConnectionId !== null &&
-    selectedConnectionId !== input.provider.selectedConnection.id;
-
-  const baseCard: Omit<OrganizationIdentityLinkingProviderCard, "errorMessage"> = {
+  const baseRow: Omit<OrganizationIdentityLinkingProviderRow, "errorMessage"> = {
     providerFamily: input.provider.providerFamily,
     displayName: input.provider.displayName,
     logoKey: input.provider.logoKey,
-    configurationStatusLabel: formatIdentityLinkProviderConfigurationStatus({
-      configurationStatus: input.provider.configurationStatus,
-    }),
-    configurationStatusTone: input.provider.configurationStatus,
-    eligibleConnections: eligibleConnections.map((connection) => ({
+    connectionOptions: eligibleConnections.map((connection) => ({
       id: connection.id,
       label: formatIdentityLinkEligibleConnectionLabel(connection),
     })),
     selectedConnectionId,
-    configureActionLabel: resolveIdentityLinkConfigureActionLabel(),
-    statusActionLabel: resolveIdentityLinkStatusActionLabel({
-      configurationStatus: input.provider.configurationStatus,
-    }),
-    addConnectionOptions: createIdentityLinkAddConnectionOptions({
-      eligibleTargetKeys: input.provider.eligibleTargetKeys,
-    }),
-    statusActionVisible:
-      input.provider.selectedConnection !== null && !hasUnsavedConnectionSelection,
-    statusActionDisabled: input.statusUpdatingProviderFamily === input.provider.providerFamily,
-    saveActionDisabled: selectedConnectionId === null,
-    saveActionPending: input.configuringProviderFamily === input.provider.providerFamily,
-    statusActionPending: input.statusUpdatingProviderFamily === input.provider.providerFamily,
-    statusActionNextStatus: input.provider.configurationStatus === "active" ? "disabled" : "active",
+    connectionPending: input.configuringProviderFamily === input.provider.providerFamily,
+    enablePending: input.statusUpdatingProviderFamily === input.provider.providerFamily,
+    enabled: input.provider.configurationStatus === "active",
+    linkedUsersCount: input.providerLinksQuery?.data?.length ?? 0,
     memberLinksLoading: input.providerLinksQuery?.isPending ?? false,
     memberLinksErrorMessage:
       input.providerLinksQuery !== null && input.providerLinksQuery.isError
@@ -359,11 +362,11 @@ export function buildProviderCard(input: {
 
   const errorMessage = input.actionErrorMessageByProviderFamily[input.provider.providerFamily];
   if (errorMessage === undefined) {
-    return baseCard;
+    return baseRow;
   }
 
   return {
-    ...baseCard,
+    ...baseRow,
     errorMessage,
   };
 }
@@ -392,24 +395,4 @@ function resolveSelectedConnectionId(input: {
   }
 
   return input.eligibleConnections[0]?.id ?? null;
-}
-
-function createIdentityLinkAddConnectionOptions(input: {
-  eligibleTargetKeys: readonly string[];
-}): readonly {
-  href: string;
-  label: string;
-}[] {
-  if (input.eligibleTargetKeys.length === 0) {
-    throw new Error("Identity-linking provider is missing an eligible target key.");
-  }
-
-  const searchParams = new URLSearchParams({
-    returnTo: "/settings/organization/identity-linking",
-  });
-
-  return input.eligibleTargetKeys.map((targetKey) => ({
-    href: `/integrations/${targetKey}/add?${searchParams.toString()}`,
-    label: input.eligibleTargetKeys.length === 1 ? "Connect new" : `Connect new (${targetKey})`,
-  }));
 }

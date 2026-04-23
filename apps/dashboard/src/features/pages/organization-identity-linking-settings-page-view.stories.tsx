@@ -1,59 +1,189 @@
+import { systemSleeper } from "@mistle/time";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import type React from "react";
+import { useState } from "react";
 
-import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
+import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
   OrganizationIdentityLinkingSettingsPageView,
-  type OrganizationIdentityLinkingProviderCard,
+  type OrganizationIdentityLinkingProviderRow,
 } from "./organization-identity-linking-settings-page-view.js";
 
-const GitHubConnectionOptions = [
+const BaseProviders = [
   {
-    id: "conn_github_primary",
-    label: "GitHub Engineering",
+    providerFamily: "github",
+    displayName: "GitHub",
+    logoKey: "github",
+    connectionOptions: [
+      {
+        id: "conn_github_primary",
+        label: "GitHub Engineering",
+      },
+      {
+        id: "conn_github_platform",
+        label: "GitHub Platform",
+      },
+    ],
+    selectedConnectionId: "conn_github_primary",
+    connectionPending: false,
+    enablePending: false,
+    enabled: true,
+    linkedUsersCount: 12,
+    memberLinksLoading: false,
+    memberLinksErrorMessage: null,
+    memberLinks: [
+      {
+        userId: "usr_owner",
+        name: "Owner User",
+        email: "owner@example.com",
+        statusLabel: "Linked",
+        principalSummary: "owner-github",
+        updatedAt: "2026-04-20T00:00:00.000Z",
+      },
+      {
+        userId: "usr_member",
+        name: "Member User",
+        email: "member@example.com",
+        statusLabel: "Not linked",
+        principalSummary: null,
+        updatedAt: null,
+      },
+    ],
   },
   {
-    id: "conn_github_backup",
-    label: "GitHub Platform",
+    providerFamily: "slack",
+    displayName: "Slack",
+    logoKey: "slack",
+    connectionOptions: [
+      {
+        id: "conn_slack_workspace",
+        label: "Slack Workspace",
+      },
+    ],
+    selectedConnectionId: "conn_slack_workspace",
+    connectionPending: false,
+    enablePending: false,
+    enabled: false,
+    linkedUsersCount: 3,
+    memberLinksLoading: false,
+    memberLinksErrorMessage: null,
+    memberLinks: [
+      {
+        userId: "usr_slack_admin",
+        name: "Slack Admin",
+        email: "admin@example.com",
+        statusLabel: "Linked",
+        principalSummary: "mistle-workspace",
+        updatedAt: "2026-04-22T09:15:00.000Z",
+      },
+    ],
   },
-] as const satisfies OrganizationIdentityLinkingProviderCard["eligibleConnections"];
+  {
+    providerFamily: "linear",
+    displayName: "Linear",
+    logoKey: "linear",
+    connectionOptions: [],
+    selectedConnectionId: null,
+    connectionPending: false,
+    enablePending: false,
+    enabled: false,
+    linkedUsersCount: 0,
+    memberLinksLoading: false,
+    memberLinksErrorMessage: null,
+    memberLinks: [],
+  },
+] as const satisfies readonly OrganizationIdentityLinkingProviderRow[];
 
-const BaseGitHubProvider: OrganizationIdentityLinkingProviderCard = {
-  providerFamily: "github",
-  displayName: "GitHub",
-  logoKey: "github",
-  configurationStatusLabel: "Configured",
-  configurationStatusTone: "unconfigured",
-  eligibleConnections: GitHubConnectionOptions,
-  selectedConnectionId: "conn_github_primary",
-  configureActionLabel: "Save connection",
-  statusActionLabel: "Enable",
-  statusActionNextStatus: "active",
-  addConnectionOptions: [
-    {
-      href: "/settings/organization/integrations/new?target=github-cloud",
-      label: "Connect new",
-    },
-  ],
-  statusActionVisible: false,
-  statusActionDisabled: false,
-  saveActionDisabled: false,
-  saveActionPending: false,
-  statusActionPending: false,
-  memberLinksLoading: false,
-  memberLinksErrorMessage: null,
-  memberLinks: [],
-};
+function wait(ms: number): Promise<void> {
+  return systemSleeper.sleep(ms);
+}
 
+function clearProviderError(
+  provider: OrganizationIdentityLinkingProviderRow,
+): OrganizationIdentityLinkingProviderRow {
+  const { errorMessage: _errorMessage, ...rest } = provider;
+  return rest;
+}
+
+function StatefulPrototype(
+  args: Omit<
+    React.ComponentProps<typeof OrganizationIdentityLinkingSettingsPageView>,
+    "onEnabledChange" | "onProviderConnectionChange"
+  >,
+): React.JSX.Element {
+  const [providers, setProviders] = useState(args.providers);
+
+  return (
+    <OrganizationIdentityLinkingSettingsPageView
+      {...args}
+      onEnabledChange={async ({ providerFamily, enabled }) => {
+        setProviders((currentProviders) =>
+          currentProviders.map((provider) =>
+            provider.providerFamily !== providerFamily
+              ? provider
+              : {
+                  ...clearProviderError(provider),
+                  enablePending: true,
+                },
+          ),
+        );
+
+        await wait(500);
+
+        setProviders((currentProviders) =>
+          currentProviders.map((provider) =>
+            provider.providerFamily !== providerFamily
+              ? provider
+              : {
+                  ...provider,
+                  enabled,
+                  enablePending: false,
+                },
+          ),
+        );
+      }}
+      onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
+        setProviders((currentProviders) =>
+          currentProviders.map((provider) =>
+            provider.providerFamily !== providerFamily
+              ? provider
+              : {
+                  ...clearProviderError(provider),
+                  selectedConnectionId: integrationConnectionId,
+                  connectionPending: true,
+                },
+          ),
+        );
+
+        await wait(500);
+
+        setProviders((currentProviders) =>
+          currentProviders.map((provider) =>
+            provider.providerFamily !== providerFamily
+              ? provider
+              : {
+                  ...provider,
+                  connectionPending: false,
+                },
+          ),
+        );
+      }}
+      providers={providers}
+    />
+  );
+}
+
+/** Review this Storybook surface as the proposed autosaving list-based replacement for the current provider cards. */
 const meta = {
   title: "Dashboard/Settings/OrganizationIdentityLinking/PageView",
   component: OrganizationIdentityLinkingSettingsPageView,
-  decorators: [withDashboardPageStory, withDashboardMemoryRouter],
+  decorators: [withDashboardPageStory],
+  render: StatefulPrototype,
   args: {
     loadErrorMessage: null,
-    providers: [BaseGitHubProvider],
-    onProviderConnectionChange: () => {},
-    onSaveProvider: async () => {},
-    onStatusAction: async () => {},
+    onEnabledChange: async () => {},
+    onProviderConnectionChange: async () => {},
+    providers: BaseProviders,
   },
 } satisfies Meta<typeof OrganizationIdentityLinkingSettingsPageView>;
 
@@ -61,7 +191,9 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  args: {},
+};
 
 export const LoadError: Story = {
   args: {
@@ -76,58 +208,26 @@ export const NoProvidersAvailable: Story = {
   },
 };
 
-export const UnconfiguredWithoutEligibleConnections: Story = {
+export const RowError: Story = {
   args: {
     providers: [
       {
-        ...BaseGitHubProvider,
-        configurationStatusLabel: "Not configured",
-        eligibleConnections: [],
-        selectedConnectionId: null,
-        saveActionDisabled: true,
+        ...BaseProviders[0],
+        errorMessage: "Could not update GitHub identity-linking settings.",
       },
+      BaseProviders[1],
     ],
   },
 };
 
-export const ActiveProvider: Story = {
+export const LinkedUsersDialogError: Story = {
   args: {
     providers: [
       {
-        ...BaseGitHubProvider,
-        configurationStatusLabel: "Active",
-        configurationStatusTone: "active",
-        statusActionLabel: "Disable",
-        statusActionNextStatus: "disabled",
-        statusActionVisible: true,
-      },
-    ],
-  },
-};
-
-export const PendingActions: Story = {
-  args: {
-    providers: [
-      {
-        ...BaseGitHubProvider,
-        saveActionPending: true,
-        statusActionDisabled: true,
-      },
-    ],
-  },
-};
-
-export const ProviderError: Story = {
-  args: {
-    providers: [
-      {
-        ...BaseGitHubProvider,
-        configurationStatusLabel: "Disabled",
-        configurationStatusTone: "disabled",
-        errorMessage: "Could not save GitHub identity-linking settings.",
-        statusActionLabel: "Enable",
-        statusActionNextStatus: "active",
-        statusActionVisible: true,
+        ...BaseProviders[0],
+        memberLinksErrorMessage: "Could not load linked-member visibility.",
+        memberLinks: [],
+        linkedUsersCount: 0,
       },
     ],
   },

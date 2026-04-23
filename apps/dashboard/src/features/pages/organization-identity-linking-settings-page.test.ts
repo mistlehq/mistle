@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildProviderCard } from "./organization-identity-linking-settings-page.js";
 
 describe("buildProviderCard", () => {
-  it("hides the status action when the selected connection differs from the saved config", () => {
+  it("returns an autosave row model when the selected connection differs from the saved config", () => {
     const providerCard = buildProviderCard({
       actionErrorMessageByProviderFamily: {},
       configuringProviderFamily: null,
@@ -76,7 +76,18 @@ describe("buildProviderCard", () => {
     });
 
     expect(providerCard.selectedConnectionId).toBe("icn_github_new");
-    expect(providerCard.statusActionVisible).toBe(false);
+    expect(providerCard.enabled).toBe(false);
+    expect(providerCard.connectionOptions).toEqual([
+      {
+        id: "icn_github_new",
+        label: "GitHub New · GitHub App installation",
+      },
+      {
+        id: "icn_github_saved",
+        label: "GitHub Saved · GitHub App installation",
+      },
+    ]);
+    expect(providerCard.linkedUsersCount).toBe(1);
     expect(providerCard.memberLinks).toEqual([
       {
         userId: "usr_github_saved",
