@@ -7,7 +7,6 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
-import type { Pool } from "pg";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
 
@@ -102,7 +101,6 @@ export type StartedServer = {
 export type ControlPlaneApiRuntime = {
   app: ControlPlaneApp;
   db: ControlPlaneDatabase;
-  dbPool: Pool;
   request: (path: string, init?: RequestInit) => Response | Promise<Response>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
