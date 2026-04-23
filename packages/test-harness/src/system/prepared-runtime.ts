@@ -19,7 +19,7 @@ export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
   localReference: "mistle/sandbox-base:dev",
   repositoryPath: "mistle/sandbox-base",
   dockerfilePath: "packages/sandboxd/Dockerfile",
-  dockerTarget: "sandbox-base",
+  dockerTarget: "sandbox-base-system-tests",
 };
 
 export type PreparedTestHarnessDockerAppName =

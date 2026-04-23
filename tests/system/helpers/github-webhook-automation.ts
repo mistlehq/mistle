@@ -40,6 +40,8 @@ const RequiredEnvNames = [
   "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
   "MISTLE_TEST_GITHUB_APP_ID",
   "MISTLE_TEST_GITHUB_APP_SLUG",
+  "MISTLE_TEST_GITHUB_APP_CLIENT_ID",
+  "MISTLE_TEST_GITHUB_APP_CLIENT_SECRET",
   "MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM",
   "MISTLE_TEST_GITHUB_WEBHOOK_SECRET",
   "CLOUDFLARE_TUNNEL_ID",
@@ -1057,6 +1059,8 @@ async function createGitHubConnection(input: {
   session: AuthenticatedSession;
   githubAppId: string;
   githubAppSlug: string;
+  githubAppClientId: string;
+  githubAppClientSecret: string;
   githubAppPrivateKeyPem: string;
   githubWebhookSecret: string;
 }): Promise<string> {
@@ -1079,9 +1083,11 @@ async function createGitHubConnection(input: {
           connection_method: GitHubConnectionMethodId,
           app_id: input.githubAppId,
           app_slug: input.githubAppSlug,
+          client_id: input.githubAppClientId,
         },
         secrets: {
           appPrivateKeyPem: input.githubAppPrivateKeyPem,
+          clientSecret: input.githubAppClientSecret,
           webhookSecret: input.githubWebhookSecret,
         },
       }),
@@ -1306,6 +1312,10 @@ export async function startGitHubWebhookAutomationConversation(input: {
   const githubToken = requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_TOKEN");
   const githubAppId = requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_APP_ID");
   const githubAppSlug = requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_APP_SLUG");
+  const githubAppClientId = requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_APP_CLIENT_ID");
+  const githubAppClientSecret = requireGitHubWebhookAutomationEnv(
+    "MISTLE_TEST_GITHUB_APP_CLIENT_SECRET",
+  );
   const githubAppPrivateKeyPem = requireGitHubWebhookAutomationEnv(
     "MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM",
   );
@@ -1468,6 +1478,8 @@ export async function startGitHubWebhookAutomationConversation(input: {
       session,
       githubAppId,
       githubAppSlug,
+      githubAppClientId,
+      githubAppClientSecret,
       githubAppPrivateKeyPem,
       githubWebhookSecret,
     });

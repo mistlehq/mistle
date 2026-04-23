@@ -21,9 +21,9 @@ afterEach(async () => {
 });
 
 describe("DefaultSandboxBaseImageBuild", () => {
-  it("points the prepared sandbox base image at the sandboxd dockerfile", () => {
+  it("points the prepared sandbox base image at the sandboxd system-test docker target", () => {
     expect(DefaultSandboxBaseImageBuild.dockerfilePath).toBe("packages/sandboxd/Dockerfile");
-    expect(DefaultSandboxBaseImageBuild.dockerTarget).toBe("sandbox-base");
+    expect(DefaultSandboxBaseImageBuild.dockerTarget).toBe("sandbox-base-system-tests");
   });
 });
 

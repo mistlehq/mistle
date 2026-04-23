@@ -31,6 +31,12 @@ const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
   "MISTLE_TEST_GITHUB_TOKEN",
   "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
+  "MISTLE_TEST_GITHUB_APP_ID",
+  "MISTLE_TEST_GITHUB_APP_SLUG",
+  "MISTLE_TEST_GITHUB_APP_CLIENT_ID",
+  "MISTLE_TEST_GITHUB_APP_CLIENT_SECRET",
+  "MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM",
+  "MISTLE_TEST_GITHUB_WEBHOOK_SECRET",
   "CLOUDFLARE_TUNNEL_ID",
   "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON",
   "CONTROL_PLANE_API_TUNNEL_HOSTNAME",
@@ -77,7 +83,7 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   connectable: z.boolean(),
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),
-  runtimePlan: z.unknown().nullable().optional(),
+  runtimeContext: z.unknown().nullable().optional(),
   automationConversation: z.unknown().nullable().optional(),
 });
 
@@ -131,12 +137,9 @@ function parseGitHubRepository(input: string): GitHubRepository {
   };
 }
 
-function createGitHubAppInstallationCompletePath(input: {
-  targetKey: string;
-  query: Record<string, string>;
-}): string {
+function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/complete?${searchParams.toString()}`;
+  return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
 }
 
 function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
@@ -176,6 +179,50 @@ async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
   }
 
   return input.schema.parse(parsed);
+}
+
+async function createGitHubConnection(input: {
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  cookie: string;
+  githubAppId: string;
+  githubAppSlug: string;
+  githubAppClientId: string;
+  githubAppClientSecret: string;
+  githubAppPrivateKeyPem: string;
+  githubWebhookSecret: string;
+  displayName: string;
+}): Promise<string> {
+  const connection = await requestJsonOrThrow({
+    request: input.request,
+    path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/form`,
+    expectedStatus: 201,
+    description: "GitHub connection creation",
+    schema: IntegrationConnectionResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: "github-app-installation",
+        config: {
+          connection_method: "github-app-installation",
+          app_id: input.githubAppId,
+          app_slug: input.githubAppSlug,
+          client_id: input.githubAppClientId,
+        },
+        secrets: {
+          appPrivateKeyPem: input.githubAppPrivateKeyPem,
+          clientSecret: input.githubAppClientSecret,
+          webhookSecret: input.githubWebhookSecret,
+        },
+      }),
+    },
+  });
+
+  return connection.id;
 }
 
 async function githubRequestJson<TSchema extends z.ZodType>(input: {
@@ -287,6 +334,12 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
     async ({ fixture }) => {
       const repository = parseGitHubRepository(requireEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"));
       const githubToken = requireEnv("MISTLE_TEST_GITHUB_TOKEN");
+      const githubAppId = requireEnv("MISTLE_TEST_GITHUB_APP_ID");
+      const githubAppSlug = requireEnv("MISTLE_TEST_GITHUB_APP_SLUG");
+      const githubAppClientId = requireEnv("MISTLE_TEST_GITHUB_APP_CLIENT_ID");
+      const githubAppClientSecret = requireEnv("MISTLE_TEST_GITHUB_APP_CLIENT_SECRET");
+      const githubAppPrivateKeyPem = requireEnv("MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM");
+      const githubWebhookSecret = requireEnv("MISTLE_TEST_GITHUB_WEBHOOK_SECRET");
       const githubInstallationId = await resolveGitHubAppInstallationId({
         owner: repository.owner,
         repo: repository.repo,
@@ -377,21 +430,29 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
         },
       });
 
+      const githubConnectionId = await createGitHubConnection({
+        request: fixture.request,
+        cookie: session.cookie,
+        githubAppId,
+        githubAppSlug,
+        githubAppClientId,
+        githubAppClientSecret,
+        githubAppPrivateKeyPem,
+        githubWebhookSecret,
+        displayName: `GitHub Title Test GitHub ${randomUUID()}`,
+      });
+
       const githubOauthStart = await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/github-app-installation/start`,
+        path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/github-app-installation/start`,
         expectedStatus: 200,
         description: "GitHub App installation start",
         schema: StartRedirectConnectionResponseSchema,
         init: {
           method: "POST",
           headers: {
-            "content-type": "application/json",
             cookie: session.cookie,
           },
-          body: JSON.stringify({
-            displayName: `GitHub Title Test GitHub ${randomUUID()}`,
-          }),
         },
       });
 
@@ -404,7 +465,6 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
 
       const githubAppInstallationCompleteResponse = await fixture.request(
         createGitHubAppInstallationCompletePath({
-          targetKey: GitHubTargetKey,
           query: {
             state: githubOauthState,
             installation_id: githubInstallationId,
@@ -427,15 +487,15 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
       }
 
       const githubConnection = await waitForCondition({
-        description: "persisted GitHub connection to be created",
+        description: "persisted GitHub connection installation to be completed",
         timeoutMs: AutomationRunTimeoutMs,
         evaluate: async () => {
           return (
             (await fixture.db.query.integrationConnections.findFirst({
               where: (table, { and, eq }) =>
                 and(
+                  eq(table.id, githubConnectionId),
                   eq(table.organizationId, session.organizationId),
-                  eq(table.targetKey, GitHubTargetKey),
                   eq(table.externalSubjectId, githubInstallationId),
                 ),
             })) ?? null

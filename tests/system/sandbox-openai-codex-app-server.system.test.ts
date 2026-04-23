@@ -177,7 +177,12 @@ const SandboxInstanceStatusResponseSchema = z
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
-    runtimePlan: z.unknown().nullable(),
+    runtimeContext: z
+      .object({
+        launchCwd: z.string().min(1).nullable(),
+        primaryRepositoryRoot: z.string().min(1).nullable(),
+      })
+      .nullable(),
     automationConversation: z
       .object({
         conversationId: z.string().min(1),
@@ -269,7 +274,15 @@ type SandboxScenarioContext = {
 const WebSocketJsonMessagePumps = new WeakMap<WebSocket, WebSocketJsonMessagePump>();
 
 function hasRequiredGitHubEnv(): boolean {
-  return [GITHUB_TEST_REPOSITORY_ENV_NAME].every((name) => {
+  return [
+    GITHUB_TEST_REPOSITORY_ENV_NAME,
+    "MISTLE_TEST_GITHUB_APP_ID",
+    "MISTLE_TEST_GITHUB_APP_SLUG",
+    "MISTLE_TEST_GITHUB_APP_CLIENT_ID",
+    "MISTLE_TEST_GITHUB_APP_CLIENT_SECRET",
+    "MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM",
+    "MISTLE_TEST_GITHUB_WEBHOOK_SECRET",
+  ].every((name) => {
     const value = process.env[name];
     return typeof value === "string" && value.length > 0;
   });
@@ -331,12 +344,9 @@ function parseGitHubRepository(input: string): GitHubRepository {
   };
 }
 
-function createGitHubAppInstallationCompletePath(input: {
-  targetKey: string;
-  query: Record<string, string>;
-}): string {
+function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/complete?${searchParams.toString()}`;
+  return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
 }
 
 async function expectStatusJson(input: {
@@ -1589,6 +1599,64 @@ async function createOpenAiConnection(input: {
   return readNonEmptyStringField(createConnectionPayload, "id");
 }
 
+async function createGitHubConnection(input: {
+  fixture: Pick<SystemTestFixture, "request">;
+  authenticatedSession: AuthenticatedFixtureSession;
+  githubAppId: string;
+  githubAppSlug: string;
+  githubAppClientId: string;
+  githubAppClientSecret: string;
+  githubAppPrivateKeyPem: string;
+  githubWebhookSecret: string;
+  displayName: string;
+  stepTrace: StepTraceEntry[];
+}): Promise<string> {
+  const createConnectionResponse = await runStep({
+    stepTrace: input.stepTrace,
+    stepName: "create GitHub connection",
+    action: async () => {
+      return await requestWithTimeout({
+        request: input.fixture.request,
+        path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/form`,
+        timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+        description: "GitHub form connection creation",
+        init: {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: input.authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            displayName: input.displayName,
+            methodId: "github-app-installation",
+            config: {
+              connection_method: "github-app-installation",
+              app_id: input.githubAppId,
+              app_slug: input.githubAppSlug,
+              client_id: input.githubAppClientId,
+            },
+            secrets: {
+              appPrivateKeyPem: input.githubAppPrivateKeyPem,
+              clientSecret: input.githubAppClientSecret,
+              webhookSecret: input.githubWebhookSecret,
+            },
+          }),
+        },
+      });
+    },
+  });
+  const createConnectionPayload = await expectStatusJson({
+    response: createConnectionResponse,
+    status: 201,
+    description: "GitHub form connection creation",
+  });
+  if (!isRecord(createConnectionPayload)) {
+    throw new Error("Expected GitHub form connection response to be an object.");
+  }
+
+  return readNonEmptyStringField(createConnectionPayload, "id");
+}
+
 async function createSandboxProfile(input: {
   fixture: Pick<SystemTestFixture, "request">;
   authenticatedSession: AuthenticatedFixtureSession;
@@ -2583,6 +2651,12 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
         action: async ({ stepTrace, websocketTraceEntries, registerWebsocketCleanup }) => {
           const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
           const repository = parseGitHubRepository(requireEnv(GITHUB_TEST_REPOSITORY_ENV_NAME));
+          const githubAppId = requireEnv("MISTLE_TEST_GITHUB_APP_ID");
+          const githubAppSlug = requireEnv("MISTLE_TEST_GITHUB_APP_SLUG");
+          const githubAppClientId = requireEnv("MISTLE_TEST_GITHUB_APP_CLIENT_ID");
+          const githubAppClientSecret = requireEnv("MISTLE_TEST_GITHUB_APP_CLIENT_SECRET");
+          const githubAppPrivateKeyPem = requireEnv("MISTLE_TEST_GITHUB_APP_PRIVATE_KEY_PEM");
+          const githubWebhookSecret = requireEnv("MISTLE_TEST_GITHUB_WEBHOOK_SECRET");
           const githubInstallationId = await runStep({
             stepTrace,
             stepName: "resolve provisioned GitHub App installation",
@@ -2611,24 +2685,33 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
             stepTrace,
           });
 
-          const githubConnectionId = await runStep({
+          const githubConnectionId = await createGitHubConnection({
+            fixture,
+            authenticatedSession,
+            githubAppId,
+            githubAppSlug,
+            githubAppClientId,
+            githubAppClientSecret,
+            githubAppPrivateKeyPem,
+            githubWebhookSecret,
+            displayName: `GitHub Codex System Test ${randomUUID()}`,
             stepTrace,
-            stepName: "create GitHub connection",
+          });
+
+          await runStep({
+            stepTrace,
+            stepName: "complete GitHub installation",
             action: async () => {
               const startResponse = await requestWithTimeout({
                 request: fixture.request,
-                path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/github-app-installation/start`,
+                path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/github-app-installation/start`,
                 timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
                 description: "GitHub App installation start",
                 init: {
                   method: "POST",
                   headers: {
-                    "content-type": "application/json",
                     cookie: authenticatedSession.cookie,
                   },
-                  body: JSON.stringify({
-                    displayName: `GitHub Codex System Test ${randomUUID()}`,
-                  }),
                 },
               });
               const startPayload = await expectStatusJson({
@@ -2656,7 +2739,6 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               const completeResponse = await requestWithTimeout({
                 request: fixture.request,
                 path: createGitHubAppInstallationCompletePath({
-                  targetKey: GITHUB_TARGET_KEY,
                   query: {
                     state: githubOauthState,
                     installation_id: githubInstallationId,
@@ -2679,25 +2761,29 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                   `GitHub App installation completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
                 );
               }
+            },
+          });
 
-              const connection = await waitForCondition({
-                description: "persisted GitHub connection to be created",
+          await runStep({
+            stepTrace,
+            stepName: "wait for GitHub connection installation to be persisted",
+            action: async () => {
+              await waitForCondition({
+                description: "persisted GitHub connection installation to be completed",
                 timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
                 evaluate: async () => {
                   return (
                     (await fixture.db.query.integrationConnections.findFirst({
                       where: (table, { and, eq }) =>
                         and(
+                          eq(table.id, githubConnectionId),
                           eq(table.organizationId, authenticatedSession.organizationId),
-                          eq(table.targetKey, GITHUB_TARGET_KEY),
                           eq(table.externalSubjectId, githubInstallationId),
                         ),
                     })) ?? null
                   );
                 },
               });
-
-              return connection.id;
             },
           });
 
