@@ -1,4 +1,4 @@
-import { cn, linkVariants } from "@mistle/ui";
+import { cn, linkClassName } from "@mistle/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 
@@ -27,7 +27,7 @@ export function ChatExternalLink({
     <>
       <button
         className={cn(
-          linkVariants(),
+          linkClassName,
           "appearance-none border-0 bg-transparent p-0 text-inherit cursor-pointer",
           className,
         )}
