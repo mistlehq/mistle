@@ -187,6 +187,9 @@ async function dropDatabaseIfExists(input: {
 
   await adminClient.connect();
   try {
+    await adminClient.query(
+      `ALTER DATABASE ${quotedRuntimeDatabaseName} WITH ALLOW_CONNECTIONS false`,
+    );
     await waitForDatabaseDisconnections({
       adminClient,
       databaseName: input.databaseName,
