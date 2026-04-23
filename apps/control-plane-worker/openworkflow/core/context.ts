@@ -10,6 +10,8 @@ import { createControlPlaneOpenWorkflow } from "./client.js";
 import { createEmailSender, type ControlPlaneWorkerEmailDelivery } from "./email.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 
+const ControlPlaneInternalRequestTimeoutMs = 60_000;
+
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
   dbPool: Pool;
@@ -42,6 +44,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
     const controlPlaneInternalClient = new ControlPlaneInternalClient({
       baseUrl: workerConfig.controlPlaneApi.baseUrl,
       internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+      requestTimeoutMs: ControlPlaneInternalRequestTimeoutMs,
     });
     const emailDelivery = {
       emailSender: createEmailSender(workerConfig),
