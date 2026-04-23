@@ -7,6 +7,7 @@
     "typecheck": "cargo check --locked --all-targets",
     "test": "node ./scripts/run-cargo-in-container.mjs test --locked --lib --bins",
     "test:integration": "node ./scripts/run-cargo-integration-tests-in-container.mjs",
+    "test:stress": "node ./scripts/run-cargo-stress-tests-in-container.mjs",
     "format": "node ./scripts/cargo-fmt.mjs",
     "format:check": "node ./scripts/cargo-fmt.mjs --check"
   }

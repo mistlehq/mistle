@@ -6,6 +6,7 @@ FROM rust:1.93-bookworm
 
 ARG CODEX_CLI_VERSION=0.122.0
 ARG MISE_VERSION=v2026.4.19
+ARG CARGO_NEXTEST_VERSION=0.9.133
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
@@ -22,5 +23,6 @@ RUN apt-get update \
     pkg-config \
   && rm -rf /var/lib/apt/lists/*
 
+RUN cargo install --locked cargo-nextest --version ${CARGO_NEXTEST_VERSION}
 RUN curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise MISE_VERSION=${MISE_VERSION} sh
 RUN npm install -g @openai/codex@${CODEX_CLI_VERSION}

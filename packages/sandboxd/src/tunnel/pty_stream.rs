@@ -90,6 +90,35 @@ impl PtyStreamRelay {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct PtyStreamExitTracker {
+    pending_exit_code: Option<i32>,
+    saw_output_close: bool,
+}
+
+impl PtyStreamExitTracker {
+    fn record_exit(&mut self, exit_code: i32) -> Option<i32> {
+        self.pending_exit_code = Some(exit_code);
+        self.exit_code_to_emit()
+    }
+
+    fn record_output_close(&mut self, exit_code: Option<i32>) -> Option<i32> {
+        self.saw_output_close = true;
+        if self.pending_exit_code.is_none() {
+            self.pending_exit_code = exit_code;
+        }
+        self.exit_code_to_emit()
+    }
+
+    fn exit_code_to_emit(&self) -> Option<i32> {
+        if self.saw_output_close {
+            self.pending_exit_code
+        } else {
+            None
+        }
+    }
+}
+
 /// Starts one PTY relay from an initial `stream.open` payload and runs it until exit.
 pub fn relay_pty_stream(
     socket: &mut WebSocket<TcpStream>,
@@ -160,6 +189,7 @@ pub fn relay_pty_stream(
         open_message.channel.pty_session_id.clone(),
         open_message.stream_id,
     );
+    let mut exit_tracker = PtyStreamExitTracker::default();
     write_text_frame(socket, stream_open_ok(open_message.stream_id))?;
 
     loop {
@@ -211,13 +241,15 @@ pub fn relay_pty_stream(
                     }
                 }
                 PtyEvent::Exit(exit_code) => {
-                    for stream_id in relay.attached_stream_ids.iter().copied() {
-                        write_text_frame(socket, pty_exit_event(stream_id, exit_code))?;
+                    if let Some(exit_code) = exit_tracker.record_exit(exit_code) {
+                        for stream_id in relay.attached_stream_ids.iter().copied() {
+                            write_text_frame(socket, pty_exit_event(stream_id, exit_code))?;
+                        }
+                        return Ok(());
                     }
-                    return Ok(());
                 }
                 PtyEvent::Closed => {
-                    if let Some(exit_code) = session.exit_code() {
+                    if let Some(exit_code) = exit_tracker.record_output_close(session.exit_code()) {
                         for stream_id in relay.attached_stream_ids.iter().copied() {
                             write_text_frame(socket, pty_exit_event(stream_id, exit_code))?;
                         }
@@ -454,4 +486,32 @@ where
     socket
         .send(Message::Text(payload.into()))
         .map_err(|error| PtyStreamError::new(format!("failed to write pty control frame: {error}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PtyStreamExitTracker;
+
+    #[test]
+    fn delays_exit_until_output_reader_closes_when_exit_arrives_first() {
+        let mut tracker = PtyStreamExitTracker::default();
+
+        assert_eq!(tracker.record_exit(4), None);
+        assert_eq!(tracker.record_output_close(Some(4)), Some(4));
+    }
+
+    #[test]
+    fn emits_exit_when_reader_already_closed_and_exit_arrives_later() {
+        let mut tracker = PtyStreamExitTracker::default();
+
+        assert_eq!(tracker.record_output_close(None), None);
+        assert_eq!(tracker.record_exit(4), Some(4));
+    }
+
+    #[test]
+    fn emits_exit_from_reader_close_when_exit_code_is_already_known() {
+        let mut tracker = PtyStreamExitTracker::default();
+
+        assert_eq!(tracker.record_output_close(Some(4)), Some(4));
+    }
 }

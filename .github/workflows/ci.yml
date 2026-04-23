@@ -527,6 +527,12 @@ jobs:
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/sandboxd test:integration
 
+      - name: Run sandboxd stress tests in Nix shell
+        env:
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:ci
+          MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
+        run: nix develop --command pnpm --filter @mistle/sandboxd test:stress
+
       - name: Save sandboxd container cargo cache
         if: steps.test-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
