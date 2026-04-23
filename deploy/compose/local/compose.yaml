@@ -9,10 +9,11 @@ x-mistle-local-config-volume: &mistle-local-config-volume
   target: /app/config/mistle.toml
   read_only: true
 
-x-mistle-local-provision-manifest-volume: &mistle-local-provision-manifest-volume
+x-mistle-local-integration-targets-manifest-volume:
+  &mistle-local-integration-targets-manifest-volume
   type: bind
-  source: ./config/integration-targets.provision.json
-  target: /app/deploy/compose/local/config/integration-targets.provision.json
+  source: ../../../integration-targets.json
+  target: /app/integration-targets.json
   read_only: true
 
 x-mistle-local-app: &mistle-local-app
@@ -26,7 +27,7 @@ x-mistle-local-bootstrap: &mistle-local-bootstrap
     - ${MISTLE_LOCAL_ENV_FILE:-./.env}
   volumes:
     - *mistle-local-config-volume
-    - *mistle-local-provision-manifest-volume
+    - *mistle-local-integration-targets-manifest-volume
   restart: "no"
 
 x-mistle-local-migration-job: &mistle-local-migration-job
@@ -346,7 +347,7 @@ services:
       - integration-targets:sync
     environment:
       <<: *mistle-runtime-environment
-      MISTLE_INTEGRATION_TARGETS_PROVISION_MANIFEST_PATH: /app/deploy/compose/local/config/integration-targets.provision.json
+      MISTLE_INTEGRATION_TARGETS_MANIFEST_PATH: /app/integration-targets.json
     networks:
       - app
 

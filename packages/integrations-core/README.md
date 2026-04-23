@@ -271,7 +271,7 @@ This is the recommended workflow.
 
 - Register the definition in `packages/integrations-definitions/src/index.ts`.
 - Control-plane `integration-targets:sync` will insert/update the `integration_targets` row from registry definitions.
-- Provide operator-owned config/secrets through `integration-targets.provision.json`.
+- Provide operator-owned target configuration through `integration-targets.json`.
 
 11. Add tests.
 

@@ -17,9 +17,9 @@ import {
 import { Client as PgClient, Pool } from "pg";
 
 import {
-  loadIntegrationTargetsProvisionManifest,
-  provisionIntegrationTargets,
-} from "../scripts/integration-targets/provision-integration-targets.js";
+  loadIntegrationTargetsManifest,
+  seedIntegrationTargets,
+} from "../scripts/integration-targets/seed-integration-targets.js";
 import { syncIntegrationTargets } from "../scripts/integration-targets/sync-integration-targets.js";
 import { createControlPlaneBackend } from "../src/openworkflow.js";
 
@@ -27,8 +27,6 @@ const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_template";
 const WORKFLOW_NAMESPACE_ID = "integration";
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
-const INTEGRATIONS_MASTER_KEY_VERSION = 1;
-const INTEGRATIONS_MASTER_KEY_MATERIAL = "integration-master-key-testing";
 const TestContextId = "control-plane-api.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
@@ -150,20 +148,14 @@ export default async function setup(): Promise<() => Promise<void>> {
 
       await syncIntegrationTargets(database, integrationRegistry);
 
-      const loadedManifest = loadIntegrationTargetsProvisionManifest({
+      const loadedManifest = loadIntegrationTargetsManifest({
         env: process.env,
         startDirectory: process.cwd(),
       });
       if (loadedManifest !== undefined) {
-        await provisionIntegrationTargets({
+        await seedIntegrationTargets({
           db: database,
           integrationRegistry,
-          integrationsConfig: {
-            activeMasterEncryptionKeyVersion: INTEGRATIONS_MASTER_KEY_VERSION,
-            masterEncryptionKeys: {
-              [String(INTEGRATIONS_MASTER_KEY_VERSION)]: INTEGRATIONS_MASTER_KEY_MATERIAL,
-            },
-          },
           manifest: loadedManifest.manifest,
         });
       }

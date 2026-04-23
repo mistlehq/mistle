@@ -7,9 +7,9 @@ import { Pool } from "pg";
 import { logger } from "../src/logger.js";
 import { loadIntegrationTargetsSyncConfigFromModuleUrl } from "./integration-targets-sync-config-path.js";
 import {
-  loadIntegrationTargetsProvisionManifest,
-  provisionIntegrationTargets,
-} from "./integration-targets/provision-integration-targets.js";
+  loadIntegrationTargetsManifest,
+  seedIntegrationTargets,
+} from "./integration-targets/seed-integration-targets.js";
 import { syncIntegrationTargets } from "./integration-targets/sync-integration-targets.js";
 
 async function main(): Promise<void> {
@@ -33,25 +33,18 @@ async function main(): Promise<void> {
       "Synced integration targets from integration registry.",
     );
 
-    const loadedManifest = loadIntegrationTargetsProvisionManifest({
+    const loadedManifest = loadIntegrationTargetsManifest({
       env: process.env,
       startDirectory: process.cwd(),
     });
     if (loadedManifest === undefined) {
-      logger.info(
-        "No integration target provision manifest found. Sync completed without target provisioning.",
-      );
+      logger.info("No integration target manifest found. Sync completed without target seeding.");
       return;
     }
 
-    const provisionedTargets = await provisionIntegrationTargets({
+    const seededTargets = await seedIntegrationTargets({
       db,
       integrationRegistry,
-      integrationsConfig: {
-        activeMasterEncryptionKeyVersion:
-          loadedConfig.integrations.activeMasterEncryptionKeyVersion,
-        masterEncryptionKeys: loadedConfig.integrations.masterEncryptionKeys,
-      },
       manifest: loadedManifest.manifest,
     });
 
@@ -59,9 +52,9 @@ async function main(): Promise<void> {
       {
         manifestSource: loadedManifest.source,
         manifestSourceValue: loadedManifest.sourceValue,
-        provisionedTargets,
+        seededTargets,
       },
-      "Provisioned integration targets from manifest.",
+      "Seeded integration targets from manifest.",
     );
   } finally {
     await pool.end();

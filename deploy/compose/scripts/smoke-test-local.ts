@@ -580,7 +580,7 @@ async function assertSmokeTestIntegrationTargetAvailable(cookie: string): Promis
   const openAiTarget = targets.find((target) => target.targetKey === OpenAiTargetKey);
   if (openAiTarget === undefined) {
     throw new Error(
-      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be provisioned. Update integration-targets.provision.example.json or adjust the smoke test prerequisites.`,
+      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be present in integration-targets.json or adjust the smoke test prerequisites.`,
     );
   }
 

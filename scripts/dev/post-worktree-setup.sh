@@ -58,7 +58,6 @@ direnv allow "$worktree_path"
 
 copy_optional_local_bootstrap_file ".env.dev"
 copy_optional_local_bootstrap_file ".env.test"
-copy_optional_local_bootstrap_file "integration-targets.provision.json"
 
 (
   cd "$worktree_path"

@@ -80,12 +80,7 @@ GitHub examples:
 
 To customize the default provisioned targets:
 
-1. Edit `integration-targets.provision.example.json`
-2. Regenerate the local Compose manifest:
-
-   ```bash
-   pnpm generate:local-provision-manifest
-   ```
+1. Edit `integration-targets.json`
 
 ## Stop And Reset
 

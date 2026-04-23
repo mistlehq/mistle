@@ -24,7 +24,4 @@ config/config.integration.*.toml
 config/config.production.toml
 dev/.generated/
 deploy/compose/local/.generated/
-integration-targets.provision.json
-!deploy/compose/local/config/integration-targets.provision.json
-
 .local/
