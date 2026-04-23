@@ -4,6 +4,7 @@ export const InternalSandboxRuntimeMintConnectionRequestSchema = z
   .object({
     organizationId: z.string().min(1),
     instanceId: z.string().min(1),
+    actingUserId: z.string().min(1).optional(),
   })
   .strict();
 

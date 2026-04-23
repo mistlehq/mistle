@@ -4,6 +4,7 @@ import type {
   DataPlaneSandboxInstancesClient,
   GetSandboxInstanceResponse,
 } from "@mistle/data-plane-internal-client";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 import { systemClock, systemSleeper } from "@mistle/time";
@@ -14,6 +15,7 @@ import {
   SandboxInstancesNotFoundCodes,
   SandboxInstancesNotFoundError,
 } from "../../../sandbox-instances/errors.js";
+import { resolveActingUserGitIdentity } from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
 
 const ConnectionWaitTimeoutMs = 30_000;
 const ConnectionWaitPollIntervalMs = 250;
@@ -129,11 +131,13 @@ async function waitForRunningSandboxInstance(
 
 export async function mintConnectionToken(
   {
+    db,
     dataPlaneClient,
     gatewayWebsocketUrl,
     tokenTtlSeconds,
     tokenConfig,
   }: {
+    db: ControlPlaneDatabase;
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
       "getSandboxInstance" | "resumeSandboxInstance"
@@ -145,6 +149,7 @@ export async function mintConnectionToken(
   input: {
     organizationId: string;
     instanceId: string;
+    actingUserId?: string;
   },
 ): Promise<{
   instanceId: string;
@@ -167,9 +172,21 @@ export async function mintConnectionToken(
       instanceId: input.instanceId,
     });
   } else if (sandboxInstance.status === "stopped") {
+    const gitIdentity =
+      input.actingUserId === undefined
+        ? undefined
+        : await resolveActingUserGitIdentity(db, {
+            organizationId: input.organizationId,
+            actingUser: {
+              userId: input.actingUserId,
+            },
+          });
+
     await dataPlaneClient.resumeSandboxInstance({
       organizationId: input.organizationId,
       instanceId: input.instanceId,
+      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+      ...(gitIdentity === undefined ? {} : { gitIdentity }),
     });
     sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
       organizationId: input.organizationId,

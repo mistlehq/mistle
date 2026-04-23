@@ -87,6 +87,9 @@ export async function acquireAutomationConnection(
   const connection = await ctx.controlPlaneInternalClient.mintSandboxConnectionToken({
     organizationId: input.preparedAutomationRun.organizationId,
     instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+    ...(input.preparedAutomationRun.actingUserId === undefined
+      ? {}
+      : { actingUserId: input.preparedAutomationRun.actingUserId }),
   });
 
   return {

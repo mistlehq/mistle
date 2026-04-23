@@ -1808,6 +1808,10 @@
                   "instanceId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "actingUserId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": ["organizationId", "instanceId"],

@@ -631,6 +631,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            actingUserId?: string;
             instanceId: string;
             organizationId: string;
           };

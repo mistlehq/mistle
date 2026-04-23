@@ -7,6 +7,7 @@ import { mintConnectionToken } from "../services/mint-connection-token.js";
 import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+  const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const sandboxConfig = ctx.get("sandboxConfig");
   const connectionTokenConfig = ctx.get("connectionTokenConfig");
@@ -14,6 +15,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
 
   const mintedToken = await mintConnectionToken(
     {
+      db,
       dataPlaneClient,
       gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
       tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
@@ -23,7 +25,11 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
         tokenAudience: connectionTokenConfig.audience,
       },
     },
-    body,
+    {
+      organizationId: body.organizationId,
+      instanceId: body.instanceId,
+      ...(body.actingUserId === undefined ? {} : { actingUserId: body.actingUserId }),
+    },
   );
 
   return ctx.json(mintedToken, 200);
