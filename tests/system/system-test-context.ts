@@ -71,7 +71,12 @@ export type SystemTestFixture = {
     timeoutMs?: number;
   }) => Promise<{ exitCode: number; output: string }>;
   openPtyAndAssertRoundTrip: (sandboxInstanceId: string) => Promise<void>;
-  restartContainer: (containerId: string) => Promise<void>;
+  restartContainer: (
+    containerId: string,
+    options?: {
+      timeoutSeconds?: number;
+    },
+  ) => Promise<void>;
   stopContainer: (containerId: string) => Promise<void>;
   startContainer: (containerId: string) => Promise<void>;
   waitForSandboxStatus: (
@@ -760,8 +765,13 @@ async function waitForCondition<T>(input: {
 async function runDockerLifecycleCommand(input: {
   action: "restart" | "start" | "stop";
   containerId: string;
+  timeoutSeconds?: number;
 }): Promise<void> {
-  await execFileAsync("docker", [input.action, input.containerId], {
+  const args =
+    input.action === "restart" && input.timeoutSeconds !== undefined
+      ? [input.action, "-t", String(input.timeoutSeconds), input.containerId]
+      : [input.action, input.containerId];
+  await execFileAsync("docker", args, {
     cwd: PROJECT_ROOT_HOST_PATH,
   });
 }
@@ -905,6 +915,13 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
       const controlPlaneApiClient = createControlPlaneApiClient(controlPlaneApiBaseUrl);
       const request = createRequestFn(controlPlaneApiBaseUrl);
       let currentDataPlaneGatewayBaseUrl = systemTestContext.dataPlaneGatewayBaseUrl;
+      if (systemTestContext.sandboxProvider === "docker") {
+        currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+          containerId: systemTestContext.dataPlaneGatewayContainerId,
+          containerPort: 5202,
+          currentBaseUrl: currentDataPlaneGatewayBaseUrl,
+        });
+      }
       const databasePool = new Pool({
         connectionString: systemTestContext.controlPlaneDatabaseUrl,
       });
@@ -1630,10 +1647,13 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           startSandboxAndWaitReady,
           runSandboxPtyCommand,
           openPtyAndAssertRoundTrip,
-          restartContainer: async (containerId) => {
+          restartContainer: async (containerId, options) => {
             await runDockerLifecycleCommand({
               action: "restart",
               containerId,
+              ...(options?.timeoutSeconds === undefined
+                ? {}
+                : { timeoutSeconds: options.timeoutSeconds }),
             });
             if (containerId === systemTestContext.dataPlaneGatewayContainerId) {
               currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({

@@ -112,7 +112,9 @@ describe("sandbox gateway restart resilience", () => {
         await fixture.openPtyAndAssertRoundTrip(sandboxInstanceId);
 
         currentStep = "restart gateway";
-        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId);
+        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId, {
+          timeoutSeconds: 1,
+        });
         await waitForHttpOk({
           baseUrl: fixture.dataPlaneGatewayBaseUrl,
           path: "/__healthz",

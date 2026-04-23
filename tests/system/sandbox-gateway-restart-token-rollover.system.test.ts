@@ -21,7 +21,9 @@ describe("sandbox gateway restart token rollover", () => {
         await fixture.openPtyAndAssertRoundTrip(sandboxInstanceId);
 
         currentStep = "restart gateway first time";
-        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId);
+        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId, {
+          timeoutSeconds: 1,
+        });
         const sandboxStatusAfterFirstRestart = await fixture.waitForSandboxConnectable(
           sandboxInstanceId,
           true,
@@ -33,7 +35,9 @@ describe("sandbox gateway restart token rollover", () => {
         await fixture.openPtyAndAssertRoundTrip(sandboxInstanceId);
 
         currentStep = "restart gateway second time";
-        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId);
+        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId, {
+          timeoutSeconds: 1,
+        });
         const sandboxStatusAfterSecondRestart = await fixture.waitForSandboxConnectable(
           sandboxInstanceId,
           true,

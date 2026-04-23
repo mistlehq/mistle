@@ -34,7 +34,9 @@ describe("sandbox disconnect deadline cleared on reattach", () => {
         await fixture.openPtyAndAssertRoundTrip(sandboxInstanceId);
 
         currentStep = "restart gateway and wait for reattach";
-        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId);
+        await fixture.restartContainer(fixture.dataPlaneGatewayContainerId, {
+          timeoutSeconds: 1,
+        });
         const sandboxStatusAfterReconnect = await fixture.waitForSandboxConnectable(
           sandboxInstanceId,
           true,
