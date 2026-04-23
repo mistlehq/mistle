@@ -5,31 +5,27 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { ActionTile } from "./action-tile.js";
 
+function ShellPreview(): React.JSX.Element {
+  return (
+    <div className="w-full max-w-4xl">
+      <ActionTile
+        action={<Button type="button">Add integrations</Button>}
+        className="border-primary/40 bg-primary/5"
+        description="Shared action-tile shell for dashboard cards with a trailing action."
+        title="Add integrations"
+      />
+    </div>
+  );
+}
+
 const meta = {
   title: "Dashboard/Shared/ActionTile",
-  component: ActionTile,
+  component: ShellPreview,
   decorators: [withDashboardCenteredStory],
-  render: (args) => (
-    <div className="w-full max-w-4xl">
-      <ActionTile {...args} />
-    </div>
-  ),
   parameters: {
     layout: "fullscreen",
   },
-  argTypes: {
-    variant: {
-      control: "inline-radio",
-      options: ["default", "info"],
-    },
-  },
-  args: {
-    action: <Button type="button">Add integrations</Button>,
-    description: "Shared action-tile shell for dashboard cards with a trailing action.",
-    title: "Add integrations",
-    variant: "default",
-  },
-} satisfies Meta<typeof ActionTile>;
+} satisfies Meta<typeof ShellPreview>;
 
 export default meta;
 
@@ -49,7 +45,6 @@ export const HomeStepStyle: Story = {
           leading={<div aria-hidden className="size-2.5 rounded-full bg-primary" />}
           leadingPlacement="detached"
           title="Add integrations"
-          variant="default"
         />
       </div>
     );
@@ -75,7 +70,6 @@ export const IntegrationTileStyle: Story = {
             <CheckCircleIcon aria-hidden className="size-5 text-emerald-600" weight="fill" />
           }
           title="Integration Tile"
-          variant="default"
         />
       </div>
     );
@@ -96,7 +90,6 @@ export const NoAction: Story = {
           }
           leadingPlacement="detached"
           title="Completed step"
-          variant="default"
         />
       </div>
     );

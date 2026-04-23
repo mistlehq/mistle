@@ -49,17 +49,4 @@ describe("CopyableValue", () => {
       }),
     ).toBeTruthy();
   });
-
-  it("supports info surface styling without changing copy behavior", () => {
-    const { container } = render(
-      <CopyableValue
-        label="Signing key command"
-        surfaceVariant="info"
-        value='ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing'
-      />,
-    );
-
-    expect(container.querySelector(".border-sky-200")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Copy Signing key command" })).toBeTruthy();
-  });
 });

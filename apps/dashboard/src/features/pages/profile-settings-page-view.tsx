@@ -507,7 +507,6 @@ function LinkedAccountCard(input: {
                   <div className="flex flex-col gap-3">
                     <CopyableValue
                       label="Generate a SSH signing key with no passphrase"
-                      surfaceVariant="info"
                       value='ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing'
                     />
                     <CopyableValue
@@ -526,7 +525,6 @@ function LinkedAccountCard(input: {
                           or via GH CLI:
                         </>
                       }
-                      surfaceVariant="info"
                       value="gh ssh-key add ~/.ssh/mistle-signing.pub --type signing"
                     />
                   </div>
@@ -539,14 +537,13 @@ function LinkedAccountCard(input: {
                           setShowCommitSigningLocalGenerationHelp(true);
                         }}
                         type="button"
-                        variant="info"
+                        variant="outline"
                       >
                         Show helper
                       </Button>
                     }
                     description="Generate one on your machine, then upload the private key here."
                     title="Need a new signing key?"
-                    variant="info"
                   />
                 )}
                 <Textarea
