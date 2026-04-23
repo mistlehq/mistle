@@ -58,6 +58,7 @@ const OtlpTraceExportSchema = z.looseObject({
 });
 
 type RecordedSpan = {
+  attributes: z.infer<typeof OtlpAttributeSchema>[] | undefined;
   name: string;
   serviceName: string;
   spanId: string;
@@ -97,6 +98,7 @@ function collectRecordedSpans(
       for (const scopeSpan of resourceSpan.scopeSpans ?? []) {
         for (const span of scopeSpan.spans ?? []) {
           recordedSpans.push({
+            attributes: span.attributes,
             name: span.name,
             serviceName,
             spanId: span.spanId,
@@ -114,32 +116,54 @@ async function waitForSynchronousRuntimeStateTrace(input: {
   baselineRequestCount: number;
   otlpTraceCaptureFilePath: string;
 }): Promise<{
-  apiSpan: RecordedSpan;
+  apiGatewayClientSpan: RecordedSpan;
   gatewaySpan: RecordedSpan;
 }> {
   const deadlineMs = systemClock.nowMs() + TracePollingTimeoutMs;
+  const runtimeStatePathPattern = /^\/internal\/sandbox-instances\/[^/]+\/runtime-state$/;
 
   while (systemClock.nowMs() < deadlineMs) {
     const capturedRequests = await readCapturedOtlpRequests(input.otlpTraceCaptureFilePath);
     const newRequests = capturedRequests.slice(input.baselineRequestCount);
     const recordedSpans = collectRecordedSpans(newRequests);
-    const apiSpan = recordedSpans.find(
+    const apiGatewayClientSpan = recordedSpans.find(
       (span) =>
         span.serviceName === "@mistle/data-plane-api" &&
-        span.name === "GET /internal/sandbox/instances",
+        span.name === "GET" &&
+        readStringAttribute({
+          attributes: span.attributes,
+          key: "server.address",
+        }) === "data-plane-gateway" &&
+        runtimeStatePathPattern.test(
+          readStringAttribute({
+            attributes: span.attributes,
+            key: "url.path",
+          }) ?? "",
+        ),
     );
 
-    if (apiSpan !== undefined) {
+    if (apiGatewayClientSpan !== undefined) {
       const gatewaySpan = recordedSpans.find(
         (span) =>
           span.serviceName === "@mistle/data-plane-gateway" &&
-          span.name === "GET /internal/sandbox-instances/:instanceId/runtime-state" &&
-          span.traceId === apiSpan.traceId,
+          span.name === "GET" &&
+          span.traceId === apiGatewayClientSpan.traceId &&
+          runtimeStatePathPattern.test(
+            readStringAttribute({
+              attributes: span.attributes,
+              key: "http.target",
+            }) ??
+              readStringAttribute({
+                attributes: span.attributes,
+                key: "url.path",
+              }) ??
+              "",
+          ),
       );
 
       if (gatewaySpan !== undefined) {
         return {
-          apiSpan,
+          apiGatewayClientSpan,
           gatewaySpan,
         };
       }
@@ -192,13 +216,13 @@ describe("system runtime state tracing", () => {
 
       expect(response.status).toBe(200);
 
-      const { apiSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
+      const { apiGatewayClientSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
         baselineRequestCount,
         otlpTraceCaptureFilePath: fixture.otlpTraceCaptureFilePath,
       });
 
-      expect(gatewaySpan.traceId).toBe(apiSpan.traceId);
-      expect(gatewaySpan.spanId).not.toBe(apiSpan.spanId);
+      expect(gatewaySpan.traceId).toBe(apiGatewayClientSpan.traceId);
+      expect(gatewaySpan.spanId).not.toBe(apiGatewayClientSpan.spanId);
     } finally {
       await dataPlaneDb
         .delete(sandboxInstances)
