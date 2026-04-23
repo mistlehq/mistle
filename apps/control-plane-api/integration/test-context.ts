@@ -7,6 +7,7 @@ import {
   reserveAvailablePort,
   runCleanupTasks,
 } from "@mistle/test-harness";
+import { systemSleeper } from "@mistle/time";
 import { Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
@@ -118,9 +119,7 @@ async function waitForDatabaseDisconnections(input: {
       return;
     }
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, DatabaseDrainPollIntervalMs);
-    });
+    await systemSleeper.sleep(DatabaseDrainPollIntervalMs);
   }
 
   throw new Error(
