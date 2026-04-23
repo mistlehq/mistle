@@ -1,0 +1,397 @@
+import { Checkbox, Notice } from "@mistle/ui";
+import { useDebouncedValue } from "@tanstack/react-pacer";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { resolveApiErrorMessage } from "../api/error-message.js";
+import { IntegrationResourcePickerView } from "../forms/integration-resource-picker-view.js";
+import {
+  listIntegrationConnectionResources,
+  refreshIntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
+import { formatDateTime } from "../shared/date-formatters.js";
+import type {
+  IntegrationConnectionSummary,
+  IntegrationTargetSummary,
+  SandboxProfileBindingEditorRow,
+} from "./sandbox-profile-binding-config-editor.js";
+import {
+  resolveBindingConfigSummaryItems,
+  resolveBindingToolToggleModel,
+} from "./sandbox-profile-binding-config-editor.js";
+import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
+
+const SearchDebounceMs = 300;
+
+function resolveGitBindingRow(
+  rows: readonly SandboxProfileBindingEditorRow[],
+): SandboxProfileBindingEditorRow | null {
+  return rows.find((row) => row.kind === "git") ?? null;
+}
+
+function resolveRepositorySummary(
+  connection: IntegrationConnectionSummary | undefined,
+): { count: number; lastSyncedAt?: string; syncState?: string } | null {
+  const summary = connection?.resources?.find((resource) => resource.kind === "repository");
+
+  if (summary === undefined) {
+    return null;
+  }
+
+  return {
+    count: summary.count,
+    ...(summary.lastSyncedAt === undefined ? {} : { lastSyncedAt: summary.lastSyncedAt }),
+    syncState: summary.syncState,
+  };
+}
+
+function formatSyncMetadata(input: { lastSyncedAt?: string | undefined }): string | null {
+  if (input.lastSyncedAt === undefined) {
+    return null;
+  }
+
+  return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
+}
+
+function resolveSelectedHandles(row: SandboxProfileBindingEditorRow | null): string[] {
+  if (row === null || !Array.isArray(row.config["repositories"])) {
+    return [];
+  }
+
+  return row.config["repositories"].filter((value): value is string => typeof value === "string");
+}
+
+function RepositoryResourcesPicker(input: {
+  row: SandboxProfileBindingEditorRow;
+  connection: IntegrationConnectionSummary;
+  onRowChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useDebouncedValue(search, {
+    wait: SearchDebounceMs,
+  });
+  const selectedHandles = resolveSelectedHandles(input.row);
+  const repositorySummary = resolveRepositorySummary(input.connection);
+
+  const resourceQuery = useQuery({
+    queryKey: [
+      "integration-connections",
+      input.connection.id,
+      "resources",
+      "repository",
+      debouncedSearch,
+    ],
+    queryFn: async ({ signal }) =>
+      listIntegrationConnectionResources({
+        connectionId: input.connection.id,
+        kind: "repository",
+        ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
+        signal,
+      }),
+    retry: false,
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: async () =>
+      refreshIntegrationConnectionResources({
+        connectionId: input.connection.id,
+        kind: "repository",
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["integration-connections", input.connection.id, "resources", "repository"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["sandbox-profiles", "integration-directory"],
+        }),
+      ]);
+    },
+  });
+
+  const visibleItems = resourceQuery.data?.items ?? [];
+  const availableHandles = new Set(visibleItems.map((item) => item.handle));
+  const unavailableSelectedHandles =
+    resourceQuery.data === undefined || debouncedSearch.length > 0
+      ? []
+      : selectedHandles.filter((handle) => !availableHandles.has(handle));
+  const refreshErrorMessage =
+    refreshMutation.error === null || refreshMutation.error === undefined
+      ? null
+      : resolveApiErrorMessage({
+          error: refreshMutation.error,
+          fallbackMessage: "Could not refresh resources for this connection.",
+        });
+  const resourceListErrorMessage = !resourceQuery.isError
+    ? null
+    : resolveApiErrorMessage({
+        error: resourceQuery.error,
+        fallbackMessage: "Could not load resources for this connection.",
+      });
+
+  function updateSelectedHandles(nextValue: readonly string[]): void {
+    input.onRowChange(input.row.clientId, {
+      config: {
+        ...input.row.config,
+        repositories: [...nextValue],
+      },
+    });
+  }
+
+  function toggleAll(): void {
+    const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
+    const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
+
+    if (allVisibleSelected) {
+      updateSelectedHandles(selectedHandles.filter((handle) => !visibleHandleSet.has(handle)));
+      return;
+    }
+
+    const selectedSet = new Set(selectedHandles);
+    const handlesToAdd = visibleItems
+      .filter((item) => !selectedSet.has(item.handle))
+      .map((item) => item.handle);
+    updateSelectedHandles([...selectedHandles, ...handlesToAdd]);
+  }
+
+  return (
+    <IntegrationResourcePickerView
+      emptyMessage="No repositories available for this connection."
+      id={`sandbox-profile-repositories-${input.connection.id}`}
+      isRefreshing={refreshMutation.isPending}
+      label="Repositories"
+      listState={
+        resourceQuery.isPending
+          ? {
+              mode: "loading",
+            }
+          : resourceQuery.isError
+            ? {
+                mode: "error",
+                message:
+                  resourceListErrorMessage ?? "Could not load resources for this connection.",
+              }
+            : {
+                mode: "ready",
+                items: resourceQuery.data.items,
+              }
+      }
+      onBlur={() => {}}
+      onFocus={() => {}}
+      onRefresh={() => {
+        refreshMutation.mutate();
+      }}
+      onSearchChange={setSearch}
+      onSelectionChange={updateSelectedHandles}
+      onToggleAll={toggleAll}
+      refreshErrorMessage={refreshErrorMessage}
+      refreshLabel="Refresh repositories"
+      refreshTooltip={
+        repositorySummary?.count === undefined
+          ? "Refresh repositories"
+          : `Refresh repositories (${String(repositorySummary.count)} available)`
+      }
+      search={search}
+      searchPlaceholder="Add repositories"
+      selectedHandles={selectedHandles}
+      unavailableSelectedHandles={unavailableSelectedHandles}
+      visibleItems={visibleItems}
+    />
+  );
+}
+
+function ToolBindingsSection(input: {
+  rows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  onRowChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+}): React.JSX.Element {
+  const toolRows = input.rows.filter((row) => {
+    const toolToggleModel = resolveBindingToolToggleModel({
+      row,
+      connections: input.availableConnections,
+      targets: input.availableTargets,
+    });
+
+    return toolToggleModel.mode === "supported";
+  });
+
+  if (toolRows.length === 0) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Choose integrations with CLI tools in Integrations before selecting tools here.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col">
+      <div className="text-muted-foreground grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-4 border-b py-2 text-xs uppercase tracking-wide">
+        <p>Integration</p>
+        <p>Tools</p>
+      </div>
+      {toolRows.map((row) => {
+        const toolToggleModel = resolveBindingToolToggleModel({
+          row,
+          connections: input.availableConnections,
+          targets: input.availableTargets,
+        });
+        const rowMetadata = resolveRowBindingMetadata({
+          row,
+          availableConnections: input.availableConnections,
+          availableTargets: input.availableTargets,
+        });
+        const summaryItems = resolveBindingConfigSummaryItems({
+          row,
+          connections: input.availableConnections,
+          targets: input.availableTargets,
+          excludedPropertyKeys: ["tools", "repositories"],
+          maxItems: 3,
+        });
+
+        if (toolToggleModel.mode !== "supported") {
+          return null;
+        }
+
+        return (
+          <div
+            className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-4 border-b py-4"
+            key={row.clientId}
+          >
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {rowMetadata?.target?.displayName ?? "Integration"}
+              </p>
+              {summaryItems.length === 0 ? null : (
+                <div className="mt-2 flex flex-col gap-2">
+                  {summaryItems.map((item) => (
+                    <div className="min-w-0" key={item.label}>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                        {item.label}
+                      </p>
+                      <p className="truncate text-sm">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              {toolToggleModel.options.map((option) => (
+                <label className="flex items-center gap-2 text-sm" key={option.value}>
+                  <Checkbox
+                    aria-label={option.label}
+                    checked={option.checked}
+                    onCheckedChange={(checked) => {
+                      input.onRowChange(row.clientId, {
+                        config: {
+                          ...toolToggleModel.config,
+                          tools:
+                            checked === true
+                              ? toolToggleModel.options
+                                  .filter(
+                                    (candidate) =>
+                                      candidate.checked || candidate.value === option.value,
+                                  )
+                                  .map((candidate) => candidate.value)
+                              : toolToggleModel.options
+                                  .filter(
+                                    (candidate) =>
+                                      candidate.checked && candidate.value !== option.value,
+                                  )
+                                  .map((candidate) => candidate.value),
+                        },
+                      });
+                    }}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function SandboxProfileResourcesAndToolsSection(input: {
+  rows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  onRowChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+}): React.JSX.Element {
+  const gitRow = resolveGitBindingRow(input.rows);
+  const gitConnection =
+    gitRow === null
+      ? undefined
+      : input.availableConnections.find((connection) => connection.id === gitRow.connectionId);
+  const gitSummaryItems =
+    gitRow === null
+      ? []
+      : resolveBindingConfigSummaryItems({
+          row: gitRow,
+          connections: input.availableConnections,
+          targets: input.availableTargets,
+          excludedPropertyKeys: ["repositories", "tools"],
+        });
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-3">
+        <p className="text-muted-foreground text-xs uppercase tracking-wide">
+          Repository Resources
+        </p>
+        {gitRow === null || gitConnection === undefined ? (
+          <p className="text-muted-foreground text-sm">
+            Choose a Git provider in Integrations before selecting repository resources.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <RepositoryResourcesPicker
+              connection={gitConnection}
+              onRowChange={input.onRowChange}
+              row={gitRow}
+            />
+            {gitSummaryItems.length === 0 ? null : (
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {gitSummaryItems.map((item) => (
+                  <div className="flex flex-col gap-1" key={item.label}>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      {item.label}
+                    </p>
+                    <p className="text-sm">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {formatSyncMetadata(resolveRepositorySummary(gitConnection) ?? {}) === null ? null : (
+              <Notice variant="default">
+                {formatSyncMetadata(resolveRepositorySummary(gitConnection) ?? {})}
+              </Notice>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-muted-foreground text-xs uppercase tracking-wide">Tools</p>
+        <ToolBindingsSection
+          availableConnections={input.availableConnections}
+          availableTargets={input.availableTargets}
+          onRowChange={input.onRowChange}
+          rows={input.rows}
+        />
+      </div>
+    </div>
+  );
+}

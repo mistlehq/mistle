@@ -31,6 +31,7 @@ import {
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
+import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resources-and-tools-section.js";
 
 type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
@@ -39,16 +40,12 @@ type SandboxProfileEditorPageStoryArgs = {
 
 const StorySections = [
   {
-    id: "agent",
-    label: "Agent Harness",
+    id: "integrations",
+    label: "Integrations",
   },
   {
-    id: "git",
-    label: "Git Provider",
-  },
-  {
-    id: "connector",
-    label: "Connectors",
+    id: "resources-and-tools",
+    label: "Resources & Tools",
   },
   {
     id: "configurations",
@@ -190,7 +187,7 @@ function SandboxProfileEditorPageStoryView(
         profileName={profileName}
         profileNameFallback={profileName}
         renderSectionPanel={(sectionId) => {
-          if (sectionId === "agent") {
+          if (sectionId === "integrations") {
             return (
               <IntegrationsEditorSection
                 availableConnections={StoryIntegrationConnections}
@@ -233,106 +230,26 @@ function SandboxProfileEditorPageStoryView(
                     currentRows.filter((row) => row.clientId !== clientId),
                   );
                 }}
-                sectionKinds={["agent"]}
+                layout="stacked"
+                sectionKinds={["agent", "git", "connector"]}
                 showSectionNavigation={false}
               />
             );
           }
 
-          if (sectionId === "git") {
+          if (sectionId === "resources-and-tools") {
             return (
-              <IntegrationsEditorSection
+              <SandboxProfileResourcesAndToolsSection
                 availableConnections={StoryIntegrationConnections}
                 availableTargets={StoryIntegrationTargets}
-                integrationBindingsQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationDirectoryQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationRowErrorsByClientId={{}}
-                integrationRows={integrationRows}
-                integrationSaveError={null}
-                isSubmittingIntegrationBindings={false}
-                onAddIntegrationBindingRow={async (nextBinding) => {
-                  setIntegrationRows((currentRows) => [
-                    ...currentRows,
-                    {
-                      clientId: `row-${String(currentRows.length + 1)}`,
-                      connectionId: nextBinding.connectionId,
-                      kind: nextBinding.kind,
-                      config: nextBinding.config,
-                    },
-                  ]);
-                  return true;
-                }}
-                onIntegrationBindingRowChange={(clientId, changes) => {
+                onRowChange={(clientId, changes) => {
                   setIntegrationRows((currentRows) =>
                     currentRows.map((row) =>
                       row.clientId === clientId ? { ...row, ...changes } : row,
                     ),
                   );
                 }}
-                onRemoveIntegrationBindingRow={(clientId) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.filter((row) => row.clientId !== clientId),
-                  );
-                }}
-                sectionKinds={["git"]}
-                showSectionNavigation={false}
-              />
-            );
-          }
-
-          if (sectionId === "connector") {
-            return (
-              <IntegrationsEditorSection
-                availableConnections={StoryIntegrationConnections}
-                availableTargets={StoryIntegrationTargets}
-                integrationBindingsQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationDirectoryQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationRowErrorsByClientId={{}}
-                integrationRows={integrationRows}
-                integrationSaveError={null}
-                isSubmittingIntegrationBindings={false}
-                onAddIntegrationBindingRow={async (nextBinding) => {
-                  setIntegrationRows((currentRows) => [
-                    ...currentRows,
-                    {
-                      clientId: `row-${String(currentRows.length + 1)}`,
-                      connectionId: nextBinding.connectionId,
-                      kind: nextBinding.kind,
-                      config: nextBinding.config,
-                    },
-                  ]);
-                  return true;
-                }}
-                onIntegrationBindingRowChange={(clientId, changes) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.map((row) =>
-                      row.clientId === clientId ? { ...row, ...changes } : row,
-                    ),
-                  );
-                }}
-                onRemoveIntegrationBindingRow={(clientId) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.filter((row) => row.clientId !== clientId),
-                  );
-                }}
-                sectionKinds={["connector"]}
-                showSectionNavigation={false}
+                rows={integrationRows}
               />
             );
           }

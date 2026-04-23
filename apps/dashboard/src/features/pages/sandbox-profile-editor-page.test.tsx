@@ -644,13 +644,24 @@ function renderSandboxProfileEditor(input?: { setupScript?: string | null }): vo
 }
 
 describe("SandboxProfileEditorPage", () => {
-  it("renders configurations in the existing integrations rail", () => {
+  it("renders the setup-flow sections in the editor rail", () => {
     renderSandboxProfileEditor();
 
-    expect(screen.getByRole("tab", { name: "Agent Harness" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "Git Provider" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "Connectors" })).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Integrations" })).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Resources & Tools" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Configurations" })).toBeDefined();
+  });
+
+  it("shows resources guidance when no git provider is configured", () => {
+    renderSandboxProfileEditor();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Resources & Tools" }));
+
+    expect(
+      screen.getByText(
+        "Choose a Git provider in Integrations before selecting repository resources.",
+      ),
+    ).toBeDefined();
   });
 
   it("shows the setup script editor in the configurations section", () => {

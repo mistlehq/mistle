@@ -62,6 +62,7 @@ export type IntegrationsEditorSectionProps = {
   onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
   sectionKinds?: readonly SandboxIntegrationBindingKind[];
   showSectionNavigation?: boolean;
+  layout?: "tabbed" | "stacked";
 };
 
 const BindingSectionKinds: readonly SandboxIntegrationBindingKind[] = ["agent", "git", "connector"];
@@ -99,6 +100,8 @@ export function IntegrationsEditorSection(
 ): React.JSX.Element {
   const sectionKinds = props.sectionKinds ?? BindingSectionKinds;
   const showSectionNavigation = props.showSectionNavigation ?? true;
+  const layout = props.layout ?? "tabbed";
+  const isStackedLayout = layout === "stacked";
   const [integrationDialogState, setIntegrationDialogState] =
     useState<SandboxProfileBindingDialogState | null>(null);
   const [activeTab, setActiveTab] = useState<SandboxIntegrationBindingKind>(
@@ -376,7 +379,7 @@ export function IntegrationsEditorSection(
 
   return (
     <div className="flex flex-col gap-4">
-      {showSectionNavigation ? (
+      {showSectionNavigation && !isStackedLayout ? (
         <div className="md:hidden">
           <Select
             onValueChange={(value) =>
@@ -402,12 +405,12 @@ export function IntegrationsEditorSection(
 
       <div
         className={
-          showSectionNavigation
+          showSectionNavigation && !isStackedLayout
             ? "flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]"
             : "flex flex-col gap-4"
         }
       >
-        {showSectionNavigation ? (
+        {showSectionNavigation && !isStackedLayout ? (
           <div aria-label="Integration sections" className="hidden flex-col md:flex" role="tablist">
             {visibleTabs.map((section) => (
               <button
@@ -431,13 +434,13 @@ export function IntegrationsEditorSection(
           </div>
         ) : null}
 
-        {showSectionNavigation ? (
+        {showSectionNavigation && !isStackedLayout ? (
           <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
         ) : null}
 
         <div
           className={
-            showSectionNavigation
+            showSectionNavigation && !isStackedLayout
               ? "flex min-w-0 flex-1 flex-col gap-4 md:pl-8"
               : "flex min-w-0 flex-1 flex-col gap-4"
           }
@@ -469,16 +472,23 @@ export function IntegrationsEditorSection(
           {sectionKinds.map((kind) => (
             <div
               aria-labelledby={
-                showSectionNavigation ? `sandbox-profile-integrations-tab-${kind}` : undefined
+                showSectionNavigation && !isStackedLayout
+                  ? `sandbox-profile-integrations-tab-${kind}`
+                  : undefined
               }
               className="w-full"
-              hidden={activeTab !== kind}
-              id={showSectionNavigation ? `sandbox-profile-integrations-panel-${kind}` : undefined}
+              hidden={isStackedLayout ? false : activeTab !== kind}
+              id={
+                showSectionNavigation && !isStackedLayout
+                  ? `sandbox-profile-integrations-panel-${kind}`
+                  : undefined
+              }
               key={kind}
-              role={showSectionNavigation ? "tabpanel" : undefined}
+              role={showSectionNavigation && !isStackedLayout ? "tabpanel" : undefined}
             >
-              {activeTab !== kind || hideActiveAddAction ? null : activeAddConstraintMessage ===
-                null ? (
+              {isStackedLayout ||
+              activeTab !== kind ||
+              hideActiveAddAction ? null : activeAddConstraintMessage === null ? (
                 <div className="mb-4 flex justify-end">{activeAddButton}</div>
               ) : (
                 <div className="mb-4 flex justify-end">
@@ -503,7 +513,7 @@ export function IntegrationsEditorSection(
                 onRemove={props.onRemoveIntegrationBindingRow}
                 rowErrorsByClientId={props.integrationRowErrorsByClientId}
                 rows={integrationRowsByKind[kind]}
-                showSectionChrome={false}
+                showSectionChrome={isStackedLayout}
                 onCreateBindingFromConnection={createBindingFromConnection}
                 onRowDraftDirtyChange={handleRowDraftDirtyChange}
               />
