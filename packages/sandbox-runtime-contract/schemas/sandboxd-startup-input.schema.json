@@ -73,6 +73,10 @@
             }
           ]
         },
+        "setupScript": {
+          "type": "string",
+          "minLength": 1
+        },
         "egressRoutes": {
           "readOnly": true,
           "type": "array",

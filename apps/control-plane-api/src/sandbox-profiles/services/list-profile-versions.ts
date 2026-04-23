@@ -1,5 +1,3 @@
-import type { SandboxProfileVersion } from "@mistle/db/control-plane";
-
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -9,7 +7,10 @@ type ListProfileVersionsInput = {
 };
 
 type ListProfileVersionsOutput = {
-  versions: SandboxProfileVersion[];
+  versions: Array<{
+    sandboxProfileId: string;
+    version: number;
+  }>;
 };
 
 export async function listProfileVersions(
@@ -32,6 +33,10 @@ export async function listProfileVersions(
   }
 
   const versions = await db.query.sandboxProfileVersions.findMany({
+    columns: {
+      sandboxProfileId: true,
+      version: true,
+    },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
     orderBy: (table, { desc }) => [desc(table.version)],
   });

@@ -12,6 +12,7 @@ use serde::{Deserialize, Deserializer};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompiledRuntimePlan {
+    pub setup_script: Option<String>,
     pub egress_routes: Vec<CompiledEgressRoute>,
     pub artifacts: Vec<CompiledRuntimeArtifact>,
     pub workspace_sources: Vec<CompiledWorkspaceSource>,

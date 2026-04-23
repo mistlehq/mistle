@@ -86,6 +86,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_compile_success",
       version: 1,
+      setupScript: "printf 'hello from setup script\\n'",
     });
     await fixture.db
       .insert(integrationTargets)
@@ -150,6 +151,7 @@ describe("sandbox profile compile runtime plan integration", () => {
 
     expect(runtimePlan.sandboxProfileId).toBe("sbp_compile_success");
     expect(runtimePlan.version).toBe(1);
+    expect(runtimePlan.setupScript).toBe("printf 'hello from setup script\\n'");
     expect(runtimePlan.egressRoutes).toHaveLength(1);
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
@@ -259,6 +261,42 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");
+  });
+
+  it("omits blank setup scripts from the compiled runtime plan", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-blank-setup-script@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_compile_blank_setup_script",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Blank Setup Script Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_compile_blank_setup_script",
+      version: 1,
+      setupScript: "   \n\t  ",
+    });
+
+    const runtimePlan = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_blank_setup_script",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: "mistle/sandbox-base:dev",
+        },
+      },
+    );
+
+    expect(runtimePlan.setupScript).toBeUndefined();
   });
 
   it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({

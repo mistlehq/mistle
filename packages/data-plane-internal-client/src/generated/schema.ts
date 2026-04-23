@@ -460,6 +460,7 @@ export interface paths {
                 };
               }[];
               sandboxProfileId: string;
+              setupScript?: string;
               version: number;
               workspaceSources: {
                 /** Format: uri */
@@ -893,6 +894,7 @@ export interface paths {
                   };
                 }[];
                 sandboxProfileId: string;
+                setupScript?: string;
                 version: number;
                 workspaceSources: {
                   /** Format: uri */

@@ -159,6 +159,31 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(CompiledRuntimePlanSchema.parse(plan)).toEqual(plan);
   });
 
+  it("accepts optional setup scripts in the shared runtime-plan schema", () => {
+    const plan = {
+      ...assembleCompiledRuntimePlan({
+        sandboxProfileId: "sbp_setup_script",
+        version: 3,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        compiledBindingResults: [
+          {
+            egressRoutes: [],
+            artifacts: [],
+            runtimeClients: [],
+            workspaceSources: [],
+            agentRuntimes: [],
+          },
+        ],
+      }),
+      setupScript: "printf 'hello from setup script\\n'",
+    };
+
+    expect(CompiledRuntimePlanSchema.parse(plan)).toEqual(plan);
+  });
+
   it("merges runtime client fragments and produces deterministic ordering", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_123",

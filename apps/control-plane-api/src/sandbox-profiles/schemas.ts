@@ -63,7 +63,12 @@ export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
 
 export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
   version: z.number().int().min(1),
-}).strict();
+})
+  .pick({
+    sandboxProfileId: true,
+    version: true,
+  })
+  .strict();
 
 export const listSandboxProfileVersionsResponseSchema = z
   .object({

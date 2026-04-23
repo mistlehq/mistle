@@ -80,6 +80,14 @@ export type CompileSandboxRuntimePlanInput = {
   image: ResolvedSandboxImage;
 };
 
+function normalizeSetupScript(setupScript: string | null): string | undefined {
+  if (setupScript === null || setupScript.trim().length === 0) {
+    return undefined;
+  }
+
+  return setupScript;
+}
+
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
   code: IntegrationCompilerError["code"],
 ): SandboxRuntimePlanCompilerErrorCode {
@@ -280,6 +288,7 @@ export async function compileSandboxRuntimePlan(
   const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
     columns: {
       sandboxProfileId: true,
+      setupScript: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -301,7 +310,7 @@ export async function compileSandboxRuntimePlan(
   });
 
   try {
-    return compileRuntimePlan({
+    const runtimePlan = compileRuntimePlan({
       organizationId: input.organizationId,
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
@@ -309,6 +318,13 @@ export async function compileSandboxRuntimePlan(
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
     });
+
+    const setupScript = normalizeSetupScript(sandboxProfileVersion.setupScript);
+
+    return {
+      ...runtimePlan,
+      ...(setupScript === undefined ? {} : { setupScript }),
+    };
   } catch (error) {
     if (error instanceof IntegrationCompilerError) {
       throw new SandboxRuntimePlanCompilerError({

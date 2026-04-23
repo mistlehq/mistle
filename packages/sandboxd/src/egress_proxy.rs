@@ -2362,6 +2362,7 @@ mod tests {
 
     fn sample_runtime_plan() -> CompiledRuntimePlan {
         CompiledRuntimePlan {
+            setup_script: None,
             egress_routes: vec![CompiledEgressRoute {
                 egress_rule_id: "egress-rule-1".to_string(),
                 binding_id: "binding-1".to_string(),

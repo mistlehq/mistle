@@ -10,6 +10,7 @@ export const sandboxProfileVersions = controlPlaneSchema.table(
       .notNull()
       .references(() => sandboxProfiles.id, { onDelete: "cascade" }),
     version: bigint("version", { mode: "number" }).notNull(),
+    setupScript: text("setup_script"),
   },
   (table) => [
     primaryKey({

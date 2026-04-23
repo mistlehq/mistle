@@ -13,6 +13,8 @@ use crate::time::{Clock, Sleeper};
 
 /// Default polling interval used while waiting for child processes with a timeout.
 pub const DEFAULT_COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(10);
+const DEFAULT_COMMAND_STDOUT_TAIL_BYTES: usize = 4 * 1024;
+const DEFAULT_COMMAND_STDERR_TAIL_BYTES: usize = 8 * 1024;
 
 /// Describes one subprocess invocation.
 pub struct CommandSpec<'a> {
@@ -29,6 +31,22 @@ struct CommandResult {
     timed_out: bool,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CommandOutputTails {
+    pub stdout_tail: Option<String>,
+    pub stderr_tail: Option<String>,
+    pub stdout_captured: bool,
+    pub stderr_captured: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandFailure {
+    pub message: String,
+    pub exit_code: Option<i32>,
+    pub timed_out: bool,
+    pub output_tails: CommandOutputTails,
+}
+
 /// Runs one subprocess and returns an error that includes combined output on failure.
 pub fn run_command<C, S>(
     command: CommandSpec<'_>,
@@ -37,13 +55,29 @@ pub fn run_command<C, S>(
     poll_interval: Duration,
 ) -> Result<(), String>
 where
-    C: Clock,
-    S: Sleeper,
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
 {
-    let executable = command
-        .args
-        .first()
-        .ok_or_else(|| "command args must not be empty".to_string())?;
+    run_command_with_details(command, clock, sleeper, poll_interval).map_err(|error| error.message)
+}
+
+/// Runs one subprocess and returns structured failure details on error.
+pub fn run_command_with_details<C, S>(
+    command: CommandSpec<'_>,
+    clock: &C,
+    sleeper: &S,
+    poll_interval: Duration,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
+    let executable = command.args.first().ok_or_else(|| CommandFailure {
+        message: "command args must not be empty".to_string(),
+        exit_code: None,
+        timed_out: false,
+        output_tails: CommandOutputTails::default(),
+    })?;
 
     let mut child_command = Command::new(executable);
     child_command.args(&command.args[1..]);
@@ -59,17 +93,24 @@ where
         child_command.envs(env);
     }
 
-    let mut child = child_command
-        .spawn()
-        .map_err(|error| format!("failed to spawn command: {error}"))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "command stdout pipe was not available".to_string())?;
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "command stderr pipe was not available".to_string())?;
+    let mut child = child_command.spawn().map_err(|error| CommandFailure {
+        message: format!("failed to spawn command: {error}"),
+        exit_code: None,
+        timed_out: false,
+        output_tails: CommandOutputTails::default(),
+    })?;
+    let stdout = child.stdout.take().ok_or_else(|| CommandFailure {
+        message: "command stdout pipe was not available".to_string(),
+        exit_code: None,
+        timed_out: false,
+        output_tails: CommandOutputTails::default(),
+    })?;
+    let stderr = child.stderr.take().ok_or_else(|| CommandFailure {
+        message: "command stderr pipe was not available".to_string(),
+        exit_code: None,
+        timed_out: false,
+        output_tails: CommandOutputTails::default(),
+    })?;
 
     let stdout_thread = thread::spawn(move || read_pipe(stdout));
     let stderr_thread = thread::spawn(move || read_pipe(stderr));
@@ -79,26 +120,60 @@ where
         clock,
         sleeper,
         poll_interval,
-    )?;
+    )
+    .map_err(|message| CommandFailure {
+        message,
+        exit_code: None,
+        timed_out: false,
+        output_tails: CommandOutputTails::default(),
+    })?;
 
     let stdout = stdout_thread
         .join()
-        .map_err(|_| "command stdout reader panicked".to_string())??;
+        .map_err(|_| CommandFailure {
+            message: "command stdout reader panicked".to_string(),
+            exit_code: None,
+            timed_out: false,
+            output_tails: CommandOutputTails::default(),
+        })?
+        .map_err(|message| CommandFailure {
+            message,
+            exit_code: None,
+            timed_out: false,
+            output_tails: CommandOutputTails::default(),
+        })?;
     let stderr = stderr_thread
         .join()
-        .map_err(|_| "command stderr reader panicked".to_string())??;
+        .map_err(|_| CommandFailure {
+            message: "command stderr reader panicked".to_string(),
+            exit_code: None,
+            timed_out: false,
+            output_tails: CommandOutputTails::default(),
+        })?
+        .map_err(|message| CommandFailure {
+            message,
+            exit_code: None,
+            timed_out: false,
+            output_tails: CommandOutputTails::default(),
+        })?;
     let result = CommandResult {
         status,
         stdout,
         stderr,
         timed_out,
     };
+    let output_tails = collect_command_output_tails(&result);
 
     if result.timed_out {
         let timeout_ms = command
             .timeout_ms
             .expect("timed out result should only exist when timeoutMs is set");
-        return Err(format!("command timed out after {timeout_ms}ms"));
+        return Err(CommandFailure {
+            message: format!("command timed out after {timeout_ms}ms"),
+            exit_code: result.status.code(),
+            timed_out: true,
+            output_tails,
+        });
     }
 
     if result.status.success() {
@@ -108,10 +183,20 @@ where
     let output = combine_command_output(&result);
     let failure = describe_command_failure(&result);
     if output.is_empty() {
-        return Err(failure);
+        return Err(CommandFailure {
+            message: failure,
+            exit_code: result.status.code(),
+            timed_out: false,
+            output_tails,
+        });
     }
 
-    Err(format!("{failure} (output={output})"))
+    Err(CommandFailure {
+        message: format!("{failure} (output={output})"),
+        exit_code: result.status.code(),
+        timed_out: false,
+        output_tails,
+    })
 }
 
 fn wait_for_child<C, S>(
@@ -122,8 +207,8 @@ fn wait_for_child<C, S>(
     poll_interval: Duration,
 ) -> Result<(ExitStatus, bool), String>
 where
-    C: Clock,
-    S: Sleeper,
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
 {
     let Some(timeout_ms) = timeout_ms else {
         let status = child
@@ -178,4 +263,26 @@ fn describe_command_failure(result: &CommandResult) -> String {
         Some(code) => format!("command failed with exit code {code}"),
         None => "command failed".to_string(),
     }
+}
+
+fn collect_command_output_tails(result: &CommandResult) -> CommandOutputTails {
+    let stdout_tail = collect_output_tail(&result.stdout, DEFAULT_COMMAND_STDOUT_TAIL_BYTES);
+    let stderr_tail = collect_output_tail(&result.stderr, DEFAULT_COMMAND_STDERR_TAIL_BYTES);
+
+    CommandOutputTails {
+        stdout_captured: stdout_tail.is_some(),
+        stderr_captured: stderr_tail.is_some(),
+        stdout_tail,
+        stderr_tail,
+    }
+}
+
+fn collect_output_tail(output: &str, max_bytes: usize) -> Option<String> {
+    if output.is_empty() {
+        return None;
+    }
+
+    let bytes = output.as_bytes();
+    let start = bytes.len().saturating_sub(max_bytes);
+    Some(String::from_utf8_lossy(&bytes[start..]).to_string())
 }

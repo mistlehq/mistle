@@ -2099,6 +2099,7 @@ export type CompiledRuntimePlan = {
   sandboxProfileId: string;
   version: number;
   image: ResolvedSandboxImage;
+  setupScript?: string;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;

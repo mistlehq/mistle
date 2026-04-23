@@ -25,6 +25,7 @@ const RuntimePlanSchema = z.object({
       imageRef: z.string().min(1),
     }),
   ]),
+  setupScript: z.string().min(1).optional(),
   egressRoutes: z.array(
     z.object({
       egressRuleId: z.string().min(1),
@@ -420,6 +421,23 @@ describe("encodeSandboxStartupInput", () => {
         grant: "grant-token-value",
       },
     });
+  });
+
+  it("preserves an optional setup script in the encoded runtime plan", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: {
+        ...createRuntimePlan(),
+        setupScript: "printf 'setup script ran\\n'",
+      },
+      egressGrantByRuleId: {},
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.runtimePlan.setupScript).toBe("printf 'setup script ran\\n'");
   });
 
   it("preserves linked-principal credential resolvers in the encoded runtime plan", () => {

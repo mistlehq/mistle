@@ -14,11 +14,15 @@ use std::thread::{self, JoinHandle};
 use url::Url;
 
 use crate::codex_proxy::CodexProxyControlHandle;
+use crate::command::{
+    CommandFailure, CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command_with_details,
+};
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
 use crate::protocol::startup::StartupInput;
+use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
 use crate::runtime::RuntimePlanApplyError;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
@@ -41,6 +45,7 @@ pub enum SandboxdStateError {
     ApplyRuntimePlan(String),
     ApplyGitIdentity(String),
     StartEgressProxy(String),
+    RunSetupScript(String),
     StartRuntimeProcesses(String),
     StartRuntimeAdapters(String),
     StartTunnelSession(String),
@@ -62,6 +67,9 @@ impl fmt::Display for SandboxdStateError {
             }
             Self::StartEgressProxy(error) => {
                 write!(f, "failed to start local egress proxy: {error}")
+            }
+            Self::RunSetupScript(error) => {
+                write!(f, "failed to run setup script: {error}")
             }
             Self::StartRuntimeProcesses(error) => {
                 write!(f, "failed to start runtime client processes: {error}")
@@ -94,6 +102,7 @@ const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PRO
 const MANAGED_RUNTIME_PATH_ENV: &str = "PATH";
 const MANAGED_RUNTIME_PATH_VALUE: &str =
     "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
@@ -190,6 +199,18 @@ impl SandboxdState {
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+        record_operation_phase_started(&diagnostics_logger, "run_setup_script");
+        run_setup_script(
+            &runtime_plan,
+            &runtime_env,
+            clock.as_ref(),
+            sleeper.as_ref(),
+        )
+        .map_err(|error| {
+            record_setup_script_failure(&diagnostics_logger, &error);
+            SandboxdStateError::RunSetupScript(error.message)
+        })?;
+        record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
         record_operation_phase_started(&diagnostics_logger, "start_runtime_processes");
@@ -746,6 +767,53 @@ fn record_runtime_process_failure(
     record_operation_phase_failure(diagnostics_logger, "start_runtime_processes", attributes);
 }
 
+fn record_setup_script_failure(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    error: &CommandFailure,
+) {
+    let mut attributes = BTreeMap::from([
+        (
+            "failureKind".to_string(),
+            startup_diagnostics_string("setup_script_failed"),
+        ),
+        (
+            "error".to_string(),
+            startup_diagnostics_string(error.message.clone()),
+        ),
+        (
+            "stdoutCaptured".to_string(),
+            serde_json::Value::Bool(error.output_tails.stdout_captured),
+        ),
+        (
+            "stderrCaptured".to_string(),
+            serde_json::Value::Bool(error.output_tails.stderr_captured),
+        ),
+    ]);
+    if let Some(exit_code) = error.exit_code {
+        attributes.insert(
+            "exitCode".to_string(),
+            startup_diagnostics_u64(exit_code as u64),
+        );
+    }
+    if let Some(stdout_tail) = &error.output_tails.stdout_tail {
+        attributes.insert(
+            "stdoutTail".to_string(),
+            startup_diagnostics_string(stdout_tail.clone()),
+        );
+    }
+    if let Some(stderr_tail) = &error.output_tails.stderr_tail {
+        attributes.insert(
+            "stderrTail".to_string(),
+            startup_diagnostics_string(stderr_tail.clone()),
+        );
+    }
+    if error.timed_out {
+        attributes.insert("timedOut".to_string(), serde_json::Value::Bool(true));
+    }
+
+    record_operation_phase_failure(diagnostics_logger, "run_setup_script", attributes);
+}
+
 const CODEX_COORDINATION_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 const CODEX_PROXY_RECOVERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 const RUNTIME_READINESS_PROJECTION_POLL_INTERVAL: std::time::Duration =
@@ -1003,6 +1071,76 @@ fn merge_managed_runtime_environment(
     Ok(runtime_env)
 }
 
+fn run_setup_script<C, S>(
+    runtime_plan: &runtime::CompiledRuntimePlan,
+    runtime_env: &BTreeMap<String, String>,
+    clock: &C,
+    sleeper: &S,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
+    run_setup_script_in_directory(
+        runtime_plan,
+        runtime_env,
+        SETUP_SCRIPT_WORKING_DIRECTORY,
+        clock,
+        sleeper,
+    )
+}
+
+fn run_setup_script_in_directory<C, S>(
+    runtime_plan: &runtime::CompiledRuntimePlan,
+    runtime_env: &BTreeMap<String, String>,
+    working_directory: &str,
+    clock: &C,
+    sleeper: &S,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
+    let Some(setup_script) = runtime_plan.setup_script.as_ref() else {
+        return Ok(());
+    };
+    if setup_script.trim().is_empty() {
+        return Ok(());
+    }
+
+    let shell_args = vec![
+        DEFAULT_PTY_SHELL.to_string(),
+        "-lc".to_string(),
+        setup_script.clone(),
+    ];
+    let environment = build_setup_script_environment(runtime_env);
+
+    run_command_with_details(
+        CommandSpec {
+            args: &shell_args,
+            env: Some(&environment),
+            cwd: Some(working_directory),
+            timeout_ms: None,
+        },
+        clock,
+        sleeper,
+        DEFAULT_COMMAND_POLL_INTERVAL,
+    )
+}
+
+fn build_setup_script_environment(
+    runtime_env: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    let mut environment = std::env::vars().collect::<BTreeMap<_, _>>();
+    environment.insert("TERM".to_string(), DEFAULT_PTY_TERM.to_string());
+
+    for (name, value) in runtime_env {
+        environment.insert(name.clone(), value.clone());
+    }
+
+    environment
+}
+
 fn apply_runtime_startup_overrides(
     runtime_plan: &mut runtime::CompiledRuntimePlan,
     startup_input: &StartupInput,
@@ -1153,9 +1291,11 @@ mod tests {
         RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        MANAGED_RUNTIME_PATH_ENV, MANAGED_RUNTIME_PATH_VALUE, apply_runtime_startup_overrides,
-        collect_runtime_environment, merge_managed_runtime_environment,
-        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
+        MANAGED_RUNTIME_PATH_ENV, MANAGED_RUNTIME_PATH_VALUE, SETUP_SCRIPT_WORKING_DIRECTORY,
+        apply_runtime_startup_overrides, build_setup_script_environment,
+        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
+        run_setup_script_in_directory, spawn_codex_coordination_thread,
+        spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::{SystemClock, ThreadSleeper};
@@ -1163,6 +1303,7 @@ mod tests {
     #[test]
     fn preserves_codex_runtime_client_config_while_rewriting_workspace_sources() {
         let mut runtime_plan = CompiledRuntimePlan {
+            setup_script: None,
             egress_routes: vec![
                 crate::runtime::CompiledEgressRoute {
                     egress_rule_id: "egress_rule_bind_openai_agent".to_string(),
@@ -1463,6 +1604,7 @@ supports_websockets = false
     #[test]
     fn collects_runtime_environment_from_artifacts() {
         let runtime_plan = CompiledRuntimePlan {
+            setup_script: None,
             egress_routes: Vec::new(),
             artifacts: vec![
                 crate::runtime::CompiledRuntimeArtifact {
@@ -1511,6 +1653,7 @@ supports_websockets = false
     #[test]
     fn rejects_conflicting_runtime_environment_values() {
         let runtime_plan = CompiledRuntimePlan {
+            setup_script: None,
             egress_routes: Vec::new(),
             artifacts: vec![
                 crate::runtime::CompiledRuntimeArtifact {
@@ -1574,6 +1717,157 @@ supports_websockets = false
         assert_eq!(
             error,
             "runtime plan artifacts define managed env 'PATH', which sandboxd reserves"
+        );
+    }
+
+    #[test]
+    fn build_setup_script_environment_matches_pty_basics() {
+        let environment = build_setup_script_environment(&BTreeMap::from([(
+            "MISTLE_TEST_ENV".to_string(),
+            "runtime-value".to_string(),
+        )]));
+
+        assert_eq!(
+            environment.get("TERM"),
+            Some(&crate::pty::DEFAULT_PTY_TERM.to_string())
+        );
+        assert_eq!(
+            environment.get("MISTLE_TEST_ENV"),
+            Some(&"runtime-value".to_string())
+        );
+        assert_eq!(SETUP_SCRIPT_WORKING_DIRECTORY, "/root");
+    }
+
+    #[test]
+    fn run_setup_script_skips_missing_or_blank_scripts() {
+        let runtime_env = BTreeMap::new();
+        let missing_setup_script_plan = CompiledRuntimePlan {
+            setup_script: None,
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+        run_setup_script(
+            &missing_setup_script_plan,
+            &runtime_env,
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect("missing setup script should be a no-op");
+
+        let blank_setup_script_plan = CompiledRuntimePlan {
+            setup_script: Some("   \n\t  ".to_string()),
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+        run_setup_script(
+            &blank_setup_script_plan,
+            &runtime_env,
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect("blank setup script should be a no-op");
+    }
+
+    #[test]
+    fn run_setup_script_uses_root_cwd_and_runtime_environment() {
+        let working_directory = std::env::temp_dir().join(format!(
+            "mistle-setup-script-working-directory-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&working_directory)
+            .expect("setup script test working directory should be created");
+        let output_path = std::env::temp_dir().join(format!(
+            "mistle-setup-script-output-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let runtime_plan = CompiledRuntimePlan {
+            setup_script: Some(format!(
+                "printf '%s\\n' \"$TERM\" > {path}; printf '%s\\n' \"$MISTLE_TEST_ENV\" >> {path}; pwd >> {path}",
+                path = output_path.display()
+            )),
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+        let runtime_env =
+            BTreeMap::from([("MISTLE_TEST_ENV".to_string(), "runtime-value".to_string())]);
+
+        run_setup_script_in_directory(
+            &runtime_plan,
+            &runtime_env,
+            working_directory
+                .to_str()
+                .expect("working directory should be valid unicode"),
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect("setup script should run successfully");
+
+        let output = std::fs::read_to_string(&output_path)
+            .expect("setup script should write its output file");
+        let canonical_working_directory = std::fs::canonicalize(&working_directory)
+            .expect("working directory should canonicalize");
+        assert_eq!(
+            output,
+            format!(
+                "xterm-256color\nruntime-value\n{}\n",
+                canonical_working_directory.display()
+            )
+        );
+
+        let _ = std::fs::remove_file(output_path);
+        let _ = std::fs::remove_dir_all(working_directory);
+    }
+
+    #[test]
+    fn run_setup_script_captures_stdout_and_stderr_on_failure() {
+        let runtime_plan = CompiledRuntimePlan {
+            setup_script: Some(
+                "printf 'stdout-line'; printf 'stderr-line' >&2; exit 17".to_string(),
+            ),
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+
+        let error = run_setup_script_in_directory(
+            &runtime_plan,
+            &BTreeMap::new(),
+            std::env::temp_dir()
+                .to_str()
+                .expect("temporary directory should be valid unicode"),
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect_err("failing setup script should return an error");
+
+        assert_eq!(error.exit_code, Some(17));
+        assert!(!error.timed_out);
+        assert!(error.output_tails.stdout_captured);
+        assert!(error.output_tails.stderr_captured);
+        assert_eq!(
+            error.output_tails.stdout_tail.as_deref(),
+            Some("stdout-line")
+        );
+        assert_eq!(
+            error.output_tails.stderr_tail.as_deref(),
+            Some("stderr-line")
         );
     }
 
