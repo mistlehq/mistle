@@ -6,7 +6,10 @@ import { createElement, type PropsWithChildren } from "react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { useSessionRepositoryStatus } from "./use-session-repository-status.js";
+import {
+  getSessionRepositoryStatusQueryKey,
+  useSessionRepositoryStatus,
+} from "./use-session-repository-status.js";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: PropsWithChildren): React.JSX.Element {
@@ -15,12 +18,11 @@ function createWrapper(queryClient: QueryClient) {
 }
 
 function createRepositoryStatusQueryKey() {
-  return [
-    "session-repository-status",
-    "sbi_test",
-    "/root/acme/repo-1",
-    "2026-04-22T00:00:00.000Z",
-  ] as const;
+  return getSessionRepositoryStatusQueryKey({
+    connectedAtIso: "2026-04-22T00:00:00.000Z",
+    sandboxInstanceId: "sbi_test",
+    cwd: "/root/acme/repo-1",
+  });
 }
 
 describe("useSessionRepositoryStatus", () => {

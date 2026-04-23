@@ -29,6 +29,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+export function getSessionRepositoryStatusQueryKey(input: {
+  connectedAtIso: string | null;
+  sandboxInstanceId: string | null;
+  cwd: string | null;
+}) {
+  return [
+    SessionRepositoryStatusQueryKeyPrefix,
+    input.sandboxInstanceId,
+    input.cwd,
+    input.connectedAtIso,
+  ] as const;
+}
+
 function isNotGitRepositoryResult(input: { exitCode: number; stderr: string }): boolean {
   return (
     input.exitCode === 128 && /not a git repository|not in a git directory/i.test(input.stderr)
@@ -224,12 +237,11 @@ export function useSessionRepositoryStatus(input: {
   const lastRefreshEpochRef = useRef(input.refreshEpoch);
   const queryKey = useMemo(
     () =>
-      [
-        SessionRepositoryStatusQueryKeyPrefix,
-        input.sandboxInstanceId,
-        input.cwd,
-        input.connectedAtIso,
-      ] as const,
+      getSessionRepositoryStatusQueryKey({
+        connectedAtIso: input.connectedAtIso,
+        sandboxInstanceId: input.sandboxInstanceId,
+        cwd: input.cwd,
+      }),
     [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
   );
   const selectionIdentity = useMemo(() => queryKey.join("::"), [queryKey]);
