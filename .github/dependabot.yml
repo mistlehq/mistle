@@ -5,6 +5,16 @@ updates:
     schedule:
       interval: daily
     versioning-strategy: increase
+    groups:
+      react-runtime:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      rjsf:
+        patterns:
+          - "@rjsf/*"
     ignore:
       - dependency-name: "@types/node"
         update-types:
