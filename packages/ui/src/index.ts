@@ -63,4 +63,3 @@ export * from "./components/ui/toggle-group.js";
 export * from "./components/ui/toggle.js";
 export * from "./components/ui/tooltip.js";
 export { cn } from "./lib/utils.js";
-export { toast } from "sonner";

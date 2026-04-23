@@ -1,3 +1,4 @@
+import { Toaster } from "@mistle/ui";
 import type { Decorator } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router";
 
@@ -15,6 +16,7 @@ export const withDashboardPageStory: Decorator = (Story): React.JSX.Element => {
   return (
     <div className="min-h-screen">
       <Story />
+      <Toaster position="top-right" />
     </div>
   );
 };

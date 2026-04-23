@@ -220,6 +220,12 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           });
         }}
         onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
+          const previousDisplayedConnectionId = resolveProviderDisplayedConnectionId({
+            provider:
+              providers.find((candidate) => candidate.providerFamily === providerFamily) ?? null,
+            selectedConnectionIdByProviderFamily,
+          });
+
           setSelectedConnectionIdByProviderFamily((current) => ({
             ...current,
             [providerFamily]: integrationConnectionId,
@@ -231,11 +237,13 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
               integrationConnectionId,
             });
           } catch (error) {
-            setSelectedConnectionIdByProviderFamily((current) => {
-              const next = { ...current };
-              delete next[providerFamily];
-              return next;
-            });
+            setSelectedConnectionIdByProviderFamily((current) =>
+              restoreSelectedConnectionDraft({
+                current,
+                providerFamily,
+                selectedConnectionId: previousDisplayedConnectionId,
+              }),
+            );
 
             throw error;
           }
@@ -270,21 +278,6 @@ function resolveLoadErrorMessage(input: {
   }
 
   return null;
-}
-
-export function buildProviderCard(input: {
-  configuringProviderFamily: string | null;
-  statusUpdatingProviderFamily: string | null;
-  provider: OrganizationIdentityLinkProvider;
-  providerLinksQuery: {
-    data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
-    isPending: boolean;
-    isError: boolean;
-    error: unknown;
-  } | null;
-  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
-}): OrganizationIdentityLinkingProviderRow {
-  return buildProviderRow(input);
 }
 
 export function buildProviderRow(input: {
@@ -343,6 +336,43 @@ export function buildProviderRow(input: {
         }),
         updatedAt: link.updatedAt,
       })) ?? [],
+  };
+}
+
+function resolveProviderDisplayedConnectionId(input: {
+  provider: OrganizationIdentityLinkProvider | null;
+  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
+}): string | null {
+  if (input.provider === null) {
+    return null;
+  }
+
+  const eligibleConnections = listEligibleIdentityLinkConnections({
+    provider: input.provider,
+  });
+
+  return resolveSelectedConnectionId({
+    draftSelectedConnectionId:
+      input.selectedConnectionIdByProviderFamily[input.provider.providerFamily],
+    eligibleConnections,
+    selectedConnectionId: input.provider.selectedConnection?.id ?? null,
+  });
+}
+
+function restoreSelectedConnectionDraft(input: {
+  current: Readonly<Record<string, string | undefined>>;
+  providerFamily: string;
+  selectedConnectionId: string | null;
+}): Readonly<Record<string, string | undefined>> {
+  if (input.selectedConnectionId === null) {
+    const next = { ...input.current };
+    delete next[input.providerFamily];
+    return next;
+  }
+
+  return {
+    ...input.current,
+    [input.providerFamily]: input.selectedConnectionId,
   };
 }
 

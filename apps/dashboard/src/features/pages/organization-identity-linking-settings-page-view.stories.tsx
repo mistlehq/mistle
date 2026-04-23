@@ -1,7 +1,9 @@
 import { systemSleeper } from "@mistle/time";
+import { toast } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
@@ -102,26 +104,9 @@ function StatefulPrototype(
   args: Omit<
     React.ComponentProps<typeof OrganizationIdentityLinkingSettingsPageView>,
     "onEnabledChange" | "onProviderConnectionChange"
-  > & {
-    initiallyOpenLinkedUsersProviderFamily?: string;
-  },
+  >,
 ): React.JSX.Element {
   const [providers, setProviders] = useState(args.providers);
-
-  useEffect(() => {
-    if (args.initiallyOpenLinkedUsersProviderFamily === undefined) {
-      return;
-    }
-
-    const button = document.querySelector<HTMLButtonElement>(
-      `[aria-label="View ${resolveProviderDisplayName({
-        providerFamily: args.initiallyOpenLinkedUsersProviderFamily,
-        providers,
-      })} linked users"]`,
-    );
-
-    button?.click();
-  }, [args.initiallyOpenLinkedUsersProviderFamily, providers]);
 
   return (
     <OrganizationIdentityLinkingSettingsPageView
@@ -220,7 +205,6 @@ export const NoProvidersAvailable: Story = {
 
 export const LinkedUsersDialogError: Story = {
   args: {
-    initiallyOpenLinkedUsersProviderFamily: "github",
     providers: [
       {
         ...BaseProviders[0],
@@ -230,14 +214,91 @@ export const LinkedUsersDialogError: Story = {
       },
     ],
   },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "View GitHub linked users" }));
+  },
 };
 
-function resolveProviderDisplayName(input: {
-  providerFamily: string;
-  providers: readonly OrganizationIdentityLinkingProviderRow[];
-}): string {
-  return (
-    input.providers.find((provider) => provider.providerFamily === input.providerFamily)
-      ?.displayName ?? input.providerFamily
-  );
-}
+export const ConnectionSaveErrorToast: Story = {
+  render: (args) => {
+    function FailurePrototype(): React.JSX.Element {
+      const [providers, setProviders] = useState(args.providers);
+
+      return (
+        <OrganizationIdentityLinkingSettingsPageView
+          {...args}
+          onEnabledChange={async ({ providerFamily, enabled }) => {
+            setProviders((currentProviders) =>
+              currentProviders.map((provider) =>
+                provider.providerFamily !== providerFamily
+                  ? provider
+                  : {
+                      ...provider,
+                      enablePending: true,
+                    },
+              ),
+            );
+
+            await wait(500);
+
+            setProviders((currentProviders) =>
+              currentProviders.map((provider) =>
+                provider.providerFamily !== providerFamily
+                  ? provider
+                  : {
+                      ...provider,
+                      enablePending: false,
+                      enabled,
+                    },
+              ),
+            );
+          }}
+          onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
+            const previousSelection =
+              providers.find((provider) => provider.providerFamily === providerFamily)
+                ?.selectedConnectionId ?? null;
+
+            setProviders((currentProviders) =>
+              currentProviders.map((provider) =>
+                provider.providerFamily !== providerFamily
+                  ? provider
+                  : {
+                      ...provider,
+                      selectedConnectionId: integrationConnectionId,
+                      connectionPending: true,
+                    },
+              ),
+            );
+
+            await wait(500);
+
+            setProviders((currentProviders) =>
+              currentProviders.map((provider) =>
+                provider.providerFamily !== providerFamily
+                  ? provider
+                  : {
+                      ...provider,
+                      selectedConnectionId: previousSelection,
+                      connectionPending: false,
+                    },
+              ),
+            );
+
+            toast.error("Could not save identity-linking provider configuration.");
+          }}
+          providers={providers}
+        />
+      );
+    }
+
+    return <FailurePrototype />;
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("combobox", { name: "GitHub connection" }));
+    await userEvent.click(canvas.getByRole("option", { name: "GitHub Platform" }));
+  },
+};

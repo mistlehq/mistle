@@ -47,3 +47,4 @@ const Toaster = ({ theme: themeProp, ...props }: ToasterProps) => {
 };
 
 export { Toaster };
+export { toast } from "sonner";
