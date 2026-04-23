@@ -254,14 +254,9 @@ async function startGitBranchTunnelServer(): Promise<{
             } else {
               stdout = `${gitDir}\n`;
             }
-          } else if (
-            command === "sh" &&
-            args.length === 2 &&
-            args[0] === "-lc" &&
-            args[1] === "command -v gh"
-          ) {
+          } else if (command === "gh" && args.length === 1 && args[0] === "--version") {
             if (gitHubCliAvailabilityByCwd.get(controlMessage.channel.cwd) === true) {
-              stdout = "/usr/local/bin/gh\n";
+              stdout = "gh version 2.76.2\n";
             } else {
               exitCode = 127;
               stderr = "gh: not found";

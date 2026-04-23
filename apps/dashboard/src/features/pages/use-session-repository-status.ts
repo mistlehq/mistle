@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const RepositoryStatusCommandTimeoutMs = 5_000;
+const SessionRepositoryStatusQueryKeyPrefix = "session-repository-status";
 
 export type SessionPullRequestSummary = {
   isDraft: boolean;
@@ -14,60 +15,18 @@ export type SessionPullRequestSummary = {
   url: string;
 };
 
-type RepositoryStatusSnapshot = {
+export type SessionRepositoryStatus = {
   branchLabel: string | null;
   pullRequest: SessionPullRequestSummary | null;
 };
 
-type SessionRepositoryStatus = {
-  branchLabel: string | null;
-  pullRequest: SessionPullRequestSummary | null;
+const EmptyRepositoryStatus: SessionRepositoryStatus = {
+  branchLabel: null,
+  pullRequest: null,
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function toSessionRepositoryStatusIdentity(input: {
-  connectedAtIso: string | null;
-  refreshEpoch: number;
-  sandboxInstanceId: string | null;
-  cwd: string | null;
-}): string {
-  return [
-    input.sandboxInstanceId ?? "",
-    input.cwd ?? "",
-    input.connectedAtIso ?? "",
-    String(input.refreshEpoch),
-  ].join("::");
-}
-
-export function buildRepositoryStatusExecRequest(input: {
-  args: string[];
-  command: string;
-  cwd: string;
-}): ExecCommandRequest {
-  return {
-    args: input.args,
-    command: input.command,
-    cwd: input.cwd,
-    timeoutMs: RepositoryStatusCommandTimeoutMs,
-  };
-}
-
-export function getSessionRepositoryStatusQueryKey(input: {
-  connectedAtIso: string | null;
-  refreshEpoch: number;
-  sandboxInstanceId: string | null;
-  cwd: string | null;
-}): readonly ["session-repository-status", string | null, string | null, string | null, number] {
-  return [
-    "session-repository-status",
-    input.sandboxInstanceId,
-    input.cwd,
-    input.connectedAtIso,
-    input.refreshEpoch,
-  ];
 }
 
 function isNotGitRepositoryResult(input: { exitCode: number; stderr: string }): boolean {
@@ -95,13 +54,12 @@ async function runRepositoryStatusCommand(input: {
   const exec = new ExecStreamClient({
     transport,
   });
-  const result = await exec.run(
-    buildRepositoryStatusExecRequest({
-      args: input.args,
-      command: input.command,
-      cwd: input.cwd,
-    }),
-  );
+  const result = await exec.run({
+    args: input.args,
+    command: input.command,
+    cwd: input.cwd,
+    timeoutMs: RepositoryStatusCommandTimeoutMs,
+  } satisfies ExecCommandRequest);
 
   if (result.exitCode !== 0) {
     if (
@@ -140,16 +98,16 @@ async function isGitHubCliAvailable(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<boolean> {
-  const commandPath = await runRepositoryStatusCommand({
-    args: ["-lc", "command -v gh"],
+  const ghVersion = await runRepositoryStatusCommand({
+    args: ["--version"],
     classifyCommandUnavailableResult: true,
-    command: "sh",
+    command: "gh",
     cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
-  return commandPath !== null;
+  return ghVersion !== null;
 }
 
 function parsePullRequestSummary(output: string): SessionPullRequestSummary {
@@ -187,7 +145,7 @@ async function loadSessionRepositoryStatus(input: {
   cwd: string;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
-}): Promise<RepositoryStatusSnapshot> {
+}): Promise<SessionRepositoryStatus> {
   const gitDirectory = await runRepositoryStatusCommand({
     args: ["rev-parse", "--absolute-git-dir"],
     classifyNotGitRepositoryResult: true,
@@ -198,10 +156,7 @@ async function loadSessionRepositoryStatus(input: {
   });
 
   if (gitDirectory === null) {
-    return {
-      branchLabel: null,
-      pullRequest: null,
-    };
+    return EmptyRepositoryStatus;
   }
 
   const branchLabel = await runRepositoryStatusCommand({
@@ -213,10 +168,7 @@ async function loadSessionRepositoryStatus(input: {
   });
 
   if (branchLabel === null) {
-    return {
-      branchLabel: null,
-      pullRequest: null,
-    };
+    return EmptyRepositoryStatus;
   }
 
   if (
@@ -269,26 +221,18 @@ export function useSessionRepositoryStatus(input: {
   const isRepositoryStatusTrackingEnabled =
     input.enabled && input.sandboxInstanceId !== null && input.cwd !== null;
   const lastSelectionIdentityRef = useRef<string | null>(null);
+  const lastRefreshEpochRef = useRef(input.refreshEpoch);
   const queryKey = useMemo(
     () =>
-      getSessionRepositoryStatusQueryKey({
-        connectedAtIso: input.connectedAtIso,
-        refreshEpoch: input.refreshEpoch,
-        sandboxInstanceId: input.sandboxInstanceId,
-        cwd: input.cwd,
-      }),
-    [input.connectedAtIso, input.cwd, input.refreshEpoch, input.sandboxInstanceId],
+      [
+        SessionRepositoryStatusQueryKeyPrefix,
+        input.sandboxInstanceId,
+        input.cwd,
+        input.connectedAtIso,
+      ] as const,
+    [input.connectedAtIso, input.cwd, input.sandboxInstanceId],
   );
-  const selectionIdentity = useMemo(
-    () =>
-      toSessionRepositoryStatusIdentity({
-        connectedAtIso: input.connectedAtIso,
-        refreshEpoch: input.refreshEpoch,
-        sandboxInstanceId: input.sandboxInstanceId,
-        cwd: input.cwd,
-      }),
-    [input.connectedAtIso, input.cwd, input.refreshEpoch, input.sandboxInstanceId],
-  );
+  const selectionIdentity = useMemo(() => queryKey.join("::"), [queryKey]);
   const [freshSelectionIdentity, setFreshSelectionIdentity] = useState<string | null>(null);
   const query = useQuery({
     enabled: isRepositoryStatusTrackingEnabled,
@@ -298,10 +242,7 @@ export function useSessionRepositoryStatus(input: {
       const cwd = input.cwd;
 
       if (sandboxInstanceId === null || cwd === null) {
-        return {
-          branchLabel: null,
-          pullRequest: null,
-        } satisfies RepositoryStatusSnapshot;
+        return EmptyRepositoryStatus;
       }
 
       return await loadSessionRepositoryStatus({
@@ -334,7 +275,7 @@ export function useSessionRepositoryStatus(input: {
     const previousSelectionIdentity = lastSelectionIdentityRef.current;
     lastSelectionIdentityRef.current = selectionIdentity;
     const hasCachedSelectionData =
-      queryClient.getQueryData<RepositoryStatusSnapshot>(queryKey) !== undefined;
+      queryClient.getQueryData<SessionRepositoryStatus>(queryKey) !== undefined;
     if (
       previousSelectionIdentity !== null &&
       previousSelectionIdentity !== selectionIdentity &&
@@ -343,6 +284,20 @@ export function useSessionRepositoryStatus(input: {
       void query.refetch();
     }
   }, [isRepositoryStatusTrackingEnabled, query, queryClient, queryKey, selectionIdentity]);
+
+  useEffect(() => {
+    if (!isRepositoryStatusTrackingEnabled) {
+      lastRefreshEpochRef.current = input.refreshEpoch;
+      return;
+    }
+
+    if (lastRefreshEpochRef.current === input.refreshEpoch) {
+      return;
+    }
+
+    lastRefreshEpochRef.current = input.refreshEpoch;
+    void query.refetch();
+  }, [input.refreshEpoch, isRepositoryStatusTrackingEnabled, query]);
 
   useEffect(() => {
     if (!isRepositoryStatusTrackingEnabled || (!query.isFetchedAfterMount && !query.isError)) {
@@ -367,5 +322,3 @@ export function useSessionRepositoryStatus(input: {
     pullRequest: shouldHideRepositoryStatus ? null : (query.data?.pullRequest ?? null),
   };
 }
-
-export { RepositoryStatusCommandTimeoutMs };
