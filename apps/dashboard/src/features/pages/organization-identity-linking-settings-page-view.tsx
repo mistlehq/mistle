@@ -48,7 +48,6 @@ export type OrganizationIdentityLinkingProviderRow = {
 
 export type OrganizationIdentityLinkingSettingsPageViewProps = {
   loadErrorMessage: string | null;
-  pageErrorMessage: string | null;
   providers: readonly OrganizationIdentityLinkingProviderRow[];
   onProviderConnectionChange: (input: {
     providerFamily: string;
@@ -96,9 +95,6 @@ export function OrganizationIdentityLinkingSettingsPageView(
   return (
     <>
       <FormPageStack>
-        {props.pageErrorMessage === null ? null : (
-          <Notice variant="alert">{props.pageErrorMessage}</Notice>
-        )}
         <div className="border-y bg-white">
           <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_180px_88px] gap-4 border-b px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground uppercase md:grid">
             <div>Integration</div>

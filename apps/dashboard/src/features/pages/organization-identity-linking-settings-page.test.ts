@@ -5,7 +5,6 @@ import { buildProviderCard } from "./organization-identity-linking-settings-page
 describe("buildProviderCard", () => {
   it("returns an autosave row model when the selected connection differs from the saved config", () => {
     const providerCard = buildProviderCard({
-      actionErrorMessageByProviderFamily: {},
       configuringProviderFamily: null,
       statusUpdatingProviderFamily: null,
       provider: {

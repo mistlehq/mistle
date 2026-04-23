@@ -174,7 +174,6 @@ const meta = {
   render: StatefulPrototype,
   args: {
     loadErrorMessage: null,
-    pageErrorMessage: null,
     onEnabledChange: async () => {},
     onProviderConnectionChange: async () => {},
     providers: BaseProviders,
@@ -199,12 +198,6 @@ export const LoadError: Story = {
 export const NoProvidersAvailable: Story = {
   args: {
     providers: [],
-  },
-};
-
-export const PageError: Story = {
-  args: {
-    pageErrorMessage: "Could not update GitHub identity-linking settings.",
   },
 };
 

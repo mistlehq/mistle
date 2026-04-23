@@ -1,3 +1,4 @@
+import { toast } from "@mistle/ui";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { data, useSearchParams } from "react-router";
@@ -42,9 +43,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   const [selectedConnectionIdByProviderFamily, setSelectedConnectionIdByProviderFamily] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
-  const [actionErrorMessageByProviderFamily, setActionErrorMessageByProviderFamily] = useState<
-    Readonly<Record<string, string | undefined>>
-  >({});
   const [configuringProviderFamily, setConfiguringProviderFamily] = useState<string | null>(null);
   const [statusUpdatingProviderFamily, setStatusUpdatingProviderFamily] = useState<string | null>(
     null,
@@ -73,10 +71,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       configureOrganizationIdentityLinkProvider(input),
     onMutate: async (input) => {
       setConfiguringProviderFamily(input.providerFamily);
-      setActionErrorMessageByProviderFamily((current) => ({
-        ...current,
-        [input.providerFamily]: undefined,
-      }));
     },
     onSuccess: async () => {
       await Promise.all([
@@ -85,14 +79,13 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
         }),
       ]);
     },
-    onError: (error, input) => {
-      setActionErrorMessageByProviderFamily((current) => ({
-        ...current,
-        [input.providerFamily]: resolveApiErrorMessage({
+    onError: (error) => {
+      toast.error(
+        resolveApiErrorMessage({
           error,
           fallbackMessage: "Could not save identity-linking provider configuration.",
         }),
-      }));
+      );
     },
     onSettled: () => {
       setConfiguringProviderFamily(null);
@@ -104,24 +97,19 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       putOrganizationIdentityLinkProviderStatus(input),
     onMutate: async (input) => {
       setStatusUpdatingProviderFamily(input.providerFamily);
-      setActionErrorMessageByProviderFamily((current) => ({
-        ...current,
-        [input.providerFamily]: undefined,
-      }));
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
       });
     },
-    onError: (error, input) => {
-      setActionErrorMessageByProviderFamily((current) => ({
-        ...current,
-        [input.providerFamily]: resolveApiErrorMessage({
+    onError: (error) => {
+      toast.error(
+        resolveApiErrorMessage({
           error,
           fallbackMessage: "Could not update identity-linking provider status.",
         }),
-      }));
+      );
     },
     onSettled: () => {
       setStatusUpdatingProviderFamily(null);
@@ -225,7 +213,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           canManage,
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
-        pageErrorMessage={resolvePageErrorMessage(actionErrorMessageByProviderFamily)}
         onEnabledChange={async ({ providerFamily, enabled }) => {
           await statusMutation.mutateAsync({
             providerFamily,
@@ -255,7 +242,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
         }}
         providers={providers.map((provider) =>
           buildProviderRow({
-            actionErrorMessageByProviderFamily,
             configuringProviderFamily,
             statusUpdatingProviderFamily,
             provider,
@@ -287,7 +273,6 @@ function resolveLoadErrorMessage(input: {
 }
 
 export function buildProviderCard(input: {
-  actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>;
   configuringProviderFamily: string | null;
   statusUpdatingProviderFamily: string | null;
   provider: OrganizationIdentityLinkProvider;
@@ -302,20 +287,7 @@ export function buildProviderCard(input: {
   return buildProviderRow(input);
 }
 
-function resolvePageErrorMessage(
-  actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>,
-): string | null {
-  for (const errorMessage of Object.values(actionErrorMessageByProviderFamily)) {
-    if (errorMessage !== undefined) {
-      return errorMessage;
-    }
-  }
-
-  return null;
-}
-
 export function buildProviderRow(input: {
-  actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>;
   configuringProviderFamily: string | null;
   statusUpdatingProviderFamily: string | null;
   provider: OrganizationIdentityLinkProvider;
