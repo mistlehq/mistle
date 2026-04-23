@@ -4,6 +4,7 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions/serv
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { Pool } from "pg";
 
+import { logger } from "./logger.js";
 import { createControlPlaneBackend, createControlPlaneOpenWorkflow } from "./openworkflow.js";
 import type { ControlPlaneApiConfig } from "./types.js";
 
@@ -21,6 +22,14 @@ export async function createAppResources(
 ): Promise<AppRuntimeResources> {
   const dbPool = new Pool({
     connectionString: config.database.url,
+  });
+  dbPool.on("error", (error) => {
+    const code = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined;
+    if (code === "57P01") {
+      return;
+    }
+
+    logger.error({ err: error }, "Unexpected idle control-plane Postgres client error");
   });
   const db = createControlPlaneDatabase(dbPool);
   const objectStore = new S3CompatibleObjectStore({
