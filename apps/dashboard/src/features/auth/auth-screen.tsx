@@ -1,10 +1,10 @@
-import { Separator } from "@mistle/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router";
 
 import { getDashboardGoogleAuthMethodEnabled } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
+import { InlineDividerLabel } from "../shared/inline-divider-label.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
   createStateForDifferentEmail,
@@ -151,11 +151,7 @@ export function AuthScreen(): React.JSX.Element {
 
   const emailStageAfterForm = hasGoogleAuthMethod ? (
     <div className="gap-4 pt-1 flex flex-col">
-      <div className="items-center gap-4 flex">
-        <Separator className="flex-1" />
-        <p className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">Or</p>
-        <Separator className="flex-1" />
-      </div>
+      <InlineDividerLabel label="Or" />
       <GoogleSignInButton isPending={isSigningInWithGoogle} onClick={handleSignInWithGoogle} />
     </div>
   ) : undefined;

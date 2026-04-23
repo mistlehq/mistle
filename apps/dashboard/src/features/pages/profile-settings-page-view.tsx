@@ -13,7 +13,6 @@ import {
   FieldLabel,
   Input,
   Notice,
-  Separator,
   Spinner,
   Textarea,
 } from "@mistle/ui";
@@ -31,6 +30,7 @@ import type {
 import { ActionTile } from "../shared/action-tile.js";
 import { getErrorMessage } from "../shared/auto-save-behavior.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { InlineDividerLabel } from "../shared/inline-divider-label.js";
 import { SettingsImageField } from "../shared/settings-image-field.js";
 
 export type ProfileSettingsPageViewProps = {
@@ -561,13 +561,7 @@ function LinkedAccountCard(input: {
                   <Notice variant="alert">{commitSigningDialogErrorMessage}</Notice>
                 )}
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-4">
-                    <Separator className="flex-1" />
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                      or
-                    </span>
-                    <Separator className="flex-1" />
-                  </div>
+                  <InlineDividerLabel label="Or" />
                   <input
                     aria-label={`Choose ${input.linkedAccountCard.displayName} commit signing private key file`}
                     className="hidden"

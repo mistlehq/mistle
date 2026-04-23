@@ -1,9 +1,9 @@
-import { Separator } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, within } from "storybook/test";
 
 import { withDashboardMemoryRouter, withDashboardPageStory } from "../../storybook/decorators.js";
+import { InlineDividerLabel } from "../shared/inline-divider-label.js";
 import { AuthScreenView } from "./auth-screen-view.js";
 import { GoogleSignInButton } from "./google-sign-in-button.js";
 
@@ -66,13 +66,7 @@ export const GoogleEnabled: Story = {
   args: {
     emailStageAfterForm: (
       <div className="gap-4 pt-1 flex flex-col">
-        <div className="items-center gap-4 flex">
-          <Separator className="flex-1" />
-          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
-            Or
-          </div>
-          <Separator className="flex-1" />
-        </div>
+        <InlineDividerLabel label="Or" />
         <GoogleSignInButton isPending={false} onClick={async () => {}} />
       </div>
     ),
@@ -84,13 +78,7 @@ export const GoogleRedirecting: Story = {
   args: {
     emailStageAfterForm: (
       <div className="gap-4 pt-1 flex flex-col">
-        <div className="items-center gap-4 flex">
-          <Separator className="flex-1" />
-          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
-            Or
-          </div>
-          <Separator className="flex-1" />
-        </div>
+        <InlineDividerLabel label="Or" />
         <GoogleSignInButton isPending={true} onClick={async () => {}} />
       </div>
     ),
@@ -103,13 +91,7 @@ export const GoogleCallbackError: Story = {
     authError: "Google sign-in was cancelled.",
     emailStageAfterForm: (
       <div className="gap-4 pt-1 flex flex-col">
-        <div className="items-center gap-4 flex">
-          <Separator className="flex-1" />
-          <div className="text-muted-foreground text-xs font-medium uppercase tracking-[0.2em]">
-            Or
-          </div>
-          <Separator className="flex-1" />
-        </div>
+        <InlineDividerLabel label="Or" />
         <GoogleSignInButton isPending={false} onClick={async () => {}} />
       </div>
     ),
