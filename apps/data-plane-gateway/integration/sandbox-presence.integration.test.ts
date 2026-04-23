@@ -191,6 +191,23 @@ async function waitForPresenceState(input: {
   throw new Error(`Timed out waiting for sandbox presence state for '${input.sandboxInstanceId}'.`);
 }
 
+async function waitForLeaseRemoval(input: {
+  client: ReturnType<typeof createValkeyClient>;
+  key: string;
+}): Promise<void> {
+  const deadline = Date.now() + 5_000;
+
+  while (Date.now() < deadline) {
+    if ((await input.client.exists(input.key)) === 0) {
+      return;
+    }
+
+    await systemSleeper.sleep(50);
+  }
+
+  throw new Error(`Timed out waiting for sandbox presence lease removal for '${input.key}'.`);
+}
+
 async function closeSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
   if (socket === undefined) {
     return;
@@ -283,18 +300,11 @@ describe("sandbox presence integration", () => {
         await closeWebSocket(firstConnectionSocket);
 
         await expect(
-          waitForPresenceState({
-            fixture,
-            predicate: (hasActiveLease) => hasActiveLease,
-            sandboxInstanceId,
-            store,
+          waitForLeaseRemoval({
+            client,
+            key: detailKeyForLease(sandboxInstanceId, firstLeaseId),
           }),
-        ).resolves.toBe(true);
-
-        const firstLeaseRemoved = await client.exists(
-          detailKeyForLease(sandboxInstanceId, firstLeaseId),
-        );
-        expect(firstLeaseRemoved).toBe(0);
+        ).resolves.toBeUndefined();
 
         await expect(
           waitForPresenceState({
