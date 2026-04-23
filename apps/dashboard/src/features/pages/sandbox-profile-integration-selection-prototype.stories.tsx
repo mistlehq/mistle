@@ -1,6 +1,8 @@
 import {
   Badge,
   Button,
+  Checkbox,
+  SectionBlock,
   Select,
   SelectContent,
   SelectItem,
@@ -46,6 +48,20 @@ type IntegrationChoice = {
   logoKey: string | undefined;
   title: React.ReactNode;
   typeLabel: string;
+};
+
+type RepositoryOption = {
+  id: string;
+  label: string;
+};
+
+type ToolOption = {
+  id: string;
+  label: string;
+};
+
+type SandboxProfileIntegrationSelectionPrototypeStoryProps = {
+  initialTab?: PrototypeTabValue;
 };
 
 const NoIntegrationValue = "none";
@@ -274,6 +290,30 @@ const GitHubCredentialChoice: IntegrationChoice = {
 const GitProviderChoices = [GitHubCredentialChoice] as const;
 const DefaultGitHubConnectionId = GitHubCredentialChoice.availableConnections?.[0]?.id;
 
+const RepositoryOptionsByConnectionId: Readonly<Record<string, readonly RepositoryOption[]>> = {
+  "github-production": [
+    { id: "mistlehq/customer-support", label: "mistlehq/customer-support" },
+    { id: "mistlehq/agent-runbooks", label: "mistlehq/agent-runbooks" },
+    { id: "mistlehq/escalations", label: "mistlehq/escalations" },
+  ],
+  "github-staging": [
+    { id: "mistlehq/sandbox-playground", label: "mistlehq/sandbox-playground" },
+    { id: "mistlehq/staging-docs", label: "mistlehq/staging-docs" },
+  ],
+};
+
+const ToolOptionsByIntegrationId: Readonly<Record<string, readonly ToolOption[]>> = {
+  github: [{ id: "github-cli", label: "GitHub CLI" }],
+  [StoryLinearTarget.targetKey]: [{ id: "linear-mcp", label: "Linear MCP" }],
+  [StorySlackTarget.targetKey]: [{ id: "slack-mcp", label: "Slack MCP" }],
+  [StoryJiraTarget.targetKey]: [{ id: "jira-cli", label: "Jira CLI" }],
+  [StoryAwsTarget.targetKey]: [{ id: "aws-cli", label: "AWS CLI" }],
+  [StoryPlanetScaleTarget.targetKey]: [
+    { id: "planetscale-mcp", label: "PlanetScale MCP" },
+    { id: "planetscale-insights-mcp", label: "PlanetScale Insights MCP" },
+  ],
+};
+
 function AddConnectorTile(input: {
   item: IntegrationChoice;
   onAdd: (connectorId: string) => void;
@@ -310,9 +350,58 @@ function AddConnectorTile(input: {
   );
 }
 
-function SandboxProfileIntegrationSelectionPrototypeStory(): React.JSX.Element {
+function ToolSelectionRow(input: {
+  integration: IntegrationChoice;
+  connectionLabel: string;
+  selectedToolIds: ReadonlySet<string>;
+  onToolToggle: (toolId: string, checked: boolean) => void;
+}): React.JSX.Element {
+  const leading =
+    input.integration.logoKey === undefined ? null : (
+      <img
+        alt=""
+        className="h-5 w-5 rounded-sm"
+        src={resolveIntegrationLogoPath({ logoKey: input.integration.logoKey })}
+      />
+    );
+  const toolOptions = ToolOptionsByIntegrationId[input.integration.id] ?? [];
+
+  return (
+    <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-6 border-b py-4">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm">
+          {leading}
+          <div className="min-w-0 truncate font-medium">{input.integration.title}</div>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className="text-muted-foreground text-sm">{input.connectionLabel}</p>
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-col gap-2">
+          {toolOptions.map((tool) => (
+            <label className="flex items-center gap-2 text-sm" key={tool.id}>
+              <Checkbox
+                aria-label={tool.label}
+                checked={input.selectedToolIds.has(tool.id)}
+                onCheckedChange={(checked) => {
+                  input.onToolToggle(tool.id, checked === true);
+                }}
+              />
+              <span>{tool.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SandboxProfileIntegrationSelectionPrototypeStory(
+  input: SandboxProfileIntegrationSelectionPrototypeStoryProps,
+): React.JSX.Element {
   const [profileName, setProfileName] = useState("Customer Support Sandbox");
-  const [activeTab, setActiveTab] = useState<PrototypeTabValue>("integrations");
+  const [activeTab, setActiveTab] = useState<PrototypeTabValue>(input.initialTab ?? "integrations");
   const [selectedGitProviderId, setSelectedGitProviderId] = useState(GitHubChoice.id);
   const [selectedConnections, setSelectedConnections] = useState<Readonly<Record<string, string>>>({
     codex: "openai-primary",
@@ -320,12 +409,37 @@ function SandboxProfileIntegrationSelectionPrototypeStory(): React.JSX.Element {
     [StoryLinearTarget.targetKey]: "linear-workspace",
     [StorySlackTarget.targetKey]: "slack-workspace",
   });
+  const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<readonly string[]>(
+    DefaultGitHubConnectionId === undefined
+      ? []
+      : [RepositoryOptionsByConnectionId[DefaultGitHubConnectionId]?.[0]?.id].filter(
+          (value): value is string => value !== undefined,
+        ),
+  );
+  const [selectedToolIdsByIntegrationId, setSelectedToolIdsByIntegrationId] = useState<
+    Readonly<Record<string, readonly string[]>>
+  >({
+    github: ["github-cli"],
+    [StoryLinearTarget.targetKey]: ["linear-mcp"],
+    [StorySlackTarget.targetKey]: ["slack-mcp"],
+  });
 
   function setSelectedConnection(id: string, nextConnectionId: string): void {
     setSelectedConnections((currentChoices) => ({
       ...currentChoices,
       [id]: nextConnectionId,
     }));
+
+    if (id === GitHubChoice.id) {
+      const nextRepositoryIds = new Set(
+        (RepositoryOptionsByConnectionId[nextConnectionId] ?? []).map(
+          (repository) => repository.id,
+        ),
+      );
+      setSelectedRepositoryIds((currentRepositoryIds) =>
+        currentRepositoryIds.filter((repositoryId) => nextRepositoryIds.has(repositoryId)),
+      );
+    }
   }
 
   function addConnector(id: string): void {
@@ -346,6 +460,11 @@ function SandboxProfileIntegrationSelectionPrototypeStory(): React.JSX.Element {
       const nextChoices = { ...currentChoices };
       delete nextChoices[id];
       return nextChoices;
+    });
+    setSelectedToolIdsByIntegrationId((currentToolIdsByIntegrationId) => {
+      const nextToolIdsByIntegrationId = { ...currentToolIdsByIntegrationId };
+      delete nextToolIdsByIntegrationId[id];
+      return nextToolIdsByIntegrationId;
     });
   }
 
@@ -371,12 +490,58 @@ function SandboxProfileIntegrationSelectionPrototypeStory(): React.JSX.Element {
     }));
   }
 
+  function toggleRepository(repositoryId: string, checked: boolean): void {
+    setSelectedRepositoryIds((currentRepositoryIds) => {
+      if (checked) {
+        if (currentRepositoryIds.includes(repositoryId)) {
+          return currentRepositoryIds;
+        }
+        return [...currentRepositoryIds, repositoryId];
+      }
+      return currentRepositoryIds.filter(
+        (currentRepositoryId) => currentRepositoryId !== repositoryId,
+      );
+    });
+  }
+
+  function toggleTool(integrationId: string, toolId: string, checked: boolean): void {
+    setSelectedToolIdsByIntegrationId((currentToolIdsByIntegrationId) => {
+      const currentToolIds = currentToolIdsByIntegrationId[integrationId] ?? [];
+      const nextToolIds = checked
+        ? currentToolIds.includes(toolId)
+          ? currentToolIds
+          : [...currentToolIds, toolId]
+        : currentToolIds.filter((currentToolId) => currentToolId !== toolId);
+      return {
+        ...currentToolIdsByIntegrationId,
+        [integrationId]: nextToolIds,
+      };
+    });
+  }
+
   const selectedConnectorChoices = ConnectorChoices.filter(
     (item) => selectedConnections[item.id] !== undefined,
   );
   const addConnectorChoices = ConnectorChoices.filter(
     (item) => selectedConnections[item.id] === undefined,
   );
+  const selectedGitConnectionId =
+    selectedGitProviderId === NoIntegrationValue
+      ? undefined
+      : selectedConnections[selectedGitProviderId];
+  const selectedGitConnectionLabel = GitProviderChoices.find(
+    (choice) => choice.id === selectedGitProviderId,
+  )?.availableConnections?.find((connection) => connection.id === selectedGitConnectionId)?.label;
+  const repositoryOptions =
+    selectedGitConnectionId === undefined
+      ? []
+      : (RepositoryOptionsByConnectionId[selectedGitConnectionId] ?? []);
+  const toolRowChoices = [
+    ...(selectedGitProviderId === NoIntegrationValue ? [] : [GitHubCredentialChoice]),
+    ...selectedConnectorChoices.filter(
+      (item) => (ToolOptionsByIntegrationId[item.id] ?? []).length > 0,
+    ),
+  ];
 
   return (
     <PageFrame maxWidthClassName="max-w-5xl" title="">
@@ -539,8 +704,102 @@ function SandboxProfileIntegrationSelectionPrototypeStory(): React.JSX.Element {
               id="sandbox-profile-setup-panel-resources-and-tools"
               role="tabpanel"
             >
-              <div className="max-w-4xl rounded-md border p-4 text-sm text-muted-foreground">
-                Resources and tool selection will be configured here after integrations are chosen.
+              <div className="flex max-w-5xl flex-col gap-8">
+                {selectedGitConnectionId === undefined ? (
+                  <SectionBlock
+                    emptyState="Choose a Git provider in Integrations before selecting repository resources."
+                    title="Repository Resources"
+                  />
+                ) : (
+                  <SectionBlock title="Repository Resources">
+                    <div className="flex flex-col border-b">
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 border-b py-2 text-xs uppercase tracking-wide text-muted-foreground">
+                        <div className="min-w-0">
+                          <p>Integration</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p>Connection</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 border-b py-4">
+                        <div className="min-w-0">
+                          <IntegrationNameCell item={GitHubChoice} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-muted-foreground text-sm">
+                            {selectedGitConnectionLabel ?? "No connection selected"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-3 py-4">
+                        <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                          Repositories
+                        </p>
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          {repositoryOptions.map((repository) => (
+                            <label
+                              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                              key={repository.id}
+                            >
+                              <Checkbox
+                                aria-label={repository.label}
+                                checked={selectedRepositoryIds.includes(repository.id)}
+                                onCheckedChange={(checked) => {
+                                  toggleRepository(repository.id, checked === true);
+                                }}
+                              />
+                              <span>{repository.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </SectionBlock>
+                )}
+
+                {toolRowChoices.length === 0 ? (
+                  <SectionBlock
+                    emptyState="Choose integrations with CLI tools in Integrations before selecting tools here."
+                    title="CLI Tools"
+                  />
+                ) : (
+                  <SectionBlock title="CLI Tools">
+                    <div className="flex flex-col">
+                      <div className="text-muted-foreground grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-6 border-b py-2 text-xs uppercase tracking-wide">
+                        <div className="min-w-0">
+                          <p>Integration</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p>Connection</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p>Tools</p>
+                        </div>
+                      </div>
+                      {toolRowChoices.map((item) => {
+                        const selectedConnectionId = selectedConnections[item.id];
+                        const connectionLabel = item.availableConnections?.find(
+                          (connection) => connection.id === selectedConnectionId,
+                        )?.label;
+                        if (connectionLabel === undefined) {
+                          return null;
+                        }
+
+                        return (
+                          <ToolSelectionRow
+                            connectionLabel={connectionLabel}
+                            integration={item}
+                            key={item.id}
+                            onToolToggle={(toolId, checked) => {
+                              toggleTool(item.id, toolId, checked);
+                            }}
+                            selectedToolIds={new Set(selectedToolIdsByIntegrationId[item.id] ?? [])}
+                          />
+                        );
+                      })}
+                    </div>
+                  </SectionBlock>
+                )}
               </div>
             </div>
 
@@ -576,4 +835,20 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Integrations: Story = {
+  args: {
+    initialTab: "integrations",
+  },
+};
+
+export const ResourcesAndTools: Story = {
+  args: {
+    initialTab: "resources-and-tools",
+  },
+};
+
+export const Configurations: Story = {
+  args: {
+    initialTab: "configurations",
+  },
+};
