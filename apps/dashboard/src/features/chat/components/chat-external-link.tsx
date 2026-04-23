@@ -1,3 +1,4 @@
+import { cn, linkVariants } from "@mistle/ui";
 import type { CSSProperties, ReactNode } from "react";
 import { useState } from "react";
 
@@ -25,9 +26,11 @@ export function ChatExternalLink({
   return (
     <>
       <button
-        className={["appearance-none border-0 bg-transparent p-0 text-inherit", className]
-          .filter(Boolean)
-          .join(" ")}
+        className={cn(
+          linkVariants(),
+          "appearance-none border-0 bg-transparent p-0 text-inherit cursor-pointer",
+          className,
+        )}
         onClick={() => {
           setIsDialogOpen(true);
         }}

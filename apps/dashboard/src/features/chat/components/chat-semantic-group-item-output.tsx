@@ -127,7 +127,7 @@ export function ChatSemanticGroupItemOutput({
               }}
             >
               <ChatExternalLink
-                className="block w-full truncate text-left text-sm hover:underline"
+                className="block w-full truncate text-left text-sm"
                 href={result.url}
                 style={{
                   lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",

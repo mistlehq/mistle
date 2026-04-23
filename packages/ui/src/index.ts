@@ -33,6 +33,7 @@ export * from "./components/ui/inline-code.js";
 export * from "./components/ui/item.js";
 export * from "./components/ui/kbd.js";
 export * from "./components/ui/label.js";
+export * from "./components/ui/link.js";
 export * from "./components/ui/menubar.js";
 export * from "./components/ui/more-actions-menu.js";
 export * from "./components/ui/native-select.js";

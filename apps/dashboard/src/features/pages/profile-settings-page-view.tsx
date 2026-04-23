@@ -12,6 +12,7 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
+  Link,
   Notice,
   Spinner,
   Textarea,
@@ -514,14 +515,13 @@ function LinkedAccountCard(input: {
                       labelContent={
                         <>
                           Add the public key via{" "}
-                          <a
-                            className="text-primary cursor-default underline underline-offset-4"
+                          <Link
                             href="https://github.com/settings/keys"
                             rel="noreferrer"
                             target="_blank"
                           >
                             GitHub settings
-                          </a>{" "}
+                          </Link>{" "}
                           or via GH CLI:
                         </>
                       }

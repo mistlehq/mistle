@@ -88,7 +88,7 @@ export const SigningLocalGenerationHelperDialog: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Add private key" }));
     await userEvent.click(canvas.getByRole("button", { name: "Show helper" }));
 
-    await expect(canvas.getByText("Need a new signing key?")).toBeTruthy();
+    await expect(canvas.queryByText("Need a new signing key?")).toBeNull();
     await expect(canvas.getByText("Generate a SSH signing key with no passphrase")).toBeTruthy();
     await expect(canvas.getByText(/Add the public key via/)).toBeTruthy();
     await expect(
