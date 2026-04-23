@@ -2,34 +2,63 @@ import {
   Badge,
   Button,
   Checkbox,
-  SectionBlock,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldContent,
+  FieldHeader,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
-import { TrashIcon } from "@phosphor-icons/react";
+import { InfoIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type React from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { useIntegrationResourcePickerStoryState } from "../forms/integration-resource-picker-story-harness.js";
+import {
+  createGithubRepositoryResources,
+  RepositoryItems,
+} from "../forms/integration-resource-picker-story-support.js";
+import { IntegrationResourcePickerView } from "../forms/integration-resource-picker-view.js";
+import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { PageFrame } from "../shared/page-frame.js";
 import {
+  StoryAwsConnection,
   StoryAwsTarget,
   StoryDatadogTarget,
+  StoryGithubConnection,
   StoryGithubTarget,
+  StoryJiraConnection,
   StoryJiraTarget,
+  StoryLinearConnection,
   StoryLinearTarget,
   StoryOpenAiTarget,
   StoryPlanetScaleTarget,
   StorySignozTarget,
+  StorySlackConnection,
   StorySlackTarget,
 } from "./integrations-editor-section-story-support.js";
+import {
+  SandboxProfileBindingConfigEditor,
+  type IntegrationConnectionSummary,
+  type IntegrationTargetSummary,
+  type SandboxProfileBindingEditorRow,
+} from "./sandbox-profile-binding-config-editor.js";
+import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 
 const PrototypeTabs = [
   { value: "integrations", label: "Integrations" },
@@ -50,14 +79,22 @@ type IntegrationChoice = {
   typeLabel: string;
 };
 
-type RepositoryOption = {
+type ToolOption = {
   id: string;
   label: string;
 };
 
-type ToolOption = {
-  id: string;
+type IntegrationToolConfigSummary = {
   label: string;
+  value: string;
+};
+
+type ConfigurationEditorContext = {
+  integrationId: string;
+  title: string;
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
 };
 
 type SandboxProfileIntegrationSelectionPrototypeStoryProps = {
@@ -290,16 +327,14 @@ const GitHubCredentialChoice: IntegrationChoice = {
 const GitProviderChoices = [GitHubCredentialChoice] as const;
 const DefaultGitHubConnectionId = GitHubCredentialChoice.availableConnections?.[0]?.id;
 
-const RepositoryOptionsByConnectionId: Readonly<Record<string, readonly RepositoryOption[]>> = {
-  "github-production": [
-    { id: "mistlehq/customer-support", label: "mistlehq/customer-support" },
-    { id: "mistlehq/agent-runbooks", label: "mistlehq/agent-runbooks" },
-    { id: "mistlehq/escalations", label: "mistlehq/escalations" },
-  ],
-  "github-staging": [
-    { id: "mistlehq/sandbox-playground", label: "mistlehq/sandbox-playground" },
-    { id: "mistlehq/staging-docs", label: "mistlehq/staging-docs" },
-  ],
+const RepositoryItemsByConnectionId: Readonly<
+  Record<string, readonly IntegrationConnectionResource[]>
+> = {
+  "github-production": RepositoryItems,
+  "github-staging": createGithubRepositoryResources({
+    connectionId: "github-staging",
+    items: RepositoryItems.slice(0, 5),
+  }).items,
 };
 
 const ToolOptionsByIntegrationId: Readonly<Record<string, readonly ToolOption[]>> = {
@@ -311,6 +346,16 @@ const ToolOptionsByIntegrationId: Readonly<Record<string, readonly ToolOption[]>
   [StoryPlanetScaleTarget.targetKey]: [
     { id: "planetscale-mcp", label: "PlanetScale MCP" },
     { id: "planetscale-insights-mcp", label: "PlanetScale Insights MCP" },
+  ],
+};
+
+const ToolConfigSummaryByIntegrationId: Readonly<
+  Record<string, readonly IntegrationToolConfigSummary[]>
+> = {
+  [StoryAwsTarget.targetKey]: [
+    { label: "Services", value: "S3, STS, Secrets Manager" },
+    { label: "Regions", value: "us-east-1, us-west-2" },
+    { label: "Default region", value: "us-east-1" },
   ],
 };
 
@@ -351,8 +396,8 @@ function AddConnectorTile(input: {
 }
 
 function ToolSelectionRow(input: {
+  editAction?: React.ReactNode;
   integration: IntegrationChoice;
-  connectionLabel: string;
   selectedToolIds: ReadonlySet<string>;
   onToolToggle: (toolId: string, checked: boolean) => void;
 }): React.JSX.Element {
@@ -365,9 +410,10 @@ function ToolSelectionRow(input: {
       />
     );
   const toolOptions = ToolOptionsByIntegrationId[input.integration.id] ?? [];
+  const configSummary = ToolConfigSummaryByIntegrationId[input.integration.id] ?? [];
 
   return (
-    <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-6 border-b py-4">
+    <div className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-sm">
           {leading}
@@ -375,10 +421,19 @@ function ToolSelectionRow(input: {
         </div>
       </div>
       <div className="min-w-0">
-        <p className="text-muted-foreground text-sm">{input.connectionLabel}</p>
-      </div>
-      <div className="min-w-0">
         <div className="flex flex-col gap-2">
+          {configSummary.length === 0 ? null : (
+            <div className="mb-1 flex flex-col gap-2">
+              {configSummary.map((item) => (
+                <div className="flex flex-col gap-0.5" key={item.label}>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                    {item.label}
+                  </p>
+                  <p className="text-sm">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          )}
           {toolOptions.map((tool) => (
             <label className="flex items-center gap-2 text-sm" key={tool.id}>
               <Checkbox
@@ -393,7 +448,46 @@ function ToolSelectionRow(input: {
           ))}
         </div>
       </div>
+      <div className="flex w-8 shrink-0 items-start justify-end">{input.editAction}</div>
     </div>
+  );
+}
+
+function RepositoryResourcePicker(input: {
+  connectionId: string;
+  items: readonly IntegrationConnectionResource[];
+}): React.JSX.Element {
+  const storyState = useIntegrationResourcePickerStoryState({
+    items: input.items,
+    title: "Repositories",
+    refreshLabel: "Refresh repositories",
+    syncMetadata: "Last synced Mar 9, 2026, 12:00 PM",
+    emptyMessage: "No repositories available for this connection.",
+    initialSelectedHandles: input.items.slice(0, 2).map((item) => item.handle),
+  });
+
+  return (
+    <IntegrationResourcePickerView
+      emptyMessage={storyState.viewModel.emptyMessage}
+      id={`repository-resources-${input.connectionId}`}
+      isRefreshing={false}
+      label="Repositories"
+      listState={{ mode: "ready", items: storyState.visibleItems }}
+      onBlur={() => {}}
+      onFocus={() => {}}
+      onRefresh={() => {}}
+      onSearchChange={storyState.setSearch}
+      onSelectionChange={storyState.setSelectedHandles}
+      onToggleAll={storyState.toggleAll}
+      refreshErrorMessage={null}
+      refreshLabel="Refresh repositories"
+      refreshTooltip={storyState.viewModel.refreshTooltip}
+      search={storyState.search}
+      searchPlaceholder="Add repositories"
+      selectedHandles={storyState.selectedHandles}
+      unavailableSelectedHandles={[]}
+      visibleItems={storyState.visibleItems}
+    />
   );
 }
 
@@ -402,6 +496,8 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
 ): React.JSX.Element {
   const [profileName, setProfileName] = useState("Customer Support Sandbox");
   const [activeTab, setActiveTab] = useState<PrototypeTabValue>(input.initialTab ?? "integrations");
+  const [isAddConnectorsDialogOpen, setIsAddConnectorsDialogOpen] = useState(false);
+  const [isAwsConfigDialogOpen, setIsAwsConfigDialogOpen] = useState(false);
   const [selectedGitProviderId, setSelectedGitProviderId] = useState(GitHubChoice.id);
   const [selectedConnections, setSelectedConnections] = useState<Readonly<Record<string, string>>>({
     codex: "openai-primary",
@@ -409,37 +505,32 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
     [StoryLinearTarget.targetKey]: "linear-workspace",
     [StorySlackTarget.targetKey]: "slack-workspace",
   });
-  const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<readonly string[]>(
-    DefaultGitHubConnectionId === undefined
-      ? []
-      : [RepositoryOptionsByConnectionId[DefaultGitHubConnectionId]?.[0]?.id].filter(
-          (value): value is string => value !== undefined,
-        ),
-  );
   const [selectedToolIdsByIntegrationId, setSelectedToolIdsByIntegrationId] = useState<
     Readonly<Record<string, readonly string[]>>
   >({
     github: ["github-cli"],
+    [StoryAwsTarget.targetKey]: ["aws-cli"],
+    [StoryJiraTarget.targetKey]: ["jira-cli"],
     [StoryLinearTarget.targetKey]: ["linear-mcp"],
     [StorySlackTarget.targetKey]: ["slack-mcp"],
   });
+  const [configByIntegrationId, setConfigByIntegrationId] = useState<
+    Readonly<Record<string, Record<string, unknown>>>
+  >({
+    [StoryAwsTarget.targetKey]: {
+      services: ["s3", "sts", "secretsmanager"],
+      regions: ["us-east-1", "us-west-2"],
+      defaultRegion: "us-east-1",
+      tools: ["aws-cli"],
+    },
+  });
+  const [setupScript, setSetupScript] = useState("");
 
   function setSelectedConnection(id: string, nextConnectionId: string): void {
     setSelectedConnections((currentChoices) => ({
       ...currentChoices,
       [id]: nextConnectionId,
     }));
-
-    if (id === GitHubChoice.id) {
-      const nextRepositoryIds = new Set(
-        (RepositoryOptionsByConnectionId[nextConnectionId] ?? []).map(
-          (repository) => repository.id,
-        ),
-      );
-      setSelectedRepositoryIds((currentRepositoryIds) =>
-        currentRepositoryIds.filter((repositoryId) => nextRepositoryIds.has(repositoryId)),
-      );
-    }
   }
 
   function addConnector(id: string): void {
@@ -490,20 +581,6 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
     }));
   }
 
-  function toggleRepository(repositoryId: string, checked: boolean): void {
-    setSelectedRepositoryIds((currentRepositoryIds) => {
-      if (checked) {
-        if (currentRepositoryIds.includes(repositoryId)) {
-          return currentRepositoryIds;
-        }
-        return [...currentRepositoryIds, repositoryId];
-      }
-      return currentRepositoryIds.filter(
-        (currentRepositoryId) => currentRepositoryId !== repositoryId,
-      );
-    });
-  }
-
   function toggleTool(integrationId: string, toolId: string, checked: boolean): void {
     setSelectedToolIdsByIntegrationId((currentToolIdsByIntegrationId) => {
       const currentToolIds = currentToolIdsByIntegrationId[integrationId] ?? [];
@@ -517,6 +594,26 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
         [integrationId]: nextToolIds,
       };
     });
+    if (integrationId === StoryAwsTarget.targetKey) {
+      setConfigByIntegrationId((currentConfigByIntegrationId) => {
+        const currentConfig = currentConfigByIntegrationId[integrationId] ?? {};
+        const currentToolIds = Array.isArray(currentConfig.tools)
+          ? currentConfig.tools.filter((value): value is string => typeof value === "string")
+          : [];
+        const nextToolIds = checked
+          ? currentToolIds.includes(toolId)
+            ? currentToolIds
+            : [...currentToolIds, toolId]
+          : currentToolIds.filter((currentToolId) => currentToolId !== toolId);
+        return {
+          ...currentConfigByIntegrationId,
+          [integrationId]: {
+            ...currentConfig,
+            tools: nextToolIds,
+          },
+        };
+      });
+    }
   }
 
   const selectedConnectorChoices = ConnectorChoices.filter(
@@ -529,13 +626,15 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
     selectedGitProviderId === NoIntegrationValue
       ? undefined
       : selectedConnections[selectedGitProviderId];
-  const selectedGitConnectionLabel = GitProviderChoices.find(
-    (choice) => choice.id === selectedGitProviderId,
-  )?.availableConnections?.find((connection) => connection.id === selectedGitConnectionId)?.label;
   const repositoryOptions =
     selectedGitConnectionId === undefined
       ? []
-      : (RepositoryOptionsByConnectionId[selectedGitConnectionId] ?? []);
+      : (RepositoryItemsByConnectionId[selectedGitConnectionId] ?? []);
+  const configurationEditorContext = resolveConfigurationEditorContext({
+    activeIntegrationId: StoryAwsTarget.targetKey,
+    configByIntegrationId,
+    selectedConnections,
+  });
   const toolRowChoices = [
     ...(selectedGitProviderId === NoIntegrationValue ? [] : [GitHubCredentialChoice]),
     ...selectedConnectorChoices.filter(
@@ -627,7 +726,7 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
                       key={id}
                     >
                       <div className="min-w-0">
-                        <p className="text-muted-foreground text-sm">{item.typeLabel}</p>
+                        <p className="text-sm font-medium text-primary">{item.typeLabel}</p>
                       </div>
                       <div className="min-w-0">
                         {id === GitHubChoice.id ? (
@@ -674,26 +773,20 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
                 </div>
               </div>
 
-              <div className="mt-8 max-w-5xl">
-                <div className="flex items-center gap-4">
-                  <h2 className="text-base font-semibold uppercase tracking-wide">
-                    Add Connectors
-                  </h2>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <div className="mt-4 w-full max-w-6xl">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {addConnectorChoices.map((item) => (
-                      <AddConnectorTile
-                        item={item}
-                        key={item.id}
-                        onAdd={(connectorId) => {
-                          addConnector(connectorId);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="mt-3 max-w-5xl">
+                {addConnectorChoices.length === 0 ? null : (
+                  <Button
+                    className="px-0 text-sm"
+                    onClick={() => {
+                      setIsAddConnectorsDialogOpen(true);
+                    }}
+                    type="button"
+                    variant="link"
+                  >
+                    <PlusIcon aria-hidden className="size-4" />
+                    Add more connectors
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -705,100 +798,70 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
               role="tabpanel"
             >
               <div className="flex max-w-5xl flex-col gap-8">
-                {selectedGitConnectionId === undefined ? (
-                  <SectionBlock
-                    emptyState="Choose a Git provider in Integrations before selecting repository resources."
-                    title="Repository Resources"
-                  />
-                ) : (
-                  <SectionBlock title="Repository Resources">
-                    <div className="flex flex-col border-b">
-                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 border-b py-2 text-xs uppercase tracking-wide text-muted-foreground">
-                        <div className="min-w-0">
-                          <p>Integration</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p>Connection</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-6 border-b py-4">
-                        <div className="min-w-0">
-                          <IntegrationNameCell item={GitHubChoice} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-muted-foreground text-sm">
-                            {selectedGitConnectionLabel ?? "No connection selected"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-3 py-4">
-                        <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                          Repositories
-                        </p>
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                          {repositoryOptions.map((repository) => (
-                            <label
-                              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                              key={repository.id}
-                            >
-                              <Checkbox
-                                aria-label={repository.label}
-                                checked={selectedRepositoryIds.includes(repository.id)}
-                                onCheckedChange={(checked) => {
-                                  toggleRepository(repository.id, checked === true);
-                                }}
-                              />
-                              <span>{repository.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </SectionBlock>
-                )}
+                <div className="flex flex-col gap-3">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                    Repository Resources
+                  </p>
+                  {selectedGitConnectionId === undefined ? (
+                    <p className="text-muted-foreground text-sm">
+                      Choose a Git provider in Integrations before selecting repository resources.
+                    </p>
+                  ) : (
+                    <RepositoryResourcePicker
+                      connectionId={selectedGitConnectionId}
+                      items={repositoryOptions}
+                      key={selectedGitConnectionId}
+                    />
+                  )}
+                </div>
 
                 {toolRowChoices.length === 0 ? (
-                  <SectionBlock
-                    emptyState="Choose integrations with CLI tools in Integrations before selecting tools here."
-                    title="CLI Tools"
-                  />
+                  <p className="text-muted-foreground text-sm">
+                    Choose integrations with CLI tools in Integrations before selecting tools here.
+                  </p>
                 ) : (
-                  <SectionBlock title="CLI Tools">
-                    <div className="flex flex-col">
-                      <div className="text-muted-foreground grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)] gap-6 border-b py-2 text-xs uppercase tracking-wide">
-                        <div className="min-w-0">
-                          <p>Integration</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p>Connection</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p>Tools</p>
-                        </div>
+                  <div className="flex flex-col">
+                    <div className="text-muted-foreground grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-2 text-xs uppercase tracking-wide">
+                      <div className="min-w-0">
+                        <p>Integration</p>
                       </div>
-                      {toolRowChoices.map((item) => {
-                        const selectedConnectionId = selectedConnections[item.id];
-                        const connectionLabel = item.availableConnections?.find(
-                          (connection) => connection.id === selectedConnectionId,
-                        )?.label;
-                        if (connectionLabel === undefined) {
-                          return null;
-                        }
-
-                        return (
-                          <ToolSelectionRow
-                            connectionLabel={connectionLabel}
-                            integration={item}
-                            key={item.id}
-                            onToolToggle={(toolId, checked) => {
-                              toggleTool(item.id, toolId, checked);
-                            }}
-                            selectedToolIds={new Set(selectedToolIdsByIntegrationId[item.id] ?? [])}
-                          />
-                        );
-                      })}
+                      <div className="min-w-0">
+                        <p>Tools</p>
+                      </div>
+                      <div className="w-8 shrink-0" />
                     </div>
-                  </SectionBlock>
+                    {toolRowChoices.map((item) => {
+                      if (selectedConnections[item.id] === undefined) {
+                        return null;
+                      }
+
+                      return (
+                        <ToolSelectionRow
+                          editAction={
+                            item.id === StoryAwsTarget.targetKey ? (
+                              <Button
+                                aria-label="Edit binding"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setIsAwsConfigDialogOpen(true);
+                                }}
+                                type="button"
+                                variant="ghost"
+                              >
+                                <PencilSimpleIcon aria-hidden className="size-4" />
+                              </Button>
+                            ) : undefined
+                          }
+                          integration={item}
+                          key={item.id}
+                          onToolToggle={(toolId, checked) => {
+                            toggleTool(item.id, toolId, checked);
+                          }}
+                          selectedToolIds={new Set(selectedToolIdsByIntegrationId[item.id] ?? [])}
+                        />
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
@@ -810,15 +873,187 @@ function SandboxProfileIntegrationSelectionPrototypeStory(
               id="sandbox-profile-setup-panel-configurations"
               role="tabpanel"
             >
-              <div className="max-w-4xl rounded-md border p-4 text-sm text-muted-foreground">
-                Additional sandbox configuration settings will be configured here.
+              <div className="max-w-5xl">
+                <Field>
+                  <FieldHeader>
+                    <div className="flex items-center gap-1.5">
+                      <p
+                        className="text-muted-foreground text-xs uppercase tracking-wide"
+                        id="sandbox-setup-script-label"
+                      >
+                        Setup script
+                      </p>
+                      <Tooltip delay={0}>
+                        <TooltipTrigger
+                          aria-label="Explain setup script"
+                          render={
+                            <button
+                              className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+                              type="button"
+                            />
+                          }
+                        >
+                          <InfoIcon aria-hidden className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-64 text-left" side="top">
+                          Runs once during sandbox setup after repositories, resources, and CLI
+                          tools are ready. Use it for project bootstrap steps such as dependency
+                          install, local config generation, or repo-specific setup commands.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </FieldHeader>
+                  <FieldContent>
+                    <SandboxSetupScriptEditor
+                      ariaLabelledBy="sandbox-setup-script-label"
+                      onChange={setSetupScript}
+                      placeholderText={`#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install
+pnpm dev:bootstrap`}
+                      value={setupScript}
+                    />
+                  </FieldContent>
+                </Field>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <Dialog
+        onOpenChange={(nextOpen) => {
+          setIsAddConnectorsDialogOpen(nextOpen);
+        }}
+        open={isAddConnectorsDialogOpen}
+      >
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader variant="sectioned">
+            <DialogTitle>Add connectors</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {addConnectorChoices.map((item) => (
+              <AddConnectorTile
+                item={item}
+                key={item.id}
+                onAdd={(connectorId) => {
+                  addConnector(connectorId);
+                }}
+              />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(nextOpen) => {
+          setIsAwsConfigDialogOpen(nextOpen);
+        }}
+        open={isAwsConfigDialogOpen}
+      >
+        <DialogContent className="sm:max-w-4xl">
+          <button autoFocus className="sr-only" type="button">
+            AWS dialog
+          </button>
+          <DialogHeader variant="sectioned">
+            <DialogTitle>AWS</DialogTitle>
+          </DialogHeader>
+          {configurationEditorContext === null ? null : (
+            <SandboxProfileBindingConfigEditor
+              availableConnections={configurationEditorContext.availableConnections}
+              availableTargets={configurationEditorContext.availableTargets}
+              formContext={{
+                columns: 2,
+                labelTone: "detail",
+                layout: "vertical",
+              }}
+              onIntegrationBindingRowChange={(_clientId, changes) => {
+                if (changes.config === undefined) {
+                  return;
+                }
+                const nextConfig = Object.fromEntries(Object.entries(changes.config));
+
+                setConfigByIntegrationId((currentConfigByIntegrationId) => ({
+                  ...currentConfigByIntegrationId,
+                  [configurationEditorContext.integrationId]: nextConfig,
+                }));
+                const nextTools = Array.isArray(nextConfig.tools)
+                  ? nextConfig.tools.filter((value): value is string => typeof value === "string")
+                  : undefined;
+                if (nextTools !== undefined) {
+                  setSelectedToolIdsByIntegrationId((currentToolIdsByIntegrationId) => ({
+                    ...currentToolIdsByIntegrationId,
+                    [configurationEditorContext.integrationId]: nextTools,
+                  }));
+                }
+              }}
+              row={configurationEditorContext.row}
+            />
+          )}
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                setIsAwsConfigDialogOpen(false);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageFrame>
   );
+}
+
+function resolveConfigurationEditorContext(input: {
+  activeIntegrationId: string | null;
+  configByIntegrationId: Readonly<Record<string, Record<string, unknown>>>;
+  selectedConnections: Readonly<Record<string, string>>;
+}): ConfigurationEditorContext | null {
+  if (input.activeIntegrationId !== StoryAwsTarget.targetKey) {
+    return null;
+  }
+
+  const selectedConnectionId = input.selectedConnections[StoryAwsTarget.targetKey];
+  if (selectedConnectionId === undefined) {
+    return null;
+  }
+
+  return {
+    integrationId: StoryAwsTarget.targetKey,
+    title: "AWS",
+    row: {
+      clientId: "configuration-editor-aws",
+      connectionId: selectedConnectionId,
+      kind: "connector",
+      config: input.configByIntegrationId[StoryAwsTarget.targetKey] ?? {
+        services: ["s3", "sts", "secretsmanager"],
+        regions: ["us-east-1", "us-west-2"],
+        defaultRegion: "us-east-1",
+        tools: ["aws-cli"],
+      },
+    },
+    availableConnections: [
+      {
+        ...StoryAwsConnection,
+        id: selectedConnectionId,
+      },
+      StoryGithubConnection,
+      StoryJiraConnection,
+      StoryLinearConnection,
+      StorySlackConnection,
+    ],
+    availableTargets: [
+      StoryAwsTarget,
+      StoryGithubTarget,
+      StoryJiraTarget,
+      StoryLinearTarget,
+      StorySlackTarget,
+    ],
+  };
 }
 
 /**
