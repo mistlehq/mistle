@@ -520,6 +520,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
     composerText: "",
     gitBranchLabel: null,
+    pullRequest: null,
     pendingDiffCommentSummary: null,
     isSubmitPending: false,
     pendingAttachments: [],

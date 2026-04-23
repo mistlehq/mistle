@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type { PendingSessionDiffComment } from "../session-diff-comment.js";
@@ -105,7 +105,10 @@ function SessionComposerStateHarness(input: {
           displayAttachments: [],
         }),
       },
-      gitBranchLabel: null,
+      repositoryStatus: {
+        branchLabel: null,
+        pullRequest: null,
+      },
       sessionErrorMessage: null,
       turnControl: {
         activeTurnState: "idle",
@@ -161,6 +164,10 @@ function SessionComposerStateHarness(input: {
 }
 
 describe("useSessionComposerState", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("submits diff comments even when the composer text is blank and clears them on success", async () => {
     render(
       <SessionComposerStateHarness

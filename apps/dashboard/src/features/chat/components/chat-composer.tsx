@@ -17,6 +17,7 @@ import {
   ChatCircleTextIcon,
   CircleNotchIcon,
   GitBranchIcon,
+  GitPullRequestIcon,
   PlusIcon,
   StopCircleIcon,
   XIcon,
@@ -62,6 +63,13 @@ export type ChatComposerStatusMessage = {
 export type ChatComposerViewModel = {
   composerText: string;
   gitBranchLabel: string | null;
+  pullRequest: {
+    isDraft: boolean;
+    number: number;
+    state: string;
+    title: string;
+    url: string;
+  } | null;
   pendingDiffCommentSummary: {
     count: number;
     label: string;
@@ -103,6 +111,7 @@ export type ChatComposerViewModel = {
 export function ChatComposer({
   composerText,
   gitBranchLabel,
+  pullRequest,
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
@@ -393,10 +402,29 @@ export function ChatComposer({
           )}
         </div>
       </div>
-      {gitBranchLabel === null ? null : (
-        <div className="text-muted-foreground flex items-center gap-1.5 px-1.5 pt-2 text-sm">
-          <GitBranchIcon aria-hidden="true" className="size-4" />
-          <span>{gitBranchLabel}</span>
+      {gitBranchLabel === null && pullRequest === null ? null : (
+        <div className="text-muted-foreground flex items-center gap-4 px-1.5 pt-2 text-sm">
+          {gitBranchLabel === null ? null : (
+            <div className="flex items-center gap-1.5">
+              <GitBranchIcon aria-hidden="true" className="size-4" />
+              <span>{gitBranchLabel}</span>
+            </div>
+          )}
+          {pullRequest === null ? null : (
+            <a
+              className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+              href={pullRequest.url}
+              rel="noreferrer"
+              target="_blank"
+              title={pullRequest.title}
+            >
+              <GitPullRequestIcon aria-hidden="true" className="size-4 shrink-0" />
+              <span className="truncate">
+                PR #{String(pullRequest.number)}
+                {pullRequest.isDraft ? " Draft" : ""}
+              </span>
+            </a>
+          )}
         </div>
       )}
     </div>

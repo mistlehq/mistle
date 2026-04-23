@@ -9,6 +9,7 @@ import {
   buildPendingSessionDiffCommentSummaryTitle,
   type PendingSessionDiffComment,
 } from "../session-diff-comment.js";
+import type { SessionPullRequestSummary } from "../use-session-repository-status.js";
 import { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
 import {
   buildModelSelectionRequiredMessage,
@@ -76,7 +77,10 @@ export type SessionComposerStateInput = {
   clearSessionErrorMessage: () => void;
   configControl: SessionComposerConfigControl;
   attachmentControl: SessionComposerAttachmentControl;
-  gitBranchLabel: string | null;
+  repositoryStatus: {
+    branchLabel: string | null;
+    pullRequest: SessionPullRequestSummary | null;
+  };
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -612,7 +616,8 @@ export function useSessionComposerState(input: {
       submitDisabled,
       submitDisabledReason: null,
       canUploadAttachments: composerStateInput.attachmentControl.canUploadAttachments,
-      gitBranchLabel: composerStateInput.gitBranchLabel,
+      gitBranchLabel: composerStateInput.repositoryStatus.branchLabel,
+      pullRequest: composerStateInput.repositoryStatus.pullRequest,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&

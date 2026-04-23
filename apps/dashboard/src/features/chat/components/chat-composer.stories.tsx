@@ -154,6 +154,20 @@ export const WithGitBranch: Story = {
   },
 };
 
+export const WithGitBranchAndPullRequest: Story = {
+  args: {
+    composerText: "Summarize the current dashboard regression.",
+    gitBranchLabel: "feature/show-session-branch",
+    pullRequest: {
+      isDraft: false,
+      number: 142,
+      state: "OPEN",
+      title: "Show pull request status in the composer",
+      url: "https://github.com/mistlehq/mistle/pull/142",
+    },
+  },
+};
+
 export const SteeringTurnShortcutHover: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",

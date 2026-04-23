@@ -122,6 +122,7 @@ type CodexSessionMessageState = {
 
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
+  repositoryStatusRefreshEpoch: number;
   threadAuthority: {
     providerThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
@@ -149,6 +150,7 @@ export function useCodexSessionState(input: {
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
+  const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
 
@@ -236,6 +238,9 @@ export function useCodexSessionState(input: {
     connectionGenerationRef,
     ensureCurrentGeneration,
     handleChatNotificationReceived: handleNotificationReceived,
+    onTurnCompleted: () => {
+      setRepositoryStatusRefreshEpoch((currentEpoch) => currentEpoch + 1);
+    },
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
@@ -908,6 +913,7 @@ export function useCodexSessionState(input: {
 
   return {
     lifecycle,
+    repositoryStatusRefreshEpoch,
     threadAuthority,
     threads,
     chat,

@@ -10,6 +10,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerText: "Ship it",
     gitBranchLabel: null,
+    pullRequest: null,
     pendingDiffCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
@@ -168,6 +169,24 @@ describe("ChatComposer", () => {
     render(<ChatComposer {...createBaseComposerProps()} gitBranchLabel="feature/show-branch" />);
 
     expect(screen.getByText("feature/show-branch")).toBeTruthy();
+  });
+
+  it("renders the current pull request beside the branch when provided", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        gitBranchLabel="feature/show-branch"
+        pullRequest={{
+          isDraft: false,
+          number: 142,
+          state: "OPEN",
+          title: "Show pull request status in composer",
+          url: "https://github.com/mistlehq/mistle/pull/142",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "PR #142" })).toBeTruthy();
   });
 
   it("accepts dropped image files on the git branch footer row", () => {

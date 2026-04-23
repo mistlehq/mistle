@@ -114,7 +114,19 @@ async function startGitBranchTunnelServer(): Promise<{
   emitTurnCompleted: (turnId: string) => void;
   emitTurnStarted: (turnId: string) => void;
   getBranchCommandCount: () => number;
+  getPullRequestCommandCount: () => number;
   failNextGitDirectoryLookup: () => void;
+  setGitHubCliAvailabilityForCwd: (cwd: string, isAvailable: boolean) => void;
+  setPullRequestForCwd: (
+    cwd: string,
+    pullRequest: {
+      isDraft: boolean;
+      number: number;
+      state: string;
+      title: string;
+      url: string;
+    } | null,
+  ) => void;
   setCurrentBranchForCwd: (cwd: string, branch: string) => void;
   setCurrentBranch: (branch: string) => void;
   url: string;
@@ -122,10 +134,39 @@ async function startGitBranchTunnelServer(): Promise<{
   let agentSocket: SocketSender | null = null;
   let agentStreamId: number | null = null;
   let branchCommandCount = 0;
+  let pullRequestCommandCount = 0;
   const currentBranchByCwd = new Map<string, string>([
     ["/root/mistlehq/mistle", "main"],
     ["/root/mistlehq/company-os", "company-main"],
     ["/root/mistlehq/e2e-test-repo", "e2e-main"],
+  ]);
+  const gitHubCliAvailabilityByCwd = new Map<string, boolean>([
+    ["/root/mistlehq/mistle", true],
+    ["/root/mistlehq/company-os", false],
+    ["/root/mistlehq/e2e-test-repo", false],
+  ]);
+  const pullRequestByCwd = new Map<
+    string,
+    {
+      isDraft: boolean;
+      number: number;
+      state: string;
+      title: string;
+      url: string;
+    } | null
+  >([
+    [
+      "/root/mistlehq/mistle",
+      {
+        isDraft: false,
+        number: 142,
+        state: "OPEN",
+        title: "Show pull request status in composer",
+        url: "https://github.com/mistlehq/mistle/pull/142",
+      },
+    ],
+    ["/root/mistlehq/company-os", null],
+    ["/root/mistlehq/e2e-test-repo", null],
   ]);
   let gitDirectoryLookupFailureCount = 0;
   const gitDir = "/root/mistlehq/mistle/.git";
@@ -212,6 +253,34 @@ async function startGitBranchTunnelServer(): Promise<{
               stderr = "command timed out after 5000ms";
             } else {
               stdout = `${gitDir}\n`;
+            }
+          } else if (
+            command === "sh" &&
+            args.length === 2 &&
+            args[0] === "-lc" &&
+            args[1] === "command -v gh"
+          ) {
+            if (gitHubCliAvailabilityByCwd.get(controlMessage.channel.cwd) === true) {
+              stdout = "/usr/local/bin/gh\n";
+            } else {
+              exitCode = 127;
+              stderr = "gh: not found";
+            }
+          } else if (
+            command === "gh" &&
+            args.length === 4 &&
+            args[0] === "pr" &&
+            args[1] === "view" &&
+            args[2] === "--json" &&
+            args[3] === "number,title,url,state,isDraft"
+          ) {
+            pullRequestCommandCount += 1;
+            const pullRequest = pullRequestByCwd.get(controlMessage.channel.cwd) ?? null;
+            if (pullRequest === null) {
+              exitCode = 1;
+              stderr = "no pull requests found for branch";
+            } else {
+              stdout = `${JSON.stringify(pullRequest)}\n`;
             }
           } else {
             exitCode = 1;
@@ -381,8 +450,15 @@ async function startGitBranchTunnelServer(): Promise<{
       });
     },
     getBranchCommandCount: () => branchCommandCount,
+    getPullRequestCommandCount: () => pullRequestCommandCount,
     failNextGitDirectoryLookup: () => {
       gitDirectoryLookupFailureCount += 1;
+    },
+    setGitHubCliAvailabilityForCwd: (cwd: string, isAvailable: boolean) => {
+      gitHubCliAvailabilityByCwd.set(cwd, isAvailable);
+    },
+    setPullRequestForCwd: (cwd: string, pullRequest) => {
+      pullRequestByCwd.set(cwd, pullRequest);
     },
     setCurrentBranchForCwd: (cwd: string, branch: string) => {
       currentBranchByCwd.set(cwd, branch);
@@ -469,19 +545,32 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
 
       tunnelServer.emitTurnStarted("turn_1");
       await waitFor(() => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
 
       tunnelServer.setCurrentBranch("feature/after-turn");
+      tunnelServer.setPullRequestForCwd("/root/mistlehq/mistle", {
+        isDraft: false,
+        number: 143,
+        state: "OPEN",
+        title: "Refresh composer pull request status after turn completion",
+        url: "https://github.com/mistlehq/mistle/pull/143",
+      });
       tunnelServer.emitTurnCompleted("turn_1");
       await waitFor(() => {
         expect(screen.getByText("feature/after-turn")).toBeTruthy();
       });
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "PR #143" })).toBeTruthy();
+      });
       expect(tunnelServer.getBranchCommandCount()).toBe(2);
+      expect(tunnelServer.getPullRequestCommandCount()).toBe(2);
     } finally {
       await rendered.close();
       await tunnelServer.close();
@@ -513,6 +602,7 @@ describe("SessionWorkbenchPage git branch label", () => {
         expect(screen.getByText("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
+      expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
     } finally {
       await rendered.close();
       await tunnelServer.close();
@@ -546,8 +636,16 @@ describe("SessionWorkbenchPage git branch label", () => {
       await waitFor(() => {
         expect(screen.getByText("company-main")).toBeTruthy();
       });
+      expect(screen.queryByRole("link", { name: "PR #142" })).toBeNull();
 
       tunnelServer.setCurrentBranchForCwd("/root/mistlehq/mistle", "feature/returned-repo");
+      tunnelServer.setPullRequestForCwd("/root/mistlehq/mistle", {
+        isDraft: true,
+        number: 144,
+        state: "OPEN",
+        title: "Show returned repository pull request status",
+        url: "https://github.com/mistlehq/mistle/pull/144",
+      });
       await selectPrimaryRepositoryOption("mistlehq/mistle");
 
       await waitFor(() => {
@@ -557,6 +655,41 @@ describe("SessionWorkbenchPage git branch label", () => {
       await waitFor(() => {
         expect(screen.getByText("feature/returned-repo")).toBeTruthy();
       });
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "PR #144 Draft" })).toBeTruthy();
+      });
+    } finally {
+      await rendered.close();
+      await tunnelServer.close();
+      restoreWebSocket();
+    }
+  }, 45_000);
+
+  it("shows only the branch when the GitHub CLI is unavailable", async () => {
+    const restoreWebSocket = installNodeWebSocket();
+    const tunnelServer = await startGitBranchTunnelServer();
+    tunnelServer.setGitHubCliAvailabilityForCwd("/root/mistlehq/mistle", false);
+    const rendered = await renderDashboardPageIntegration({
+      handler: createWorkbenchRequestHandler({
+        tunnelUrl: tunnelServer.url,
+      }),
+      ui: (
+        <HeaderActionsHost>
+          <MemoryRouter initialEntries={["/sessions/sbi_repo_page"]}>
+            <Routes>
+              <Route element={<SessionWorkbenchPage />} path="/sessions/:sandboxInstanceId" />
+            </Routes>
+          </MemoryRouter>
+        </HeaderActionsHost>
+      ),
+    });
+
+    try {
+      await waitFor(() => {
+        expect(screen.getByText("main")).toBeTruthy();
+      });
+      expect(screen.queryByRole("link", { name: "PR #142" })).toBeNull();
+      expect(tunnelServer.getPullRequestCommandCount()).toBe(0);
     } finally {
       await rendered.close();
       await tunnelServer.close();
