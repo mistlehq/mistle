@@ -1,4 +1,5 @@
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { Navigate } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -17,6 +18,25 @@ import {
   SETTINGS_INTEGRATIONS_QUERY_KEY,
   useIntegrationsDirectoryState,
 } from "./use-integrations-directory-state.js";
+
+function isUninstalledGitHubAppConnection(input: {
+  connectionMethodId: string | undefined;
+  config: Record<string, unknown> | undefined;
+  externalSubjectId: string | undefined;
+}): boolean {
+  if (input.connectionMethodId !== "github-app-installation") {
+    return false;
+  }
+
+  const installationId =
+    typeof input.config?.["installation_id"] === "string"
+      ? input.config["installation_id"]
+      : typeof input.externalSubjectId === "string"
+        ? input.externalSubjectId
+        : null;
+
+  return installationId === null;
+}
 
 export function IntegrationsPage() {
   const location = useLocation();
@@ -72,6 +92,28 @@ export function IntegrationsPage() {
 
   if (directoryState.integrationsQuery.isPending) {
     return null;
+  }
+
+  const selectedDetailConnection =
+    directoryState.selectedDetailConnections.find(
+      (connection) => connection.id === directoryState.activeDetailConnectionId,
+    ) ?? directoryState.selectedDetailConnections[0];
+
+  if (
+    detailTargetKey !== null &&
+    selectedDetailConnection !== undefined &&
+    isUninstalledGitHubAppConnection({
+      connectionMethodId: selectedDetailConnection.connectionMethodId,
+      config: selectedDetailConnection.config,
+      externalSubjectId: selectedDetailConnection.externalSubjectId,
+    })
+  ) {
+    return (
+      <Navigate
+        replace
+        to={`/integrations/${detailTargetKey}/${selectedDetailConnection.id}/github-app/setup`}
+      />
+    );
   }
 
   const detailSurface =

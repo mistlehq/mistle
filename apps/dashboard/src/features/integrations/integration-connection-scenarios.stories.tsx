@@ -6,9 +6,6 @@ import {
   createAwsDetailViewStoryProps,
   createDatadogDetailViewStoryProps,
   createGitHubEnterpriseServerDetailViewStoryProps,
-  createGitHubAppDetailViewStoryProps,
-  createGitHubAppCallbackLoadingDetailViewStoryProps,
-  createGitHubAppSetupIncompleteDetailViewStoryProps,
   createJiraDetailViewStoryProps,
   createJiraWebhookNotConfiguredDetailViewStoryProps,
   createLinearDetailViewStoryProps,
@@ -88,19 +85,6 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
-
-export const GitHub: Story = {
-  name: "GitHub",
-  args: {
-    ...withoutStoryHandlers(
-      mergeDetailViewStoryProps(
-        createGitHubAppDetailViewStoryProps(),
-        createGitHubAppCallbackLoadingDetailViewStoryProps(),
-        createGitHubAppSetupIncompleteDetailViewStoryProps(),
-      ),
-    ),
-  },
-};
 
 export const GitHubEnterpriseServer: Story = {
   name: "GitHub Enterprise Server",

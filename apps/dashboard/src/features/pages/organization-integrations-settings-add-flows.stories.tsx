@@ -7,7 +7,7 @@ import {
 } from "./organization-integrations-settings-page-story-support.js";
 
 function OrganizationIntegrationsAddFlowStory(): React.JSX.Element {
-  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GitHubCloud} />;
+  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Jira} />;
 }
 
 const meta = {
@@ -19,13 +19,6 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
-
-export const GitHubCloud: Story = {
-  name: "GitHub Cloud",
-  render: function RenderStory() {
-    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GitHubCloud} />;
-  },
-};
 
 export const GitHubEnterpriseServer: Story = {
   name: "GitHub Enterprise Server",

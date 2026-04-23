@@ -398,7 +398,7 @@ describe("integrations page view model", () => {
     expect(item?.authMethodLabel).toBe("Access key + AssumeRole");
   });
 
-  it("marks pre-install GitHub App connections as setup incomplete", () => {
+  it("omits GitHub installation detail state before the app is installed", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {
@@ -421,28 +421,8 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.installation?.actionLabel).toBe("Install GitHub App");
-    expect(item?.installation?.description).toBe(
-      "Set the URLs below in your Github App settings, then install the app",
-    );
-    expect(item?.installation?.postInstallationSetupUrl).toBe(
-      "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
-    );
+    expect(item?.installation).toBeUndefined();
     expect(item?.contextItems).toBeUndefined();
-    expect(item?.installation?.fields).toEqual([
-      {
-        label: "App ID",
-        value: "123",
-      },
-      {
-        label: "App slug",
-        value: "mistle-github-app",
-      },
-      {
-        label: "Installation",
-        value: "Pending",
-      },
-    ]);
   });
 
   it("builds detail items from server-resolved Jira auth metadata", () => {
@@ -542,7 +522,7 @@ describe("integrations page view model", () => {
     expect(item?.authSecretLabels).toEqual(["Personal API token"]);
   });
 
-  it("includes GitHub App installation mutation state in detail items", () => {
+  it("omits GitHub App installation detail state before install even when a start mutation is pending", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {
@@ -574,8 +554,7 @@ describe("integrations page view model", () => {
       refreshingResourceKeys: new Set<string>(),
     });
 
-    expect(item?.installation?.isPending).toBe(true);
-    expect(item?.installation?.errorMessage).toBe("Could not start GitHub App installation.");
+    expect(item?.installation).toBeUndefined();
   });
 
   it("marks syncing resources as refreshing even without a local pending refresh", () => {

@@ -17,10 +17,7 @@ import {
   IntegrationConnectionDetailView,
   type IntegrationConnectionDetailViewProps,
 } from "../integrations/integration-connection-detail-view.js";
-import {
-  createGitHubAppDetailViewStoryProps,
-  createGitHubAppSetupIncompleteDetailViewStoryProps,
-} from "../integrations/integration-story-harness.js";
+import { createGitHubAppDetailViewStoryProps } from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -47,6 +44,14 @@ function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
 
 const GitHubDefinition = getGitHubDefinitionOrThrow();
 const StoryControlPlaneApiOrigin = "https://control-plane.example.com";
+const StoryIntegrationCreateHandle = {
+  ...ROUTE_HANDLES.integrationCreate,
+  description: "",
+} as const;
+const StoryIntegrationGitHubManualSetupHandle = {
+  ...ROUTE_HANDLES.integrationGitHubManualSetup,
+  description: "",
+} as const;
 
 function configureDashboardRuntimeForStory(): void {
   globalThis.__MISTLE_RUNTIME_CONFIG__ = {
@@ -190,7 +195,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionCreatePage />}
-                handle={ROUTE_HANDLES.integrationCreate}
+                handle={StoryIntegrationCreateHandle}
                 path="add"
               />
             </Route>
@@ -229,7 +234,7 @@ function GitHubManualSetupPageStory(input: {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionGitHubManualSetupPage />}
-                handle={ROUTE_HANDLES.integrationGitHubManualSetup}
+                handle={StoryIntegrationGitHubManualSetupHandle}
                 path=":connectionId/github-app/setup"
               />
             </Route>
@@ -317,13 +322,6 @@ export const SetupAppManuallyWithPrefilledValues: PageStory = {
         webhookSources={[createWebhookSourceFixture()]}
       />
     );
-  },
-};
-
-export const InstallationPendingDetail: PageStory = {
-  decorators: [withDashboardCenteredStory],
-  render: function RenderStory() {
-    return <GitHubDetailStory props={createGitHubAppSetupIncompleteDetailViewStoryProps()} />;
   },
 };
 

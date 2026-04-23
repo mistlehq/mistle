@@ -334,6 +334,10 @@ function resolveGitHubAppConnectionContext(
         ? connection.externalSubjectId
         : null;
 
+  if (installationId === null) {
+    return undefined;
+  }
+
   const installationFields = [
     ...(appId === null
       ? []
@@ -353,18 +357,13 @@ function resolveGitHubAppConnectionContext(
         ]),
     {
       label: "Installation",
-      value: installationId === null ? "Pending" : installationId,
+      value: installationId,
     },
   ];
 
   return {
     installation: {
-      actionLabel: installationId === null ? "Install GitHub App" : "Manage installation",
-      ...(installationId === null
-        ? {
-            description: "Set the URLs below in your Github App settings, then install the app",
-          }
-        : {}),
+      actionLabel: "Manage installation",
       fields: installationFields,
       ...(controlPlaneApiOrigin === undefined
         ? {}
