@@ -31,7 +31,8 @@ const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
   "MISTLE_TEST_GITHUB_TOKEN",
   "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
-  "CLOUDFLARE_TUNNEL_TOKEN",
+  "CLOUDFLARE_TUNNEL_ID",
+  "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON",
   "CONTROL_PLANE_API_TUNNEL_HOSTNAME",
 ] as const;
 
@@ -267,7 +268,8 @@ describeIf("system GitHub webhook sandbox title seeding", () => {
   beforeAll(async () => {
     const systemTestContext = await readSystemTestContext();
     tunnel = await startCloudflaredTunnel({
-      tunnelToken: requireEnv("CLOUDFLARE_TUNNEL_TOKEN"),
+      tunnelId: requireEnv("CLOUDFLARE_TUNNEL_ID"),
+      tunnelCredentialsJson: requireEnv("CLOUDFLARE_TUNNEL_CREDENTIALS_JSON"),
       publicHostname: requireEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
       targetLocalPort: resolveControlPlaneApiLocalPort(systemTestContext.controlPlaneApiBaseUrl),
       startupTimeoutMs: TunnelStartupTimeoutMs,

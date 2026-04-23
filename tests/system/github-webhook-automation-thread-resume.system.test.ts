@@ -55,7 +55,10 @@ describeIf("system GitHub webhook automation thread resume", () => {
   beforeAll(async () => {
     const systemTestContext = await readSystemTestContext();
     tunnel = await startCloudflaredTunnel({
-      tunnelToken: requireGitHubWebhookAutomationEnv("CLOUDFLARE_TUNNEL_TOKEN"),
+      tunnelId: requireGitHubWebhookAutomationEnv("CLOUDFLARE_TUNNEL_ID"),
+      tunnelCredentialsJson: requireGitHubWebhookAutomationEnv(
+        "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON",
+      ),
       publicHostname: requireGitHubWebhookAutomationEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
       targetLocalPort: resolveControlPlaneApiLocalPort(systemTestContext.controlPlaneApiBaseUrl),
       startupTimeoutMs: TunnelStartupTimeoutMs,

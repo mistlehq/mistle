@@ -22,7 +22,8 @@ const DATA_PLANE_GATEWAY_IDLE_TIMEOUT_MS = 20_000;
 const DATA_PLANE_GATEWAY_BOOTSTRAP_DISCONNECT_GRACE_MS = 8_000;
 const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
   "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED";
-const CloudflareTunnelTokenEnvVar = "CLOUDFLARE_TUNNEL_TOKEN";
+const CloudflareTunnelIdEnvVar = "CLOUDFLARE_TUNNEL_ID";
+const CloudflareTunnelCredentialsJsonEnvVar = "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON";
 const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
 const SystemSandboxProvider = {
@@ -64,7 +65,8 @@ function readRequiredEnvVar(name: string): string {
 
 function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvider }):
   | {
-      cloudflareTunnelToken: string;
+      tunnelId: string;
+      tunnelCredentialsJson: string;
       publicHostname: string;
     }
   | undefined {
@@ -73,7 +75,8 @@ function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvi
   }
 
   return {
-    cloudflareTunnelToken: readRequiredEnvVar(CloudflareTunnelTokenEnvVar),
+    tunnelId: readRequiredEnvVar(CloudflareTunnelIdEnvVar),
+    tunnelCredentialsJson: readRequiredEnvVar(CloudflareTunnelCredentialsJsonEnvVar),
     publicHostname: readRequiredEnvVar(DataPlaneGatewayTunnelHostnameEnvVar),
   };
 }

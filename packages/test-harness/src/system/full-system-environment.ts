@@ -25,6 +25,10 @@ import { type StartPostgresWithPgBouncerInput } from "../services/postgres/index
 import { acquireSharedPostgresMailpitInfra } from "../services/shared-postgres-mailpit.js";
 import { startValkey, type ValkeyService } from "../services/valkey/index.js";
 import {
+  buildCloudflaredTunnelConfig,
+  parseCloudflaredTunnelCredentialsJson,
+} from "./cloudflared-config.js";
+import {
   readPreparedTestHarnessRuntime,
   SANDBOX_SNAPSHOT_REPOSITORY_PATH,
 } from "./prepared-runtime.js";
@@ -96,7 +100,8 @@ export type StartFullSystemEnvironmentInput = {
   tokenizerProxyEnvironment?: Record<string, string>;
   sandboxPublicGatewayTunnel?:
     | {
-        cloudflareTunnelToken: string;
+        tunnelId: string;
+        tunnelCredentialsJson: string;
         publicHostname: string;
       }
     | undefined;
@@ -252,7 +257,8 @@ async function readCloudflaredLogs(containerName: string): Promise<string> {
 
 async function startCloudflaredGatewayTunnel(input: {
   networkName: string;
-  cloudflareTunnelToken: string;
+  tunnelId: string;
+  tunnelCredentialsJson: string;
   publicHostname: string;
   targetHost: string;
   targetPort: number;
@@ -262,16 +268,21 @@ async function startCloudflaredGatewayTunnel(input: {
 }> {
   const configDirectory = await mkdtemp(join(tmpdir(), "mistle-cloudflared-"));
   const configPath = join(configDirectory, "config.yml");
+  const credentialsPath = join(configDirectory, "credentials.json");
   const containerName = `mistle-cloudflared-${randomUUID().replaceAll("-", "")}`;
   const publicBaseUrl = `https://${input.publicHostname}`;
-  const configContent = [
-    "ingress:",
-    `  - hostname: ${input.publicHostname}`,
-    `    service: http://${input.targetHost}:${String(input.targetPort)}`,
-    "  - service: http_status:404",
-    "",
-  ].join("\n");
+  parseCloudflaredTunnelCredentialsJson({
+    tunnelId: input.tunnelId,
+    credentialsJson: input.tunnelCredentialsJson,
+  });
+  const configContent = buildCloudflaredTunnelConfig({
+    tunnelId: input.tunnelId,
+    credentialsFilePath: "/etc/cloudflared/credentials.json",
+    publicHostname: input.publicHostname,
+    serviceUrl: `http://${input.targetHost}:${String(input.targetPort)}`,
+  });
 
+  await writeFile(credentialsPath, input.tunnelCredentialsJson, "utf8");
   await writeFile(configPath, configContent, "utf8");
 
   let started = false;
@@ -288,13 +299,14 @@ async function startCloudflaredGatewayTunnel(input: {
         input.networkName,
         "--volume",
         `${configPath}:/etc/cloudflared/config.yml:ro`,
+        "--volume",
+        `${credentialsPath}:/etc/cloudflared/credentials.json:ro`,
         CLOUDFLARED_IMAGE_REFERENCE,
         "tunnel",
         "--config",
         "/etc/cloudflared/config.yml",
         "run",
-        "--token",
-        input.cloudflareTunnelToken,
+        input.tunnelId,
       ],
       {
         timeout: 30_000,
@@ -323,6 +335,7 @@ async function startCloudflaredGatewayTunnel(input: {
     };
   } catch (error) {
     const writtenConfig = await readFile(configPath, "utf8").catch(() => "");
+    const writtenCredentials = await readFile(credentialsPath, "utf8").catch(() => "");
     const logs = started ? await readCloudflaredLogs(containerName) : "";
 
     if (started) {
@@ -336,7 +349,7 @@ async function startCloudflaredGatewayTunnel(input: {
     throw new Error(
       `Failed to start cloudflared gateway tunnel for ${input.publicHostname}. ${
         error instanceof Error ? error.message : String(error)
-      } Config: ${writtenConfig} Logs: ${logs}`,
+      } Config: ${writtenConfig} Credentials: ${writtenCredentials} Logs: ${logs}`,
     );
   }
 }
@@ -618,7 +631,8 @@ export async function startFullSystemEnvironment(
       const startedGatewayTunnel = await withStepTiming("start public gateway tunnel", async () => {
         return startCloudflaredGatewayTunnel({
           networkName: activeNetwork.getName(),
-          cloudflareTunnelToken: publicGatewayTunnel.cloudflareTunnelToken,
+          tunnelId: publicGatewayTunnel.tunnelId,
+          tunnelCredentialsJson: publicGatewayTunnel.tunnelCredentialsJson,
           publicHostname: publicGatewayTunnel.publicHostname,
           targetHost: "data-plane-gateway",
           targetPort: 5202,

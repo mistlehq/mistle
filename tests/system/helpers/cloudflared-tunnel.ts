@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import {
+  buildCloudflaredTunnelConfig,
+  parseCloudflaredTunnelCredentialsJson,
+} from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 
 const execFileAsync = promisify(execFile);
@@ -21,7 +25,8 @@ type ExecResult = {
 };
 
 export type StartCloudflaredTunnelInput = {
-  tunnelToken: string;
+  tunnelId: string;
+  tunnelCredentialsJson: string;
   publicHostname: string;
   targetLocalPort: number;
   image?: string;
@@ -116,18 +121,22 @@ export async function startCloudflaredTunnel(
   const containerName = `mistle-system-cloudflared-${randomUUID()}`;
   const configDirectoryPath = await mkdtemp(join(tmpdir(), "mistle-system-cloudflared-"));
   const configPath = join(configDirectoryPath, "config.yml");
+  const credentialsPath = join(configDirectoryPath, "credentials.json");
   const publicBaseUrl = `https://${input.publicHostname}`;
   const startupTimeoutMs = input.startupTimeoutMs ?? DefaultStartupTimeoutMs;
   const image = input.image ?? DefaultCloudflaredImage;
+  parseCloudflaredTunnelCredentialsJson({
+    tunnelId: input.tunnelId,
+    credentialsJson: input.tunnelCredentialsJson,
+  });
+  const configContent = buildCloudflaredTunnelConfig({
+    tunnelId: input.tunnelId,
+    credentialsFilePath: "/etc/cloudflared/credentials.json",
+    publicHostname: input.publicHostname,
+    serviceUrl: `http://host.docker.internal:${String(input.targetLocalPort)}`,
+  });
 
-  const configContent = [
-    "ingress:",
-    `  - hostname: ${input.publicHostname}`,
-    `    service: http://host.docker.internal:${String(input.targetLocalPort)}`,
-    "  - service: http_status:404",
-    "",
-  ].join("\n");
-
+  await writeFile(credentialsPath, input.tunnelCredentialsJson, "utf8");
   await writeFile(configPath, configContent, "utf8");
 
   let started = false;
@@ -145,13 +154,14 @@ export async function startCloudflaredTunnel(
         "host.docker.internal:host-gateway",
         "--volume",
         `${configPath}:/etc/cloudflared/config.yml:ro`,
+        "--volume",
+        `${credentialsPath}:/etc/cloudflared/credentials.json:ro`,
         image,
         "tunnel",
         "--config",
         "/etc/cloudflared/config.yml",
         "run",
-        "--token",
-        input.tunnelToken,
+        input.tunnelId,
       ],
     });
     started = true;
@@ -177,6 +187,7 @@ export async function startCloudflaredTunnel(
   } catch (error) {
     const logs = started ? await readContainerLogs(containerName) : "";
     const writtenConfig = await readFile(configPath, "utf8").catch(() => "");
+    const writtenCredentials = await readFile(credentialsPath, "utf8").catch(() => "");
 
     if (started) {
       await execFileOrThrow({
@@ -188,7 +199,7 @@ export async function startCloudflaredTunnel(
     await rm(configDirectoryPath, { recursive: true, force: true });
 
     throw new Error(
-      `Failed to start cloudflared tunnel for ${input.publicHostname}. ${error instanceof Error ? error.message : String(error)} Config: ${writtenConfig} Logs: ${logs}`,
+      `Failed to start cloudflared tunnel for ${input.publicHostname}. ${error instanceof Error ? error.message : String(error)} Config: ${writtenConfig} Credentials: ${writtenCredentials} Logs: ${logs}`,
     );
   }
 }

@@ -1,3 +1,4 @@
+export * from "./cloudflared-config.js";
 export * from "./control-plane-system-environment.js";
 export * from "./full-system-environment.js";
 export * from "./integration-config-paths.js";
