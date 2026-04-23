@@ -1,9 +1,11 @@
-FROM node:25-bookworm AS node
+ARG NODE_IMAGE=node:24.14.1-bookworm
+
+FROM ${NODE_IMAGE} AS node
 
 FROM rust:1.93-bookworm
 
 ARG CODEX_CLI_VERSION=0.122.0
-ARG MISE_VERSION=v2026.3.13
+ARG MISE_VERSION=v2026.4.19
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

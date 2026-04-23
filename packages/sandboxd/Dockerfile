@@ -1,18 +1,21 @@
 # syntax=docker/dockerfile:1.7
 
+ARG NODE_IMAGE=node:24.14.1-bookworm
+ARG PYTHON_IMAGE=python:3.14.4-bookworm
 ARG DOCKER_IMAGE=docker:29.3.1-dind
-ARG NIX_IMAGE=ghcr.io/nixos/nix@sha256:e2fe74e96e965653c7b8f16ac64d1e56581c63c84d7fa07fb0692fd055cd06b0
+ARG NIX_IMAGE=nixos/nix:2.34.6
 
 FROM ${DOCKER_IMAGE} AS docker
 
-FROM node:25-bookworm AS node
+FROM ${NODE_IMAGE} AS node
+
+FROM ${PYTHON_IMAGE} AS python
 
 FROM ${NIX_IMAGE} AS nix
 
 FROM debian:bookworm-slim AS sandbox-base-common
 
-ARG MISE_VERSION=2026.2.20
-ARG ARCHIL_CLIENT_VERSION=0.8.8-1776208557
+ARG MISE_VERSION=v2026.4.19
 
 ENV DEBIAN_FRONTEND=noninteractive \
   PATH="/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/nix/var/nix/profiles/default/sbin"
@@ -86,8 +89,6 @@ FROM sandbox-base-common AS sandbox-base
 # The final sandbox image only carries the compiled supervisor binary and the
 # shared Linux tooling the sandbox session expects at runtime.
 
-ARG ARCHIL_CLIENT_VERSION
-
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     bat \
@@ -104,8 +105,6 @@ RUN apt-get update \
     netcat-openbsd \
     psmisc \
     procps \
-    python3 \
-    python3-venv \
     rsync \
     sqlite3 \
     strace \
@@ -114,15 +113,13 @@ RUN apt-get update \
     tree \
     vim \
     zip \
-  && arch="$(dpkg --print-architecture)" \
-  && archil_package="/tmp/archil_${ARCHIL_CLIENT_VERSION}_${arch}.deb" \
-  && curl -fsSL -o "${archil_package}" "https://s3.amazonaws.com/archil-client/pkg/archil_${ARCHIL_CLIENT_VERSION}_${arch}.deb" \
-  && apt-get install -y --no-install-recommends "${archil_package}" \
+  && curl -fsSL https://archil.com/install | ARCHIL_SKIP_IAM_CHECK=1 sh \
   && ln -sf /usr/bin/archil /opt/mistle/bin/archil \
   && ln -sf /usr/bin/batcat /opt/mistle/bin/bat \
   && ln -sf /usr/bin/fdfind /opt/mistle/bin/fd \
-  && rm -f "${archil_package}" \
   && rm -rf /var/lib/apt/lists/*
+
+COPY --from=python /usr/local /usr/local
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
@@ -173,8 +170,6 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
 
 FROM sandbox-base-common AS sandbox-base-system-tests
 
-ARG ARCHIL_CLIENT_VERSION
-
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     fuse \
@@ -182,12 +177,8 @@ RUN apt-get update \
     procps \
     strace \
     vim \
-  && arch="$(dpkg --print-architecture)" \
-  && archil_package="/tmp/archil_${ARCHIL_CLIENT_VERSION}_${arch}.deb" \
-  && curl -fsSL -o "${archil_package}" "https://s3.amazonaws.com/archil-client/pkg/archil_${ARCHIL_CLIENT_VERSION}_${arch}.deb" \
-  && apt-get install -y --no-install-recommends "${archil_package}" \
+  && curl -fsSL https://archil.com/install | ARCHIL_SKIP_IAM_CHECK=1 sh \
   && ln -sf /usr/bin/archil /opt/mistle/bin/archil \
-  && rm -f "${archil_package}" \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=sandboxd-system-tests-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
