@@ -1,7 +1,7 @@
 import { systemSleeper } from "@mistle/time";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
@@ -102,9 +102,26 @@ function StatefulPrototype(
   args: Omit<
     React.ComponentProps<typeof OrganizationIdentityLinkingSettingsPageView>,
     "onEnabledChange" | "onProviderConnectionChange"
-  >,
+  > & {
+    initiallyOpenLinkedUsersProviderFamily?: string;
+  },
 ): React.JSX.Element {
   const [providers, setProviders] = useState(args.providers);
+
+  useEffect(() => {
+    if (args.initiallyOpenLinkedUsersProviderFamily === undefined) {
+      return;
+    }
+
+    const button = document.querySelector<HTMLButtonElement>(
+      `[aria-label="View ${resolveProviderDisplayName({
+        providerFamily: args.initiallyOpenLinkedUsersProviderFamily,
+        providers,
+      })} linked users"]`,
+    );
+
+    button?.click();
+  }, [args.initiallyOpenLinkedUsersProviderFamily, providers]);
 
   return (
     <OrganizationIdentityLinkingSettingsPageView
@@ -203,6 +220,7 @@ export const NoProvidersAvailable: Story = {
 
 export const LinkedUsersDialogError: Story = {
   args: {
+    initiallyOpenLinkedUsersProviderFamily: "github",
     providers: [
       {
         ...BaseProviders[0],
@@ -213,3 +231,13 @@ export const LinkedUsersDialogError: Story = {
     ],
   },
 };
+
+function resolveProviderDisplayName(input: {
+  providerFamily: string;
+  providers: readonly OrganizationIdentityLinkingProviderRow[];
+}): string {
+  return (
+    input.providers.find((provider) => provider.providerFamily === input.providerFamily)
+      ?.displayName ?? input.providerFamily
+  );
+}
