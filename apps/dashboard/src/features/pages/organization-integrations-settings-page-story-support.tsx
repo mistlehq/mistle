@@ -1,3 +1,5 @@
+import { json } from "@codemirror/lang-json";
+import { EditorView } from "@codemirror/view";
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions/openai";
@@ -29,6 +31,7 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { InfoIcon } from "@phosphor-icons/react";
+import CodeMirror from "@uiw/react-codemirror";
 import { useState } from "react";
 import type React from "react";
 
@@ -394,12 +397,47 @@ type GitHubAppManagedSetupStage =
   | "ready-to-install"
   | "installed";
 
+const GitHubDraftManifest = JSON.stringify(
+  {
+    name: "Mistle GitHub",
+    url: "https://mistle.example.com/integrations/github",
+    description: "GitHub App used by Mistle for repository access and webhook delivery.",
+    hook_attributes: {
+      active: true,
+      url: "https://mistle.example.com/api/integrations/github/webhook",
+    },
+    redirect_url: "https://mistle.example.com/api/integrations/github/manifest/callback",
+    callback_urls: ["https://mistle.example.com/api/integrations/github/install/callback"],
+    setup_url: "https://mistle.example.com/api/integrations/github/setup",
+    public: false,
+    default_events: [
+      "issues",
+      "issue_comment",
+      "pull_request",
+      "pull_request_review_comment",
+      "check_run",
+      "check_suite",
+    ],
+    default_permissions: {
+      checks: "write",
+      issues: "write",
+      metadata: "read",
+      pull_requests: "write",
+    },
+    request_oauth_on_install: true,
+    setup_on_update: true,
+  },
+  null,
+  2,
+);
+
 function GitHubManagedSetupSummary(input: {
   onBack: () => void;
   onContinue: () => void;
   onReset: () => void;
   stage: GitHubAppManagedSetupStage;
 }): React.JSX.Element {
+  const [manifestValue, setManifestValue] = useState(GitHubDraftManifest);
   const stageLines: Record<
     GitHubAppManagedSetupStage,
     {
@@ -456,54 +494,88 @@ function GitHubManagedSetupSummary(input: {
     <FormPageFrame title="Create GitHub App With A Manifest">
       <FormPageStack>
         <FormPageSection>
+          <div className="p-4">
+            <DefinitionList
+              items={[
+                {
+                  id: "connection-name",
+                  label: "Name",
+                  value: "Mistle GitHub",
+                },
+                {
+                  id: "auth-method",
+                  label: "Authentication method",
+                  value: "GitHub App installation",
+                },
+              ]}
+            />
+          </div>
+        </FormPageSection>
+        <FormPageSection>
           <div className="flex flex-col gap-6 p-4">
-            <Card className="shadow-none">
-              <CardContent className="pt-6">
-                <DefinitionList
-                  items={[
-                    {
-                      id: "connection-name",
-                      label: "Name",
-                      value: "Mistle GitHub",
-                    },
-                    {
-                      id: "auth-method",
-                      label: "Authentication method",
-                      value: "GitHub App installation",
-                    },
-                  ]}
-                />
-              </CardContent>
-            </Card>
-            <Notice title={stageView.title}>{stageView.description}</Notice>
-            {stageView.helper === undefined ? null : (
-              <p className="text-muted-foreground text-sm">{stageView.helper}</p>
+            {input.stage === "draft" ? (
+              <Field contentWidth="fill" orientation="vertical">
+                <FieldHeader>
+                  <FieldLabel htmlFor="github-app-manifest-editor">GitHub App manifest</FieldLabel>
+                  <FieldDescription>
+                    Mistle generates this manifest for your GitHub App. You can review or edit it
+                    before continuing.
+                  </FieldDescription>
+                </FieldHeader>
+                <FieldContent>
+                  <div className="overflow-hidden rounded-md border">
+                    <CodeMirror
+                      basicSetup={{
+                        foldGutter: false,
+                        highlightActiveLine: false,
+                        highlightActiveLineGutter: false,
+                      }}
+                      className="text-sm"
+                      extensions={[json(), EditorView.lineWrapping]}
+                      height="420px"
+                      id="github-app-manifest-editor"
+                      onChange={(value) => {
+                        setManifestValue(value);
+                      }}
+                      value={manifestValue}
+                    />
+                  </div>
+                </FieldContent>
+              </Field>
+            ) : (
+              <>
+                <Notice title={stageView.title}>{stageView.description}</Notice>
+                {stageView.helper === undefined ? null : (
+                  <p className="text-muted-foreground text-sm">{stageView.helper}</p>
+                )}
+                <Card className="shadow-none">
+                  <CardHeader className="gap-1">
+                    <CardTitle className="text-base">Connection shape after this step</CardTitle>
+                    <CardDescription>
+                      The proposed flow still converges into the existing GitHub App installation
+                      connection shape.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">Connection method:</span> GitHub App
+                      installation
+                    </div>
+                    <div>
+                      <span className="font-medium">Before manifest exchange:</span> no app secrets
+                      saved yet
+                    </div>
+                    <div>
+                      <span className="font-medium">After manifest exchange:</span> `app_id`,
+                      `app_slug`, PEM, webhook secret, optional client secret
+                    </div>
+                    <div>
+                      <span className="font-medium">After installation:</span> `installation_id`
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
-            <Card className="shadow-none">
-              <CardHeader className="gap-1">
-                <CardTitle className="text-base">Connection shape after this step</CardTitle>
-                <CardDescription>
-                  The proposed flow still converges into the existing GitHub App installation
-                  connection shape.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-2 text-sm">
-                <div>
-                  <span className="font-medium">Connection method:</span> GitHub App installation
-                </div>
-                <div>
-                  <span className="font-medium">Before manifest exchange:</span> no app secrets
-                  saved yet
-                </div>
-                <div>
-                  <span className="font-medium">After manifest exchange:</span> `app_id`,
-                  `app_slug`, PEM, webhook secret, optional client secret
-                </div>
-                <div>
-                  <span className="font-medium">After installation:</span> `installation_id`
-                </div>
-              </CardContent>
-            </Card>
             <FormPageActionBar>
               <Button onClick={input.onBack} type="button" variant="outline">
                 Back
