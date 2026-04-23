@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  CopyableValue,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -12,6 +13,7 @@ import {
   FieldLabel,
   Input,
   Notice,
+  Separator,
   Spinner,
   Textarea,
 } from "@mistle/ui";
@@ -26,6 +28,7 @@ import type {
   LinkedAccountCallbackNotice,
   LinkedAccountCardViewModel,
 } from "../settings/identity-linking/linked-accounts-model.js";
+import { ActionTile } from "../shared/action-tile.js";
 import { getErrorMessage } from "../shared/auto-save-behavior.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SettingsImageField } from "../shared/settings-image-field.js";
@@ -246,6 +249,8 @@ function LinkedAccountCard(input: {
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
   const [pastedCommitSigningKey, setPastedCommitSigningKey] = useState("");
+  const [showCommitSigningLocalGenerationHelp, setShowCommitSigningLocalGenerationHelp] =
+    useState(false);
   const [commitSigningDialogErrorMessage, setCommitSigningDialogErrorMessage] = useState<
     string | null
   >(null);
@@ -257,11 +262,13 @@ function LinkedAccountCard(input: {
 
     setIsCommitSigningDialogOpen(false);
     setPastedCommitSigningKey("");
+    setShowCommitSigningLocalGenerationHelp(false);
     setCommitSigningDialogErrorMessage(null);
   }
 
   function openCommitSigningDialog(): void {
     setCommitSigningDialogErrorMessage(null);
+    setShowCommitSigningLocalGenerationHelp(false);
     setIsCommitSigningDialogOpen(true);
   }
 
@@ -485,17 +492,60 @@ function LinkedAccountCard(input: {
             <DialogContent
               className="sm:max-w-2xl"
               formProps={{
-                className: "grid gap-6",
+                className: "grid gap-5",
                 onSubmit: (event) => {
                   void handleCommitSigningDialogSubmit(event);
                 },
               }}
             >
               <DialogHeader variant="sectioned">
-                <DialogTitle>Upload SSH private key</DialogTitle>
+                <DialogTitle>Add Private Key</DialogTitle>
               </DialogHeader>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-5">
+                {showCommitSigningLocalGenerationHelp ? (
+                  <div className="flex flex-col gap-3">
+                    <CopyableValue
+                      label="Generate a SSH signing key with no passphrase"
+                      value='ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing'
+                    />
+                    <CopyableValue
+                      label="Add the public key via GitHub settings or via GH CLI:"
+                      labelContent={
+                        <>
+                          Add the public key via{" "}
+                          <a
+                            className="text-primary underline underline-offset-4"
+                            href="https://github.com/settings/keys"
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            GitHub settings
+                          </a>{" "}
+                          or via GH CLI:
+                        </>
+                      }
+                      value="gh ssh-key add ~/.ssh/mistle-signing.pub --type signing"
+                    />
+                  </div>
+                ) : (
+                  <ActionTile
+                    action={
+                      <Button
+                        disabled={linkedAccountActionPending}
+                        onClick={() => {
+                          setShowCommitSigningLocalGenerationHelp(true);
+                        }}
+                        type="button"
+                        variant="outline"
+                      >
+                        Show helper
+                      </Button>
+                    }
+                    description="Generate one on your machine, then upload the private key here."
+                    title="Need a new signing key?"
+                  />
+                )}
                 <Textarea
                   className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs"
                   onChange={(event) => {
@@ -503,15 +553,21 @@ function LinkedAccountCard(input: {
                     setPastedCommitSigningKey(event.currentTarget.value);
                   }}
                   placeholder="Paste your SSH private key"
-                  rows={12}
+                  rows={6}
                   value={pastedCommitSigningKey}
                   wrap="soft"
                 />
                 {commitSigningDialogErrorMessage === null ? null : (
                   <Notice variant="alert">{commitSigningDialogErrorMessage}</Notice>
                 )}
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs text-muted-foreground">Or choose a private key file</p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    <Separator className="flex-1" />
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                      or
+                    </span>
+                    <Separator className="flex-1" />
+                  </div>
                   <input
                     aria-label={`Choose ${input.linkedAccountCard.displayName} commit signing private key file`}
                     className="hidden"
@@ -556,7 +612,7 @@ function LinkedAccountCard(input: {
                   }
                   type="submit"
                 >
-                  Upload private key
+                  Add private key
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -551,13 +551,52 @@ describe("ProfileSettingsPageView", () => {
         value: "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
       },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Upload private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
 
     await waitFor(() => {
       expect(uploadedFiles).toHaveLength(1);
     });
     expect(uploadedFiles[0]?.name).toBe("my-signing-key");
     expect(uploadedFiles[0]?.type).toBe("text/plain");
+  });
+
+  it("shows local generation help in the GitHub commit signing dialog", async () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show helper" }));
+
+    expect(screen.getByText('ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing')).toBeTruthy();
+    expect(
+      screen.getByText("gh ssh-key add ~/.ssh/mistle-signing.pub --type signing"),
+    ).toBeTruthy();
+    expect(screen.getByText("Generate a SSH signing key with no passphrase")).toBeTruthy();
+    expect(screen.getByText(/Add the public key via/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "GitHub settings" }).getAttribute("href")).toBe(
+      "https://github.com/settings/keys",
+    );
+  });
+
+  it("resets local generation help when the GitHub commit signing dialog closes", async () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show helper" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+
+    expect(screen.getByRole("button", { name: "Show helper" })).toBeTruthy();
+    expect(screen.queryByText('ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing')).toBeNull();
   });
 
   it("uploads a GitHub commit signing key from the file chooser", async () => {
@@ -614,7 +653,7 @@ describe("ProfileSettingsPageView", () => {
         value: "-----BEGIN OPENSSH PRIVATE KEY-----\ninvalid\n-----END OPENSSH PRIVATE KEY-----\n",
       },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Upload private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
 
     expect(await screen.findByText("Invalid private key.")).toBeTruthy();
     expect(screen.getByRole("dialog")).toBeTruthy();

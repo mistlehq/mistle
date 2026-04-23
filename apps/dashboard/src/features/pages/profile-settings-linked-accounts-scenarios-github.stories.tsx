@@ -72,8 +72,31 @@ export const SigningUploadFailureDialog: Story = {
       canvas.getByPlaceholderText("Paste your SSH private key"),
       "-----BEGIN OPENSSH PRIVATE KEY-----\ninvalid\n-----END OPENSSH PRIVATE KEY-----\n",
     );
-    await userEvent.click(canvas.getByRole("button", { name: "Upload private key" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Add private key" }));
 
     await expect(canvas.getByText("Invalid private key.")).toBeTruthy();
+  },
+};
+
+export const SigningLocalGenerationHelperDialog: Story = {
+  args: {
+    linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Add private key" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Show helper" }));
+
+    await expect(canvas.getByText("Need a new signing key?")).toBeTruthy();
+    await expect(canvas.getByText("Generate a SSH signing key with no passphrase")).toBeTruthy();
+    await expect(canvas.getByText(/Add the public key via/)).toBeTruthy();
+    await expect(
+      canvas.getByText('ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing'),
+    ).toBeTruthy();
+    await expect(canvas.getByRole("link", { name: "GitHub settings" })).toBeTruthy();
+    await expect(
+      canvas.getByText("gh ssh-key add ~/.ssh/mistle-signing.pub --type signing"),
+    ).toBeTruthy();
   },
 };

@@ -27,4 +27,26 @@ describe("CopyableValue", () => {
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy Webhook callback URL" })).toBeTruthy();
   });
+
+  it("renders rich field label content while preserving copy accessibility text", () => {
+    render(
+      <CopyableValue
+        label="Add the public key via GitHub settings or via GH CLI:"
+        labelContent={
+          <>
+            Add the public key via <a href="https://github.com/settings/keys">GitHub settings</a> or
+            via GH CLI:
+          </>
+        }
+        value="gh ssh-key add ~/.ssh/id_ed25519.pub --type signing"
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "GitHub settings" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Copy Add the public key via GitHub settings or via GH CLI:",
+      }),
+    ).toBeTruthy();
+  });
 });
