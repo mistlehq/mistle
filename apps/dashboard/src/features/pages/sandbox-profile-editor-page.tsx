@@ -29,7 +29,6 @@ import {
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { IntegrationsEditorSection } from "./integrations-editor-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -370,34 +369,58 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
+  const showBindingsUnavailableNotice =
+    input.loader.integrationBindingsQuery.isError ||
+    (!input.loader.integrationBindingsQuery.isPending && input.loader.version === null);
+  const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
+
   if (
     input.loader.integrationBindingsQuery.isPending ||
-    input.loader.integrationBindingsQuery.isError ||
     input.loader.integrationDirectoryQuery.isPending ||
-    input.loader.integrationDirectoryQuery.isError ||
     input.loader.initialRows === null ||
-    input.loader.version === null
+    input.loader.version === null ||
+    input.loader.integrationBindingsQuery.isError ||
+    input.loader.integrationDirectoryQuery.isError
   ) {
     return (
-      <IntegrationsEditorSection
-        availableConnections={input.loader.availableConnections}
-        availableTargets={input.loader.availableTargets}
-        integrationBindingsQuery={input.loader.integrationBindingsQuery}
-        integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
-        integrationRowErrorsByClientId={{}}
-        integrationRows={[]}
-        integrationSaveError={null}
-        isSubmittingIntegrationBindings={false}
-        layout="stacked"
-        onAddIntegrationBindingRow={async () => false}
-        onIntegrationBindingRowChange={() => {}}
-        onRemoveIntegrationBindingRow={() => {}}
-        sectionKinds={["agent", "git", "connector"]}
-        showSectionNavigation={false}
-        {...(input.onHasUnsavedChangesChange === undefined
-          ? {}
-          : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
-      />
+      <div className="flex flex-col gap-4">
+        {showBindingsUnavailableNotice ? (
+          <Notice title="Could not load integration bindings" variant="alert">
+            {resolveApiErrorMessage({
+              error: input.loader.integrationBindingsQuery.error,
+              fallbackMessage: "Could not load sandbox profile integration bindings.",
+            })}
+          </Notice>
+        ) : null}
+        {showDirectoryUnavailableNotice ? (
+          <Notice title="Could not load integration connections" variant="alert">
+            {resolveApiErrorMessage({
+              error: input.loader.integrationDirectoryQuery.error,
+              fallbackMessage: "Could not load integration connections.",
+            })}
+          </Notice>
+        ) : null}
+        {input.activeSectionId === "resources-and-tools" ? (
+          <SandboxProfileResourcesAndToolsSection
+            availableConnections={input.loader.availableConnections}
+            availableTargets={input.loader.availableTargets}
+            onRowChange={() => {}}
+            rows={[]}
+          />
+        ) : (
+          <SandboxProfileIntegrationsSetupSection
+            availableConnections={input.loader.availableConnections}
+            availableTargets={input.loader.availableTargets}
+            integrationBindingsQuery={input.loader.integrationBindingsQuery}
+            integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
+            integrationRows={[]}
+            integrationSaveError={null}
+            onAddIntegrationBindingRow={async () => false}
+            onIntegrationBindingRowChange={() => {}}
+            onRemoveIntegrationBindingRow={() => {}}
+          />
+        )}
+      </div>
     );
   }
 

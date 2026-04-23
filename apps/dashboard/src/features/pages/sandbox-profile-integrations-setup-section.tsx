@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ type IntegrationChoice = {
   id: string;
   kind: SandboxIntegrationBindingKind;
   logoKey: string | undefined;
-  title: string;
+  title: React.ReactNode;
 };
 
 const NoIntegrationValue = "none";
@@ -334,6 +335,19 @@ export function SandboxProfileIntegrationsSetupSection(input: {
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
   );
 
+  const agentDisplayChoice =
+    agentChoices[0] === undefined
+      ? undefined
+      : {
+          ...agentChoices[0],
+          title: (
+            <span className="flex items-center gap-2">
+              <span>Codex</span>
+              <Badge variant="outline">Default</Badge>
+            </span>
+          ),
+        };
+
   async function upsertSingleBinding(inputValue: {
     kind: Extract<SandboxIntegrationBindingKind, "agent" | "git">;
     targetKey: string;
@@ -408,11 +422,15 @@ export function SandboxProfileIntegrationsSetupSection(input: {
       return;
     }
 
-    await input.onAddIntegrationBindingRow({
+    const didSave = await input.onAddIntegrationBindingRow({
       kind: "connector",
       connectionId: nextConnection.id,
       config: nextConfig,
     });
+
+    if (didSave && addConnectorChoices.length === 1) {
+      setIsAddConnectorsDialogOpen(false);
+    }
   }
 
   const agentTargetKey = findTargetForConnection({
@@ -470,19 +488,9 @@ export function SandboxProfileIntegrationsSetupSection(input: {
               <p className="text-primary text-sm font-medium">Agent Harness</p>
             </div>
             <div className="min-w-0">
-              <IntegrationSelectionCell
-                allowNone={false}
-                ariaLabel="agent harness integration"
-                choices={agentChoices}
-                onIntegrationChange={(nextTargetKey) => {
-                  void upsertSingleBinding({
-                    kind: "agent",
-                    row: agentRow,
-                    targetKey: nextTargetKey,
-                  });
-                }}
-                selectedIntegrationId={agentTargetKey ?? agentChoices[0]?.id ?? NoIntegrationValue}
-              />
+              {agentDisplayChoice === undefined ? null : (
+                <IntegrationNameCell item={agentDisplayChoice} />
+              )}
             </div>
             <div className="min-w-0">
               <ConnectionSelectionCell
