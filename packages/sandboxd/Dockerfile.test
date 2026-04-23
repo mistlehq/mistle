@@ -2,7 +2,7 @@ FROM node:25-bookworm AS node
 
 FROM rust:1.93-bookworm
 
-ARG CODEX_CLI_VERSION=0.122.0
+ARG CODEX_CLI_VERSION=0.123.0
 ARG MISE_VERSION=v2026.3.13
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
