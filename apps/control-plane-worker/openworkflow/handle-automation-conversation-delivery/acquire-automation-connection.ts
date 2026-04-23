@@ -1,5 +1,4 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { systemSleeper } from "@mistle/time";
 
 import type {
@@ -15,17 +14,9 @@ import type { AcquiredAutomationConnection } from "./types.js";
 const SandboxStartTimeoutMs = 5 * 60 * 1000;
 const SandboxStartPollIntervalMs = 1_000;
 
-export function createAutomationSandboxResumeIdempotencyKey(input: {
-  automationRunId: string;
-  sandboxInstanceId: string;
-}): string {
-  return `automation-run-resume:${input.automationRunId}:${input.sandboxInstanceId}`;
-}
-
 export async function acquireAutomationConnection(
   ctx: {
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "resumeSandboxInstance">;
   },
   input: {
     preparedAutomationRun: PreparedAutomationRun;
@@ -41,7 +32,6 @@ export async function acquireAutomationConnection(
 
   const deadline = Date.now() + SandboxStartTimeoutMs;
   let isSandboxRunning = false;
-  let hasRequestedResume = false;
   while (Date.now() < deadline) {
     const sandboxInstance = await ctx.controlPlaneInternalClient.getSandboxInstance({
       organizationId: input.preparedAutomationRun.organizationId,
@@ -62,16 +52,21 @@ export async function acquireAutomationConnection(
       });
     }
 
-    if (sandboxInstance.status === "stopped" && !hasRequestedResume) {
-      await ctx.dataPlaneClient.resumeSandboxInstance({
+    if (sandboxInstance.status === "stopped") {
+      const connection = await ctx.controlPlaneInternalClient.mintSandboxConnectionToken({
         organizationId: input.preparedAutomationRun.organizationId,
         instanceId: sandboxInstance.id,
-        idempotencyKey: createAutomationSandboxResumeIdempotencyKey({
-          automationRunId: input.preparedAutomationRun.automationRunId,
-          sandboxInstanceId: sandboxInstance.id,
-        }),
+        ...(input.preparedAutomationRun.actingUserId === undefined
+          ? {}
+          : { actingUserId: input.preparedAutomationRun.actingUserId }),
       });
-      hasRequestedResume = true;
+
+      return {
+        instanceId: connection.instanceId,
+        url: connection.url,
+        token: connection.token,
+        expiresAt: connection.expiresAt,
+      };
     }
 
     await systemSleeper.sleep(SandboxStartPollIntervalMs);

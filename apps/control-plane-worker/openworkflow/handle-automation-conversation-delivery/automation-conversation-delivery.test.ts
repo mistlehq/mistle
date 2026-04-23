@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { createAutomationSandboxResumeIdempotencyKey } from "./acquire-automation-connection.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,
@@ -16,31 +15,6 @@ import {
 } from "./conversation-delivery-planning.js";
 
 describe("conversation delivery plans", () => {
-  describe("createAutomationSandboxResumeIdempotencyKey", () => {
-    it("returns a stable key for the same automation run and sandbox", () => {
-      expect(
-        createAutomationSandboxResumeIdempotencyKey({
-          automationRunId: "aru_01kq1sr7zwfew9wp1cf92mb2ev",
-          sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
-        }),
-      ).toBe("automation-run-resume:aru_01kq1sr7zwfew9wp1cf92mb2ev:sbi_01knvnbakhfevv29xs862a8txe");
-    });
-
-    it("returns different keys for different automation runs on the same conversation sandbox", () => {
-      const firstKey = createAutomationSandboxResumeIdempotencyKey({
-        automationRunId: "aru_01kq1sr7zwfew9wp1cf92mb2ev",
-        sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
-      });
-
-      const secondKey = createAutomationSandboxResumeIdempotencyKey({
-        automationRunId: "aru_01kq1ss2w1few9wp8gd0r0c5v0",
-        sandboxInstanceId: "sbi_01knvnbakhfevv29xs862a8txe",
-      });
-
-      expect(secondKey).not.toBe(firstKey);
-    });
-  });
-
   describe("resolveAutomationConversationDeliverySandboxAction", () => {
     it("starts a new sandbox when no route sandbox is persisted", () => {
       expect(
