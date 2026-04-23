@@ -408,14 +408,11 @@ export function SandboxProfileIntegrationsSetupSection(input: {
       return;
     }
 
-    const didSave = await input.onAddIntegrationBindingRow({
+    await input.onAddIntegrationBindingRow({
       kind: "connector",
       connectionId: nextConnection.id,
       config: nextConfig,
     });
-    if (didSave) {
-      setIsAddConnectorsDialogOpen(false);
-    }
   }
 
   const agentTargetKey = findTargetForConnection({

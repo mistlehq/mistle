@@ -1,4 +1,4 @@
-import { Checkbox, Notice } from "@mistle/ui";
+import { Checkbox } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -10,7 +10,6 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { formatDateTime } from "../shared/date-formatters.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -44,14 +43,6 @@ function resolveRepositorySummary(
     ...(summary.lastSyncedAt === undefined ? {} : { lastSyncedAt: summary.lastSyncedAt }),
     syncState: summary.syncState,
   };
-}
-
-function formatSyncMetadata(input: { lastSyncedAt?: string | undefined }): string | null {
-  if (input.lastSyncedAt === undefined) {
-    return null;
-  }
-
-  return `Last synced ${formatDateTime(input.lastSyncedAt)}`;
 }
 
 function resolveSelectedHandles(row: SandboxProfileBindingEditorRow | null): string[] {
@@ -388,17 +379,11 @@ export function SandboxProfileResourcesAndToolsSection(input: {
                 ))}
               </div>
             )}
-            {formatSyncMetadata(resolveRepositorySummary(gitConnection) ?? {}) === null ? null : (
-              <Notice variant="default">
-                {formatSyncMetadata(resolveRepositorySummary(gitConnection) ?? {})}
-              </Notice>
-            )}
           </div>
         )}
       </div>
 
       <div className="flex flex-col gap-3">
-        <p className="text-muted-foreground text-xs uppercase tracking-wide">Tools</p>
         <ToolBindingsSection
           availableConnections={input.availableConnections}
           availableTargets={input.availableTargets}
