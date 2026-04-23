@@ -19,4 +19,26 @@ describe("ActionTile", () => {
     expect(root?.querySelector("button")).toBeNull();
     expect(root?.children).toHaveLength(1);
   });
+
+  it("supports info variant styling", () => {
+    const { container } = render(
+      <ActionTile
+        action={
+          <button data-slot="button" type="button">
+            Show helper
+          </button>
+        }
+        description="Generate one locally and upload it here."
+        title="Need a new signing key?"
+        variant="info"
+      />,
+    );
+
+    expect(container.firstElementChild?.className).toContain("border-blue-200");
+    expect(container.firstElementChild?.className).toContain("bg-blue-50");
+    expect(screen.getByText("Need a new signing key?").className).toContain("text-blue-700");
+    expect(screen.getByText("Generate one locally and upload it here.").className).toContain(
+      "text-blue-400",
+    );
+  });
 });

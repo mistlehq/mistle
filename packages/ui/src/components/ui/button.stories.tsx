@@ -23,6 +23,13 @@ export const Outline = {
   },
 };
 
+export const Info = {
+  args: {
+    variant: "info",
+    children: "Show helper",
+  },
+};
+
 export const Destructive = {
   args: {
     variant: "destructive",

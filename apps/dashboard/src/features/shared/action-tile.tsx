@@ -1,6 +1,19 @@
 import { cn } from "@mistle/ui";
 import type { ReactNode } from "react";
 
+const ActionTileStyles = {
+  default: {
+    description: "text-muted-foreground",
+    root: "",
+    title: "",
+  },
+  info: {
+    description: "text-blue-500",
+    root: "border-blue-200 bg-blue-50",
+    title: "text-blue-600",
+  },
+} as const;
+
 type ActionTileProps = {
   action?: ReactNode;
   actionContainerClassName?: string;
@@ -14,6 +27,7 @@ type ActionTileProps = {
   padding?: "comfortable" | "default";
   title: ReactNode;
   titleClassName?: string;
+  variant?: "default" | "info";
 };
 
 export function ActionTile({
@@ -29,14 +43,17 @@ export function ActionTile({
   padding = "default",
   title,
   titleClassName,
+  variant = "default",
 }: ActionTileProps): React.JSX.Element {
   const isDetachedLeading = leading !== undefined && leadingPlacement === "detached";
   const hasAction = action != null;
+  const styles = ActionTileStyles[variant];
 
   return (
     <div
       className={cn(
         "flex flex-col gap-3 rounded-md border py-3 sm:flex-row sm:items-center sm:justify-between",
+        styles.root,
         padding === "default" && "px-3",
         padding === "comfortable" && "px-4",
         className,
@@ -68,12 +85,10 @@ export function ActionTile({
               ) : (
                 <div className="flex h-5 w-5 shrink-0 items-center justify-center">{leading}</div>
               )}
-              <p className={cn("text-sm font-medium", titleClassName)}>{title}</p>
+              <p className={cn("text-sm font-medium", styles.title, titleClassName)}>{title}</p>
               {badge}
             </div>
-            <p className={cn("text-muted-foreground text-sm", descriptionClassName)}>
-              {description}
-            </p>
+            <p className={cn("text-sm", styles.description, descriptionClassName)}>{description}</p>
           </div>
         </div>
       </div>
