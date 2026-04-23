@@ -373,7 +373,9 @@ jobs:
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run TS tests in Nix shell
-        run: nix develop --command pnpm test:ts
+        run: >-
+          nix develop --command pnpm turbo run test --output-logs=full
+          --filter=!@mistle/sandboxd --filter=!@mistle/commit-sign
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-ts-turbo-cache.outputs.cache-hit != 'true' }}
