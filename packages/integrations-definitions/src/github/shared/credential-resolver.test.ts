@@ -35,6 +35,7 @@ function createResolverInput(
         connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         app_id: "123",
         app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
         installation_id: "12345",
       },
       secrets: {
@@ -130,6 +131,7 @@ describe("github credential resolver helpers", () => {
               connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
               app_id: "123",
               app_slug: "mistle-github-app",
+              client_id: "Iv1.client123",
               installation_id: "12345",
             },
             secrets: {},

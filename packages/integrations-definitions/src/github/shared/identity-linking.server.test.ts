@@ -79,11 +79,10 @@ describe("github identity linking", () => {
             connection_method: "github-app-installation",
             app_id: "123",
             app_slug: "mistle",
+            client_id: "Iv1.client123",
           },
         },
-        availableConnectionSecretSlotKeys: new Set([
-          GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
-        ]),
+        availableConnectionSecretSlotKeys: new Set(),
       }),
     ).toBe(false);
   });

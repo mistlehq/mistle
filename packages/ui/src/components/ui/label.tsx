@@ -1,7 +1,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
-import { detailLabelTextClassName } from "./detail-label.js";
+import { detailLabelTextClassName } from "./label-text.js";
 
 function Label({ className, htmlFor, ...props }: React.ComponentProps<"label">) {
   return (

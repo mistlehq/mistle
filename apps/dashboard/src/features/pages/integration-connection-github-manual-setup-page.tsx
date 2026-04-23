@@ -2,11 +2,11 @@ import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
   CopyableValue,
-  DetailLabel,
   Field,
   FieldContent,
   FieldDescription,
   FieldHeader,
+  FieldLabel,
   Input,
   Notice,
   Spinner,
@@ -56,6 +56,8 @@ type GitHubManualSetupFieldState = {
 const GitHubManualSetupRequiredFieldLabels = {
   appId: "App ID",
   appSlug: "App slug",
+  clientId: "Client ID",
+  clientSecret: "Client secret",
   appPrivateKeyPem: "App private key",
   webhookSecret: "Webhook secret",
 } as const;
@@ -78,6 +80,7 @@ const GitHubManualSetupConfigFieldKeys: readonly GitHubManualSetupFieldKey[] = [
 const GitHubManualSetupRequiredConfigFieldKeys: readonly GitHubManualSetupFieldKey[] = [
   "appId",
   "appSlug",
+  "clientId",
 ];
 
 const GitHubManualSetupSecretFieldKeys: readonly GitHubManualSetupFieldKey[] = [
@@ -87,6 +90,7 @@ const GitHubManualSetupSecretFieldKeys: readonly GitHubManualSetupFieldKey[] = [
 ];
 
 const GitHubManualSetupRequiredSecretFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+  "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
 ];
@@ -162,7 +166,8 @@ function normalizeGitHubManualSetupValue(value: string): string {
 function hasRequiredGitHubSetupConfigValues(draft: GitHubManualSetupDraft): boolean {
   return (
     normalizeGitHubManualSetupValue(draft.appId).length > 0 &&
-    normalizeGitHubManualSetupValue(draft.appSlug).length > 0
+    normalizeGitHubManualSetupValue(draft.appSlug).length > 0 &&
+    normalizeGitHubManualSetupValue(draft.clientId).length > 0
   );
 }
 
@@ -220,16 +225,16 @@ function getGitHubManualSetupFieldValidationMessage(input: {
     return `${GitHubManualSetupRequiredFieldLabels.appPrivateKeyPem} is required.`;
   }
 
-  if (input.fieldKey === "webhookSecret" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.webhookSecret} is required.`;
+  if (input.fieldKey === "clientId" && normalizedValue.length === 0) {
+    return `${GitHubManualSetupRequiredFieldLabels.clientId} is required.`;
   }
 
-  if (
-    input.fieldKey === "clientSecret" &&
-    normalizedValue.length === 0 &&
-    normalizeGitHubManualSetupValue(input.savedDraft.clientSecret).length > 0
-  ) {
-    return "Clearing Client secret is not supported yet.";
+  if (input.fieldKey === "clientSecret" && normalizedValue.length === 0) {
+    return `${GitHubManualSetupRequiredFieldLabels.clientSecret} is required.`;
+  }
+
+  if (input.fieldKey === "webhookSecret" && normalizedValue.length === 0) {
+    return `${GitHubManualSetupRequiredFieldLabels.webhookSecret} is required.`;
   }
 
   return null;
@@ -699,6 +704,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
             onChange={(nextValue) => {
               updateFieldDraft("appId", nextValue);
             }}
+            required
             value={draft.appId}
           />
 
@@ -712,21 +718,8 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
             onChange={(nextValue) => {
               updateFieldDraft("appSlug", nextValue);
             }}
+            required
             value={draft.appSlug}
-          />
-
-          <GitHubManualSetupField
-            description="Optional. Only required for linked user auth."
-            fieldState={fieldStates.clientId}
-            id="github-client-id"
-            label="Client ID"
-            onBlur={() => {
-              void commitField("clientId");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("clientId", nextValue);
-            }}
-            value={draft.clientId}
           />
 
           <GitHubManualSetupField
@@ -741,12 +734,26 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
               updateFieldDraft("appPrivateKeyPem", nextValue);
             }}
             placeholder="-----BEGIN PRIVATE KEY-----"
+            required
             rows={8}
             value={draft.appPrivateKeyPem}
           />
 
           <GitHubManualSetupField
-            description="Optional. Only required for linked user auth."
+            fieldState={fieldStates.clientId}
+            id="github-client-id"
+            label="Client ID"
+            onBlur={() => {
+              void commitField("clientId");
+            }}
+            onChange={(nextValue) => {
+              updateFieldDraft("clientId", nextValue);
+            }}
+            required
+            value={draft.clientId}
+          />
+
+          <GitHubManualSetupField
             fieldState={fieldStates.clientSecret}
             id="github-client-secret"
             label="Client secret"
@@ -756,6 +763,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
             onChange={(nextValue) => {
               updateFieldDraft("clientSecret", nextValue);
             }}
+            required
             type="password"
             value={draft.clientSecret}
           />
@@ -770,6 +778,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
             onChange={(nextValue) => {
               updateFieldDraft("webhookSecret", nextValue);
             }}
+            required
             type="password"
             value={draft.webhookSecret}
           />
@@ -805,6 +814,7 @@ function GitHubManualSetupField(input: {
   label: string;
   value: string;
   fieldState: GitHubManualSetupFieldState;
+  required?: boolean;
   description?: string;
   placeholder?: string;
   rows?: number;
@@ -827,7 +837,9 @@ function GitHubManualSetupField(input: {
   return (
     <Field contentWidth="fill" orientation="vertical">
       <FieldHeader>
-        <DetailLabel as="p">{input.label}</DetailLabel>
+        <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
+          {input.label}
+        </FieldLabel>
         {input.description === undefined ? null : (
           <FieldDescription>{input.description}</FieldDescription>
         )}

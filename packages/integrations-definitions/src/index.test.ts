@@ -240,7 +240,7 @@ describe("integrations-definitions index", () => {
             },
             {
               name: "clientSecret",
-              label: "Client secret (Linked User Auth)",
+              label: "Client secret",
               inputType: "password",
               slotKey: "github.github-cloud.github-app-installation.client-secret",
             },

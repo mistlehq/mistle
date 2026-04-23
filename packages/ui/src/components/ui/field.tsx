@@ -125,7 +125,11 @@ function FieldHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
+type FieldLabelProps = React.ComponentProps<typeof Label> & {
+  required?: boolean;
+};
+
+function FieldLabel({ children, className, required = false, ...props }: FieldLabelProps) {
   return (
     <Label
       data-slot="field-label"
@@ -135,7 +139,17 @@ function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>)
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {required ? (
+        <>
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+          <span className="sr-only">required</span>
+        </>
+      ) : null}
+    </Label>
   );
 }
 

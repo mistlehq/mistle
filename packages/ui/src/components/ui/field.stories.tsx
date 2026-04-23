@@ -99,3 +99,23 @@ export const HorizontalWithDescription = {
     );
   },
 };
+
+export const RequiredLabel = {
+  render: function Render() {
+    return (
+      <div className="w-[24rem]">
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="required-workspace-name" required>
+              Workspace name
+            </FieldLabel>
+            <FieldDescription>The primary name used to identify this workspace.</FieldDescription>
+          </FieldHeader>
+          <FieldContent>
+            <Input defaultValue="Platform Engineering" id="required-workspace-name" />
+          </FieldContent>
+        </Field>
+      </div>
+    );
+  },
+};

@@ -1,8 +1,7 @@
 import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
-
-export const detailLabelTextClassName = "text-muted-foreground text-xs uppercase tracking-wide";
+import { detailLabelTextClassName } from "./label-text.js";
 
 type DetailLabelProps = React.HTMLAttributes<HTMLElement> & {
   as?: "dt" | "p" | "div" | "span";
