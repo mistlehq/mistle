@@ -76,6 +76,7 @@ export async function createControlPlaneApiRuntime(
   return {
     app,
     db: resources.db,
+    dbPool: resources.dbPool,
     request: app.request,
     start: async () => {
       if (stopped) {

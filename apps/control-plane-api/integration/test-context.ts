@@ -266,6 +266,9 @@ export const it = vitestIt.extend<{
             },
           },
         });
+        // Integration teardown force-drops the per-file runtime database, which can
+        // terminate the last idle client while the pool is still unwinding.
+        runtime.dbPool.on("error", () => undefined);
         cleanupTasks.unshift(async () => {
           await runtime.stop();
         });
