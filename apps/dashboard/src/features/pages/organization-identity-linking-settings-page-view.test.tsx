@@ -10,6 +10,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         loadErrorMessage={null}
+        pageErrorMessage={null}
         onEnabledChange={async () => {}}
         onProviderConnectionChange={async () => {}}
         providers={[
@@ -77,6 +78,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         loadErrorMessage={null}
+        pageErrorMessage={null}
         onEnabledChange={async ({ enabled }) => {
           enabledStates.push(enabled);
         }}
@@ -116,6 +118,7 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     render(
       <OrganizationIdentityLinkingSettingsPageView
         loadErrorMessage={null}
+        pageErrorMessage={null}
         onEnabledChange={async () => {}}
         onProviderConnectionChange={async () => {}}
         providers={[
@@ -140,5 +143,34 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
     fireEvent.click(screen.getByRole("button", { name: "View GitHub linked users" }));
 
     expect(screen.getByText("Could not load linked-member visibility.")).toBeTruthy();
+  });
+
+  it("renders a single page-level action error notice", () => {
+    render(
+      <OrganizationIdentityLinkingSettingsPageView
+        loadErrorMessage={null}
+        pageErrorMessage="Could not update GitHub identity-linking settings."
+        onEnabledChange={async () => {}}
+        onProviderConnectionChange={async () => {}}
+        providers={[
+          {
+            providerFamily: "github",
+            displayName: "GitHub",
+            logoKey: "github",
+            connectionOptions: [],
+            selectedConnectionId: null,
+            connectionPending: false,
+            enablePending: false,
+            enabled: false,
+            linkedUsersCount: 0,
+            memberLinksLoading: false,
+            memberLinksErrorMessage: null,
+            memberLinks: [],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Could not update GitHub identity-linking settings.")).toBeTruthy();
   });
 });

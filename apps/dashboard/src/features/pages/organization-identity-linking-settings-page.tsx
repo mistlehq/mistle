@@ -225,6 +225,7 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           canManage,
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
+        pageErrorMessage={resolvePageErrorMessage(actionErrorMessageByProviderFamily)}
         onEnabledChange={async ({ providerFamily, enabled }) => {
           await statusMutation.mutateAsync({
             providerFamily,
@@ -301,6 +302,18 @@ export function buildProviderCard(input: {
   return buildProviderRow(input);
 }
 
+function resolvePageErrorMessage(
+  actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>,
+): string | null {
+  for (const errorMessage of Object.values(actionErrorMessageByProviderFamily)) {
+    if (errorMessage !== undefined) {
+      return errorMessage;
+    }
+  }
+
+  return null;
+}
+
 export function buildProviderRow(input: {
   actionErrorMessageByProviderFamily: Readonly<Record<string, string | undefined>>;
   configuringProviderFamily: string | null;
@@ -324,7 +337,7 @@ export function buildProviderRow(input: {
     eligibleConnections,
     selectedConnectionId: input.provider.selectedConnection?.id ?? null,
   });
-  const baseRow: Omit<OrganizationIdentityLinkingProviderRow, "errorMessage"> = {
+  return {
     providerFamily: input.provider.providerFamily,
     displayName: input.provider.displayName,
     logoKey: input.provider.logoKey,
@@ -358,16 +371,6 @@ export function buildProviderRow(input: {
         }),
         updatedAt: link.updatedAt,
       })) ?? [],
-  };
-
-  const errorMessage = input.actionErrorMessageByProviderFamily[input.provider.providerFamily];
-  if (errorMessage === undefined) {
-    return baseRow;
-  }
-
-  return {
-    ...baseRow,
-    errorMessage,
   };
 }
 

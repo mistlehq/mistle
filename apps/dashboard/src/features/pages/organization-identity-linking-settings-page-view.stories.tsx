@@ -98,13 +98,6 @@ function wait(ms: number): Promise<void> {
   return systemSleeper.sleep(ms);
 }
 
-function clearProviderError(
-  provider: OrganizationIdentityLinkingProviderRow,
-): OrganizationIdentityLinkingProviderRow {
-  const { errorMessage: _errorMessage, ...rest } = provider;
-  return rest;
-}
-
 function StatefulPrototype(
   args: Omit<
     React.ComponentProps<typeof OrganizationIdentityLinkingSettingsPageView>,
@@ -122,7 +115,7 @@ function StatefulPrototype(
             provider.providerFamily !== providerFamily
               ? provider
               : {
-                  ...clearProviderError(provider),
+                  ...provider,
                   enablePending: true,
                 },
           ),
@@ -148,7 +141,7 @@ function StatefulPrototype(
             provider.providerFamily !== providerFamily
               ? provider
               : {
-                  ...clearProviderError(provider),
+                  ...provider,
                   selectedConnectionId: integrationConnectionId,
                   connectionPending: true,
                 },
@@ -181,6 +174,7 @@ const meta = {
   render: StatefulPrototype,
   args: {
     loadErrorMessage: null,
+    pageErrorMessage: null,
     onEnabledChange: async () => {},
     onProviderConnectionChange: async () => {},
     providers: BaseProviders,
@@ -208,15 +202,9 @@ export const NoProvidersAvailable: Story = {
   },
 };
 
-export const RowError: Story = {
+export const PageError: Story = {
   args: {
-    providers: [
-      {
-        ...BaseProviders[0],
-        errorMessage: "Could not update GitHub identity-linking settings.",
-      },
-      BaseProviders[1],
-    ],
+    pageErrorMessage: "Could not update GitHub identity-linking settings.",
   },
 };
 

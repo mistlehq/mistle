@@ -19,7 +19,7 @@ import { EyeIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { FormPageStack } from "../shared/form-page.js";
 
 export type OrganizationIdentityLinkingProviderRow = {
   providerFamily: string;
@@ -44,11 +44,11 @@ export type OrganizationIdentityLinkingProviderRow = {
     principalSummary: string | null;
     updatedAt: string | null;
   }[];
-  errorMessage?: string;
 };
 
 export type OrganizationIdentityLinkingSettingsPageViewProps = {
   loadErrorMessage: string | null;
+  pageErrorMessage: string | null;
   providers: readonly OrganizationIdentityLinkingProviderRow[];
   onProviderConnectionChange: (input: {
     providerFamily: string;
@@ -74,11 +74,9 @@ export function OrganizationIdentityLinkingSettingsPageView(
   if (props.loadErrorMessage !== null) {
     return (
       <FormPageStack>
-        <FormPageSection>
-          <div className="flex flex-col gap-3 p-4">
-            <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
-          </div>
-        </FormPageSection>
+        <div className="flex flex-col gap-3">
+          <Notice variant="alert">{props.loadErrorMessage} Please try again later.</Notice>
+        </div>
       </FormPageStack>
     );
   }
@@ -86,13 +84,11 @@ export function OrganizationIdentityLinkingSettingsPageView(
   if (props.providers.length === 0) {
     return (
       <FormPageStack>
-        <FormPageSection>
-          <div className="flex flex-col gap-3 p-4">
-            <Notice>
-              No identity-linking providers are currently available for this environment.
-            </Notice>
-          </div>
-        </FormPageSection>
+        <div className="flex flex-col gap-3">
+          <Notice>
+            No identity-linking providers are currently available for this environment.
+          </Notice>
+        </div>
       </FormPageStack>
     );
   }
@@ -100,6 +96,9 @@ export function OrganizationIdentityLinkingSettingsPageView(
   return (
     <>
       <FormPageStack>
+        {props.pageErrorMessage === null ? null : (
+          <Notice variant="alert">{props.pageErrorMessage}</Notice>
+        )}
         <div className="border-y bg-white">
           <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_180px_88px] gap-4 border-b px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground uppercase md:grid">
             <div>Integration</div>
@@ -144,8 +143,7 @@ function IdentityLinkingProviderRowView(input: {
   const provider = input.provider;
   const selectedConnectionLabel = resolveSelectedConnectionLabel(provider);
   const hasEligibleConnections = provider.connectionOptions.length > 0;
-  const rowStatusMessage =
-    provider.errorMessage ?? (provider.connectionPending ? "Saving connection..." : null);
+  const rowStatusMessage = provider.connectionPending ? "Saving connection..." : null;
 
   return (
     <div className={input.isLastRow ? undefined : "border-b"}>
@@ -253,12 +251,8 @@ function IdentityLinkingProviderRowView(input: {
         </div>
       </div>
 
-      {rowStatusMessage === null ? null : provider.errorMessage === undefined ? (
+      {rowStatusMessage === null ? null : (
         <div className="px-4 pb-4 text-sm text-muted-foreground">{rowStatusMessage}</div>
-      ) : (
-        <div className="px-4 pb-4">
-          <Notice variant="alert">{rowStatusMessage}</Notice>
-        </div>
       )}
     </div>
   );
