@@ -9,6 +9,7 @@ import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 import type {
   IntegrationConnectionSummary,
@@ -233,9 +234,10 @@ function ToolBindingsSection(input: {
 
   return (
     <div className="flex flex-col">
-      <div className="text-muted-foreground grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-4 border-b py-2 text-xs uppercase tracking-wide">
+      <div className="text-muted-foreground grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-2 text-xs uppercase tracking-wide">
         <p>Integration</p>
         <p>Tools</p>
+        <div className="w-8 shrink-0" />
       </div>
       {toolRows.map((row) => {
         const toolToggleModel = resolveBindingToolToggleModel({
@@ -262,58 +264,70 @@ function ToolBindingsSection(input: {
 
         return (
           <div
-            className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-4 border-b py-4"
+            className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-4"
             key={row.clientId}
           >
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">
-                {rowMetadata?.target?.displayName ?? "Integration"}
-              </p>
-              {summaryItems.length === 0 ? null : (
-                <div className="mt-2 flex flex-col gap-2">
-                  {summaryItems.map((item) => (
-                    <div className="min-w-0" key={item.label}>
-                      <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                        {item.label}
-                      </p>
-                      <p className="truncate text-sm">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              {toolToggleModel.options.map((option) => (
-                <label className="flex items-center gap-2 text-sm" key={option.value}>
-                  <Checkbox
-                    aria-label={option.label}
-                    checked={option.checked}
-                    onCheckedChange={(checked) => {
-                      input.onRowChange(row.clientId, {
-                        config: {
-                          ...toolToggleModel.config,
-                          tools:
-                            checked === true
-                              ? toolToggleModel.options
-                                  .filter(
-                                    (candidate) =>
-                                      candidate.checked || candidate.value === option.value,
-                                  )
-                                  .map((candidate) => candidate.value)
-                              : toolToggleModel.options
-                                  .filter(
-                                    (candidate) =>
-                                      candidate.checked && candidate.value !== option.value,
-                                  )
-                                  .map((candidate) => candidate.value),
-                        },
-                      });
-                    }}
+              <div className="flex items-center gap-2 text-sm">
+                {rowMetadata?.target?.logoKey === undefined ? null : (
+                  <img
+                    alt=""
+                    className="h-5 w-5 rounded-sm"
+                    src={resolveIntegrationLogoPath({ logoKey: rowMetadata.target.logoKey })}
                   />
-                  <span>{option.label}</span>
-                </label>
-              ))}
+                )}
+                <div className="min-w-0 truncate font-medium">
+                  {rowMetadata?.target?.displayName ?? "Integration"}
+                </div>
+              </div>
             </div>
+            <div className="min-w-0">
+              <div className="flex flex-col gap-2">
+                {summaryItems.length === 0 ? null : (
+                  <div className="mb-1 flex flex-col gap-2">
+                    {summaryItems.map((item) => (
+                      <div className="flex min-w-0 flex-col gap-0.5" key={item.label}>
+                        <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                          {item.label}
+                        </p>
+                        <p className="text-sm">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {toolToggleModel.options.map((option) => (
+                  <label className="flex items-center gap-2 text-sm" key={option.value}>
+                    <Checkbox
+                      aria-label={option.label}
+                      checked={option.checked}
+                      onCheckedChange={(checked) => {
+                        input.onRowChange(row.clientId, {
+                          config: {
+                            ...toolToggleModel.config,
+                            tools:
+                              checked === true
+                                ? toolToggleModel.options
+                                    .filter(
+                                      (candidate) =>
+                                        candidate.checked || candidate.value === option.value,
+                                    )
+                                    .map((candidate) => candidate.value)
+                                : toolToggleModel.options
+                                    .filter(
+                                      (candidate) =>
+                                        candidate.checked && candidate.value !== option.value,
+                                    )
+                                    .map((candidate) => candidate.value),
+                          },
+                        });
+                      }}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex w-8 shrink-0 items-start justify-end" />
           </div>
         );
       })}

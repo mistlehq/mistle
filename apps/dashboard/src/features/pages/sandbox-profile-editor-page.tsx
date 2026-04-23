@@ -39,6 +39,7 @@ import {
   SandboxProfileEditorSections,
   type SandboxProfileEditorSection,
 } from "./sandbox-profile-editor-sections.js";
+import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import {
   useLoadedSandboxProfileIntegrationsState,
   useSandboxProfileIntegrationsLoader,
@@ -448,7 +449,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
       rows={integrationsState.integrationRows}
     />
   ) : (
-    <IntegrationsEditorSection
+    <SandboxProfileIntegrationsSetupSection
       availableConnections={integrationsState.availableConnections}
       availableTargets={integrationsState.availableTargets}
       integrationBindingsQuery={{
@@ -457,19 +458,11 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
         isPending: false,
       }}
       integrationDirectoryQuery={input.integrationDirectoryQuery}
-      integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
       integrationRows={integrationsState.integrationRows}
       integrationSaveError={integrationsState.integrationSaveError}
-      isSubmittingIntegrationBindings={integrationsState.isSubmittingIntegrationBindings}
-      layout="stacked"
       onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
       onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
       onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
-      sectionKinds={["agent", "git", "connector"]}
-      showSectionNavigation={false}
-      {...(input.onHasUnsavedChangesChange === undefined
-        ? {}
-        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
     />
   );
 }

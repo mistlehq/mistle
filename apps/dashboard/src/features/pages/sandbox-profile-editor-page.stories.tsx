@@ -23,13 +23,13 @@ import {
   StoryOpenAiConnection,
   StoryPlanetScaleConnection,
 } from "./integrations-editor-section-story-support.js";
-import { IntegrationsEditorSection } from "./integrations-editor-section.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
+import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resources-and-tools-section.js";
 
@@ -189,7 +189,7 @@ function SandboxProfileEditorPageStoryView(
         renderSectionPanel={(sectionId) => {
           if (sectionId === "integrations") {
             return (
-              <IntegrationsEditorSection
+              <SandboxProfileIntegrationsSetupSection
                 availableConnections={StoryIntegrationConnections}
                 availableTargets={StoryIntegrationTargets}
                 integrationBindingsQuery={{
@@ -202,10 +202,8 @@ function SandboxProfileEditorPageStoryView(
                   error: null,
                   isPending: false,
                 }}
-                integrationRowErrorsByClientId={{}}
                 integrationRows={integrationRows}
                 integrationSaveError={null}
-                isSubmittingIntegrationBindings={false}
                 onAddIntegrationBindingRow={async (nextBinding) => {
                   setIntegrationRows((currentRows) => [
                     ...currentRows,
@@ -230,9 +228,6 @@ function SandboxProfileEditorPageStoryView(
                     currentRows.filter((row) => row.clientId !== clientId),
                   );
                 }}
-                layout="stacked"
-                sectionKinds={["agent", "git", "connector"]}
-                showSectionNavigation={false}
               />
             );
           }
