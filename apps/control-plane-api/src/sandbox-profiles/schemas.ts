@@ -70,6 +70,14 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   })
   .strict();
 
+export const sandboxProfileVersionSetupScriptSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export const listSandboxProfileVersionsResponseSchema = z
   .object({
     versions: z.array(sandboxProfileVersionSchema),
@@ -107,6 +115,18 @@ export const getSandboxProfileVersionAutomationConfigResponseSchema = z
     repositoryOptions: z.array(sandboxProfileRepositoryOptionSchema),
   })
   .strict();
+
+export const putSandboxProfileVersionSetupScriptBodySchema = z
+  .object({
+    setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const getSandboxProfileVersionSetupScriptResponseSchema =
+  sandboxProfileVersionSetupScriptSchema;
+
+export const putSandboxProfileVersionSetupScriptResponseSchema =
+  sandboxProfileVersionSetupScriptSchema;
 
 export const createSandboxProfileBodySchema = z
   .object({

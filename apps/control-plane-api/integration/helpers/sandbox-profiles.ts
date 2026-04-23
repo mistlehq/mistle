@@ -24,10 +24,12 @@ export function createSandboxProfileFixture(input: {
 export function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
   version: number;
+  setupScript?: string | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
+    ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
   };
 }
 
