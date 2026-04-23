@@ -22,6 +22,8 @@
 - Read `docs/testing/no-mocking.md` before adding or changing tests.
 - Test **everything**. Tests must be rigorous. Our intent is ensuring a new person contributing to the same code base cannot break our stuff and that nothing slips by.
 - Unless the user asks otherwise, run only the tests you added or modified instead of the entire suite to avoid wasting time.
+- For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, and `pnpm test:integration -- --project <project> <file>` for the root integration runner.
+- In this repo, `pnpm --filter <pkg> test:integration -- <file>` does **not** reliably scope to that file. It forwards as `vitest run -c <config> -- <file>`, and Vitest treats that differently from a positional file filter. Use the direct `exec vitest ... <file>` form when you need a single-file package-level run.
 - Unit tests should be colocated / close to the source code and scoped to pure function/class/module behavior (no external dependencies)
 - Integration tests should be in a dedicated integration/ folder for a given app or package.
 - System tests should be in a tests/system/ folder.

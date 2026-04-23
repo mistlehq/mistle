@@ -10,6 +10,7 @@ import controlPlaneWorkerConfig from "./apps/control-plane-worker/vitest.integra
 import dashboardConfig from "./apps/dashboard/vitest.integration.config.ts";
 import dataPlaneApiConfig from "./apps/data-plane-api/vitest.integration.config.ts";
 import dataPlaneGatewayConfig from "./apps/data-plane-gateway/vitest.integration.config.ts";
+import dataPlaneWorkerConfig from "./apps/data-plane-worker/vitest.integration.config.ts";
 import tokenizerProxyConfig from "./apps/tokenizer-proxy/vitest.integration.config.ts";
 import configConfig from "./packages/config/vitest.integration.config.ts";
 import dbConfig from "./packages/db/vitest.integration.config.ts";
@@ -62,6 +63,11 @@ export default defineConfig({
         name: "@mistle/data-plane-gateway",
         root: "./apps/data-plane-gateway",
         config: dataPlaneGatewayConfig,
+      }),
+      createNamedProject({
+        name: "@mistle/data-plane-worker",
+        root: "./apps/data-plane-worker",
+        config: dataPlaneWorkerConfig,
       }),
       createNamedProject({
         name: "@mistle/tokenizer-proxy",

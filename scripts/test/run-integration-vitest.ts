@@ -24,6 +24,10 @@ const IntegrationVitestProjects = [
     packageName: "@mistle/data-plane-gateway",
   },
   {
+    projectName: "@mistle/data-plane-worker",
+    packageName: "@mistle/data-plane-worker",
+  },
+  {
     projectName: "@mistle/tokenizer-proxy",
     packageName: "@mistle/tokenizer-proxy",
   },
