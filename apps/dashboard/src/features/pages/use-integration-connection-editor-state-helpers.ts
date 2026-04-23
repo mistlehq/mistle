@@ -461,6 +461,13 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
   }
 
   if (input.editor.mode === "create") {
+    if (
+      input.editor.targetFamilyId === "github" &&
+      input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+    ) {
+      return null;
+    }
+
     const missingSecretField = selectedMethod.secretFields.find(
       (secretField) =>
         secretField.optional !== true &&

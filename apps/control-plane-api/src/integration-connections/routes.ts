@@ -6,6 +6,7 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import * as cancelDeviceAuthorizationAttempt from "./cancel-device-authorization-attempt/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import * as createFormConnection from "./create-form-connection/index.js";
+import * as createGitHubAppDraftConnection from "./create-github-app-draft-connection/index.js";
 import * as createIntegrationWebhookSource from "./create-integration-webhook-source/index.js";
 import * as deleteIntegrationConnection from "./delete-integration-connection/index.js";
 import * as deleteIntegrationWebhookSource from "./delete-integration-webhook-source/index.js";
@@ -66,6 +67,8 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(createFormConnection.route.path, requireAuthSession);
   routes.openapi(createFormConnection.route, createFormConnection.handler);
+  routes.use(createGitHubAppDraftConnection.route.path, requireAuthSession);
+  routes.openapi(createGitHubAppDraftConnection.route, createGitHubAppDraftConnection.handler);
 
   routes.on(
     updateIntegrationConnection.route.method,

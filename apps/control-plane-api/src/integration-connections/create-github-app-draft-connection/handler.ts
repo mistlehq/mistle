@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { startGitHubAppInstallationConnection } from "../services/start-github-app-installation-connection.js";
+import { createGitHubAppDraftConnection } from "../services/create-github-app-draft-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -12,22 +12,22 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const integrationsConfig = ctx.get("config").integrations;
-  const { connectionId } = ctx.req.valid("param");
+  const { targetKey } = ctx.req.valid("param");
+  const { displayName } = ctx.req.valid("json");
 
-  const startedConnection = await startGitHubAppInstallationConnection(
+  const createdConnection = await createGitHubAppDraftConnection(
     {
       db,
       integrationRegistry,
-      integrationsConfig,
     },
     {
       organizationId: session.activeOrganizationId,
-      connectionId,
+      targetKey,
+      displayName,
     },
   );
 
-  return ctx.json(startedConnection, 200);
+  return ctx.json(createdConnection, 201);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

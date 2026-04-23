@@ -111,7 +111,16 @@ function LoadedIntegrationConnectionCreatePage(input: {
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
     onClose: () => navigate(input.returnPath ?? "/integrations"),
-    onSubmitSuccess: async ({ connectionId, editor }) => {
+    onSubmitSuccess: async ({ connectionId, editor, methodId }) => {
+      if (
+        connectionId !== null &&
+        editor.targetFamilyId === "github" &&
+        methodId === "github-app-installation"
+      ) {
+        await navigate(`/integrations/${editor.targetKey}/${connectionId}/github-app/setup`);
+        return;
+      }
+
       if (input.returnPath !== undefined && connectionId !== null) {
         await navigate(
           appendIntegrationConnectionReturnParams({

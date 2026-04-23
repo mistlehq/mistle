@@ -146,6 +146,51 @@ function openAiCreateEditorInput() {
   };
 }
 
+function gitHubAppCreateEditorInput() {
+  return {
+    mode: "create" as const,
+    methods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "form" as const,
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API key",
+            inputType: "password" as const,
+            slotKey: "github.github-cloud.api-key.api-key",
+          },
+        ],
+      },
+      {
+        id: "github-app-installation",
+        label: "GitHub App installation",
+        kind: "form" as const,
+        secretFields: [
+          {
+            name: "appPrivateKeyPem",
+            label: "App private key PEM",
+            inputType: "textarea" as const,
+            slotKey: "github.github-cloud.app-private-key-pem",
+          },
+          {
+            name: "webhookSecret",
+            label: "Webhook secret",
+            inputType: "password" as const,
+            slotKey: "github.github-cloud.webhook-secret",
+          },
+        ],
+      },
+    ],
+    targetConfig: {},
+    targetDisplayName: "GitHub",
+    targetFamilyId: "github",
+    targetKey: "github-cloud",
+    targetVariantId: "github-cloud",
+  };
+}
+
 function signozRedirectUpdateEditorInput() {
   return {
     mode: "update" as const,
@@ -424,6 +469,73 @@ describe("useIntegrationConnectionEditorState", () => {
         timeout: 5_000,
       },
     );
+  });
+
+  it("creates a GitHub App draft connection without requiring create-time secrets", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname ===
+          "/v1/integration/connections/github-cloud/github-app-installation/draft"
+      ) {
+        return {
+          status: 201,
+          body: {
+            id: "icn_github_draft",
+            targetKey: "github-cloud",
+            displayName: "Engineering GitHub",
+            status: "active",
+            config: {
+              connection_method: "github-app-installation",
+            },
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-04-23T00:00:00.000Z",
+            updatedAt: "2026-04-23T00:00:00.000Z",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    let submittedConnectionId: string | null = null;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: gitHubAppCreateEditorInput(),
+          onSubmitSuccess: ({ connectionId }) => {
+            submittedConnectionId = connectionId;
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onMethodChange("github-app-installation");
+      result.current.onConnectionDisplayNameChange("Engineering GitHub");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(submittedConnectionId).toBe("icn_github_draft");
+    });
+
+    expect(server.requests).toEqual([
+      {
+        method: "POST",
+        pathname: "/v1/integration/connections/github-cloud/github-app-installation/draft",
+        body: {
+          displayName: "Engineering GitHub",
+        },
+      },
+    ]);
   });
 
   it("cancels the pending attempt when the editor is closed", async () => {

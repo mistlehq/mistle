@@ -52,6 +52,35 @@ export async function createFormIntegrationConnection(input: {
   }
 }
 
+export async function createGitHubAppDraftIntegrationConnection(input: {
+  targetKey: string;
+  displayName: string;
+}): Promise<CreatedIntegrationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createGitHubAppDraftIntegrationConnection",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/draft`,
+      body: {
+        displayName: input.displayName,
+      },
+      fallbackMessage: "Could not create GitHub App connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: IntegrationConnectionSchema,
+      operation: "createGitHubAppDraftIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "createGitHubAppDraftIntegrationConnection",
+      error,
+      fallbackMessage: "Could not create GitHub App connection.",
+    });
+  }
+}
+
 export async function createApiKeyIntegrationConnection(input: {
   targetKey: string;
   displayName: string;

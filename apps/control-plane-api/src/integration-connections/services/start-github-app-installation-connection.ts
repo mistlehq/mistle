@@ -13,13 +13,21 @@ import {
 } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
+import {
+  InternalIntegrationCredentialsError,
+  InternalIntegrationCredentialsErrorCodes,
+} from "../../internal/integration-credentials/services/errors.js";
+import type { AppContext } from "../../types.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeGitHubAppInstallationStateMetadata,
 } from "./redirect-flow.js";
-import { resolveConnectionWithTargetOrThrow } from "./webhook-sources.js";
+import {
+  resolveConnectionSecretsOrThrow,
+  resolveConnectionWithTargetOrThrow,
+} from "./webhook-sources.js";
 
 export type StartGitHubAppInstallationConnectionInput = {
   organizationId: string;
@@ -119,10 +127,11 @@ export async function startGitHubAppInstallationConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
   },
   input: StartGitHubAppInstallationConnectionInput,
 ): Promise<StartedGitHubAppInstallationConnection> {
-  const { db, integrationRegistry } = ctx;
+  const { db, integrationRegistry, integrationsConfig } = ctx;
 
   const connection = await resolveConnectionWithTargetOrThrow({
     db,
@@ -145,6 +154,26 @@ export async function startGitHubAppInstallationConnection(
     config: connection.config,
     connectionId: input.connectionId,
   });
+  try {
+    await resolveConnectionSecretsOrThrow({
+      db,
+      integrationRegistry,
+      connection,
+      integrationsConfig,
+    });
+  } catch (error) {
+    if (
+      error instanceof InternalIntegrationCredentialsError &&
+      error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
+    ) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
+        `Integration connection '${input.connectionId}' is missing required GitHub App credentials.`,
+      );
+    }
+
+    throw error;
+  }
   let parsedTargetConfig: z.output<typeof GitHubTargetConfigSchema>;
   try {
     parsedTargetConfig = GitHubTargetConfigSchema.parse(connection.target.config);

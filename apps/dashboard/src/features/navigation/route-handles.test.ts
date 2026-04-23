@@ -16,6 +16,10 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.integrationCreate.description).toBe("function");
     expect(ROUTE_HANDLES.integrationCreate.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
+    expect(typeof ROUTE_HANDLES.integrationGitHubManualSetup.title).toBe("function");
+    expect(typeof ROUTE_HANDLES.integrationGitHubManualSetup.description).toBe("function");
+    expect(ROUTE_HANDLES.integrationGitHubManualSetup.header?.icon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationGitHubManualSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
@@ -131,6 +135,20 @@ describe("route handles", () => {
     expect(createTitle({ params: { targetKey: "github-cloud" } })).toBe("Add GitHub Connection");
     expect(createTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Add Custom Integration V2 Connection",
+    );
+  });
+
+  it("resolves GitHub manual setup title from the target key", () => {
+    const setupTitle = ROUTE_HANDLES.integrationGitHubManualSetup.title;
+    expect(typeof setupTitle).toBe("function");
+
+    if (typeof setupTitle !== "function") {
+      throw new Error("integrationGitHubManualSetup title must be a function");
+    }
+
+    expect(setupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");
+    expect(setupTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
+      "Setup Custom Integration V2 App",
     );
   });
 

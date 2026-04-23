@@ -10,6 +10,7 @@ export {
 export {
   cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
+  createGitHubAppDraftIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,

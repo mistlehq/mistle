@@ -619,7 +619,7 @@ function ExistingGitHubAppSetupStory(): React.JSX.Element {
   const configSchema = GitHubAppInstallationConnectionConfigForm.schema;
 
   return (
-    <FormPageFrame title="Set Up An Existing GitHub App">
+    <FormPageFrame title="Setup GitHub App Manually">
       <FormPageStack>
         <FormPageSection>
           <div className="p-4">
@@ -887,8 +887,8 @@ export function ProposedGitHubCloudAddFlowStory(): React.JSX.Element {
                           className="max-w-80 whitespace-pre-wrap text-left"
                           side="top"
                         >
-                          Choose whether this connection should use an existing GitHub App or create
-                          a new customer-owned app through Mistle&apos;s guided manifest flow.
+                          Choose whether this connection should be set up manually or create a new
+                          customer-owned app through Mistle&apos;s guided manifest flow.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -914,7 +914,7 @@ export function ProposedGitHubCloudAddFlowStory(): React.JSX.Element {
                       <div className="flex items-start gap-3">
                         <RadioGroupItem id="storybook-github-setup-existing" value="existing-app" />
                         <label className="text-sm" htmlFor="storybook-github-setup-existing">
-                          Use an existing GitHub app
+                          Setup app manually
                         </label>
                       </div>
                     </RadioGroup>

@@ -114,6 +114,10 @@ function resolveIntegrationEditTitle(input: RouteTextResolverInput): string {
   return `Edit ${resolveIntegrationDetailTitle(input)} Connection`;
 }
 
+function resolveGitHubManualSetupTitle(input: RouteTextResolverInput): string {
+  return `Setup ${resolveIntegrationDetailTitle(input)} App`;
+}
+
 function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): React.ReactNode | null {
   const targetKey = input.params["targetKey"];
   if (targetKey === undefined || targetKey.trim().length === 0) {
@@ -193,6 +197,15 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Edit",
     title: resolveIntegrationEditTitle,
+    description: resolveIntegrationDetailSubtitle,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
+  },
+  integrationGitHubManualSetup: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Setup",
+    title: resolveGitHubManualSetupTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,

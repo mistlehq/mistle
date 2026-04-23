@@ -13,6 +13,7 @@ import type { IntegrationConnectionMethod } from "../integrations/integrations-s
 import {
   cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
+  createGitHubAppDraftIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
@@ -33,6 +34,7 @@ import {
 type IntegrationConnectionSubmitSuccessInput = {
   connectionId: string | null;
   editor: IntegrationConnectionEditorState;
+  methodId: IntegrationConnectionMethodId;
 };
 
 type UseIntegrationConnectionEditorStateInput = {
@@ -53,6 +55,17 @@ function isDeviceAuthorizationMethod(
   method: IntegrationConnectionMethod | null,
 ): method is Extract<IntegrationConnectionMethod, { kind: "device-authorization" }> {
   return method?.kind === "device-authorization";
+}
+
+function shouldCreateGitHubAppDraftConnection(input: {
+  editor: IntegrationConnectionEditorState;
+  methodId: IntegrationConnectionMethodId;
+}): boolean {
+  return (
+    input.editor.mode === "create" &&
+    input.editor.targetFamilyId === "github" &&
+    input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  );
 }
 
 function resolveEditableConfigValue(input: {
@@ -111,6 +124,11 @@ export function useIntegrationConnectionEditorState(
     }) => createFormIntegrationConnection(mutationInput),
   });
 
+  const createGitHubAppDraftMutation = useMutation({
+    mutationFn: async (mutationInput: { targetKey: string; displayName: string }) =>
+      createGitHubAppDraftIntegrationConnection(mutationInput),
+  });
+
   const startRedirectMutation = useMutation({
     mutationFn: async (mutationInput: {
       targetKey: string;
@@ -158,6 +176,7 @@ export function useIntegrationConnectionEditorState(
     });
   const submitPending =
     createFormMutation.isPending ||
+    createGitHubAppDraftMutation.isPending ||
     startDeviceAuthorizationMutation.isPending ||
     startRedirectMutation.isPending ||
     updateConnectionMutation.isPending ||
@@ -251,6 +270,7 @@ export function useIntegrationConnectionEditorState(
                 await handleSubmitSuccess({
                   connectionId: null,
                   editor,
+                  methodId: draft.methodId,
                 });
               }
               return;
@@ -343,9 +363,33 @@ export function useIntegrationConnectionEditorState(
         await handleSubmitSuccess({
           connectionId: updatedConnection.id,
           editor,
+          methodId: draft.methodId,
         });
         return;
       } else {
+        if (
+          shouldCreateGitHubAppDraftConnection({
+            editor,
+            methodId: draft.methodId,
+          })
+        ) {
+          const createdConnection = await createGitHubAppDraftMutation.mutateAsync({
+            targetKey: editor.targetKey,
+            displayName: normalizedConnectionDisplayName,
+          });
+
+          await queryClient.invalidateQueries({
+            queryKey: input.queryKey,
+          });
+
+          await handleSubmitSuccess({
+            connectionId: createdConnection.id,
+            editor,
+            methodId: draft.methodId,
+          });
+          return;
+        }
+
         const createdConnection = await createFormMutation.mutateAsync({
           targetKey: editor.targetKey,
           displayName: normalizedConnectionDisplayName,
@@ -361,6 +405,7 @@ export function useIntegrationConnectionEditorState(
         await handleSubmitSuccess({
           connectionId: createdConnection.id,
           editor,
+          methodId: draft.methodId,
         });
         return;
       }
@@ -384,6 +429,7 @@ export function useIntegrationConnectionEditorState(
       await handleSubmitSuccess({
         connectionId: updatedConnection.id,
         editor,
+        methodId: draft.methodId,
       });
       return;
     }
