@@ -208,7 +208,7 @@ function getOpenDialog(): HTMLElement {
 }
 
 describe("IntegrationsEditorSection", () => {
-  it("adds an agent harness binding from the empty-state connection selector", async () => {
+  it("shows an enabled add action for an empty agent harness section", async () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -217,9 +217,29 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    const addButton = getVisibleAddButton();
+
+    expect(addButton.hasAttribute("disabled")).toBe(false);
+    expect(within(getActiveTabPanel()).queryByRole("combobox", { name: "Connection" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit binding" })).toBeNull();
+  });
+
+  it("adds an agent harness binding from the add dialog", async () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/Primary OpenAI Workspace/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       const agentSection = getActiveTabPanel();
@@ -233,21 +253,7 @@ describe("IntegrationsEditorSection", () => {
     });
   }, 10000);
 
-  it("renders an inline connection selector instead of an add action for empty agent harness", async () => {
-    const queryClient = createTestQueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <Harness />
-      </QueryClientProvider>,
-    );
-
-    expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
-    expect(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" })).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Edit binding" })).toBeNull();
-  });
-
-  it("adds a git provider binding from the empty-state connection selector", async () => {
+  it("adds a git provider binding from the add dialog", async () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -257,9 +263,13 @@ describe("IntegrationsEditorSection", () => {
     );
 
     activateIntegrationsTab("Git Provider");
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/GitHub Production/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       const gitProvidersSection = getActiveTabPanel();
@@ -285,7 +295,10 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
 
     expect(within(listbox).getByText(/Primary OpenAI Workspace/)).toBeDefined();
@@ -341,9 +354,13 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/Primary OpenAI Workspace/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       const agentSection = getActiveTabPanel();
@@ -364,9 +381,13 @@ describe("IntegrationsEditorSection", () => {
     );
 
     activateIntegrationsTab("Git Provider");
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/GitHub Production/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       const gitProvidersSection = getActiveTabPanel();
@@ -381,7 +402,7 @@ describe("IntegrationsEditorSection", () => {
     expect(screen.queryByRole("button", { name: "Add" })).toBeNull();
   });
 
-  it("stages agent harness edits until save and restores them on cancel", async () => {
+  it("autosaves agent harness edits inline without save or cancel actions", async () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -390,22 +411,20 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     let listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/Primary OpenAI Workspace/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(
         within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }),
       ).toBeDefined();
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
 
     fireEvent.change(
@@ -416,52 +435,12 @@ describe("IntegrationsEditorSection", () => {
     );
 
     await waitFor(() => {
-      expect(within(getActiveTabPanel()).getByRole("button", { name: "Save" })).toBeDefined();
-      expect(within(getActiveTabPanel()).getByRole("button", { name: "Cancel" })).toBeDefined();
       const agentInstructions = within(getActiveTabPanel()).getByRole("textbox", {
         name: "Agent Instructions",
       }) as HTMLTextAreaElement;
       expect(agentInstructions.value).toBe("Use the backup workspace when needed.");
-    });
-
-    fireEvent.click(within(getActiveTabPanel()).getByRole("button", { name: "Cancel" }));
-
-    await waitFor(() => {
-      const agentInstructions = within(getActiveTabPanel()).getByRole("textbox", {
-        name: "Agent Instructions",
-      }) as HTMLTextAreaElement;
-      expect(agentInstructions.value).toBe("");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
-    });
-
-    fireEvent.change(
-      within(getActiveTabPanel()).getByRole("textbox", { name: "Agent Instructions" }),
-      {
-        target: { value: "Use the backup workspace when needed." },
-      },
-    );
-    fireEvent.click(within(getActiveTabPanel()).getByRole("button", { name: "Save" }));
-
-    await waitFor(() => {
-      const agentInstructions = within(getActiveTabPanel()).getByRole("textbox", {
-        name: "Agent Instructions",
-      }) as HTMLTextAreaElement;
-      expect(agentInstructions.value).toBe("Use the backup workspace when needed.");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
 
     fireEvent.change(
@@ -476,35 +455,12 @@ describe("IntegrationsEditorSection", () => {
         name: "Agent Instructions",
       }) as HTMLTextAreaElement;
       expect(agentInstructions.value).toBe("");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(false);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(false);
-    });
-
-    fireEvent.click(within(getActiveTabPanel()).getByRole("button", { name: "Save" }));
-
-    await waitFor(() => {
-      const agentInstructions = within(getActiveTabPanel()).getByRole("textbox", {
-        name: "Agent Instructions",
-      }) as HTMLTextAreaElement;
-      expect(agentInstructions.value).toBe("");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
   });
 
-  it("stages git provider edits until save and restores them on cancel", async () => {
+  it("autosaves git provider edits inline without save or cancel actions", async () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -514,60 +470,36 @@ describe("IntegrationsEditorSection", () => {
     );
 
     activateIntegrationsTab("Git Provider");
-    fireEvent.click(within(getActiveTabPanel()).getByRole("combobox", { name: "Connection" }));
+    fireEvent.click(getVisibleAddButton());
+    fireEvent.click(
+      within(getOpenDialog()).getByRole("combobox", { name: "Add binding connection" }),
+    );
     const listbox = await screen.findByRole("listbox");
     fireEvent.click(within(listbox).getByText(/GitHub Production/));
+    fireEvent.click(within(getOpenDialog()).getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(within(getActiveTabPanel()).getAllByRole("checkbox").length).toBeGreaterThan(0);
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
 
     fireEvent.click(within(getActiveTabPanel()).getAllByRole("checkbox")[0] as HTMLElement);
 
     await waitFor(() => {
-      expect(within(getActiveTabPanel()).getByRole("button", { name: "Save" })).toBeDefined();
-      expect(within(getActiveTabPanel()).getByRole("button", { name: "Cancel" })).toBeDefined();
       const firstCheckbox = within(getActiveTabPanel()).getAllByRole("checkbox")[0];
       expect(firstCheckbox?.getAttribute("aria-checked")).toBe("false");
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
 
-    fireEvent.click(within(getActiveTabPanel()).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(getActiveTabPanel()).getAllByRole("checkbox")[0] as HTMLElement);
 
     await waitFor(() => {
       const firstCheckbox = within(getActiveTabPanel()).getAllByRole("checkbox")[0];
       expect(firstCheckbox?.getAttribute("aria-checked")).toBe("true");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
-    });
-
-    fireEvent.click(within(getActiveTabPanel()).getAllByRole("checkbox")[0] as HTMLElement);
-    fireEvent.click(within(getActiveTabPanel()).getByRole("button", { name: "Save" }));
-
-    await waitFor(() => {
-      const firstCheckbox = within(getActiveTabPanel()).getAllByRole("checkbox")[0];
-      expect(firstCheckbox?.getAttribute("aria-checked")).toBe("false");
-      expect(
-        within(getActiveTabPanel()).getByRole("button", { name: "Save" }).hasAttribute("disabled"),
-      ).toBe(true);
-      expect(
-        within(getActiveTabPanel())
-          .getByRole("button", { name: "Cancel" })
-          .hasAttribute("disabled"),
-      ).toBe(true);
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Save" })).toBeNull();
+      expect(within(getActiveTabPanel()).queryByRole("button", { name: "Cancel" })).toBeNull();
     });
   });
 
@@ -608,7 +540,7 @@ describe("IntegrationsEditorSection", () => {
     expect(screen.getByRole("tab", { name: "Connectors" })).toBeDefined();
   });
 
-  it("shows connector headers and inline empty-state add action", () => {
+  it("shows connector empty-state copy with a single add action", () => {
     const queryClient = createTestQueryClient();
 
     render(
@@ -620,9 +552,6 @@ describe("IntegrationsEditorSection", () => {
     activateIntegrationsTab("Connectors");
 
     const connectorsPanel = getActiveTabPanel();
-    expect(within(connectorsPanel).getByText("Integration")).toBeDefined();
-    expect(within(connectorsPanel).getByText("Connection")).toBeDefined();
-    expect(within(connectorsPanel).getByText("Configuration")).toBeDefined();
     expect(
       within(connectorsPanel).getAllByText(
         "Add connectors to give the agent access to external tools and their resources, like Linear or Slack.",

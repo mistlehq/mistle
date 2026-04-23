@@ -38,7 +38,7 @@ export function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): 
     return "Agent Harness";
   }
   if (kind === "git") {
-    return "Git Providers";
+    return "Git Provider";
   }
   return "Connectors";
 }
@@ -48,7 +48,7 @@ function formatBindingSectionEmptyState(kind: SandboxIntegrationBindingKind): st
     return "Assign the agent harness for this sandbox profile.";
   }
   if (kind === "git") {
-    return "Add Git providers to give the agent access to resources like repositories.";
+    return "Add Git provider to give the agent access to resources like repositories.";
   }
   return "Add connectors to give the agent access to external tools and their resources, like Linear or Slack.";
 }
@@ -65,58 +65,6 @@ export function shouldHideBindingSectionAddAction(input: {
   rowCount: number;
 }): boolean {
   return (input.kind === "agent" || input.kind === "git") && input.rowCount > 0;
-}
-
-function serializeBindingRowState(row: Omit<SandboxProfileBindingEditorRow, "clientId">): string {
-  return JSON.stringify({
-    id: row.id,
-    connectionId: row.connectionId,
-    kind: row.kind,
-    config: row.config,
-  });
-}
-
-function useDraftBindingRow(row: SandboxProfileBindingEditorRow): {
-  draftRow: SandboxProfileBindingEditorRow;
-  isDirty: boolean;
-  setDraftRow: React.Dispatch<React.SetStateAction<SandboxProfileBindingEditorRow>>;
-  resetDraftRow: () => void;
-} {
-  const persistedSignature = serializeBindingRowState(row);
-  const persistedRowRef = React.useRef(row);
-  const [draftRow, setDraftRow] = React.useState(row);
-
-  persistedRowRef.current = row;
-
-  React.useEffect(() => {
-    setDraftRow(persistedRowRef.current);
-  }, [persistedSignature]);
-
-  return {
-    draftRow,
-    isDirty: serializeBindingRowState(draftRow) !== persistedSignature,
-    setDraftRow,
-    resetDraftRow: () => {
-      setDraftRow(row);
-    },
-  };
-}
-
-function BindingDraftActions(input: {
-  isDirty: boolean;
-  onCancel: () => void;
-  onSave: () => void;
-}): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-end gap-2">
-      <Button disabled={!input.isDirty} onClick={input.onCancel} type="button" variant="outline">
-        Cancel
-      </Button>
-      <Button disabled={!input.isDirty} onClick={input.onSave} type="button">
-        Save
-      </Button>
-    </div>
-  );
 }
 
 function resolveAvailableConnectionsForBindingKind(input: {
@@ -205,15 +153,9 @@ function SchemaBindingRowEditor(input: {
   removeAction?: React.ReactNode;
   fieldId: string;
 }): React.JSX.Element {
-  const { draftRow, isDirty, resetDraftRow, setDraftRow } = useDraftBindingRow(input.row);
-
   React.useEffect(() => {
-    input.onDraftDirtyChange?.(input.row.clientId, isDirty);
-
-    return () => {
-      input.onDraftDirtyChange?.(input.row.clientId, false);
-    };
-  }, [input.onDraftDirtyChange, input.row.clientId, isDirty]);
+    input.onDraftDirtyChange?.(input.row.clientId, false);
+  }, [input.onDraftDirtyChange, input.row.clientId]);
 
   return (
     <div className="flex flex-col gap-4 py-2">
@@ -231,8 +173,7 @@ function SchemaBindingRowEditor(input: {
               (candidate) => candidate.targetKey === nextConnection?.targetKey,
             );
 
-            setDraftRow((currentRow) => ({
-              ...currentRow,
+            input.onChange(input.row.clientId, {
               connectionId: nextValue,
               config:
                 nextConnection === undefined || nextTarget === undefined
@@ -241,10 +182,10 @@ function SchemaBindingRowEditor(input: {
                       connection: nextConnection,
                       target: nextTarget,
                     }),
-            }));
+            });
           }}
           placeholder="Select integration connection"
-          selectedConnectionId={draftRow.connectionId}
+          selectedConnectionId={input.row.connectionId}
           trailingAction={input.removeAction}
         />
 
@@ -257,23 +198,9 @@ function SchemaBindingRowEditor(input: {
             layout: "vertical",
           }}
           onIntegrationBindingRowChange={(clientId, changes) => {
-            setDraftRow((currentRow) =>
-              clientId === currentRow.clientId ? { ...currentRow, ...changes } : currentRow,
-            );
+            input.onChange(clientId, changes);
           }}
-          row={draftRow}
-        />
-
-        <BindingDraftActions
-          isDirty={isDirty}
-          onCancel={resetDraftRow}
-          onSave={() => {
-            input.onChange(input.row.clientId, {
-              connectionId: draftRow.connectionId,
-              kind: draftRow.kind,
-              config: draftRow.config,
-            });
-          }}
+          row={input.row}
         />
 
         {input.rowError === undefined ? null : <Notice variant="alert">{input.rowError}</Notice>}
@@ -678,12 +605,6 @@ export function SandboxProfileBindingSection(input: {
   }) => Promise<void> | void;
 }): React.JSX.Element {
   const showSectionChrome = input.showSectionChrome ?? true;
-  const availableConnectionsForKind = input.availableConnections.filter((connection) => {
-    const target = input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    );
-    return resolveBindingKindFromTarget(target) === input.kind;
-  });
   const addConstraintMessage =
     input.rows.length > 0 && input.addDisabled ? formatBindingSectionConstraint(input.kind) : null;
   const hideAddAction = shouldHideBindingSectionAddAction({
@@ -765,6 +686,13 @@ export function SandboxProfileBindingSection(input: {
     );
 
   if (!showSectionChrome) {
+    if (input.rows.length === 0) {
+      return (
+        <div className="text-muted-foreground text-sm">
+          {formatBindingSectionEmptyState(input.kind)}
+        </div>
+      );
+    }
     return sectionContent;
   }
 
@@ -772,8 +700,6 @@ export function SandboxProfileBindingSection(input: {
     return (
       <SectionBlock
         action={
-          ((input.kind === "agent" || input.kind === "git") &&
-            availableConnectionsForKind.length > 0) ||
           hideAddAction ? null : addConstraintMessage === null ? (
             addButton
           ) : (
@@ -783,11 +709,7 @@ export function SandboxProfileBindingSection(input: {
             </Tooltip>
           )
         }
-        {...(((input.kind === "agent" || input.kind === "git") &&
-          availableConnectionsForKind.length > 0) ||
-        input.rows.length > 0
-          ? { children: sectionContent }
-          : { emptyState: formatBindingSectionEmptyState(input.kind) })}
+        emptyState={formatBindingSectionEmptyState(input.kind)}
         title={formatBindingSectionTitle(input.kind)}
       />
     );

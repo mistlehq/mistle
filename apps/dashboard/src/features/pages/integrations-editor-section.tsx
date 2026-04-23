@@ -347,15 +347,10 @@ export function IntegrationsEditorSection(
   }
 
   const activeRowCount = integrationRowsByKind[activeTab].length;
-  const hideActiveAddAction =
-    (activeTab === "agent" || activeTab === "git") && activeRowCount === 0
-      ? true
-      : activeTab === "connector" && activeRowCount === 0
-        ? true
-        : shouldHideBindingSectionAddAction({
-            kind: activeTab,
-            rowCount: activeRowCount,
-          });
+  const hideActiveAddAction = shouldHideBindingSectionAddAction({
+    kind: activeTab,
+    rowCount: activeRowCount,
+  });
   const activeAddConstraintMessage =
     activeRowCount > 0 && isAddDisabled(activeTab)
       ? formatBindingSectionConstraint(activeTab)
