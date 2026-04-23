@@ -61,5 +61,7 @@ export type SandboxProfileVersionIntegrationBinding = {
   createdAt: string;
   updatedAt: string;
 };
+export type SandboxProfileVersionSetupScript =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileVersionAutomationConfig =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"];

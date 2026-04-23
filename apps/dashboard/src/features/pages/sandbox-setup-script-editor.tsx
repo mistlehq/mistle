@@ -10,6 +10,7 @@ type SandboxSetupScriptEditorProps = {
   ariaLabelledBy: string;
   disabled?: boolean;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholderText?: string;
   value: string;
 };
@@ -76,6 +77,11 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
         ...(placeholderText === undefined
           ? []
           : [placeholder((view) => createPlaceholder(view, placeholderText))]),
+        EditorView.domEventHandlers({
+          blur: () => {
+            input.onBlur?.();
+          },
+        }),
         EditorView.lineWrapping,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.editable.of(!(input.disabled ?? false)),
@@ -87,7 +93,7 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
         }),
         createEditorTheme(),
       ] satisfies Extension[],
-    [input.ariaLabelledBy, input.disabled, placeholderText],
+    [input.ariaLabelledBy, input.disabled, input.onBlur, placeholderText],
   );
 
   return (

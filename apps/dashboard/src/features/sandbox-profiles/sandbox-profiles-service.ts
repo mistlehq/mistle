@@ -12,6 +12,7 @@ import type {
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionIntegrationBinding,
+  SandboxProfileVersionSetupScript,
   SandboxProfilesListResult,
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
@@ -277,6 +278,14 @@ const SandboxProfileVersionAutomationConfigResponseSchema = z
   })
   .strict();
 
+const SandboxProfileVersionSetupScriptResponseSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    setupScript: z.string().nullable(),
+  })
+  .strict();
+
 export async function listSandboxProfileVersions(input: {
   profileId: string;
   signal?: AbortSignal;
@@ -400,6 +409,45 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
   }
 }
 
+export async function getSandboxProfileVersionSetupScript(input: {
+  profileId: string;
+  version: number;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileVersionSetupScript> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxProfileVersionSetupScript",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/setup-script`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load sandbox profile setup script.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionSetupScriptResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxProfileVersionSetupScript",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile setup script response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxProfileVersionSetupScript",
+        error,
+        fallbackMessage: "Could not load sandbox profile setup script.",
+      }),
+    );
+  }
+}
+
 export async function putSandboxProfileVersionIntegrationBindings(input: {
   profileId: string;
   version: number;
@@ -445,6 +493,47 @@ export async function putSandboxProfileVersionIntegrationBindings(input: {
         operation: "putSandboxProfileVersionIntegrationBindings",
         error,
         fallbackMessage: "Could not save sandbox profile integration bindings.",
+      }),
+    );
+  }
+}
+
+export async function putSandboxProfileVersionSetupScript(input: {
+  profileId: string;
+  version: number;
+  setupScript: string | null;
+}): Promise<SandboxProfileVersionSetupScript> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putSandboxProfileVersionSetupScript",
+      method: "PUT",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/setup-script`,
+      body: {
+        setupScript: input.setupScript,
+      },
+      fallbackMessage: "Could not save sandbox profile setup script.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionSetupScriptResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionSetupScript",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile setup script response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "putSandboxProfileVersionSetupScript",
+        error,
+        fallbackMessage: "Could not save sandbox profile setup script.",
       }),
     );
   }

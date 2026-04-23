@@ -60,6 +60,8 @@ export type IntegrationsEditorSectionProps = {
   }) => Promise<boolean>;
   isSubmittingIntegrationBindings: boolean;
   onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  sectionKinds?: readonly SandboxIntegrationBindingKind[];
+  showSectionNavigation?: boolean;
 };
 
 const BindingSectionKinds: readonly SandboxIntegrationBindingKind[] = ["agent", "git", "connector"];
@@ -95,9 +97,13 @@ export function preserveDialogRowIdentity(input: {
 export function IntegrationsEditorSection(
   props: IntegrationsEditorSectionProps,
 ): React.JSX.Element {
+  const sectionKinds = props.sectionKinds ?? BindingSectionKinds;
+  const showSectionNavigation = props.showSectionNavigation ?? true;
   const [integrationDialogState, setIntegrationDialogState] =
     useState<SandboxProfileBindingDialogState | null>(null);
-  const [activeTab, setActiveTab] = useState<SandboxIntegrationBindingKind>("agent");
+  const [activeTab, setActiveTab] = useState<SandboxIntegrationBindingKind>(
+    sectionKinds[0] ?? "agent",
+  );
   const [dirtyDraftRowsByClientId, setDirtyDraftRowsByClientId] = useState<
     Readonly<Record<string, true>>
   >({});
@@ -366,55 +372,76 @@ export function IntegrationsEditorSection(
       Add
     </Button>
   );
+  const visibleTabs = BindingSectionTabs.filter((tab) => sectionKinds.includes(tab.kind));
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="md:hidden">
-        <Select
-          onValueChange={(value) => setActiveTab(value as SandboxIntegrationBindingKind)}
-          value={activeTab}
-        >
-          <SelectTrigger aria-label="Select integration section" className="w-full">
-            <SelectValue placeholder="Select section">
-              {BindingSectionTabs.find((tab) => tab.kind === activeTab)?.label}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
-            {BindingSectionTabs.map((tab) => (
-              <SelectItem key={tab.kind} value={tab.kind}>
-                {tab.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]">
-        <div aria-label="Integration sections" className="hidden flex-col md:flex" role="tablist">
-          {BindingSectionTabs.map((tab) => (
-            <button
-              aria-controls={`sandbox-profile-integrations-panel-${tab.kind}`}
-              aria-selected={tab.kind === activeTab}
-              className={`flex w-full items-start border-l-2 py-3 pl-4 pr-3 text-left text-sm font-medium leading-tight transition-colors ${
-                tab.kind === activeTab
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              id={`sandbox-profile-integrations-tab-${tab.kind}`}
-              key={tab.kind}
-              onClick={() => setActiveTab(tab.kind)}
-              role="tab"
-              tabIndex={tab.kind === activeTab ? 0 : -1}
-              type="button"
-            >
-              {tab.label}
-            </button>
-          ))}
+      {showSectionNavigation ? (
+        <div className="md:hidden">
+          <Select
+            onValueChange={(value) =>
+              setActiveTab((value as SandboxIntegrationBindingKind) ?? "agent")
+            }
+            value={activeTab}
+          >
+            <SelectTrigger aria-label="Select integration section" className="w-full">
+              <SelectValue placeholder="Select section">
+                {visibleTabs.find((section) => section.kind === activeTab)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {visibleTabs.map((section) => (
+                <SelectItem key={section.kind} value={section.kind}>
+                  {section.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      ) : null}
 
-        <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
+      <div
+        className={
+          showSectionNavigation
+            ? "flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]"
+            : "flex flex-col gap-4"
+        }
+      >
+        {showSectionNavigation ? (
+          <div aria-label="Integration sections" className="hidden flex-col md:flex" role="tablist">
+            {visibleTabs.map((section) => (
+              <button
+                aria-controls={`sandbox-profile-integrations-panel-${section.kind}`}
+                aria-selected={section.kind === activeTab}
+                className={`flex w-full items-start border-l-2 py-3 pl-4 pr-3 text-left text-sm font-medium leading-tight transition-colors ${
+                  section.kind === activeTab
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                id={`sandbox-profile-integrations-tab-${section.kind}`}
+                key={section.kind}
+                onClick={() => setActiveTab(section.kind)}
+                role="tab"
+                tabIndex={section.kind === activeTab ? 0 : -1}
+                type="button"
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4 md:pl-8">
+        {showSectionNavigation ? (
+          <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
+        ) : null}
+
+        <div
+          className={
+            showSectionNavigation
+              ? "flex min-w-0 flex-1 flex-col gap-4 md:pl-8"
+              : "flex min-w-0 flex-1 flex-col gap-4"
+          }
+        >
           {props.integrationBindingsQuery.isError ? (
             <Notice title="Could not load integration bindings" variant="alert">
               {resolveApiErrorMessage({
@@ -439,14 +466,16 @@ export function IntegrationsEditorSection(
             </Notice>
           ) : null}
 
-          {BindingSectionKinds.map((kind) => (
+          {sectionKinds.map((kind) => (
             <div
-              aria-labelledby={`sandbox-profile-integrations-tab-${kind}`}
+              aria-labelledby={
+                showSectionNavigation ? `sandbox-profile-integrations-tab-${kind}` : undefined
+              }
               className="w-full"
               hidden={activeTab !== kind}
-              id={`sandbox-profile-integrations-panel-${kind}`}
+              id={showSectionNavigation ? `sandbox-profile-integrations-panel-${kind}` : undefined}
               key={kind}
-              role="tabpanel"
+              role={showSectionNavigation ? "tabpanel" : undefined}
             >
               {activeTab !== kind || hideActiveAddAction ? null : activeAddConstraintMessage ===
                 null ? (

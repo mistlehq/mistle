@@ -38,6 +38,13 @@ export function sandboxProfileVersionIntegrationBindingsQueryKey(input: {
   ];
 }
 
+export function sandboxProfileVersionSetupScriptQueryKey(input: {
+  profileId: string;
+  version: number;
+}): readonly ["sandbox-profiles", "setup-script", string, number] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "setup-script", input.profileId, input.version];
+}
+
 export function sandboxProfileVersionAutomationConfigQueryKey(input: {
   profileId: string;
   version: number;
