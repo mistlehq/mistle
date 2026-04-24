@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "jsx-email": "^2.8.4",
-    "nodemailer": "^8.0.3",
+    "nodemailer": "^8.0.5",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
