@@ -32,6 +32,7 @@ describe("sandbox profiles get integration", () => {
     expect(body.id).toBe("sbp_get_001");
     expect(body.organizationId).toBe(authenticatedSession.organizationId);
     expect(body.displayName).toBe("Get Profile");
+    expect(body.activeVersion).toBeNull();
   });
 
   it("returns 401 when no authenticated session is provided", async ({ fixture }) => {

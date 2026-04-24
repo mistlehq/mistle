@@ -170,10 +170,11 @@ export type {
   SandboxProfile,
   SandboxProfileStatus,
 } from "./sandbox-profiles.js";
-export { sandboxProfileVersions } from "./sandbox-profile-versions.js";
+export { sandboxProfileVersions, SandboxProfileVersionStates } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
+  SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {
   sandboxProfileVersionIntegrationBindings,

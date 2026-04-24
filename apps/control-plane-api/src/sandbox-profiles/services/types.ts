@@ -3,7 +3,7 @@ import type {
   ControlPlaneDatabase,
   IntegrationBindingKind,
   SandboxProfile,
-  SandboxProfileVersion,
+  SandboxProfileVersionState,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
@@ -41,7 +41,12 @@ export type SandboxProfilesService = {
     profileId: string;
   }>;
   listProfileVersions: (input: { organizationId: string; profileId: string }) => Promise<{
-    versions: SandboxProfileVersion[];
+    versions: Array<{
+      sandboxProfileId: string;
+      version: number;
+      state: SandboxProfileVersionState;
+      isActive: boolean;
+    }>;
   }>;
   getProfileVersionIntegrationBindings: (input: {
     organizationId: string;

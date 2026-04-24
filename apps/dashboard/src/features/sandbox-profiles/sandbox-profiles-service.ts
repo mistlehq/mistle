@@ -22,6 +22,7 @@ const LaunchableSandboxProfilesResultSchema = z
     items: z.array(
       z
         .object({
+          activeVersion: z.number().int().min(1).nullable(),
           id: z.string().min(1),
           organizationId: z.string().min(1),
           displayName: z.string().min(1),
@@ -231,7 +232,9 @@ export async function updateSandboxProfile(input: {
 
 const SandboxProfileVersionSchema = z
   .object({
+    isActive: z.boolean(),
     sandboxProfileId: z.string().min(1),
+    state: z.enum(["draft", "published"]),
     version: z.number().int().min(1),
   })
   .strict();

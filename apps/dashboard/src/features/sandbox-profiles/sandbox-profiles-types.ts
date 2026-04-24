@@ -49,6 +49,8 @@ export type SandboxIntegrationBindingKind =
 export type SandboxProfileVersion = {
   sandboxProfileId: string;
   version: number;
+  state: "draft" | "published";
+  isActive: boolean;
 };
 
 export type SandboxProfileVersionIntegrationBinding = {

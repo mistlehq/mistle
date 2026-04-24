@@ -294,6 +294,7 @@ describe("buildWebhookAutomationSandboxProfileOptions", () => {
       buildWebhookAutomationSandboxProfileOptions({
         sandboxProfiles: [
           {
+            activeVersion: null,
             id: "sbp_1",
             organizationId: "org_1",
             displayName: "Repo Maintainer",

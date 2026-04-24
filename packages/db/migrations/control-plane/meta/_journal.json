@@ -113,6 +113,13 @@
       "when": 1776943164663,
       "tag": "0015_add-sandbox-profile-version-setup-script",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1777000197150,
+      "tag": "0016_add-sandbox-profile-version-draft-lifecycle",
+      "breakpoints": true
     }
   ]
 }

@@ -51,6 +51,7 @@ describe("sandbox profiles list integration", () => {
     const firstPage = ListSandboxProfilesResponseSchema.parse(await firstPageResponse.json());
 
     expect(firstPage.totalResults).toBe(3);
+    expect(firstPage.items.map((item) => item.activeVersion)).toEqual([null, null]);
     expect(firstPage.items.map((item) => item.id)).toEqual(["sbp_003", "sbp_002"]);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
@@ -71,6 +72,7 @@ describe("sandbox profiles list integration", () => {
     const secondPage = ListSandboxProfilesResponseSchema.parse(await secondPageResponse.json());
 
     expect(secondPage.totalResults).toBe(3);
+    expect(secondPage.items.map((item) => item.activeVersion)).toEqual([null]);
     expect(secondPage.items.map((item) => item.id)).toEqual(["sbp_001"]);
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
@@ -91,6 +93,7 @@ describe("sandbox profiles list integration", () => {
     const previousPage = ListSandboxProfilesResponseSchema.parse(await previousPageResponse.json());
 
     expect(previousPage.totalResults).toBe(3);
+    expect(previousPage.items.map((item) => item.activeVersion)).toEqual([null, null]);
     expect(previousPage.items.map((item) => item.id)).toEqual(["sbp_003", "sbp_002"]);
   });
 
@@ -170,6 +173,7 @@ describe("sandbox profiles list integration", () => {
     expect(firstOrgResponse.status).toBe(200);
     const firstOrgList = ListSandboxProfilesResponseSchema.parse(await firstOrgResponse.json());
     expect(firstOrgList.totalResults).toBe(2);
+    expect(firstOrgList.items.map((item) => item.activeVersion)).toEqual([null, null]);
     expect(firstOrgList.items.map((item) => item.id)).toEqual(["sbp_a_002", "sbp_a_001"]);
 
     const secondOrgResponse = await fixture.request("/v1/sandbox/profiles", {
@@ -180,6 +184,7 @@ describe("sandbox profiles list integration", () => {
     expect(secondOrgResponse.status).toBe(200);
     const secondOrgList = ListSandboxProfilesResponseSchema.parse(await secondOrgResponse.json());
     expect(secondOrgList.totalResults).toBe(1);
+    expect(secondOrgList.items.map((item) => item.activeVersion)).toEqual([null]);
     expect(secondOrgList.items.map((item) => item.id)).toEqual(["sbp_b_001"]);
   });
 });

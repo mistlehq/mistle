@@ -21,6 +21,7 @@ import {
 import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 
 type SelectableProfile = {
+  activeVersion: number | null;
   id: string;
   displayName: string;
   status: "active";
@@ -38,6 +39,7 @@ function buildSelectableProfile(
 
   return {
     id,
+    activeVersion: 3,
     displayName: "Alpha Profile",
     status: "active",
     latestVersion: 3,

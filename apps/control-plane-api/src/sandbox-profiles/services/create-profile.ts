@@ -1,5 +1,9 @@
 import type { InsertSandboxProfile, SandboxProfile } from "@mistle/db/control-plane";
-import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
+import {
+  sandboxProfiles,
+  sandboxProfileVersions,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -25,6 +29,7 @@ export async function createProfile(
       .values({
         sandboxProfileId: createdProfile.id,
         version: INITIAL_SANDBOX_PROFILE_VERSION,
+        state: SandboxProfileVersionStates.DRAFT,
       })
       .returning();
 

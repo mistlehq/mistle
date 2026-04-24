@@ -1,3 +1,5 @@
+import type { SandboxProfileVersionState } from "@mistle/db/control-plane";
+
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -10,6 +12,8 @@ type ListProfileVersionsOutput = {
   versions: Array<{
     sandboxProfileId: string;
     version: number;
+    state: SandboxProfileVersionState;
+    isActive: boolean;
   }>;
 };
 
@@ -20,6 +24,7 @@ export async function listProfileVersions(
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
+      activeVersion: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
@@ -36,13 +41,17 @@ export async function listProfileVersions(
     columns: {
       sandboxProfileId: true,
       version: true,
+      state: true,
     },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
     orderBy: (table, { desc }) => [desc(table.version)],
   });
 
   return {
-    versions,
+    versions: versions.map((version) => ({
+      ...version,
+      isActive: version.version === sandboxProfile.activeVersion,
+    })),
   };
 }
 

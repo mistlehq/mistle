@@ -6163,6 +6163,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                activeVersion: number | null;
                 createdAt: string;
                 displayName: string;
                 id: string;
@@ -6262,6 +6263,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              activeVersion: number | null;
               createdAt: string;
               displayName: string;
               id: string;
@@ -6353,6 +6355,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              activeVersion: number | null;
               createdAt: string;
               displayName: string;
               id: string;
@@ -6541,6 +6544,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              activeVersion: number | null;
               createdAt: string;
               displayName: string;
               id: string;
@@ -6642,7 +6646,10 @@ export interface paths {
           content: {
             "application/json": {
               versions: {
+                isActive: boolean;
                 sandboxProfileId: string;
+                /** @enum {string} */
+                state: "draft" | "published";
                 version: number;
               }[];
             };
@@ -7437,6 +7444,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                activeVersion: number | null;
                 createdAt: string;
                 displayName: string;
                 id: string;

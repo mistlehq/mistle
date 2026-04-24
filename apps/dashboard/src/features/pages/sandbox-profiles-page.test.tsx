@@ -20,6 +20,7 @@ describe("SandboxProfilesPage", () => {
     const listResult: SandboxProfilesListResult = {
       items: [
         {
+          activeVersion: null,
           createdAt: "2026-03-05T00:00:00.000Z",
           displayName: "Default Profile",
           id: "sbp_123",
@@ -70,6 +71,7 @@ describe("SandboxProfilesPage", () => {
     const listResult: SandboxProfilesListResult = {
       items: [
         {
+          activeVersion: null,
           createdAt: "2026-03-05T00:00:00.000Z",
           displayName: "Default Profile",
           id: "sbp_123",
@@ -116,6 +118,7 @@ describe("SandboxProfilesPage", () => {
     const listResult: SandboxProfilesListResult = {
       items: [
         {
+          activeVersion: null,
           createdAt: "2026-03-05T00:00:00.000Z",
           displayName: "Single profile",
           id: "sbp_123",

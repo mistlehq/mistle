@@ -41,6 +41,7 @@ export function buildStoryLaunchableSandboxProfile(
 
   return {
     id,
+    activeVersion: 3,
     displayName: "Alpha Profile",
     status: "active",
     latestVersion: 3,

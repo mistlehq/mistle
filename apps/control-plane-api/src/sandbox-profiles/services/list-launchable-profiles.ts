@@ -35,6 +35,7 @@ export async function listLaunchableProfiles(
       id: sandboxProfiles.id,
       organizationId: sandboxProfiles.organizationId,
       displayName: sandboxProfiles.displayName,
+      activeVersion: sandboxProfiles.activeVersion,
       status: sandboxProfiles.status,
       createdAt: sandboxProfiles.createdAt,
       updatedAt: sandboxProfiles.updatedAt,

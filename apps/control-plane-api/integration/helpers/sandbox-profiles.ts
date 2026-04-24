@@ -2,6 +2,7 @@ import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
   SandboxProfileStatuses,
+  SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
 export function createSandboxProfileFixture(input: {
@@ -9,12 +10,14 @@ export function createSandboxProfileFixture(input: {
   organizationId: string;
   displayName: string;
   createdAt: string;
+  activeVersion?: number | null;
   updatedAt?: string;
 }) {
   return {
     id: input.id,
     organizationId: input.organizationId,
     displayName: input.displayName,
+    ...(input.activeVersion === undefined ? {} : { activeVersion: input.activeVersion }),
     status: SandboxProfileStatuses.ACTIVE,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt ?? input.createdAt,
@@ -24,11 +27,15 @@ export function createSandboxProfileFixture(input: {
 export function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
   version: number;
+  state?: "draft" | "published";
+  publishedAt?: string | null;
   setupScript?: string | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
+    state: input.state ?? SandboxProfileVersionStates.PUBLISHED,
+    ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
   };
 }

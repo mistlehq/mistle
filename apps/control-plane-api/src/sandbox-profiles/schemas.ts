@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
+  SandboxProfileVersionStates,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
   sandboxProfiles,
@@ -21,8 +22,13 @@ const integrationBindingKindSchema = z.enum([
   IntegrationBindingKinds.GIT,
   IntegrationBindingKinds.CONNECTOR,
 ]);
+const sandboxProfileVersionStateSchema = z.enum([
+  SandboxProfileVersionStates.DRAFT,
+  SandboxProfileVersionStates.PUBLISHED,
+]);
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
+  activeVersion: z.number().int().min(1).nullable(),
   status: sandboxProfileStatusSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
@@ -62,11 +68,17 @@ export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
 ).strict();
 
 export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
+  state: sandboxProfileVersionStateSchema,
+  publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
 })
   .pick({
     sandboxProfileId: true,
     version: true,
+    state: true,
+  })
+  .extend({
+    isActive: z.boolean(),
   })
   .strict();
 

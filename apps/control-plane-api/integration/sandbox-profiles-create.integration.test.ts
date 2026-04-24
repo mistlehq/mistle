@@ -1,4 +1,8 @@
-import { members, SandboxProfileStatuses } from "@mistle/db/control-plane";
+import {
+  members,
+  SandboxProfileStatuses,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -31,6 +35,7 @@ describe("sandbox profiles create integration", () => {
     const body = SandboxProfileSchema.parse(await response.json());
     expect(body.organizationId).toBe(authenticatedSession.organizationId);
     expect(body.displayName).toBe("Created Profile");
+    expect(body.activeVersion).toBeNull();
     expect(body.status).toBe(SandboxProfileStatuses.ACTIVE);
 
     const persistedProfile = await fixture.db.query.sandboxProfiles.findFirst({
@@ -43,6 +48,7 @@ describe("sandbox profiles create integration", () => {
     expect(persistedProfile.organizationId).toBe(authenticatedSession.organizationId);
     expect(persistedProfile.displayName).toBe("Created Profile");
     expect(persistedProfile.status).toBe(SandboxProfileStatuses.ACTIVE);
+    expect(persistedProfile.activeVersion).toBeNull();
 
     const persistedVersions = await fixture.db.query.sandboxProfileVersions.findMany({
       where: (table, { eq }) => eq(table.sandboxProfileId, body.id),
@@ -55,6 +61,8 @@ describe("sandbox profiles create integration", () => {
     }
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
+    expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
+    expect(initialVersion.publishedAt).toBeNull();
   });
 
   it("rejects creation when status is provided", async ({ fixture }) => {

@@ -1,4 +1,4 @@
-import { index, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, index, text, timestamp } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { controlPlaneSchema } from "./namespace.js";
@@ -22,6 +22,7 @@ export const sandboxProfiles = controlPlaneSchema.table(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     displayName: text("display_name").notNull(),
+    activeVersion: bigint("active_version", { mode: "number" }),
     status: text("status")
       .notNull()
       .$type<SandboxProfileStatus>()
