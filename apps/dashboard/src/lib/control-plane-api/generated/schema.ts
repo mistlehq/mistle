@@ -7443,6 +7443,19 @@ export interface paths {
             };
           };
         };
+        /** @description Sandbox profile version is not editable. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_DRAFT";
+              message: string;
+            };
+          };
+        };
         /** @description Internal server error. */
         500: {
           headers: {
@@ -7870,6 +7883,19 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile version is not editable. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_DRAFT";
               message: string;
             };
           };
