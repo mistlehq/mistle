@@ -15,6 +15,7 @@ import {
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import type React from "react";
 import { useState } from "react";
+import { Link } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -32,6 +33,7 @@ import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 type IntegrationChoice = {
   id: string;
   kind: SandboxIntegrationBindingKind;
+  hasSelectableConnections: boolean;
   logoKey: string | undefined;
   title: React.ReactNode;
 };
@@ -166,26 +168,30 @@ function resolveKindChoices(input: {
   kind: SandboxIntegrationBindingKind;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  includeDisconnectedTargets?: boolean;
 }): IntegrationChoice[] {
   const choices: IntegrationChoice[] = [];
   const seenTargetKeys = new Set<string>();
 
-  for (const connection of input.availableConnections) {
-    const target = input.availableTargets.find(
-      (candidate) => candidate.targetKey === connection.targetKey,
-    );
-    if (target === undefined) {
-      continue;
-    }
+  for (const target of input.availableTargets) {
     if (
       resolveBindingKindFromTarget(target) !== input.kind ||
       seenTargetKeys.has(target.targetKey)
     ) {
       continue;
     }
+
+    const hasSelectableConnections = input.availableConnections.some(
+      (connection) => connection.targetKey === target.targetKey,
+    );
+    if (!hasSelectableConnections && input.includeDisconnectedTargets !== true) {
+      continue;
+    }
+
     seenTargetKeys.add(target.targetKey);
     choices.push({
       id: target.targetKey,
+      hasSelectableConnections,
       kind: input.kind,
       logoKey: target.logoKey,
       title: target.displayName,
@@ -253,14 +259,25 @@ function AddConnectorTile(input: {
   return (
     <ActionTile
       action={
-        <Button
-          onClick={() => {
-            input.onAdd(input.choice.id);
-          }}
-          type="button"
-        >
-          Add
-        </Button>
+        input.choice.hasSelectableConnections ? (
+          <Button
+            onClick={() => {
+              input.onAdd(input.choice.id);
+            }}
+            type="button"
+          >
+            Add
+          </Button>
+        ) : (
+          <Link
+            className="text-primary inline-flex items-center px-0 text-sm font-medium underline-offset-4 hover:underline"
+            rel="noreferrer"
+            target="_blank"
+            to={`/integrations/${input.choice.id}`}
+          >
+            Setup integration
+          </Link>
+        )
       }
       description=""
       leading={
@@ -314,6 +331,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
     kind: "connector",
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    includeDisconnectedTargets: true,
   });
 
   const agentRow = input.integrationRows.find((row) => row.kind === "agent") ?? null;
@@ -608,6 +626,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   <IntegrationNameCell
                     item={{
                       id: target.targetKey,
+                      hasSelectableConnections: true,
                       kind: "connector",
                       logoKey: target.logoKey,
                       title: target.displayName,
