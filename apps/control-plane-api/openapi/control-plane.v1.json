@@ -12041,6 +12041,328 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions": {
+      "post": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Create a new draft sandbox profile version by cloning the latest version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sandboxProfileId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["draft", "published"]
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["sandboxProfileId", "version", "state", "isActive"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile already has a draft version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["DRAFT_ALREADY_EXISTS"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List sandbox profile versions for a sandbox profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sandboxProfileId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": ["draft", "published"]
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["sandboxProfileId", "version", "state", "isActive"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["versions"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}": {
       "get": {
         "tags": ["Sandbox Profiles"],
@@ -12524,7 +12846,7 @@
         }
       }
     },
-    "/v1/sandbox/profiles/{profileId}/versions": {
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/publishability": {
       "get": {
         "tags": ["Sandbox Profiles"],
         "parameters": [
@@ -12537,42 +12859,66 @@
             "required": true,
             "name": "profileId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "List sandbox profile versions for a sandbox profile.",
+            "description": "Get the publishability state for the specified sandbox profile version.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "versions": {
+                    "publishable": {
+                      "type": "boolean"
+                    },
+                    "issues": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "sandboxProfileId": {
-                            "type": "string"
-                          },
-                          "version": {
-                            "type": "integer",
-                            "minimum": 1
-                          },
-                          "state": {
+                          "code": {
                             "type": "string",
-                            "enum": ["draft", "published"]
+                            "enum": [
+                              "PROFILE_VERSION_NOT_DRAFT",
+                              "AGENT_BINDING_REQUIRED",
+                              "INVALID_BINDING_CONNECTION_REFERENCE",
+                              "CONNECTION_NOT_ACTIVE",
+                              "TARGET_DISABLED"
+                            ]
                           },
-                          "isActive": {
-                            "type": "boolean"
+                          "message": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "bindingId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "connectionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "targetKey": {
+                            "type": "string",
+                            "minLength": 1
                           }
                         },
-                        "required": ["sandboxProfileId", "version", "state", "isActive"],
+                        "required": ["code", "message"],
                         "additionalProperties": false
                       }
                     }
                   },
-                  "required": ["versions"],
+                  "required": ["publishable", "issues"],
                   "additionalProperties": false
                 }
               }
@@ -12645,7 +12991,7 @@
             }
           },
           "404": {
-            "description": "Sandbox profile was not found.",
+            "description": "Sandbox profile or version was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12653,7 +12999,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND"]
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -13695,6 +14041,194 @@
                     "code": {
                       "type": "string",
                       "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/publish": {
+      "post": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Publish the specified sandbox profile draft version and make it active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "sandboxProfileId": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["draft", "published"]
+                        },
+                        "isActive": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["sandboxProfileId", "version", "state", "isActive"],
+                      "additionalProperties": false
+                    },
+                    "activeVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "required": ["version", "activeVersion"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version cannot be published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_DRAFT", "PROFILE_VERSION_NOT_PUBLISHABLE"]
                     },
                     "message": {
                       "type": "string",

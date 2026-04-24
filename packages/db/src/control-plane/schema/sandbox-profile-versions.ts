@@ -1,4 +1,5 @@
-import { bigint, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { bigint, check, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { controlPlaneSchema } from "./namespace.js";
 import { sandboxProfiles } from "./sandbox-profiles.js";
@@ -29,6 +30,10 @@ export const sandboxProfileVersions = controlPlaneSchema.table(
     primaryKey({
       columns: [table.sandboxProfileId, table.version],
     }),
+    uniqueIndex("sandbox_profile_versions_one_draft_per_profile_uidx")
+      .on(table.sandboxProfileId)
+      .where(sql`${table.state} = 'draft'`),
+    check("sandbox_profile_versions_state_check", sql`${table.state} in ('draft', 'published')`),
   ],
 );
 

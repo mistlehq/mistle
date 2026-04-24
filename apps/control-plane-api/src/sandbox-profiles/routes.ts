@@ -3,15 +3,18 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_PROFILES_ROUTE_BASE_PATH } from "./constants.js";
+import * as createSandboxProfileVersion from "./create-sandbox-profile-version/index.js";
 import * as createSandboxProfile from "./create-sandbox-profile/index.js";
 import * as deleteSandboxProfile from "./delete-sandbox-profile/index.js";
 import * as getSandboxProfileVersionAutomationConfig from "./get-sandbox-profile-version-automation-config/index.js";
 import * as getSandboxProfileVersionIntegrationBindings from "./get-sandbox-profile-version-integration-bindings/index.js";
+import * as getSandboxProfileVersionPublishability from "./get-sandbox-profile-version-publishability/index.js";
 import * as getSandboxProfileVersionSetupScript from "./get-sandbox-profile-version-setup-script/index.js";
 import * as getSandboxProfile from "./get-sandbox-profile/index.js";
 import * as listLaunchableSandboxProfiles from "./list-launchable-sandbox-profiles/index.js";
 import * as listSandboxProfileVersions from "./list-sandbox-profile-versions/index.js";
 import * as listSandboxProfiles from "./list-sandbox-profiles/index.js";
+import * as publishSandboxProfileVersion from "./publish-sandbox-profile-version/index.js";
 import * as putSandboxProfileVersionIntegrationBindings from "./put-sandbox-profile-version-integration-bindings/index.js";
 import * as putSandboxProfileVersionSetupScript from "./put-sandbox-profile-version-setup-script/index.js";
 import * as startSandboxProfileInstance from "./start-sandbox-profile-instance/index.js";
@@ -25,10 +28,15 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
   routes.openapi(listSandboxProfiles.route, listSandboxProfiles.handler);
   routes.openapi(listLaunchableSandboxProfiles.route, listLaunchableSandboxProfiles.handler);
   routes.openapi(createSandboxProfile.route, createSandboxProfile.handler);
+  routes.openapi(createSandboxProfileVersion.route, createSandboxProfileVersion.handler);
   routes.openapi(getSandboxProfile.route, getSandboxProfile.handler);
   routes.openapi(updateSandboxProfile.route, updateSandboxProfile.handler);
   routes.openapi(deleteSandboxProfile.route, deleteSandboxProfile.handler);
   routes.openapi(listSandboxProfileVersions.route, listSandboxProfileVersions.handler);
+  routes.openapi(
+    getSandboxProfileVersionPublishability.route,
+    getSandboxProfileVersionPublishability.handler,
+  );
   routes.openapi(
     getSandboxProfileVersionAutomationConfig.route,
     getSandboxProfileVersionAutomationConfig.handler,
@@ -49,6 +57,7 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
     putSandboxProfileVersionSetupScript.route,
     putSandboxProfileVersionSetupScript.handler,
   );
+  routes.openapi(publishSandboxProfileVersion.route, publishSandboxProfileVersion.handler);
   routes.openapi(startSandboxProfileInstance.route, startSandboxProfileInstance.handler);
 
   return {

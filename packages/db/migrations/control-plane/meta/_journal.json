@@ -120,6 +120,13 @@
       "when": 1777000197150,
       "tag": "0016_add-sandbox-profile-version-draft-lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1777002783935,
+      "tag": "0017_add-sandbox-profile-version-draft-constraints",
+      "breakpoints": true
     }
   ]
 }

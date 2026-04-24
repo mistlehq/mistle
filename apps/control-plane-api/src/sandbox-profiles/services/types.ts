@@ -31,6 +31,12 @@ export type SandboxProfilesService = {
     organizationId: string;
     displayName: string;
   }) => Promise<SandboxProfile>;
+  createProfileVersionDraft: (input: { organizationId: string; profileId: string }) => Promise<{
+    sandboxProfileId: string;
+    version: number;
+    state: SandboxProfileVersionState;
+    isActive: boolean;
+  }>;
   getProfile: (input: { organizationId: string; profileId: string }) => Promise<SandboxProfile>;
   updateProfile: (input: {
     organizationId: string;
@@ -46,6 +52,20 @@ export type SandboxProfilesService = {
       version: number;
       state: SandboxProfileVersionState;
       isActive: boolean;
+    }>;
+  }>;
+  getProfileVersionPublishability: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  }) => Promise<{
+    publishable: boolean;
+    issues: Array<{
+      code: string;
+      message: string;
+      bindingId?: string;
+      connectionId?: string;
+      targetKey?: string;
     }>;
   }>;
   getProfileVersionIntegrationBindings: (input: {
@@ -93,4 +113,17 @@ export type SandboxProfilesService = {
     profileVersion: number;
     image: ResolvedSandboxImage;
   }) => Promise<CompiledRuntimePlan>;
+  publishProfileVersion: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  }) => Promise<{
+    version: {
+      sandboxProfileId: string;
+      version: number;
+      state: SandboxProfileVersionState;
+      isActive: boolean;
+    };
+    activeVersion: number;
+  }>;
 };

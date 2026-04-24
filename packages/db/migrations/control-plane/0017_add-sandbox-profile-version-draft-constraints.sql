@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "sandbox_profile_versions_one_draft_per_profile_uidx" ON "control_plane"."sandbox_profile_versions" USING btree ("sandbox_profile_id") WHERE "control_plane"."sandbox_profile_versions"."state" = 'draft';--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD CONSTRAINT "sandbox_profile_versions_state_check" CHECK ("control_plane"."sandbox_profile_versions"."state" in ('draft', 'published'));

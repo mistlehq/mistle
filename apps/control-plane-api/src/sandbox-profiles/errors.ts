@@ -1,4 +1,4 @@
-import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
 
 export const SandboxProfilesBadRequestCodes = {
   INVALID_LIST_PROFILES_INPUT: "INVALID_LIST_PROFILES_INPUT",
@@ -91,6 +91,24 @@ export class SandboxProfilesCompileError extends BadRequestError {
   }
 }
 
+export const SandboxProfilesConflictCodes = {
+  DRAFT_ALREADY_EXISTS: "DRAFT_ALREADY_EXISTS",
+  PROFILE_VERSION_NOT_DRAFT: "PROFILE_VERSION_NOT_DRAFT",
+  PROFILE_VERSION_NOT_PUBLISHABLE: "PROFILE_VERSION_NOT_PUBLISHABLE",
+} as const;
+
+export type SandboxProfilesConflictCode =
+  (typeof SandboxProfilesConflictCodes)[keyof typeof SandboxProfilesConflictCodes];
+
+export class SandboxProfilesConflictError extends ConflictError {
+  code: SandboxProfilesConflictCode;
+
+  constructor(code: SandboxProfilesConflictCode, message: string) {
+    super(code, message);
+    this.code = code;
+  }
+}
+
 export const SandboxProfilesNotFoundCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
   PROFILE_VERSION_NOT_FOUND: "PROFILE_VERSION_NOT_FOUND",
@@ -107,3 +125,14 @@ export class SandboxProfilesNotFoundError extends NotFoundError {
     this.code = code;
   }
 }
+
+export const SandboxProfilePublishabilityIssueCodes = {
+  PROFILE_VERSION_NOT_DRAFT: "PROFILE_VERSION_NOT_DRAFT",
+  AGENT_BINDING_REQUIRED: "AGENT_BINDING_REQUIRED",
+  INVALID_BINDING_CONNECTION_REFERENCE: "INVALID_BINDING_CONNECTION_REFERENCE",
+  CONNECTION_NOT_ACTIVE: "CONNECTION_NOT_ACTIVE",
+  TARGET_DISABLED: "TARGET_DISABLED",
+} as const;
+
+export type SandboxProfilePublishabilityIssueCode =
+  (typeof SandboxProfilePublishabilityIssueCodes)[keyof typeof SandboxProfilePublishabilityIssueCodes];

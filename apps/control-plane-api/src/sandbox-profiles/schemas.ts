@@ -13,6 +13,8 @@ import {
 } from "@mistle/http/pagination";
 import { createSelectSchema } from "drizzle-zod";
 
+import { SandboxProfilePublishabilityIssueCodes } from "./errors.js";
+
 const sandboxProfileStatusSchema = z.enum([
   SandboxProfileStatuses.ACTIVE,
   SandboxProfileStatuses.INACTIVE,
@@ -93,6 +95,38 @@ export const sandboxProfileVersionSetupScriptSchema = z
 export const listSandboxProfileVersionsResponseSchema = z
   .object({
     versions: z.array(sandboxProfileVersionSchema),
+  })
+  .strict();
+
+export const getSandboxProfileVersionPublishabilityResponseSchema = z
+  .object({
+    publishable: z.boolean(),
+    issues: z.array(
+      z
+        .object({
+          code: z.enum([
+            SandboxProfilePublishabilityIssueCodes.PROFILE_VERSION_NOT_DRAFT,
+            SandboxProfilePublishabilityIssueCodes.AGENT_BINDING_REQUIRED,
+            SandboxProfilePublishabilityIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+            SandboxProfilePublishabilityIssueCodes.CONNECTION_NOT_ACTIVE,
+            SandboxProfilePublishabilityIssueCodes.TARGET_DISABLED,
+          ]),
+          message: z.string().min(1),
+          bindingId: z.string().min(1).optional(),
+          connectionId: z.string().min(1).optional(),
+          targetKey: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const createSandboxProfileVersionResponseSchema = sandboxProfileVersionSchema;
+
+export const publishSandboxProfileVersionResponseSchema = z
+  .object({
+    version: sandboxProfileVersionSchema,
+    activeVersion: z.number().int().min(1),
   })
   .strict();
 
