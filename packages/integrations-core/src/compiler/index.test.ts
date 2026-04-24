@@ -679,7 +679,7 @@ function createCanonicalGithubReleaseInstallArtifactDefinition(): IntegrationDef
                 release: {
                   kind: "tag",
                   match: "exact",
-                  tag: "rust-v0.122.0",
+                  tag: "rust-v0.124.0",
                 },
                 asset: {
                   kind: "by_arch",
@@ -1220,7 +1220,7 @@ describe("compileRuntimePlan", () => {
       release: {
         kind: "tag",
         match: "exact",
-        tag: "rust-v0.122.0",
+        tag: "rust-v0.124.0",
       },
       asset: {
         kind: "by_arch",

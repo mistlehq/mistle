@@ -627,7 +627,7 @@ mod tests {
             serde_json::from_value::<RuntimeArtifactGitHubReleaseSelector>(serde_json::json!({
               "kind": "tag",
               "match": "exact",
-              "tag": "rust-v0.122.0"
+              "tag": "rust-v0.124.0"
             }))
             .expect("github release selector should decode");
 
@@ -669,7 +669,7 @@ mod tests {
           "release": {
             "kind": "tag",
             "match": "exact",
-            "tag": "rust-v0.122.0"
+            "tag": "rust-v0.124.0"
           },
           "asset": {
             "kind": "by_arch",

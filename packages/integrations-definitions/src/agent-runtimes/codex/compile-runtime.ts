@@ -15,7 +15,7 @@ import { composeCodexDeveloperInstructions } from "./developer-instructions.js";
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexCliVersion = "0.122.0";
+const CodexCliVersion = "0.124.0";
 const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
