@@ -20,6 +20,12 @@ import { useState } from "react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { FormPageStack } from "../shared/form-page.js";
+import {
+  ResponsiveFieldList,
+  ResponsiveFieldListCell,
+  type ResponsiveFieldListColumn,
+  ResponsiveFieldListRow,
+} from "../shared/responsive-field-list.js";
 
 export type OrganizationIdentityLinkingProviderRow = {
   providerFamily: string;
@@ -55,6 +61,13 @@ export type OrganizationIdentityLinkingSettingsPageViewProps = {
   }) => Promise<void> | void;
   onEnabledChange: (input: { providerFamily: string; enabled: boolean }) => Promise<void> | void;
 };
+
+const IdentityLinkingProviderColumns = [
+  { key: "integration", label: "Integration", desktopWidth: "minmax(0,1.1fr)" },
+  { key: "connection", label: "Connection", desktopWidth: "minmax(0,1.6fr)" },
+  { key: "linkedUsers", label: "Linked Users", desktopWidth: "180px", align: "center" },
+  { key: "enable", label: "Enable", desktopWidth: "88px", align: "center" },
+] satisfies readonly ResponsiveFieldListColumn[];
 
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
@@ -95,13 +108,11 @@ export function OrganizationIdentityLinkingSettingsPageView(
   return (
     <>
       <FormPageStack>
-        <div className="border-y bg-white">
-          <div className="hidden grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_180px_88px] gap-4 border-b px-4 py-3 text-xs font-medium tracking-wide text-muted-foreground uppercase md:grid">
-            <div>Integration</div>
-            <div>Connection</div>
-            <div className="text-center">Linked Users</div>
-            <div className="text-center">Enable</div>
-          </div>
+        <ResponsiveFieldList
+          className="border-y bg-white"
+          columns={IdentityLinkingProviderColumns}
+          headerClassName="px-4 py-3 font-medium"
+        >
           {props.providers.map((provider, index) => (
             <IdentityLinkingProviderRowView
               key={provider.providerFamily}
@@ -114,7 +125,7 @@ export function OrganizationIdentityLinkingSettingsPageView(
               provider={provider}
             />
           ))}
-        </div>
+        </ResponsiveFieldList>
       </FormPageStack>
 
       <LinkedUsersDialog
@@ -142,8 +153,13 @@ function IdentityLinkingProviderRowView(input: {
   const rowStatusMessage = provider.connectionPending ? "Saving connection..." : null;
 
   return (
-    <div className={input.isLastRow ? undefined : "border-b"}>
-      <div className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_180px_88px] md:items-center">
+    <ResponsiveFieldListRow
+      className="px-4 py-4"
+      isLastRow={input.isLastRow}
+      status={rowStatusMessage}
+      statusClassName="pt-4"
+    >
+      <ResponsiveFieldListCell columnKey="integration">
         <div className="flex min-w-0 items-center gap-3">
           <img
             alt={`${provider.displayName} logo`}
@@ -151,106 +167,90 @@ function IdentityLinkingProviderRowView(input: {
             src={resolveIntegrationLogoPath({ logoKey: provider.logoKey })}
           />
           <div className="min-w-0">
-            <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase md:hidden">
-              Integration
-            </div>
             <div className="truncate text-sm font-medium">{provider.displayName}</div>
           </div>
         </div>
+      </ResponsiveFieldListCell>
 
-        <div className="min-w-0">
-          <div className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase md:hidden">
-            Connection
-          </div>
-          {hasEligibleConnections ? (
-            <Select
-              onValueChange={(integrationConnectionId) => {
-                if (integrationConnectionId === null || integrationConnectionId.length === 0) {
-                  return;
-                }
-
-                void input.onProviderConnectionChange({
-                  providerFamily: provider.providerFamily,
-                  integrationConnectionId,
-                });
-              }}
-              value={provider.selectedConnectionId ?? ""}
-            >
-              <SelectTrigger
-                aria-label={`${provider.displayName} connection`}
-                className="w-full md:max-w-xl"
-                disabled={provider.connectionPending}
-              >
-                <SelectValue placeholder={`Select ${provider.displayName} connection`}>
-                  {selectedConnectionLabel}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
-                {provider.connectionOptions.map((connection) => (
-                  <SelectItem key={connection.id} value={connection.id}>
-                    {connection.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-              No eligible active connections
-            </div>
-          )}
-        </div>
-
-        <div className="md:flex md:justify-center">
-          <div className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase md:hidden">
-            Linked Users
-          </div>
-          <div className="inline-flex items-center gap-2.5 md:justify-center">
-            <span className="text-sm">
-              {provider.memberLinksLoading ? "Loading..." : String(provider.linkedUsersCount)}
-            </span>
-            <Button
-              aria-label={`View ${provider.displayName} linked users`}
-              className="h-auto w-auto p-0 hover:bg-transparent"
-              onClick={input.onOpenLinkedUsers}
-              type="button"
-              variant="ghost"
-            >
-              <EyeIcon />
-            </Button>
-          </div>
-        </div>
-
-        <div className="md:flex md:justify-center">
-          <div className="mb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase md:hidden">
-            Enable
-          </div>
-          <div className="inline-flex items-center justify-center gap-2">
-            <Switch
-              aria-label={`Enable ${provider.displayName} identity linking`}
-              checked={provider.enabled}
-              disabled={
-                provider.enablePending ||
-                provider.connectionPending ||
-                provider.selectedConnectionId === null
+      <ResponsiveFieldListCell columnKey="connection">
+        {hasEligibleConnections ? (
+          <Select
+            onValueChange={(integrationConnectionId) => {
+              if (integrationConnectionId === null || integrationConnectionId.length === 0) {
+                return;
               }
-              onCheckedChange={(enabled) => {
-                void input.onEnabledChange({
-                  providerFamily: provider.providerFamily,
-                  enabled,
-                });
-              }}
-            />
-            {provider.connectionPending || provider.enablePending ? (
-              <Spinner aria-hidden className="size-4 text-muted-foreground" />
-            ) : null}
-          </div>
-        </div>
-      </div>
 
-      {rowStatusMessage === null ? null : (
-        <div className="px-4 pb-4 text-sm text-muted-foreground">{rowStatusMessage}</div>
-      )}
-    </div>
+              void input.onProviderConnectionChange({
+                providerFamily: provider.providerFamily,
+                integrationConnectionId,
+              });
+            }}
+            value={provider.selectedConnectionId ?? ""}
+          >
+            <SelectTrigger
+              aria-label={`${provider.displayName} connection`}
+              className="w-full md:max-w-xl"
+              disabled={provider.connectionPending}
+            >
+              <SelectValue placeholder={`Select ${provider.displayName} connection`}>
+                {selectedConnectionLabel}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent alignItemWithTrigger={false}>
+              {provider.connectionOptions.map((connection) => (
+                <SelectItem key={connection.id} value={connection.id}>
+                  {connection.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+            No eligible active connections
+          </div>
+        )}
+      </ResponsiveFieldListCell>
+
+      <ResponsiveFieldListCell columnKey="linkedUsers">
+        <div className="inline-flex items-center gap-2.5 md:justify-center">
+          <span className="text-sm">
+            {provider.memberLinksLoading ? "Loading..." : String(provider.linkedUsersCount)}
+          </span>
+          <Button
+            aria-label={`View ${provider.displayName} linked users`}
+            className="h-auto w-auto p-0 hover:bg-transparent"
+            onClick={input.onOpenLinkedUsers}
+            type="button"
+            variant="ghost"
+          >
+            <EyeIcon />
+          </Button>
+        </div>
+      </ResponsiveFieldListCell>
+
+      <ResponsiveFieldListCell columnKey="enable">
+        <div className="inline-flex items-center justify-center gap-2">
+          <Switch
+            aria-label={`Enable ${provider.displayName} identity linking`}
+            checked={provider.enabled}
+            disabled={
+              provider.enablePending ||
+              provider.connectionPending ||
+              provider.selectedConnectionId === null
+            }
+            onCheckedChange={(enabled) => {
+              void input.onEnabledChange({
+                providerFamily: provider.providerFamily,
+                enabled,
+              });
+            }}
+          />
+          {provider.connectionPending || provider.enablePending ? (
+            <Spinner aria-hidden className="size-4 text-muted-foreground" />
+          ) : null}
+        </div>
+      </ResponsiveFieldListCell>
+    </ResponsiveFieldListRow>
   );
 }
 

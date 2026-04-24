@@ -10,6 +10,12 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import {
+  ResponsiveFieldList,
+  ResponsiveFieldListCell,
+  type ResponsiveFieldListColumn,
+  ResponsiveFieldListRow,
+} from "../shared/responsive-field-list.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -22,6 +28,18 @@ import {
 import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 
 const SearchDebounceMs = 300;
+
+const ToolBindingsColumns = [
+  { key: "integration", label: "Integration", desktopWidth: "minmax(0,12rem)" },
+  { key: "tools", label: "Tools", desktopWidth: "minmax(0,1fr)" },
+  {
+    key: "actions",
+    label: <span className="sr-only">Actions</span>,
+    desktopWidth: "auto",
+    align: "end",
+    hideMobileLabel: true,
+  },
+] satisfies readonly ResponsiveFieldListColumn[];
 
 function resolveGitBindingRow(
   rows: readonly SandboxProfileBindingEditorRow[],
@@ -224,12 +242,7 @@ function ToolBindingsSection(input: {
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="text-muted-foreground grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-2 text-xs uppercase tracking-wide">
-        <p>Integration</p>
-        <p>Tools</p>
-        <div className="w-8 shrink-0" />
-      </div>
+    <ResponsiveFieldList columns={ToolBindingsColumns}>
       {toolRows.map((row) => {
         const toolToggleModel = resolveBindingToolToggleModel({
           row,
@@ -254,11 +267,8 @@ function ToolBindingsSection(input: {
         }
 
         return (
-          <div
-            className="grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] gap-4 border-b py-4"
-            key={row.clientId}
-          >
-            <div className="min-w-0">
+          <ResponsiveFieldListRow className="py-4" key={row.clientId}>
+            <ResponsiveFieldListCell columnKey="integration">
               <div className="flex items-center gap-2 text-sm">
                 {rowMetadata?.target?.logoKey === undefined ? null : (
                   <img
@@ -271,8 +281,8 @@ function ToolBindingsSection(input: {
                   {rowMetadata?.target?.displayName ?? "Integration"}
                 </div>
               </div>
-            </div>
-            <div className="min-w-0">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="tools">
               <div className="flex flex-col gap-2">
                 {summaryItems.length === 0 ? null : (
                   <div className="mb-1 flex flex-col gap-2">
@@ -317,12 +327,12 @@ function ToolBindingsSection(input: {
                   </label>
                 ))}
               </div>
-            </div>
-            <div className="flex w-8 shrink-0 items-start justify-end" />
-          </div>
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="actions" />
+          </ResponsiveFieldListRow>
         );
       })}
-    </div>
+    </ResponsiveFieldList>
   );
 }
 

@@ -23,6 +23,12 @@ import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import {
+  ResponsiveFieldList,
+  ResponsiveFieldListCell,
+  type ResponsiveFieldListColumn,
+  ResponsiveFieldListRow,
+} from "../shared/responsive-field-list.js";
+import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
   type IntegrationConnectionSummary,
@@ -40,6 +46,19 @@ type IntegrationChoice = {
 };
 
 const NoIntegrationValue = "none";
+
+const SandboxProfileIntegrationSetupColumns = [
+  { key: "type", label: "Type", desktopWidth: "10rem" },
+  { key: "integration", label: "Integration", desktopWidth: "minmax(0,1fr)" },
+  { key: "connection", label: "Connection", desktopWidth: "minmax(0,1fr)" },
+  {
+    key: "actions",
+    label: <span className="sr-only">Actions</span>,
+    desktopWidth: "2rem",
+    align: "end",
+    hideMobileLabel: true,
+  },
+] satisfies readonly ResponsiveFieldListColumn[];
 
 function IntegrationNameCell(input: { item: IntegrationChoice }): React.JSX.Element {
   return (
@@ -565,30 +584,17 @@ export function SandboxProfileIntegrationsSetupSection(input: {
       ) : null}
 
       <div className="max-w-5xl">
-        <div className="flex flex-col">
-          <div className="text-muted-foreground grid grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_2rem] gap-6 border-b py-2 text-xs uppercase tracking-wide">
-            <div className="min-w-0">
-              <p>Type</p>
-            </div>
-            <div className="min-w-0">
-              <p>Integration</p>
-            </div>
-            <div className="min-w-0">
-              <p>Connection</p>
-            </div>
-            <div className="w-8 shrink-0" />
-          </div>
-
-          <div className="grid grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-6 border-b py-4">
-            <div className="min-w-0">
+        <ResponsiveFieldList columns={SandboxProfileIntegrationSetupColumns} gapClassName="gap-6">
+          <ResponsiveFieldListRow className="py-4" gapClassName="gap-6">
+            <ResponsiveFieldListCell columnKey="type">
               <p className="text-primary text-sm font-medium">Agent Harness</p>
-            </div>
-            <div className="min-w-0">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="integration">
               {agentDisplayChoice === undefined ? null : (
                 <IntegrationNameCell item={agentDisplayChoice} />
               )}
-            </div>
-            <div className="min-w-0">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="connection">
               <ConnectionSelectionCell
                 ariaLabel="agent harness connection"
                 availableConnections={resolveConnectionsForTarget({
@@ -617,15 +623,15 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 }}
                 selectedConnectionId={agentRow?.connectionId}
               />
-            </div>
-            <div className="w-8 shrink-0" />
-          </div>
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="actions" />
+          </ResponsiveFieldListRow>
 
-          <div className="grid grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-6 border-b py-4">
-            <div className="min-w-0">
+          <ResponsiveFieldListRow className="py-4" gapClassName="gap-6">
+            <ResponsiveFieldListCell columnKey="type">
               <p className="text-primary text-sm font-medium">Git Provider</p>
-            </div>
-            <div className="min-w-0">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="integration">
               {gitIssue === null ? (
                 <IntegrationSelectionCell
                   allowNone={true}
@@ -649,8 +655,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
               ) : (
                 <UnresolvedNoneCell />
               )}
-            </div>
-            <div className="min-w-0">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="connection">
               {gitIssue === "missing-connection" ? (
                 <UnresolvedConnectionCell message="Connection cannot be found" />
               ) : gitIssue === "missing-target" ? (
@@ -685,8 +691,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   selectedConnectionId={gitRow?.connectionId}
                 />
               )}
-            </div>
-            <div className="flex w-8 shrink-0 justify-end">
+            </ResponsiveFieldListCell>
+            <ResponsiveFieldListCell columnKey="actions">
               {gitIssue === null || gitRow === null ? null : (
                 <Button
                   aria-label="Remove git provider"
@@ -700,8 +706,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   <TrashIcon aria-hidden className="size-4" />
                 </Button>
               )}
-            </div>
-          </div>
+            </ResponsiveFieldListCell>
+          </ResponsiveFieldListRow>
 
           {connectorRows.map((row) => {
             const rowMetadata = resolveRowBindingMetadata({
@@ -732,14 +738,11 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   : null;
 
             return (
-              <div
-                className="grid grid-cols-[10rem_minmax(0,1fr)_minmax(0,1fr)_2rem] items-center gap-6 border-b py-4"
-                key={row.clientId}
-              >
-                <div className="min-w-0">
+              <ResponsiveFieldListRow className="py-4" gapClassName="gap-6" key={row.clientId}>
+                <ResponsiveFieldListCell columnKey="type">
                   <p className="text-primary text-sm font-medium">Connector</p>
-                </div>
-                <div className="min-w-0">
+                </ResponsiveFieldListCell>
+                <ResponsiveFieldListCell columnKey="integration">
                   {connection === undefined ? (
                     <UnresolvedIntegrationCell title={integrationTitle} />
                   ) : (
@@ -753,8 +756,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                       }}
                     />
                   )}
-                </div>
-                <div className="min-w-0">
+                </ResponsiveFieldListCell>
+                <ResponsiveFieldListCell columnKey="connection">
                   {connectionMessage === null && target !== undefined ? (
                     <ConnectionSelectionCell
                       ariaLabel={`${target.displayName} connection`}
@@ -773,8 +776,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                       message={connectionMessage ?? "Connection cannot be found"}
                     />
                   )}
-                </div>
-                <div className="flex w-8 shrink-0 justify-end">
+                </ResponsiveFieldListCell>
+                <ResponsiveFieldListCell columnKey="actions">
                   <Button
                     aria-label="Remove connector"
                     className="h-7 w-7"
@@ -786,11 +789,11 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   >
                     <TrashIcon aria-hidden className="size-4" />
                   </Button>
-                </div>
-              </div>
+                </ResponsiveFieldListCell>
+              </ResponsiveFieldListRow>
             );
           })}
-        </div>
+        </ResponsiveFieldList>
       </div>
 
       {addConnectorChoices.length === 0 ? null : (
