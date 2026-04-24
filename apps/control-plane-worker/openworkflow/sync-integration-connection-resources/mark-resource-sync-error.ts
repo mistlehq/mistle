@@ -3,7 +3,7 @@ import {
   IntegrationConnectionResourceSyncStates,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 export async function markResourceSyncError(input: {
   db: ControlPlaneDatabase;
@@ -17,22 +17,19 @@ export async function markResourceSyncError(input: {
   };
 }): Promise<boolean> {
   return input.db.transaction(async (tx) => {
-    const lockedStateRows = await tx.execute(
-      sql<{
-        lastSyncStartedAt: string | null;
-        syncState: string;
-      }>`
-        select
-          last_sync_started_at as "lastSyncStartedAt",
-          sync_state as "syncState"
-        from "control_plane"."integration_connection_resource_states"
-        where
-          connection_id = ${input.connectionId}
-          and kind = ${input.kind}
-        for update
-      `,
-    );
-    const lockedState = lockedStateRows.rows[0];
+    const [lockedState] = await tx
+      .select({
+        lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
+        syncState: integrationConnectionResourceStates.syncState,
+      })
+      .from(integrationConnectionResourceStates)
+      .where(
+        and(
+          eq(integrationConnectionResourceStates.connectionId, input.connectionId),
+          eq(integrationConnectionResourceStates.kind, input.kind),
+        ),
+      )
+      .for("update");
     if (
       lockedState === undefined ||
       lockedState.syncState !== IntegrationConnectionResourceSyncStates.SYNCING ||
