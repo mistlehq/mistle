@@ -6,21 +6,16 @@ import { randomUUID } from "node:crypto";
 
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import { systemSleeper } from "@mistle/time";
-import { afterAll, beforeAll, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import {
-  startCloudflaredTunnel,
-  type StartedCloudflaredTunnel,
-} from "./helpers/cloudflared-tunnel.js";
 import { resolveGitHubAppInstallationId } from "./helpers/github-app-installation.js";
-import { it, readSystemTestContext } from "./system-test-context.js";
+import { it } from "./system-test-context.js";
 
 const OpenAiTargetKey = "openai-default";
 const GitHubTargetKey = "github-cloud";
 const OpenAiConnectionMethodId = "api-key";
 const TestTimeoutMs = 10 * 60_000;
-const TunnelStartupTimeoutMs = 60_000;
 const PollIntervalMs = 2_000;
 const SandboxReadyTimeoutMs = 3 * 60_000;
 const WebhookDeliveryTimeoutMs = 3 * 60_000;
@@ -140,16 +135,6 @@ function parseGitHubRepository(input: string): GitHubRepository {
 function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
   return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
-}
-
-function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
-  const baseUrl = new URL(controlPlaneApiBaseUrl);
-  const parsedPort = Number.parseInt(baseUrl.port, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
-    throw new Error("Control plane API base URL must include a positive numeric port.");
-  }
-
-  return parsedPort;
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
@@ -310,25 +295,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const describeIf = hasRequiredEnv() ? describe : describe.skip;
 
 describeIf("system GitHub webhook sandbox title seeding", () => {
-  let tunnel: StartedCloudflaredTunnel | null = null;
-
-  beforeAll(async () => {
-    const systemTestContext = await readSystemTestContext();
-    tunnel = await startCloudflaredTunnel({
-      tunnelId: requireEnv("CLOUDFLARE_TUNNEL_ID"),
-      tunnelCredentialsJson: requireEnv("CLOUDFLARE_TUNNEL_CREDENTIALS_JSON"),
-      publicHostname: requireEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
-      targetLocalPort: resolveControlPlaneApiLocalPort(systemTestContext.controlPlaneApiBaseUrl),
-      startupTimeoutMs: TunnelStartupTimeoutMs,
-    });
-  }, TunnelStartupTimeoutMs + 30_000);
-
-  afterAll(async () => {
-    if (tunnel !== null) {
-      await tunnel.stop();
-    }
-  });
-
   it(
     "seeds a non-empty sandbox title after a real GitHub webhook automation delivery",
     async ({ fixture }) => {

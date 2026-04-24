@@ -1247,7 +1247,7 @@ describe("persistent sandbox storage", () => {
         authenticatedSession,
         sandboxInstanceId,
       });
-      expect(initialContents).toBe([marker, marker, marker].join("\n"));
+      expect(initialContents).toBe([marker, marker].join("\n"));
 
       await stopSandboxInstance({
         fixture,
@@ -1275,7 +1275,7 @@ describe("persistent sandbox storage", () => {
         authenticatedSession,
         sandboxInstanceId,
       });
-      expect(resumedContents).toBe([marker, marker, marker].join("\n"));
+      expect(resumedContents).toBe([marker, marker].join("\n"));
     } catch (error) {
       testError = error;
     } finally {

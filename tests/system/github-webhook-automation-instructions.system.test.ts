@@ -4,46 +4,18 @@
 
 import { randomUUID } from "node:crypto";
 
-import { afterAll, beforeAll, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import {
-  startCloudflaredTunnel,
-  type StartedCloudflaredTunnel,
-} from "./helpers/cloudflared-tunnel.js";
-import {
   hasRequiredGitHubWebhookAutomationEnv,
-  requireGitHubWebhookAutomationEnv,
-  resolveControlPlaneApiLocalPort,
   startGitHubWebhookAutomationConversation,
   TestTimeoutMs,
-  TunnelStartupTimeoutMs,
 } from "./helpers/github-webhook-automation.js";
-import { it, readSystemTestContext } from "./system-test-context.js";
+import { it } from "./system-test-context.js";
 
 const describeIf = hasRequiredGitHubWebhookAutomationEnv() ? describe : describe.skip;
 
 describeIf("system GitHub webhook automation instructions", () => {
-  let tunnel: StartedCloudflaredTunnel | null = null;
-
-  beforeAll(async () => {
-    const systemTestContext = await readSystemTestContext();
-    tunnel = await startCloudflaredTunnel({
-      tunnelId: requireGitHubWebhookAutomationEnv("CLOUDFLARE_TUNNEL_ID"),
-      tunnelCredentialsJson: requireGitHubWebhookAutomationEnv(
-        "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON",
-      ),
-      publicHostname: requireGitHubWebhookAutomationEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
-      targetLocalPort: resolveControlPlaneApiLocalPort(systemTestContext.controlPlaneApiBaseUrl),
-      startupTimeoutMs: TunnelStartupTimeoutMs,
-    });
-  }, TunnelStartupTimeoutMs + 30_000);
-
-  afterAll(async () => {
-    if (tunnel !== null) {
-      await tunnel.stop();
-    }
-  });
-
   it(
     "applies automation-specific instructions to the initial Codex turn",
     async ({ fixture }) => {

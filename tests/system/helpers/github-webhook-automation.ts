@@ -33,6 +33,7 @@ export const ResourceSyncTimeoutMs = 2 * 60_000;
 export const ThreadReadTimeoutMs = 90_000;
 export const AgentReplyTimeoutMs = 3 * 60_000;
 export const GitHubIssueCommentConsistencyTimeoutMs = 30_000;
+export const GitHubWebhookConfigTimeoutMs = 30_000;
 
 const RequiredEnvNames = [
   "MISTLE_TEST_OPENAI_API_KEY",
@@ -255,6 +256,17 @@ function resolveGatewayWebSocketUrl(input: { mintedUrl: string; gatewayBaseUrl: 
   mintedUrl.port = gatewayBaseUrl.port;
 
   return mintedUrl.toString();
+}
+
+async function waitForGitHubAppWebhookUrl(expectedUrl: string): Promise<void> {
+  await waitForCondition({
+    description: `GitHub App webhook config URL '${expectedUrl}'`,
+    timeoutMs: GitHubWebhookConfigTimeoutMs,
+    evaluate: async () => {
+      const currentConfig = await readGitHubAppWebhookConfig();
+      return currentConfig.url === expectedUrl ? currentConfig : null;
+    },
+  });
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
@@ -1549,12 +1561,13 @@ export async function startGitHubWebhookAutomationConversation(input: {
     });
 
     originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
+    const expectedWebhookCallbackUrl = buildGitHubWebhookCallbackUrl({
+      publicHostname,
+      targetKey: GitHubTargetKey,
+      endpointKey: githubWebhookSource.endpointKey,
+    });
     await updateGitHubAppWebhookConfig({
-      url: buildGitHubWebhookCallbackUrl({
-        publicHostname,
-        targetKey: GitHubTargetKey,
-        endpointKey: githubWebhookSource.endpointKey,
-      }),
+      url: expectedWebhookCallbackUrl,
       ...(originalGitHubAppWebhookConfig.contentType === undefined
         ? {}
         : { contentType: originalGitHubAppWebhookConfig.contentType }),
@@ -1562,6 +1575,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
         ? {}
         : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
     });
+    await waitForGitHubAppWebhookUrl(expectedWebhookCallbackUrl);
 
     const issue = await githubRequestJson({
       method: "POST",

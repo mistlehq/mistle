@@ -14,6 +14,11 @@ import {
   writeTestContext,
 } from "@mistle/test-harness";
 
+import {
+  startCloudflaredTunnel,
+  type StartedCloudflaredTunnel,
+} from "./helpers/cloudflared-tunnel.js";
+
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
@@ -25,6 +30,7 @@ const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
 const CloudflareTunnelIdEnvVar = "CLOUDFLARE_TUNNEL_ID";
 const CloudflareTunnelCredentialsJsonEnvVar = "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON";
 const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
+const ControlPlaneApiTunnelHostnameEnvVar = "CONTROL_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
 const SystemSandboxProvider = {
   DOCKER: "docker",
@@ -63,6 +69,26 @@ function readRequiredEnvVar(name: string): string {
   return value;
 }
 
+function readOptionalEnvVar(name: string): string | undefined {
+  const value = process.env[name];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
+function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
+  const baseUrl = new URL(controlPlaneApiBaseUrl);
+  const parsedPort = Number.parseInt(baseUrl.port, 10);
+  if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
+    throw new Error("Control plane API base URL must include a positive numeric port.");
+  }
+
+  return parsedPort;
+}
+
 function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvider }):
   | {
       tunnelId: string;
@@ -78,6 +104,50 @@ function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvi
     tunnelId: readRequiredEnvVar(CloudflareTunnelIdEnvVar),
     tunnelCredentialsJson: readRequiredEnvVar(CloudflareTunnelCredentialsJsonEnvVar),
     publicHostname: readRequiredEnvVar(DataPlaneGatewayTunnelHostnameEnvVar),
+  };
+}
+
+function resolveSharedControlPlaneTunnel():
+  | {
+      tunnelId: string;
+      tunnelCredentialsJson: string;
+      publicHostname: string;
+    }
+  | undefined {
+  const tunnelId = readOptionalEnvVar(CloudflareTunnelIdEnvVar);
+  const tunnelCredentialsJson = readOptionalEnvVar(CloudflareTunnelCredentialsJsonEnvVar);
+  const publicHostname = readOptionalEnvVar(ControlPlaneApiTunnelHostnameEnvVar);
+
+  const configuredValues = [tunnelId, tunnelCredentialsJson, publicHostname].filter(
+    (value): value is string => value !== undefined,
+  );
+
+  if (configuredValues.length === 0) {
+    return undefined;
+  }
+
+  if (tunnelId === undefined) {
+    throw new Error(
+      `${CloudflareTunnelIdEnvVar} is required when enabling the shared control-plane tunnel.`,
+    );
+  }
+
+  if (tunnelCredentialsJson === undefined) {
+    throw new Error(
+      `${CloudflareTunnelCredentialsJsonEnvVar} is required when enabling the shared control-plane tunnel.`,
+    );
+  }
+
+  if (publicHostname === undefined) {
+    throw new Error(
+      `${ControlPlaneApiTunnelHostnameEnvVar} is required when enabling the shared control-plane tunnel.`,
+    );
+  }
+
+  return {
+    tunnelId,
+    tunnelCredentialsJson,
+    publicHostname,
   };
 }
 
@@ -162,8 +232,19 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       },
       tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
     });
+    let sharedControlPlaneTunnel: StartedCloudflaredTunnel | null = null;
 
     try {
+      const controlPlaneTunnel = resolveSharedControlPlaneTunnel();
+      if (controlPlaneTunnel !== undefined) {
+        sharedControlPlaneTunnel = await startCloudflaredTunnel({
+          tunnelId: controlPlaneTunnel.tunnelId,
+          tunnelCredentialsJson: controlPlaneTunnel.tunnelCredentialsJson,
+          publicHostname: controlPlaneTunnel.publicHostname,
+          targetLocalPort: resolveControlPlaneApiLocalPort(environment.controlPlaneApi.hostBaseUrl),
+        });
+      }
+
       const gatewayLifecycle = readGatewayLifecycleOrThrow({
         environment,
       });
@@ -194,6 +275,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
         },
       });
     } catch (error) {
+      if (sharedControlPlaneTunnel !== null) {
+        await sharedControlPlaneTunnel.stop().catch(() => undefined);
+      }
       await otlpReceiver.close();
       await rm(otlpTraceCaptureFilePath, { force: true });
       await removeTestContext(TestContextId);
@@ -203,6 +287,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
 
     return async () => {
       await removeTestContext(TestContextId);
+      if (sharedControlPlaneTunnel !== null) {
+        await sharedControlPlaneTunnel.stop().catch(() => undefined);
+      }
       await environment.stop();
       await otlpReceiver.close();
       await rm(otlpTraceCaptureFilePath, { force: true });

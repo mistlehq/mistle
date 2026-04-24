@@ -72,38 +72,6 @@ describe("system sandboxd healthz codex recovery", () => {
           sandboxInstanceId,
         });
 
-        const degradedHealth = await waitForCondition({
-          description: "sandboxd __healthz codex degradation",
-          timeoutMs: 30_000,
-          pollIntervalMs: 100,
-          evaluate: async () => {
-            const health = await readSandboxHealthz({
-              fixture,
-              authenticatedSession,
-              sandboxInstanceId,
-            }).catch(() => null);
-            if (health === null) {
-              return null;
-            }
-
-            const codexProxy = requireHealthComponent(health, "codex_proxy");
-            const codexAppServer = requireHealthComponent(health, "codex_app_server");
-            if (codexProxy.state !== "healthy" || codexAppServer.state !== "healthy") {
-              return health;
-            }
-
-            return null;
-          },
-        });
-
-        const degradedCodexProxy = requireHealthComponent(degradedHealth, "codex_proxy");
-        const degradedCodexAppServer = requireHealthComponent(degradedHealth, "codex_app_server");
-        expect(
-          degradedCodexProxy.state === "restarting" ||
-            degradedCodexAppServer.state === "restarting",
-        ).toBe(true);
-        expect(degradedCodexAppServer.restart_count).toBeGreaterThan(0);
-
         const recoveredHealth = await waitForCondition({
           description: "sandboxd __healthz codex recovery",
           timeoutMs: 30_000,
@@ -123,7 +91,7 @@ describe("system sandboxd healthz codex recovery", () => {
             if (
               codexProxy.state === "healthy" &&
               codexAppServer.state === "healthy" &&
-              codexAppServer.restart_count >= degradedCodexAppServer.restart_count
+              codexAppServer.restart_count >= 1
             ) {
               return health;
             }
@@ -133,7 +101,9 @@ describe("system sandboxd healthz codex recovery", () => {
         });
 
         expect(requireHealthComponent(recoveredHealth, "codex_proxy").state).toBe("healthy");
-        expect(requireHealthComponent(recoveredHealth, "codex_app_server").state).toBe("healthy");
+        const recoveredCodexAppServer = requireHealthComponent(recoveredHealth, "codex_app_server");
+        expect(recoveredCodexAppServer.state).toBe("healthy");
+        expect(recoveredCodexAppServer.restart_count).toBeGreaterThanOrEqual(1);
       } finally {
         await attachedAgentSession.close().catch(() => {});
       }

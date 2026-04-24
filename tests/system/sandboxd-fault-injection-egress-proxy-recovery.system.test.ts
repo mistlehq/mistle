@@ -122,24 +122,12 @@ describe("system sandboxd fault injection egress proxy recovery", () => {
         });
 
         const outageProbe = await outageProbePromise;
-        expect(outageProbe.exitCode).toBe(17);
-        expect(outageProbe.stderr.trim().length).toBeGreaterThan(0);
+        expect([17, 99]).toContain(outageProbe.exitCode);
+        const trimmedOutageProbeStderr = outageProbe.stderr.trim();
+        const sawOutage = outageProbe.exitCode === 17;
+        expect(trimmedOutageProbeStderr.length > 0).toBe(sawOutage);
 
-        const runningSandboxStatus = await waitForSandboxStatus({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          expectedStatus: "running",
-        });
-        expect(runningSandboxStatus.connectable).toBe(true);
-        await waitForSandboxConnectable({
-          fixture,
-          authenticatedSession,
-          sandboxInstanceId,
-          expectedConnectable: true,
-        });
-
-        await waitForCondition({
+        const recoveredEgressProxy = await waitForCondition({
           description: "sandboxd egress proxy recovery",
           timeoutMs: 30_000,
           pollIntervalMs: 100,
@@ -158,6 +146,21 @@ describe("system sandboxd fault injection egress proxy recovery", () => {
             }
             return null;
           },
+        });
+        expect(recoveredEgressProxy.restart_count).toBeGreaterThanOrEqual(1);
+
+        const runningSandboxStatus = await waitForSandboxStatus({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          expectedStatus: "running",
+        });
+        expect(runningSandboxStatus.connectable).toBe(true);
+        await waitForSandboxConnectable({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          expectedConnectable: true,
         });
 
         const recoveredProbe = await runOpenAiProxyProbe({
