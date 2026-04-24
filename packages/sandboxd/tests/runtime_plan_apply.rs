@@ -38,7 +38,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -254,7 +254,7 @@ fn decodes_typed_artifact_install_steps() {
       "version": 1,
       "image": {
         "source": "base",
-        "imageRef": "mistle/sandbox-base:dev"
+        "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
       },
       "egressRoutes": [],
       "artifacts": [
@@ -328,7 +328,7 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -370,7 +370,7 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -411,7 +411,7 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -443,7 +443,7 @@ fn rejects_invalid_typed_artifact_install_payload_shapes_during_decode() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -497,7 +497,7 @@ fn applies_typed_exec_artifact_install_steps() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -547,7 +547,7 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [
             {
@@ -619,7 +619,7 @@ fn create_runtime_plan_apply_input(
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [],

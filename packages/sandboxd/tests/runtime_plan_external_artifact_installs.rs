@@ -22,7 +22,7 @@ fn applies_typed_mise_install_steps() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [
@@ -76,7 +76,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
           "version": 1,
           "image": {
             "source": "base",
-            "imageRef": "mistle/sandbox-base:dev"
+            "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
           },
           "egressRoutes": [],
           "artifacts": [

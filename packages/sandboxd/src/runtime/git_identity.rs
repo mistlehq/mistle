@@ -99,7 +99,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -146,7 +146,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -211,7 +211,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],

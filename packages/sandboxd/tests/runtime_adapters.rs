@@ -153,7 +153,7 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
             "version": 1,
             "image": {
                 "source": "base",
-                "imageRef": "mistle/sandbox-base:dev"
+                "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
             },
             "egressRoutes": [],
             "artifacts": [],
