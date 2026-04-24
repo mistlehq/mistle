@@ -1,15 +1,18 @@
-import { json } from "@codemirror/lang-json";
+import { json, jsonParseLinter } from "@codemirror/lang-json";
+import { linter } from "@codemirror/lint";
+import { EditorView } from "@codemirror/view";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
   CopyableValue,
-  DefinitionList,
   Field,
   FieldContent,
-  FieldDescription,
   FieldHeader,
   FieldLabel,
+  Input,
   Notice,
+  RadioGroup,
+  RadioGroupItem,
   Tabs,
   TabsContent,
   TabsList,
@@ -55,6 +58,15 @@ type GitHubManualSetupDraft = {
 
 type GitHubManualSetupFieldKey = keyof GitHubManualSetupDraft;
 type GitHubAppSetupMode = "manifest" | "manual";
+type GitHubManifestAppOwnerKind = "personal" | "organization";
+type GitHubManifestValidation =
+  | {
+      status: "valid";
+    }
+  | {
+      message: string;
+      status: "invalid";
+    };
 
 type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
 
@@ -427,59 +439,133 @@ function buildGitHubAppSetupCallbackUrl(): string {
   ).toString();
 }
 
-function renderGitHubAppSetupSummary(connection: IntegrationConnection): React.JSX.Element {
-  return (
-    <DefinitionList
-      className="px-1"
-      itemClassName="min-w-0"
-      items={[
-        {
-          id: "connection-name",
-          label: "Name",
-          value: connection.displayName,
-        },
-        {
-          id: "auth-method",
-          label: "Authentication method",
-          value: connection.connectionMethodLabel,
-        },
-      ]}
-    />
-  );
+function resolveJsonParseErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "Manifest must be valid JSON.";
+}
+
+export function validateGitHubManifestJson(value: string): GitHubManifestValidation {
+  try {
+    JSON.parse(value);
+    return { status: "valid" };
+  } catch (error) {
+    return {
+      message: resolveJsonParseErrorMessage(error),
+      status: "invalid",
+    };
+  }
+}
+
+export function formatGitHubManifestJson(value: string): string {
+  const parsedManifest: unknown = JSON.parse(value);
+  return JSON.stringify(parsedManifest, null, 2);
+}
+
+function createGitHubManifestFormatOnBlurExtension(input: {
+  onManifestChange: (value: string) => void;
+}): ReturnType<typeof EditorView.domEventHandlers> {
+  return EditorView.domEventHandlers({
+    blur: (_event, view) => {
+      const currentValue = view.state.doc.toString();
+      const validation = validateGitHubManifestJson(currentValue);
+      if (validation.status === "invalid") {
+        return;
+      }
+
+      const formattedValue = formatGitHubManifestJson(currentValue);
+      if (formattedValue !== currentValue) {
+        input.onManifestChange(formattedValue);
+      }
+    },
+  });
 }
 
 function GitHubManifestSetupPanel(input: {
+  appOwnerKind: GitHubManifestAppOwnerKind | null;
   manifestValue: string;
+  onAppOwnerKindChange: (value: GitHubManifestAppOwnerKind) => void;
   onManifestChange: (value: string) => void;
+  onOrganizationSlugChange: (value: string) => void;
+  organizationSlug: string;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <Field contentWidth="fill" orientation="vertical">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-medium">GitHub App Manifest</h2>
+        <p className="text-muted-foreground text-sm">
+          Create a GitHub App from a basic manifest. You can still change the settings later in
+          GitHub.
+        </p>
+      </div>
+      <div className="overflow-hidden rounded-md border">
+        <CodeMirror
+          basicSetup={{
+            foldGutter: false,
+            highlightActiveLine: false,
+            highlightActiveLineGutter: false,
+            lineNumbers: false,
+          }}
+          className="text-sm"
+          extensions={[
+            json(),
+            linter(jsonParseLinter()),
+            createGitHubManifestFormatOnBlurExtension({
+              onManifestChange: input.onManifestChange,
+            }),
+          ]}
+          id="github-app-manifest-editor"
+          onChange={input.onManifestChange}
+          value={input.manifestValue}
+        />
+      </div>
+      <Field>
         <FieldHeader>
-          <FieldLabel htmlFor="github-app-manifest-editor">GitHub App manifest</FieldLabel>
-          <FieldDescription>
-            Create a new GitHub App with Mistle&apos;s recommended permissions, events, and callback
-            URLs. You can still adjust the settings after creation in Github.
-          </FieldDescription>
+          <FieldLabel>Which account should the app be created in?</FieldLabel>
         </FieldHeader>
         <FieldContent>
-          <div className="overflow-hidden rounded-md border">
-            <CodeMirror
-              basicSetup={{
-                foldGutter: false,
-                highlightActiveLine: false,
-                highlightActiveLineGutter: false,
-                lineNumbers: false,
-              }}
-              className="text-sm"
-              extensions={[json()]}
-              id="github-app-manifest-editor"
-              onChange={input.onManifestChange}
-              value={input.manifestValue}
-            />
-          </div>
+          <RadioGroup
+            aria-label="GitHub App owner"
+            onValueChange={(nextValue) => {
+              if (nextValue === "personal" || nextValue === "organization") {
+                input.onAppOwnerKindChange(nextValue);
+              }
+            }}
+            value={input.appOwnerKind ?? ""}
+          >
+            <div className="flex items-start gap-3">
+              <RadioGroupItem id="github-app-owner-personal" value="personal" />
+              <label className="text-sm" htmlFor="github-app-owner-personal">
+                Personal account
+              </label>
+            </div>
+            <div className="flex items-start gap-3">
+              <RadioGroupItem id="github-app-owner-organization" value="organization" />
+              <label className="text-sm" htmlFor="github-app-owner-organization">
+                Organization
+              </label>
+            </div>
+          </RadioGroup>
         </FieldContent>
       </Field>
+      {input.appOwnerKind === "organization" ? (
+        <Field>
+          <FieldLabel htmlFor="github-app-owner-organization-slug" required>
+            GitHub organization
+          </FieldLabel>
+          <Input
+            id="github-app-owner-organization-slug"
+            onChange={(event) => {
+              input.onOrganizationSlugChange(event.currentTarget.value);
+            }}
+            placeholder="github-org"
+            required
+            value={input.organizationSlug}
+          />
+        </Field>
+      ) : null}
     </div>
   );
 }
@@ -812,6 +898,9 @@ export function GitHubAppSetupPane(input: {
     resolveInitialGitHubAppSetupMode(input.connection),
   );
   const [manifestValue, setManifestValue] = useState(GitHubDraftManifest);
+  const [manifestAppOwnerKind, setManifestAppOwnerKind] =
+    useState<GitHubManifestAppOwnerKind | null>(null);
+  const [manifestOrganizationSlug, setManifestOrganizationSlug] = useState("");
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSecretFieldKeys(input.connection),
   );
@@ -1092,8 +1181,6 @@ export function GitHubAppSetupPane(input: {
 
   return (
     <FormPageStack>
-      {renderGitHubAppSetupSummary(input.connection)}
-
       <Tabs
         onValueChange={(nextValue) => {
           if (nextValue === "manifest" || nextValue === "manual") {
@@ -1125,8 +1212,12 @@ export function GitHubAppSetupPane(input: {
 
             <TabsContent value="manifest">
               <GitHubManifestSetupPanel
+                appOwnerKind={manifestAppOwnerKind}
                 manifestValue={manifestValue}
+                onAppOwnerKindChange={setManifestAppOwnerKind}
                 onManifestChange={setManifestValue}
+                onOrganizationSlugChange={setManifestOrganizationSlug}
+                organizationSlug={manifestOrganizationSlug}
               />
             </TabsContent>
 

@@ -277,6 +277,9 @@ importers:
       '@codemirror/lang-markdown':
         specifier: 6.5.0
         version: 6.5.0
+      '@codemirror/lint':
+        specifier: 6.9.5
+        version: 6.9.5
       '@codemirror/state':
         specifier: 6.6.0
         version: 6.6.0

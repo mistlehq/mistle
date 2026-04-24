@@ -10,7 +10,11 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { GitHubManualSetupPane } from "./integration-connection-github-manual-setup-page.js";
+import {
+  formatGitHubManifestJson,
+  GitHubManualSetupPane,
+  validateGitHubManifestJson,
+} from "./integration-connection-github-manual-setup-page.js";
 
 function createGitHubManualSetupConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -97,12 +101,18 @@ describe("GitHubManualSetupPane", () => {
     });
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
-    expect(screen.getByText("GitHub App manifest")).toBeTruthy();
+    expect(screen.getByText("GitHub App Manifest")).toBeTruthy();
     expect(
       screen.getByText(
-        "Create a new GitHub App with Mistle's recommended permissions, events, and callback URLs. You can still adjust the settings after creation in Github.",
+        "Create a GitHub App from a basic manifest. You can still change the settings later in GitHub.",
       ),
     ).toBeTruthy();
+    expect(screen.getByText("Which account should the app be created in?")).toBeTruthy();
+    expect(screen.queryByText("Choose where GitHub should create the app.")).toBeNull();
+    expect(screen.getByRole("radio", { name: "Personal account" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Organization" })).toBeTruthy();
+    expect(screen.queryByLabelText("GitHub organization")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Format JSON" })).toBeNull();
     expect(screen.queryByText("Needs setup")).toBeNull();
     expect(screen.queryByText("Status")).toBeNull();
     expect(screen.queryByText("Draft")).toBeNull();
@@ -147,5 +157,22 @@ describe("GitHubManualSetupPane", () => {
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);
+  });
+
+  it("formats valid manifest JSON", () => {
+    expect(formatGitHubManifestJson('{"name":"Mistle","default_events":["issues"]}')).toBe(
+      '{\n  "name": "Mistle",\n  "default_events": [\n    "issues"\n  ]\n}',
+    );
+  });
+
+  it("validates manifest JSON syntax", () => {
+    expect(validateGitHubManifestJson('{"name":"Mistle"}')).toEqual({ status: "valid" });
+
+    const invalidResult = validateGitHubManifestJson('{"name":');
+    expect(invalidResult.status).toBe("invalid");
+    if (invalidResult.status !== "invalid") {
+      throw new Error("invalid manifest JSON must return an invalid validation result");
+    }
+    expect(invalidResult.message.length).toBeGreaterThan(0);
   });
 });
