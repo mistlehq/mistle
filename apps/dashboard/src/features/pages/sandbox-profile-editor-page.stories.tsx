@@ -22,8 +22,13 @@ import {
   StoryLinearConnection,
   StoryOpenAiConnection,
   StoryPlanetScaleConnection,
+  StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
-import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
+import type {
+  IntegrationConnectionSummary,
+  IntegrationTargetSummary,
+  SandboxProfileBindingEditorRow,
+} from "./sandbox-profile-binding-config-editor.js";
 import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
@@ -35,6 +40,8 @@ import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resour
 
 type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
+  availableConnections?: readonly IntegrationConnectionSummary[];
+  availableTargets?: readonly IntegrationTargetSummary[];
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -196,8 +203,8 @@ function SandboxProfileEditorPageStoryView(
           if (sectionId === "integrations") {
             return (
               <SandboxProfileIntegrationsSetupSection
-                availableConnections={StoryIntegrationConnections}
-                availableTargets={StoryIntegrationTargets}
+                availableConnections={input.availableConnections ?? StoryIntegrationConnections}
+                availableTargets={input.availableTargets ?? StoryIntegrationTargets}
                 integrationBindingsQuery={{
                   isError: false,
                   error: null,
@@ -241,8 +248,8 @@ function SandboxProfileEditorPageStoryView(
           if (sectionId === "resources-and-tools") {
             return (
               <SandboxProfileResourcesAndToolsSection
-                availableConnections={StoryIntegrationConnections}
-                availableTargets={StoryIntegrationTargets}
+                availableConnections={input.availableConnections ?? StoryIntegrationConnections}
+                availableTargets={input.availableTargets ?? StoryIntegrationTargets}
                 onRowChange={(clientId, changes) => {
                   setIntegrationRows((currentRows) =>
                     currentRows.map((row) =>
@@ -310,14 +317,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const ConfigurationsSelected: Story = {
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(canvas.getByRole("tab", { name: "Configurations" }));
-  },
-};
-
 export const EmptySetupScript: Story = {
   args: {
     setupScript: null,
@@ -336,6 +335,24 @@ export const StaleConnectorBinding: Story = {
       {
         id: "binding-stale-connector",
         connectionId: "connection-missing",
+        kind: "connector",
+        config: {},
+      },
+    ],
+  },
+};
+
+export const StaleConnectorMissingTarget: Story = {
+  args: {
+    availableConnections: StoryIntegrationConnections,
+    availableTargets: StoryIntegrationTargets.filter(
+      (target) => target.targetKey !== StorySlackConnection.targetKey,
+    ),
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-stale-connector-missing-target",
+        connectionId: StorySlackConnection.id,
         kind: "connector",
         config: {},
       },

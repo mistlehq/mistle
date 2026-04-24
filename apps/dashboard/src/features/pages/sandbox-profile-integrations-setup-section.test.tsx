@@ -12,6 +12,7 @@ import {
   StoryJiraTarget,
   StoryOpenAiConnection,
   StoryOpenAiTarget,
+  StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 
@@ -90,8 +91,56 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("Unknown connector")).toBeDefined();
-    expect(screen.getByText("Connection no longer available.")).toBeDefined();
+    expect(screen.getByText("Some integrations need attention")).toBeDefined();
+    expect(
+      screen.getByText("Remove or replace integrations where the connection cannot be found."),
+    ).toBeDefined();
+    expect(screen.getByText("Unknown integration")).toBeDefined();
+    expect(screen.getByText("Connection cannot be found")).toBeDefined();
     expect(screen.getByRole("button", { name: "Remove connector" })).toBeDefined();
+  });
+
+  it("shows the same alert notice when a connector target is missing", () => {
+    render(
+      <MemoryRouter>
+        <SandboxProfileIntegrationsSetupSection
+          availableConnections={[
+            StoryOpenAiConnection,
+            StoryGithubConnection,
+            StoryJiraConnection,
+            StorySlackConnection,
+          ]}
+          availableTargets={[StoryOpenAiTarget, StoryGithubTarget, StoryJiraTarget]}
+          integrationBindingsQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationDirectoryQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationRows={[
+            {
+              clientId: "missing-target-row",
+              connectionId: StorySlackConnection.id,
+              kind: "connector",
+              config: {},
+            },
+          ]}
+          integrationSaveError={null}
+          onAddIntegrationBindingRow={async () => true}
+          onIntegrationBindingRowChange={() => {}}
+          onRemoveIntegrationBindingRow={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Some integrations need attention")).toBeDefined();
+    expect(
+      screen.getByText("Remove or replace integrations where the connection cannot be found."),
+    ).toBeDefined();
+    expect(screen.getByText("Integration no longer available.")).toBeDefined();
   });
 });

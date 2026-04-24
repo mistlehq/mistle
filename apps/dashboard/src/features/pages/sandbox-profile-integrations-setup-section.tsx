@@ -291,7 +291,29 @@ function AddConnectorTile(input: {
 }
 
 function UnresolvedConnectionCell(input: { message: string }): React.JSX.Element {
-  return <p className="text-muted-foreground text-sm">{input.message}</p>;
+  return <p className="text-destructive text-sm">{input.message}</p>;
+}
+
+function UnresolvedIntegrationCell(input: { title: string }): React.JSX.Element {
+  return <p className="text-destructive truncate text-sm">{input.title}</p>;
+}
+
+function resolveConnectorRowIssue(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): "missing-connection" | "missing-target" | null {
+  const connection = input.availableConnections.find(
+    (candidate) => candidate.id === input.row.connectionId,
+  );
+  if (connection === undefined) {
+    return "missing-connection";
+  }
+
+  const target = input.availableTargets.find(
+    (candidate) => candidate.targetKey === connection.targetKey,
+  );
+  return target === undefined ? "missing-target" : null;
 }
 
 export function SandboxProfileIntegrationsSetupSection(input: {
@@ -355,6 +377,14 @@ export function SandboxProfileIntegrationsSetupSection(input: {
   );
   const addConnectorChoices = connectorChoices.filter(
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
+  );
+  const hasUnresolvedConnectorRows = connectorRows.some(
+    (row) =>
+      resolveConnectorRowIssue({
+        row,
+        availableConnections: input.availableConnections,
+        availableTargets: input.availableTargets,
+      }) !== null,
   );
 
   const agentDisplayChoice =
@@ -487,6 +517,12 @@ export function SandboxProfileIntegrationsSetupSection(input: {
       {input.integrationSaveError ? (
         <Notice title="Save failed" variant="alert">
           {input.integrationSaveError}
+        </Notice>
+      ) : null}
+
+      {hasUnresolvedConnectorRows ? (
+        <Notice title="Some integrations need attention" variant="alert">
+          Remove or replace integrations where the connection cannot be found.
         </Notice>
       ) : null}
 
@@ -624,11 +660,13 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                     (candidate) => candidate.targetKey === connection.targetKey,
                   );
             const integrationTitle =
-              target?.displayName ?? connectionTarget?.displayName ?? "Unknown connector";
+              connection === undefined
+                ? "Unknown integration"
+                : (target?.displayName ?? connectionTarget?.displayName ?? "Unknown integration");
             const integrationLogoKey = target?.logoKey ?? connectionTarget?.logoKey;
             const connectionMessage =
               connection === undefined
-                ? "Connection no longer available."
+                ? "Connection cannot be found"
                 : target === undefined
                   ? "Integration no longer available."
                   : null;
@@ -642,15 +680,19 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   <p className="text-primary text-sm font-medium">Connector</p>
                 </div>
                 <div className="min-w-0">
-                  <IntegrationNameCell
-                    item={{
-                      id: target?.targetKey ?? connectionTarget?.targetKey ?? row.clientId,
-                      hasSelectableConnections: connection !== undefined,
-                      kind: "connector",
-                      logoKey: integrationLogoKey,
-                      title: integrationTitle,
-                    }}
-                  />
+                  {connection === undefined ? (
+                    <UnresolvedIntegrationCell title={integrationTitle} />
+                  ) : (
+                    <IntegrationNameCell
+                      item={{
+                        id: target?.targetKey ?? connectionTarget?.targetKey ?? row.clientId,
+                        hasSelectableConnections: true,
+                        kind: "connector",
+                        logoKey: integrationLogoKey,
+                        title: integrationTitle,
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="min-w-0">
                   {connectionMessage === null && target !== undefined ? (
@@ -668,7 +710,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                     />
                   ) : (
                     <UnresolvedConnectionCell
-                      message={connectionMessage ?? "Connection no longer available."}
+                      message={connectionMessage ?? "Connection cannot be found"}
                     />
                   )}
                 </div>
