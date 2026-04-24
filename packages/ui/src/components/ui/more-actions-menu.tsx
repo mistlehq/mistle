@@ -12,6 +12,7 @@ export type MoreActionsMenuProps = {
   sideOffset?: number;
   disabled?: boolean;
   triggerSize?: "icon-xs" | "icon-sm" | "icon" | "icon-lg";
+  triggerVariant?: React.ComponentProps<typeof Button>["variant"];
 };
 
 export function MoreActionsMenu(input: MoreActionsMenuProps): React.JSX.Element {
@@ -23,7 +24,7 @@ export function MoreActionsMenu(input: MoreActionsMenuProps): React.JSX.Element 
             aria-label={input.triggerLabel}
             disabled={input.disabled}
             size={input.triggerSize ?? "icon"}
-            variant="ghost"
+            variant={input.triggerVariant ?? "ghost"}
           />
         }
       >

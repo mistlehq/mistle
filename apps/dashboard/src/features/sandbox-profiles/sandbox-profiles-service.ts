@@ -486,6 +486,39 @@ export async function publishSandboxProfileVersion(input: {
   }
 }
 
+export async function discardSandboxProfileDraftChanges(input: {
+  profileId: string;
+  draftVersion: number;
+  activeVersion: number;
+}): Promise<void> {
+  const [activeBindings, activeSetupScript] = await Promise.all([
+    getSandboxProfileVersionIntegrationBindings({
+      profileId: input.profileId,
+      version: input.activeVersion,
+    }),
+    getSandboxProfileVersionSetupScript({
+      profileId: input.profileId,
+      version: input.activeVersion,
+    }),
+  ]);
+
+  await putSandboxProfileVersionIntegrationBindings({
+    profileId: input.profileId,
+    version: input.draftVersion,
+    bindings: activeBindings.bindings.map((binding) => ({
+      connectionId: binding.connectionId,
+      kind: binding.kind,
+      config: binding.config,
+    })),
+  });
+
+  await putSandboxProfileVersionSetupScript({
+    profileId: input.profileId,
+    version: input.draftVersion,
+    setupScript: activeSetupScript.setupScript,
+  });
+}
+
 export async function getSandboxProfileVersionIntegrationBindings(input: {
   profileId: string;
   version: number;

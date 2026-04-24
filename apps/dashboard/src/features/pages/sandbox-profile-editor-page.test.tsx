@@ -354,7 +354,7 @@ describe("SandboxProfileEditorPage", () => {
   it("renders draft profiles with publish action", () => {
     renderSandboxProfileEditor();
 
-    expect(screen.getByText("Draft")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
+    expect(screen.queryByText("You are in draft mode")).toBeNull();
+    expect(screen.getByRole("button", { name: "Publish Changes" })).toBeDefined();
   });
 });

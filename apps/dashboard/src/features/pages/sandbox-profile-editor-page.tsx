@@ -1,13 +1,22 @@
 import {
   Button,
+  ButtonGroup,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenuItem,
   Field,
   FieldContent,
   FieldHeader,
   FieldLabel,
   FieldLabelWithTooltip,
   Input,
+  MoreActionsMenu,
   Notice,
 } from "@mistle/ui";
 import { CheckCircleIcon, InfoIcon, SpinnerGapIcon } from "@phosphor-icons/react";
@@ -27,6 +36,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   createSandboxProfileVersionDraft,
+  discardSandboxProfileDraftChanges,
   getSandboxProfile,
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
@@ -364,6 +374,7 @@ function LoadedSandboxProfileEditorPage(
 ): React.JSX.Element {
   const [viewedVersionKind, setViewedVersionKind] = useState<ViewedVersionKind | null>(null);
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
+  const [isCancelDraftDialogOpen, setIsCancelDraftDialogOpen] = useState(false);
   const profileVersionsQuery = useQuery({
     queryKey: sandboxProfileVersionsQueryKey(input.profileId),
     queryFn: async ({ signal }) =>
@@ -439,6 +450,43 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
+  const discardChangesMutation = useMutation({
+    mutationFn: async (inputValue: {
+      draftVersion: number;
+      activeVersion: number;
+      leaveDraftMode: boolean;
+    }) =>
+      discardSandboxProfileDraftChanges({
+        profileId: input.profileId,
+        draftVersion: inputValue.draftVersion,
+        activeVersion: inputValue.activeVersion,
+      }),
+    onSuccess: async (_result, variables) => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateVersionBindings({
+          profileId: input.profileId,
+          version: variables.draftVersion,
+        }),
+        input.invalidateVersionSetupScript({
+          profileId: input.profileId,
+          version: variables.draftVersion,
+        }),
+      ]);
+      if (variables.leaveDraftMode) {
+        setIsCancelDraftDialogOpen(false);
+        setViewedVersionKind("active");
+      }
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not discard draft changes.",
+        }),
+      );
+    },
+  });
 
   if (profileVersionsQuery.isPending) {
     return <></>;
@@ -477,6 +525,12 @@ function LoadedSandboxProfileEditorPage(
       onMakeChanges={() => {
         createDraftMutation.mutate();
       }}
+      onDiscardChangesAndLeaveDraft={(inputValue) => {
+        discardChangesMutation.mutate({
+          ...inputValue,
+          leaveDraftMode: true,
+        });
+      }}
       onPublish={(version) => {
         publishMutation.mutate(version);
       }}
@@ -491,6 +545,9 @@ function LoadedSandboxProfileEditorPage(
       profile={input.profile}
       profileId={input.profileId}
       publishIsPending={publishMutation.isPending}
+      discardChangesIsPending={discardChangesMutation.isPending}
+      isCancelDraftDialogOpen={isCancelDraftDialogOpen}
+      onCancelDraftDialogOpenChange={setIsCancelDraftDialogOpen}
       versionActionError={versionActionError}
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -508,7 +565,11 @@ function ReadySandboxProfileEditorPage(input: {
   versionActionError: string | null;
   publishIsPending: boolean;
   createDraftIsPending: boolean;
+  discardChangesIsPending: boolean;
+  isCancelDraftDialogOpen: boolean;
   onPublish: (version: number) => void;
+  onDiscardChangesAndLeaveDraft: (input: { draftVersion: number; activeVersion: number }) => void;
+  onCancelDraftDialogOpenChange: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -540,6 +601,8 @@ function ReadySandboxProfileEditorPage(input: {
       isSavingProfileName={metaState.isUpdating}
       mode={input.mode}
       onMakeChanges={input.onMakeChanges}
+      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+      onCancelDraftDialogOpenChange={input.onCancelDraftDialogOpenChange}
       onPublish={input.onPublish}
       onSaveProfileName={metaState.onProfileNameSave}
       onViewActive={input.onViewActive}
@@ -547,7 +610,10 @@ function ReadySandboxProfileEditorPage(input: {
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
       versionActionError={input.versionActionError}
-      versionActionIsPending={input.publishIsPending || input.createDraftIsPending}
+      versionActionIsPending={
+        input.publishIsPending || input.createDraftIsPending || input.discardChangesIsPending
+      }
+      isCancelDraftDialogOpen={input.isCancelDraftDialogOpen}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "configurations") {
           return (
@@ -602,7 +668,10 @@ export function SandboxProfileEditorView(input: {
   mode: SandboxProfileEditorVersionMode;
   versionActionError: string | null;
   versionActionIsPending: boolean;
+  isCancelDraftDialogOpen: boolean;
   onPublish: (version: number) => void;
+  onDiscardChangesAndLeaveDraft: (input: { draftVersion: number; activeVersion: number }) => void;
+  onCancelDraftDialogOpenChange: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -611,6 +680,14 @@ export function SandboxProfileEditorView(input: {
   hasUnsavedIntegrationChanges?: boolean;
   isSavingProfileName?: boolean;
 }): React.JSX.Element {
+  const discardChangesInput =
+    input.mode.kind === "draft" && input.mode.activeVersion !== null
+      ? {
+          draftVersion: input.mode.version,
+          activeVersion: input.mode.activeVersion,
+        }
+      : null;
+
   return (
     <div className="gap-4 flex flex-col">
       <UnsavedChangesGuard
@@ -619,7 +696,7 @@ export function SandboxProfileEditorView(input: {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="min-w-0">
           <AutoSaveTitleHeading
             ariaLabel="Profile name"
             emptyDisplayText={input.profileNameFallback}
@@ -628,40 +705,69 @@ export function SandboxProfileEditorView(input: {
             value={input.profileName}
             disabled={input.isSavingProfileName === true}
           />
-          <span className="border-border text-muted-foreground inline-flex h-6 items-center rounded-sm border px-2 text-xs font-medium">
-            {input.mode.kind === "draft" ? "Draft" : "Published"}
-          </span>
         </div>
         <div className="flex items-center gap-2">
+          {input.mode.kind === "draft" ? null : (
+            <span className="inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700">
+              Published
+            </span>
+          )}
           {input.mode.kind === "draft" ? (
             <>
               {input.mode.activeVersion === null ? null : (
-                <Button onClick={input.onViewActive} type="button" variant="outline">
-                  View published version
+                <Button
+                  onClick={() => {
+                    input.onCancelDraftDialogOpenChange(true);
+                  }}
+                  type="button"
+                  variant="ghost"
+                  className="pr-0.5 text-muted-foreground hover:text-foreground hover:bg-transparent"
+                >
+                  Cancel
                 </Button>
               )}
-              <Button
-                disabled={input.versionActionIsPending}
-                onClick={() => {
-                  input.onPublish(input.mode.version);
-                }}
-                type="button"
-              >
-                Publish
-              </Button>
+              <ButtonGroup>
+                <Button
+                  disabled={input.versionActionIsPending}
+                  onClick={() => {
+                    input.onPublish(input.mode.version);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Publish
+                </Button>
+                <MoreActionsMenu
+                  disabled={input.versionActionIsPending}
+                  triggerLabel="More draft actions"
+                  triggerVariant="outline"
+                >
+                  <DropdownMenuItem variant="destructive">Delete profile</DropdownMenuItem>
+                </MoreActionsMenu>
+              </ButtonGroup>
             </>
           ) : input.mode.hasDraft ? (
             <Button onClick={input.onViewDraft} type="button">
               Back to draft
             </Button>
           ) : (
-            <Button
-              disabled={input.versionActionIsPending}
-              onClick={input.onMakeChanges}
-              type="button"
-            >
-              Make changes
-            </Button>
+            <ButtonGroup>
+              <Button
+                disabled={input.versionActionIsPending}
+                onClick={input.onMakeChanges}
+                type="button"
+                variant="outline"
+              >
+                Make changes
+              </Button>
+              <MoreActionsMenu
+                disabled={input.versionActionIsPending}
+                triggerLabel="More profile actions"
+                triggerVariant="outline"
+              >
+                <DropdownMenuItem variant="destructive">Delete profile</DropdownMenuItem>
+              </MoreActionsMenu>
+            </ButtonGroup>
           )}
         </div>
       </div>
@@ -670,6 +776,43 @@ export function SandboxProfileEditorView(input: {
         <Notice title="Profile version action failed" variant="alert">
           {input.versionActionError}
         </Notice>
+      )}
+
+      {discardChangesInput === null ? null : (
+        <Dialog
+          onOpenChange={input.onCancelDraftDialogOpenChange}
+          open={input.isCancelDraftDialogOpen}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Keep draft changes?</DialogTitle>
+              <DialogDescription>
+                Keep this draft for later, or discard the changes.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                disabled={input.versionActionIsPending}
+                onClick={() => {
+                  input.onDiscardChangesAndLeaveDraft(discardChangesInput);
+                }}
+                type="button"
+                variant="ghost"
+              >
+                Discard
+              </Button>
+              <Button
+                onClick={() => {
+                  input.onViewActive();
+                  input.onCancelDraftDialogOpenChange(false);
+                }}
+                type="button"
+              >
+                Keep
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       <SandboxProfileEditorSections

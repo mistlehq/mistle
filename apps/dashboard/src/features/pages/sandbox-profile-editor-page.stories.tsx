@@ -43,7 +43,8 @@ type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   availableConnections?: readonly IntegrationConnectionSummary[];
   availableTargets?: readonly IntegrationTargetSummary[];
-  lifecycleState?: "draft" | "published" | "published-with-draft";
+  isCancelDraftDialogOpen?: boolean;
+  lifecycleState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
     directoryErrorMessage?: string;
@@ -181,6 +182,9 @@ function SandboxProfileEditorPageStoryView(
   const [setupScriptSaveStatus, setSetupScriptSaveStatus] = useState<
     "idle" | "saving" | "saved" | "saved-fading"
   >("idle");
+  const [isCancelDraftDialogOpen, setIsCancelDraftDialogOpen] = useState(
+    input.isCancelDraftDialogOpen ?? false,
+  );
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
@@ -226,7 +230,10 @@ function SandboxProfileEditorPageStoryView(
     });
   }
 
-  const isEditable = input.lifecycleState === undefined || input.lifecycleState === "draft";
+  const isEditable =
+    input.lifecycleState === undefined ||
+    input.lifecycleState === "draft" ||
+    input.lifecycleState === "draft-with-published";
   const mode =
     input.lifecycleState === "published" || input.lifecycleState === "published-with-draft"
       ? {
@@ -237,8 +244,8 @@ function SandboxProfileEditorPageStoryView(
         }
       : {
           kind: "draft" as const,
-          version: 1,
-          activeVersion: null,
+          version: input.lifecycleState === "draft-with-published" ? 2 : 1,
+          activeVersion: input.lifecycleState === "draft-with-published" ? 1 : null,
           hasDraft: true as const,
         };
 
@@ -247,12 +254,15 @@ function SandboxProfileEditorPageStoryView(
       <SandboxProfileEditorView
         mode={mode}
         onMakeChanges={() => {}}
+        onDiscardChangesAndLeaveDraft={() => {}}
+        onCancelDraftDialogOpenChange={setIsCancelDraftDialogOpen}
         onPublish={() => {}}
         onSaveProfileName={handleProfileNameSave}
         onViewActive={() => {}}
         onViewDraft={() => {}}
         profileName={profileName}
         profileNameFallback={profileName}
+        isCancelDraftDialogOpen={isCancelDraftDialogOpen}
         versionActionError={null}
         versionActionIsPending={false}
         renderSectionPanel={(sectionId) => {
@@ -389,6 +399,19 @@ export const Default: Story = {};
 export const Published: Story = {
   args: {
     lifecycleState: "published",
+  },
+};
+
+export const DraftWithPublishedVersion: Story = {
+  args: {
+    lifecycleState: "draft-with-published",
+  },
+};
+
+export const CancelDraftChangesDialog: Story = {
+  args: {
+    isCancelDraftDialogOpen: true,
+    lifecycleState: "draft-with-published",
   },
 };
 
