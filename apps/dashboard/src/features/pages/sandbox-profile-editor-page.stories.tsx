@@ -359,3 +359,35 @@ export const StaleConnectorMissingTarget: Story = {
     ],
   },
 };
+
+export const StaleGitProviderBinding: Story = {
+  args: {
+    initialBindings: [
+      ...StoryBindings.filter((binding) => binding.kind !== "git"),
+      {
+        id: "binding-stale-git",
+        connectionId: "missing-git-connection",
+        kind: "git",
+        config: {},
+      },
+    ],
+  },
+};
+
+export const StaleGitProviderMissingTarget: Story = {
+  args: {
+    availableConnections: StoryIntegrationConnections,
+    availableTargets: StoryIntegrationTargets.filter(
+      (target) => target.targetKey !== StoryGithubConnection.targetKey,
+    ),
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-stale-git-missing-target",
+        connectionId: StoryGithubConnection.id,
+        kind: "git",
+        config: {},
+      },
+    ],
+  },
+};

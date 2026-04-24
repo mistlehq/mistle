@@ -25,7 +25,32 @@ afterEach(() => {
   void cleanupTestQueryClients();
 });
 
-function renderSandboxProfileEditor(input?: { setupScript?: string | null }): void {
+function renderSandboxProfileEditor(input?: {
+  bindings?: readonly {
+    id: string;
+    connectionId: string;
+    kind: "agent" | "git" | "connector";
+    config: Record<string, unknown>;
+  }[];
+  connections?: readonly {
+    id: string;
+    displayName: string;
+    targetKey: string;
+    status: "active" | "error" | "revoked";
+    config?: Record<string, unknown>;
+  }[];
+  setupScript?: string | null;
+  targets?: readonly {
+    targetKey: string;
+    displayName: string;
+    familyId: string;
+    variantId: string;
+    config: Record<string, unknown>;
+    targetHealth: {
+      configStatus: "valid" | "invalid";
+    };
+  }[];
+}): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -50,12 +75,12 @@ function renderSandboxProfileEditor(input?: { setupScript?: string | null }): vo
       version,
     }),
     {
-      bindings: [],
+      bindings: input?.bindings ?? [],
     },
   );
   queryClient.setQueryData(["sandbox-profiles", "integration-directory"], {
-    connections: [],
-    targets: [],
+    connections: input?.connections ?? [],
+    targets: input?.targets ?? [],
   });
   queryClient.setQueryData(
     sandboxProfileVersionSetupScriptQueryKey({
@@ -107,6 +132,27 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByText(
         "Choose a Git provider in Integrations before selecting repository resources.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("shows stale git guidance when a persisted git binding cannot be resolved", () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-git",
+          connectionId: "missing-git-connection",
+          kind: "git",
+          config: {},
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Resources & Tools" }));
+
+    expect(
+      screen.getByText(
+        "Fix the Git provider in Integrations before selecting repository resources.",
       ),
     ).toBeDefined();
   });

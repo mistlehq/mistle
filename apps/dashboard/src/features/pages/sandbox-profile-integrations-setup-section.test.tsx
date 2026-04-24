@@ -143,4 +143,79 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     ).toBeDefined();
     expect(screen.getByText("Integration no longer available.")).toBeDefined();
   });
+
+  it("keeps stale git provider bindings visible so they can be removed", () => {
+    render(
+      <MemoryRouter>
+        <SandboxProfileIntegrationsSetupSection
+          availableConnections={[StoryOpenAiConnection, StoryJiraConnection]}
+          availableTargets={[StoryOpenAiTarget, StoryJiraTarget]}
+          integrationBindingsQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationDirectoryQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationRows={[
+            {
+              clientId: "stale-git-row",
+              connectionId: "missing-git-connection",
+              kind: "git",
+              config: {},
+            },
+          ]}
+          integrationSaveError={null}
+          onAddIntegrationBindingRow={async () => true}
+          onIntegrationBindingRowChange={() => {}}
+          onRemoveIntegrationBindingRow={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Some integrations need attention")).toBeDefined();
+    expect(screen.getByText("None")).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "git provider integration" })).toBeNull();
+    expect(screen.getByText("Connection cannot be found")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Remove git provider" })).toBeDefined();
+  });
+
+  it("shows stale git provider rows when the target is missing", () => {
+    render(
+      <MemoryRouter>
+        <SandboxProfileIntegrationsSetupSection
+          availableConnections={[StoryOpenAiConnection, StoryGithubConnection]}
+          availableTargets={[StoryOpenAiTarget]}
+          integrationBindingsQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationDirectoryQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationRows={[
+            {
+              clientId: "missing-git-target-row",
+              connectionId: StoryGithubConnection.id,
+              kind: "git",
+              config: {},
+            },
+          ]}
+          integrationSaveError={null}
+          onAddIntegrationBindingRow={async () => true}
+          onIntegrationBindingRowChange={() => {}}
+          onRemoveIntegrationBindingRow={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Some integrations need attention")).toBeDefined();
+    expect(screen.getByText("Integration no longer available.")).toBeDefined();
+  });
 });

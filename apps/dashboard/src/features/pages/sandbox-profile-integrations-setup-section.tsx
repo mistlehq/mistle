@@ -298,6 +298,10 @@ function UnresolvedIntegrationCell(input: { title: string }): React.JSX.Element 
   return <p className="text-destructive truncate text-sm">{input.title}</p>;
 }
 
+function UnresolvedNoneCell(): React.JSX.Element {
+  return <p className="text-sm">None</p>;
+}
+
 function resolveConnectorRowIssue(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -305,6 +309,29 @@ function resolveConnectorRowIssue(input: {
 }): "missing-connection" | "missing-target" | null {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
+  );
+  if (connection === undefined) {
+    return "missing-connection";
+  }
+
+  const target = input.availableTargets.find(
+    (candidate) => candidate.targetKey === connection.targetKey,
+  );
+  return target === undefined ? "missing-target" : null;
+}
+
+function resolveBindingIssue(input: {
+  row: SandboxProfileBindingEditorRow | null;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): "missing-connection" | "missing-target" | null {
+  const row = input.row;
+  if (row === null) {
+    return null;
+  }
+
+  const connection = input.availableConnections.find(
+    (candidate) => candidate.id === row.connectionId,
   );
   if (connection === undefined) {
     return "missing-connection";
@@ -378,6 +405,16 @@ export function SandboxProfileIntegrationsSetupSection(input: {
   const addConnectorChoices = connectorChoices.filter(
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
   );
+  const agentIssue = resolveBindingIssue({
+    row: agentRow,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
+  const gitIssue = resolveBindingIssue({
+    row: gitRow,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+  });
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
       resolveConnectorRowIssue({
@@ -386,6 +423,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
         availableTargets: input.availableTargets,
       }) !== null,
   );
+  const hasUnresolvedRows = agentIssue !== null || gitIssue !== null || hasUnresolvedConnectorRows;
 
   const agentDisplayChoice =
     agentChoices[0] === undefined
@@ -520,7 +558,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
         </Notice>
       ) : null}
 
-      {hasUnresolvedConnectorRows ? (
+      {hasUnresolvedRows ? (
         <Notice title="Some integrations need attention" variant="alert">
           Remove or replace integrations where the connection cannot be found.
         </Notice>
@@ -588,28 +626,36 @@ export function SandboxProfileIntegrationsSetupSection(input: {
               <p className="text-primary text-sm font-medium">Git Provider</p>
             </div>
             <div className="min-w-0">
-              <IntegrationSelectionCell
-                allowNone={true}
-                ariaLabel="git provider integration"
-                choices={gitChoices}
-                onIntegrationChange={(nextTargetKey) => {
-                  if (nextTargetKey === NoIntegrationValue) {
-                    if (gitRow !== null) {
-                      input.onRemoveIntegrationBindingRow(gitRow.clientId);
+              {gitIssue === null ? (
+                <IntegrationSelectionCell
+                  allowNone={true}
+                  ariaLabel="git provider integration"
+                  choices={gitChoices}
+                  onIntegrationChange={(nextTargetKey) => {
+                    if (nextTargetKey === NoIntegrationValue) {
+                      if (gitRow !== null) {
+                        input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                      }
+                      return;
                     }
-                    return;
-                  }
-                  void upsertSingleBinding({
-                    kind: "git",
-                    row: gitRow,
-                    targetKey: nextTargetKey,
-                  });
-                }}
-                selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
-              />
+                    void upsertSingleBinding({
+                      kind: "git",
+                      row: gitRow,
+                      targetKey: nextTargetKey,
+                    });
+                  }}
+                  selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
+                />
+              ) : (
+                <UnresolvedNoneCell />
+              )}
             </div>
             <div className="min-w-0">
-              {gitTargetKey === null ? null : (
+              {gitIssue === "missing-connection" ? (
+                <UnresolvedConnectionCell message="Connection cannot be found" />
+              ) : gitIssue === "missing-target" ? (
+                <UnresolvedConnectionCell message="Integration no longer available." />
+              ) : gitTargetKey === null ? null : (
                 <ConnectionSelectionCell
                   ariaLabel="git provider connection"
                   availableConnections={resolveConnectionsForTarget({
@@ -640,7 +686,21 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 />
               )}
             </div>
-            <div className="w-8 shrink-0" />
+            <div className="flex w-8 shrink-0 justify-end">
+              {gitIssue === null || gitRow === null ? null : (
+                <Button
+                  aria-label="Remove git provider"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  <TrashIcon aria-hidden className="size-4" />
+                </Button>
+              )}
+            </div>
           </div>
 
           {connectorRows.map((row) => {

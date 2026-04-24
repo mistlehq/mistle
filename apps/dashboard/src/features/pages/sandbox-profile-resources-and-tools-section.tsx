@@ -340,6 +340,18 @@ export function SandboxProfileResourcesAndToolsSection(input: {
     gitRow === null
       ? undefined
       : input.availableConnections.find((connection) => connection.id === gitRow.connectionId);
+  const gitTarget =
+    gitConnection === undefined
+      ? undefined
+      : input.availableTargets.find((target) => target.targetKey === gitConnection.targetKey);
+  const gitIssue =
+    gitRow === null
+      ? null
+      : gitConnection === undefined
+        ? "missing-connection"
+        : gitTarget === undefined
+          ? "missing-target"
+          : null;
   const gitSummaryItems =
     gitRow === null
       ? []
@@ -356,7 +368,11 @@ export function SandboxProfileResourcesAndToolsSection(input: {
         <p className="text-muted-foreground text-xs uppercase tracking-wide">
           Repository Resources
         </p>
-        {gitRow === null || gitConnection === undefined ? (
+        {gitIssue !== null ? (
+          <p className="text-destructive text-sm">
+            Fix the Git provider in Integrations before selecting repository resources.
+          </p>
+        ) : gitRow === null || gitConnection === undefined ? (
           <p className="text-muted-foreground text-sm">
             Choose a Git provider in Integrations before selecting repository resources.
           </p>
