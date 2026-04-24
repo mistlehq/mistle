@@ -17,4 +17,15 @@ describe("buildDashboardUrl", () => {
       ),
     ).toBe("https://app.mistle.example/dashboard/invitations/accept");
   });
+
+  it("preserves query parameters from dashboard paths", () => {
+    expect(
+      buildDashboardUrl(
+        "https://app.mistle.example/dashboard?foo=bar#section",
+        "/integrations/github-cloud/icn_123/github-app/setup?githubAppManifest=created",
+      ),
+    ).toBe(
+      "https://app.mistle.example/dashboard/integrations/github-cloud/icn_123/github-app/setup?githubAppManifest=created",
+    );
+  });
 });

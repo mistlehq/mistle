@@ -4,8 +4,9 @@ function trimTrailingSlash(value: string): string {
 
 export function buildDashboardUrl(dashboardBaseUrl: string, path: string): string {
   const url = new URL(dashboardBaseUrl);
-  url.pathname = `${trimTrailingSlash(url.pathname)}${path}`;
-  url.search = "";
+  const pathUrl = new URL(path, "https://dashboard-path.local");
+  url.pathname = `${trimTrailingSlash(url.pathname)}${pathUrl.pathname}`;
+  url.search = pathUrl.search;
   url.hash = "";
   return url.toString();
 }
