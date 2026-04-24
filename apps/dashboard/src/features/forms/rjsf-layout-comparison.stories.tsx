@@ -249,7 +249,7 @@ function ManualHorizontalField(): React.JSX.Element {
               <SelectValue placeholder="Select provider region">US East 1</SelectValue>
             </SelectTrigger>
           </div>
-          <SelectContent align="end" alignItemWithTrigger={false}>
+          <SelectContent align="end">
             <SelectItem value="us-east-1">US East 1</SelectItem>
             <SelectItem value="eu-west-1">EU West 1</SelectItem>
             <SelectItem value="ap-southeast-1">AP Southeast 1</SelectItem>

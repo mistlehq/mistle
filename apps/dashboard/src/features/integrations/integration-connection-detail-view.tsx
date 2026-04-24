@@ -224,7 +224,7 @@ export function IntegrationConnectionDetailView(
             </SelectValue>
           </SelectTrigger>
           {isMobileConnectionSelectOpen ? (
-            <SelectContent alignItemWithTrigger={false}>
+            <SelectContent>
               {props.connections.map((connection) => (
                 <SelectItem key={connection.id} value={connection.id}>
                   {connection.displayName}

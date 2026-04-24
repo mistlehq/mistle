@@ -25,7 +25,7 @@ export function SandboxProfileEditorSections(input: {
               {input.sections.find((section) => section.id === activeSectionId)?.label}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent alignItemWithTrigger={false}>
+          <SelectContent>
             {input.sections.map((section) => (
               <SelectItem key={section.id} value={section.id}>
                 {section.label}

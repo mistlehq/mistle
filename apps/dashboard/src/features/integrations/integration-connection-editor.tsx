@@ -234,7 +234,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
                   {selectedMethodLabel}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
+              <SelectContent>
                 {editor.methods.map((method) => (
                   <SelectItem key={method.id} value={method.id}>
                     {formatIntegrationConnectionMethodLabel(method)}

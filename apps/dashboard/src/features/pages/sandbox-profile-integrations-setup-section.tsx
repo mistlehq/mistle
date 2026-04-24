@@ -105,7 +105,7 @@ function IntegrationSelectionCell(input: {
           )}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false}>
+      <SelectContent>
         {input.allowNone === true ? <SelectItem value={NoIntegrationValue}>None</SelectItem> : null}
         {input.choices.map((choice) => (
           <SelectItem key={choice.id} value={choice.id}>
@@ -173,7 +173,7 @@ function ConnectionSelectionCell(input: {
           )}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent alignItemWithTrigger={false}>
+      <SelectContent>
         {input.availableConnections.map((connection) => (
           <SelectItem key={connection.id} value={connection.id}>
             {connection.displayName}

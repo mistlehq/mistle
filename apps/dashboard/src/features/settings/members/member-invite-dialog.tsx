@@ -135,7 +135,7 @@ function OpenMemberInviteDialog(input: {
                       {form.selectedRole === null ? undefined : formatRoleLabel(form.selectedRole)}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
+                  <SelectContent>
                     {input.assignableRoles.map((role) => (
                       <SelectItem key={role} value={role}>
                         {formatRoleLabel(role)}

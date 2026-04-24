@@ -859,7 +859,7 @@ export function ProposedGitHubCloudAddFlowStory(): React.JSX.Element {
                       {githubMethods.find((method) => method.id === methodId)?.label}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
+                  <SelectContent>
                     {githubMethods.map((method) => (
                       <SelectItem key={method.id} value={method.id}>
                         {method.label}

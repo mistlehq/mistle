@@ -214,7 +214,7 @@ export function AutoSaveSelectField(input: AutoSaveSelectFieldProps): React.JSX.
                   {selectedOptionLabel}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent alignItemWithTrigger={false}>
+              <SelectContent>
                 {input.options.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}

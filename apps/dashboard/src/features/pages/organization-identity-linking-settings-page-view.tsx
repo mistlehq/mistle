@@ -196,7 +196,7 @@ function IdentityLinkingProviderRowView(input: {
                 {selectedConnectionLabel}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
+            <SelectContent>
               {provider.connectionOptions.map((connection) => (
                 <SelectItem key={connection.id} value={connection.id}>
                   {connection.label}

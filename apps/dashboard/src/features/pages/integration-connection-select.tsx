@@ -63,11 +63,7 @@ export function IntegrationConnectionSelect(input: {
           )}
         </SelectValue>
       </SelectTrigger>
-      <SelectContent
-        align="end"
-        alignItemWithTrigger={false}
-        className={SchemaFormSelectContentClassName}
-      >
+      <SelectContent align="end" className={SchemaFormSelectContentClassName}>
         {input.availableConnections.map((connection) => {
           const connectionTarget = input.availableTargets.find(
             (candidate) => candidate.targetKey === connection.targetKey,
