@@ -8,6 +8,7 @@ import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
   DockerIntegrationConfigPathInContainer,
   E2BIntegrationConfigPathInContainer,
+  readTestContext,
   removeTestContext,
   startOtlpReceiver,
   startFullSystemEnvironment,
@@ -18,6 +19,11 @@ import {
   startCloudflaredTunnel,
   type StartedCloudflaredTunnel,
 } from "./helpers/cloudflared-tunnel.js";
+import { updateGitHubAppWebhookConfig } from "./helpers/github-app-installation.js";
+import {
+  SharedGitHubWebhookHarnessConfigSchema,
+  SharedGitHubWebhookHarnessContextId,
+} from "./helpers/github-webhook-automation.js";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
 const APP_STARTUP_TIMEOUT_MS = 120_000;
@@ -278,6 +284,7 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       if (sharedControlPlaneTunnel !== null) {
         await sharedControlPlaneTunnel.stop().catch(() => undefined);
       }
+      await removeTestContext(SharedGitHubWebhookHarnessContextId).catch(() => undefined);
       await otlpReceiver.close();
       await rm(otlpTraceCaptureFilePath, { force: true });
       await removeTestContext(TestContextId);
@@ -286,6 +293,24 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
     }
 
     return async () => {
+      const originalGitHubAppWebhookConfig = await readTestContext({
+        id: SharedGitHubWebhookHarnessContextId,
+        schema: SharedGitHubWebhookHarnessConfigSchema,
+      }).catch(() => null);
+
+      if (originalGitHubAppWebhookConfig !== null) {
+        await updateGitHubAppWebhookConfig({
+          url: originalGitHubAppWebhookConfig.url,
+          ...(originalGitHubAppWebhookConfig.contentType === undefined
+            ? {}
+            : { contentType: originalGitHubAppWebhookConfig.contentType }),
+          ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
+            ? {}
+            : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+        }).catch(() => undefined);
+      }
+
+      await removeTestContext(SharedGitHubWebhookHarnessContextId).catch(() => undefined);
       await removeTestContext(TestContextId);
       if (sharedControlPlaneTunnel !== null) {
         await sharedControlPlaneTunnel.stop().catch(() => undefined);

@@ -7,6 +7,7 @@ import {
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
+import { writeTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
@@ -150,12 +151,37 @@ export type GitHubWebhookAutomationConversation = {
   sandboxInstanceId: string;
   repository: GitHubRepository;
   githubToken: string;
+  sessionCookie: string;
   rpcClient: CodexJsonRpcClient;
   initialThreadRead: CodexThreadReadResult;
   buildExpectedSessionLinkUrl: () => string;
   reconnectRpcClient: () => Promise<CodexJsonRpcClient>;
   cleanup: () => Promise<void>;
 };
+
+type SharedGitHubWebhookAutomationHarness = {
+  session: AuthenticatedSession;
+  repository: GitHubRepository;
+  githubToken: string;
+  githubConnectionId: string;
+  githubWebhookSource: GitHubWebhookSource;
+  publicHostname: string;
+  originalGitHubAppWebhookConfig: {
+    url: string;
+    contentType?: string;
+    insecureSsl?: string;
+  };
+};
+
+let sharedGitHubWebhookHarnessPromise: Promise<SharedGitHubWebhookAutomationHarness> | null = null;
+export const SharedGitHubWebhookHarnessContextId = "system-github-webhook-harness";
+export const SharedGitHubWebhookHarnessConfigSchema = z
+  .object({
+    url: z.string().min(1),
+    contentType: z.string().min(1).optional(),
+    insecureSsl: z.string().min(1).optional(),
+  })
+  .strict();
 
 export type GitHubWebhookAutomationFollowUp = {
   automationRunId: string;
@@ -1314,10 +1340,9 @@ async function createWebhookAutomation(input: {
   }
 }
 
-export async function startGitHubWebhookAutomationConversation(input: {
-  fixture: SystemTestFixture;
-  automationInstructions?: string;
-}): Promise<GitHubWebhookAutomationConversation> {
+async function createSharedGitHubWebhookAutomationHarness(
+  fixture: SystemTestFixture,
+): Promise<SharedGitHubWebhookAutomationHarness> {
   const repository = parseGitHubRepository(
     requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"),
   );
@@ -1334,37 +1359,91 @@ export async function startGitHubWebhookAutomationConversation(input: {
   const githubWebhookSecret = requireGitHubWebhookAutomationEnv(
     "MISTLE_TEST_GITHUB_WEBHOOK_SECRET",
   );
-  const openAiApiKey = requireGitHubWebhookAutomationEnv("MISTLE_TEST_OPENAI_API_KEY");
-  const dataPlaneGatewayBaseUrl = input.fixture.dataPlaneGatewayBaseUrl;
   const publicHostname = requireGitHubWebhookAutomationEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const githubInstallationId = await resolveGitHubAppInstallationId({
     owner: repository.owner,
     repo: repository.repo,
     targetKey: GitHubTargetKey,
   });
-  const payloadMarker = `mistle-system-webhook-${randomUUID()}`;
-  const expectedInputSubstring = `GitHub issue comment webhook: ${payloadMarker}`;
-  const session = await input.fixture.authSession();
+  const session = await fixture.authSession();
 
-  let githubConnectionId: string | null = null;
-  let issueNumber: number | null = null;
-  let sessionClient: AgentStreamClient | null = null;
-  let sessionTransport: SandboxSessionTransport | null = null;
-  let rpcClient: CodexJsonRpcClient | null = null;
   let originalGitHubAppWebhookConfig: {
     url: string;
     contentType?: string;
     insecureSsl?: string;
   } | null = null;
-  let didCleanup = false;
-  let conversation: GitHubWebhookAutomationConversation | null = null;
 
-  async function cleanup(): Promise<void> {
-    if (didCleanup) {
-      return;
-    }
-    didCleanup = true;
+  try {
+    const githubConnectionId = await createGitHubConnection({
+      fixture,
+      session,
+      githubAppId,
+      githubAppSlug,
+      githubAppClientId,
+      githubAppClientSecret,
+      githubAppPrivateKeyPem,
+      githubWebhookSecret,
+    });
 
+    await completeGitHubInstallation({
+      fixture,
+      session,
+      githubConnectionId,
+      githubInstallationId,
+    });
+
+    await refreshGitHubRepositoryResource({
+      fixture,
+      session,
+      githubConnectionId,
+      repository,
+    });
+
+    const githubWebhookSource = await readGitHubWebhookSource({
+      fixture,
+      session,
+      githubConnectionId,
+    });
+
+    originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
+    const expectedWebhookCallbackUrl = buildGitHubWebhookCallbackUrl({
+      publicHostname,
+      targetKey: GitHubTargetKey,
+      endpointKey: githubWebhookSource.endpointKey,
+    });
+    await updateGitHubAppWebhookConfig({
+      url: expectedWebhookCallbackUrl,
+      ...(originalGitHubAppWebhookConfig.contentType === undefined
+        ? {}
+        : { contentType: originalGitHubAppWebhookConfig.contentType }),
+      ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
+        ? {}
+        : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+    });
+    await waitForGitHubAppWebhookUrl(expectedWebhookCallbackUrl);
+    await writeTestContext({
+      id: SharedGitHubWebhookHarnessContextId,
+      value: {
+        url: originalGitHubAppWebhookConfig.url,
+        ...(originalGitHubAppWebhookConfig.contentType === undefined
+          ? {}
+          : { contentType: originalGitHubAppWebhookConfig.contentType }),
+        ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
+          ? {}
+          : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+      },
+    });
+
+    return {
+      session,
+      repository,
+      githubToken,
+      githubConnectionId,
+      githubWebhookSource,
+      publicHostname,
+      originalGitHubAppWebhookConfig,
+    };
+  } catch (error) {
     if (originalGitHubAppWebhookConfig !== null) {
       await updateGitHubAppWebhookConfig({
         url: originalGitHubAppWebhookConfig.url,
@@ -1376,6 +1455,55 @@ export async function startGitHubWebhookAutomationConversation(input: {
           : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
       }).catch(() => undefined);
     }
+    throw error;
+  }
+}
+
+export async function getSharedGitHubWebhookAutomationHarness(
+  fixture: SystemTestFixture,
+): Promise<SharedGitHubWebhookAutomationHarness> {
+  if (sharedGitHubWebhookHarnessPromise === null) {
+    sharedGitHubWebhookHarnessPromise = createSharedGitHubWebhookAutomationHarness(fixture).catch(
+      (error) => {
+        sharedGitHubWebhookHarnessPromise = null;
+        throw error;
+      },
+    );
+  }
+
+  return await sharedGitHubWebhookHarnessPromise;
+}
+
+export async function startGitHubWebhookAutomationConversation(input: {
+  fixture: SystemTestFixture;
+  automationInstructions?: string;
+}): Promise<GitHubWebhookAutomationConversation> {
+  const openAiApiKey = requireGitHubWebhookAutomationEnv("MISTLE_TEST_OPENAI_API_KEY");
+  const dataPlaneGatewayBaseUrl = input.fixture.dataPlaneGatewayBaseUrl;
+  const payloadMarker = `mistle-system-webhook-${randomUUID()}`;
+  const expectedInputSubstring = `GitHub issue comment webhook: ${payloadMarker}`;
+  const sharedHarness = await getSharedGitHubWebhookAutomationHarness(input.fixture);
+  const {
+    session,
+    repository,
+    githubToken,
+    githubConnectionId,
+    githubWebhookSource,
+    publicHostname,
+  } = sharedHarness;
+
+  let issueNumber: number | null = null;
+  let sessionClient: AgentStreamClient | null = null;
+  let sessionTransport: SandboxSessionTransport | null = null;
+  let rpcClient: CodexJsonRpcClient | null = null;
+  let didCleanup = false;
+  let conversation: GitHubWebhookAutomationConversation | null = null;
+
+  async function cleanup(): Promise<void> {
+    if (didCleanup) {
+      return;
+    }
+    didCleanup = true;
 
     rpcClient?.dispose();
     sessionClient?.disconnect();
@@ -1485,37 +1613,6 @@ export async function startGitHubWebhookAutomationConversation(input: {
       ],
     });
 
-    githubConnectionId = await createGitHubConnection({
-      fixture: input.fixture,
-      session,
-      githubAppId,
-      githubAppSlug,
-      githubAppClientId,
-      githubAppClientSecret,
-      githubAppPrivateKeyPem,
-      githubWebhookSecret,
-    });
-
-    await completeGitHubInstallation({
-      fixture: input.fixture,
-      session,
-      githubConnectionId,
-      githubInstallationId,
-    });
-
-    await refreshGitHubRepositoryResource({
-      fixture: input.fixture,
-      session,
-      githubConnectionId,
-      repository,
-    });
-
-    const githubWebhookSource = await readGitHubWebhookSource({
-      fixture: input.fixture,
-      session,
-      githubConnectionId,
-    });
-
     await putSandboxBindings({
       fixture: input.fixture,
       session,
@@ -1559,23 +1656,6 @@ export async function startGitHubWebhookAutomationConversation(input: {
         ? {}
         : { instructions: input.automationInstructions }),
     });
-
-    originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
-    const expectedWebhookCallbackUrl = buildGitHubWebhookCallbackUrl({
-      publicHostname,
-      targetKey: GitHubTargetKey,
-      endpointKey: githubWebhookSource.endpointKey,
-    });
-    await updateGitHubAppWebhookConfig({
-      url: expectedWebhookCallbackUrl,
-      ...(originalGitHubAppWebhookConfig.contentType === undefined
-        ? {}
-        : { contentType: originalGitHubAppWebhookConfig.contentType }),
-      ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
-        ? {}
-        : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
-    });
-    await waitForGitHubAppWebhookUrl(expectedWebhookCallbackUrl);
 
     const issue = await githubRequestJson({
       method: "POST",
@@ -1786,6 +1866,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
       sandboxInstanceId: route.sandboxInstanceId,
       repository,
       githubToken,
+      sessionCookie: session.cookie,
       rpcClient: connectedRpcClient,
       initialThreadRead,
       buildExpectedSessionLinkUrl: () =>
