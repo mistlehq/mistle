@@ -4,6 +4,8 @@ import {
   integrationConnections,
   integrationTargets,
   sandboxProfiles,
+  sandboxProfileVersions,
+  SandboxProfileVersionStates,
   sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
 import { desc, eq, inArray, sql } from "drizzle-orm";
@@ -42,6 +44,13 @@ export async function listLaunchableProfiles(
       sql`${eq(sandboxProfiles.organizationId, input.organizationId)}
         and ${sandboxProfiles.activeVersion} is not null
         and exists (
+        select 1
+        from ${sandboxProfileVersions} as spv
+        where spv."sandbox_profile_id" = ${sandboxProfiles.id}
+          and spv."version" = ${sandboxProfiles.activeVersion}
+          and spv."state" = ${SandboxProfileVersionStates.PUBLISHED}
+      )
+      and exists (
         select 1
         from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
         inner join ${integrationConnections} as icn
