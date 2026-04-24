@@ -7,7 +7,6 @@ import type {
   IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import { resolveLatestVersion } from "../pages/sandbox-profile-integrations-state.js";
 import {
   sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -17,6 +16,7 @@ import {
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -72,6 +72,11 @@ const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
 const RequiredTriggerSelectionMessage = "Please add a trigger";
 const MissingProfileVersionQueryId = 0;
+
+function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
+  const activeVersion = versions.find((version) => version.isActive);
+  return activeVersion?.version ?? null;
+}
 
 function hasRequiredFieldErrors(
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>,
@@ -374,13 +379,13 @@ export function useLoadedWebhookAutomationEditorState(
     enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
     retry: false,
   });
-  const latestSelectedProfileVersion = useMemo(
-    () => resolveLatestVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+  const activeSelectedProfileVersion = useMemo(
+    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
     [selectedProfileVersionsQuery.data],
   );
   const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
     ? selectedSandboxProfileVersion.version
-    : latestSelectedProfileVersion;
+    : activeSelectedProfileVersion;
   const selectedProfileAutomationConfigQuery = useQuery({
     queryKey: sandboxProfileVersionAutomationConfigQueryKey({
       profileId: selectedProfileId,

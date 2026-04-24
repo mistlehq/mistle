@@ -243,9 +243,9 @@ export function resolveSessionResultsSummary(input: {
 export function SessionsPage(): React.JSX.Element {
   const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Tradeoff: the selection intentionally snapshots the launchable profile, including latestVersion.
+  // Tradeoff: the selection intentionally snapshots the launchable profile, including activeVersion.
   // This can lag behind a later refetch, but we prefer starting the exact version the picker
-  // validated at selection time over silently upgrading to a newer version after the user selects it.
+  // validated at selection time over silently changing the selected launch target after selection.
   const [selectedProfile, setSelectedProfile] = useState<LaunchableSandboxProfile | null>(null);
   const {
     launchedSessions,
@@ -275,7 +275,7 @@ export function SessionsPage(): React.JSX.Element {
       }),
   });
   const selectableProfiles = selectableProfilesQuery.data?.items ?? [];
-  const selectedProfileVersion = selectedProfile?.latestVersion ?? null;
+  const selectedProfileVersion = selectedProfile?.activeVersion ?? null;
 
   useEffect(() => {
     if (

@@ -5,6 +5,7 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
   members,
+  SandboxProfileVersionStates,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
   sandboxProfiles,
@@ -92,6 +93,7 @@ describe("home summary integration", () => {
       id: "sbp_home_summary",
       organizationId: authenticatedSession.organizationId,
       displayName: "Default Profile",
+      activeVersion: 1,
       status: SandboxProfileStatuses.ACTIVE,
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",
@@ -199,6 +201,108 @@ describe("home summary integration", () => {
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
   });
 
+  it("uses the active published version when a newer draft exists", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_home_summary_active_version",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-home-summary-active-version@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-home-summary-active-version",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {},
+    });
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_home_summary_active_version",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-home-summary-active-version",
+        displayName: "OpenAI",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "icn_home_summary_active_version_inactive",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-home-summary-active-version",
+        displayName: "OpenAI inactive",
+        status: IntegrationConnectionStatuses.ERROR,
+        createdAt: "2026-03-02T00:00:00.000Z",
+        updatedAt: "2026-03-02T00:00:00.000Z",
+      },
+    ]);
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_home_summary_active_version",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Default Profile",
+      activeVersion: 1,
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values([
+      {
+        sandboxProfileId: "sbp_home_summary_active_version",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        sandboxProfileId: "sbp_home_summary_active_version",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        publishedAt: null,
+      },
+    ]);
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_home_summary_active_version_v1",
+        sandboxProfileId: "sbp_home_summary_active_version",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_home_summary_active_version",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {},
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "ibd_home_summary_active_version_v2",
+        sandboxProfileId: "sbp_home_summary_active_version",
+        sandboxProfileVersion: 2,
+        connectionId: "icn_home_summary_active_version_inactive",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {},
+        createdAt: "2026-03-02T00:00:00.000Z",
+        updatedAt: "2026-03-02T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/home", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = homeSummaryResponseSchema.parse(await response.json());
+    expect(body.onboarding).toMatchObject({
+      hasProfiles: true,
+      hasUsableProfiles: true,
+    });
+  });
+
   it("returns 403 when the active organization membership has been revoked", async ({
     fixture,
   }) => {
@@ -263,6 +367,7 @@ describe("home summary integration", () => {
       id: "sbp_home_summary_system_started",
       organizationId: authenticatedSession.organizationId,
       displayName: "Default Profile",
+      activeVersion: 1,
       status: SandboxProfileStatuses.ACTIVE,
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",
@@ -416,6 +521,7 @@ describe("home summary integration", () => {
       id: "sbp_home_summary_non_agent",
       organizationId: authenticatedSession.organizationId,
       displayName: "Profile with stale git binding",
+      activeVersion: 1,
       status: SandboxProfileStatuses.ACTIVE,
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",

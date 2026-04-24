@@ -1,6 +1,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionStates,
   integrationConnections,
   integrationTargets,
   sandboxProfileVersionIntegrationBindings,
@@ -32,42 +33,49 @@ describe("sandbox profiles launchable integration", () => {
         id: "sbp_launchable_agent_with_repos",
         organizationId: authenticatedSession.organizationId,
         displayName: "Launchable Agent With Repos Profile",
+        activeVersion: 1,
         createdAt: "2026-01-04T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_agent",
         organizationId: authenticatedSession.organizationId,
         displayName: "Launchable Agent Profile",
+        activeVersion: 2,
         createdAt: "2026-01-03T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_git_only",
         organizationId: authenticatedSession.organizationId,
         displayName: "Git Only Profile",
+        activeVersion: 1,
         createdAt: "2026-01-02T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_old_agent_only",
         organizationId: authenticatedSession.organizationId,
         displayName: "Old Agent Only Profile",
+        activeVersion: 1,
         createdAt: "2026-01-01T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_inactive_connection",
         organizationId: authenticatedSession.organizationId,
         displayName: "Inactive Connection Profile",
+        activeVersion: 1,
         createdAt: "2025-12-31T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_disabled_target",
         organizationId: authenticatedSession.organizationId,
         displayName: "Disabled Target Profile",
+        activeVersion: 1,
         createdAt: "2025-12-30T00:00:00.000Z",
       }),
       createSandboxProfileFixture({
         id: "sbp_launchable_mixed_bindings",
         organizationId: authenticatedSession.organizationId,
         displayName: "Mixed Bindings Profile",
+        activeVersion: 1,
         createdAt: "2025-12-29T00:00:00.000Z",
       }),
     ]);
@@ -95,6 +103,7 @@ describe("sandbox profiles launchable integration", () => {
       createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_launchable_old_agent_only",
         version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
       }),
       createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_launchable_inactive_connection",
@@ -315,12 +324,13 @@ describe("sandbox profiles launchable integration", () => {
     expect(response.status).toBe(200);
 
     const body = ListLaunchableSandboxProfilesResponseSchema.parse(await response.json());
-    expect(body.items).toHaveLength(3);
+    expect(body.items).toHaveLength(4);
     expect(body.items).toStrictEqual([
       {
         id: "sbp_launchable_agent_with_repos",
         organizationId: authenticatedSession.organizationId,
         displayName: "Launchable Agent With Repos Profile",
+        activeVersion: 1,
         status: "active",
         latestVersion: 1,
         repositoryOptions: [
@@ -342,6 +352,7 @@ describe("sandbox profiles launchable integration", () => {
         id: "sbp_launchable_agent",
         organizationId: authenticatedSession.organizationId,
         displayName: "Launchable Agent Profile",
+        activeVersion: 2,
         status: "active",
         latestVersion: 2,
         repositoryOptions: [],
@@ -349,9 +360,21 @@ describe("sandbox profiles launchable integration", () => {
         updatedAt: "2026-01-03T00:00:00.000Z",
       },
       {
+        id: "sbp_launchable_old_agent_only",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Old Agent Only Profile",
+        activeVersion: 1,
+        status: "active",
+        latestVersion: 1,
+        repositoryOptions: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
         id: "sbp_launchable_mixed_bindings",
         organizationId: authenticatedSession.organizationId,
         displayName: "Mixed Bindings Profile",
+        activeVersion: 1,
         status: "active",
         latestVersion: 1,
         repositoryOptions: [],

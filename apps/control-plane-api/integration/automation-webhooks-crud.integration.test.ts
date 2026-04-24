@@ -8,6 +8,7 @@ import {
   integrationTargets,
   integrationWebhookSources,
   SandboxProfileStatuses,
+  SandboxProfileVersionStates,
   sandboxProfiles,
   sandboxProfileVersions,
   sandboxProfileVersionIntegrationBindings,
@@ -242,11 +243,11 @@ describe("automation webhooks CRUD integration", () => {
     expect(persistedTarget.primaryRepositoryId).toBe("mistlehq/platform");
   });
 
-  it("persists the latest sandbox profile version when webhook target version is omitted", async ({
+  it("persists the active sandbox profile version when webhook target version is omitted", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "automation-webhooks-create-latest-version@example.com",
+      email: "automation-webhooks-create-active-version@example.com",
     });
 
     await insertIntegrationTargets(fixture);
@@ -262,20 +263,23 @@ describe("automation webhooks CRUD integration", () => {
       targetKey: GitHubTarget.targetKey,
     });
     await insertSandboxProfile(fixture, {
-      id: "sbp_webhook_create_latest_001",
+      id: "sbp_webhook_create_active_001",
       organizationId: authenticatedSession.organizationId,
+      activeVersion: 2,
     });
     await insertSandboxProfileVersion(fixture, {
-      profileId: "sbp_webhook_create_latest_001",
+      profileId: "sbp_webhook_create_active_001",
       version: 2,
+      state: SandboxProfileVersionStates.PUBLISHED,
     });
     await insertSandboxProfileVersion(fixture, {
-      profileId: "sbp_webhook_create_latest_001",
+      profileId: "sbp_webhook_create_active_001",
       version: 5,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await insertSandboxProfileBinding(fixture, {
-      profileId: "sbp_webhook_create_latest_001",
-      version: 5,
+      profileId: "sbp_webhook_create_active_001",
+      version: 2,
       connectionId: "icn_webhook_create_latest_001",
     });
 
@@ -294,7 +298,7 @@ describe("automation webhooks CRUD integration", () => {
         conversationKeyTemplate: "{{payload.issue.node_id}}",
         idempotencyKeyTemplate: "{{payload.comment.node_id}}",
         target: {
-          sandboxProfileId: "sbp_webhook_create_latest_001",
+          sandboxProfileId: "sbp_webhook_create_active_001",
         },
       }),
     });
@@ -302,7 +306,7 @@ describe("automation webhooks CRUD integration", () => {
     expect(response.status).toBe(201);
     const body = AutomationWebhookSchema.parse(await response.json());
     expect(body.instructions).toBeNull();
-    expect(body.target.sandboxProfileVersion).toBe(5);
+    expect(body.target.sandboxProfileVersion).toBe(2);
     expect(body.target.primaryRepositoryId).toBeNull();
 
     const persistedTarget = await fixture.db.query.automationTargets.findFirst({
@@ -311,7 +315,7 @@ describe("automation webhooks CRUD integration", () => {
     if (persistedTarget === undefined) {
       throw new Error("Expected automation target row to exist.");
     }
-    expect(persistedTarget.sandboxProfileVersion).toBe(5);
+    expect(persistedTarget.sandboxProfileVersion).toBe(2);
     expect(persistedTarget.primaryRepositoryId).toBeNull();
   });
 
@@ -1585,12 +1589,14 @@ async function insertSandboxProfile(
   input: {
     id: string;
     organizationId: string;
+    activeVersion?: number | null;
   },
 ) {
   await fixture.db.insert(sandboxProfiles).values({
     id: input.id,
     organizationId: input.organizationId,
     displayName: `${input.id} display`,
+    ...(input.activeVersion === undefined ? {} : { activeVersion: input.activeVersion }),
     status: SandboxProfileStatuses.ACTIVE,
     createdAt: "2026-02-01T00:00:00.000Z",
     updatedAt: "2026-02-01T00:00:00.000Z",
@@ -1602,11 +1608,20 @@ async function insertSandboxProfileVersion(
   input: {
     profileId: string;
     version: number;
+    state?: "draft" | "published";
+    publishedAt?: string | null;
   },
 ) {
   await fixture.db.insert(sandboxProfileVersions).values({
     sandboxProfileId: input.profileId,
     version: input.version,
+    state: input.state ?? SandboxProfileVersionStates.PUBLISHED,
+    publishedAt:
+      input.publishedAt === undefined
+        ? input.state === SandboxProfileVersionStates.DRAFT
+          ? null
+          : "2026-02-01T00:00:00.000Z"
+        : input.publishedAt,
   });
 }
 

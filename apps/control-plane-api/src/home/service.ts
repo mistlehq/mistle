@@ -77,6 +77,7 @@ export async function getHomeSummary(
           select 1
           from ${sandboxProfiles} as sp
           where sp."organization_id" = ${params.organizationId}
+            and sp."active_version" is not null
             and exists (
               select 1
               from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
@@ -85,11 +86,7 @@ export async function getHomeSummary(
               inner join ${integrationTargets} as itg
                 on itg."target_key" = icn."target_key"
               where spvib."sandbox_profile_id" = sp."id"
-                and spvib."sandbox_profile_version" = (
-                  select max(spv.version)::int
-                  from "control_plane"."sandbox_profile_versions" as spv
-                  where spv."sandbox_profile_id" = sp."id"
-                )
+                and spvib."sandbox_profile_version" = sp."active_version"
                 and spvib."kind" = ${IntegrationBindingKinds.AGENT}
                 and icn."organization_id" = ${params.organizationId}
                 and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
@@ -104,11 +101,7 @@ export async function getHomeSummary(
               left join ${integrationTargets} as itg
                 on itg."target_key" = icn."target_key"
               where spvib."sandbox_profile_id" = sp."id"
-                and spvib."sandbox_profile_version" = (
-                  select max(spv.version)::int
-                  from "control_plane"."sandbox_profile_versions" as spv
-                  where spv."sandbox_profile_id" = sp."id"
-                )
+                and spvib."sandbox_profile_version" = sp."active_version"
                 and spvib."kind" = ${IntegrationBindingKinds.AGENT}
                 and (
                   icn."id" is null

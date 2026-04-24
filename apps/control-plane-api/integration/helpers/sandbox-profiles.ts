@@ -35,7 +35,12 @@ export function createSandboxProfileVersionFixture(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state ?? SandboxProfileVersionStates.PUBLISHED,
-    ...(input.publishedAt === undefined ? {} : { publishedAt: input.publishedAt }),
+    publishedAt:
+      input.publishedAt === undefined
+        ? input.state === SandboxProfileVersionStates.DRAFT
+          ? null
+          : "2026-01-01T00:00:00.000Z"
+        : input.publishedAt,
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
   };
 }

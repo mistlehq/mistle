@@ -53,6 +53,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
     selectedProfileId === null
       ? null
       : (selectableProfiles.find((profile) => profile.id === selectedProfileId) ?? null);
+  const selectedProfileVersion = selectedProfile?.activeVersion ?? null;
   const repositoryOptionsForProfile =
     selectedProfile?.repositoryOptions.map((option) => ({
       value: option.id,
@@ -76,12 +77,13 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   const startSessionMutation = useMutation({
     mutationFn: async (input: {
       profile: LaunchableSandboxProfile;
+      profileVersion: number;
       primaryRepositoryId: string | null;
     }) => {
       try {
         return await startSandboxInstanceFromProfileVersion({
           profileId: input.profile.id,
-          profileVersion: input.profile.latestVersion,
+          profileVersion: input.profileVersion,
           primaryRepositoryId: input.primaryRepositoryId,
           idempotencyKey: crypto.randomUUID(),
         });
@@ -108,6 +110,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   });
   const canStartSession =
     selectedProfile !== null &&
+    selectedProfileVersion !== null &&
     selectedRepositoryOption !== null &&
     !selectableProfilesQuery.isPending &&
     !startSessionMutation.isPending;
@@ -165,13 +168,18 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   function handleCreateSessionSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    if (selectedProfile === null || selectedRepositoryOption === null) {
+    if (
+      selectedProfile === null ||
+      selectedProfileVersion === null ||
+      selectedRepositoryOption === null
+    ) {
       return;
     }
 
     setStartErrorMessage(null);
     startSessionMutation.mutate({
       profile: selectedProfile,
+      profileVersion: selectedProfileVersion,
       primaryRepositoryId:
         selectedRepositoryOption.value === WorkspaceRootOption.value
           ? null

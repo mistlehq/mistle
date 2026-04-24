@@ -24,11 +24,7 @@ export async function listLaunchableProfiles(
 ): Promise<{
   items: LaunchableSandboxProfile[];
 }> {
-  const latestVersionSql = sql<number>`(
-    select max(spv.version)::int
-    from "control_plane"."sandbox_profile_versions" as spv
-    where spv."sandbox_profile_id" = ${sandboxProfiles.id}
-  )`;
+  const launchableVersionSql = sql<number>`(${sandboxProfiles.activeVersion})::int`;
 
   const candidates = await db
     .select({
@@ -39,11 +35,13 @@ export async function listLaunchableProfiles(
       status: sandboxProfiles.status,
       createdAt: sandboxProfiles.createdAt,
       updatedAt: sandboxProfiles.updatedAt,
-      latestVersion: latestVersionSql,
+      latestVersion: launchableVersionSql,
     })
     .from(sandboxProfiles)
     .where(
-      sql`${eq(sandboxProfiles.organizationId, input.organizationId)} and exists (
+      sql`${eq(sandboxProfiles.organizationId, input.organizationId)}
+        and ${sandboxProfiles.activeVersion} is not null
+        and exists (
         select 1
         from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
         inner join ${integrationConnections} as icn
@@ -51,7 +49,7 @@ export async function listLaunchableProfiles(
         inner join ${integrationTargets} as itg
           on itg."target_key" = icn."target_key"
         where spvib."sandbox_profile_id" = ${sandboxProfiles.id}
-          and spvib."sandbox_profile_version" = ${latestVersionSql}
+          and spvib."sandbox_profile_version" = ${launchableVersionSql}
           and spvib."kind" = ${IntegrationBindingKinds.AGENT}
           and icn."organization_id" = ${input.organizationId}
           and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
@@ -65,7 +63,7 @@ export async function listLaunchableProfiles(
         left join ${integrationTargets} as itg
           on itg."target_key" = icn."target_key"
         where spvib."sandbox_profile_id" = ${sandboxProfiles.id}
-          and spvib."sandbox_profile_version" = ${latestVersionSql}
+          and spvib."sandbox_profile_version" = ${launchableVersionSql}
           and spvib."kind" = ${IntegrationBindingKinds.AGENT}
           and (
             icn."id" is null
@@ -78,7 +76,7 @@ export async function listLaunchableProfiles(
     .orderBy(desc(sandboxProfiles.createdAt), desc(sandboxProfiles.id));
 
   const candidateIds = candidates.map((candidate) => candidate.id);
-  const latestVersionByProfileId = new Map(
+  const launchableVersionByProfileId = new Map(
     candidates.map((candidate) => [candidate.id, candidate.latestVersion]),
   );
   const gitBindings =
@@ -115,7 +113,8 @@ export async function listLaunchableProfiles(
   const gitBindingsByProfileId = new Map<string, Array<{ config: Record<string, unknown> }>>();
   for (const gitBinding of gitBindings) {
     if (
-      latestVersionByProfileId.get(gitBinding.sandboxProfileId) !== gitBinding.sandboxProfileVersion
+      launchableVersionByProfileId.get(gitBinding.sandboxProfileId) !==
+      gitBinding.sandboxProfileVersion
     ) {
       continue;
     }

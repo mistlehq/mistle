@@ -16,16 +16,15 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
   const sandboxProfileVersion =
     input.sandboxProfileVersion ??
     (
-      await ctx.db.query.sandboxProfileVersions.findFirst({
+      await ctx.db.query.sandboxProfiles.findFirst({
         columns: {
-          version: true,
+          activeVersion: true,
         },
-        where: (table, { eq }) => eq(table.sandboxProfileId, input.sandboxProfileId),
-        orderBy: (table, { desc }) => [desc(table.version)],
+        where: (table, { eq }) => eq(table.id, input.sandboxProfileId),
       })
-    )?.version;
+    )?.activeVersion;
 
-  if (sandboxProfileVersion === undefined) {
+  if (sandboxProfileVersion === undefined || sandboxProfileVersion === null) {
     throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
       "Sandbox profile must bind the selected integration connection to use its automation triggers.",
