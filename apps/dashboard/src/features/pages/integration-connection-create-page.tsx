@@ -118,7 +118,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
         methodId === "github-app-installation"
       ) {
         await navigate(
-          `/integrations/${editor.targetKey}?connectionId=${encodeURIComponent(connectionId)}`,
+          `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/github-app/setup`,
         );
         return;
       }

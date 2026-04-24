@@ -477,7 +477,7 @@ export const AddConnection: PageStory = {
   },
 };
 
-export const SetupAppManually: PageStory = {
+export const SetupDraftWithManifest: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubManualSetupPageStory
@@ -488,7 +488,7 @@ export const SetupAppManually: PageStory = {
   },
 };
 
-export const SetupAppManuallyWithPrefilledValues: PageStory = {
+export const SetupDraftManually: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubManualSetupPageStory
@@ -505,7 +505,7 @@ export const SetupAppManuallyWithPrefilledValues: PageStory = {
   },
 };
 
-export const SetupAppManuallyWithConfiguredSecrets: PageStory = {
+export const SetupDraftReadyToInstall: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubManualSetupPageStory

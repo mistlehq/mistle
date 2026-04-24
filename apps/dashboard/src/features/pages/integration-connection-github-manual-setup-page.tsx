@@ -1,6 +1,22 @@
+import { json } from "@codemirror/lang-json";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
-import { Button, CopyableValue, Notice } from "@mistle/ui";
+import {
+  Button,
+  CopyableValue,
+  DefinitionList,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
+  Notice,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -38,6 +54,7 @@ type GitHubManualSetupDraft = {
 };
 
 type GitHubManualSetupFieldKey = keyof GitHubManualSetupDraft;
+type GitHubAppSetupMode = "manifest" | "manual";
 
 type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
 
@@ -82,6 +99,40 @@ const GitHubManualSetupRequiredSecretFieldKeys: readonly GitHubManualSetupFieldK
   "appPrivateKeyPem",
   "webhookSecret",
 ];
+
+const GitHubDraftManifest = JSON.stringify(
+  {
+    name: "Mistle GitHub App",
+    url: "https://github.com/mistlehq/mistle",
+    description: "Used in Mistle for sandbox agents",
+    hook_attributes: {
+      active: true,
+      url: "https://mistle.example.com/api/integrations/github/webhook",
+    },
+    redirect_url: "https://mistle.example.com/api/integrations/github/manifest/callback",
+    callback_urls: ["https://mistle.example.com/api/integrations/github/install/callback"],
+    setup_url: "https://mistle.example.com/api/integrations/github/setup",
+    public: false,
+    default_events: [
+      "issues",
+      "issue_comment",
+      "pull_request",
+      "pull_request_review_comment",
+      "check_run",
+      "check_suite",
+    ],
+    default_permissions: {
+      checks: "write",
+      issues: "write",
+      metadata: "read",
+      pull_requests: "write",
+    },
+    request_oauth_on_install: false,
+    setup_on_update: true,
+  },
+  null,
+  2,
+);
 
 type GitHubManualSetupTimeoutRefs = Record<
   GitHubManualSetupFieldKey,
@@ -128,6 +179,19 @@ function resolveConfiguredSecretFieldKeys(
   }
 
   return configuredSecretFieldKeys;
+}
+
+function hasConfiguredGitHubAppValues(connection: IntegrationConnection): boolean {
+  return (
+    typeof connection.config?.["app_id"] === "string" ||
+    typeof connection.config?.["app_slug"] === "string" ||
+    typeof connection.config?.["client_id"] === "string" ||
+    (connection.configuredSecretNames?.length ?? 0) > 0
+  );
+}
+
+function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
+  return hasConfiguredGitHubAppValues(connection) ? "manual" : "manifest";
 }
 
 function createInitialFieldStates(): Record<GitHubManualSetupFieldKey, SavingFieldState> {
@@ -363,6 +427,279 @@ function buildGitHubAppSetupCallbackUrl(): string {
   ).toString();
 }
 
+function renderGitHubAppSetupSummary(connection: IntegrationConnection): React.JSX.Element {
+  return (
+    <DefinitionList
+      className="px-1"
+      itemClassName="min-w-0"
+      items={[
+        {
+          id: "connection-name",
+          label: "Name",
+          value: connection.displayName,
+        },
+        {
+          id: "auth-method",
+          label: "Authentication method",
+          value: connection.connectionMethodLabel,
+        },
+      ]}
+    />
+  );
+}
+
+function GitHubManifestSetupPanel(input: {
+  manifestValue: string;
+  onManifestChange: (value: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      <Field contentWidth="fill" orientation="vertical">
+        <FieldHeader>
+          <FieldLabel htmlFor="github-app-manifest-editor">GitHub App manifest</FieldLabel>
+          <FieldDescription>
+            Create a new GitHub App with Mistle&apos;s recommended permissions, events, and callback
+            URLs. You can still adjust the settings after creation in Github.
+          </FieldDescription>
+        </FieldHeader>
+        <FieldContent>
+          <div className="overflow-hidden rounded-md border">
+            <CodeMirror
+              basicSetup={{
+                foldGutter: false,
+                highlightActiveLine: false,
+                highlightActiveLineGutter: false,
+                lineNumbers: false,
+              }}
+              className="text-sm"
+              extensions={[json()]}
+              id="github-app-manifest-editor"
+              onChange={input.onManifestChange}
+              value={input.manifestValue}
+            />
+          </div>
+        </FieldContent>
+      </Field>
+    </div>
+  );
+}
+
+function GitHubManualSetupPanel(input: {
+  configuredSecretFieldKeys: ReadonlySet<GitHubManualSetupSecretFieldKey>;
+  draft: GitHubManualSetupDraft;
+  fieldStates: Record<GitHubManualSetupFieldKey, SavingFieldState>;
+  isSecretReplacementDialogOpen: boolean;
+  onCommitField: (fieldKey: GitHubManualSetupFieldKey) => void;
+  onReplacementDialogOpenChange: (open: boolean) => void;
+  onRevertSecretReplacement: (fieldKey: GitHubManualSetupSecretFieldKey) => void;
+  onUpdateFieldDraft: (fieldKey: GitHubManualSetupFieldKey, nextValue: string) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-medium">Existing GitHub App</h2>
+          <p className="text-muted-foreground text-sm">
+            Paste values from a GitHub App you already created or configured in GitHub.
+          </p>
+        </div>
+        <SavingTextField
+          fieldState={input.fieldStates.appId}
+          id="github-app-id"
+          label="App ID"
+          onBlur={() => {
+            input.onCommitField("appId");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("appId", nextValue);
+          }}
+          required
+          value={input.draft.appId}
+        />
+
+        <SavingTextField
+          fieldState={input.fieldStates.appSlug}
+          id="github-app-slug"
+          label="App slug"
+          onBlur={() => {
+            input.onCommitField("appSlug");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("appSlug", nextValue);
+          }}
+          required
+          value={input.draft.appSlug}
+        />
+
+        <SavingTextField
+          fieldState={input.fieldStates.clientId}
+          id="github-client-id"
+          label="Client ID"
+          onBlur={() => {
+            input.onCommitField("clientId");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("clientId", nextValue);
+          }}
+          required
+          value={input.draft.clientId}
+        />
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h2 className="text-base font-medium">Secrets</h2>
+        <ConfiguredSecretField
+          fieldState={input.fieldStates.appPrivateKeyPem}
+          secretLabel="app private key"
+          id="github-app-private-key"
+          label="App private key"
+          multiline
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("appPrivateKeyPem");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("appPrivateKeyPem", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("appPrivateKeyPem");
+          }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
+          placeholder="-----BEGIN PRIVATE KEY-----"
+          configured={input.configuredSecretFieldKeys.has("appPrivateKeyPem")}
+          required
+          rows={8}
+          value={input.draft.appPrivateKeyPem}
+        />
+
+        <ConfiguredSecretField
+          fieldState={input.fieldStates.clientSecret}
+          secretLabel="client secret"
+          id="github-client-secret"
+          label="Client secret"
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("clientSecret");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("clientSecret", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("clientSecret");
+          }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
+          configured={input.configuredSecretFieldKeys.has("clientSecret")}
+          required
+          type="password"
+          value={input.draft.clientSecret}
+        />
+
+        <ConfiguredSecretField
+          fieldState={input.fieldStates.webhookSecret}
+          secretLabel="webhook secret"
+          id="github-webhook-secret"
+          label="Webhook secret"
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("webhookSecret");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("webhookSecret", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("webhookSecret");
+          }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
+          configured={input.configuredSecretFieldKeys.has("webhookSecret")}
+          required
+          type="password"
+          value={input.draft.webhookSecret}
+        />
+      </div>
+    </div>
+  );
+}
+
+function GitHubSetupUrls(input: {
+  setupCallbackUrl: string;
+  webhookCallbackState:
+    | {
+        kind: "loading";
+      }
+    | {
+        kind: "error";
+        message: string;
+      }
+    | {
+        kind: "ready";
+        value: string;
+      }
+    | {
+        kind: "missing";
+      };
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-medium">Hook URLs</h2>
+        <p className="text-muted-foreground text-sm">
+          Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks
+          and webhook events.
+        </p>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <CopyableValue label="Post-installation setup URL" value={input.setupCallbackUrl} />
+        {input.webhookCallbackState.kind === "loading" ? (
+          <CopyableValue label="Webhook callback URL" loading />
+        ) : input.webhookCallbackState.kind === "error" ? (
+          <Notice title="Could not load webhook URL" variant="alert">
+            {input.webhookCallbackState.message}
+          </Notice>
+        ) : input.webhookCallbackState.kind === "missing" ? (
+          <Notice title="Webhook URL is not available yet" variant="alert">
+            GitHub setup requires a webhook callback URL, but this connection does not have one yet.
+          </Notice>
+        ) : (
+          <CopyableValue label="Webhook callback URL" value={input.webhookCallbackState.value} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GitHubAppSetupActions(input: {
+  canInstall: boolean;
+  isInstalled: boolean;
+  isManifestMode: boolean;
+  isRedirectingToInstallation: boolean;
+  isSecretReplacementDialogOpen: boolean;
+  onStartInstallation: () => void;
+  startInstallationPending: boolean;
+}): React.JSX.Element {
+  const showInstallAction = input.isInstalled || !input.isManifestMode;
+  const installPending = input.startInstallationPending || input.isRedirectingToInstallation;
+
+  return (
+    <FormPageActionBar>
+      {input.isManifestMode && !input.isInstalled ? (
+        <Button disabled type="button">
+          Create app in GitHub
+        </Button>
+      ) : null}
+      {showInstallAction ? (
+        <Button
+          disabled={!input.canInstall || installPending || input.isSecretReplacementDialogOpen}
+          onClick={input.onStartInstallation}
+          type="button"
+        >
+          {installPending
+            ? "Starting install..."
+            : input.isInstalled
+              ? "Manage Installation"
+              : "Install GitHub App"}
+        </Button>
+      ) : null}
+    </FormPageActionBar>
+  );
+}
+
 export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
@@ -453,7 +790,7 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}
     >
-      <GitHubManualSetupPane
+      <GitHubAppSetupPane
         key={connection.id}
         connection={connection}
         onBack={() => {
@@ -464,13 +801,17 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
   );
 }
 
-export function GitHubManualSetupPane(input: {
+export function GitHubAppSetupPane(input: {
   connection: IntegrationConnection;
   onBack?: () => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createInitialDraft(input.connection));
   const [savedDraft, setSavedDraft] = useState(() => createInitialDraft(input.connection));
+  const [setupMode, setSetupMode] = useState<GitHubAppSetupMode>(() =>
+    resolveInitialGitHubAppSetupMode(input.connection),
+  );
+  const [manifestValue, setManifestValue] = useState(GitHubDraftManifest);
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSecretFieldKeys(input.connection),
   );
@@ -699,6 +1040,33 @@ export function GitHubManualSetupPane(input: {
   }
 
   const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
+  const webhookCallbackState:
+    | {
+        kind: "loading";
+      }
+    | {
+        kind: "error";
+        message: string;
+      }
+    | {
+        kind: "ready";
+        value: string;
+      }
+    | {
+        kind: "missing";
+      } = webhookSourcesQuery.isPending
+    ? { kind: "loading" }
+    : webhookSourcesQuery.isError
+      ? {
+          kind: "error",
+          message: resolveApiErrorMessage({
+            error: webhookSourcesQuery.error,
+            fallbackMessage: "Could not load integration webhook sources.",
+          }),
+        }
+      : webhookCallbackUrl === undefined
+        ? { kind: "missing" }
+        : { kind: "ready", value: webhookCallbackUrl };
   const isInstalled = hasInstalledGitHubApp(input.connection);
   const requiredConfigReady = GitHubManualSetupRequiredConfigFieldKeys.every((fieldKey) =>
     isGitHubManualSetupFieldReadyForInstall({
@@ -721,181 +1089,92 @@ export function GitHubManualSetupPane(input: {
     }),
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
-  const installButtonDisabled =
-    !canInstall ||
-    startInstallationMutation.isPending ||
-    isRedirectingToInstallation ||
-    isSecretReplacementDialogOpen;
-  const installButtonPending = startInstallationMutation.isPending || isRedirectingToInstallation;
+
   return (
     <FormPageStack>
-      <FormPageSection>
-        <div className="flex flex-col gap-6 p-4">
-          {actionErrorMessage === null ? null : (
-            <Notice title="Could not continue setup" variant="alert">
-              {actionErrorMessage}
-            </Notice>
-          )}
+      {renderGitHubAppSetupSummary(input.connection)}
 
-          <CopyableValue
-            label="Post-installation setup URL"
-            value={buildGitHubAppSetupCallbackUrl()}
-          />
-          {webhookSourcesQuery.isPending ? (
-            <CopyableValue label="Webhook callback URL" loading />
-          ) : webhookSourcesQuery.isError ? (
-            <Notice title="Could not load webhook URL" variant="alert">
-              {resolveApiErrorMessage({
-                error: webhookSourcesQuery.error,
-                fallbackMessage: "Could not load integration webhook sources.",
-              })}
-            </Notice>
-          ) : webhookCallbackUrl === undefined ? (
-            <Notice title="Webhook URL is not available yet" variant="alert">
-              GitHub setup requires a webhook callback URL, but this connection does not have one
-              yet.
-            </Notice>
-          ) : (
-            <CopyableValue label="Webhook callback URL" value={webhookCallbackUrl} />
-          )}
+      <Tabs
+        onValueChange={(nextValue) => {
+          if (nextValue === "manifest" || nextValue === "manual") {
+            setSetupMode(nextValue);
+          }
+        }}
+        value={setupMode}
+      >
+        <div className="flex flex-col gap-1 px-1">
+          <h2 className="text-lg font-medium">Choose a setup method</h2>
+          <p className="text-muted-foreground text-sm">
+            Create a new GitHub App with a manifest or connect an app you&apos;ve already configured
+            in GitHub
+          </p>
+        </div>
 
-          <SavingTextField
-            fieldState={fieldStates.appId}
-            id="github-app-id"
-            label="App ID"
-            onBlur={() => {
-              void commitField("appId");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appId", nextValue);
-            }}
-            required
-            value={draft.appId}
-          />
+        <FormPageSection>
+          <div className="flex flex-col gap-6 p-4">
+            <TabsList className="w-full">
+              <TabsTrigger value="manifest">Create from manifest</TabsTrigger>
+              <TabsTrigger value="manual">Use existing app</TabsTrigger>
+            </TabsList>
 
-          <SavingTextField
-            fieldState={fieldStates.appSlug}
-            id="github-app-slug"
-            label="App slug"
-            onBlur={() => {
-              void commitField("appSlug");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appSlug", nextValue);
-            }}
-            required
-            value={draft.appSlug}
-          />
-
-          <ConfiguredSecretField
-            fieldState={fieldStates.appPrivateKeyPem}
-            secretLabel="app private key"
-            id="github-app-private-key"
-            label="App private key"
-            multiline
-            onCancelReplace={() => {
-              revertSecretReplacement("appPrivateKeyPem");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appPrivateKeyPem", nextValue);
-            }}
-            onCommit={() => {
-              void commitField("appPrivateKeyPem");
-            }}
-            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            placeholder="-----BEGIN PRIVATE KEY-----"
-            configured={configuredSecretFieldKeys.has("appPrivateKeyPem")}
-            required
-            rows={8}
-            value={draft.appPrivateKeyPem}
-          />
-
-          <SavingTextField
-            fieldState={fieldStates.clientId}
-            id="github-client-id"
-            label="Client ID"
-            onBlur={() => {
-              void commitField("clientId");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("clientId", nextValue);
-            }}
-            required
-            value={draft.clientId}
-          />
-
-          <ConfiguredSecretField
-            fieldState={fieldStates.clientSecret}
-            secretLabel="client secret"
-            id="github-client-secret"
-            label="Client secret"
-            onCancelReplace={() => {
-              revertSecretReplacement("clientSecret");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("clientSecret", nextValue);
-            }}
-            onCommit={() => {
-              void commitField("clientSecret");
-            }}
-            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            configured={configuredSecretFieldKeys.has("clientSecret")}
-            required
-            type="password"
-            value={draft.clientSecret}
-          />
-
-          <ConfiguredSecretField
-            fieldState={fieldStates.webhookSecret}
-            secretLabel="webhook secret"
-            id="github-webhook-secret"
-            label="Webhook secret"
-            onCancelReplace={() => {
-              revertSecretReplacement("webhookSecret");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("webhookSecret", nextValue);
-            }}
-            onCommit={() => {
-              void commitField("webhookSecret");
-            }}
-            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            configured={configuredSecretFieldKeys.has("webhookSecret")}
-            required
-            type="password"
-            value={draft.webhookSecret}
-          />
-
-          <FormPageActionBar>
-            {input.onBack === undefined ? null : (
-              <Button
-                onClick={() => {
-                  input.onBack?.();
-                }}
-                type="button"
-                variant="outline"
-              >
-                Back
-              </Button>
+            {actionErrorMessage === null ? null : (
+              <Notice title="Could not continue setup" variant="alert">
+                {actionErrorMessage}
+              </Notice>
             )}
-            <Button
-              disabled={installButtonDisabled}
-              onClick={() => {
+
+            <TabsContent value="manifest">
+              <GitHubManifestSetupPanel
+                manifestValue={manifestValue}
+                onManifestChange={setManifestValue}
+              />
+            </TabsContent>
+
+            <TabsContent value="manual">
+              <GitHubManualSetupPanel
+                configuredSecretFieldKeys={configuredSecretFieldKeys}
+                draft={draft}
+                fieldStates={fieldStates}
+                isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
+                onCommitField={(fieldKey) => {
+                  void commitField(fieldKey);
+                }}
+                onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
+                onRevertSecretReplacement={revertSecretReplacement}
+                onUpdateFieldDraft={updateFieldDraft}
+              />
+            </TabsContent>
+
+            {setupMode === "manual" ? (
+              <GitHubSetupUrls
+                setupCallbackUrl={buildGitHubAppSetupCallbackUrl()}
+                webhookCallbackState={webhookCallbackState}
+              />
+            ) : null}
+
+            <GitHubAppSetupActions
+              canInstall={canInstall}
+              isInstalled={isInstalled}
+              isManifestMode={setupMode === "manifest"}
+              isRedirectingToInstallation={isRedirectingToInstallation}
+              isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
+              onStartInstallation={() => {
                 setActionErrorMessage(null);
                 setIsRedirectingToInstallation(true);
                 void startInstallationMutation.mutateAsync().catch(() => undefined);
               }}
-              type="button"
-            >
-              {installButtonPending
-                ? "Starting install..."
-                : isInstalled
-                  ? "Manage Installation"
-                  : "Install App"}
-            </Button>
-          </FormPageActionBar>
-        </div>
-      </FormPageSection>
+              startInstallationPending={startInstallationMutation.isPending}
+            />
+          </div>
+        </FormPageSection>
+      </Tabs>
     </FormPageStack>
   );
+}
+
+export function GitHubManualSetupPane(input: {
+  connection: IntegrationConnection;
+  onBack?: () => void;
+}): React.JSX.Element {
+  return <GitHubAppSetupPane {...input} />;
 }

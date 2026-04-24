@@ -85,6 +85,58 @@ describe("GitHubManualSetupPane", () => {
     resetDashboardConfigForTest();
   });
 
+  it("defaults a blank draft connection to the manifest setup mode", () => {
+    renderGitHubManualSetupPane({
+      connection: {
+        ...createGitHubManualSetupConnection(),
+        config: {
+          connection_method: "github-app-installation",
+        },
+        configuredSecretNames: undefined,
+      },
+    });
+
+    expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
+    expect(screen.getByText("GitHub App manifest")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Create a new GitHub App with Mistle's recommended permissions, events, and callback URLs. You can still adjust the settings after creation in Github.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Needs setup")).toBeNull();
+    expect(screen.queryByText("Status")).toBeNull();
+    expect(screen.queryByText("Draft")).toBeNull();
+    expect(screen.queryByText("Webhook callback URL")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Create app in GitHub" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
+
+  it("defaults a prefilled connection to the manual setup mode", () => {
+    renderGitHubManualSetupPane();
+
+    expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
+    expect(screen.getByDisplayValue("12345")).toBeTruthy();
+    expect(screen.getByText("Existing GitHub App")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Paste values from a GitHub App you already created or configured in GitHub.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Secrets")).toBeTruthy();
+    expect(screen.getByText("Hook URLs")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks and webhook events.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
+
   it("keeps installation available when required secrets are already configured on the server", () => {
     renderGitHubManualSetupPane({
       connection: createGitHubManualSetupConnection({
@@ -92,8 +144,8 @@ describe("GitHubManualSetupPane", () => {
       }),
     });
 
-    expect(screen.getByRole("button", { name: "Install App" }).hasAttribute("disabled")).toBe(
-      false,
-    );
+    expect(
+      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 });
