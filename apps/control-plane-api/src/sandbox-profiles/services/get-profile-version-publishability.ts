@@ -185,5 +185,3 @@ export async function getProfileVersionPublishability(
     issues,
   };
 }
-
-export type { GetProfileVersionPublishabilityInput, GetProfileVersionPublishabilityOutput };

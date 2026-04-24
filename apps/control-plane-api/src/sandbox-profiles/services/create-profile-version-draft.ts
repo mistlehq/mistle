@@ -149,5 +149,3 @@ export async function createProfileVersionDraft(
     throw error;
   }
 }
-
-export type { CreateProfileVersionDraftInput, CreateProfileVersionDraftOutput };

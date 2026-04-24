@@ -137,5 +137,3 @@ export async function publishProfileVersion(
     };
   });
 }
-
-export type { PublishProfileVersionInput, PublishProfileVersionOutput };
