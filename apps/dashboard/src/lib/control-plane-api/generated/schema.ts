@@ -1741,7 +1741,6 @@ export interface paths {
             "application/json": {
               fields: {
                 manifest: string;
-                state: string;
               };
               /** Format: uri */
               submissionUrl: string;

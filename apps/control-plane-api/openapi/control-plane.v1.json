@@ -4846,13 +4846,9 @@
                         "manifest": {
                           "type": "string",
                           "minLength": 1
-                        },
-                        "state": {
-                          "type": "string",
-                          "minLength": 1
                         }
                       },
-                      "required": ["manifest", "state"],
+                      "required": ["manifest"],
                       "additionalProperties": false
                     }
                   },

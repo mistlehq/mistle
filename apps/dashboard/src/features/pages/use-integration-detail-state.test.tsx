@@ -160,6 +160,43 @@ describe("useIntegrationDetailState", () => {
     });
     expect(result.current.activeDetailConnectionId).toBe("icn_active");
   });
+
+  it("selects a route-requested connection when it appears after a stale directory refresh", () => {
+    const { result, rerender } = renderHook(
+      ({ nextCards }) =>
+        useIntegrationDetailState({
+          cards: nextCards,
+          detailConnectionId: "icn_route_selected",
+          detailTargetKey: "github",
+        }),
+      {
+        initialProps: {
+          nextCards: [
+            createCard({
+              targetKey: "github",
+              connections: [createConnection({ id: "icn_active", status: "active" })],
+            }),
+          ],
+        },
+      },
+    );
+
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [
+            createConnection({ id: "icn_active", status: "active" }),
+            createConnection({ id: "icn_route_selected", status: "active" }),
+          ],
+        }),
+      ],
+    });
+
+    expect(result.current.activeDetailConnectionId).toBe("icn_route_selected");
+  });
 });
 
 function createConnection(input: {

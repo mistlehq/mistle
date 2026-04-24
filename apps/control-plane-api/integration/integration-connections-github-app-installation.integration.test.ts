@@ -70,10 +70,19 @@ async function ensureGithubCloudTarget(
 function createDashboardOrganizationIntegrationsUrl(
   fixture: ControlPlaneApiIntegrationFixture,
   targetKey: string,
+  options?: {
+    connectionId?: string;
+  },
 ): string {
+  const searchParams = new URLSearchParams();
+  if (options?.connectionId !== undefined) {
+    searchParams.set("connectionId", options.connectionId);
+  }
+  const query = searchParams.size === 0 ? "" : `?${searchParams.toString()}`;
+
   return buildDashboardUrl(
     fixture.config.dashboard.baseUrl,
-    `/integrations/${encodeURIComponent(targetKey)}`,
+    `/integrations/${encodeURIComponent(targetKey)}${query}`,
   );
 }
 
@@ -119,7 +128,7 @@ describe("integration connections GitHub App installation integration", () => {
       connectionId,
     });
 
-    expect(authorizationUrl.pathname).toBe("/apps/mistle-github-app/installations/new");
+    expect(authorizationUrl.pathname).toBe("/apps/mistle-github-app/installations/select_target");
     expect(state).toBeTruthy();
 
     const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
@@ -230,7 +239,8 @@ describe("integration connections GitHub App installation integration", () => {
     const submissionUrl = new URL(responseBody.submissionUrl);
     expect(submissionUrl.origin).toBe("https://github.com");
     expect(submissionUrl.pathname).toBe("/organizations/mistle-labs/settings/apps/new");
-    expect(responseBody.fields.state).toBeTruthy();
+    const state = resolveGitHubAppManifestSubmissionState(submissionUrl);
+    expect(responseBody.fields).not.toHaveProperty("state");
 
     const manifest = parseJsonRecord(responseBody.fields.manifest);
     expect(manifest["name"]).toBe("Mistle GitHub App");
@@ -257,7 +267,7 @@ describe("integration connections GitHub App installation integration", () => {
         and(
           eq(table.organizationId, authenticatedSession.organizationId),
           eq(table.targetKey, "github-cloud"),
-          eq(table.state, responseBody.fields.state),
+          eq(table.state, state),
         ),
     });
     expect(redirectSession).toBeDefined();
@@ -484,7 +494,7 @@ describe("integration connections GitHub App installation integration", () => {
 
     expect(completeResponse.status).toBe(302);
     expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud"),
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", { connectionId }),
     );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
@@ -583,7 +593,7 @@ describe("integration connections GitHub App installation integration", () => {
 
     expect(completeResponse.status).toBe(302);
     expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud"),
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", { connectionId }),
     );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
@@ -1013,10 +1023,20 @@ async function startGitHubAppManifestConnection(
 
   expect(response.status).toBe(200);
   const responseBody = StartGitHubAppManifestConnectionResponseSchema.parse(await response.json());
+  const submissionUrl = new URL(responseBody.submissionUrl);
 
   return {
-    state: responseBody.fields.state,
+    state: resolveGitHubAppManifestSubmissionState(submissionUrl),
   };
+}
+
+function resolveGitHubAppManifestSubmissionState(submissionUrl: URL): string {
+  const state = submissionUrl.searchParams.get("state");
+  if (state === null || state.length === 0) {
+    throw new Error("GitHub App manifest submission URL must include state.");
+  }
+
+  return state;
 }
 
 async function insertRedirectSession(

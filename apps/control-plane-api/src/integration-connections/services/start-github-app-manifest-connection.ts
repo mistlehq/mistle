@@ -45,7 +45,6 @@ type StartedGitHubAppManifestConnection = {
   submissionUrl: string;
   fields: {
     manifest: string;
-    state: string;
   };
 };
 
@@ -60,19 +59,21 @@ function appendUrlPath(input: { baseUrl: string; path: string }): string {
 
 function buildGitHubAppManifestSubmissionUrl(input: {
   owner: GitHubAppManifestOwner;
+  state: string;
   webBaseUrl: string;
 }): string {
-  if (input.owner.kind === "personal") {
-    return appendUrlPath({
+  const path =
+    input.owner.kind === "personal"
+      ? "/settings/apps/new"
+      : `/organizations/${encodeURIComponent(input.owner.organizationSlug)}/settings/apps/new`;
+  const submissionUrl = new URL(
+    appendUrlPath({
       baseUrl: input.webBaseUrl,
-      path: "/settings/apps/new",
-    });
-  }
-
-  return appendUrlPath({
-    baseUrl: input.webBaseUrl,
-    path: `/organizations/${encodeURIComponent(input.owner.organizationSlug)}/settings/apps/new`,
-  });
+      path,
+    }),
+  );
+  submissionUrl.searchParams.set("state", input.state);
+  return submissionUrl.toString();
 }
 
 function buildCallbackUrl(input: { controlPlaneBaseUrl: string; path: string }): string {
@@ -261,10 +262,10 @@ export async function startGitHubAppManifestConnection(
     submissionUrl: buildGitHubAppManifestSubmissionUrl({
       owner: input.owner,
       webBaseUrl: parsedTargetConfig.webBaseUrl,
+      state,
     }),
     fields: {
       manifest: JSON.stringify(manifest),
-      state,
     },
   };
 }

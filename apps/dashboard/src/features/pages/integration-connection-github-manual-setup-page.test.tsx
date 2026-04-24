@@ -152,7 +152,7 @@ describe("GitHubManualSetupPane", () => {
     ).toBeTruthy();
     const installButton = screen.getByRole("button", { name: "Install GitHub App" });
     expect(installButton.hasAttribute("disabled")).toBe(true);
-    expect(installButton.querySelector("svg")).toBeTruthy();
+    expect(installButton.querySelector("svg")).toBeNull();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     expect(container.innerHTML).toContain("flex flex-col gap-4");
     expect(container.innerHTML).not.toContain("xl:grid-cols-2");
@@ -167,7 +167,27 @@ describe("GitHubManualSetupPane", () => {
 
     const installButton = screen.getByRole("button", { name: "Install GitHub App" });
     expect(installButton.hasAttribute("disabled")).toBe(false);
-    expect(installButton.querySelector("svg")).toBeTruthy();
+    expect(installButton.querySelector("svg")).toBeNull();
+  });
+
+  it("marks installed connections as external management actions", () => {
+    const connection = createGitHubManualSetupConnection({
+      configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+    });
+
+    renderGitHubManualSetupPane({
+      connection: {
+        ...connection,
+        config: {
+          ...connection.config,
+          installation_id: "12345",
+        },
+      },
+    });
+
+    const manageButton = screen.getByRole("button", { name: "Manage Installation" });
+    expect(manageButton.hasAttribute("disabled")).toBe(false);
+    expect(manageButton.querySelector("svg")).toBeTruthy();
   });
 
   it("shows a GitHub App creation success view with an install app action", () => {

@@ -46,7 +46,6 @@ export const StartGitHubAppManifestConnectionResponseSchema = z
     fields: z
       .object({
         manifest: z.string().min(1),
-        state: z.string().min(1),
       })
       .strict(),
   })

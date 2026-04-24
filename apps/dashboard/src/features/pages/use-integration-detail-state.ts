@@ -7,11 +7,15 @@ export function useIntegrationDetailState(input: {
   detailConnectionId: string | null;
   detailTargetKey: string | null;
 }) {
-  const invalidatedRequestedConnectionIdsRef = useRef<Set<string>>(new Set());
-  const lastRouteConnectionIdRef = useRef<string | null>(null);
-  const [requestedDetailConnectionId, setRequestedDetailConnectionId] = useState<string | null>(
-    null,
-  );
+  const invalidatedUserRequestedConnectionIdsRef = useRef<Set<string>>(new Set());
+  const lastRouteConnectionIdRef = useRef<string | null>(input.detailConnectionId);
+  const [requestedDetailConnection, setRequestedDetailConnection] = useState<{
+    id: string | null;
+    source: "route" | "user";
+  }>(() => ({
+    id: input.detailConnectionId,
+    source: "route",
+  }));
 
   useEffect(() => {
     if (input.detailConnectionId === lastRouteConnectionIdRef.current) {
@@ -19,7 +23,10 @@ export function useIntegrationDetailState(input: {
     }
 
     lastRouteConnectionIdRef.current = input.detailConnectionId;
-    setRequestedDetailConnectionId(input.detailConnectionId);
+    setRequestedDetailConnection({
+      id: input.detailConnectionId,
+      source: "route",
+    });
   }, [input.detailConnectionId]);
 
   const selectedDetailCard =
@@ -33,16 +40,21 @@ export function useIntegrationDetailState(input: {
     selectedDetailConnections.find((connection) => connection.status === "active")?.id ??
     selectedDetailConnections[0]?.id ??
     null;
+  const requestedDetailConnectionId = requestedDetailConnection.id;
 
   const requestedConnectionStillExists =
     requestedDetailConnectionId !== null &&
     selectedDetailConnections.some((connection) => connection.id === requestedDetailConnectionId);
-  if (!requestedConnectionStillExists && requestedDetailConnectionId !== null) {
-    invalidatedRequestedConnectionIdsRef.current.add(requestedDetailConnectionId);
+  if (
+    requestedDetailConnection.source === "user" &&
+    !requestedConnectionStillExists &&
+    requestedDetailConnectionId !== null
+  ) {
+    invalidatedUserRequestedConnectionIdsRef.current.add(requestedDetailConnectionId);
   }
   const requestedConnectionIsInvalidated =
     requestedDetailConnectionId !== null &&
-    invalidatedRequestedConnectionIdsRef.current.has(requestedDetailConnectionId);
+    invalidatedUserRequestedConnectionIdsRef.current.has(requestedDetailConnectionId);
 
   const activeDetailConnectionId =
     defaultConnectionId !== null &&
@@ -55,10 +67,13 @@ export function useIntegrationDetailState(input: {
     activeDetailConnectionId,
     setActiveDetailConnectionId: (nextConnectionId: string | null) => {
       if (nextConnectionId !== null) {
-        invalidatedRequestedConnectionIdsRef.current.delete(nextConnectionId);
+        invalidatedUserRequestedConnectionIdsRef.current.delete(nextConnectionId);
       }
 
-      setRequestedDetailConnectionId(nextConnectionId);
+      setRequestedDetailConnection({
+        id: nextConnectionId,
+        source: "user",
+      });
     },
     selectedDetailCard,
     selectedDetailConnections,

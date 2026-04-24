@@ -497,12 +497,11 @@ function parseGitHubManifestRecord(value: string): Record<string, unknown> {
 function submitGitHubAppManifestForm(input: {
   submissionUrl: string;
   fields: Record<string, string>;
-  target: string;
 }): void {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = input.submissionUrl;
-  form.target = input.target;
+  form.target = "_self";
   form.style.display = "none";
 
   for (const [name, value] of Object.entries(input.fields)) {
@@ -826,7 +825,6 @@ function GitHubAppSetupActions(input: {
           type="button"
         >
           Create app in GitHub
-          <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
         </Button>
       ) : null}
       {showInstallAction ? (
@@ -840,9 +838,9 @@ function GitHubAppSetupActions(input: {
             : input.isInstalled
               ? "Manage Installation"
               : "Install GitHub App"}
-          {installPending ? null : (
+          {!installPending && input.isInstalled ? (
             <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
-          )}
+          ) : null}
         </Button>
       ) : null}
     </FormPageActionBar>
@@ -1022,27 +1020,16 @@ export function GitHubAppSetupPane(input: {
     },
   });
 
-  async function startGitHubAppManifestCreationInNewWindow(): Promise<void> {
+  async function startGitHubAppManifestCreationInCurrentWindow(): Promise<void> {
     setActionErrorMessage(null);
-    const manifestWindow = openExternalAuthorizationWindow({
-      loadingMessage: "Opening GitHub App creation...",
-      targetName: `mistle-github-app-manifest-${crypto.randomUUID()}`,
-      title: "Opening GitHub App creation...",
-    });
-    if (manifestWindow === null) {
-      setActionErrorMessage("Browser blocked opening a new window.");
-      return;
-    }
 
     try {
       const { fields, submissionUrl } = await startManifestCreationMutation.mutateAsync();
       submitGitHubAppManifestForm({
         submissionUrl,
         fields,
-        target: manifestWindow.targetName,
       });
     } catch (error) {
-      manifestWindow.close();
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
@@ -1052,7 +1039,23 @@ export function GitHubAppSetupPane(input: {
     }
   }
 
-  async function startGitHubAppInstallationInNewWindow(): Promise<void> {
+  async function startGitHubAppInstallationInCurrentWindow(): Promise<void> {
+    setActionErrorMessage(null);
+
+    try {
+      const startedInstallation = await startInstallationMutation.mutateAsync();
+      globalThis.location.assign(startedInstallation.authorizationUrl);
+    } catch (error) {
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not start GitHub App installation.",
+        }),
+      );
+    }
+  }
+
+  async function startGitHubAppInstallationManagementInNewWindow(): Promise<void> {
     setActionErrorMessage(null);
     const authorizationWindow = openExternalAuthorizationWindow({
       loadingMessage: "Opening GitHub App installation...",
@@ -1068,22 +1071,6 @@ export function GitHubAppSetupPane(input: {
       authorizationWindow.navigate(startedInstallation.authorizationUrl);
     } catch (error) {
       authorizationWindow.close();
-      setActionErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not start GitHub App installation.",
-        }),
-      );
-    }
-  }
-
-  async function startGitHubAppInstallationInCurrentWindow(): Promise<void> {
-    setActionErrorMessage(null);
-
-    try {
-      const startedInstallation = await startInstallationMutation.mutateAsync();
-      globalThis.location.assign(startedInstallation.authorizationUrl);
-    } catch (error) {
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
@@ -1446,10 +1433,14 @@ export function GitHubAppSetupPane(input: {
               isManifestMode={setupMode === "manifest"}
               isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
               onCreateManifest={() => {
-                void startGitHubAppManifestCreationInNewWindow();
+                void startGitHubAppManifestCreationInCurrentWindow();
               }}
               onStartInstallation={() => {
-                void startGitHubAppInstallationInNewWindow();
+                if (isInstalled) {
+                  void startGitHubAppInstallationManagementInNewWindow();
+                  return;
+                }
+                void startGitHubAppInstallationInCurrentWindow();
               }}
               canCreateManifest={canCreateManifest}
               createManifestPending={startManifestCreationMutation.isPending}

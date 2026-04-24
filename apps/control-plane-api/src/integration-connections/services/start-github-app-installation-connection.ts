@@ -116,8 +116,8 @@ function buildGitHubAppInstallationUrl(input: {
 }): string {
   const installationPath =
     input.variantId === "github-enterprise-server"
-      ? `/github-apps/${input.appSlug}/installations/new`
-      : `/apps/${input.appSlug}/installations/new`;
+      ? `/github-apps/${input.appSlug}/installations/select_target`
+      : `/apps/${input.appSlug}/installations/select_target`;
   const installUrl = new URL(installationPath, input.webBaseUrl);
   installUrl.searchParams.set("state", input.state);
   return installUrl.toString();
