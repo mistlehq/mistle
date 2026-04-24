@@ -43,7 +43,7 @@ import { startSandbox } from "../openworkflow/start-sandbox-instance/start-sandb
 const DockerSocketPath = "/var/run/docker.sock";
 const IntegrationTestTimeoutMs = 300_000;
 const SandboxBaseImageReference =
-  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
+  "ghcr.io/mistlehq/sandbox-base@sha256:4d1432a2f3d2f246a260d8c6a74fa4c04abe0b24ea1b4c4a332ee00d4d903577";
 
 type DatabaseStack = {
   directUrl: string;
