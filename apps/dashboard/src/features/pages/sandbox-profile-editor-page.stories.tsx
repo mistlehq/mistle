@@ -30,6 +30,7 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  SandboxProfileIntegrationsSetupUnavailableState,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
@@ -42,6 +43,11 @@ type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   availableConnections?: readonly IntegrationConnectionSummary[];
   availableTargets?: readonly IntegrationTargetSummary[];
+  integrationsSectionState?: {
+    bindingsErrorMessage?: string;
+    directoryErrorMessage?: string;
+    kind: "error";
+  };
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -50,6 +56,10 @@ type SandboxProfileEditorPageStoryArgs = {
   }[];
   setupScript: string | null;
 };
+
+type IntegrationsSectionState = NonNullable<
+  SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
+>;
 
 const StorySections = [
   {
@@ -128,6 +138,28 @@ const StoryBindings = [
   },
 ] as const;
 
+function renderUnavailableIntegrationsSectionPanel(input: {
+  sectionId: SandboxProfileEditorSection["id"];
+  state: IntegrationsSectionState;
+}): React.JSX.Element {
+  return (
+    <SandboxProfileIntegrationsSetupUnavailableState
+      activeSectionId={input.sectionId}
+      integrationBindingsError={
+        input.state.bindingsErrorMessage === undefined
+          ? null
+          : new Error(input.state.bindingsErrorMessage)
+      }
+      integrationDirectoryError={
+        input.state.directoryErrorMessage === undefined
+          ? null
+          : new Error(input.state.directoryErrorMessage)
+      }
+      isPending={false}
+    />
+  );
+}
+
 function SandboxProfileEditorPageStoryView(
   input: SandboxProfileEditorPageStoryArgs,
 ): React.JSX.Element {
@@ -200,6 +232,16 @@ function SandboxProfileEditorPageStoryView(
         profileName={profileName}
         profileNameFallback={profileName}
         renderSectionPanel={(sectionId) => {
+          if (
+            input.integrationsSectionState !== undefined &&
+            (sectionId === "integrations" || sectionId === "resources-and-tools")
+          ) {
+            return renderUnavailableIntegrationsSectionPanel({
+              sectionId,
+              state: input.integrationsSectionState,
+            });
+          }
+
           if (sectionId === "integrations") {
             return (
               <SandboxProfileIntegrationsSetupSection
@@ -325,6 +367,21 @@ export const EmptySetupScript: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("tab", { name: "Configurations" }));
+  },
+};
+
+export const ResourcesAndToolsLoadError: Story = {
+  args: {
+    integrationsSectionState: {
+      kind: "error",
+      bindingsErrorMessage: "Could not load sandbox profile integration bindings.",
+      directoryErrorMessage: "Could not load integration connections.",
+    },
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("tab", { name: "Resources & Tools" }));
   },
 };
 

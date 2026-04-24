@@ -50,6 +50,7 @@ function renderSandboxProfileEditor(input?: {
       configStatus: "valid" | "invalid";
     };
   }[];
+  integrationsLoading?: boolean;
 }): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
@@ -66,18 +67,34 @@ function renderSandboxProfileEditor(input?: {
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
-  queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
-    versions: [{ sandboxProfileId: profileId, version }],
-  });
-  queryClient.setQueryData(
-    sandboxProfileVersionIntegrationBindingsQueryKey({
-      profileId,
-      version,
-    }),
-    {
-      bindings: input?.bindings ?? [],
-    },
-  );
+  if (input?.integrationsLoading === true) {
+    const versionsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionsQueryKey(profileId),
+      queryFn: async () => ({
+        versions: [{ sandboxProfileId: profileId, version }],
+      }),
+    });
+
+    versionsQuery.setState({
+      ...versionsQuery.state,
+      data: undefined,
+      fetchStatus: "fetching",
+      status: "pending",
+    });
+  } else {
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+      versions: [{ sandboxProfileId: profileId, version }],
+    });
+    queryClient.setQueryData(
+      sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId,
+        version,
+      }),
+      {
+        bindings: input?.bindings ?? [],
+      },
+    );
+  }
   queryClient.setQueryData(["sandbox-profiles", "integration-directory"], {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
@@ -155,6 +172,21 @@ describe("SandboxProfileEditorPage", () => {
         "Fix the Git provider in Integrations before selecting repository resources.",
       ),
     ).toBeDefined();
+  });
+
+  it("shows no loading placeholder in resources and tools while integrations are loading", () => {
+    renderSandboxProfileEditor({
+      integrationsLoading: true,
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Resources & Tools" }));
+
+    expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
+    expect(
+      screen.queryByText(
+        "Choose a Git provider in Integrations before selecting repository resources.",
+      ),
+    ).toBeNull();
   });
 
   it("shows the setup script editor in the configurations section", () => {

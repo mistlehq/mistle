@@ -330,7 +330,7 @@ export function SandboxProfileEditorView(input: {
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
   sections: readonly SandboxProfileEditorSection[];
-  renderSectionPanel: (sectionId: string) => React.JSX.Element;
+  renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
   isSavingProfileName?: boolean;
 }): React.JSX.Element {
@@ -383,44 +383,19 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
     input.loader.integrationDirectoryQuery.isError
   ) {
     return (
-      <div className="flex flex-col gap-4">
-        {showBindingsUnavailableNotice ? (
-          <Notice title="Could not load integration bindings" variant="alert">
-            {resolveApiErrorMessage({
-              error: input.loader.integrationBindingsQuery.error,
-              fallbackMessage: "Could not load sandbox profile integration bindings.",
-            })}
-          </Notice>
-        ) : null}
-        {showDirectoryUnavailableNotice ? (
-          <Notice title="Could not load integration connections" variant="alert">
-            {resolveApiErrorMessage({
-              error: input.loader.integrationDirectoryQuery.error,
-              fallbackMessage: "Could not load integration connections.",
-            })}
-          </Notice>
-        ) : null}
-        {input.activeSectionId === "resources-and-tools" ? (
-          <SandboxProfileResourcesAndToolsSection
-            availableConnections={input.loader.availableConnections}
-            availableTargets={input.loader.availableTargets}
-            onRowChange={() => {}}
-            rows={[]}
-          />
-        ) : (
-          <SandboxProfileIntegrationsSetupSection
-            availableConnections={input.loader.availableConnections}
-            availableTargets={input.loader.availableTargets}
-            integrationBindingsQuery={input.loader.integrationBindingsQuery}
-            integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
-            integrationRows={[]}
-            integrationSaveError={null}
-            onAddIntegrationBindingRow={async () => false}
-            onIntegrationBindingRowChange={() => {}}
-            onRemoveIntegrationBindingRow={() => {}}
-          />
-        )}
-      </div>
+      <SandboxProfileIntegrationsSetupUnavailableState
+        activeSectionId={input.activeSectionId}
+        integrationBindingsError={
+          showBindingsUnavailableNotice ? input.loader.integrationBindingsQuery.error : null
+        }
+        integrationDirectoryError={
+          showDirectoryUnavailableNotice ? input.loader.integrationDirectoryQuery.error : null
+        }
+        isPending={
+          input.loader.integrationBindingsQuery.isPending ||
+          input.loader.integrationDirectoryQuery.isPending
+        }
+      />
     );
   }
 
@@ -439,6 +414,44 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
         ? {}
         : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
     />
+  );
+}
+
+export function SandboxProfileIntegrationsSetupUnavailableState(input: {
+  activeSectionId: SandboxProfileEditorSection["id"];
+  integrationBindingsError: unknown;
+  integrationDirectoryError: unknown;
+  isPending: boolean;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      {input.isPending && input.activeSectionId !== "resources-and-tools" ? (
+        <div
+          aria-live="polite"
+          className="text-muted-foreground flex items-center gap-2 text-sm"
+          role="status"
+        >
+          <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />
+          <span>Loading integrations...</span>
+        </div>
+      ) : null}
+      {input.integrationBindingsError !== null ? (
+        <Notice title="Could not load integration bindings" variant="alert">
+          {resolveApiErrorMessage({
+            error: input.integrationBindingsError,
+            fallbackMessage: "Could not load sandbox profile integration bindings.",
+          })}
+        </Notice>
+      ) : null}
+      {input.integrationDirectoryError !== null ? (
+        <Notice title="Could not load integration connections" variant="alert">
+          {resolveApiErrorMessage({
+            error: input.integrationDirectoryError,
+            fallbackMessage: "Could not load integration connections.",
+          })}
+        </Notice>
+      ) : null}
+    </div>
   );
 }
 
