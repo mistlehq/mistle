@@ -397,6 +397,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
 
 function GitHubManualSetupPageStory(input: {
   connection: IntegrationConnection;
+  initialEntry?: string;
   webhookSources: readonly IntegrationWebhookSource[];
 }): React.JSX.Element {
   configureDashboardRuntimeForStory();
@@ -422,7 +423,10 @@ function GitHubManualSetupPageStory(input: {
         </Route>,
       ),
       {
-        initialEntries: ["/integrations/github-cloud/icn_github_story_draft/github-app/setup"],
+        initialEntries: [
+          input.initialEntry ??
+            "/integrations/github-cloud/icn_github_story_draft/github-app/setup",
+        ],
       },
     ),
   );
@@ -517,6 +521,25 @@ export const SetupDraftReadyToInstall: PageStory = {
           },
           configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
         })}
+        webhookSources={[createWebhookSourceFixture()]}
+      />
+    );
+  },
+};
+
+export const ManifestCreationSuccess: PageStory = {
+  render: function RenderStory() {
+    return (
+      <GitHubManualSetupPageStory
+        connection={createDraftGitHubConnection({
+          config: {
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.manifeststorybook",
+          },
+          configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+        })}
+        initialEntry="/integrations/github-cloud/icn_github_story_draft/github-app/setup?githubAppManifest=created"
         webhookSources={[createWebhookSourceFixture()]}
       />
     );

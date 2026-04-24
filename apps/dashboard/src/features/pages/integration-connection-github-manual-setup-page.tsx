@@ -1427,7 +1427,7 @@ export function GitHubAppSetupPane(input: {
               isManifestMode={setupMode === "manifest"}
               isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
               onCreateManifest={() => {
-                void startManifestCreationMutation.mutateAsync();
+                void startGitHubAppManifestCreationInNewWindow();
               }}
               onStartInstallation={() => {
                 void startGitHubAppInstallationInNewWindow();
