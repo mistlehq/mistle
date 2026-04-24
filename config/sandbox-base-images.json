@@ -1,0 +1,9 @@
+{
+  "localDev": {
+    "dockerRegistry": "127.0.0.1:5001/mistle/sandbox-base:dev",
+    "preparedRuntime": "mistle/sandbox-base:dev"
+  },
+  "localTest": {
+    "docker": "mistle/sandbox-base:test"
+  }
+}
