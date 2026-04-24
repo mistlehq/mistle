@@ -1,5 +1,13 @@
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   CopyableValue,
   Field,
@@ -51,6 +59,12 @@ type GitHubManualSetupFieldStatus = "idle" | "saving" | "saved" | "saved-fading"
 type GitHubManualSetupFieldState = {
   status: GitHubManualSetupFieldStatus;
   errorMessage: string | null;
+};
+
+type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
+type PendingGitHubSecretReplacement = {
+  fieldKey: GitHubManualSetupSecretFieldKey;
+  value: string;
 };
 
 const GitHubManualSetupRequiredFieldLabels = {
@@ -114,6 +128,24 @@ function createInitialDraft(connection: IntegrationConnection): GitHubManualSetu
     appPrivateKeyPem: "",
     webhookSecret: "",
   };
+}
+
+function resolveConfiguredSecretFieldKeys(
+  connection: IntegrationConnection,
+): ReadonlySet<GitHubManualSetupSecretFieldKey> {
+  const configuredSecretFieldKeys = new Set<GitHubManualSetupSecretFieldKey>();
+
+  for (const configuredSecretName of connection.configuredSecretNames ?? []) {
+    if (
+      configuredSecretName === "clientSecret" ||
+      configuredSecretName === "appPrivateKeyPem" ||
+      configuredSecretName === "webhookSecret"
+    ) {
+      configuredSecretFieldKeys.add(configuredSecretName);
+    }
+  }
+
+  return configuredSecretFieldKeys;
 }
 
 function createInitialFieldStates(): Record<
@@ -310,9 +342,20 @@ function isGitHubManualSetupFieldReadyForInstall(input: {
   draft: GitHubManualSetupDraft;
   savedDraft: GitHubManualSetupDraft;
   fieldState: GitHubManualSetupFieldState;
+  isConfiguredOnServer?: boolean;
 }): boolean {
   const normalizedDraftValue = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
   const normalizedSavedValue = normalizeGitHubManualSetupValue(input.savedDraft[input.fieldKey]);
+
+  if (
+    input.isConfiguredOnServer === true &&
+    normalizedDraftValue.length === 0 &&
+    normalizedSavedValue.length === 0 &&
+    input.fieldState.status !== "saving" &&
+    input.fieldState.errorMessage === null
+  ) {
+    return true;
+  }
 
   return (
     normalizedDraftValue.length > 0 &&
@@ -320,6 +363,17 @@ function isGitHubManualSetupFieldReadyForInstall(input: {
     normalizedDraftValue === normalizedSavedValue &&
     input.fieldState.status !== "saving" &&
     input.fieldState.errorMessage === null
+  );
+}
+
+function hasExistingGitHubSecretValue(input: {
+  fieldKey: GitHubManualSetupSecretFieldKey;
+  savedDraft: GitHubManualSetupDraft;
+  configuredSecretFieldKeys: ReadonlySet<GitHubManualSetupSecretFieldKey>;
+}): boolean {
+  return (
+    input.configuredSecretFieldKeys.has(input.fieldKey) ||
+    normalizeGitHubManualSetupValue(input.savedDraft[input.fieldKey]).length > 0
   );
 }
 
@@ -431,18 +485,29 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}
     >
-      <LoadedIntegrationConnectionGitHubManualSetupPage connection={connection} />
+      <GitHubManualSetupPane
+        key={connection.id}
+        connection={connection}
+        onBack={() => {
+          void navigate("/integrations");
+        }}
+      />
     </FormPageFrame>
   );
 }
 
-function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
+export function GitHubManualSetupPane(input: {
   connection: IntegrationConnection;
+  onBack?: () => void;
 }): React.JSX.Element {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createInitialDraft(input.connection));
   const [savedDraft, setSavedDraft] = useState(() => createInitialDraft(input.connection));
+  const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
+    resolveConfiguredSecretFieldKeys(input.connection),
+  );
+  const [pendingSecretReplacement, setPendingSecretReplacement] =
+    useState<PendingGitHubSecretReplacement | null>(null);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
@@ -512,7 +577,10 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
     }
   }
 
-  async function commitField(fieldKey: GitHubManualSetupFieldKey): Promise<void> {
+  async function persistField(
+    fieldKey: GitHubManualSetupFieldKey,
+    currentDraft: GitHubManualSetupDraft,
+  ): Promise<void> {
     if (fieldStates[fieldKey].status === "saving") {
       return;
     }
@@ -520,7 +588,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
     if (
       !isGitHubManualSetupFieldDirty({
         fieldKey,
-        draft,
+        draft: currentDraft,
         savedDraft,
       })
     ) {
@@ -534,7 +602,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
 
     const validationMessage = getGitHubManualSetupFieldValidationMessage({
       fieldKey,
-      draft,
+      draft: currentDraft,
       savedDraft,
     });
     if (validationMessage !== null) {
@@ -551,7 +619,7 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
     if (
       !shouldPersistGitHubManualSetupField({
         fieldKey,
-        draft,
+        draft: currentDraft,
       })
     ) {
       return;
@@ -567,14 +635,14 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
 
     try {
       const secrets = buildGitHubManualSetupSecrets({
-        draft,
+        draft: currentDraft,
         fieldKey,
       });
 
       await updateFormIntegrationConnection({
         connectionId: input.connection.id,
         displayName: input.connection.displayName,
-        config: buildGitHubManualSetupConfig(draft),
+        config: buildGitHubManualSetupConfig(currentDraft),
         ...(secrets === undefined ? {} : { secrets }),
       });
 
@@ -584,16 +652,27 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
 
       const nextSavedDraft = buildNextSavedDraft({
         savedDraft,
-        draft,
+        draft: currentDraft,
         fieldKey,
       });
       const nextDraft = buildNextDraftAfterSave({
-        draft,
+        draft: currentDraft,
         fieldKey,
       });
 
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
+      if (
+        fieldKey === "clientSecret" ||
+        fieldKey === "appPrivateKeyPem" ||
+        fieldKey === "webhookSecret"
+      ) {
+        setConfiguredSecretFieldKeys((currentConfiguredSecretFieldKeys) => {
+          const nextConfiguredSecretFieldKeys = new Set(currentConfiguredSecretFieldKeys);
+          nextConfiguredSecretFieldKeys.add(fieldKey);
+          return nextConfiguredSecretFieldKeys;
+        });
+      }
       setActionErrorMessage(null);
       setFieldStates((currentFieldStates) => ({
         ...currentFieldStates,
@@ -642,6 +721,63 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
     }
   }
 
+  async function commitField(fieldKey: GitHubManualSetupFieldKey): Promise<void> {
+    await persistField(fieldKey, draft);
+  }
+
+  function revertSecretReplacement(fieldKey: GitHubManualSetupSecretFieldKey): void {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [fieldKey]: "",
+    }));
+    resetFieldFeedback(fieldKey);
+    setPendingSecretReplacement(null);
+  }
+
+  function requestSecretReplacementConfirmation(
+    fieldKey: GitHubManualSetupSecretFieldKey,
+    nextValue: string,
+  ): void {
+    setPendingSecretReplacement({
+      fieldKey,
+      value: nextValue,
+    });
+  }
+
+  async function confirmSecretReplacement(): Promise<void> {
+    if (pendingSecretReplacement === null) {
+      return;
+    }
+
+    setPendingSecretReplacement(null);
+    await persistField(pendingSecretReplacement.fieldKey, {
+      ...draft,
+      [pendingSecretReplacement.fieldKey]: pendingSecretReplacement.value,
+    });
+  }
+
+  function handleSecretFieldBlur(fieldKey: GitHubManualSetupSecretFieldKey): void {
+    const nextValue = normalizeGitHubManualSetupValue(draft[fieldKey]);
+
+    if (nextValue.length === 0) {
+      void commitField(fieldKey);
+      return;
+    }
+
+    if (
+      hasExistingGitHubSecretValue({
+        fieldKey,
+        savedDraft,
+        configuredSecretFieldKeys,
+      })
+    ) {
+      requestSecretReplacementConfirmation(fieldKey, nextValue);
+      return;
+    }
+
+    void commitField(fieldKey);
+  }
+
   const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
   const isInstalled = hasInstalledGitHubApp(input.connection);
   const requiredConfigReady = GitHubManualSetupRequiredConfigFieldKeys.every((fieldKey) =>
@@ -650,6 +786,13 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
       draft,
       savedDraft,
       fieldState: fieldStates[fieldKey],
+      ...(GitHubManualSetupSecretFieldKeys.includes(fieldKey)
+        ? {
+            isConfiguredOnServer: configuredSecretFieldKeys.has(
+              fieldKey as GitHubManualSetupSecretFieldKey,
+            ),
+          }
+        : {}),
     }),
   );
   const requiredSecretsReady = GitHubManualSetupRequiredSecretFieldKeys.every((fieldKey) =>
@@ -663,149 +806,198 @@ function LoadedIntegrationConnectionGitHubManualSetupPage(input: {
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
   const installButtonDisabled = !canInstall || startInstallationMutation.isPending;
   return (
-    <FormPageStack>
-      <FormPageSection>
-        <div className="flex flex-col gap-6 p-4">
-          {actionErrorMessage === null ? null : (
-            <Notice title="Could not continue setup" variant="alert">
-              {actionErrorMessage}
-            </Notice>
-          )}
+    <>
+      <FormPageStack>
+        <FormPageSection>
+          <div className="flex flex-col gap-6 p-4">
+            {actionErrorMessage === null ? null : (
+              <Notice title="Could not continue setup" variant="alert">
+                {actionErrorMessage}
+              </Notice>
+            )}
 
-          <CopyableValue
-            label="Post-installation setup URL"
-            value={buildGitHubAppSetupCallbackUrl()}
-          />
-          {webhookSourcesQuery.isPending ? (
-            <CopyableValue label="Webhook callback URL" loading />
-          ) : webhookSourcesQuery.isError ? (
-            <Notice title="Could not load webhook URL" variant="alert">
-              {resolveApiErrorMessage({
-                error: webhookSourcesQuery.error,
-                fallbackMessage: "Could not load integration webhook sources.",
-              })}
-            </Notice>
-          ) : webhookCallbackUrl === undefined ? (
-            <Notice title="Webhook URL is not available yet" variant="alert">
-              GitHub setup requires a webhook callback URL, but this connection does not have one
-              yet.
-            </Notice>
-          ) : (
-            <CopyableValue label="Webhook callback URL" value={webhookCallbackUrl} />
-          )}
+            <CopyableValue
+              label="Post-installation setup URL"
+              value={buildGitHubAppSetupCallbackUrl()}
+            />
+            {webhookSourcesQuery.isPending ? (
+              <CopyableValue label="Webhook callback URL" loading />
+            ) : webhookSourcesQuery.isError ? (
+              <Notice title="Could not load webhook URL" variant="alert">
+                {resolveApiErrorMessage({
+                  error: webhookSourcesQuery.error,
+                  fallbackMessage: "Could not load integration webhook sources.",
+                })}
+              </Notice>
+            ) : webhookCallbackUrl === undefined ? (
+              <Notice title="Webhook URL is not available yet" variant="alert">
+                GitHub setup requires a webhook callback URL, but this connection does not have one
+                yet.
+              </Notice>
+            ) : (
+              <CopyableValue label="Webhook callback URL" value={webhookCallbackUrl} />
+            )}
 
-          <GitHubManualSetupField
-            fieldState={fieldStates.appId}
-            id="github-app-id"
-            label="App ID"
-            onBlur={() => {
-              void commitField("appId");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appId", nextValue);
-            }}
-            required
-            value={draft.appId}
-          />
-
-          <GitHubManualSetupField
-            fieldState={fieldStates.appSlug}
-            id="github-app-slug"
-            label="App slug"
-            onBlur={() => {
-              void commitField("appSlug");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appSlug", nextValue);
-            }}
-            required
-            value={draft.appSlug}
-          />
-
-          <GitHubManualSetupField
-            fieldState={fieldStates.appPrivateKeyPem}
-            id="github-app-private-key"
-            label="App private key"
-            multiline
-            onBlur={() => {
-              void commitField("appPrivateKeyPem");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("appPrivateKeyPem", nextValue);
-            }}
-            placeholder="-----BEGIN PRIVATE KEY-----"
-            required
-            rows={8}
-            value={draft.appPrivateKeyPem}
-          />
-
-          <GitHubManualSetupField
-            fieldState={fieldStates.clientId}
-            id="github-client-id"
-            label="Client ID"
-            onBlur={() => {
-              void commitField("clientId");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("clientId", nextValue);
-            }}
-            required
-            value={draft.clientId}
-          />
-
-          <GitHubManualSetupField
-            fieldState={fieldStates.clientSecret}
-            id="github-client-secret"
-            label="Client secret"
-            onBlur={() => {
-              void commitField("clientSecret");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("clientSecret", nextValue);
-            }}
-            required
-            type="password"
-            value={draft.clientSecret}
-          />
-
-          <GitHubManualSetupField
-            fieldState={fieldStates.webhookSecret}
-            id="github-webhook-secret"
-            label="Webhook secret"
-            onBlur={() => {
-              void commitField("webhookSecret");
-            }}
-            onChange={(nextValue) => {
-              updateFieldDraft("webhookSecret", nextValue);
-            }}
-            required
-            type="password"
-            value={draft.webhookSecret}
-          />
-
-          <FormPageActionBar>
-            <Button
-              onClick={() => {
-                void navigate(`/integrations/${input.connection.targetKey}`);
+            <GitHubManualSetupField
+              fieldState={fieldStates.appId}
+              id="github-app-id"
+              label="App ID"
+              onBlur={() => {
+                void commitField("appId");
               }}
-              type="button"
-              variant="outline"
-            >
-              Back
-            </Button>
-            <Button
-              disabled={installButtonDisabled}
-              onClick={() => {
-                void startInstallationMutation.mutateAsync();
+              onChange={(nextValue) => {
+                updateFieldDraft("appId", nextValue);
               }}
-              type="button"
+              required
+              value={draft.appId}
+            />
+
+            <GitHubManualSetupField
+              fieldState={fieldStates.appSlug}
+              id="github-app-slug"
+              label="App slug"
+              onBlur={() => {
+                void commitField("appSlug");
+              }}
+              onChange={(nextValue) => {
+                updateFieldDraft("appSlug", nextValue);
+              }}
+              required
+              value={draft.appSlug}
+            />
+
+            <GitHubManualSetupField
+              fieldState={fieldStates.appPrivateKeyPem}
+              id="github-app-private-key"
+              label="App private key"
+              multiline
+              onBlur={() => {
+                handleSecretFieldBlur("appPrivateKeyPem");
+              }}
+              onChange={(nextValue) => {
+                updateFieldDraft("appPrivateKeyPem", nextValue);
+              }}
+              placeholder="-----BEGIN PRIVATE KEY-----"
+              configured={configuredSecretFieldKeys.has("appPrivateKeyPem")}
+              required
+              rows={8}
+              value={draft.appPrivateKeyPem}
+            />
+
+            <GitHubManualSetupField
+              fieldState={fieldStates.clientId}
+              id="github-client-id"
+              label="Client ID"
+              onBlur={() => {
+                void commitField("clientId");
+              }}
+              onChange={(nextValue) => {
+                updateFieldDraft("clientId", nextValue);
+              }}
+              required
+              value={draft.clientId}
+            />
+
+            <GitHubManualSetupField
+              fieldState={fieldStates.clientSecret}
+              id="github-client-secret"
+              label="Client secret"
+              onBlur={() => {
+                handleSecretFieldBlur("clientSecret");
+              }}
+              onChange={(nextValue) => {
+                updateFieldDraft("clientSecret", nextValue);
+              }}
+              configured={configuredSecretFieldKeys.has("clientSecret")}
+              required
+              type="password"
+              value={draft.clientSecret}
+            />
+
+            <GitHubManualSetupField
+              fieldState={fieldStates.webhookSecret}
+              id="github-webhook-secret"
+              label="Webhook secret"
+              onBlur={() => {
+                handleSecretFieldBlur("webhookSecret");
+              }}
+              onChange={(nextValue) => {
+                updateFieldDraft("webhookSecret", nextValue);
+              }}
+              configured={configuredSecretFieldKeys.has("webhookSecret")}
+              required
+              type="password"
+              value={draft.webhookSecret}
+            />
+
+            <FormPageActionBar>
+              {input.onBack === undefined ? null : (
+                <Button
+                  onClick={() => {
+                    input.onBack?.();
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Back
+                </Button>
+              )}
+              <Button
+                disabled={pendingSecretReplacement !== null || installButtonDisabled}
+                onClick={() => {
+                  void startInstallationMutation.mutateAsync();
+                }}
+                type="button"
+              >
+                {isInstalled ? "Manage Installation" : "Install App"}
+              </Button>
+            </FormPageActionBar>
+          </div>
+        </FormPageSection>
+      </FormPageStack>
+
+      <AlertDialog
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen && pendingSecretReplacement !== null) {
+            revertSecretReplacement(pendingSecretReplacement.fieldKey);
+          }
+        }}
+        open={pendingSecretReplacement !== null}
+      >
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace secret?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace the existing{" "}
+              {pendingSecretReplacement?.fieldKey === "appPrivateKeyPem"
+                ? "app private key"
+                : pendingSecretReplacement?.fieldKey === "clientSecret"
+                  ? "client secret"
+                  : "webhook secret"}
+              .
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:grid-cols-[1fr_auto]">
+            <AlertDialogCancel
+              onClick={() => {
+                if (pendingSecretReplacement !== null) {
+                  revertSecretReplacement(pendingSecretReplacement.fieldKey);
+                }
+              }}
             >
-              {isInstalled ? "Manage Installation" : "Install App"}
-            </Button>
-          </FormPageActionBar>
-        </div>
-      </FormPageSection>
-    </FormPageStack>
+              Keep existing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                void confirmSecretReplacement();
+              }}
+            >
+              Replace
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -815,6 +1007,7 @@ function GitHubManualSetupField(input: {
   value: string;
   fieldState: GitHubManualSetupFieldState;
   required?: boolean;
+  configured?: boolean;
   description?: string;
   placeholder?: string;
   rows?: number;
@@ -825,6 +1018,12 @@ function GitHubManualSetupField(input: {
 }): React.JSX.Element {
   const saveState = input.fieldState.errorMessage === null ? input.fieldState.status : "error";
   const showIndicator = saveState !== "idle" && saveState !== "error";
+  const resolvedPlaceholder =
+    input.configured === true && input.value.length === 0 ? "******" : input.placeholder;
+  const configuredPlaceholderClassName =
+    input.configured === true && input.value.length === 0
+      ? "placeholder:text-foreground placeholder:opacity-100 focus:placeholder:text-transparent focus:placeholder:opacity-0"
+      : null;
   const liveMessage =
     input.fieldState.errorMessage !== null
       ? ""
@@ -853,21 +1052,21 @@ function GitHubManualSetupField(input: {
             {input.multiline ? (
               <Textarea
                 aria-invalid={input.fieldState.errorMessage === null ? undefined : true}
-                className={cn(showIndicator ? "pr-10" : null)}
+                className={cn(showIndicator ? "pr-10" : null, configuredPlaceholderClassName)}
                 disabled={input.fieldState.status === "saving"}
                 id={input.id}
                 onBlur={input.onBlur}
                 onChange={(event) => {
                   input.onChange(event.currentTarget.value);
                 }}
-                placeholder={input.placeholder}
+                placeholder={resolvedPlaceholder}
                 rows={input.rows}
                 value={input.value}
               />
             ) : (
               <Input
                 aria-invalid={input.fieldState.errorMessage === null ? undefined : true}
-                className={cn(showIndicator ? "pr-9" : null)}
+                className={cn(showIndicator ? "pr-9" : null, configuredPlaceholderClassName)}
                 disabled={input.fieldState.status === "saving"}
                 id={input.id}
                 onBlur={input.onBlur}
@@ -879,7 +1078,7 @@ function GitHubManualSetupField(input: {
                     event.currentTarget.blur();
                   }
                 }}
-                placeholder={input.placeholder}
+                placeholder={resolvedPlaceholder}
                 type={input.type}
                 value={input.value}
               />
