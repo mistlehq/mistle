@@ -779,7 +779,7 @@ function GitHubSetupUrls(input: {
           and webhook events.
         </p>
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="flex flex-col gap-4">
         <CopyableValue label="Post-installation setup URL" value={input.setupCallbackUrl} />
         {input.webhookCallbackState.kind === "loading" ? (
           <CopyableValue label="Webhook callback URL" loading />
