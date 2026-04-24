@@ -139,6 +139,40 @@ function NestedObjectLayoutHarness(input: { formData: JsonObject }): React.JSX.E
   );
 }
 
+const DescriptionOnlyObjectSchema: RJSFSchema = {
+  type: "object",
+  properties: {
+    credentials: {
+      description: "Credentials used when calling the provider API.",
+      type: "object",
+      properties: {
+        apiToken: {
+          title: "API token",
+          type: "string",
+        },
+      },
+    },
+  },
+};
+
+function DescriptionOnlyObjectHarness(): React.JSX.Element {
+  return (
+    <SchemaFormWithoutSubmit
+      formContext={{}}
+      formData={{
+        credentials: {
+          apiToken: "secret-token",
+        },
+      }}
+      noHtml5Validate
+      onChange={() => {}}
+      schema={DescriptionOnlyObjectSchema}
+      showErrorList={false}
+      validator={validator}
+    />
+  );
+}
+
 describe("SchemaFormWithoutSubmit", () => {
   it("wires the single-select combobox widget through the form theme", async () => {
     render(
@@ -184,5 +218,13 @@ describe("SchemaFormWithoutSubmit", () => {
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
     expect(screen.getByLabelText("Agent Instructions").closest(".md\\:col-span-2")).not.toBeNull();
+  });
+
+  it("keeps a description affordance for object groups without titles", () => {
+    render(<DescriptionOnlyObjectHarness />);
+
+    expect(screen.getByText("Description")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Field description" })).toBeDefined();
+    expect(screen.getByLabelText("API token")).toBeDefined();
   });
 });

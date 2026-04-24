@@ -953,6 +953,33 @@ function SchemaFormFieldTemplate(
   );
 }
 
+function SchemaFormObjectHeader(input: {
+  description: string | undefined;
+  title: string;
+}): React.JSX.Element | null {
+  if (input.title.length === 0 && input.description === undefined) {
+    return null;
+  }
+
+  if (input.title.length === 0) {
+    return (
+      <DetailLabelWithTooltip as="p" tooltip={input.description} tooltipLabel="Field description">
+        Description
+      </DetailLabelWithTooltip>
+    );
+  }
+
+  if (input.description === undefined) {
+    return <FieldTitle>{input.title}</FieldTitle>;
+  }
+
+  return (
+    <FieldTitleWithTooltip tooltip={input.description} tooltipLabel="Field description">
+      {input.title}
+    </FieldTitleWithTooltip>
+  );
+}
+
 function SchemaFormObjectFieldTemplate(
   props: ObjectFieldTemplateProps<JsonObject, RJSFSchema, SchemaFormContext>,
 ): React.JSX.Element {
@@ -1023,15 +1050,9 @@ function SchemaFormObjectFieldTemplate(
               : undefined,
         )}
       >
-        {title.length > 0 ? (
+        {title.length > 0 || description !== undefined ? (
           <FieldHeader className={columns === 2 ? "md:col-span-2" : undefined}>
-            {description === undefined ? (
-              <FieldTitle>{title}</FieldTitle>
-            ) : (
-              <FieldTitleWithTooltip tooltip={description} tooltipLabel="Field description">
-                {title}
-              </FieldTitleWithTooltip>
-            )}
+            <SchemaFormObjectHeader description={description} title={title} />
           </FieldHeader>
         ) : null}
         {visibleRenderableProperties.map((property) => (
