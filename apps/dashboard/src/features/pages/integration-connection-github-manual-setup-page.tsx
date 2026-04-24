@@ -21,7 +21,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -846,6 +846,7 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
   const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const { title, description } = resolvePageFrameText(pageMeta, "Setup GitHub App");
   const targetKey = params["targetKey"];
   const connectionId = params["connectionId"];
@@ -935,6 +936,7 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
       <GitHubAppSetupPane
         key={connection.id}
         connection={connection}
+        manifestCreationSucceeded={searchParams.get("githubAppManifest") === "created"}
         onBack={() => {
           void navigate("/integrations");
         }}
@@ -945,6 +947,7 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
 
 export function GitHubAppSetupPane(input: {
   connection: IntegrationConnection;
+  manifestCreationSucceeded?: boolean;
   onBack?: () => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -1285,6 +1288,39 @@ export function GitHubAppSetupPane(input: {
     (manifestAppOwnerKind === "personal" ||
       (manifestAppOwnerKind === "organization" && manifestOrganizationSlug.trim().length > 0));
 
+  if (input.manifestCreationSucceeded === true && !isInstalled) {
+    return (
+      <FormPageStack>
+        <FormPageSection>
+          <div className="flex flex-col gap-6 p-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-medium">GitHub App creation success.</h2>
+              <p className="text-muted-foreground text-sm">
+                Install the app to choose the GitHub account and repositories Mistle can access.
+              </p>
+            </div>
+            {actionErrorMessage === null ? null : (
+              <Notice title="Could not continue setup" variant="alert">
+                {actionErrorMessage}
+              </Notice>
+            )}
+            <FormPageActionBar>
+              <Button
+                disabled={!canInstall || startInstallationMutation.isPending}
+                onClick={() => {
+                  void startInstallationMutation.mutateAsync();
+                }}
+                type="button"
+              >
+                Install App
+              </Button>
+            </FormPageActionBar>
+          </div>
+        </FormPageSection>
+      </FormPageStack>
+    );
+  }
+
   return (
     <FormPageStack>
       <Tabs
@@ -1376,6 +1412,7 @@ export function GitHubAppSetupPane(input: {
 
 export function GitHubManualSetupPane(input: {
   connection: IntegrationConnection;
+  manifestCreationSucceeded?: boolean;
   onBack?: () => void;
 }): React.JSX.Element {
   return <GitHubAppSetupPane {...input} />;

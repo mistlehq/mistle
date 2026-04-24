@@ -338,7 +338,7 @@ describe("integration connections GitHub App installation integration", () => {
       expect(completeResponse.headers.get("location")).toBe(
         buildDashboardUrl(
           fixture.config.dashboard.baseUrl,
-          `/integrations/github-cloud/${connectionId}/github-app/setup`,
+          `/integrations/github-cloud/${connectionId}/github-app/setup?githubAppManifest=created`,
         ),
       );
       expect(seenRequests).toEqual([

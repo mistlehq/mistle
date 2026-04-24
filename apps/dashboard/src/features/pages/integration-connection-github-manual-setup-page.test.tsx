@@ -58,6 +58,7 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
 
 function renderGitHubManualSetupPane(input?: {
   connection?: IntegrationConnection;
+  manifestCreationSucceeded?: boolean;
   webhookSources?: readonly IntegrationWebhookSource[];
 }) {
   globalThis.__MISTLE_RUNTIME_CONFIG__ = {
@@ -76,9 +77,17 @@ function renderGitHubManualSetupPane(input?: {
     [...(input?.webhookSources ?? [createWebhookSourceFixture()])],
   );
 
+  const paneProps =
+    input?.manifestCreationSucceeded === undefined
+      ? { connection }
+      : {
+          connection,
+          manifestCreationSucceeded: input.manifestCreationSucceeded,
+        };
+
   return render(
     <QueryClientProvider client={queryClient}>
-      <GitHubManualSetupPane connection={connection} />
+      <GitHubManualSetupPane {...paneProps} />
     </QueryClientProvider>,
   );
 }
@@ -157,6 +166,26 @@ describe("GitHubManualSetupPane", () => {
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);
+  });
+
+  it("shows a GitHub App creation success view with an install app action", () => {
+    renderGitHubManualSetupPane({
+      connection: createGitHubManualSetupConnection({
+        configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+      }),
+      manifestCreationSucceeded: true,
+    });
+
+    expect(screen.getByText("GitHub App creation success.")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Install the app to choose the GitHub account and repositories Mistle can access.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Install App" }).hasAttribute("disabled")).toBe(
+      false,
+    );
+    expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
   });
 
   it("formats valid manifest JSON", () => {
