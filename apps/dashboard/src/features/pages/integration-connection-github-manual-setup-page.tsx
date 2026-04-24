@@ -1077,6 +1077,22 @@ export function GitHubAppSetupPane(input: {
     }
   }
 
+  async function startGitHubAppInstallationInCurrentWindow(): Promise<void> {
+    setActionErrorMessage(null);
+
+    try {
+      const startedInstallation = await startInstallationMutation.mutateAsync();
+      globalThis.location.assign(startedInstallation.authorizationUrl);
+    } catch (error) {
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not start GitHub App installation.",
+        }),
+      );
+    }
+  }
+
   useEffect(() => {
     return () => {
       for (const fieldKey of GitHubManualSetupFieldKeys) {
@@ -1328,12 +1344,9 @@ export function GitHubAppSetupPane(input: {
       <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-medium">GitHub App creation success.</h2>
-              <p className="text-muted-foreground text-sm">
-                Install the app to choose the GitHub account and repositories Mistle can access.
-              </p>
-            </div>
+            <Notice title="GitHub App creation success." variant="success">
+              Install the app to choose the GitHub account and repositories Mistle can access.
+            </Notice>
             {actionErrorMessage === null ? null : (
               <Notice title="Could not continue setup" variant="alert">
                 {actionErrorMessage}
@@ -1343,12 +1356,11 @@ export function GitHubAppSetupPane(input: {
               <Button
                 disabled={!canInstall || startInstallationMutation.isPending}
                 onClick={() => {
-                  void startGitHubAppInstallationInNewWindow();
+                  void startGitHubAppInstallationInCurrentWindow();
                 }}
                 type="button"
               >
                 Install App
-                <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
               </Button>
             </FormPageActionBar>
           </div>
