@@ -17,6 +17,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  textLinkVariants,
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SyntheticEvent } from "react";
@@ -301,7 +302,10 @@ export function SandboxProfilesPage(): React.JSX.Element {
                 <TableRow key={profile.id}>
                   <TableCell className="whitespace-normal">
                     <button
-                      className="text-left font-medium underline-offset-4 break-words hover:underline"
+                      className={textLinkVariants({
+                        variant: "listItem",
+                        className: "text-left break-words",
+                      })}
                       onClick={() => {
                         navigateToProfileDetail(profile.id);
                       }}

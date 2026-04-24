@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  TextLink,
 } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
@@ -144,14 +145,13 @@ function renderDeviceAuthorizationPending(input: {
           <FieldLabel>Verification URL</FieldLabel>
         </FieldHeader>
         <FieldContent>
-          <a
-            className="text-primary break-all text-sm underline underline-offset-2"
+          <TextLink
+            className="break-all text-sm"
             href={input.pending.verificationUrl}
-            rel="noreferrer"
-            target="_blank"
+            opensInNewWindow
           >
             {input.pending.verificationUrl}
-          </a>
+          </TextLink>
         </FieldContent>
       </Field>
 

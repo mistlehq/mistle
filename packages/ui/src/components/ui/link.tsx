@@ -6,7 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils.js";
 
 const textLinkVariants = cva(
-  "cursor-pointer rounded-[2px] outline-none transition-[color,text-decoration-thickness,text-underline-offset] duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50 inline-flex items-baseline min-w-0",
+  "cursor-pointer rounded-[2px] outline-none transition-[color,text-decoration-thickness,text-underline-offset] duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50",
   {
     variants: {
       variant: {
@@ -43,7 +43,9 @@ function TextLink({
       {
         className: cn(
           textLinkVariants({ variant }),
-          opensInNewWindow ? "gap-1 has-data-[icon=inline-end]:pr-0.5" : null,
+          opensInNewWindow
+            ? "inline-flex min-w-0 items-baseline gap-1 has-data-[icon=inline-end]:pr-0.5"
+            : null,
           className,
         ),
         rel: opensInNewWindow ? "noreferrer" : rel,

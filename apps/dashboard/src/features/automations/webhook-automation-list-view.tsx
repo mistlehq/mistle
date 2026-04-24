@@ -9,6 +9,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
+  textLinkVariants,
 } from "@mistle/ui";
 import { WarningCircleIcon } from "@phosphor-icons/react";
 
@@ -161,7 +162,10 @@ function AutomationIdentityCell(input: {
       <div className="flex items-center gap-2">
         <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
         <button
-          className="text-left font-medium underline-offset-4 break-words hover:underline"
+          className={textLinkVariants({
+            variant: "listItem",
+            className: "text-left break-words",
+          })}
           onClick={() => {
             input.onOpenAutomation(input.item.id);
           }}
