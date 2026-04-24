@@ -14,14 +14,15 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TextLink,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { ArrowSquareOutIcon, InfoIcon } from "@phosphor-icons/react";
+import { InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -110,13 +111,13 @@ function SessionTitleCell(input: { href?: string; title: string }): React.JSX.El
   }
 
   return (
-    <Link className="flex max-w-full items-center gap-1" to={input.href}>
+    <TextLink
+      className="flex max-w-full items-center gap-1 group-hover/session-row:underline group-focus-within/session-row:underline"
+      render={<RouterLink to={input.href} />}
+      variant="listItem"
+    >
       {titleText}
-      <ArrowSquareOutIcon
-        aria-hidden
-        className="size-4 shrink-0 cursor-default opacity-0 transition-[opacity,transform] group-hover/session-row:translate-x-0.5 group-hover/session-row:opacity-100 group-focus-within/session-row:translate-x-0.5 group-focus-within/session-row:opacity-100"
-      />
-    </Link>
+    </TextLink>
   );
 }
 

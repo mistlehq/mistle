@@ -11,11 +11,12 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TextLink,
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import type React from "react";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link as RouterLink } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -269,14 +270,13 @@ function AddConnectorTile(input: {
             Add
           </Button>
         ) : (
-          <Link
-            className="text-primary inline-flex items-center px-0 text-sm font-medium underline-offset-4 hover:underline"
-            rel="noreferrer"
-            target="_blank"
-            to={`/integrations/${input.choice.id}`}
+          <TextLink
+            className="text-sm font-medium"
+            opensInNewWindow
+            render={<RouterLink to={`/integrations/${input.choice.id}`} />}
           >
             Setup integration
-          </Link>
+          </TextLink>
         )
       }
       description=""

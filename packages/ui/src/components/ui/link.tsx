@@ -1,14 +1,74 @@
-import type { ComponentProps } from "react";
+import { mergeProps } from "@base-ui/react/merge-props";
+import { useRender } from "@base-ui/react/use-render";
+import { ArrowSquareOutIcon } from "@phosphor-icons/react";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils.js";
 
-const linkClassName =
-  "text-primary cursor-pointer rounded-[2px] underline decoration-[1px] underline-offset-[0.18em] outline-none transition-[text-decoration-thickness,text-underline-offset] duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50 hover:decoration-[1.5px] hover:underline-offset-[0.24em] focus-visible:decoration-[1.5px] focus-visible:underline-offset-[0.24em]";
+const textLinkVariants = cva(
+  "cursor-pointer rounded-[2px] outline-none transition-[color,text-decoration-thickness,text-underline-offset] duration-150 focus-visible:ring-[3px] focus-visible:ring-ring/50 inline-flex items-baseline min-w-0",
+  {
+    variants: {
+      variant: {
+        inline:
+          "text-primary underline decoration-[1px] underline-offset-[0.18em] hover:decoration-[1.5px] hover:underline-offset-[0.24em] focus-visible:decoration-[1.5px] focus-visible:underline-offset-[0.24em]",
+        listItem:
+          "text-foreground font-medium no-underline hover:underline focus-visible:underline",
+      },
+    },
+    defaultVariants: {
+      variant: "inline",
+    },
+  },
+);
 
-type LinkProps = ComponentProps<"a">;
+type TextLinkProps = useRender.ComponentProps<"a"> &
+  VariantProps<typeof textLinkVariants> & {
+    opensInNewWindow?: boolean;
+  };
 
-function Link({ className, ...props }: LinkProps): React.JSX.Element {
-  return <a className={cn(linkClassName, className)} data-slot="link" {...props} />;
+function TextLink({
+  children,
+  className,
+  opensInNewWindow = false,
+  rel,
+  render,
+  target,
+  variant = "inline",
+  ...props
+}: TextLinkProps): React.JSX.Element {
+  return useRender({
+    defaultTagName: "a",
+    props: mergeProps<"a">(
+      {
+        className: cn(
+          textLinkVariants({ variant }),
+          opensInNewWindow ? "gap-1 has-data-[icon=inline-end]:pr-0.5" : null,
+          className,
+        ),
+        rel: opensInNewWindow ? "noreferrer" : rel,
+        target: opensInNewWindow ? "_blank" : target,
+        children: (
+          <>
+            {children}
+            {opensInNewWindow ? (
+              <ArrowSquareOutIcon
+                aria-hidden
+                className="size-[0.95em] shrink-0 translate-y-[0.12em]"
+                data-icon="inline-end"
+              />
+            ) : null}
+          </>
+        ),
+      },
+      props,
+    ),
+    ...(render === undefined ? {} : { render }),
+    state: {
+      slot: "text-link",
+      variant,
+    },
+  });
 }
 
-export { Link, linkClassName };
+export { TextLink, textLinkVariants };

@@ -12,10 +12,10 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
-  Link,
   Notice,
   Spinner,
   Textarea,
+  TextLink,
 } from "@mistle/ui";
 import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import type { SyntheticEvent } from "react";
@@ -515,13 +515,9 @@ function LinkedAccountCard(input: {
                       labelContent={
                         <>
                           Add the public key via{" "}
-                          <Link
-                            href="https://github.com/settings/keys"
-                            rel="noreferrer"
-                            target="_blank"
-                          >
+                          <TextLink href="https://github.com/settings/keys" opensInNewWindow>
                             GitHub settings
-                          </Link>{" "}
+                          </TextLink>{" "}
                           or via GH CLI:
                         </>
                       }

@@ -4,7 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CopyableValue } from "./copyable-value.js";
-import { Link } from "./link.js";
+import { TextLink } from "./link.js";
 
 describe("CopyableValue", () => {
   afterEach(() => {
@@ -36,7 +36,8 @@ describe("CopyableValue", () => {
         labelContent={
           <>
             Add the public key via{" "}
-            <Link href="https://github.com/settings/keys">GitHub settings</Link> or via GH CLI:
+            <TextLink href="https://github.com/settings/keys">GitHub settings</TextLink> or via GH
+            CLI:
           </>
         }
         value="gh ssh-key add ~/.ssh/id_ed25519.pub --type signing"

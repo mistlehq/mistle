@@ -1,21 +1,33 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Link } from "./link.js";
+import { TextLink } from "./link.js";
 
 const meta = {
-  title: "UI/Link",
-  component: Link,
+  title: "UI/TextLink",
+  component: TextLink,
   tags: ["autodocs"],
   args: {
     children: "GitHub settings",
     href: "https://github.com/settings/keys",
-    target: "_blank",
-    rel: "noreferrer",
   },
-} satisfies Meta<typeof Link>;
+} satisfies Meta<typeof TextLink>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const OpensInNewWindow: Story = {
+  args: {
+    opensInNewWindow: true,
+  },
+};
+
+export const ListItem: Story = {
+  args: {
+    children: "Session title",
+    href: "/sessions/example",
+    variant: "listItem",
+  },
+};
