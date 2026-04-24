@@ -15,6 +15,7 @@ type IntegrationConnectionResponse = {
   targetSnapshotConfig?: Record<string, unknown>;
   connectionMethodId?: string;
   connectionMethodLabel?: string;
+  configuredSecretNames?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -33,6 +34,7 @@ type BuildIntegrationConnectionResponseInput = {
     | "updatedAt"
   >;
   connectionMethods?: readonly ConnectionMethodMetadata[] | undefined;
+  configuredSecretNames?: string[] | undefined;
 };
 
 export function buildIntegrationConnectionResponse(
@@ -56,6 +58,9 @@ export function buildIntegrationConnectionResponse(
       ? {}
       : { targetSnapshotConfig: input.connection.targetSnapshotConfig }),
     ...connectionMethodMetadata,
+    ...(input.configuredSecretNames === undefined || input.configuredSecretNames.length === 0
+      ? {}
+      : { configuredSecretNames: input.configuredSecretNames }),
     createdAt: input.connection.createdAt,
     updatedAt: input.connection.updatedAt,
   };

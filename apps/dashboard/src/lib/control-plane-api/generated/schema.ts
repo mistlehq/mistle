@@ -1029,6 +1029,7 @@ export interface paths {
                 config?: {
                   [key: string]: unknown;
                 };
+                configuredSecretNames?: string[];
                 connectionMethodId?: string;
                 connectionMethodLabel?: string;
                 createdAt: string;
@@ -1161,6 +1162,7 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              configuredSecretNames?: string[];
               connectionMethodId?: string;
               connectionMethodLabel?: string;
               createdAt: string;
@@ -1404,6 +1406,7 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              configuredSecretNames?: string[];
               connectionMethodId?: string;
               connectionMethodLabel?: string;
               createdAt: string;
@@ -2678,6 +2681,7 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              configuredSecretNames?: string[];
               connectionMethodId?: string;
               connectionMethodLabel?: string;
               createdAt: string;
@@ -2809,6 +2813,7 @@ export interface paths {
               config?: {
                 [key: string]: unknown;
               };
+              configuredSecretNames?: string[];
               connectionMethodId?: string;
               connectionMethodLabel?: string;
               createdAt: string;

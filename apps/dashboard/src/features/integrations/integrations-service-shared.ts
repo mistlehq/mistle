@@ -204,6 +204,7 @@ export const IntegrationConnectionSchema = z
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
     connectionMethodId: z.string().min(1).optional(),
     connectionMethodLabel: z.string().min(1).optional(),
+    configuredSecretNames: z.array(z.string().min(1)).optional(),
     resources: z
       .array(
         z

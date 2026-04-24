@@ -1757,6 +1757,13 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "configuredSecretNames": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
                           "resources": {
                             "type": "array",
                             "items": {
@@ -3300,6 +3307,13 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "configuredSecretNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "resources": {
                       "type": "array",
                       "items": {
@@ -3554,6 +3568,13 @@
                     "connectionMethodLabel": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "configuredSecretNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "resources": {
                       "type": "array",
@@ -3813,6 +3834,13 @@
                     "connectionMethodLabel": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "configuredSecretNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "resources": {
                       "type": "array",
@@ -4257,6 +4285,13 @@
                     "connectionMethodLabel": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "configuredSecretNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "resources": {
                       "type": "array",

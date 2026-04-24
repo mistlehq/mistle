@@ -29,6 +29,7 @@ import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
+import { listConfiguredSecretNamesByConnectionId } from "./list-configured-secret-names-by-connection-id.js";
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
 
 const PAGE_SIZE_OPTIONS = {
@@ -64,6 +65,7 @@ type IntegrationConnectionListItem = {
   targetSnapshotConfig?: Record<string, unknown>;
   connectionMethodId?: string;
   connectionMethodLabel?: string;
+  configuredSecretNames?: string[];
   supportsWebhookSources?: boolean;
   resources?: Array<{
     kind: string;
@@ -193,6 +195,11 @@ export async function listIntegrationConnections(
       connectionIds: result.items.map((connection) => connection.id),
       organizationId: input.organizationId,
     });
+    const configuredSecretNamesByConnectionId = await listConfiguredSecretNamesByConnectionId({
+      connections: result.items,
+      db,
+      integrationRegistry,
+    });
 
     return {
       ...result,
@@ -222,6 +229,7 @@ export async function listIntegrationConnections(
               ...(definition === undefined
                 ? {}
                 : { connectionMethods: definition.connectionMethods }),
+              configuredSecretNames: configuredSecretNamesByConnectionId.get(connection.id),
             }),
             ...buildResourceSummary(connection, {
               integrationRegistry,

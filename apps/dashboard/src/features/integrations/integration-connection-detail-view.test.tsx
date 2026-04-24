@@ -1360,6 +1360,42 @@ describe("IntegrationConnectionDetailView", () => {
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
   });
 
+  it("renders a selected-connection custom body while keeping connection navigation visible", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_draft",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Draft GitHub",
+            status: "active",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+          {
+            id: "icn_github_installed",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "Installed GitHub",
+            status: "active",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+        ]}
+        selectedConnectionBody={<div>Setup GitHub App Pane</div>}
+        selectedConnectionId="icn_github_draft"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Select connection Draft GitHub" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Select connection Installed GitHub" })).toBeTruthy();
+    expect(screen.getByText("Setup GitHub App Pane")).toBeTruthy();
+    expect(screen.queryByText("Authentication")).toBeNull();
+  });
+
   it("shows a loading callback field in the installation section while GitHub webhook details are loading", () => {
     render(
       <IntegrationConnectionDetailView

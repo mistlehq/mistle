@@ -6,6 +6,11 @@ import { useNavigate, useParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import {
+  ConfiguredSecretField,
+  SavingTextField,
+  type SavingFieldState,
+} from "../forms/configured-secret-field.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
@@ -21,11 +26,6 @@ import {
 } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import {
-  GitHubManualSetupField,
-  GitHubManualSetupSecretField,
-  type GitHubManualSetupFieldState,
-} from "./integration-connection-github-manual-setup-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubManualSetupDraft = {
@@ -122,10 +122,7 @@ function resolveConfiguredSecretFieldKeys(
   return configuredSecretFieldKeys;
 }
 
-function createInitialFieldStates(): Record<
-  GitHubManualSetupFieldKey,
-  GitHubManualSetupFieldState
-> {
+function createInitialFieldStates(): Record<GitHubManualSetupFieldKey, SavingFieldState> {
   return {
     appId: { status: "idle", errorMessage: null },
     appSlug: { status: "idle", errorMessage: null },
@@ -315,7 +312,7 @@ function isGitHubManualSetupFieldReadyForInstall(input: {
   fieldKey: GitHubManualSetupFieldKey;
   draft: GitHubManualSetupDraft;
   savedDraft: GitHubManualSetupDraft;
-  fieldState: GitHubManualSetupFieldState;
+  fieldState: SavingFieldState;
   isConfiguredOnServer?: boolean;
 }): boolean {
   const normalizedDraftValue = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
@@ -756,7 +753,7 @@ export function GitHubManualSetupPane(input: {
             <CopyableValue label="Webhook callback URL" value={webhookCallbackUrl} />
           )}
 
-          <GitHubManualSetupField
+          <SavingTextField
             fieldState={fieldStates.appId}
             id="github-app-id"
             label="App ID"
@@ -770,7 +767,7 @@ export function GitHubManualSetupPane(input: {
             value={draft.appId}
           />
 
-          <GitHubManualSetupField
+          <SavingTextField
             fieldState={fieldStates.appSlug}
             id="github-app-slug"
             label="App slug"
@@ -784,7 +781,7 @@ export function GitHubManualSetupPane(input: {
             value={draft.appSlug}
           />
 
-          <GitHubManualSetupSecretField
+          <ConfiguredSecretField
             fieldState={fieldStates.appPrivateKeyPem}
             secretLabel="app private key"
             id="github-app-private-key"
@@ -807,7 +804,7 @@ export function GitHubManualSetupPane(input: {
             value={draft.appPrivateKeyPem}
           />
 
-          <GitHubManualSetupField
+          <SavingTextField
             fieldState={fieldStates.clientId}
             id="github-client-id"
             label="Client ID"
@@ -821,7 +818,7 @@ export function GitHubManualSetupPane(input: {
             value={draft.clientId}
           />
 
-          <GitHubManualSetupSecretField
+          <ConfiguredSecretField
             fieldState={fieldStates.clientSecret}
             secretLabel="client secret"
             id="github-client-secret"
@@ -842,7 +839,7 @@ export function GitHubManualSetupPane(input: {
             value={draft.clientSecret}
           />
 
-          <GitHubManualSetupSecretField
+          <ConfiguredSecretField
             fieldState={fieldStates.webhookSecret}
             secretLabel="webhook secret"
             id="github-webhook-secret"

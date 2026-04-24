@@ -1,5 +1,4 @@
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { Navigate } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -7,6 +6,7 @@ import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integr
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
+import { GitHubManualSetupPane } from "./integration-connection-github-manual-setup-page.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -99,23 +99,6 @@ export function IntegrationsPage() {
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
 
-  if (
-    detailTargetKey !== null &&
-    selectedDetailConnection !== undefined &&
-    isUninstalledGitHubAppConnection({
-      connectionMethodId: selectedDetailConnection.connectionMethodId,
-      config: selectedDetailConnection.config,
-      externalSubjectId: selectedDetailConnection.externalSubjectId,
-    })
-  ) {
-    return (
-      <Navigate
-        replace
-        to={`/integrations/${detailTargetKey}/${selectedDetailConnection.id}/github-app/setup`}
-      />
-    );
-  }
-
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
       <IntegrationConnectionDetailView
@@ -167,6 +150,19 @@ export function IntegrationsPage() {
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         selectedConnectionId={directoryState.activeDetailConnectionId}
+        selectedConnectionBody={
+          selectedDetailConnection !== undefined &&
+          isUninstalledGitHubAppConnection({
+            connectionMethodId: selectedDetailConnection.connectionMethodId,
+            config: selectedDetailConnection.config,
+            externalSubjectId: selectedDetailConnection.externalSubjectId,
+          }) ? (
+            <GitHubManualSetupPane
+              connection={selectedDetailConnection}
+              key={selectedDetailConnection.id}
+            />
+          ) : undefined
+        }
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
         onCreateWebhookSource={({ connectionId }) => {
           webhookSourceState.createWebhookSource({ connectionId });

@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import type { IntegrationWebhookSourceSectionState } from "../pages/use-integration-webhook-source-state.js";
@@ -81,6 +82,7 @@ export type IntegrationConnectionDetailViewProps = {
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<string, IntegrationResourceListItemData>;
   selectedConnectionId?: string | null;
+  selectedConnectionBody?: ReactNode;
   titleEditor?:
     | {
         disabled: boolean;
@@ -307,6 +309,9 @@ export function IntegrationConnectionDetailView(
               : { resourceItemsByKey: props.resourceItemsByKey })}
             {...(props.webhookPolicy === undefined ? {} : { webhookPolicy: props.webhookPolicy })}
             {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
+            {...(props.selectedConnectionBody === undefined
+              ? {}
+              : { customBody: props.selectedConnectionBody })}
             {...(selectedWebhookSourceState === undefined
               ? {}
               : { webhookSourceState: selectedWebhookSourceState })}
@@ -326,6 +331,7 @@ function ConnectionDetailPane(input: {
   onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
+  customBody?: ReactNode;
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
@@ -410,168 +416,178 @@ function ConnectionDetailPane(input: {
         </div>
       </header>
 
-      {viewState.hasInstallationSection ? (
-        <SectionBlock
-          action={
-            input.onStartGitHubAppInstallation !== undefined &&
-            viewState.installation?.actionLabel !== undefined ? (
-              <Button
-                disabled={viewState.installation?.isPending ?? false}
-                onClick={() => {
-                  void input.onStartGitHubAppInstallation?.(input.connection.id);
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {viewState.installation?.isPending === true
-                  ? "Starting install..."
-                  : viewState.installation.actionLabel}
-              </Button>
-            ) : null
-          }
-          {...(viewState.installation?.description === undefined
-            ? {}
-            : { description: viewState.installation.description })}
-          title="Installation"
-        >
-          <div className="flex flex-col gap-4">
-            <InstallationSection
-              fields={viewState.installation?.fields}
-              {...(viewState.installation === undefined ||
-              !("callbackUrl" in viewState.installation) ||
-              viewState.installation.callbackUrl === undefined
-                ? {}
-                : { callbackUrl: viewState.installation.callbackUrl })}
-              {...(viewState.installation === undefined ||
-              !("isCallbackUrlLoading" in viewState.installation) ||
-              viewState.installation.isCallbackUrlLoading !== true
-                ? {}
-                : { isCallbackUrlLoading: true })}
-              {...(viewState.installation?.postInstallationSetupUrl === undefined
-                ? {}
-                : { postInstallationSetupUrl: viewState.installation.postInstallationSetupUrl })}
-            />
-            {viewState.installation?.errorMessage === undefined ? null : (
-              <Notice variant="alert">{viewState.installation.errorMessage}</Notice>
-            )}
-          </div>
-        </SectionBlock>
-      ) : null}
+      {input.customBody === undefined ? null : input.customBody}
 
-      <SectionBlock
-        action={
-          input.connection.authMethodId !== undefined &&
-          input.connection.authMethodId !== null &&
-          input.connection.isIdentityLinked !== true &&
-          input.onEditAuthentication !== undefined ? (
-            <Button
-              aria-label="Edit"
-              onClick={() => {
-                input.onEditAuthentication?.(input.connection.id);
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Edit
-            </Button>
-          ) : null
-        }
-        title="Authentication"
-      >
-        <ConnectionAuthSection
-          authMethodId={input.connection.authMethodId}
-          authMethodLabel={input.connection.authMethodLabel}
-          {...(input.connection.authFields === undefined
-            ? {}
-            : { authFields: input.connection.authFields })}
-          {...(input.connection.authSecretLabels === undefined
-            ? {}
-            : { authSecretLabels: input.connection.authSecretLabels })}
-        />
-      </SectionBlock>
-
-      {input.connection.resources.length === 0 ? null : (
-        <SectionBlock title="Resources">
-          <ResourcesSection
-            connectionId={input.connection.id}
-            onRefreshResource={input.onRefreshResource}
-            resourceItemsByKey={input.resourceItemsByKey}
-            resources={input.connection.resources}
-          />
-        </SectionBlock>
-      )}
-
-      {viewState.webhookSectionUiState !== null && webhookSourceState !== undefined ? (
-        <SectionBlock
-          action={
-            viewState.webhookSectionUiState.showCreateAction === true &&
-            input.onCreateWebhookSource !== undefined ? (
-              <Button
-                disabled={webhookSourceState.isCreating}
-                onClick={() => {
-                  input.onCreateWebhookSource?.({ connectionId: input.connection.id });
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {webhookSourceState.isCreating ? "Creating..." : "Create webhook"}
-              </Button>
-            ) : viewState.webhookSectionUiState.showStandaloneDeleteAction === true &&
-              viewState.webhookSectionUiState.standaloneSource !== undefined &&
-              input.onDeleteWebhookSource !== undefined ? (
-              (() => {
-                const standaloneSource = viewState.webhookSectionUiState.standaloneSource;
-
-                return (
+      {input.customBody !== undefined ? null : (
+        <>
+          {viewState.hasInstallationSection ? (
+            <SectionBlock
+              action={
+                input.onStartGitHubAppInstallation !== undefined &&
+                viewState.installation?.actionLabel !== undefined ? (
                   <Button
-                    aria-label={`Delete webhook source ${standaloneSource.displayName}`}
-                    disabled={webhookSourceState.deletingWebhookSourceId === standaloneSource.id}
+                    disabled={viewState.installation?.isPending ?? false}
                     onClick={() => {
-                      input.onDeleteWebhookSource?.({
-                        connectionId: input.connection.id,
-                        webhookSourceId: standaloneSource.id,
-                      });
+                      void input.onStartGitHubAppInstallation?.(input.connection.id);
                     }}
                     size="sm"
                     type="button"
                     variant="outline"
                   >
-                    {webhookSourceState.deletingWebhookSourceId === standaloneSource.id
-                      ? "Deleting..."
-                      : "Delete webhook"}
+                    {viewState.installation?.isPending === true
+                      ? "Starting install..."
+                      : viewState.installation.actionLabel}
                   </Button>
-                );
-              })()
-            ) : null
-          }
-          title="Webhook"
-        >
-          <WebhookSourcesSection
-            connectionId={input.connection.id}
-            hideDeleteAction={viewState.webhookSectionUiState.hideInlineDeleteAction}
-            onCreateWebhookSource={undefined}
-            onDeleteWebhookSource={input.onDeleteWebhookSource}
-            state={webhookSourceState}
-          />
-        </SectionBlock>
-      ) : null}
+                ) : null
+              }
+              {...(viewState.installation?.description === undefined
+                ? {}
+                : { description: viewState.installation.description })}
+              title="Installation"
+            >
+              <div className="flex flex-col gap-4">
+                <InstallationSection
+                  fields={viewState.installation?.fields}
+                  {...(viewState.installation === undefined ||
+                  !("callbackUrl" in viewState.installation) ||
+                  viewState.installation.callbackUrl === undefined
+                    ? {}
+                    : { callbackUrl: viewState.installation.callbackUrl })}
+                  {...(viewState.installation === undefined ||
+                  !("isCallbackUrlLoading" in viewState.installation) ||
+                  viewState.installation.isCallbackUrlLoading !== true
+                    ? {}
+                    : { isCallbackUrlLoading: true })}
+                  {...(viewState.installation?.postInstallationSetupUrl === undefined
+                    ? {}
+                    : {
+                        postInstallationSetupUrl: viewState.installation.postInstallationSetupUrl,
+                      })}
+                />
+                {viewState.installation?.errorMessage === undefined ? null : (
+                  <Notice variant="alert">{viewState.installation.errorMessage}</Notice>
+                )}
+              </div>
+            </SectionBlock>
+          ) : null}
 
-      {input.connection.contextItems === undefined ||
-      input.connection.contextItems.length === 0 ? null : (
-        <SectionBlock title="Details">
-          <div className="flex flex-col gap-4">
-            <DefinitionList
-              items={input.connection.contextItems.map((item) => ({
-                id: item.label,
-                label: item.label,
-                value: item.value,
-              }))}
+          <SectionBlock
+            action={
+              input.connection.authMethodId !== undefined &&
+              input.connection.authMethodId !== null &&
+              input.connection.isIdentityLinked !== true &&
+              input.onEditAuthentication !== undefined ? (
+                <Button
+                  aria-label="Edit"
+                  onClick={() => {
+                    input.onEditAuthentication?.(input.connection.id);
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Edit
+                </Button>
+              ) : null
+            }
+            title="Authentication"
+          >
+            <ConnectionAuthSection
+              authMethodId={input.connection.authMethodId}
+              authMethodLabel={input.connection.authMethodLabel}
+              {...(input.connection.authFields === undefined
+                ? {}
+                : { authFields: input.connection.authFields })}
+              {...(input.connection.authSecretLabels === undefined
+                ? {}
+                : { authSecretLabels: input.connection.authSecretLabels })}
             />
-          </div>
-        </SectionBlock>
+          </SectionBlock>
+
+          {input.connection.resources.length === 0 ? null : (
+            <SectionBlock title="Resources">
+              <ResourcesSection
+                connectionId={input.connection.id}
+                onRefreshResource={input.onRefreshResource}
+                resourceItemsByKey={input.resourceItemsByKey}
+                resources={input.connection.resources}
+              />
+            </SectionBlock>
+          )}
+
+          {viewState.webhookSectionUiState !== null && webhookSourceState !== undefined ? (
+            <SectionBlock
+              action={
+                viewState.webhookSectionUiState.showCreateAction === true &&
+                input.onCreateWebhookSource !== undefined ? (
+                  <Button
+                    disabled={webhookSourceState.isCreating}
+                    onClick={() => {
+                      input.onCreateWebhookSource?.({ connectionId: input.connection.id });
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {webhookSourceState.isCreating ? "Creating..." : "Create webhook"}
+                  </Button>
+                ) : viewState.webhookSectionUiState.showStandaloneDeleteAction === true &&
+                  viewState.webhookSectionUiState.standaloneSource !== undefined &&
+                  input.onDeleteWebhookSource !== undefined ? (
+                  (() => {
+                    const standaloneSource = viewState.webhookSectionUiState.standaloneSource;
+
+                    return (
+                      <Button
+                        aria-label={`Delete webhook source ${standaloneSource.displayName}`}
+                        disabled={
+                          webhookSourceState.deletingWebhookSourceId === standaloneSource.id
+                        }
+                        onClick={() => {
+                          input.onDeleteWebhookSource?.({
+                            connectionId: input.connection.id,
+                            webhookSourceId: standaloneSource.id,
+                          });
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {webhookSourceState.deletingWebhookSourceId === standaloneSource.id
+                          ? "Deleting..."
+                          : "Delete webhook"}
+                      </Button>
+                    );
+                  })()
+                ) : null
+              }
+              title="Webhook"
+            >
+              <WebhookSourcesSection
+                connectionId={input.connection.id}
+                hideDeleteAction={viewState.webhookSectionUiState.hideInlineDeleteAction}
+                onCreateWebhookSource={undefined}
+                onDeleteWebhookSource={input.onDeleteWebhookSource}
+                state={webhookSourceState}
+              />
+            </SectionBlock>
+          ) : null}
+
+          {input.connection.contextItems === undefined ||
+          input.connection.contextItems.length === 0 ? null : (
+            <SectionBlock title="Details">
+              <div className="flex flex-col gap-4">
+                <DefinitionList
+                  items={input.connection.contextItems.map((item) => ({
+                    id: item.label,
+                    label: item.label,
+                    value: item.value,
+                  }))}
+                />
+              </div>
+            </SectionBlock>
+          )}
+        </>
       )}
     </section>
   );

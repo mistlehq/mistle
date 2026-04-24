@@ -14,6 +14,7 @@ import {
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "../src/integration-connections/complete-github-app-installation-connection/schema.js";
+import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
@@ -197,6 +198,33 @@ describe("integration connections GitHub App installation integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_START_INPUT");
     expect(responseBody.message).toContain("missing required GitHub App credentials");
+  });
+
+  it("returns configured secret names for GitHub App connections in the list response", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
+      email: "integration-connections-github-app-installation-configured-secrets@example.com",
+      displayName: "GitHub Prod",
+    });
+
+    const response = await fixture.request("/v1/integration/connections?limit=20", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = ListIntegrationConnectionsResponseSchema.parse(await response.json());
+    const listedConnection = payload.items.find((item) => item.id === connectionId);
+
+    expect(listedConnection?.configuredSecretNames).toEqual([
+      "appPrivateKeyPem",
+      "clientSecret",
+      "webhookSecret",
+    ]);
   });
 
   it("completes installation by updating the existing GitHub App connection without requiring auth", async ({
