@@ -268,6 +268,90 @@ describe("compileGitHubCloudBinding", () => {
     ]);
   });
 
+  it("keeps api access and gh artifact when no repositories are selected", () => {
+    const compiled = compileGitHubCloudBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://api.github.com",
+          webBaseUrl: "https://github.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          connection_method: "api-key",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: [],
+          tools: ["github-cli"],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["api.github.com"],
+          pathPrefixes: ["/"],
+          methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        },
+        upstream: {
+          baseUrl: "https://api.github.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_123",
+          secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
+        },
+        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
+      },
+      {
+        match: {
+          hosts: ["uploads.github.com"],
+          pathPrefixes: ["/"],
+          methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        },
+        upstream: {
+          baseUrl: "https://uploads.github.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_123",
+          secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_API_KEY,
+        },
+      },
+    ]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.workspaceSources).toEqual([]);
+  });
+
   it("preserves custom API base path for enterprise-style proxies", () => {
     const compiled = compileGitHubCloudBinding({
       organizationId: "org_123",

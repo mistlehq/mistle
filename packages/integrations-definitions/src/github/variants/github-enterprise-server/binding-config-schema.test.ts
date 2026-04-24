@@ -3,6 +3,15 @@ import { describe, expect, it } from "vitest";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 
 describe("GitHubEnterpriseServerBindingConfigSchema", () => {
+  it("defaults repositories to an empty list", () => {
+    const parsed = GitHubEnterpriseServerBindingConfigSchema.parse({});
+
+    expect(parsed).toEqual({
+      repositories: [],
+      tools: [],
+    });
+  });
+
   it("parses a valid git binding config", () => {
     const parsed = GitHubEnterpriseServerBindingConfigSchema.parse({
       repositories: ["acme/backend", "acme/frontend"],

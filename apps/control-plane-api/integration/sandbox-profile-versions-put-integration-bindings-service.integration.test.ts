@@ -537,6 +537,63 @@ describe("sandbox profile version put integration bindings service integration",
     });
   });
 
+  it("accepts a github binding with no repositories selected", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-github-empty@example.com",
+    });
+
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_github_empty_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_github_empty_001",
+      targetKey: "github-cloud-put-bindings-empty",
+    });
+
+    const result = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_github_empty_001",
+        profileVersion: 1,
+        bindings: [
+          {
+            connectionId: "icn_put_bindings_github_empty_001",
+            kind: IntegrationBindingKinds.GIT,
+            config: {
+              repositories: [],
+              tools: ["github-cli"],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(result.bindings).toHaveLength(1);
+    expect(result.bindings[0]?.config).toEqual({
+      repositories: [],
+      tools: ["github-cli"],
+    });
+
+    const persistedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_put_bindings_github_empty_001"),
+            eq(table.sandboxProfileVersion, 1),
+            eq(table.connectionId, "icn_put_bindings_github_empty_001"),
+          ),
+      });
+
+    expect(persistedBinding?.config).toEqual({
+      repositories: [],
+      tools: ["github-cli"],
+    });
+  });
+
   it("defaults Jira binding tool selections to an empty array on write", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-version-put-bindings-jira@example.com",

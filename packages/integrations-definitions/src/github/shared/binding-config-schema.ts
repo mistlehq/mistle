@@ -9,7 +9,7 @@ const GitHubToolSchema = z.enum([GitHubToolIds.GITHUB_CLI]);
 
 export const GitHubBindingConfigSchema = z
   .object({
-    repositories: z.array(GitHubRepositorySchema).min(1),
+    repositories: z.array(GitHubRepositorySchema).default([]),
     tools: z.array(GitHubToolSchema).default([]),
   })
   .strict();

@@ -202,15 +202,6 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
     left.localeCompare(right),
   );
   const includesGitHubCli = input.binding.config.tools.includes(GitHubToolIds.GITHUB_CLI);
-  if (repositories.length === 0) {
-    return {
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-      workspaceSources: [],
-    };
-  }
-
   const gitRouteHost = new URL(input.target.config.webBaseUrl).host;
   const gitPathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.webBaseUrl);
   const apiRouteHost = new URL(input.target.config.apiBaseUrl).host;
@@ -247,50 +238,55 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
         }
       : {}),
   };
+  const egressRoutes: GitHubCompiledRoute[] = [];
+
+  if (gitRepositoryPathPrefixes.length > 0) {
+    egressRoutes.push({
+      match: {
+        hosts: [gitRouteHost],
+        pathPrefixes: gitRepositoryPathPrefixes,
+        methods: GitHubGitHttpMethods,
+      },
+      upstream: {
+        baseUrl: input.target.config.webBaseUrl,
+      },
+      authInjection: {
+        type: "basic",
+        target: "authorization",
+        username: "x-access-token",
+      },
+      credentialResolver,
+    });
+  }
+
+  egressRoutes.push({
+    match: {
+      hosts: [apiRouteHost],
+      pathPrefixes: apiPathPrefixes,
+      methods: GitHubApiMethods,
+    },
+    upstream: {
+      baseUrl: input.target.config.apiBaseUrl,
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    credentialResolver,
+    requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
+  });
+
+  if (uploadRouteHost !== undefined) {
+    egressRoutes.push(
+      buildGitHubUploadRoute({
+        host: uploadRouteHost,
+        credentialResolver,
+      }),
+    );
+  }
 
   return {
-    egressRoutes: [
-      {
-        match: {
-          hosts: [gitRouteHost],
-          pathPrefixes: gitRepositoryPathPrefixes,
-          methods: GitHubGitHttpMethods,
-        },
-        upstream: {
-          baseUrl: input.target.config.webBaseUrl,
-        },
-        authInjection: {
-          type: "basic",
-          target: "authorization",
-          username: "x-access-token",
-        },
-        credentialResolver,
-      },
-      {
-        match: {
-          hosts: [apiRouteHost],
-          pathPrefixes: apiPathPrefixes,
-          methods: GitHubApiMethods,
-        },
-        upstream: {
-          baseUrl: input.target.config.apiBaseUrl,
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver,
-        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
-      },
-      ...(uploadRouteHost === undefined
-        ? []
-        : [
-            buildGitHubUploadRoute({
-              host: uploadRouteHost,
-              credentialResolver,
-            }),
-          ]),
-    ],
+    egressRoutes,
     artifacts: includesGitHubCli
       ? [
           {

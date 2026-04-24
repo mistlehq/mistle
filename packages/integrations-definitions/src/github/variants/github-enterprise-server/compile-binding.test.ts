@@ -242,6 +242,70 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     ]);
   });
 
+  it("keeps api access and gh artifact when no repositories are selected", () => {
+    const compiled = compileGitHubEnterpriseServerBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_enterprise_server",
+      target: {
+        familyId: "github",
+        variantId: "github-enterprise-server",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://ghe.example.com/api/v3",
+          webBaseUrl: "https://ghe.example.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          connection_method: "api-key",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: [],
+          tools: ["github-cli"],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.egressRoutes).toEqual([
+      {
+        match: {
+          hosts: ["ghe.example.com"],
+          pathPrefixes: ["/api/v3", "/api/graphql"],
+          methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        },
+        upstream: {
+          baseUrl: "https://ghe.example.com/api/v3",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: "icn_123",
+          secretType: "api_key",
+          slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_API_KEY,
+        },
+        requestMiddleware: [GitHubRequestMiddlewareIds.APPEND_SESSION_LINK_TO_MARKDOWN],
+      },
+    ]);
+    expect(compiled.artifacts).toHaveLength(1);
+    expect(compiled.workspaceSources).toEqual([]);
+  });
+
   it("deduplicates and sorts repositories for deterministic route matching", () => {
     const compiled = compileGitHubEnterpriseServerBinding({
       organizationId: "org_123",
