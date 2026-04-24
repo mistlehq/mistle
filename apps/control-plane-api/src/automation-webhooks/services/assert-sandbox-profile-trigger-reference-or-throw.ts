@@ -24,7 +24,7 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
       })
     )?.activeVersion;
 
-  if (sandboxProfileVersion === undefined || sandboxProfileVersion === null) {
+  if (!sandboxProfileVersion) {
     throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
       "Sandbox profile must bind the selected integration connection to use its automation triggers.",
