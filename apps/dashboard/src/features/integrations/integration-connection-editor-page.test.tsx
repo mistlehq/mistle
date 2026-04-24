@@ -506,7 +506,7 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();
   });
 
-  it("renders GitHub App form fields in create mode", () => {
+  it("skips GitHub App setup fields in create mode", () => {
     renderEditorPage({
       configForm: {
         mode: "form",
@@ -545,12 +545,11 @@ describe("IntegrationConnectionEditorPage", () => {
       methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     });
 
-    expect(screen.getByLabelText("App ID")).toBeTruthy();
-    expect(screen.getByLabelText("App slug")).toBeTruthy();
-    expect(screen.getByLabelText("Client ID (Linked User Auth)")).toBeTruthy();
-    const privateKeyField = screen.getByPlaceholderText("-----BEGIN PRIVATE KEY-----");
-    expect(privateKeyField.tagName).toBe("TEXTAREA");
-    expect(screen.getByPlaceholderText("Enter webhook secret")).toBeTruthy();
+    expect(screen.queryByLabelText("App ID")).toBeNull();
+    expect(screen.queryByLabelText("App slug")).toBeNull();
+    expect(screen.queryByLabelText("Client ID (Linked User Auth)")).toBeNull();
+    expect(screen.queryByPlaceholderText("-----BEGIN PRIVATE KEY-----")).toBeNull();
+    expect(screen.queryByPlaceholderText("Enter webhook secret")).toBeNull();
     expect(screen.queryByLabelText("installation_id")).toBeNull();
     expect(screen.queryByLabelText("setup_action")).toBeNull();
     expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();

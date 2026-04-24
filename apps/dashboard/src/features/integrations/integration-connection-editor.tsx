@@ -22,6 +22,7 @@ import validator from "@rjsf/validator-ajv8";
 import { SchemaFormWithoutSubmit } from "../forms/schema-form.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { resolveSelectedConnectionMethod } from "./integration-connection-method-selection.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
 export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
@@ -94,17 +95,6 @@ function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMet
   return method.label;
 }
 
-function resolveSelectedMethod(input: {
-  editor: IntegrationConnectionEditorState;
-  methodId: IntegrationConnectionMethodId;
-}): IntegrationConnectionMethod | null {
-  if (input.editor.mode === "update") {
-    return input.editor.currentMethod.id === input.methodId ? input.editor.currentMethod : null;
-  }
-
-  return input.editor.methods.find((method) => method.id === input.methodId) ?? null;
-}
-
 function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): string {
   if (method?.kind === "redirect" || method?.kind === "device-authorization") {
     return method.ui.create.submitLabel;
@@ -119,6 +109,17 @@ function renderAuthCreateHelper(method: IntegrationConnectionMethod | null) {
   }
 
   return <Notice>{method.ui.create.helperText}</Notice>;
+}
+
+function shouldSkipCreateTimeGitHubAppFields(input: {
+  editor: IntegrationConnectionEditorState;
+  method: IntegrationConnectionMethod | null;
+}): boolean {
+  return (
+    input.editor.mode === "create" &&
+    input.editor.targetFamilyId === "github" &&
+    input.method?.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  );
 }
 
 function renderDeviceAuthorizationPending(input: {
@@ -175,12 +176,21 @@ function renderDeviceAuthorizationPending(input: {
 function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
   const editor = props.editor;
   const isUpdateMode = editor.mode === "update";
-  const selectedMethod = resolveSelectedMethod({
+  const selectedMethod = resolveSelectedConnectionMethod({
     editor,
     methodId: props.methodId,
   });
   const showMethodPicker = editor.mode === "create" && editor.methods.length > 1;
-  const showsSecretInput = selectedMethod?.kind === "form";
+  const skipCreateTimeGitHubAppFields = shouldSkipCreateTimeGitHubAppFields({
+    editor,
+    method: selectedMethod,
+  });
+  const showsConfigForm =
+    skipCreateTimeGitHubAppFields === false &&
+    props.configForm.mode === "form" &&
+    props.configForm.visiblePropertyKeys.length > 0;
+  const showsSecretInput =
+    skipCreateTimeGitHubAppFields === false && selectedMethod?.kind === "form";
   const selectedMethodLabel = selectedMethod
     ? formatIntegrationConnectionMethodLabel(selectedMethod)
     : undefined;
@@ -236,7 +246,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
         </Field>
       ) : null}
 
-      {props.configForm.mode === "form" && props.configForm.visiblePropertyKeys.length > 0 ? (
+      {showsConfigForm && props.configForm.mode === "form" ? (
         <SchemaFormWithoutSubmit
           formData={props.configValue}
           noHtml5Validate
@@ -363,7 +373,7 @@ export function IntegrationConnectionEditorPage(
                 {isUpdateMode
                   ? "Save"
                   : resolveCreateSubmitLabel(
-                      resolveSelectedMethod({
+                      resolveSelectedConnectionMethod({
                         editor,
                         methodId: props.methodId,
                       }),

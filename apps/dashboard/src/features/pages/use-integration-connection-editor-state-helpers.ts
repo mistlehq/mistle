@@ -8,6 +8,7 @@ import type {
   IntegrationConnectionEditorState,
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
+import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import { isRecord } from "../shared/is-record.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
@@ -92,17 +93,6 @@ function resolveVisiblePropertyKeys(input: {
   return Object.keys(properties).filter(
     (propertyKey) => readUiWidget(input.uiSchema, propertyKey) !== "hidden",
   );
-}
-
-function resolveSelectedMethod(input: {
-  editor: IntegrationConnectionEditorState;
-  methodId: IntegrationConnectionMethodId;
-}): IntegrationConnectionMethod | null {
-  if (input.editor.mode === "update") {
-    return input.editor.currentMethod.id === input.methodId ? input.editor.currentMethod : null;
-  }
-
-  return input.editor.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 export function resolveConnectionMethodFormUiModel(input: {
@@ -441,7 +431,7 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
     return "Authentication method is required.";
   }
 
-  const selectedMethod = resolveSelectedMethod({
+  const selectedMethod = resolveSelectedConnectionMethod({
     editor: input.editor,
     methodId: input.methodId,
   });

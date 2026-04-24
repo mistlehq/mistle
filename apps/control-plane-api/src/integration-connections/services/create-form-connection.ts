@@ -18,6 +18,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import {
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
@@ -34,18 +35,6 @@ export type CreateFormConnectionInput = {
   secrets: Record<string, string>;
 };
 
-type CreatedConnection = {
-  id: string;
-  targetKey: string;
-  displayName: string;
-  status: "active" | "error" | "revoked";
-  externalSubjectId?: string;
-  config?: Record<string, unknown>;
-  targetSnapshotConfig?: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export async function createFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -55,7 +44,7 @@ export async function createFormConnection(
     };
   },
   input: CreateFormConnectionInput,
-): Promise<CreatedConnection> {
+): Promise<ReturnType<typeof buildIntegrationConnectionResponse>> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
   const target = await db.query.integrationTargets.findFirst({
@@ -194,21 +183,9 @@ export async function createFormConnection(
         });
       }
 
-      return {
-        id: createdConnection.id,
-        targetKey: createdConnection.targetKey,
-        displayName: createdConnection.displayName,
-        status: createdConnection.status,
-        ...(createdConnection.externalSubjectId === null
-          ? {}
-          : { externalSubjectId: createdConnection.externalSubjectId }),
-        ...(createdConnection.config === null ? {} : { config: createdConnection.config }),
-        ...(createdConnection.targetSnapshotConfig === null
-          ? {}
-          : { targetSnapshotConfig: createdConnection.targetSnapshotConfig }),
-        createdAt: createdConnection.createdAt,
-        updatedAt: createdConnection.updatedAt,
-      };
+      return buildIntegrationConnectionResponse({
+        connection: createdConnection,
+      });
     });
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);

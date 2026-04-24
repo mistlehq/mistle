@@ -9,6 +9,7 @@ import type {
   IntegrationConnectionEditorState,
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
+import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import {
   cancelDeviceAuthorizationAttempt,
@@ -82,17 +83,6 @@ function resolveEditableConfigValue(input: {
   });
 
   return Object.fromEntries(entries);
-}
-
-function resolveSelectedMethod(input: {
-  editor: IntegrationConnectionEditorState;
-  methodId: IntegrationConnectionMethodId;
-}): IntegrationConnectionMethod | null {
-  if (input.editor.mode === "update") {
-    return input.editor.currentMethod.id === input.methodId ? input.editor.currentMethod : null;
-  }
-
-  return input.editor.methods.find((method) => method.id === input.methodId) ?? null;
 }
 
 const DeviceAuthorizationPollFloorMs = 2_000;
@@ -331,7 +321,7 @@ export function useIntegrationConnectionEditorState(
     }
 
     const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
-    const selectedMethod = resolveSelectedMethod({
+    const selectedMethod = resolveSelectedConnectionMethod({
       editor,
       methodId: draft.methodId,
     });

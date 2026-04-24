@@ -14,6 +14,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import { ensureImplicitConnectionWebhookSource } from "./webhook-sources.js";
 
 export type CreateGitHubAppDraftConnectionInput = {
@@ -22,25 +23,13 @@ export type CreateGitHubAppDraftConnectionInput = {
   displayName: string;
 };
 
-type CreatedConnection = {
-  id: string;
-  targetKey: string;
-  displayName: string;
-  status: "active" | "error" | "revoked";
-  externalSubjectId?: string;
-  config?: Record<string, unknown>;
-  targetSnapshotConfig?: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export async function createGitHubAppDraftConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
   input: CreateGitHubAppDraftConnectionInput,
-): Promise<CreatedConnection> {
+): Promise<ReturnType<typeof buildIntegrationConnectionResponse>> {
   const { db, integrationRegistry } = ctx;
 
   const target = await db.query.integrationTargets.findFirst({
@@ -124,20 +113,8 @@ export async function createGitHubAppDraftConnection(
       });
     }
 
-    return {
-      id: createdConnection.id,
-      targetKey: createdConnection.targetKey,
-      displayName: createdConnection.displayName,
-      status: createdConnection.status,
-      ...(createdConnection.externalSubjectId === null
-        ? {}
-        : { externalSubjectId: createdConnection.externalSubjectId }),
-      ...(createdConnection.config === null ? {} : { config: createdConnection.config }),
-      ...(createdConnection.targetSnapshotConfig === null
-        ? {}
-        : { targetSnapshotConfig: createdConnection.targetSnapshotConfig }),
-      createdAt: createdConnection.createdAt,
-      updatedAt: createdConnection.updatedAt,
-    };
+    return buildIntegrationConnectionResponse({
+      connection: createdConnection,
+    });
   });
 }

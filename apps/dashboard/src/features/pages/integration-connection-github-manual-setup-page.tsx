@@ -91,6 +91,18 @@ type GitHubManualSetupTimeoutRefs = Record<
   }
 >;
 
+function isGitHubManualSetupSecretFieldKey(
+  fieldKey: string,
+): fieldKey is GitHubManualSetupSecretFieldKey {
+  return (
+    fieldKey === "clientSecret" || fieldKey === "appPrivateKeyPem" || fieldKey === "webhookSecret"
+  );
+}
+
+function isGitHubManualSetupConfigFieldKey(fieldKey: GitHubManualSetupFieldKey): boolean {
+  return GitHubManualSetupConfigFieldKeys.includes(fieldKey);
+}
+
 function createInitialDraft(connection: IntegrationConnection): GitHubManualSetupDraft {
   const config = connection.config;
 
@@ -110,11 +122,7 @@ function resolveConfiguredSecretFieldKeys(
   const configuredSecretFieldKeys = new Set<GitHubManualSetupSecretFieldKey>();
 
   for (const configuredSecretName of connection.configuredSecretNames ?? []) {
-    if (
-      configuredSecretName === "clientSecret" ||
-      configuredSecretName === "appPrivateKeyPem" ||
-      configuredSecretName === "webhookSecret"
-    ) {
+    if (isGitHubManualSetupSecretFieldKey(configuredSecretName)) {
       configuredSecretFieldKeys.add(configuredSecretName);
     }
   }
@@ -247,7 +255,7 @@ function shouldPersistGitHubManualSetupField(input: {
   fieldKey: GitHubManualSetupFieldKey;
   draft: GitHubManualSetupDraft;
 }): boolean {
-  if (GitHubManualSetupConfigFieldKeys.includes(input.fieldKey)) {
+  if (isGitHubManualSetupConfigFieldKey(input.fieldKey)) {
     return hasRequiredGitHubSetupConfigValues(input.draft);
   }
 
@@ -271,7 +279,7 @@ function buildNextSavedDraft(input: {
     nextSavedDraft[configFieldKey] = normalizeGitHubManualSetupValue(input.draft[configFieldKey]);
   }
 
-  if (GitHubManualSetupSecretFieldKeys.includes(input.fieldKey)) {
+  if (isGitHubManualSetupSecretFieldKey(input.fieldKey)) {
     nextSavedDraft[input.fieldKey] = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
   }
 
@@ -290,7 +298,7 @@ function buildNextDraftAfterSave(input: {
     nextDraft[configFieldKey] = normalizeGitHubManualSetupValue(input.draft[configFieldKey]);
   }
 
-  if (GitHubManualSetupSecretFieldKeys.includes(input.fieldKey)) {
+  if (isGitHubManualSetupSecretFieldKey(input.fieldKey)) {
     nextDraft[input.fieldKey] = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
   }
 
@@ -621,11 +629,7 @@ export function GitHubManualSetupPane(input: {
 
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
-      if (
-        fieldKey === "clientSecret" ||
-        fieldKey === "appPrivateKeyPem" ||
-        fieldKey === "webhookSecret"
-      ) {
+      if (isGitHubManualSetupSecretFieldKey(fieldKey)) {
         setConfiguredSecretFieldKeys((currentConfiguredSecretFieldKeys) => {
           const nextConfiguredSecretFieldKeys = new Set(currentConfiguredSecretFieldKeys);
           nextConfiguredSecretFieldKeys.add(fieldKey);
@@ -700,12 +704,8 @@ export function GitHubManualSetupPane(input: {
       draft,
       savedDraft,
       fieldState: fieldStates[fieldKey],
-      ...(GitHubManualSetupSecretFieldKeys.includes(fieldKey)
-        ? {
-            isConfiguredOnServer: configuredSecretFieldKeys.has(
-              fieldKey as GitHubManualSetupSecretFieldKey,
-            ),
-          }
+      ...(isGitHubManualSetupSecretFieldKey(fieldKey)
+        ? { isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey) }
         : {}),
     }),
   );
