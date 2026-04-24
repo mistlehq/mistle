@@ -397,11 +397,15 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                   displayName: "Install GitHub",
                   status: "active",
                   bindingCount: 0,
+                  connectionMethodId: "github-app-installation",
+                  connectionMethodLabel: "GitHub App installation",
                   config: {
                     connection_method: "github-app-installation",
                     app_id: "123",
                     app_slug: "mistle-github-app",
+                    client_id: "Iv1.123",
                   },
+                  configuredSecretNames: ["clientSecret", "appPrivateKeyPem", "webhookSecret"],
                   createdAt: "2026-03-03T00:00:00.000Z",
                   updatedAt: "2026-03-11T04:30:00.000Z",
                 },
@@ -415,6 +419,15 @@ describe("IntegrationsPage resource refresh concurrency", () => {
         }
 
         if (
+          request.method === "GET" &&
+          requestUrl.pathname === "/v1/integration/connections/icn_install/webhook-sources"
+        ) {
+          response.writeHead(200, { "content-type": "application/json" });
+          response.end(JSON.stringify([]));
+          return;
+        }
+
+        if (
           request.method === "POST" &&
           requestUrl.pathname ===
             "/v1/integration/connections/icn_install/github-app-installation/start"
@@ -422,7 +435,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              authorizationUrl: "#install-github-app",
+              authorizationUrl: "http://127.0.0.1/#install-github-app",
             }),
           );
           return;
@@ -437,11 +450,15 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     try {
       expect((await screen.findAllByText("Install GitHub")).length).toBeGreaterThanOrEqual(1);
 
-      fireEvent.click(screen.getByRole("button", { name: "Install GitHub App" }));
+      const installButton = await screen.findByRole("button", { name: "Install App" });
+      await waitFor(() => {
+        expect(installButton).toHaveProperty("disabled", false);
+      });
+      fireEvent.click(installButton);
 
       await waitFor(() => {
-        const installButton = screen.getByRole("button", { name: "Starting install..." });
-        expect(installButton).toHaveProperty("disabled", true);
+        const pendingButton = screen.getByRole("button", { name: "Starting install..." });
+        expect(pendingButton).toHaveProperty("disabled", true);
       });
     } finally {
       await renderedPage.close();

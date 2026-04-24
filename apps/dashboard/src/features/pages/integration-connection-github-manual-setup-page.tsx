@@ -475,6 +475,7 @@ export function GitHubManualSetupPane(input: {
     resolveConfiguredSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
+  const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
@@ -497,6 +498,7 @@ export function GitHubManualSetupPane(input: {
       globalThis.location.assign(authorizationUrl);
     },
     onError: (error) => {
+      setIsRedirectingToInstallation(false);
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
@@ -720,7 +722,11 @@ export function GitHubManualSetupPane(input: {
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
   const installButtonDisabled =
-    !canInstall || startInstallationMutation.isPending || isSecretReplacementDialogOpen;
+    !canInstall ||
+    startInstallationMutation.isPending ||
+    isRedirectingToInstallation ||
+    isSecretReplacementDialogOpen;
+  const installButtonPending = startInstallationMutation.isPending || isRedirectingToInstallation;
   return (
     <FormPageStack>
       <FormPageSection>
@@ -875,11 +881,17 @@ export function GitHubManualSetupPane(input: {
             <Button
               disabled={installButtonDisabled}
               onClick={() => {
-                void startInstallationMutation.mutateAsync();
+                setActionErrorMessage(null);
+                setIsRedirectingToInstallation(true);
+                void startInstallationMutation.mutateAsync().catch(() => undefined);
               }}
               type="button"
             >
-              {isInstalled ? "Manage Installation" : "Install App"}
+              {installButtonPending
+                ? "Starting install..."
+                : isInstalled
+                  ? "Manage Installation"
+                  : "Install App"}
             </Button>
           </FormPageActionBar>
         </div>

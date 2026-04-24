@@ -421,6 +421,7 @@ describe("SessionWorkbenchPage primary repository", () => {
                   organizationId: "org_123",
                   displayName: "Alpha Profile",
                   status: "active",
+                  activeVersion: 1,
                   latestVersion: 1,
                   createdAt: "2026-03-01T00:00:00.000Z",
                   updatedAt: "2026-03-01T00:00:00.000Z",
