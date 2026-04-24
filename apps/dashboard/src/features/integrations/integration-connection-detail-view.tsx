@@ -5,6 +5,7 @@ import {
   BadgeListField,
   CopyableValue,
   DefinitionList,
+  DetailLabel,
   Notice,
   Select,
   SelectContent,
@@ -876,9 +877,7 @@ function WebhookSourceCard(input: {
       {shouldShowHeaderRow ? (
         <div className="flex items-start justify-between gap-3">
           {shouldShowHeaderText ? (
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">
-              {input.source.displayName}
-            </p>
+            <DetailLabel as="p">{input.source.displayName}</DetailLabel>
           ) : (
             <span />
           )}

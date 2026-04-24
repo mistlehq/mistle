@@ -209,6 +209,47 @@ function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+type FieldTitleWithTooltipProps = React.ComponentProps<typeof FieldTitle> & {
+  tooltip: React.ReactNode;
+  tooltipContentClassName?: string;
+  tooltipLabel: string;
+  tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
+};
+
+function FieldTitleWithTooltip({
+  children,
+  tooltip,
+  tooltipContentClassName,
+  tooltipLabel,
+  tooltipSide = "top",
+  ...props
+}: FieldTitleWithTooltipProps): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-1.5">
+      <FieldTitle {...props}>{children}</FieldTitle>
+      <Tooltip delay={0}>
+        <TooltipTrigger
+          aria-label={tooltipLabel}
+          render={
+            <button
+              className="text-foreground/80 hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+              type="button"
+            />
+          }
+        >
+          <InfoIcon aria-hidden className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent
+          className={cn("max-w-64 text-left", tooltipContentClassName)}
+          side={tooltipSide}
+        >
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
@@ -312,4 +353,5 @@ export {
   FieldSet,
   FieldContent,
   FieldTitle,
+  FieldTitleWithTooltip,
 };

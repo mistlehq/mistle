@@ -1,4 +1,4 @@
-import { DetailLabel } from "./detail-label.js";
+import { DetailLabel, DetailLabelWithTooltip } from "./detail-label.js";
 
 export default {
   title: "UI/DetailLabel",
@@ -16,6 +16,20 @@ export const WithStrongerWeight = {
     children: "Tools in sandbox",
     className: "font-semibold",
     as: "p",
+  },
+};
+
+export const WithTooltip = {
+  render: function Render() {
+    return (
+      <DetailLabelWithTooltip
+        as="p"
+        tooltip="Shown in shared activity and review queues."
+        tooltipLabel="Explain workspace name"
+      >
+        Workspace name
+      </DetailLabelWithTooltip>
+    );
   },
 };
 

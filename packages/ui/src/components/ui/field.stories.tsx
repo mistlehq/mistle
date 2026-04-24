@@ -6,6 +6,7 @@ import {
   FieldHeader,
   FieldLabel,
   FieldLabelWithTooltip,
+  FieldTitleWithTooltip,
 } from "./field.js";
 import { Input } from "./input.js";
 
@@ -84,6 +85,21 @@ export const LabelWithTooltip = {
             <Input defaultValue="pnpm install" id="setup-script" />
           </FieldContent>
         </Field>
+      </div>
+    );
+  },
+};
+
+export const TitleWithTooltip = {
+  render: function Render() {
+    return (
+      <div className="w-[24rem]">
+        <FieldTitleWithTooltip
+          tooltip="These settings apply to generated connection fields."
+          tooltipLabel="Explain connection settings"
+        >
+          Connection settings
+        </FieldTitleWithTooltip>
       </div>
     );
   },

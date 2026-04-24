@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { cn } from "../../lib/utils.js";
 import { Button } from "./button.js";
+import { DetailLabel } from "./detail-label.js";
 import { Spinner } from "./spinner.js";
 
 const COPY_SUCCESS_DISPLAY_MS = 1200;
@@ -82,7 +83,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   if (isLoading) {
     return (
       <div className="gap-1.5 flex flex-col">
-        <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
+        <DetailLabel as="p">{input.label}</DetailLabel>
         <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
           <div className="min-w-0 flex flex-1 items-center gap-2 px-1 font-mono text-xs">
             <Spinner
@@ -186,9 +187,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
 
   return (
     <div className="gap-1.5 flex flex-col">
-      <p className="text-muted-foreground text-xs uppercase tracking-wide">
-        {readyInput.labelContent ?? readyInput.label}
-      </p>
+      <DetailLabel as="p">{readyInput.labelContent ?? readyInput.label}</DetailLabel>
       <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
         <p className="min-w-0 flex-1 break-all px-1 font-mono text-xs">{readyInput.value}</p>
         {button}

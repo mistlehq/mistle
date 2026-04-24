@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
 import { Badge } from "./badge.js";
+import { DetailLabel } from "./detail-label.js";
 
 export type BadgeListFieldItem = {
   id: React.Key;
@@ -28,12 +29,9 @@ function BadgeListField({
   return (
     <div className={cn("gap-1.5 flex flex-col", className)} data-slot="badge-list-field" {...props}>
       {label === undefined ? null : (
-        <p
-          className="text-muted-foreground text-xs uppercase tracking-wide"
-          data-slot="badge-list-label"
-        >
+        <DetailLabel as="p" data-slot="badge-list-label">
           {label}
-        </p>
+        </DetailLabel>
       )}
       <div className="flex flex-wrap gap-2" data-slot="badge-list-items">
         {items.map((item) => (
