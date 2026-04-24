@@ -24,7 +24,7 @@
     "@mistle/telemetry": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@smithy/hash-node": "^4.2.14",
-    "@smithy/protocol-http": "^5.3.13",
+    "@smithy/protocol-http": "^5.3.14",
     "@smithy/signature-v4": "^5.3.13",
     "hono": "^4.12.14"
   },

@@ -678,8 +678,8 @@ importers:
         specifier: ^4.2.14
         version: 4.2.14
       '@smithy/protocol-http':
-        specifier: ^5.3.13
-        version: 5.3.13
+        specifier: ^5.3.14
+        version: 5.3.14
       '@smithy/signature-v4':
         specifier: ^5.3.13
         version: 5.3.13
@@ -5701,10 +5701,6 @@ packages:
 
   '@smithy/property-provider@4.2.14':
     resolution: {integrity: sha512-WuM31CgfsnQ/10i7NYr0PyxqknD72Y5uMfUMVSniPjbEPceiTErb4eIqJQ+pdxNEAUEWrewrGjIRjVbVHsxZiQ==}
-    engines: {node: '>=18.0.0'}
-
-  '@smithy/protocol-http@5.3.13':
-    resolution: {integrity: sha512-+HsmuJUF4u8POo6s8/a2Yb/AQ5t/YgLovCuHF9oxbocqv+SZ6gd8lC2duBFiCA/vFHoHQhoq7QjqJqZC6xOxxg==}
     engines: {node: '>=18.0.0'}
 
   '@smithy/protocol-http@5.3.14':
@@ -17649,11 +17645,6 @@ snapshots:
       '@smithy/types': 4.14.1
       tslib: 2.8.1
 
-  '@smithy/protocol-http@5.3.13':
-    dependencies:
-      '@smithy/types': 4.14.0
-      tslib: 2.8.1
-
   '@smithy/protocol-http@5.3.14':
     dependencies:
       '@smithy/types': 4.14.1
@@ -17682,7 +17673,7 @@ snapshots:
   '@smithy/signature-v4@5.3.13':
     dependencies:
       '@smithy/is-array-buffer': 4.2.2
-      '@smithy/protocol-http': 5.3.13
+      '@smithy/protocol-http': 5.3.14
       '@smithy/types': 4.14.0
       '@smithy/util-hex-encoding': 4.2.2
       '@smithy/util-middleware': 4.2.13
