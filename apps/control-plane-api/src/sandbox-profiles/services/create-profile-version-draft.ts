@@ -1,8 +1,9 @@
 import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
+  isPostgresUniqueConstraintError,
   SandboxProfileVersionStates,
-} from "@mistle/db/control-plane";
+} from "@mistle/db";
 
 import {
   SandboxProfilesConflictCodes,
@@ -24,21 +25,8 @@ type CreateProfileVersionDraftOutput = {
   isActive: boolean;
 };
 
-const UNIQUE_VIOLATION_CODE = "23505";
 const DRAFT_UNIQUE_INDEX_NAME = "sandbox_profile_versions_one_draft_per_profile_uidx";
 const SANDBOX_PROFILE_VERSIONS_PRIMARY_KEY_NAME = "sandbox_profile_versions_pkey";
-
-function isUniqueConstraintConflict(error: unknown, constraintName: string): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  if (!("code" in error) || error.code !== UNIQUE_VIOLATION_CODE) {
-    return false;
-  }
-
-  return "constraint" in error && error.constraint === constraintName;
-}
 
 export async function createProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
@@ -149,8 +137,8 @@ export async function createProfileVersionDraft(
     });
   } catch (error) {
     if (
-      isUniqueConstraintConflict(error, DRAFT_UNIQUE_INDEX_NAME) ||
-      isUniqueConstraintConflict(error, SANDBOX_PROFILE_VERSIONS_PRIMARY_KEY_NAME)
+      isPostgresUniqueConstraintError(error, DRAFT_UNIQUE_INDEX_NAME) ||
+      isPostgresUniqueConstraintError(error, SANDBOX_PROFILE_VERSIONS_PRIMARY_KEY_NAME)
     ) {
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.DRAFT_ALREADY_EXISTS,
