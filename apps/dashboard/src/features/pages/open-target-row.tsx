@@ -1,4 +1,4 @@
-import { Spinner } from "@mistle/ui";
+import { Spinner, textLinkVariants } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 
 type OpenTargetRowProps = {
@@ -21,7 +21,15 @@ export function OpenTargetRow(input: OpenTargetRowProps): React.JSX.Element {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {input.primary}
+          <div
+            className={textLinkVariants({
+              variant: "listItem",
+              className:
+                "min-w-0 text-left text-sm group-hover/open-target-row:underline group-focus-visible/open-target-row:underline",
+            })}
+          >
+            {input.primary}
+          </div>
           <ArrowSquareOutIcon
             aria-hidden
             className="size-4 shrink-0 opacity-0 transition-[opacity,transform] group-hover/open-target-row:translate-x-0.5 group-hover/open-target-row:opacity-100 group-focus-visible/open-target-row:translate-x-0.5 group-focus-visible/open-target-row:opacity-100"

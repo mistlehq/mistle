@@ -163,7 +163,7 @@ export function SessionPortAccessPopover(input: {
                   void input.state.openProcess(entry.listenerProcess);
                 }}
                 primary={
-                  <p className="truncate text-sm text-stone-700 group-hover/open-target-row:underline group-focus-visible/open-target-row:underline">
+                  <p className="truncate">
                     {entry.bindAddresses.join(", ")}:
                     <span className="font-semibold text-stone-950">
                       {String(primaryListener.port)}
