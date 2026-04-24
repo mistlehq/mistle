@@ -8,6 +8,8 @@ import { DetailLabel } from "./detail-label.js";
 import { Spinner } from "./spinner.js";
 
 const COPY_SUCCESS_DISPLAY_MS = 1200;
+const singleLineValueClassName =
+  "min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-1 font-mono text-xs";
 
 type CopyFeedback =
   | { state: "idle" }
@@ -173,7 +175,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     return (
       <div className="gap-1.5 flex flex-col">
         <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
-          <p className="min-w-0 flex-1 break-all px-1 font-mono text-xs">{readyInput.value}</p>
+          <p className={singleLineValueClassName}>{readyInput.value}</p>
           {button}
         </div>
         {visibleCopyState === "failed" ? (
@@ -189,7 +191,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     <div className="gap-1.5 flex flex-col">
       <DetailLabel as="p">{readyInput.labelContent ?? readyInput.label}</DetailLabel>
       <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
-        <p className="min-w-0 flex-1 break-all px-1 font-mono text-xs">{readyInput.value}</p>
+        <p className={singleLineValueClassName}>{readyInput.value}</p>
         {button}
       </div>
       {visibleCopyState === "failed" ? (

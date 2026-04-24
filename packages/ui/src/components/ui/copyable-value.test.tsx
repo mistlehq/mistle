@@ -29,6 +29,18 @@ describe("CopyableValue", () => {
     expect(screen.getByRole("button", { name: "Copy Webhook callback URL" })).toBeTruthy();
   });
 
+  it("keeps field values on one row with horizontal overflow", () => {
+    render(
+      <CopyableValue
+        label="Webhook callback URL"
+        value="https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_demo_long_token"
+      />,
+    );
+
+    expect(screen.getByText(/github-cloud/).className).toContain("whitespace-nowrap");
+    expect(screen.getByText(/github-cloud/).className).toContain("overflow-x-auto");
+  });
+
   it("renders rich field label content while preserving copy accessibility text", () => {
     render(
       <CopyableValue
