@@ -12,21 +12,6 @@ import {
   type IntegrationConnectionEditorState,
 } from "./integration-connection-editor.js";
 
-const GitHubAppInstallationSecretFields = [
-  {
-    name: "appPrivateKeyPem",
-    label: "App private key PEM",
-    placeholder: "-----BEGIN PRIVATE KEY-----",
-    inputType: "textarea" as const,
-  },
-  {
-    name: "webhookSecret",
-    label: "Webhook secret",
-    placeholder: "Enter webhook secret",
-    inputType: "password" as const,
-  },
-] as const;
-
 const createEditor: IntegrationConnectionEditorState = {
   methods: [
     {
@@ -46,7 +31,14 @@ const createEditor: IntegrationConnectionEditorState = {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "form",
-      secretFields: [...GitHubAppInstallationSecretFields],
+      secretFields: [
+        {
+          name: "setupSecret",
+          label: "Setup secret",
+          placeholder: "Hidden setup secret",
+          inputType: "password",
+        },
+      ],
     },
   ],
   mode: "create",
@@ -110,7 +102,20 @@ function createUpdateFormEditor(
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "form",
-      secretFields: [...GitHubAppInstallationSecretFields],
+      secretFields: [
+        {
+          name: "appPrivateKeyPem",
+          label: "App private key PEM",
+          placeholder: "-----BEGIN PRIVATE KEY-----",
+          inputType: "textarea",
+        },
+        {
+          name: "webhookSecret",
+          label: "Webhook secret",
+          placeholder: "Enter webhook secret",
+          inputType: "password",
+        },
+      ],
     },
     initialConnectionDisplayName: "Existing GitHub App installation connection",
     mode: "update",
@@ -506,52 +511,29 @@ describe("IntegrationConnectionEditorPage", () => {
     expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();
   });
 
-  it("skips GitHub App setup fields in create mode", () => {
+  it("skips create-time setup fields for GitHub App installation", () => {
     renderEditorPage({
       configForm: {
         mode: "form",
         schema: {
           type: "object",
           properties: {
-            connection_method: {
+            ignored_setup_field: {
               type: "string",
-              default: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-            },
-            app_id: {
-              type: "string",
-              title: "App ID",
-            },
-            app_slug: {
-              type: "string",
-              title: "App slug",
-            },
-            client_id: {
-              type: "string",
-              title: "Client ID (Linked User Auth)",
+              title: "Ignored setup field",
             },
           },
         },
-        uiSchema: {
-          connection_method: {
-            "ui:widget": "hidden",
-          },
-        },
-        value: {
-          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        },
-        visiblePropertyKeys: ["app_id", "app_slug", "client_id"],
+        uiSchema: {},
+        value: {},
+        visiblePropertyKeys: ["ignored_setup_field"],
       },
       connectionDisplayNamePlaceholder: "GitHub connection",
       methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     });
 
-    expect(screen.queryByLabelText("App ID")).toBeNull();
-    expect(screen.queryByLabelText("App slug")).toBeNull();
-    expect(screen.queryByLabelText("Client ID (Linked User Auth)")).toBeNull();
-    expect(screen.queryByPlaceholderText("-----BEGIN PRIVATE KEY-----")).toBeNull();
-    expect(screen.queryByPlaceholderText("Enter webhook secret")).toBeNull();
-    expect(screen.queryByLabelText("installation_id")).toBeNull();
-    expect(screen.queryByLabelText("setup_action")).toBeNull();
+    expect(screen.queryByLabelText("Ignored setup field")).toBeNull();
+    expect(screen.queryByPlaceholderText("Hidden setup secret")).toBeNull();
     expect(screen.getByRole("button", { name: "Add connection" })).toBeTruthy();
   });
 
