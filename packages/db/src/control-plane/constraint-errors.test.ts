@@ -1,0 +1,49 @@
+import { describe, expect, it } from "vitest";
+
+import { ControlPlaneConstraintIds, isControlPlaneUniqueViolation } from "./constraint-errors.js";
+
+describe("control-plane constraint errors", () => {
+  it("matches the sandbox profile one-draft unique index", () => {
+    const error = {
+      code: "23505",
+      constraint: "sandbox_profile_versions_one_draft_per_profile_uidx",
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches the sandbox profile versions primary key for next-version races", () => {
+    const error = {
+      cause: {
+        code: "23505",
+        constraint: "sandbox_profile_versions_pkey",
+      },
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE,
+      ),
+    ).toBe(true);
+  });
+
+  it("returns false for unrelated control-plane constraints", () => {
+    const error = {
+      code: "23505",
+      constraint: "identity_link_redirect_sessions_state_uidx",
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE,
+      ),
+    ).toBe(false);
+  });
+});

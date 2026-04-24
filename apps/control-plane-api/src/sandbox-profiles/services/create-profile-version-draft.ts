@@ -1,9 +1,10 @@
 import {
+  ControlPlaneConstraintIds,
+  isControlPlaneUniqueViolation,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
-  isPostgresUniqueConstraintError,
   SandboxProfileVersionStates,
-} from "@mistle/db";
+} from "@mistle/db/control-plane";
 
 import {
   SandboxProfilesConflictCodes,
@@ -24,9 +25,6 @@ type CreateProfileVersionDraftOutput = {
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   isActive: boolean;
 };
-
-const DRAFT_UNIQUE_INDEX_NAME = "sandbox_profile_versions_one_draft_per_profile_uidx";
-const SANDBOX_PROFILE_VERSIONS_PRIMARY_KEY_NAME = "sandbox_profile_versions_pkey";
 
 export async function createProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
@@ -137,8 +135,10 @@ export async function createProfileVersionDraft(
     });
   } catch (error) {
     if (
-      isPostgresUniqueConstraintError(error, DRAFT_UNIQUE_INDEX_NAME) ||
-      isPostgresUniqueConstraintError(error, SANDBOX_PROFILE_VERSIONS_PRIMARY_KEY_NAME)
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE,
+      )
     ) {
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.DRAFT_ALREADY_EXISTS,
