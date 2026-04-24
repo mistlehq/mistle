@@ -21,8 +21,8 @@ import {
 } from "./helpers/cloudflared-tunnel.js";
 import { updateGitHubAppWebhookConfig } from "./helpers/github-app-installation.js";
 import {
-  SharedGitHubWebhookHarnessConfigSchema,
   SharedGitHubWebhookHarnessContextId,
+  SharedGitHubWebhookHarnessContextSchema,
 } from "./helpers/github-webhook-automation.js";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
@@ -293,20 +293,20 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
     }
 
     return async () => {
-      const originalGitHubAppWebhookConfig = await readTestContext({
+      const sharedGitHubWebhookHarness = await readTestContext({
         id: SharedGitHubWebhookHarnessContextId,
-        schema: SharedGitHubWebhookHarnessConfigSchema,
+        schema: SharedGitHubWebhookHarnessContextSchema,
       }).catch(() => null);
 
-      if (originalGitHubAppWebhookConfig !== null) {
+      if (sharedGitHubWebhookHarness !== null) {
         await updateGitHubAppWebhookConfig({
-          url: originalGitHubAppWebhookConfig.url,
-          ...(originalGitHubAppWebhookConfig.contentType === undefined
+          url: sharedGitHubWebhookHarness.originalWebhookConfig.url,
+          ...(sharedGitHubWebhookHarness.originalWebhookConfig.contentType === undefined
             ? {}
-            : { contentType: originalGitHubAppWebhookConfig.contentType }),
-          ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
+            : { contentType: sharedGitHubWebhookHarness.originalWebhookConfig.contentType }),
+          ...(sharedGitHubWebhookHarness.originalWebhookConfig.insecureSsl === undefined
             ? {}
-            : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+            : { insecureSsl: sharedGitHubWebhookHarness.originalWebhookConfig.insecureSsl }),
         }).catch(() => undefined);
       }
 

@@ -7,7 +7,7 @@ import {
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
-import { writeTestContext } from "@mistle/test-harness";
+import { readTestContext, writeTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
@@ -175,11 +175,39 @@ type SharedGitHubWebhookAutomationHarness = {
 
 let sharedGitHubWebhookHarnessPromise: Promise<SharedGitHubWebhookAutomationHarness> | null = null;
 export const SharedGitHubWebhookHarnessContextId = "system-github-webhook-harness";
-export const SharedGitHubWebhookHarnessConfigSchema = z
+export const SharedGitHubWebhookHarnessContextSchema = z
   .object({
-    url: z.string().min(1),
-    contentType: z.string().min(1).optional(),
-    insecureSsl: z.string().min(1).optional(),
+    originalWebhookConfig: z
+      .object({
+        url: z.string().min(1),
+        contentType: z.string().min(1).optional(),
+        insecureSsl: z.string().min(1).optional(),
+      })
+      .strict(),
+    session: z
+      .object({
+        cookie: z.string().min(1),
+        organizationId: z.string().min(1),
+        userId: z.string().min(1),
+      })
+      .strict(),
+    repository: z
+      .object({
+        owner: z.string().min(1),
+        repo: z.string().min(1),
+      })
+      .strict(),
+    githubConnectionId: z.string().min(1),
+    githubWebhookSource: z
+      .object({
+        id: z.string().min(1),
+        targetKey: z.string().min(1),
+        integrationConnectionId: z.string().min(1),
+        endpointKey: z.string().min(1),
+        callbackUrl: z.string().min(1).optional(),
+      })
+      .strict(),
+    publicHostname: z.string().min(1),
   })
   .strict();
 
@@ -293,6 +321,35 @@ async function waitForGitHubAppWebhookUrl(expectedUrl: string): Promise<void> {
       return currentConfig.url === expectedUrl ? currentConfig : null;
     },
   });
+}
+
+async function readSharedGitHubWebhookAutomationHarnessFromContext(): Promise<SharedGitHubWebhookAutomationHarness | null> {
+  const persisted = await readTestContext({
+    id: SharedGitHubWebhookHarnessContextId,
+    schema: SharedGitHubWebhookHarnessContextSchema,
+  }).catch(() => null);
+
+  if (persisted === null) {
+    return null;
+  }
+
+  return {
+    session: persisted.session,
+    repository: persisted.repository,
+    githubToken: requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_TOKEN"),
+    githubConnectionId: persisted.githubConnectionId,
+    githubWebhookSource: persisted.githubWebhookSource,
+    publicHostname: persisted.publicHostname,
+    originalGitHubAppWebhookConfig: {
+      url: persisted.originalWebhookConfig.url,
+      ...(persisted.originalWebhookConfig.contentType === undefined
+        ? {}
+        : { contentType: persisted.originalWebhookConfig.contentType }),
+      ...(persisted.originalWebhookConfig.insecureSsl === undefined
+        ? {}
+        : { insecureSsl: persisted.originalWebhookConfig.insecureSsl }),
+    },
+  };
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
@@ -1424,13 +1481,28 @@ async function createSharedGitHubWebhookAutomationHarness(
     await writeTestContext({
       id: SharedGitHubWebhookHarnessContextId,
       value: {
-        url: originalGitHubAppWebhookConfig.url,
-        ...(originalGitHubAppWebhookConfig.contentType === undefined
-          ? {}
-          : { contentType: originalGitHubAppWebhookConfig.contentType }),
-        ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
-          ? {}
-          : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+        originalWebhookConfig: {
+          url: originalGitHubAppWebhookConfig.url,
+          ...(originalGitHubAppWebhookConfig.contentType === undefined
+            ? {}
+            : { contentType: originalGitHubAppWebhookConfig.contentType }),
+          ...(originalGitHubAppWebhookConfig.insecureSsl === undefined
+            ? {}
+            : { insecureSsl: originalGitHubAppWebhookConfig.insecureSsl }),
+        },
+        session,
+        repository,
+        githubConnectionId,
+        githubWebhookSource: {
+          id: githubWebhookSource.id,
+          targetKey: githubWebhookSource.targetKey,
+          integrationConnectionId: githubWebhookSource.integrationConnectionId,
+          endpointKey: githubWebhookSource.endpointKey,
+          ...(githubWebhookSource.callbackUrl === undefined
+            ? {}
+            : { callbackUrl: githubWebhookSource.callbackUrl }),
+        },
+        publicHostname,
       },
     });
 
@@ -1463,12 +1535,17 @@ export async function getSharedGitHubWebhookAutomationHarness(
   fixture: SystemTestFixture,
 ): Promise<SharedGitHubWebhookAutomationHarness> {
   if (sharedGitHubWebhookHarnessPromise === null) {
-    sharedGitHubWebhookHarnessPromise = createSharedGitHubWebhookAutomationHarness(fixture).catch(
-      (error) => {
-        sharedGitHubWebhookHarnessPromise = null;
-        throw error;
-      },
-    );
+    sharedGitHubWebhookHarnessPromise = (async () => {
+      const persistedHarness = await readSharedGitHubWebhookAutomationHarnessFromContext();
+      if (persistedHarness !== null) {
+        return persistedHarness;
+      }
+
+      return await createSharedGitHubWebhookAutomationHarness(fixture);
+    })().catch((error) => {
+      sharedGitHubWebhookHarnessPromise = null;
+      throw error;
+    });
   }
 
   return await sharedGitHubWebhookHarnessPromise;
