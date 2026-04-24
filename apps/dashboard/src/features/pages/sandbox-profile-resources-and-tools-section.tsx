@@ -1,4 +1,4 @@
-import { Checkbox } from "@mistle/ui";
+import { Checkbox, DetailLabel } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -288,9 +288,7 @@ function ToolBindingsSection(input: {
                   <div className="mb-1 flex flex-col gap-2">
                     {summaryItems.map((item) => (
                       <div className="flex min-w-0 flex-col gap-0.5" key={item.label}>
-                        <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                          {item.label}
-                        </p>
+                        <DetailLabel as="p">{item.label}</DetailLabel>
                         <p className="text-sm">{item.value}</p>
                       </div>
                     ))}
@@ -375,9 +373,7 @@ export function SandboxProfileResourcesAndToolsSection(input: {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
-        <p className="text-muted-foreground text-xs uppercase tracking-wide">
-          Repository Resources
-        </p>
+        <DetailLabel as="p">Repository Resources</DetailLabel>
         {gitIssue !== null ? (
           <p className="text-destructive text-sm">
             Fix the Git provider in Integrations before selecting repository resources.
@@ -397,9 +393,7 @@ export function SandboxProfileResourcesAndToolsSection(input: {
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {gitSummaryItems.map((item) => (
                   <div className="flex flex-col gap-1" key={item.label}>
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
-                      {item.label}
-                    </p>
+                    <DetailLabel as="p">{item.label}</DetailLabel>
                     <p className="text-sm">{item.value}</p>
                   </div>
                 ))}

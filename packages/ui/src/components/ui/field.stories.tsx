@@ -5,6 +5,7 @@ import {
   FieldError,
   FieldHeader,
   FieldLabel,
+  FieldLabelWithTooltip,
 } from "./field.js";
 import { Input } from "./input.js";
 
@@ -58,6 +59,29 @@ export const VerticalWithDescription = {
           </FieldHeader>
           <FieldContent>
             <Input defaultValue="Platform Engineering" id="workspace-name" />
+          </FieldContent>
+        </Field>
+      </div>
+    );
+  },
+};
+
+export const LabelWithTooltip = {
+  render: function Render() {
+    return (
+      <div className="w-[24rem]">
+        <Field>
+          <FieldHeader>
+            <FieldLabelWithTooltip
+              htmlFor="setup-script"
+              tooltip="Runs once after repositories, resources, and CLI tools are ready."
+              tooltipLabel="Explain setup script"
+            >
+              Setup script
+            </FieldLabelWithTooltip>
+          </FieldHeader>
+          <FieldContent>
+            <Input defaultValue="pnpm install" id="setup-script" />
           </FieldContent>
         </Field>
       </div>

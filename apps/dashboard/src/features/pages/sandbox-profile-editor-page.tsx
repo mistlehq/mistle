@@ -6,13 +6,11 @@ import {
   FieldContent,
   FieldHeader,
   FieldLabel,
+  FieldLabelWithTooltip,
   Input,
   Notice,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
 } from "@mistle/ui";
-import { CheckCircleIcon, InfoIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";
@@ -583,32 +581,13 @@ export function SandboxProfileSetupScriptPanel(input: {
     <div className="max-w-5xl">
       <Field>
         <FieldHeader>
-          <div className="flex items-center gap-1.5">
-            <p
-              className="text-muted-foreground text-xs uppercase tracking-wide"
-              id="sandbox-setup-script-label"
-            >
-              Setup script
-            </p>
-            <Tooltip delay={0}>
-              <TooltipTrigger
-                aria-label="Explain setup script"
-                render={
-                  <button
-                    className="text-muted-foreground hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
-                    type="button"
-                  />
-                }
-              >
-                <InfoIcon aria-hidden className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-64 text-left" side="top">
-                Runs once during sandbox setup after repositories, resources, and CLI tools are
-                ready. Use it for project bootstrap steps such as dependency install, local config
-                generation, or repo-specific setup commands.
-              </TooltipContent>
-            </Tooltip>
-          </div>
+          <FieldLabelWithTooltip
+            id="sandbox-setup-script-label"
+            tooltip="Runs once during sandbox setup after repositories, resources, and CLI tools are ready. Use it for project bootstrap steps such as dependency install, local config generation, or repo-specific setup commands."
+            tooltipLabel="Explain setup script"
+          >
+            Setup script
+          </FieldLabelWithTooltip>
         </FieldHeader>
         <FieldContent>
           <p aria-live="polite" className="sr-only" role="status">

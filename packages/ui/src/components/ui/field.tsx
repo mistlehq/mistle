@@ -1,9 +1,11 @@
+import { InfoIcon } from "@phosphor-icons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { useMemo } from "react";
 
 import { cn } from "../../lib/utils.js";
 import { Label } from "./label.js";
 import { Separator } from "./separator.js";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./tooltip.js";
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -153,6 +155,47 @@ function FieldLabel({ children, className, required = false, ...props }: FieldLa
   );
 }
 
+type FieldLabelWithTooltipProps = FieldLabelProps & {
+  tooltip: React.ReactNode;
+  tooltipContentClassName?: string;
+  tooltipLabel: string;
+  tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
+};
+
+function FieldLabelWithTooltip({
+  children,
+  tooltip,
+  tooltipContentClassName,
+  tooltipLabel,
+  tooltipSide = "top",
+  ...props
+}: FieldLabelWithTooltipProps) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <FieldLabel {...props}>{children}</FieldLabel>
+      <Tooltip delay={0}>
+        <TooltipTrigger
+          aria-label={tooltipLabel}
+          render={
+            <button
+              className="text-foreground/80 hover:text-foreground inline-flex size-4 shrink-0 items-center justify-center rounded-sm"
+              type="button"
+            />
+          }
+        >
+          <InfoIcon aria-hidden className="size-3.5" />
+        </TooltipTrigger>
+        <TooltipContent
+          className={cn("max-w-64 text-left", tooltipContentClassName)}
+          side={tooltipSide}
+        >
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -260,6 +303,7 @@ export {
   Field,
   FieldHeader,
   FieldLabel,
+  FieldLabelWithTooltip,
   FieldDescription,
   FieldError,
   FieldGroup,

@@ -1,4 +1,4 @@
-import { cn } from "@mistle/ui";
+import { cn, DetailLabel } from "@mistle/ui";
 import { createContext, useContext } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -76,7 +76,7 @@ export function ResponsiveFieldList(input: {
       <div className={cn("flex flex-col", input.className)} data-slot="responsive-field-list">
         <div
           className={cn(
-            "text-muted-foreground hidden border-b text-xs tracking-wide uppercase md:grid md:grid-cols-[var(--responsive-field-list-grid-template)]",
+            "hidden border-b md:grid md:grid-cols-[var(--responsive-field-list-grid-template)]",
             input.gapClassName ?? "gap-4",
             input.headerClassName ?? "py-2",
           )}
@@ -84,7 +84,8 @@ export function ResponsiveFieldList(input: {
           style={gridStyle}
         >
           {input.columns.map((column) => (
-            <div
+            <DetailLabel
+              as="div"
               className={cn(
                 "min-w-0",
                 column.align === "center" ? "text-center" : null,
@@ -94,7 +95,7 @@ export function ResponsiveFieldList(input: {
               key={column.key}
             >
               {column.label}
-            </div>
+            </DetailLabel>
           ))}
         </div>
         {input.children}
@@ -162,16 +163,13 @@ export function ResponsiveFieldListCell(input: {
       data-slot="responsive-field-list-cell"
     >
       {column.hideMobileLabel === true ? null : (
-        <div
-          className={cn(
-            "text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase md:hidden",
-            column.mobileLabelClassName,
-            input.mobileLabelClassName,
-          )}
+        <DetailLabel
+          as="div"
+          className={cn("mb-1 md:hidden", column.mobileLabelClassName, input.mobileLabelClassName)}
           data-slot="responsive-field-list-mobile-label"
         >
           {column.label}
-        </div>
+        </DetailLabel>
       )}
       <div className={input.contentClassName}>{input.children}</div>
     </div>
