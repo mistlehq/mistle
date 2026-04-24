@@ -18,7 +18,10 @@ import {
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { SandboxProfileEditorPage } from "./sandbox-profile-editor-page.js";
+import {
+  resolveSandboxProfileEditorVersionMode,
+  SandboxProfileEditorPage,
+} from "./sandbox-profile-editor-page.js";
 
 afterEach(() => {
   cleanup();
@@ -51,6 +54,7 @@ function renderSandboxProfileEditor(input?: {
     };
   }[];
   integrationsLoading?: boolean;
+  versionState?: "draft" | "published";
 }): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
@@ -62,28 +66,49 @@ function renderSandboxProfileEditor(input?: {
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
     displayName: "Prototype Profile",
+    activeVersion: input?.versionState === "published" ? version : null,
     status: "active",
     latestVersion: version,
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
   if (input?.integrationsLoading === true) {
-    const versionsQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sandboxProfileVersionsQueryKey(profileId),
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+      versions: [
+        {
+          sandboxProfileId: profileId,
+          version,
+          state: input?.versionState ?? "draft",
+          isActive: input?.versionState === "published",
+        },
+      ],
+    });
+    const bindingsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId,
+        version,
+      }),
       queryFn: async () => ({
-        versions: [{ sandboxProfileId: profileId, version }],
+        bindings: [],
       }),
     });
 
-    versionsQuery.setState({
-      ...versionsQuery.state,
+    bindingsQuery.setState({
+      ...bindingsQuery.state,
       data: undefined,
       fetchStatus: "fetching",
       status: "pending",
     });
   } else {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
-      versions: [{ sandboxProfileId: profileId, version }],
+      versions: [
+        {
+          sandboxProfileId: profileId,
+          version,
+          state: input?.versionState ?? "draft",
+          isActive: input?.versionState === "published",
+        },
+      ],
     });
     queryClient.setQueryData(
       sandboxProfileVersionIntegrationBindingsQueryKey({
@@ -133,6 +158,68 @@ function renderSandboxProfileEditor(input?: {
 }
 
 describe("SandboxProfileEditorPage", () => {
+  it("defaults to draft when draft and published versions both exist", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: 1,
+      viewedVersionKind: null,
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: true,
+        },
+        {
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: 2,
+        activeVersion: 1,
+        hasDraft: true,
+      },
+    });
+  });
+
+  it("can resolve the published version while a draft exists", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: 1,
+      viewedVersionKind: "active",
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: true,
+        },
+        {
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: true,
+      },
+    });
+  });
+
   it("renders the setup-flow sections in the editor rail", () => {
     renderSandboxProfileEditor();
 
@@ -221,5 +308,53 @@ describe("SandboxProfileEditorPage", () => {
     const editorRoot = editor.closest('[data-slot="sandbox-setup-script-editor"]');
 
     expect(editorRoot?.getAttribute("data-editor-state")).toBe("empty");
+  });
+
+  it("renders published profiles as read-only", () => {
+    renderSandboxProfileEditor({
+      versionState: "published",
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "Codex connection",
+          targetKey: "codex",
+          status: "active",
+        },
+      ],
+      targets: [
+        {
+          targetKey: "codex",
+          displayName: "Codex",
+          familyId: "agent",
+          variantId: "default",
+          config: {},
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
+    });
+
+    expect(screen.getByText("Published")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Make changes" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "agent harness connection" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("renders draft profiles with publish action", () => {
+    renderSandboxProfileEditor();
+
+    expect(screen.getByText("Draft")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
   });
 });

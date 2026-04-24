@@ -43,6 +43,7 @@ type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   availableConnections?: readonly IntegrationConnectionSummary[];
   availableTargets?: readonly IntegrationTargetSummary[];
+  lifecycleState?: "draft" | "published" | "published-with-draft";
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
     directoryErrorMessage?: string;
@@ -225,12 +226,35 @@ function SandboxProfileEditorPageStoryView(
     });
   }
 
+  const isEditable = input.lifecycleState === undefined || input.lifecycleState === "draft";
+  const mode =
+    input.lifecycleState === "published" || input.lifecycleState === "published-with-draft"
+      ? {
+          kind: "active" as const,
+          version: 1,
+          activeVersion: 1,
+          hasDraft: input.lifecycleState === "published-with-draft",
+        }
+      : {
+          kind: "draft" as const,
+          version: 1,
+          activeVersion: null,
+          hasDraft: true as const,
+        };
+
   return (
     <QueryClientProvider client={queryClient}>
       <SandboxProfileEditorView
+        mode={mode}
+        onMakeChanges={() => {}}
+        onPublish={() => {}}
         onSaveProfileName={handleProfileNameSave}
+        onViewActive={() => {}}
+        onViewDraft={() => {}}
         profileName={profileName}
         profileNameFallback={profileName}
+        versionActionError={null}
+        versionActionIsPending={false}
         renderSectionPanel={(sectionId) => {
           if (
             input.integrationsSectionState !== undefined &&
@@ -259,6 +283,7 @@ function SandboxProfileEditorPageStoryView(
                 }}
                 integrationRows={integrationRows}
                 integrationSaveError={null}
+                disabled={!isEditable}
                 onAddIntegrationBindingRow={async (nextBinding) => {
                   setIntegrationRows((currentRows) => [
                     ...currentRows,
@@ -292,6 +317,7 @@ function SandboxProfileEditorPageStoryView(
               <SandboxProfileResourcesAndToolsSection
                 availableConnections={input.availableConnections ?? StoryIntegrationConnections}
                 availableTargets={input.availableTargets ?? StoryIntegrationTargets}
+                disabled={!isEditable}
                 onRowChange={(clientId, changes) => {
                   setIntegrationRows((currentRows) =>
                     currentRows.map((row) =>
@@ -308,6 +334,7 @@ function SandboxProfileEditorPageStoryView(
             <SandboxProfileSetupScriptPanel
               onBlur={handleSetupScriptBlur}
               onChange={setSetupScriptDraft}
+              disabled={!isEditable}
               saveStatus={setupScriptSaveStatus}
               value={setupScriptDraft}
             />
@@ -358,6 +385,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Published: Story = {
+  args: {
+    lifecycleState: "published",
+  },
+};
 
 export const EmptySetupScript: Story = {
   args: {

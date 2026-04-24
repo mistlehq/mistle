@@ -10,8 +10,8 @@ import {
   Input,
   Notice,
 } from "@mistle/ui";
-import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircleIcon, InfoIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -23,8 +23,19 @@ import {
   sandboxProfileDetailQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
+  sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
+import {
+  createSandboxProfileVersionDraft,
+  getSandboxProfile,
+  getSandboxProfileVersionPublishability,
+  listSandboxProfileVersions,
+  publishSandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type {
+  SandboxProfile,
+  SandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type {
@@ -55,6 +66,97 @@ import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
 };
+
+type SandboxProfileEditorVersionMode =
+  | {
+      kind: "draft";
+      version: number;
+      activeVersion: number | null;
+      hasDraft: true;
+    }
+  | {
+      kind: "active";
+      version: number;
+      activeVersion: number;
+      hasDraft: boolean;
+    };
+
+type ViewedVersionKind = "draft" | "active";
+
+type ResolveEditorVersionModeResult =
+  | {
+      ok: true;
+      mode: SandboxProfileEditorVersionMode;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export function resolveSandboxProfileEditorVersionMode(input: {
+  activeVersion: number | null;
+  versions: readonly SandboxProfileVersion[];
+  viewedVersionKind: ViewedVersionKind | null;
+}): ResolveEditorVersionModeResult {
+  const draftVersions = input.versions.filter((version) => version.state === "draft");
+  if (draftVersions.length > 1) {
+    return {
+      ok: false,
+      message: "Sandbox profile has multiple draft versions.",
+    };
+  }
+
+  const draftVersion = draftVersions[0] ?? null;
+  const activeVersion =
+    input.activeVersion === null
+      ? null
+      : (input.versions.find((version) => version.version === input.activeVersion) ?? null);
+
+  if (input.activeVersion !== null && activeVersion === null) {
+    return {
+      ok: false,
+      message: "Sandbox profile active version could not be loaded.",
+    };
+  }
+
+  const preferredView = input.viewedVersionKind ?? (draftVersion === null ? "active" : "draft");
+
+  if (preferredView === "draft") {
+    if (draftVersion === null) {
+      return {
+        ok: false,
+        message: "Sandbox profile draft version could not be loaded.",
+      };
+    }
+
+    return {
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: draftVersion.version,
+        activeVersion: input.activeVersion,
+        hasDraft: true,
+      },
+    };
+  }
+
+  if (input.activeVersion === null || activeVersion === null) {
+    return {
+      ok: false,
+      message: "Sandbox profile published version could not be loaded.",
+    };
+  }
+
+  return {
+    ok: true,
+    mode: {
+      kind: "active",
+      version: activeVersion.version,
+      activeVersion: input.activeVersion,
+      hasDraft: draftVersion !== null,
+    },
+  };
+}
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
 set -euo pipefail
@@ -220,6 +322,11 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
             queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
           });
         }}
+        invalidateProfileVersions={async (invalidateProfileId) => {
+          await queryClient.invalidateQueries({
+            queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
+          });
+        }}
         invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
           await queryClient.invalidateQueries({
             queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
@@ -244,9 +351,10 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
 type LoadedSandboxProfileEditorPageInput = {
   navigate: ReturnType<typeof useNavigate>;
   profileId: string;
-  profile: { displayName: string };
+  profile: SandboxProfile;
   invalidateSandboxProfiles: () => Promise<void>;
   invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 };
@@ -254,11 +362,168 @@ type LoadedSandboxProfileEditorPageInput = {
 function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
+  const [viewedVersionKind, setViewedVersionKind] = useState<ViewedVersionKind | null>(null);
+  const [versionActionError, setVersionActionError] = useState<string | null>(null);
+  const profileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: input.profileId,
+        signal,
+      }),
+    retry: false,
+  });
+  const createDraftMutation = useMutation({
+    mutationFn: async () =>
+      createSandboxProfileVersionDraft({
+        profileId: input.profileId,
+      }),
+    onSuccess: async () => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+      setViewedVersionKind("draft");
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create sandbox profile draft.",
+        }),
+      );
+    },
+  });
+  const publishMutation = useMutation({
+    mutationFn: async (version: number) => {
+      const publishability = await getSandboxProfileVersionPublishability({
+        profileId: input.profileId,
+        version,
+      });
+
+      if (!publishability.publishable) {
+        const firstIssue = publishability.issues[0];
+        throw new Error(firstIssue?.message ?? "Sandbox profile draft cannot be published.");
+      }
+
+      return publishSandboxProfileVersion({
+        profileId: input.profileId,
+        version,
+      });
+    },
+    onSuccess: async (result) => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+        input.invalidateVersionBindings({
+          profileId: input.profileId,
+          version: result.activeVersion,
+        }),
+        input.invalidateVersionSetupScript({
+          profileId: input.profileId,
+          version: result.activeVersion,
+        }),
+      ]);
+      setViewedVersionKind("active");
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not publish sandbox profile draft.",
+        }),
+      );
+    },
+  });
+
+  if (profileVersionsQuery.isPending) {
+    return <></>;
+  }
+
+  if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
+    return (
+      <Notice title="Could not load profile versions" variant="alert">
+        {resolveApiErrorMessage({
+          error: profileVersionsQuery.error,
+          fallbackMessage: "Could not load sandbox profile versions.",
+        })}
+      </Notice>
+    );
+  }
+
+  const resolvedMode = resolveSandboxProfileEditorVersionMode({
+    activeVersion: input.profile.activeVersion,
+    versions: profileVersionsQuery.data.versions,
+    viewedVersionKind,
+  });
+
+  if (!resolvedMode.ok) {
+    return (
+      <Notice title="Could not load profile version" variant="alert">
+        {resolvedMode.message}
+      </Notice>
+    );
+  }
+
+  return (
+    <ReadySandboxProfileEditorPage
+      createDraftIsPending={createDraftMutation.isPending}
+      mode={resolvedMode.mode}
+      navigate={input.navigate}
+      onMakeChanges={() => {
+        createDraftMutation.mutate();
+      }}
+      onPublish={(version) => {
+        publishMutation.mutate(version);
+      }}
+      onViewActive={() => {
+        setVersionActionError(null);
+        setViewedVersionKind("active");
+      }}
+      onViewDraft={() => {
+        setVersionActionError(null);
+        setViewedVersionKind("draft");
+      }}
+      profile={input.profile}
+      profileId={input.profileId}
+      publishIsPending={publishMutation.isPending}
+      versionActionError={versionActionError}
+      invalidateSandboxProfiles={input.invalidateSandboxProfiles}
+      invalidateProfileDetail={input.invalidateProfileDetail}
+      invalidateVersionBindings={input.invalidateVersionBindings}
+      invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+    />
+  );
+}
+
+function ReadySandboxProfileEditorPage(input: {
+  navigate: ReturnType<typeof useNavigate>;
+  profileId: string;
+  profile: SandboxProfile;
+  mode: SandboxProfileEditorVersionMode;
+  versionActionError: string | null;
+  publishIsPending: boolean;
+  createDraftIsPending: boolean;
+  onPublish: (version: number) => void;
+  onMakeChanges: () => void;
+  onViewActive: () => void;
+  onViewDraft: () => void;
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+}): React.JSX.Element {
   const integrationsLoader = useSandboxProfileIntegrationsLoader({
     profileId: input.profileId,
+    version: input.mode.version,
   });
   const setupScriptLoader = useSandboxProfileSetupScriptLoader({
     profileId: input.profileId,
+    version: input.mode.version,
   });
   const [hasUnsavedIntegrationChanges, setHasUnsavedIntegrationChanges] = useState(false);
   const metaState = useEditSandboxProfileMetaState({
@@ -273,21 +538,26 @@ function LoadedSandboxProfileEditorPage(
     <SandboxProfileEditorView
       hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
       isSavingProfileName={metaState.isUpdating}
+      mode={input.mode}
+      onMakeChanges={input.onMakeChanges}
+      onPublish={input.onPublish}
       onSaveProfileName={metaState.onProfileNameSave}
+      onViewActive={input.onViewActive}
+      onViewDraft={input.onViewDraft}
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
+      versionActionError={input.versionActionError}
+      versionActionIsPending={input.publishIsPending || input.createDraftIsPending}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "configurations") {
           return (
             <LoadedSandboxProfileSetupScriptSection
-              key={
-                setupScriptLoader.version === null
-                  ? `unavailable:${input.profileId}`
-                  : `${input.profileId}:${String(setupScriptLoader.version)}`
-              }
+              disabled={input.mode.kind !== "draft"}
+              key={`${input.profileId}:${String(input.mode.version)}`}
               loader={setupScriptLoader}
               profileId={input.profileId}
               invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+              version={input.mode.version}
             />
           );
         }
@@ -299,6 +569,8 @@ function LoadedSandboxProfileEditorPage(
             loader={integrationsLoader}
             onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
             profileId={input.profileId}
+            disabled={input.mode.kind !== "draft"}
+            version={input.mode.version}
             invalidateVersionBindings={input.invalidateVersionBindings}
           />
         );
@@ -327,6 +599,13 @@ export function SandboxProfileEditorView(input: {
   profileName: string | null;
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
+  mode: SandboxProfileEditorVersionMode;
+  versionActionError: string | null;
+  versionActionIsPending: boolean;
+  onPublish: (version: number) => void;
+  onMakeChanges: () => void;
+  onViewActive: () => void;
+  onViewDraft: () => void;
   sections: readonly SandboxProfileEditorSection[];
   renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
@@ -340,17 +619,58 @@ export function SandboxProfileEditorView(input: {
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AutoSaveTitleHeading
-          ariaLabel="Profile name"
-          emptyDisplayText={input.profileNameFallback}
-          onSave={input.onSaveProfileName}
-          requiredLabel="Profile name"
-          value={input.profileName}
-          {...(input.isSavingProfileName === undefined
-            ? {}
-            : { disabled: input.isSavingProfileName })}
-        />
+        <div className="flex min-w-0 items-center gap-2">
+          <AutoSaveTitleHeading
+            ariaLabel="Profile name"
+            emptyDisplayText={input.profileNameFallback}
+            onSave={input.onSaveProfileName}
+            requiredLabel="Profile name"
+            value={input.profileName}
+            disabled={input.isSavingProfileName === true}
+          />
+          <span className="border-border text-muted-foreground inline-flex h-6 items-center rounded-sm border px-2 text-xs font-medium">
+            {input.mode.kind === "draft" ? "Draft" : "Published"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {input.mode.kind === "draft" ? (
+            <>
+              {input.mode.activeVersion === null ? null : (
+                <Button onClick={input.onViewActive} type="button" variant="outline">
+                  View published version
+                </Button>
+              )}
+              <Button
+                disabled={input.versionActionIsPending}
+                onClick={() => {
+                  input.onPublish(input.mode.version);
+                }}
+                type="button"
+              >
+                Publish
+              </Button>
+            </>
+          ) : input.mode.hasDraft ? (
+            <Button onClick={input.onViewDraft} type="button">
+              Back to draft
+            </Button>
+          ) : (
+            <Button
+              disabled={input.versionActionIsPending}
+              onClick={input.onMakeChanges}
+              type="button"
+            >
+              Make changes
+            </Button>
+          )}
+        </div>
       </div>
+
+      {input.versionActionError === null ? null : (
+        <Notice title="Profile version action failed" variant="alert">
+          {input.versionActionError}
+        </Notice>
+      )}
 
       <SandboxProfileEditorSections
         renderPanel={input.renderSectionPanel}
@@ -363,20 +683,19 @@ export function SandboxProfileEditorView(input: {
 function LoadedSandboxProfileIntegrationSetupSection(input: {
   activeSectionId: string;
   profileId: string;
+  version: number;
+  disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
-  const showBindingsUnavailableNotice =
-    input.loader.integrationBindingsQuery.isError ||
-    (!input.loader.integrationBindingsQuery.isPending && input.loader.version === null);
+  const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
 
   if (
     input.loader.integrationBindingsQuery.isPending ||
     input.loader.integrationDirectoryQuery.isPending ||
     input.loader.initialRows === null ||
-    input.loader.version === null ||
     input.loader.integrationBindingsQuery.isError ||
     input.loader.integrationDirectoryQuery.isError
   ) {
@@ -399,13 +718,14 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 
   return (
     <ReadySandboxProfileIntegrationSetupSection
-      key={`${input.profileId}:${String(input.loader.version)}`}
+      key={`${input.profileId}:${String(input.version)}`}
       activeSectionId={input.activeSectionId}
       profileId={input.profileId}
-      version={input.loader.version}
+      version={input.version}
       initialRows={input.loader.initialRows}
       availableConnections={input.loader.availableConnections}
       availableTargets={input.loader.availableTargets}
+      disabled={input.disabled}
       invalidateVersionBindings={input.invalidateVersionBindings}
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       {...(input.onHasUnsavedChangesChange === undefined
@@ -460,6 +780,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   initialRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  disabled: boolean;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
@@ -479,6 +800,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     <SandboxProfileResourcesAndToolsSection
       availableConnections={integrationsState.availableConnections}
       availableTargets={integrationsState.availableTargets}
+      disabled={input.disabled}
       onRowChange={integrationsState.onIntegrationBindingRowChange}
       rows={integrationsState.integrationRows}
     />
@@ -494,6 +816,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
       integrationDirectoryQuery={input.integrationDirectoryQuery}
       integrationRows={integrationsState.integrationRows}
       integrationSaveError={integrationsState.integrationSaveError}
+      disabled={input.disabled}
       onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
       onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
       onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
@@ -503,6 +826,8 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
 
 function LoadedSandboxProfileSetupScriptSection(input: {
   profileId: string;
+  version: number;
+  disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 }): React.JSX.Element {
@@ -510,7 +835,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
     return <SandboxProfileSetupScriptPanel disabled={true} value="" />;
   }
 
-  if (input.loader.setupScriptQuery.isError || input.loader.version === null) {
+  if (input.loader.setupScriptQuery.isError) {
     return (
       <div className="gap-4 flex flex-col">
         <Notice title="Could not load setup script" variant="alert">
@@ -528,8 +853,9 @@ function LoadedSandboxProfileSetupScriptSection(input: {
     <ReadySandboxProfileSetupScriptSection
       invalidateVersionSetupScript={input.invalidateVersionSetupScript}
       profileId={input.profileId}
+      disabled={input.disabled}
       setupScript={input.loader.setupScript}
-      version={input.loader.version}
+      version={input.version}
     />
   );
 }
@@ -537,6 +863,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
 function ReadySandboxProfileSetupScriptSection(input: {
   profileId: string;
   version: number;
+  disabled: boolean;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 }): React.JSX.Element {
@@ -555,6 +882,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
       onChange={setupScriptState.onChange}
       saveStatus={setupScriptState.saveStatus}
       value={setupScriptState.draftValue}
+      disabled={input.disabled}
     />
   );
 }

@@ -11,9 +11,11 @@ import type {
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
+  SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
   SandboxProfileVersionSetupScript,
   SandboxProfilesListResult,
+  PublishSandboxProfileVersionResult,
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
@@ -245,6 +247,53 @@ const ListSandboxProfileVersionsResponseSchema = z
   })
   .strict();
 
+const SandboxProfileVersionPublishabilitySchema = z
+  .object({
+    publishable: z.boolean(),
+    issues: z.array(
+      z
+        .object({
+          code: z.enum([
+            "PROFILE_VERSION_NOT_DRAFT",
+            "AGENT_BINDING_REQUIRED",
+            "INVALID_BINDING_CONNECTION_REFERENCE",
+            "CONNECTION_NOT_ACTIVE",
+            "TARGET_DISABLED",
+          ]),
+          message: z.string().min(1),
+          bindingId: z.string().min(1).optional(),
+          connectionId: z.string().min(1).optional(),
+          targetKey: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const PublishSandboxProfileVersionResultSchema = z
+  .object({
+    activeVersion: z.number().int().min(1),
+    version: SandboxProfileVersionSchema,
+  })
+  .strict();
+
+function normalizeSandboxProfileVersionPublishability(
+  input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
+): SandboxProfileVersionPublishability {
+  const issues: SandboxProfileVersionPublishability["issues"] = input.issues.map((issue) => ({
+    code: issue.code,
+    message: issue.message,
+    ...(issue.bindingId === undefined ? {} : { bindingId: issue.bindingId }),
+    ...(issue.connectionId === undefined ? {} : { connectionId: issue.connectionId }),
+    ...(issue.targetKey === undefined ? {} : { targetKey: issue.targetKey }),
+  }));
+
+  return {
+    publishable: input.publishable,
+    issues,
+  };
+}
+
 const IntegrationBindingKindSchema = z.enum(["agent", "git", "connector"]);
 
 const SandboxProfileVersionIntegrationBindingSchema = z
@@ -322,6 +371,116 @@ export async function listSandboxProfileVersions(input: {
         operation: "listSandboxProfileVersions",
         error,
         fallbackMessage: "Could not load sandbox profile versions.",
+      }),
+    );
+  }
+}
+
+export async function createSandboxProfileVersionDraft(input: {
+  profileId: string;
+}): Promise<SandboxProfileVersion> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createSandboxProfileVersionDraft",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions`,
+      fallbackMessage: "Could not create sandbox profile draft.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "createSandboxProfileVersionDraft",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile version response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "createSandboxProfileVersionDraft",
+        error,
+        fallbackMessage: "Could not create sandbox profile draft.",
+      }),
+    );
+  }
+}
+
+export async function getSandboxProfileVersionPublishability(input: {
+  profileId: string;
+  version: number;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileVersionPublishability> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxProfileVersionPublishability",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/publishability`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load sandbox profile publishability.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionPublishabilitySchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxProfileVersionPublishability",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile publishability response payload is invalid.",
+      });
+    }
+
+    return normalizeSandboxProfileVersionPublishability(parsedResponse.data);
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxProfileVersionPublishability",
+        error,
+        fallbackMessage: "Could not load sandbox profile publishability.",
+      }),
+    );
+  }
+}
+
+export async function publishSandboxProfileVersion(input: {
+  profileId: string;
+  version: number;
+}): Promise<PublishSandboxProfileVersionResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "publishSandboxProfileVersion",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/publish`,
+      fallbackMessage: "Could not publish sandbox profile version.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "publishSandboxProfileVersion",
+        status: 500,
+        body: responseBody,
+        message: "Publish sandbox profile version response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "publishSandboxProfileVersion",
+        error,
+        fallbackMessage: "Could not publish sandbox profile version.",
       }),
     );
   }

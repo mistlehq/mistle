@@ -53,6 +53,12 @@ export type SandboxProfileVersion = {
   isActive: boolean;
 };
 
+export type SandboxProfileVersionPublishability =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
+
+export type PublishSandboxProfileVersionResult =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publish"]["post"]["responses"][200]["content"]["application/json"];
+
 export type SandboxProfileVersionIntegrationBinding = {
   id: string;
   sandboxProfileId: string;
