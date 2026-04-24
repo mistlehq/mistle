@@ -279,7 +279,9 @@ describe("IntegrationConnectionDetailView", () => {
     const refreshButton = screen.getByRole("button", { name: "Refresh repositories" });
     fireEvent.click(refreshButton);
     expect(refreshedKind).toBe("repositories");
-    fireEvent.click(screen.getByRole("button", { name: "Manage installation" }));
+    const manageInstallationButton = screen.getByRole("button", { name: "Manage installation" });
+    expect(manageInstallationButton.querySelector("svg")).toBeTruthy();
+    fireEvent.click(manageInstallationButton);
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
     fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
     expect(screen.getByRole("heading", { name: "Archive Mirror" })).toBeTruthy();
@@ -862,7 +864,9 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.click(screen.getByRole("button", { name: "Manage installation" }));
+    const manageInstallationButton = screen.getByRole("button", { name: "Manage installation" });
+    expect(manageInstallationButton.querySelector("svg")).toBeTruthy();
+    fireEvent.click(manageInstallationButton);
 
     expect(editedConnectionId).toBe("icn_github_installed");
     expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_installed");

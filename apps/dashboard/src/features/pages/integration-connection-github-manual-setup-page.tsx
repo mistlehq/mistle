@@ -18,6 +18,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@mistle/ui";
+import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
@@ -46,6 +47,7 @@ import {
 } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { openExternalAuthorizationWindow } from "./external-authorization-window.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubManualSetupDraft = {
@@ -495,10 +497,12 @@ function parseGitHubManifestRecord(value: string): Record<string, unknown> {
 function submitGitHubAppManifestForm(input: {
   submissionUrl: string;
   fields: Record<string, string>;
+  target: string;
 }): void {
   const form = document.createElement("form");
   form.method = "POST";
   form.action = input.submissionUrl;
+  form.target = input.target;
   form.style.display = "none";
 
   for (const [name, value] of Object.entries(input.fields)) {
@@ -805,14 +809,13 @@ function GitHubAppSetupActions(input: {
   createManifestPending: boolean;
   isInstalled: boolean;
   isManifestMode: boolean;
-  isRedirectingToInstallation: boolean;
   isSecretReplacementDialogOpen: boolean;
   onCreateManifest: () => void;
   onStartInstallation: () => void;
   startInstallationPending: boolean;
 }): React.JSX.Element {
   const showInstallAction = input.isInstalled || !input.isManifestMode;
-  const installPending = input.startInstallationPending || input.isRedirectingToInstallation;
+  const installPending = input.startInstallationPending;
 
   return (
     <FormPageActionBar>
@@ -823,6 +826,7 @@ function GitHubAppSetupActions(input: {
           type="button"
         >
           Create app in GitHub
+          <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
         </Button>
       ) : null}
       {showInstallAction ? (
@@ -836,6 +840,9 @@ function GitHubAppSetupActions(input: {
             : input.isInstalled
               ? "Manage Installation"
               : "Install GitHub App"}
+          {installPending ? null : (
+            <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
+          )}
         </Button>
       ) : null}
     </FormPageActionBar>
@@ -964,7 +971,6 @@ export function GitHubAppSetupPane(input: {
     resolveConfiguredSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
-  const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
@@ -983,18 +989,6 @@ export function GitHubAppSetupPane(input: {
       startGitHubAppInstallation({
         connectionId: input.connection.id,
       }),
-    onSuccess: ({ authorizationUrl }) => {
-      globalThis.location.assign(authorizationUrl);
-    },
-    onError: (error) => {
-      setIsRedirectingToInstallation(false);
-      setActionErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not start GitHub App installation.",
-        }),
-      );
-    },
   });
   const startManifestCreationMutation = useMutation({
     mutationFn: async () => {
@@ -1026,21 +1020,62 @@ export function GitHubAppSetupPane(input: {
         owner,
       });
     },
-    onSuccess: ({ fields, submissionUrl }) => {
+  });
+
+  async function startGitHubAppManifestCreationInNewWindow(): Promise<void> {
+    setActionErrorMessage(null);
+    const manifestWindow = openExternalAuthorizationWindow({
+      loadingMessage: "Opening GitHub App creation...",
+      targetName: `mistle-github-app-manifest-${crypto.randomUUID()}`,
+      title: "Opening GitHub App creation...",
+    });
+    if (manifestWindow === null) {
+      setActionErrorMessage("Browser blocked opening a new window.");
+      return;
+    }
+
+    try {
+      const { fields, submissionUrl } = await startManifestCreationMutation.mutateAsync();
       submitGitHubAppManifestForm({
         submissionUrl,
         fields,
+        target: manifestWindow.targetName,
       });
-    },
-    onError: (error) => {
+    } catch (error) {
+      manifestWindow.close();
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
           fallbackMessage: "Could not create GitHub App manifest.",
         }),
       );
-    },
-  });
+    }
+  }
+
+  async function startGitHubAppInstallationInNewWindow(): Promise<void> {
+    setActionErrorMessage(null);
+    const authorizationWindow = openExternalAuthorizationWindow({
+      loadingMessage: "Opening GitHub App installation...",
+      title: "Opening GitHub App installation...",
+    });
+    if (authorizationWindow === null) {
+      setActionErrorMessage("Browser blocked opening a new window.");
+      return;
+    }
+
+    try {
+      const startedInstallation = await startInstallationMutation.mutateAsync();
+      authorizationWindow.navigate(startedInstallation.authorizationUrl);
+    } catch (error) {
+      authorizationWindow.close();
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not start GitHub App installation.",
+        }),
+      );
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -1308,11 +1343,12 @@ export function GitHubAppSetupPane(input: {
               <Button
                 disabled={!canInstall || startInstallationMutation.isPending}
                 onClick={() => {
-                  void startInstallationMutation.mutateAsync();
+                  void startGitHubAppInstallationInNewWindow();
                 }}
                 type="button"
               >
                 Install App
+                <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
               </Button>
             </FormPageActionBar>
           </div>
@@ -1389,15 +1425,12 @@ export function GitHubAppSetupPane(input: {
               canInstall={canInstall}
               isInstalled={isInstalled}
               isManifestMode={setupMode === "manifest"}
-              isRedirectingToInstallation={isRedirectingToInstallation}
               isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
               onCreateManifest={() => {
                 void startManifestCreationMutation.mutateAsync();
               }}
               onStartInstallation={() => {
-                setActionErrorMessage(null);
-                setIsRedirectingToInstallation(true);
-                void startInstallationMutation.mutateAsync().catch(() => undefined);
+                void startGitHubAppInstallationInNewWindow();
               }}
               canCreateManifest={canCreateManifest}
               createManifestPending={startManifestCreationMutation.isPending}

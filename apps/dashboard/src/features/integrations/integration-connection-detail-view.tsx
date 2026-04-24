@@ -17,7 +17,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { TrashIcon } from "@phosphor-icons/react";
+import { ArrowSquareOutIcon, TrashIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -438,6 +438,9 @@ function ConnectionDetailPane(input: {
                     {viewState.installation?.isPending === true
                       ? "Starting install..."
                       : viewState.installation.actionLabel}
+                    {viewState.installation?.isPending === true ? null : (
+                      <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
+                    )}
                   </Button>
                 ) : null
               }

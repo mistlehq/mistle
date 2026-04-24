@@ -9,6 +9,7 @@ import {
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import { openExternalAuthorizationWindow } from "./external-authorization-window.js";
 
 export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
@@ -24,9 +25,6 @@ export function useIntegrationConnectionEditors(input: {
   const [githubAppInstallErrorByConnectionId, setGitHubAppInstallErrorByConnectionId] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
-  const [redirectingGitHubAppConnectionId, setRedirectingGitHubAppConnectionId] = useState<
-    string | null
-  >(null);
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -88,9 +86,6 @@ export function useIntegrationConnectionEditors(input: {
 
   const startGitHubAppInstallationMutation = useMutation({
     mutationFn: async (payload: { connectionId: string }) => startGitHubAppInstallation(payload),
-    onSuccess: ({ authorizationUrl }) => {
-      globalThis.location.assign(authorizationUrl);
-    },
   });
 
   const editingApiKeyConnection =
@@ -171,24 +166,34 @@ export function useIntegrationConnectionEditors(input: {
     },
     githubAppInstallation: {
       errorMessageByConnectionId: githubAppInstallErrorByConnectionId,
-      pendingConnectionId:
-        redirectingGitHubAppConnectionId ??
-        (startGitHubAppInstallationMutation.isPending
-          ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
-          : null),
+      pendingConnectionId: startGitHubAppInstallationMutation.isPending
+        ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
+        : null,
       onStartInstallation: async (connectionId: string) => {
-        setRedirectingGitHubAppConnectionId(connectionId);
         setGitHubAppInstallErrorByConnectionId((current) => ({
           ...current,
           [connectionId]: undefined,
         }));
 
+        const authorizationWindow = openExternalAuthorizationWindow({
+          loadingMessage: "Opening GitHub App installation...",
+          title: "Opening GitHub App installation...",
+        });
+        if (authorizationWindow === null) {
+          setGitHubAppInstallErrorByConnectionId((current) => ({
+            ...current,
+            [connectionId]: "Browser blocked opening a new window.",
+          }));
+          return;
+        }
+
         try {
-          await startGitHubAppInstallationMutation.mutateAsync({
+          const startedInstallation = await startGitHubAppInstallationMutation.mutateAsync({
             connectionId,
           });
+          authorizationWindow.navigate(startedInstallation.authorizationUrl);
         } catch (error) {
-          setRedirectingGitHubAppConnectionId(null);
+          authorizationWindow.close();
           const errorMessage = resolveApiErrorMessage({
             error,
             fallbackMessage: "Could not start GitHub App installation.",

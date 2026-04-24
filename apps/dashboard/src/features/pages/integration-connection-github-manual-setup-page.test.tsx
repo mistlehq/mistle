@@ -150,9 +150,9 @@ describe("GitHubManualSetupPane", () => {
         "Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks and webhook events.",
       ),
     ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
-    ).toBe(true);
+    const installButton = screen.getByRole("button", { name: "Install GitHub App" });
+    expect(installButton.hasAttribute("disabled")).toBe(true);
+    expect(installButton.querySelector("svg")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
     expect(container.innerHTML).toContain("flex flex-col gap-4");
     expect(container.innerHTML).not.toContain("xl:grid-cols-2");
@@ -165,9 +165,9 @@ describe("GitHubManualSetupPane", () => {
       }),
     });
 
-    expect(
-      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
-    ).toBe(false);
+    const installButton = screen.getByRole("button", { name: "Install GitHub App" });
+    expect(installButton.hasAttribute("disabled")).toBe(false);
+    expect(installButton.querySelector("svg")).toBeTruthy();
   });
 
   it("shows a GitHub App creation success view with an install app action", () => {
@@ -184,9 +184,9 @@ describe("GitHubManualSetupPane", () => {
         "Install the app to choose the GitHub account and repositories Mistle can access.",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Install App" }).hasAttribute("disabled")).toBe(
-      false,
-    );
+    const installAppButton = screen.getByRole("button", { name: "Install App" });
+    expect(installAppButton.hasAttribute("disabled")).toBe(false);
+    expect(installAppButton.querySelector("svg")).toBeTruthy();
     expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
   });
 
