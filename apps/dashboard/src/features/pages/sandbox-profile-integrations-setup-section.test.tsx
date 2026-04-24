@@ -8,6 +8,8 @@ import {
   StoryDatadogTarget,
   StoryGithubConnection,
   StoryGithubTarget,
+  StoryJiraConnection,
+  StoryJiraTarget,
   StoryOpenAiConnection,
   StoryOpenAiTarget,
 } from "./integrations-editor-section-story-support.js";
@@ -54,5 +56,42 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const setupLink = within(dialog).getByRole("link", { name: "Setup integration" });
     expect(setupLink.getAttribute("href")).toBe("/integrations/target-datadog");
     expect(setupLink.getAttribute("target")).toBe("_blank");
+  });
+
+  it("keeps stale connector bindings visible so they can be removed", () => {
+    render(
+      <MemoryRouter>
+        <SandboxProfileIntegrationsSetupSection
+          availableConnections={[StoryOpenAiConnection, StoryGithubConnection, StoryJiraConnection]}
+          availableTargets={[StoryOpenAiTarget, StoryGithubTarget, StoryJiraTarget]}
+          integrationBindingsQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationDirectoryQuery={{
+            isError: false,
+            error: null,
+            isPending: false,
+          }}
+          integrationRows={[
+            {
+              clientId: "stale-connector-row",
+              connectionId: "connection-missing",
+              kind: "connector",
+              config: {},
+            },
+          ]}
+          integrationSaveError={null}
+          onAddIntegrationBindingRow={async () => true}
+          onIntegrationBindingRowChange={() => {}}
+          onRemoveIntegrationBindingRow={() => {}}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Unknown connector")).toBeDefined();
+    expect(screen.getByText("Connection no longer available.")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Remove connector" })).toBeDefined();
   });
 });

@@ -290,6 +290,10 @@ function AddConnectorTile(input: {
   );
 }
 
+function UnresolvedConnectionCell(input: { message: string }): React.JSX.Element {
+  return <p className="text-muted-foreground text-sm">{input.message}</p>;
+}
+
 export function SandboxProfileIntegrationsSetupSection(input: {
   integrationBindingsQuery: {
     isError: boolean;
@@ -610,9 +614,24 @@ export function SandboxProfileIntegrationsSetupSection(input: {
               availableTargets: input.availableTargets,
             });
             const target = rowMetadata?.target;
-            if (target === undefined) {
-              return null;
-            }
+            const connection = input.availableConnections.find(
+              (candidate) => candidate.id === row.connectionId,
+            );
+            const connectionTarget =
+              connection === undefined
+                ? undefined
+                : input.availableTargets.find(
+                    (candidate) => candidate.targetKey === connection.targetKey,
+                  );
+            const integrationTitle =
+              target?.displayName ?? connectionTarget?.displayName ?? "Unknown connector";
+            const integrationLogoKey = target?.logoKey ?? connectionTarget?.logoKey;
+            const connectionMessage =
+              connection === undefined
+                ? "Connection no longer available."
+                : target === undefined
+                  ? "Integration no longer available."
+                  : null;
 
             return (
               <div
@@ -625,27 +644,33 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 <div className="min-w-0">
                   <IntegrationNameCell
                     item={{
-                      id: target.targetKey,
-                      hasSelectableConnections: true,
+                      id: target?.targetKey ?? connectionTarget?.targetKey ?? row.clientId,
+                      hasSelectableConnections: connection !== undefined,
                       kind: "connector",
-                      logoKey: target.logoKey,
-                      title: target.displayName,
+                      logoKey: integrationLogoKey,
+                      title: integrationTitle,
                     }}
                   />
                 </div>
                 <div className="min-w-0">
-                  <ConnectionSelectionCell
-                    ariaLabel={`${target.displayName} connection`}
-                    availableConnections={resolveConnectionsForTarget({
-                      targetKey: target.targetKey,
-                      availableConnections: input.availableConnections,
-                    })}
-                    availableTargets={input.availableTargets}
-                    onConnectionChange={(nextConnectionId) => {
-                      updateBindingConnection(row, nextConnectionId);
-                    }}
-                    selectedConnectionId={row.connectionId}
-                  />
+                  {connectionMessage === null && target !== undefined ? (
+                    <ConnectionSelectionCell
+                      ariaLabel={`${target.displayName} connection`}
+                      availableConnections={resolveConnectionsForTarget({
+                        targetKey: target.targetKey,
+                        availableConnections: input.availableConnections,
+                      })}
+                      availableTargets={input.availableTargets}
+                      onConnectionChange={(nextConnectionId) => {
+                        updateBindingConnection(row, nextConnectionId);
+                      }}
+                      selectedConnectionId={row.connectionId}
+                    />
+                  ) : (
+                    <UnresolvedConnectionCell
+                      message={connectionMessage ?? "Connection no longer available."}
+                    />
+                  )}
                 </div>
                 <div className="flex w-8 shrink-0 justify-end">
                   <Button

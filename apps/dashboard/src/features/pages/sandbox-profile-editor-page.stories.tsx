@@ -35,6 +35,12 @@ import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resour
 
 type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
+  initialBindings?: readonly {
+    id: string;
+    connectionId: string;
+    kind: "agent" | "git" | "connector";
+    config: Record<string, unknown>;
+  }[];
   setupScript: string | null;
 };
 
@@ -128,7 +134,7 @@ function SandboxProfileEditorPageStoryView(
   });
   const [profileName, setProfileName] = useState(input.displayName);
   const [integrationRows, setIntegrationRows] = useState<readonly SandboxProfileBindingEditorRow[]>(
-    () => mapBindingsToEditorRows(StoryBindings),
+    () => mapBindingsToEditorRows(input.initialBindings ?? StoryBindings),
   );
   const [setupScriptDraft, setSetupScriptDraft] = useState(input.setupScript ?? "");
   const [persistedSetupScript, setPersistedSetupScript] = useState(input.setupScript ?? "");
@@ -320,5 +326,19 @@ export const EmptySetupScript: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("tab", { name: "Configurations" }));
+  },
+};
+
+export const StaleConnectorBinding: Story = {
+  args: {
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-stale-connector",
+        connectionId: "connection-missing",
+        kind: "connector",
+        config: {},
+      },
+    ],
   },
 };
