@@ -28,6 +28,7 @@ import {
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
 } from "@mistle/integrations-definitions/server";
+import { systemSleeper } from "@mistle/time";
 import {
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
@@ -72,6 +73,7 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 
   return {
     db,
+    pool,
     stop: async () => {
       await pool.end();
     },
@@ -147,6 +149,38 @@ async function seedWebhookSource(input: {
     endpointKey: `${input.sourceId}-endpoint`,
     status: "active",
   });
+}
+
+async function waitForBlockedWebhookEventMutation(input: {
+  pool: Pool;
+  minimumCount?: number;
+}): Promise<void> {
+  const minimumCount = input.minimumCount ?? 1;
+  const deadlineMs = Date.now() + 10_000;
+
+  while (Date.now() < deadlineMs) {
+    const result = await input.pool.query<{ waiters: number }>(
+      `
+        select count(*)::int as waiters
+        from pg_stat_activity
+        where
+          datname = current_database()
+          and wait_event_type = 'Lock'
+          and state = 'active'
+          and query ilike '%integration_webhook_events%'
+      `,
+    );
+
+    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
+      return;
+    }
+
+    await systemSleeper.sleep(50);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${String(minimumCount)} blocked webhook event mutation(s).`,
+  );
 }
 
 describe("handleIntegrationWebhookEvent integration", () => {
@@ -892,6 +926,191 @@ describe("handleIntegrationWebhookEvent integration", () => {
         });
         expect(queuedRuns).toHaveLength(0);
       } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "only allows one worker to prepare the same webhook event concurrently",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      const lockClient = database.pool.connect();
+
+      try {
+        const organizationId = "org_worker_webhook_prepare_race";
+        const targetKey = "github-cloud-worker-webhook-prepare-race";
+        const connectionId = "icn_worker_webhook_prepare_race";
+        const webhookSourceId = "iws_worker_webhook_prepare_race";
+        const sandboxProfileId = "sbp_worker_webhook_prepare_race";
+        const automationId = "atm_worker_webhook_prepare_race";
+        const automationTargetId = "atg_worker_webhook_prepare_race";
+        const webhookEventId = "iwe_worker_webhook_prepare_race";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Webhook Prepare Race",
+          slug: "worker-webhook-prepare-race",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker webhook prepare race connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await seedWebhookSource({
+          db: database.db,
+          sourceId: webhookSourceId,
+          organizationId,
+          connectionId,
+          targetKey,
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Worker Prepare Race Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+          suffix: "worker_webhook_prepare_race",
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Prepare Race Automation",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationWebhookSourceId: webhookSourceId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle issue comment webhook",
+          conversationKeyTemplate: "github/{{payload.installation.id}}",
+          idempotencyKeyTemplate: "{{payload.delivery.id}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          integrationWebhookSourceId: webhookSourceId,
+          targetKey,
+          externalEventId: "evt_prepare_race",
+          externalDeliveryId: "delivery_prepare_race",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          providerEventType: "issue_comment",
+          eventType: "github.issue_comment.created",
+          payload: {
+            installation: {
+              id: 12345,
+            },
+            delivery: {
+              id: "delivery_prepare_race_payload",
+            },
+            comment: {
+              body: "please run @mistlebot",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.RECEIVED,
+        });
+
+        const acquiredLockClient = await lockClient;
+        await acquiredLockClient.query("BEGIN");
+        await acquiredLockClient.query(
+          `
+            select 1
+            from "control_plane"."integration_webhook_events"
+            where id = $1
+            for update
+          `,
+          [webhookEventId],
+        );
+
+        const firstPreparePromise = prepareIntegrationWebhookEvent(
+          {
+            db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
+          },
+          {
+            webhookEventId,
+          },
+        );
+        const secondPreparePromise = prepareIntegrationWebhookEvent(
+          {
+            db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
+          },
+          {
+            webhookEventId,
+          },
+        );
+
+        await waitForBlockedWebhookEventMutation({
+          pool: database.pool,
+          minimumCount: 2,
+        });
+
+        await acquiredLockClient.query("COMMIT");
+
+        const prepareResults = await Promise.all([firstPreparePromise, secondPreparePromise]);
+        const finalizedResults = prepareResults.filter((result) => result.finalized);
+        const activeResults = prepareResults.filter((result) => !result.finalized);
+
+        expect(finalizedResults).toHaveLength(1);
+        expect(finalizedResults[0]).toEqual({
+          automationRunIds: [],
+          finalized: true,
+          resourceSyncRequests: [],
+          webhookEventId,
+        });
+        expect(activeResults).toHaveLength(1);
+        expect(activeResults[0]?.automationRunIds).toHaveLength(1);
+        expect(activeResults[0]?.resourceSyncRequests).toEqual([]);
+
+        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
+          where: (table, { eq }) => eq(table.id, webhookEventId),
+        });
+        expect(persistedEvent?.status).toBe(IntegrationWebhookEventStatuses.PROCESSING);
+
+        const queuedRuns = await database.db.query.automationRuns.findMany({
+          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
+        });
+        expect(queuedRuns).toHaveLength(1);
+      } finally {
+        const acquiredLockClient = await lockClient;
+        try {
+          await acquiredLockClient.query("ROLLBACK");
+        } catch {}
+        acquiredLockClient.release();
         await database.stop();
       }
     },

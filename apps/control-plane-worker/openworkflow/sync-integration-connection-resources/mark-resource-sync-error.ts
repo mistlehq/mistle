@@ -10,35 +10,51 @@ export async function markResourceSyncError(input: {
   connectionId: string;
   familyId: string;
   kind: string;
+  syncStartedAt: string;
   failure: {
     code: string;
     message: string;
   };
-}): Promise<void> {
-  await input.db
-    .insert(integrationConnectionResourceStates)
-    .values({
-      connectionId: input.connectionId,
-      familyId: input.familyId,
-      kind: input.kind,
-      syncState: IntegrationConnectionResourceSyncStates.ERROR,
-      lastSyncFinishedAt: sql`now()`,
-      lastErrorCode: input.failure.code,
-      lastErrorMessage: input.failure.message,
-      updatedAt: sql`now()`,
-    })
-    .onConflictDoUpdate({
-      target: [
-        integrationConnectionResourceStates.connectionId,
-        integrationConnectionResourceStates.kind,
-      ],
-      set: {
+}): Promise<boolean> {
+  return input.db.transaction(async (tx) => {
+    const lockedStateRows = await tx.execute(
+      sql<{
+        lastSyncStartedAt: string | null;
+        syncState: string;
+      }>`
+        select
+          last_sync_started_at as "lastSyncStartedAt",
+          sync_state as "syncState"
+        from "control_plane"."integration_connection_resource_states"
+        where
+          connection_id = ${input.connectionId}
+          and kind = ${input.kind}
+        for update
+      `,
+    );
+    const lockedState = lockedStateRows.rows[0];
+    if (
+      lockedState === undefined ||
+      lockedState.syncState !== IntegrationConnectionResourceSyncStates.SYNCING ||
+      lockedState.lastSyncStartedAt !== input.syncStartedAt
+    ) {
+      return false;
+    }
+
+    await tx
+      .update(integrationConnectionResourceStates)
+      .set({
         familyId: input.familyId,
         syncState: IntegrationConnectionResourceSyncStates.ERROR,
         lastSyncFinishedAt: sql`now()`,
         lastErrorCode: input.failure.code,
         lastErrorMessage: input.failure.message,
         updatedAt: sql`now()`,
-      },
-    });
+      })
+      .where(
+        sql`${integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${integrationConnectionResourceStates.kind} = ${input.kind}`,
+      );
+
+    return true;
+  });
 }

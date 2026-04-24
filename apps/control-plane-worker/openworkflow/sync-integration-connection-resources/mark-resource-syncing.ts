@@ -10,8 +10,8 @@ export async function markResourceSyncing(input: {
   connectionId: string;
   familyId: string;
   kind: string;
-}): Promise<void> {
-  await input.db
+}): Promise<string> {
+  const updatedStates = await input.db
     .insert(integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
@@ -36,5 +36,15 @@ export async function markResourceSyncing(input: {
         lastErrorMessage: null,
         updatedAt: sql`now()`,
       },
+    })
+    .returning({
+      lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
     });
+
+  const updatedState = updatedStates[0];
+  if (updatedState === undefined || updatedState.lastSyncStartedAt === null) {
+    throw new Error("Expected resource sync start to persist a start timestamp.");
+  }
+
+  return updatedState.lastSyncStartedAt;
 }

@@ -83,6 +83,8 @@ export async function syncIntegrationConnectionResources(
     );
   }
 
+  let syncStartedAt: string | undefined;
+
   try {
     if (connection.status !== IntegrationConnectionStatuses.ACTIVE) {
       throw new Error(`Integration connection '${connection.id}' is not active.`);
@@ -91,7 +93,7 @@ export async function syncIntegrationConnectionResources(
       throw new Error(`Integration target '${target.targetKey}' is disabled.`);
     }
 
-    await markResourceSyncing({
+    syncStartedAt = await markResourceSyncing({
       db: deps.db,
       connectionId: connection.id,
       familyId: target.familyId,
@@ -182,22 +184,43 @@ export async function syncIntegrationConnectionResources(
 
     const discoveredResources = validateDiscoveredResources(listedResources.resources);
 
-    await applySuccessfulResourceSync({
+    const appliedSuccessfully = await applySuccessfulResourceSync({
       db: deps.db,
       connectionId: connection.id,
       familyId: target.familyId,
       kind: input.kind,
+      syncStartedAt,
       discoveredResources,
     });
+    if (!appliedSuccessfully) {
+      return {
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        kind: input.kind,
+      };
+    }
   } catch (error) {
-    await markResourceSyncError({
+    if (syncStartedAt === undefined) {
+      throw error;
+    }
+
+    const markedError = await markResourceSyncError({
       db: deps.db,
       connectionId: connection.id,
       familyId: target.familyId,
       kind: input.kind,
+      syncStartedAt,
       failure: resolveResourceSyncFailure(error),
     });
-    throw error;
+    if (markedError) {
+      throw error;
+    }
+
+    return {
+      organizationId: input.organizationId,
+      connectionId: input.connectionId,
+      kind: input.kind,
+    };
   }
 
   return {

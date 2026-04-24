@@ -14,5 +14,6 @@ export async function markIntegrationWebhookEventProcessed(
     webhookEventId: input.webhookEventId,
     status: IntegrationWebhookEventStatuses.PROCESSED,
     finalized: true,
+    fromStatuses: [IntegrationWebhookEventStatuses.PROCESSING],
   });
 }

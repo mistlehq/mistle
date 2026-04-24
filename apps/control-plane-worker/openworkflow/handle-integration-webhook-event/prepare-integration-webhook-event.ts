@@ -56,12 +56,43 @@ export async function prepareIntegrationWebhookEvent(
   }
 
   try {
-    await updateWebhookEventStatus({
+    const transitionedToProcessing = await updateWebhookEventStatus({
       db: ctx.db,
       webhookEventId: input.webhookEventId,
       status: IntegrationWebhookEventStatuses.PROCESSING,
       finalized: false,
+      fromStatuses: [
+        IntegrationWebhookEventStatuses.RECEIVED,
+        IntegrationWebhookEventStatuses.FAILED,
+      ],
     });
+    if (!transitionedToProcessing) {
+      const currentWebhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
+        columns: {
+          status: true,
+        },
+        where: (table, { eq: whereEq }) => whereEq(table.id, input.webhookEventId),
+      });
+      if (currentWebhookEvent === undefined) {
+        throw new Error(`Webhook event '${input.webhookEventId}' was not found.`);
+      }
+
+      if (
+        currentWebhookEvent.status === IntegrationWebhookEventStatuses.PROCESSING ||
+        isTerminalWebhookEventStatus(currentWebhookEvent.status)
+      ) {
+        return {
+          automationRunIds: [],
+          finalized: true,
+          resourceSyncRequests: [],
+          webhookEventId: input.webhookEventId,
+        };
+      }
+
+      throw new Error(
+        `Failed to transition webhook event '${input.webhookEventId}' into processing from status '${currentWebhookEvent.status}'.`,
+      );
+    }
 
     if (webhookEvent.integrationWebhookSourceId == null) {
       throw new Error(`Webhook event '${webhookEvent.id}' is missing integrationWebhookSourceId.`);
@@ -91,6 +122,7 @@ export async function prepareIntegrationWebhookEvent(
         webhookEventId: input.webhookEventId,
         status: IntegrationWebhookEventStatuses.IGNORED,
         finalized: true,
+        fromStatuses: [IntegrationWebhookEventStatuses.PROCESSING],
       });
 
       return {

@@ -2,6 +2,7 @@ import {
   integrationConnectionResources,
   integrationConnectionResourceStates,
   IntegrationConnectionResourceStatuses,
+  IntegrationConnectionResourceSyncStates,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import type { DiscoveredIntegrationResource } from "@mistle/integrations-core";
@@ -12,9 +13,34 @@ export async function applySuccessfulResourceSync(input: {
   connectionId: string;
   familyId: string;
   kind: string;
+  syncStartedAt: string;
   discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
-}): Promise<void> {
-  await input.db.transaction(async (tx) => {
+}): Promise<boolean> {
+  return input.db.transaction(async (tx) => {
+    const lockedStateRows = await tx.execute(
+      sql<{
+        lastSyncStartedAt: string | null;
+        syncState: string;
+      }>`
+        select
+          last_sync_started_at as "lastSyncStartedAt",
+          sync_state as "syncState"
+        from "control_plane"."integration_connection_resource_states"
+        where
+          connection_id = ${input.connectionId}
+          and kind = ${input.kind}
+        for update
+      `,
+    );
+    const lockedState = lockedStateRows.rows[0];
+    if (
+      lockedState === undefined ||
+      lockedState.syncState !== IntegrationConnectionResourceSyncStates.SYNCING ||
+      lockedState.lastSyncStartedAt !== input.syncStartedAt
+    ) {
+      return false;
+    }
+
     const existingResources = await tx.query.integrationConnectionResources.findMany({
       where: (table, { and, eq: whereEq }) =>
         and(whereEq(table.connectionId, input.connectionId), whereEq(table.kind, input.kind)),
@@ -117,12 +143,10 @@ export async function applySuccessfulResourceSync(input: {
     }
 
     await tx
-      .insert(integrationConnectionResourceStates)
-      .values({
-        connectionId: input.connectionId,
+      .update(integrationConnectionResourceStates)
+      .set({
         familyId: input.familyId,
-        kind: input.kind,
-        syncState: "ready",
+        syncState: IntegrationConnectionResourceSyncStates.READY,
         totalCount: input.discoveredResources.length,
         lastSyncedAt: sql`now()`,
         lastSyncFinishedAt: sql`now()`,
@@ -130,21 +154,10 @@ export async function applySuccessfulResourceSync(input: {
         lastErrorMessage: null,
         updatedAt: sql`now()`,
       })
-      .onConflictDoUpdate({
-        target: [
-          integrationConnectionResourceStates.connectionId,
-          integrationConnectionResourceStates.kind,
-        ],
-        set: {
-          familyId: input.familyId,
-          syncState: "ready",
-          totalCount: input.discoveredResources.length,
-          lastSyncedAt: sql`now()`,
-          lastSyncFinishedAt: sql`now()`,
-          lastErrorCode: null,
-          lastErrorMessage: null,
-          updatedAt: sql`now()`,
-        },
-      });
+      .where(
+        sql`${integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${integrationConnectionResourceStates.kind} = ${input.kind}`,
+      );
+
+    return true;
   });
 }

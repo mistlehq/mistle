@@ -22,6 +22,8 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions/serv
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { applySuccessfulResourceSync } from "../openworkflow/sync-integration-connection-resources/apply-successful-resource-sync.js";
+import { markResourceSyncing } from "../openworkflow/sync-integration-connection-resources/mark-resource-syncing.js";
 import { syncIntegrationConnectionResources } from "../openworkflow/sync-integration-connection-resources/sync-integration-connection-resources.js";
 import { it } from "./test-context.js";
 
@@ -377,6 +379,156 @@ describe("syncIntegrationConnectionResources integration", () => {
     } finally {
       await internalApiServer.stop();
       await slackApiServer.stop();
+      await database.stop();
+    }
+  });
+
+  it("ignores an older successful snapshot after a newer sync has already started", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      const organizationId = "org_sync_resources_stale_snapshot";
+      const targetKey = "github-cloud-sync-resources-stale-snapshot";
+      const connectionId = "icn_sync_resources_stale_snapshot";
+
+      await database.db.insert(organizations).values({
+        id: organizationId,
+        name: "Sync Resources Stale Snapshot",
+        slug: "sync-resources-stale-snapshot",
+      });
+      await database.db.insert(integrationTargets).values({
+        targetKey,
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      });
+      await database.db.insert(integrationConnections).values({
+        id: connectionId,
+        organizationId,
+        targetKey,
+        displayName: "GitHub Sync Resources Stale Snapshot",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        externalSubjectId: "123456",
+        config: {},
+      });
+      await database.db.insert(integrationConnectionResources).values({
+        id: "rsc_sync_resources_stale_snapshot_existing",
+        connectionId,
+        familyId: "github",
+        kind: "repository",
+        externalId: "1",
+        handle: "mistlehq/existing",
+        displayName: "mistlehq/existing",
+        status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+        metadata: {
+          defaultBranch: "main",
+        },
+        lastSeenAt: "2026-03-09T00:00:00.000Z",
+      });
+
+      const firstSyncStartedAt = await markResourceSyncing({
+        db: database.db,
+        connectionId,
+        familyId: "github",
+        kind: "repository",
+      });
+      const secondSyncStartedAt = await markResourceSyncing({
+        db: database.db,
+        connectionId,
+        familyId: "github",
+        kind: "repository",
+      });
+
+      expect(secondSyncStartedAt).not.toBe(firstSyncStartedAt);
+
+      await expect(
+        applySuccessfulResourceSync({
+          db: database.db,
+          connectionId,
+          familyId: "github",
+          kind: "repository",
+          syncStartedAt: secondSyncStartedAt,
+          discoveredResources: [
+            {
+              externalId: "1",
+              handle: "mistlehq/existing",
+              displayName: "mistlehq/existing",
+              metadata: {
+                defaultBranch: "main",
+              },
+            },
+            {
+              externalId: "2",
+              handle: "mistlehq/new",
+              displayName: "mistlehq/new",
+              metadata: {
+                defaultBranch: "develop",
+              },
+            },
+          ],
+        }),
+      ).resolves.toBe(true);
+
+      await expect(
+        applySuccessfulResourceSync({
+          db: database.db,
+          connectionId,
+          familyId: "github",
+          kind: "repository",
+          syncStartedAt: firstSyncStartedAt,
+          discoveredResources: [
+            {
+              externalId: "1",
+              handle: "mistlehq/existing",
+              displayName: "mistlehq/existing",
+              metadata: {
+                defaultBranch: "main",
+              },
+            },
+          ],
+        }),
+      ).resolves.toBe(false);
+
+      const persistedState = await database.db.query.integrationConnectionResourceStates.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, connectionId), eq(table.kind, "repository")),
+      });
+      expect(persistedState?.syncState).toBe(IntegrationConnectionResourceSyncStates.READY);
+      expect(persistedState?.totalCount).toBe(2);
+
+      const persistedResources = await database.db.query.integrationConnectionResources.findMany({
+        where: (table, { and, eq }) =>
+          and(eq(table.connectionId, connectionId), eq(table.kind, "repository")),
+        orderBy: (table, { asc }) => asc(table.handle),
+      });
+      expect(persistedResources).toHaveLength(2);
+      expect(
+        persistedResources.map((resource) => ({
+          handle: resource.handle,
+          status: resource.status,
+          removedAt: resource.removedAt,
+        })),
+      ).toEqual([
+        {
+          handle: "mistlehq/existing",
+          status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+          removedAt: null,
+        },
+        {
+          handle: "mistlehq/new",
+          status: IntegrationConnectionResourceStatuses.ACCESSIBLE,
+          removedAt: null,
+        },
+      ]);
+    } finally {
       await database.stop();
     }
   });
