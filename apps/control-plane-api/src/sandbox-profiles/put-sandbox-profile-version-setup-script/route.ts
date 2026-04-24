@@ -5,12 +5,12 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
-import { notFoundResponseSchema } from "../get-sandbox-profile-version-setup-script/schema.js";
 import {
   putSandboxProfileVersionSetupScriptBodySchema,
   putSandboxProfileVersionSetupScriptResponseSchema,
   sandboxProfileVersionParamsSchema,
 } from "../schemas.js";
+import { conflictResponseSchema, notFoundResponseSchema } from "./schema.js";
 
 export const route = createRoute({
   method: "put",
@@ -49,6 +49,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox profile version is not editable.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },

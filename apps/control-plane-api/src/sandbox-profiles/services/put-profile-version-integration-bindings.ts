@@ -2,17 +2,23 @@ import type {
   IntegrationBindingKind,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
-import { sandboxProfileVersionIntegrationBindings } from "@mistle/db/control-plane";
+import {
+  sandboxProfileVersionIntegrationBindings,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { IntegrationKinds, runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
+  SandboxProfilesConflictCodes,
+  SandboxProfilesConflictError,
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 import { validateBindingResources } from "./validate-binding-resources.js";
 
@@ -147,6 +153,7 @@ export async function putProfileVersionIntegrationBindings(
   const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
     columns: {
       sandboxProfileId: true,
+      state: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -156,6 +163,13 @@ export async function putProfileVersionIntegrationBindings(
     throw new SandboxProfilesNotFoundError(
       SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
       "Sandbox profile version was not found.",
+    );
+  }
+
+  if (sandboxProfileVersion.state !== SandboxProfileVersionStates.DRAFT) {
+    throw new SandboxProfilesConflictError(
+      SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
+      `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
     );
   }
 
@@ -356,6 +370,19 @@ export async function putProfileVersionIntegrationBindings(
   }
 
   return db.transaction(async (tx) => {
+    const lockedVersion = await lockProfileVersionForUpdateOrThrow({
+      db: tx,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    });
+
+    if (lockedVersion.state !== SandboxProfileVersionStates.DRAFT) {
+      throw new SandboxProfilesConflictError(
+        SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
+        `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
+      );
+    }
+
     const existingBindings = await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
       where: (table, { and, eq }) =>
         and(

@@ -13546,6 +13546,28 @@
               }
             }
           },
+          "409": {
+            "description": "Sandbox profile version is not editable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_DRAFT"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {
@@ -14041,6 +14063,28 @@
                     "code": {
                       "type": "string",
                       "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version is not editable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_DRAFT"]
                     },
                     "message": {
                       "type": "string",

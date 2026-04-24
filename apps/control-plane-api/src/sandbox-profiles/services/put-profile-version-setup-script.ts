@@ -1,7 +1,13 @@
-import { sandboxProfileVersions } from "@mistle/db/control-plane";
+import { sandboxProfileVersions, SandboxProfileVersionStates } from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 
-import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
+import {
+  SandboxProfilesConflictCodes,
+  SandboxProfilesConflictError,
+  SandboxProfilesNotFoundCodes,
+  SandboxProfilesNotFoundError,
+} from "../errors.js";
+import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PutProfileVersionSetupScriptInput = {
@@ -36,31 +42,46 @@ export async function putProfileVersionSetupScript(
     );
   }
 
-  const [updatedVersion] = await db
-    .update(sandboxProfileVersions)
-    .set({
-      setupScript: input.setupScript,
-    })
-    .where(
-      and(
-        eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
-        eq(sandboxProfileVersions.version, input.profileVersion),
-      ),
-    )
-    .returning({
-      sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
-      version: sandboxProfileVersions.version,
-      setupScript: sandboxProfileVersions.setupScript,
+  return db.transaction(async (tx) => {
+    const lockedVersion = await lockProfileVersionForUpdateOrThrow({
+      db: tx,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
     });
 
-  if (updatedVersion === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
-      "Sandbox profile version was not found.",
-    );
-  }
+    if (lockedVersion.state !== SandboxProfileVersionStates.DRAFT) {
+      throw new SandboxProfilesConflictError(
+        SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
+        `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
+      );
+    }
 
-  return updatedVersion;
+    const [updatedVersion] = await tx
+      .update(sandboxProfileVersions)
+      .set({
+        setupScript: input.setupScript,
+      })
+      .where(
+        and(
+          eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(sandboxProfileVersions.version, input.profileVersion),
+        ),
+      )
+      .returning({
+        sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
+        version: sandboxProfileVersions.version,
+        setupScript: sandboxProfileVersions.setupScript,
+      });
+
+    if (updatedVersion === undefined) {
+      throw new SandboxProfilesNotFoundError(
+        SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+        "Sandbox profile version was not found.",
+      );
+    }
+
+    return updatedVersion;
+  });
 }
 
 export type { PutProfileVersionSetupScriptInput, PutProfileVersionSetupScriptOutput };

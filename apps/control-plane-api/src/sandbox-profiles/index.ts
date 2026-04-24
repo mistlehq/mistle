@@ -50,7 +50,11 @@ export { route as startSandboxProfileInstanceRoute } from "./start-sandbox-profi
 export { badRequestResponseSchema as ListSandboxProfilesBadRequestResponseSchema } from "./list-sandbox-profiles/schema.js";
 export { notFoundResponseSchema as NotFoundResponseSchema } from "./get-sandbox-profile/schema.js";
 export { notFoundResponseSchema as SandboxProfileVersionNotFoundResponseSchema } from "./get-sandbox-profile-version-integration-bindings/schema.js";
-export { badRequestResponseSchema as PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema } from "./put-sandbox-profile-version-integration-bindings/schema.js";
+export {
+  badRequestResponseSchema as PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema,
+  conflictResponseSchema as PutSandboxProfileVersionIntegrationBindingsConflictResponseSchema,
+} from "./put-sandbox-profile-version-integration-bindings/schema.js";
+export { conflictResponseSchema as PutSandboxProfileVersionSetupScriptConflictResponseSchema } from "./put-sandbox-profile-version-setup-script/schema.js";
 export {
   conflictResponseSchema as CreateSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as CreateSandboxProfileVersionNotFoundResponseSchema,

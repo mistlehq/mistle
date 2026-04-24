@@ -1,4 +1,5 @@
 import { z, type RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
@@ -108,5 +109,6 @@ const routeHandler = async (
   }
 };
 
-export const handler: RouteHandler<typeof route, AppContextBindings> =
-  withRequiredSession(routeHandler);
+export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
+  withRequiredSession(routeHandler),
+);

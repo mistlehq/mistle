@@ -5,11 +5,13 @@ import {
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
+  SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
+  PutSandboxProfileVersionIntegrationBindingsConflictResponseSchema,
   PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema,
   PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
@@ -74,6 +76,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_route_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
       {
@@ -224,6 +227,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_route_invalid_connection_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const response = await fixture.request(
@@ -265,6 +269,139 @@ describe("sandbox profile version put integration bindings integration", () => {
       throw new Error("Expected integration bindings bad-request error response.");
     }
     expect(responseBody.code).toBe("INVALID_BINDING_CONNECTION_REFERENCE");
+  });
+
+  it("returns 409 when the selected sandbox profile version is published", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-route-published@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default-put-bindings-route-published",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities_by_connection_method:
+          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+      },
+    });
+
+    const [connection] = await fixture.db
+      .insert(integrationConnections)
+      .values({
+        id: "icn_put_bindings_route_published_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-default-put-bindings-route-published",
+        displayName: "Published Route Connection",
+        config: {
+          connection_method: "api-key",
+        },
+      })
+      .returning();
+
+    if (connection === undefined) {
+      throw new Error("Expected integration connection to be inserted.");
+    }
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_route_published_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Published Bindings Route Profile",
+      status: "active",
+      activeVersion: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_route_published_001",
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      publishedAt: "2026-03-03T00:01:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_put_bindings_route_published_existing_001",
+      sandboxProfileId: "sbp_put_bindings_route_published_001",
+      sandboxProfileVersion: 1,
+      connectionId: connection.id,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
+      },
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_published_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              id: "ibd_put_bindings_route_published_existing_001",
+              connectionId: connection.id,
+              kind: IntegrationBindingKinds.AGENT,
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
+                model: {
+                  defaultModel: "gpt-5.4",
+                  options: {
+                    reasoningEffort: "high",
+                  },
+                },
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = PutSandboxProfileVersionIntegrationBindingsConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_DRAFT");
+
+    const persistedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        columns: {
+          connectionId: true,
+          kind: true,
+          config: true,
+        },
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_route_published_existing_001"),
+      });
+
+    expect(persistedBinding).toEqual({
+      connectionId: connection.id,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+        model: {
+          defaultModel: "gpt-5.3-codex",
+          options: {
+            reasoningEffort: "medium",
+          },
+        },
+      },
+    });
   });
 
   it("returns 404 when sandbox profile version is missing", async ({ fixture }) => {
@@ -359,6 +496,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_route_duplicate_family_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const response = await fixture.request(
@@ -439,6 +577,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_route_invalid_binding_id_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const [connection] = await fixture.db
@@ -513,6 +652,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_route_validation_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const response = await fixture.request(
@@ -568,6 +708,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_invalid_reasoning_001",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const [connection] = await fixture.db

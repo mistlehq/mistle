@@ -6,6 +6,7 @@ import {
 
 import {
   SandboxProfilesIntegrationBindingsBadRequestCodes,
+  SandboxProfilesConflictCodes,
   SandboxProfilesNotFoundCodes,
 } from "../errors.js";
 
@@ -51,4 +52,8 @@ export const notFoundResponseSchema = createCodeMessageErrorSchema(
     SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
     SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
   ]),
+);
+
+export const conflictResponseSchema = createCodeMessageErrorSchema(
+  z.literal(SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT),
 );

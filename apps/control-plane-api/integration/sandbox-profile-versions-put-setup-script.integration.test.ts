@@ -1,7 +1,12 @@
-import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
+import {
+  sandboxProfiles,
+  sandboxProfileVersions,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
 import {
+  PutSandboxProfileVersionSetupScriptConflictResponseSchema,
   PutSandboxProfileVersionSetupScriptResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
   ValidationErrorResponseSchema,
@@ -30,6 +35,7 @@ describe("sandbox profile version put setup script integration", () => {
       ...createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_put_setup_script_001",
         version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
       }),
     });
@@ -85,6 +91,7 @@ describe("sandbox profile version put setup script integration", () => {
       ...createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_put_setup_script_clear_001",
         version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
       }),
     });
@@ -136,6 +143,7 @@ describe("sandbox profile version put setup script integration", () => {
       ...createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_put_setup_script_invalid_001",
         version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
       }),
     });
 
@@ -156,6 +164,60 @@ describe("sandbox profile version put setup script integration", () => {
     expect(response.status).toBe(400);
     const responseBody = ValidationErrorResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("VALIDATION_ERROR");
+  }, 60_000);
+
+  it("returns 409 when the selected profile version is published", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-setup-script-published@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      ...createSandboxProfileFixture({
+        id: "sbp_put_setup_script_published_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Published Setup Script Profile",
+        activeVersion: 1,
+        createdAt: "2026-03-01T00:00:00.000Z",
+      }),
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      ...createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_put_setup_script_published_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-03-01T00:01:00.000Z",
+        setupScript: "echo keep-published-script",
+      }),
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_put_setup_script_published_001/versions/1/setup-script",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          setupScript: "echo should-not-overwrite",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = PutSandboxProfileVersionSetupScriptConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_DRAFT");
+
+    const persistedVersion = await fixture.db.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_put_setup_script_published_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion?.setupScript).toBe("echo keep-published-script");
   }, 60_000);
 
   it("returns 404 when profile version is missing", async ({ fixture }) => {

@@ -6,7 +6,11 @@ import {
   putSandboxProfileVersionIntegrationBindingsResponseSchema,
   sandboxProfileVersionParamsSchema,
 } from "../schemas.js";
-import { badRequestResponseSchema, notFoundResponseSchema } from "./schema.js";
+import {
+  badRequestResponseSchema,
+  conflictResponseSchema,
+  notFoundResponseSchema,
+} from "./schema.js";
 
 export const route = createRoute({
   method: "put",
@@ -45,6 +49,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox profile version is not editable.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },
