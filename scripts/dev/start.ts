@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseToml } from "smol-toml";
 
+import {
+  getLocalDevDockerRegistrySandboxBaseImageRef,
+  getLocalPreparedRuntimeSandboxBaseImageRef,
+} from "../../packages/config/src/sandbox-base-images.js";
 import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -18,8 +22,8 @@ const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudfl
 
 const TUNNEL_SERVICE_NAME = "tunnel";
 const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
-const SANDBOX_BASE_IMAGE_TAG = "mistle/sandbox-base:dev";
-const SANDBOX_BASE_IMAGE_REGISTRY_TAG = `${LOCAL_REGISTRY_HOST}/mistle/sandbox-base:dev`;
+const SANDBOX_BASE_IMAGE_TAG = getLocalPreparedRuntimeSandboxBaseImageRef();
+const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImageRef();
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
 const SANDBOX_BASE_CACHE_DIR = resolve(REPO_ROOT, ".local", "sandbox-base");
 const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key");

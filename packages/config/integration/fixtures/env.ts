@@ -1,3 +1,5 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../../src/sandbox-base-images.js";
+
 const baseIntegrationEnv: NodeJS.ProcessEnv = {
   NODE_ENV: "development",
   MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
@@ -23,7 +25,7 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: "fixture-publish-cookie-secret",
   MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
   MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
-  MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
+  MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: getLocalDevDockerRegistrySandboxBaseImageRef(),
   MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
   MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
   MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",

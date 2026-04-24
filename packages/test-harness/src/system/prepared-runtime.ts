@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
+
 // Prepared runtime manifests record which sandbox base image and app images a
 // local test-harness run should reuse, along with the fingerprints that decide
 // when those images must be rebuilt.
@@ -16,7 +18,7 @@ export type SandboxBaseImageBuild = {
 };
 
 export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
-  localReference: "mistle/sandbox-base:dev",
+  localReference: getLocalPreparedRuntimeSandboxBaseImageRef(),
   repositoryPath: "mistle/sandbox-base",
   dockerfilePath: "packages/sandboxd/Dockerfile",
   dockerTarget: "sandbox-base-system-tests",

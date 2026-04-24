@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { SandboxStorageBackend } from "@mistle/sandbox";
 import { shutdownTelemetry } from "@mistle/telemetry";
 import { z } from "zod";
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
       },
     },
     sandbox: {
-      defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       bootstrap: {
         tokenSecret: "integration-bootstrap-token-secret",

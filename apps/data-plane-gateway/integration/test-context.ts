@@ -6,6 +6,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
@@ -353,7 +354,8 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
               MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
               MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: INTERNAL_AUTH_SERVICE_TOKEN,
               MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-              MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
+              MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE:
+                getLocalDevDockerRegistrySandboxBaseImageRef(),
               MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: `ws://host.testcontainers.internal:${String(gatewayPort)}/tunnel/sandbox`,
               MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: `ws://host.testcontainers.internal:${String(gatewayPort)}/tunnel/sandbox`,
               MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: IntegrationConnectTokenSecret,
@@ -424,7 +426,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             },
             sandbox: {
               provider: "docker",
-              defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+              defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
               gatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
               internalGatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
               connect: {

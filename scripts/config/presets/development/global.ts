@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../../../../packages/config/src/sandbox-base-images.js";
 import type { DevelopmentPresetModule } from "./types.ts";
 
 export const globalDevelopmentPreset = {
@@ -25,7 +26,7 @@ export const globalDevelopmentPreset = {
         storage: {
           backend: "archil",
         },
-        default_base_image: "localhost:5001/mistle/sandbox-base:dev",
+        default_base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://data-plane-gateway-relay:5202/tunnel/sandbox",
         connect: {

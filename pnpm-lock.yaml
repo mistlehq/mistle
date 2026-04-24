@@ -1079,6 +1079,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.1020.0
         version: 3.1021.0
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../config
       '@mistle/time':
         specifier: workspace:*
         version: link:../time

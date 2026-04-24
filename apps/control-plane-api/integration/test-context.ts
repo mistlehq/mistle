@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
   createIntegrationRuntimeScopeId,
@@ -300,7 +301,7 @@ export const it = vitestIt.extend<{
             },
           },
           sandbox: {
-            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
             bootstrap: {
               tokenSecret: "integration-bootstrap-token-secret",
