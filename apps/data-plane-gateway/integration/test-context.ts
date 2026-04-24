@@ -27,13 +27,15 @@ import { ensureCommitSignBinary } from "../../control-plane-api/integration/help
 import { startControlPlaneApiProcess } from "../../data-plane-worker/integration/helpers/control-plane-api.js";
 import { createDataPlaneGatewayRuntime } from "../src/runtime/index.js";
 import type { DataPlaneGatewayRuntime, DataPlaneGatewayRuntimeConfig } from "../src/types.js";
+import {
+  DataPlaneGatewayIntegrationTestContextId,
+  DataPlaneGatewayRuntimeDatabaseNamePrefix,
+} from "./context-config.js";
 
 const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secret";
 const IntegrationConnectTokenSecret = "integration-connect-token-secret";
 const IntegrationTokenIssuer = "integration-data-plane-worker";
 const IntegrationTokenAudience = "integration-data-plane-gateway";
-const RUNTIME_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_runtime";
-const TestContextId = "data-plane-gateway.integration";
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../..", import.meta.url));
 const CONFIG_FIXTURE_HOST_PATH = fileURLToPath(
   new URL("../../../packages/config/integration/fixtures/config.toml", import.meta.url),
@@ -86,7 +88,7 @@ type RuntimeStateBackend = DataPlaneGatewayRuntimeConfig["app"]["runtimeState"][
 
 async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
   return readTestContext({
-    id: TestContextId,
+    id: DataPlaneGatewayIntegrationTestContextId,
     schema: SharedInfraConfigSchema,
   });
 }
@@ -119,7 +121,7 @@ function createFileScopedDatabaseName(input: {
   scopeId: string;
 }): string {
   return createIntegrationRuntimeDatabaseName({
-    prefix: RUNTIME_DATABASE_NAME_PREFIX,
+    prefix: DataPlaneGatewayRuntimeDatabaseNamePrefix,
     runId: input.integrationRunId,
     filePath: input.filePath,
     scopeId: input.scopeId,

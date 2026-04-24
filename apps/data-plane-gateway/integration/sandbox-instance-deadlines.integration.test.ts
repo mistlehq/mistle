@@ -17,6 +17,7 @@ import {
   mintValidBootstrapToken,
   waitForRuntimeState,
 } from "./runtime-state-test-helpers.js";
+import { exerciseOverlappingBootstrapReplacement } from "./sandbox-instance-deadlines-overlap-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
@@ -218,6 +219,18 @@ describe("sandbox instance deadlines integration", () => {
       });
 
       await closeWebSocket(bootstrapSocket);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "clears the stale disconnect deadline when bootstrap disconnect overlaps a replacement attach",
+    async ({ fixture }) => {
+      await exerciseOverlappingBootstrapReplacement({
+        fixture,
+        sandboxInstanceId: typeid("sbi").toString(),
+        testId: "gateway_deadline_overlap_disconnect_attach",
+      });
     },
     IntegrationTestTimeoutMs,
   );

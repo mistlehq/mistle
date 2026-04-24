@@ -74,6 +74,8 @@ export type TunnelSessionTransportUnhealthy = {
 };
 
 export class TunnelSessionService {
+  private readonly bootstrapLifecycleTransitions = new Map<string, Promise<void>>();
+
   public constructor(
     private readonly gatewayNodeId: string,
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
@@ -189,26 +191,33 @@ export class TunnelSessionService {
       });
     });
 
-    void this.sandboxInstanceDeadlineService
-      .handleBootstrapAttach({
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.leaseId,
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-            ownerLeaseId: input.leaseId,
-          },
-          "Failed to persist sandbox deadlines for attached bootstrap tunnel",
-        );
-        input.onFatalError({
-          closeReason: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
-          error,
-          statusMessage: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
+    void this.enqueueBootstrapLifecycleTransition({
+      sandboxInstanceId: input.sandboxInstanceId,
+      operation: async () => {
+        if (!this.relayCoordinator.isCurrentPeer(relayTarget)) {
+          return;
+        }
+
+        await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
         });
+      },
+    }).catch((error: unknown) => {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        },
+        "Failed to persist sandbox deadlines for attached bootstrap tunnel",
+      );
+      input.onFatalError({
+        closeReason: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
+        error,
+        statusMessage: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
       });
+    });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
       relayCoordinator: this.relayCoordinator,
@@ -412,9 +421,18 @@ export class TunnelSessionService {
       return;
     }
 
-    await this.sandboxInstanceDeadlineService.handleBootstrapDisconnect({
+    await this.enqueueBootstrapLifecycleTransition({
       sandboxInstanceId: input.sandboxInstanceId,
-      ownerLeaseId: input.leaseId,
+      operation: async () => {
+        if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
+          return;
+        }
+
+        await this.sandboxInstanceDeadlineService.handleBootstrapDisconnect({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        });
+      },
     });
 
     void this.sandboxRuntimeAttachmentStore
@@ -644,5 +662,27 @@ export class TunnelSessionService {
       },
       input.statusMessage,
     );
+  }
+
+  private async enqueueBootstrapLifecycleTransition(input: {
+    sandboxInstanceId: string;
+    operation: () => Promise<void>;
+  }): Promise<void> {
+    const previousTransition = this.bootstrapLifecycleTransitions.get(input.sandboxInstanceId);
+    const currentTransition = (previousTransition ?? Promise.resolve())
+      .catch(() => {
+        // Keep later lifecycle transitions flowing after an earlier failure.
+      })
+      .then(input.operation);
+
+    this.bootstrapLifecycleTransitions.set(input.sandboxInstanceId, currentTransition);
+
+    try {
+      await currentTransition;
+    } finally {
+      if (this.bootstrapLifecycleTransitions.get(input.sandboxInstanceId) === currentTransition) {
+        this.bootstrapLifecycleTransitions.delete(input.sandboxInstanceId);
+      }
+    }
   }
 }

@@ -18,10 +18,12 @@ import {
 import { Client as PgClient } from "pg";
 
 import { createControlPlaneBackend } from "../../control-plane-api/src/openworkflow.js";
+import {
+  DataPlaneGatewayIntegrationTestContextId,
+  DataPlaneGatewayTemplateDatabaseNamePrefix,
+} from "./context-config.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
-const TEMPLATE_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_template";
-const TestContextId = "data-plane-gateway.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
   if (!/^[a-z0-9_]+$/u.test(identifier)) {
@@ -106,7 +108,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     manageProcessCleanup: false,
   });
   const templateDatabaseName = createIntegrationTemplateDatabaseName({
-    prefix: TEMPLATE_DATABASE_NAME_PREFIX,
+    prefix: DataPlaneGatewayTemplateDatabaseNamePrefix,
     runId: integrationRunId,
   });
 
@@ -153,7 +155,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await controlPlaneWorkflowBackend.stop();
 
     await writeTestContext({
-      id: TestContextId,
+      id: DataPlaneGatewayIntegrationTestContextId,
       value: {
         databaseUsername: postgresService.postgres.username,
         databasePassword: postgresService.postgres.password,
@@ -165,7 +167,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       },
     });
   } catch (error) {
-    await removeTestContext(TestContextId);
+    await removeTestContext(DataPlaneGatewayIntegrationTestContextId);
     await dropDatabaseIfExists({
       username: sharedInfraLease.infra.postgres.postgres.username,
       password: sharedInfraLease.infra.postgres.postgres.password,
@@ -179,7 +181,7 @@ export default async function setup(): Promise<() => Promise<void>> {
   }
 
   return async () => {
-    await removeTestContext(TestContextId);
+    await removeTestContext(DataPlaneGatewayIntegrationTestContextId);
     await dropDatabaseIfExists({
       username: sharedInfraLease.infra.postgres.postgres.username,
       password: sharedInfraLease.infra.postgres.postgres.password,
