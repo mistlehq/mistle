@@ -152,12 +152,12 @@ function buildDevelopmentBaseConfig(
   return applyPresetGenerators(withDefaults, developmentPresetModules);
 }
 
-function buildIntegrationConfig(input: {
+async function buildIntegrationConfig(input: {
   provider: IntegrationSandboxProvider;
   sampleConfigRoot: Record<string, unknown>;
   env: NodeJS.ProcessEnv;
-}): Record<string, unknown> {
-  const preset = getIntegrationProviderPreset(input.provider);
+}): Promise<Record<string, unknown>> {
+  const preset = await getIntegrationProviderPreset(input.provider);
   const developmentBaseConfig = buildDevelopmentBaseConfig(input.sampleConfigRoot);
   const withProviderDefaults = mergeConfigRoots(developmentBaseConfig, preset.defaults);
   const withEnvOverrides = mergeConfigRoots(
@@ -183,11 +183,11 @@ function buildIntegrationConfig(input: {
   return nextConfig;
 }
 
-function writeIntegrationConfig(input: {
+async function writeIntegrationConfig(input: {
   provider: IntegrationSandboxProvider;
   configRoot: Record<string, unknown>;
-}): string {
-  const preset = getIntegrationProviderPreset(input.provider);
+}): Promise<string> {
+  const preset = await getIntegrationProviderPreset(input.provider);
   const targetPath = join(REPO_ROOT, "config", preset.outputFileName);
   const content = `${buildGeneratedHeader(input.provider)}${stringifyToml(input.configRoot)}`;
 
@@ -205,18 +205,18 @@ function validateWrittenIntegrationConfig(configPath: string): void {
   loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath });
 }
 
-function generateIntegrationConfigFiles(input: {
+async function generateIntegrationConfigFiles(input: {
   providers: readonly IntegrationSandboxProvider[];
   sampleConfigRoot: Record<string, unknown>;
   env: NodeJS.ProcessEnv;
-}): void {
+}): Promise<void> {
   for (const provider of input.providers) {
-    const configRoot = buildIntegrationConfig({
+    const configRoot = await buildIntegrationConfig({
       provider,
       sampleConfigRoot: input.sampleConfigRoot,
       env: input.env,
     });
-    const configPath = writeIntegrationConfig({
+    const configPath = await writeIntegrationConfig({
       provider,
       configRoot,
     });
@@ -225,7 +225,7 @@ function generateIntegrationConfigFiles(input: {
   }
 }
 
-function main(): void {
+async function main(): Promise<void> {
   if (process.argv.length > 2) {
     throw new Error("This script does not accept arguments.");
   }
@@ -240,12 +240,10 @@ function main(): void {
     process.env.MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS,
   );
 
-  generateIntegrationConfigFiles({ providers, sampleConfigRoot, env: process.env });
+  await generateIntegrationConfigFiles({ providers, sampleConfigRoot, env: process.env });
 }
 
-try {
-  main();
-} catch (error) {
+void main().catch((error: unknown) => {
   if (error instanceof Error) {
     console.error(error.message);
   } else {
@@ -253,4 +251,4 @@ try {
   }
 
   process.exitCode = 1;
-}
+});

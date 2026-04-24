@@ -20,7 +20,7 @@ export const e2bAdapterIntegrationEnabled =
   sandboxIntegrationSettings.enabled &&
   sandboxIntegrationSettings.providers.has(SandboxProvider.E2B);
 
-export const e2bAdapterIntegrationSettings = resolveE2BAdapterIntegrationSettings({
+export const e2bAdapterIntegrationSettings = await resolveE2BAdapterIntegrationSettings({
   env: process.env,
   enabled: e2bAdapterIntegrationEnabled,
 });

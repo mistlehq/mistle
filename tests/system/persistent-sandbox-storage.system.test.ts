@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
 import { Archil } from "@archildata/client/api";
+import { resolveLatestPublishedSandboxBaseImageRef } from "@mistle/config";
 import {
   createDataPlaneDatabase,
   sandboxInstances,
@@ -47,8 +48,6 @@ const StoragePollIntervalMs = 500;
 const StoragePollTimeoutMs = 30_000;
 const InvalidWorkspaceRepositoryUrl =
   "https://github.com/mistlehq/this-repository-does-not-exist-for-pr17-system-test.git";
-const SystemSandboxBaseImage =
-  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
   id: z.string().min(1),
@@ -110,6 +109,22 @@ function readRequestedSystemSandboxProvider(): SystemSandboxProvider {
 
 const requestedSystemSandboxProvider = readRequestedSystemSandboxProvider();
 const itForE2B = requestedSystemSandboxProvider === SystemSandboxProvider.E2B ? it : it.skip;
+let resolvedSystemSandboxBaseImagePromise: Promise<string> | undefined;
+
+async function resolveSystemSandboxBaseImage(): Promise<string> {
+  if (requestedSystemSandboxProvider !== SystemSandboxProvider.E2B) {
+    throw new Error("System sandbox base image is only required for the E2B-backed system suite.");
+  }
+
+  resolvedSystemSandboxBaseImagePromise ??= resolveLatestPublishedSandboxBaseImageRef();
+  const systemSandboxBaseImagePromise = resolvedSystemSandboxBaseImagePromise;
+
+  if (systemSandboxBaseImagePromise === undefined) {
+    throw new Error("Expected the E2B system sandbox base image promise to be initialized.");
+  }
+
+  return systemSandboxBaseImagePromise;
+}
 
 function readStringAttribute(input: {
   attributes: z.infer<typeof OtlpAttributeSchema>[] | undefined;
@@ -1076,6 +1091,7 @@ async function startSandboxInstanceInternally(input: {
     agentRuntimes: [];
   };
 }): Promise<z.infer<typeof StartSandboxInstanceAcceptedResponseSchema>> {
+  const systemSandboxBaseImage = await resolveSystemSandboxBaseImage();
   const response = await fetch(`${input.fixture.dataPlaneApiBaseUrl}/internal/sandbox/instances`, {
     method: "POST",
     headers: {
@@ -1093,7 +1109,7 @@ async function startSandboxInstanceInternally(input: {
       },
       source: "dashboard",
       image: {
-        imageId: SystemSandboxBaseImage,
+        imageId: systemSandboxBaseImage,
         createdAt: "2026-04-17T00:00:00.000Z",
       },
     }),
@@ -1120,7 +1136,7 @@ async function startSandboxInstanceInternally(input: {
   return StartSandboxInstanceAcceptedResponseSchema.parse(parsed);
 }
 
-function createRuntimePlan(input: {
+async function createRuntimePlan(input: {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   workspaceSources?: readonly {
@@ -1129,7 +1145,7 @@ function createRuntimePlan(input: {
     path: string;
     originUrl: string;
   }[];
-}): {
+}): Promise<{
   sandboxProfileId: string;
   version: number;
   image: {
@@ -1146,13 +1162,15 @@ function createRuntimePlan(input: {
     originUrl: string;
   }[];
   agentRuntimes: [];
-} {
+}> {
+  const systemSandboxBaseImage = await resolveSystemSandboxBaseImage();
+
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: input.sandboxProfileVersion,
     image: {
       source: "base",
-      imageRef: SystemSandboxBaseImage,
+      imageRef: systemSandboxBaseImage,
     },
     egressRoutes: [],
     artifacts: [],
@@ -1179,7 +1197,7 @@ async function preparePersistentSandbox(input: {
     authenticatedSession,
     sandboxProfileId,
     sandboxProfileVersion: 1,
-    runtimePlan: createRuntimePlan({
+    runtimePlan: await createRuntimePlan({
       sandboxProfileId,
       sandboxProfileVersion: 1,
     }),
@@ -1482,7 +1500,7 @@ describe("persistent sandbox storage", () => {
           authenticatedSession,
           sandboxProfileId,
           sandboxProfileVersion: 1,
-          runtimePlan: createRuntimePlan({
+          runtimePlan: await createRuntimePlan({
             sandboxProfileId,
             sandboxProfileVersion: 1,
             workspaceSources: [

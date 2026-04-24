@@ -14,6 +14,7 @@
   },
   "devDependencies": {
     "@archildata/client": "^0.8.7",
+    "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",

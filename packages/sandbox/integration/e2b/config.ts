@@ -1,3 +1,4 @@
+import { resolveLatestPublishedSandboxBaseImageRef } from "@mistle/config";
 import { z } from "zod";
 
 const E2B_INTEGRATION_ENABLEMENT_MESSAGE =
@@ -12,11 +13,7 @@ const E2BAdapterIntegrationConfigSchema = z
         message: `E2B_API_KEY must be non-empty when ${E2B_INTEGRATION_ENABLEMENT_MESSAGE}.`,
       }),
     MISTLE_SANDBOX_E2B_DOMAIN: z.string().trim().min(1).optional(),
-    MISTLE_SANDBOX_E2B_BASE_IMAGE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("ghcr.io/mistlehq/sandbox-base:latest"),
+    MISTLE_SANDBOX_E2B_BASE_IMAGE: z.string().trim().min(1).optional(),
   })
   .strip();
 
@@ -33,10 +30,10 @@ export type E2BAdapterIntegrationSettings =
       baseImage: string;
     };
 
-export function resolveE2BAdapterIntegrationSettings(input: {
+export async function resolveE2BAdapterIntegrationSettings(input: {
   env: NodeJS.ProcessEnv;
   enabled: boolean;
-}): E2BAdapterIntegrationSettings {
+}): Promise<E2BAdapterIntegrationSettings> {
   if (!input.enabled) {
     return {
       enabled: false,
@@ -49,6 +46,7 @@ export function resolveE2BAdapterIntegrationSettings(input: {
     enabled: true,
     apiKey: parsed.E2B_API_KEY,
     domain: parsed.MISTLE_SANDBOX_E2B_DOMAIN,
-    baseImage: parsed.MISTLE_SANDBOX_E2B_BASE_IMAGE,
+    baseImage:
+      parsed.MISTLE_SANDBOX_E2B_BASE_IMAGE ?? (await resolveLatestPublishedSandboxBaseImageRef()),
   };
 }

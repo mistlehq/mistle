@@ -8,6 +8,7 @@ export {
   parseLocalSandboxBaseImageRefs,
   parsePublishedSandboxBaseImageRef,
   readLocalSandboxBaseImageRefs,
+  resolveLatestPublishedSandboxBaseImageRef,
   type LocalSandboxBaseImageRefs,
   type PublishedSandboxBaseImageRef,
   type PublishedSandboxBaseImageRefResolver,

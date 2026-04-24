@@ -1,4 +1,5 @@
 import { getValueAtPath } from "../../../../packages/config/src/core/record.js";
+import { resolveLatestPublishedSandboxBaseImageRef } from "../../../../packages/config/src/sandbox-base-images.js";
 import type { ConfigRecord } from "../development/types.ts";
 
 export const IntegrationSandboxProvider = {
@@ -33,9 +34,6 @@ const ArchilIntegrationRequiredConfigValues = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
   },
 ] as const satisfies readonly RequiredConfigValue[];
-
-const E2BIntegrationSandboxBaseImage =
-  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
 
 export type IntegrationProviderPreset = {
   defaults: ConfigRecord;
@@ -95,72 +93,79 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
   outputFileName: IntegrationConfigFileNames.DOCKER,
 };
 
-const E2B_PRESET: IntegrationProviderPreset = {
-  defaults: {
-    global: {
-      env: "development",
-      sandbox: {
-        provider: IntegrationSandboxProvider.E2B,
-        default_base_image: E2BIntegrationSandboxBaseImage,
-        storage: {
-          backend: "archil",
-        },
-        gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
-        internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
-      },
-    },
-    apps: {
-      data_plane_api: {
-        control_plane_api: {
-          base_url: "http://control-plane-api:5100",
-        },
-        sandbox: {
-          e2b: {
-            domain: "e2b.app",
-          },
-        },
-      },
-      data_plane_worker: {
-        control_plane_api: {
-          base_url: "http://control-plane-api:5100",
-        },
-        sandbox: {
-          tokenizer_proxy_egress_base_url: "https://api.mistle.example/tokenizer-proxy/egress",
-          e2b: {
-            domain: "e2b.app",
-          },
-        },
-        sandbox_storage: {
-          archil: {
-            name_prefix: "it-system-",
-          },
-        },
-      },
-    },
+const E2B_REQUIRED_CONFIG_VALUES = [
+  {
+    path: ["apps", "data_plane_api", "sandbox", "e2b", "api_key"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
   },
-  prunePaths: [
-    ["apps", "data_plane_api", "sandbox", "docker"],
-    ["apps", "data_plane_worker", "sandbox", "docker"],
-    ["apps", "data_plane_worker", "sandbox_storage", "docker_volume"],
-  ],
-  requiredConfigValues: [
-    {
-      path: ["apps", "data_plane_api", "sandbox", "e2b", "api_key"],
-      envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
+  {
+    path: ["apps", "data_plane_worker", "sandbox", "e2b", "api_key"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
+  },
+] as const satisfies readonly RequiredConfigValue[];
+
+async function createE2BPreset(): Promise<IntegrationProviderPreset> {
+  const e2bIntegrationSandboxBaseImage = await resolveLatestPublishedSandboxBaseImageRef();
+
+  return {
+    defaults: {
+      global: {
+        env: "development",
+        sandbox: {
+          provider: IntegrationSandboxProvider.E2B,
+          default_base_image: e2bIntegrationSandboxBaseImage,
+          storage: {
+            backend: "archil",
+          },
+          gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
+          internal_gateway_ws_url: "wss://gateway.mistle.example/tunnel/sandbox",
+        },
+      },
+      apps: {
+        data_plane_api: {
+          control_plane_api: {
+            base_url: "http://control-plane-api:5100",
+          },
+          sandbox: {
+            e2b: {
+              domain: "e2b.app",
+            },
+          },
+        },
+        data_plane_worker: {
+          control_plane_api: {
+            base_url: "http://control-plane-api:5100",
+          },
+          sandbox: {
+            tokenizer_proxy_egress_base_url: "https://api.mistle.example/tokenizer-proxy/egress",
+            e2b: {
+              domain: "e2b.app",
+            },
+          },
+          sandbox_storage: {
+            archil: {
+              name_prefix: "it-system-",
+            },
+          },
+        },
+      },
     },
-    {
-      path: ["apps", "data_plane_worker", "sandbox", "e2b", "api_key"],
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
-    },
-  ],
-  outputFileName: IntegrationConfigFileNames.E2B,
-};
+    prunePaths: [
+      ["apps", "data_plane_api", "sandbox", "docker"],
+      ["apps", "data_plane_worker", "sandbox", "docker"],
+      ["apps", "data_plane_worker", "sandbox_storage", "docker_volume"],
+    ],
+    requiredConfigValues: E2B_REQUIRED_CONFIG_VALUES,
+    outputFileName: IntegrationConfigFileNames.E2B,
+  };
+}
 
 export function getRequiredIntegrationConfigValues(input: {
   provider: IntegrationSandboxProvider;
   configRoot: Record<string, unknown>;
 }): readonly RequiredConfigValue[] {
-  const preset = getIntegrationProviderPreset(input.provider);
+  const presetRequiredConfigValues =
+    input.provider === IntegrationSandboxProvider.E2B ? E2B_REQUIRED_CONFIG_VALUES : [];
   const storageBackend = getValueAtPath(input.configRoot, [
     "global",
     "sandbox",
@@ -169,10 +174,10 @@ export function getRequiredIntegrationConfigValues(input: {
   ]);
 
   if (storageBackend === "archil") {
-    return [...preset.requiredConfigValues, ...ArchilIntegrationRequiredConfigValues];
+    return [...presetRequiredConfigValues, ...ArchilIntegrationRequiredConfigValues];
   }
 
-  return preset.requiredConfigValues;
+  return presetRequiredConfigValues;
 }
 
 export function parseIntegrationSandboxProviders(
@@ -216,12 +221,12 @@ export function parseIntegrationSandboxProviders(
   return [...providers];
 }
 
-export function getIntegrationProviderPreset(
+export async function getIntegrationProviderPreset(
   provider: IntegrationSandboxProvider,
-): IntegrationProviderPreset {
+): Promise<IntegrationProviderPreset> {
   if (provider === IntegrationSandboxProvider.DOCKER) {
     return DOCKER_PRESET;
   }
 
-  return E2B_PRESET;
+  return createE2BPreset();
 }

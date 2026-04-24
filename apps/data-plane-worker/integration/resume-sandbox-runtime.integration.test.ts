@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 
+import { resolveLatestPublishedSandboxBaseImageRef } from "@mistle/config";
 import {
   createSandboxAdapter,
   createSandboxRuntimeControl,
@@ -28,8 +29,7 @@ import { createSandboxRuntimeEnv } from "../openworkflow/start-sandbox-instance/
 const DockerSocketPath = "/var/run/docker.sock";
 const IntegrationTestTimeoutMs = 300_000;
 const OrganizationId = "org_resume_runtime_integration";
-const SandboxBaseImageReference =
-  "ghcr.io/mistlehq/sandbox-base@sha256:4d5cdf8bc0c87f4732544352f68c4d4f2e23341ef193fda4a53ed6214f6c9643";
+const SandboxBaseImageReference = await resolveLatestPublishedSandboxBaseImageRef();
 
 function hasDockerResumeIntegrationRuntime(): boolean {
   if (!existsSync(DockerSocketPath)) {

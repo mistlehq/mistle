@@ -8,8 +8,8 @@ import {
 import { getValueAtPath } from "../src/core/record.js";
 
 describe("integration provider presets", () => {
-  it("defaults docker integration config generation to managed Docker volume storage", () => {
-    const preset = getIntegrationProviderPreset(IntegrationSandboxProvider.DOCKER);
+  it("defaults docker integration config generation to managed Docker volume storage", async () => {
+    const preset = await getIntegrationProviderPreset(IntegrationSandboxProvider.DOCKER);
 
     expect(preset.defaults).toMatchObject({
       global: {
@@ -49,8 +49,8 @@ describe("integration provider presets", () => {
     expect(requiredValues).toEqual([]);
   });
 
-  it("defaults e2b integration config generation to managed Archil storage", () => {
-    const preset = getIntegrationProviderPreset(IntegrationSandboxProvider.E2B);
+  it("defaults e2b integration config generation to managed Archil storage", async () => {
+    const preset = await getIntegrationProviderPreset(IntegrationSandboxProvider.E2B);
 
     expect(preset.defaults).toMatchObject({
       global: {
@@ -74,6 +74,9 @@ describe("integration provider presets", () => {
     expect(getValueAtPath(preset.defaults, ["global", "sandbox", "storage"])).toEqual({
       backend: "archil",
     });
+    expect(getValueAtPath(preset.defaults, ["global", "sandbox", "default_base_image"])).toEqual(
+      expect.stringMatching(/^ghcr\.io\/mistlehq\/sandbox-base@sha256:[a-f0-9]{64}$/),
+    );
   });
 
   it("requires a complete managed Archil profile when integration storage backend is archil", () => {
