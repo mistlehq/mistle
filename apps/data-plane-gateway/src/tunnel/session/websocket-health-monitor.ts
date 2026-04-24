@@ -18,6 +18,12 @@ export type WebSocketHealthHandle = {
   isHealthy: () => boolean;
 };
 
+export type WebSocketHealthMissedPong = {
+  consecutiveMissedPongs: number;
+  lastPongAgeMs: number;
+  maxConsecutiveMissedPongs: number;
+};
+
 /**
  * Starts active ping/pong health checks for a tunnel websocket.
  *
@@ -31,6 +37,8 @@ export function startWebSocketHealthMonitor(input: {
   scheduler: Scheduler;
   pingIntervalMs: number;
   pongTimeoutMs: number;
+  maxConsecutiveMissedPongs?: number;
+  onMissedPong?: (state: WebSocketHealthMissedPong) => void;
   onUnhealthy: () => void;
 }): WebSocketHealthHandle {
   const rawSocket = input.socket.raw;
@@ -43,6 +51,13 @@ export function startWebSocketHealthMonitor(input: {
   let pingHandle: TimerHandle | undefined;
   let pingSentAtMs: number | undefined;
   let pongTimeoutHandle: TimerHandle | undefined;
+  let consecutiveMissedPongs = 0;
+  let lastPongAtMs = input.clock.nowMs();
+  const maxConsecutiveMissedPongs = input.maxConsecutiveMissedPongs ?? 1;
+
+  if (maxConsecutiveMissedPongs < 1) {
+    throw new Error("Expected websocket health monitor missed pong threshold to be positive.");
+  }
 
   const onPong = (): void => {
     if (stopped) {
@@ -56,6 +71,8 @@ export function startWebSocketHealthMonitor(input: {
       );
       pingSentAtMs = undefined;
     }
+    consecutiveMissedPongs = 0;
+    lastPongAtMs = input.clock.nowMs();
     if (pongTimeoutHandle !== undefined) {
       input.scheduler.cancel(pongTimeoutHandle);
       pongTimeoutHandle = undefined;
@@ -88,6 +105,9 @@ export function startWebSocketHealthMonitor(input: {
     if (stopped || !healthy) {
       return;
     }
+    if (pingHandle !== undefined) {
+      return;
+    }
 
     pingHandle = input.scheduler.schedule(() => {
       pingHandle = undefined;
@@ -102,7 +122,18 @@ export function startWebSocketHealthMonitor(input: {
 
       pongTimeoutHandle = input.scheduler.schedule(() => {
         pongTimeoutHandle = undefined;
-        markUnhealthy();
+        pingSentAtMs = undefined;
+        consecutiveMissedPongs += 1;
+        input.onMissedPong?.({
+          consecutiveMissedPongs,
+          lastPongAgeMs: input.clock.nowMs() - lastPongAtMs,
+          maxConsecutiveMissedPongs,
+        });
+        if (consecutiveMissedPongs >= maxConsecutiveMissedPongs) {
+          markUnhealthy();
+          return;
+        }
+        scheduleNextPing();
       }, input.pongTimeoutMs);
 
       pingSentAtMs = input.clock.nowMs();

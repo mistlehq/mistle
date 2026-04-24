@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { createServer } from "node:http";
 
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
@@ -101,6 +102,30 @@ function toPeerSocket(socket: WebSocket): RelayPeerSocket {
     },
     raw: socket,
   });
+}
+
+class FakeRawSocket extends EventEmitter {
+  public pingCallCount = 0;
+
+  public ping(
+    _data: Buffer | undefined,
+    _mask: boolean,
+    callback?: (error: Error | null | undefined) => void,
+  ): void {
+    this.pingCallCount += 1;
+    callback?.(null);
+  }
+}
+
+function createFakePeerSocket(rawSocket: FakeRawSocket): RelayPeerSocket {
+  return {
+    send: () => undefined,
+    close: () => undefined,
+    get readyState() {
+      return WebSocket.OPEN;
+    },
+    raw: rawSocket as unknown as WebSocket,
+  } as unknown as RelayPeerSocket;
 }
 
 async function createWebSocketPair(): Promise<WebSocketPair> {
@@ -230,5 +255,85 @@ describe("startWebSocketHealthMonitor", () => {
 
     expect(handle.isHealthy()).toBe(false);
     expect(unhealthyCount).toBe(1);
+  });
+
+  it("keeps sockets healthy through a transient missed pong and resets after recovery", () => {
+    const clock = createMutableClock(3_000);
+    const scheduler = createManualScheduler(clock);
+    const rawSocket = new FakeRawSocket();
+    const missedPongCounts: number[] = [];
+    let unhealthyCount = 0;
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      socket: createFakePeerSocket(rawSocket),
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      maxConsecutiveMissedPongs: 3,
+      onMissedPong: ({ consecutiveMissedPongs }) => {
+        missedPongCounts.push(consecutiveMissedPongs);
+      },
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    clock.advanceMs(10);
+    scheduler.runDue();
+    clock.advanceMs(10);
+    scheduler.runDue();
+
+    expect(handle.isHealthy()).toBe(true);
+    expect(unhealthyCount).toBe(0);
+    expect(missedPongCounts).toEqual([1]);
+
+    rawSocket.emit("pong", Buffer.alloc(0));
+
+    clock.advanceMs(10);
+    scheduler.runDue();
+    clock.advanceMs(10);
+    scheduler.runDue();
+
+    expect(handle.isHealthy()).toBe(true);
+    expect(unhealthyCount).toBe(0);
+    expect(missedPongCounts).toEqual([1, 1]);
+    handle.stop();
+  });
+
+  it("marks sockets unhealthy only after the configured missed pong threshold", () => {
+    const clock = createMutableClock(4_000);
+    const scheduler = createManualScheduler(clock);
+    const rawSocket = new FakeRawSocket();
+    const missedPongCounts: number[] = [];
+    let unhealthyCount = 0;
+
+    const handle = startWebSocketHealthMonitor({
+      clock,
+      socketKind: "bootstrap",
+      socket: createFakePeerSocket(rawSocket),
+      scheduler,
+      pingIntervalMs: 10,
+      pongTimeoutMs: 10,
+      maxConsecutiveMissedPongs: 3,
+      onMissedPong: ({ consecutiveMissedPongs }) => {
+        missedPongCounts.push(consecutiveMissedPongs);
+      },
+      onUnhealthy: () => {
+        unhealthyCount += 1;
+      },
+    });
+
+    for (let iteration = 0; iteration < 3; iteration += 1) {
+      clock.advanceMs(10);
+      scheduler.runDue();
+      clock.advanceMs(10);
+      scheduler.runDue();
+    }
+
+    expect(handle.isHealthy()).toBe(false);
+    expect(unhealthyCount).toBe(1);
+    expect(missedPongCounts).toEqual([1, 2, 3]);
   });
 });

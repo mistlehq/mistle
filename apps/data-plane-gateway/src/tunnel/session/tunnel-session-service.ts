@@ -4,6 +4,7 @@ import { WebSocket } from "ws";
 import type { SandboxInstanceDeadlineService } from "../../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../../logger.js";
 import {
+  BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
   ATTACHMENT_TTL_MS,
   PRESENCE_LEASE_RENEW_INTERVAL_MS,
   PRESENCE_LEASE_TTL_MS,
@@ -125,11 +126,25 @@ export class TunnelSessionService {
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
         pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        maxConsecutiveMissedPongs: BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
+        onMissedPong: ({ consecutiveMissedPongs, lastPongAgeMs, maxConsecutiveMissedPongs }) => {
+          logger.warn(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+              consecutiveMissedPongs,
+              lastPongAgeMs,
+              maxConsecutiveMissedPongs,
+            },
+            "Bootstrap websocket missed pong health check",
+          );
+        },
         onUnhealthy: () => {
           logger.error(
             {
               sandboxInstanceId: input.sandboxInstanceId,
               leaseId: input.leaseId,
+              maxConsecutiveMissedPongs: BOOTSTRAP_WEBSOCKET_MAX_CONSECUTIVE_MISSED_PONGS,
             },
             "Bootstrap websocket stopped responding to ping/pong health checks",
           );
