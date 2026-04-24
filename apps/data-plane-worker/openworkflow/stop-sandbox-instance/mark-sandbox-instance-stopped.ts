@@ -8,12 +8,45 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/clear-sandbox-instance-deadlines.js";
 
+type MarkSandboxInstanceStoppedOutcome = "already_stopped" | "fence_mismatch" | "stopped";
+
 export async function markSandboxInstanceStopped(ctx: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
-}): Promise<void> {
-  const updatedRows = await ctx.db.transaction(async (tx) => {
+  stillPermitted?: () => Promise<boolean>;
+}): Promise<MarkSandboxInstanceStoppedOutcome> {
+  const outcome = await ctx.db.transaction(async (tx) => {
+    const lockedRows = await tx.execute(
+      sql<{ status: string }>`
+        select status
+        from "data_plane"."sandbox_instances"
+        where id = ${ctx.sandboxInstanceId}
+        for update
+      `,
+    );
+    const lockedRow = lockedRows.rows[0];
+
+    if (lockedRow === undefined) {
+      throw new Error(`Sandbox instance '${ctx.sandboxInstanceId}' was not found.`);
+    }
+
+    if (lockedRow.status === SandboxInstanceStatuses.STOPPED) {
+      await clearSandboxInstanceDeadlines({
+        db: tx,
+        sandboxInstanceId: ctx.sandboxInstanceId,
+      });
+      return "already_stopped";
+    }
+
+    if (lockedRow.status !== SandboxInstanceStatuses.RUNNING) {
+      throw new Error("Failed to transition sandbox instance status from running to stopped.");
+    }
+
+    if (ctx.stillPermitted !== undefined && !(await ctx.stillPermitted())) {
+      return "fence_mismatch";
+    }
+
     const stoppedRows = await tx
       .update(sandboxInstances)
       .set({
@@ -32,33 +65,17 @@ export async function markSandboxInstanceStopped(ctx: {
         id: sandboxInstances.id,
       });
 
-    if (stoppedRows[0] !== undefined) {
-      await clearSandboxInstanceDeadlines({
-        db: tx,
-        sandboxInstanceId: ctx.sandboxInstanceId,
-      });
+    if (stoppedRows[0] === undefined) {
+      throw new Error("Failed to transition sandbox instance status from running to stopped.");
     }
 
-    return stoppedRows;
-  });
-
-  if (updatedRows[0] !== undefined) {
-    return;
-  }
-
-  const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
-    columns: {
-      status: true,
-    },
-    where: (table, { eq: whereEq }) => whereEq(table.id, ctx.sandboxInstanceId),
-  });
-  if (sandboxInstance?.status === SandboxInstanceStatuses.STOPPED) {
     await clearSandboxInstanceDeadlines({
-      db: ctx.db,
+      db: tx,
       sandboxInstanceId: ctx.sandboxInstanceId,
     });
-    return;
-  }
 
-  throw new Error("Failed to transition sandbox instance status from running to stopped.");
+    return "stopped";
+  });
+
+  return outcome;
 }

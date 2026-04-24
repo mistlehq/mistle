@@ -267,6 +267,68 @@ async function waitForRuntimeStateOwnerLeaseId(input: {
   );
 }
 
+async function waitForRuntimeStateDisconnectReconciliationReady(input: {
+  gatewayBaseUrl: string;
+  sandboxInstanceId: string;
+  expectedOwnerLeaseId: string;
+}): Promise<void> {
+  const runtimeStateReader = createSandboxRuntimeStateReader({
+    gatewayBaseUrl: input.gatewayBaseUrl,
+    serviceToken: InternalAuthServiceToken,
+  });
+  const deadlineMs = systemClock.nowMs() + RuntimeStateWaitTimeoutMs;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const snapshot = await runtimeStateReader.readSnapshot({
+      sandboxInstanceId: input.sandboxInstanceId,
+      nowMs: systemClock.nowMs(),
+    });
+    if (
+      snapshot.attachment === null &&
+      (snapshot.ownerLeaseId === null || snapshot.ownerLeaseId === input.expectedOwnerLeaseId)
+    ) {
+      return;
+    }
+
+    await systemSleeper.sleep(RuntimeStatePollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for disconnect reconciliation runtime-state for sandbox '${input.sandboxInstanceId}'.`,
+  );
+}
+
+async function waitForBlockedSandboxInstanceMutation(input: {
+  minimumCount?: number;
+}): Promise<void> {
+  const deadlineMs = systemClock.nowMs() + RuntimeStateWaitTimeoutMs;
+  const minimumCount = input.minimumCount ?? 1;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const result = await getDbPool().query<{ waiters: number }>(
+      `
+        select count(*)::int as waiters
+        from pg_stat_activity
+        where
+          datname = current_database()
+          and wait_event_type = 'Lock'
+          and state = 'active'
+          and query ilike '%sandbox_instances%'
+      `,
+    );
+
+    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
+      return;
+    }
+
+    await systemSleeper.sleep(RuntimeStatePollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${String(minimumCount)} blocked sandbox instance mutation(s).`,
+  );
+}
+
 describe("sandbox instance deadlines integration", () => {
   beforeAll(async () => {
     databaseStack = await startPostgresWithPgBouncer();
@@ -416,6 +478,235 @@ describe("sandbox instance deadlines integration", () => {
         });
       } finally {
         await closeWebSocket(bootstrapSocket);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "returns executed false when idle deadline ownership changes mid-execution",
+    async () => {
+      const sandboxInstanceId = "sbi_deadline_idle_toctou_repro";
+      const gatewayBaseUrl = getGatewayProcess().baseUrl;
+
+      await insertSandboxInstance({
+        sandboxInstanceId,
+        status: SandboxInstanceStatuses.RUNNING,
+        providerSandboxId: "provider-idle-toctou-repro-missing",
+      });
+
+      const firstBootstrapSocket = await connectBootstrapSocket({
+        websocketBaseUrl: getGatewayProcess().websocketBaseUrl,
+        sandboxInstanceId,
+        token: await mintValidBootstrapToken({
+          sandboxInstanceId,
+        }),
+      });
+
+      const lockClient = await getDbPool().connect();
+      let secondBootstrapSocket: Awaited<ReturnType<typeof connectBootstrapSocket>> | undefined;
+
+      try {
+        const firstOwnerLeaseId = await waitForRuntimeStateOwnerLeaseId({
+          gatewayBaseUrl,
+          sandboxInstanceId,
+        });
+
+        await insertActiveDeadline({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.IDLE,
+          ownerLeaseId: firstOwnerLeaseId,
+          dueAt: MatchingDeadlineDueAt,
+        });
+
+        await lockClient.query("BEGIN");
+        await lockClient.query(
+          `
+            select 1
+            from "data_plane"."sandbox_instances"
+            where id = $1
+            for update
+          `,
+          [sandboxInstanceId],
+        );
+
+        const deadlineExecutionPromise = handleSandboxInstanceDeadline(
+          createDeadlineExecutionContext({
+            gatewayBaseUrl,
+          }),
+          {
+            sandboxInstanceId,
+            kind: SandboxInstanceDeadlineKinds.IDLE,
+            ownerLeaseId: firstOwnerLeaseId,
+            dueAt: MatchingDeadlineDueAt,
+            generation: 1,
+          },
+        );
+
+        await waitForBlockedSandboxInstanceMutation({});
+
+        secondBootstrapSocket = await connectBootstrapSocket({
+          websocketBaseUrl: getGatewayProcess().websocketBaseUrl,
+          sandboxInstanceId,
+          token: await mintValidBootstrapToken({
+            sandboxInstanceId,
+          }),
+        });
+
+        const secondOwnerLeaseId = await waitForRuntimeStateOwnerLeaseId({
+          gatewayBaseUrl,
+          sandboxInstanceId,
+        });
+
+        expect(secondOwnerLeaseId).not.toBe(firstOwnerLeaseId);
+
+        await lockClient.query("COMMIT");
+
+        await expect(deadlineExecutionPromise).resolves.toEqual({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.IDLE,
+          executed: false,
+        });
+
+        const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({
+          columns: {
+            status: true,
+            stopReason: true,
+          },
+          where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+        });
+
+        expect(sandboxInstance).toEqual({
+          status: SandboxInstanceStatuses.RUNNING,
+          stopReason: null,
+        });
+
+        const runtimeStateReader = createSandboxRuntimeStateReader({
+          gatewayBaseUrl,
+          serviceToken: InternalAuthServiceToken,
+        });
+        const snapshot = await runtimeStateReader.readSnapshot({
+          sandboxInstanceId,
+          nowMs: systemClock.nowMs(),
+        });
+
+        expect(snapshot.ownerLeaseId).toBe(secondOwnerLeaseId);
+        expect(snapshot.attachment?.ownerLeaseId).toBe(secondOwnerLeaseId);
+      } finally {
+        try {
+          await lockClient.query("ROLLBACK");
+        } catch {}
+        lockClient.release();
+        if (secondBootstrapSocket !== undefined) {
+          await closeWebSocket(secondBootstrapSocket);
+        }
+        await closeWebSocket(firstBootstrapSocket);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "returns executed false when disconnect ownership changes mid-execution",
+    async () => {
+      const sandboxInstanceId = "sbi_deadline_disconnect_toctou_repro";
+      const gatewayBaseUrl = getGatewayProcess().baseUrl;
+      const firstOwnerLeaseId = "own_deadline_disconnect_toctou_repro";
+
+      await insertSandboxInstance({
+        sandboxInstanceId,
+        status: SandboxInstanceStatuses.RUNNING,
+        providerSandboxId: "provider-disconnect-toctou-repro-missing",
+      });
+
+      const lockClient = await getDbPool().connect();
+      let secondBootstrapSocket: Awaited<ReturnType<typeof connectBootstrapSocket>> | undefined;
+
+      try {
+        await waitForRuntimeStateDisconnectReconciliationReady({
+          gatewayBaseUrl,
+          sandboxInstanceId,
+          expectedOwnerLeaseId: firstOwnerLeaseId,
+        });
+
+        await insertActiveDeadline({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+          ownerLeaseId: firstOwnerLeaseId,
+          dueAt: MatchingDeadlineDueAt,
+        });
+
+        await lockClient.query("BEGIN");
+        await lockClient.query(
+          `
+            select 1
+            from "data_plane"."sandbox_instances"
+            where id = $1
+            for update
+          `,
+          [sandboxInstanceId],
+        );
+
+        const deadlineExecutionPromise = handleSandboxInstanceDeadline(
+          createDeadlineExecutionContext({
+            gatewayBaseUrl,
+          }),
+          {
+            sandboxInstanceId,
+            kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+            ownerLeaseId: firstOwnerLeaseId,
+            dueAt: MatchingDeadlineDueAt,
+            generation: 1,
+          },
+        );
+
+        await waitForBlockedSandboxInstanceMutation({});
+
+        secondBootstrapSocket = await connectBootstrapSocket({
+          websocketBaseUrl: getGatewayProcess().websocketBaseUrl,
+          sandboxInstanceId,
+          token: await mintValidBootstrapToken({
+            sandboxInstanceId,
+          }),
+        });
+
+        const secondOwnerLeaseId = await waitForRuntimeStateOwnerLeaseId({
+          gatewayBaseUrl,
+          sandboxInstanceId,
+        });
+
+        expect(secondOwnerLeaseId).not.toBe(firstOwnerLeaseId);
+
+        await lockClient.query("COMMIT");
+
+        await expect(deadlineExecutionPromise).resolves.toEqual({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+          executed: false,
+        });
+
+        const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({
+          columns: {
+            status: true,
+            stopReason: true,
+            failureCode: true,
+          },
+          where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+        });
+
+        expect(sandboxInstance).toEqual({
+          status: SandboxInstanceStatuses.RUNNING,
+          stopReason: null,
+          failureCode: null,
+        });
+      } finally {
+        try {
+          await lockClient.query("ROLLBACK");
+        } catch {}
+        lockClient.release();
+        if (secondBootstrapSocket !== undefined) {
+          await closeWebSocket(secondBootstrapSocket);
+        }
       }
     },
     IntegrationTestTimeoutMs,

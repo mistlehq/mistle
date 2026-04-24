@@ -81,6 +81,25 @@ async function resolveRunningSandboxInstanceStopState(input: {
   };
 }
 
+async function isSandboxStopStillPermitted(ctx: {
+  runtimeStateReader: SandboxRuntimeStateReader;
+  clock: Clock;
+  sandboxInstanceId: string;
+  stopReason: SandboxStopReason;
+  expectedOwnerLeaseId: string;
+}): Promise<boolean> {
+  const snapshot = await ctx.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: ctx.sandboxInstanceId,
+    nowMs: ctx.clock.nowMs(),
+  });
+
+  return shouldExecuteSandboxStop({
+    stopReason: ctx.stopReason,
+    expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    snapshot,
+  });
+}
+
 export async function stopSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -96,16 +115,14 @@ export async function stopSandboxInstance(
     expectedOwnerLeaseId: string;
   },
 ): Promise<boolean> {
-  const snapshot = await ctx.runtimeStateReader.readSnapshot({
-    sandboxInstanceId: input.sandboxInstanceId,
-    nowMs: ctx.clock.nowMs(),
-  });
   if (
-    !shouldExecuteSandboxStop({
+    !(await isSandboxStopStillPermitted({
+      runtimeStateReader: ctx.runtimeStateReader,
+      clock: ctx.clock,
+      sandboxInstanceId: input.sandboxInstanceId,
       stopReason: input.stopReason,
       expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-      snapshot,
-    })
+    }))
   ) {
     return false;
   }
@@ -115,6 +132,18 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstanceState === null) {
+    return false;
+  }
+
+  if (
+    !(await isSandboxStopStillPermitted({
+      runtimeStateReader: ctx.runtimeStateReader,
+      clock: ctx.clock,
+      sandboxInstanceId: input.sandboxInstanceId,
+      stopReason: input.stopReason,
+      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+    }))
+  ) {
     return false;
   }
 
@@ -139,11 +168,19 @@ export async function stopSandboxInstance(
     }
   }
 
-  await markSandboxInstanceStopped({
+  const markOutcome = await markSandboxInstanceStopped({
     db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
+    stillPermitted: async () =>
+      isSandboxStopStillPermitted({
+        runtimeStateReader: ctx.runtimeStateReader,
+        clock: ctx.clock,
+        sandboxInstanceId: input.sandboxInstanceId,
+        stopReason: input.stopReason,
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      }),
   });
 
-  return true;
+  return markOutcome !== "fence_mismatch";
 }
