@@ -6,11 +6,13 @@ import {
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
+  type StartedGitHubAppManifestConnection,
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
   DeviceAuthorizationAttemptResponseSchema,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
+  StartedGitHubAppManifestConnectionSchema,
   StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
   readJsonWithSchema,
@@ -345,6 +347,44 @@ export async function startGitHubAppInstallation(input: {
       operation: "startGitHubAppInstallation",
       error,
       fallbackMessage: "Could not start GitHub App installation.",
+    });
+  }
+}
+
+export async function startGitHubAppManifestCreation(input: {
+  connectionId: string;
+  manifest: Record<string, unknown>;
+  owner:
+    | {
+        kind: "personal";
+      }
+    | {
+        kind: "organization";
+        organizationSlug: string;
+      };
+}): Promise<StartedGitHubAppManifestConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startGitHubAppManifestCreation",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/github-app-manifest/start`,
+      body: {
+        manifest: input.manifest,
+        owner: input.owner,
+      },
+      fallbackMessage: "Could not create GitHub App manifest.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedGitHubAppManifestConnectionSchema,
+      operation: "startGitHubAppManifestCreation",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startGitHubAppManifestCreation",
+      error,
+      fallbackMessage: "Could not create GitHub App manifest.",
     });
   }
 }

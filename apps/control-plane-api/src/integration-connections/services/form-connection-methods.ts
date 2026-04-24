@@ -15,6 +15,10 @@ const UnknownRecordSchema = z.record(z.string(), z.unknown());
 
 type FormConnectionMethod = Extract<IntegrationConnectionMethodDefinition, { kind: "form" }>;
 type FormConnectionSecretField = FormConnectionMethod["secretFields"][number];
+type FormConnectionInvalidInputCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT;
 type PersistedSecretRef = {
   secretKind: IntegrationCredentialSecretKind;
   slotKey: string;
@@ -30,9 +34,7 @@ export function resolveFormConnectionMethodOrThrow(input: {
   targetKey: string;
   methodId: IntegrationConnectionMethodId;
   connectionMethods: ReadonlyArray<IntegrationConnectionMethodDefinition>;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): FormConnectionMethod {
   const method = input.connectionMethods.find((entry) => entry.id === input.methodId);
 
@@ -57,9 +59,7 @@ export function parseFormConnectionConfigOrThrow(input: {
   targetKey: string;
   method: FormConnectionMethod;
   config: Record<string, unknown>;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): Record<string, unknown> {
   try {
     const configSchema = input.method.configSchema;
@@ -95,9 +95,7 @@ export function parseFormConnectionConfigOrThrow(input: {
 export function resolvePersistedSecretRefOrThrow(input: {
   slotKey: string;
   secretType: string;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): PersistedSecretRef {
   if (input.secretType === IntegrationCredentialSecretKinds.API_KEY) {
     return {
@@ -142,9 +140,7 @@ export function resolvePersistedSecretRefOrThrow(input: {
 
 function createSecretFieldsByNameOrThrow(input: {
   method: FormConnectionMethod;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): Map<string, FormConnectionSecretField> {
   const fieldsByName = new Map<string, FormConnectionSecretField>();
 
@@ -173,9 +169,7 @@ export function parseCreateFormSecretsOrThrow(input: {
   targetKey: string;
   method: FormConnectionMethod;
   secrets: Record<string, string>;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): ParsedFormSecret[] {
   const fieldsByName = createSecretFieldsByNameOrThrow(input);
 
@@ -219,9 +213,7 @@ export function parseUpdateFormSecretsOrThrow(input: {
   targetKey: string;
   method: FormConnectionMethod;
   secrets: Record<string, string>;
-  invalidInputCode:
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT
-    | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+  invalidInputCode: FormConnectionInvalidInputCode;
 }): ParsedFormSecret[] {
   const fieldsByName = createSecretFieldsByNameOrThrow(input);
   const parsedSecrets: ParsedFormSecret[] = [];

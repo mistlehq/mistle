@@ -44,6 +44,8 @@ export function encodeGitHubAppInstallationStateMetadata(input: {
   return `${input.state}.${Buffer.from(input.connectionId, "utf8").toString("base64url")}`;
 }
 
+export const encodeGitHubAppManifestStateMetadata = encodeGitHubAppInstallationStateMetadata;
+
 export function resolveGitHubAppInstallationConnectionId(state: string): string {
   const separatorIndex = state.indexOf(".");
   if (separatorIndex < 0 || separatorIndex === state.length - 1) {
@@ -58,6 +60,8 @@ export function resolveGitHubAppInstallationConnectionId(state: string): string 
 
   return connectionId;
 }
+
+export const resolveGitHubAppManifestConnectionId = resolveGitHubAppInstallationConnectionId;
 
 export function createRedirectQueryParams(query: Record<string, string>): URLSearchParams {
   const params = new URLSearchParams();

@@ -323,6 +323,18 @@ export const StartedRedirectConnectionSchema = z
   })
   .strict();
 
+export const StartedGitHubAppManifestConnectionSchema = z
+  .object({
+    submissionUrl: z.url(),
+    fields: z
+      .object({
+        manifest: z.string().min(1),
+        state: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const StartedDeviceAuthorizationConnectionSchema = z
   .object({
     attemptId: z.string().min(1),
@@ -392,6 +404,9 @@ export type CreatedIntegrationWebhookSource = z.infer<typeof CreatedIntegrationW
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
+export type StartedGitHubAppManifestConnection = z.infer<
+  typeof StartedGitHubAppManifestConnectionSchema
+>;
 export type StartedDeviceAuthorizationConnection = z.infer<
   typeof StartedDeviceAuthorizationConnectionSchema
 >;

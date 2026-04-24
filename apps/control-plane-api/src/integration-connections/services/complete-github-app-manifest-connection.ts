@@ -1,0 +1,421 @@
+import {
+  integrationConnectionCredentials,
+  integrationConnectionRedirectSessions,
+  integrationConnections,
+  integrationCredentials,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
+import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import {
+  encryptCredentialUtf8,
+  resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
+} from "../../lib/crypto.js";
+import type { AppContext } from "../../types.js";
+import {
+  IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsNotFoundCodes,
+} from "../constants.js";
+import {
+  parseUpdateFormSecretsOrThrow,
+  resolveFormConnectionMethodOrThrow,
+} from "./form-connection-methods.js";
+import {
+  createRedirectQueryParams,
+  resolveGitHubAppManifestConnectionId,
+} from "./redirect-flow.js";
+import {
+  ensureImplicitConnectionWebhookSource,
+  resolveConnectionWithTargetOrThrow,
+} from "./webhook-sources.js";
+
+type CompleteGitHubAppManifestConnectionInput = {
+  query: Record<string, string>;
+};
+
+type CompletedConnection = {
+  id: string;
+  targetKey: string;
+};
+
+const GitHubAppManifestConversionResponseSchema = z
+  .object({
+    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    slug: z.string().min(1),
+    client_id: z.string().min(1),
+    client_secret: z.string().min(1).optional(),
+    pem: z.string().min(1),
+    webhook_secret: z.string().min(1),
+  })
+  .loose();
+
+function appendUrlPath(input: { baseUrl: string; path: string }): string {
+  const url = new URL(input.baseUrl);
+  const basePath = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
+  url.pathname = `${basePath}${input.path}`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function resolveRedirectStateOrThrow(params: URLSearchParams): string {
+  const state = params.get("state");
+  if (state === null || state.length === 0) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      "GitHub App manifest callback query must include `state`.",
+    );
+  }
+
+  return state;
+}
+
+function resolveManifestCodeOrThrow(params: URLSearchParams): string {
+  const code = params.get("code");
+  if (code === null || code.length === 0) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      "GitHub App manifest callback query must include `code`.",
+    );
+  }
+
+  return code;
+}
+
+function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
+  try {
+    return resolveGitHubAppManifestConnectionId(state);
+  } catch {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state is invalid.",
+    );
+  }
+}
+
+function assertGitHubAppConnectionOrThrow(input: {
+  connectionId: string;
+  config: Record<string, unknown> | null;
+}): void {
+  if (
+    input.config?.["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
+    );
+  }
+}
+
+function buildGitHubAppManifestConversionUrl(input: { apiBaseUrl: string; code: string }): string {
+  return appendUrlPath({
+    baseUrl: input.apiBaseUrl,
+    path: `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
+  });
+}
+
+async function convertGitHubAppManifest(input: {
+  apiBaseUrl: string;
+  code: string;
+}): Promise<z.output<typeof GitHubAppManifestConversionResponseSchema>> {
+  const response = await fetch(
+    buildGitHubAppManifestConversionUrl({
+      apiBaseUrl: input.apiBaseUrl,
+      code: input.code,
+    }),
+    {
+      method: "POST",
+      headers: {
+        accept: "application/vnd.github+json",
+      },
+    },
+  );
+
+  if (!response.ok) {
+    const responseBody = await response.text().catch(() => "");
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      `GitHub App manifest conversion failed with status ${response.status.toString()}.${responseBody.length === 0 ? "" : ` Response body: ${responseBody}`}`,
+    );
+  }
+
+  const responseJson: unknown = await response.json();
+  try {
+    return GitHubAppManifestConversionResponseSchema.parse(responseJson);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+        "GitHub App manifest conversion response is invalid.",
+      );
+    }
+
+    throw error;
+  }
+}
+
+function buildConvertedConnectionSecrets(input: {
+  conversion: z.output<typeof GitHubAppManifestConversionResponseSchema>;
+  supportsClientSecret: boolean;
+}): Record<string, string> {
+  if (input.supportsClientSecret && input.conversion.client_secret === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      "GitHub App manifest conversion response is missing `client_secret`.",
+    );
+  }
+
+  return {
+    appPrivateKeyPem: input.conversion.pem,
+    webhookSecret: input.conversion.webhook_secret,
+    ...(input.supportsClientSecret ? { clientSecret: input.conversion.client_secret ?? "" } : {}),
+  };
+}
+
+export async function completeGitHubAppManifestConnection(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+  },
+  input: CompleteGitHubAppManifestConnectionInput,
+): Promise<CompletedConnection> {
+  const queryParams = createRedirectQueryParams(input.query);
+  const state = resolveRedirectStateOrThrow(queryParams);
+  const code = resolveManifestCodeOrThrow(queryParams);
+
+  const redirectSession = await ctx.db.query.integrationConnectionRedirectSessions.findFirst({
+    where: (table, { eq }) => eq(table.state, state),
+  });
+
+  if (redirectSession === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state is invalid.",
+    );
+  }
+
+  if (redirectSession.usedAt !== null) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+      "Redirect state has already been used.",
+    );
+  }
+
+  const now = Date.now();
+  const expiresAt = Date.parse(redirectSession.expiresAt);
+  if (Number.isNaN(expiresAt)) {
+    throw new Error(`Redirect session '${redirectSession.id}' has an invalid expiry timestamp.`);
+  }
+
+  if (expiresAt <= now) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
+      "Redirect state has expired.",
+    );
+  }
+
+  const connectionId = resolveGitHubAppManifestConnectionIdOrThrow(state);
+  const connection = await resolveConnectionWithTargetOrThrow({
+    db: ctx.db,
+    organizationId: redirectSession.organizationId,
+    connectionId,
+  });
+
+  if (connection.targetKey !== redirectSession.targetKey) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state does not match the target for this connection.",
+    );
+  }
+
+  assertGitHubAppConnectionOrThrow({
+    connectionId: connection.id,
+    config: connection.config,
+  });
+
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: connection.target.familyId,
+    variantId: connection.target.variantId,
+  });
+  if (definition === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      `Integration definition '${connection.target.familyId}/${connection.target.variantId}' is not registered.`,
+    );
+  }
+
+  let parsedTargetConfig: z.output<typeof GitHubTargetConfigSchema>;
+  try {
+    parsedTargetConfig = GitHubTargetConfigSchema.parse(connection.target.config);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+        `Integration target '${connection.targetKey}' has invalid target config.`,
+      );
+    }
+
+    throw error;
+  }
+
+  const formMethod = resolveFormConnectionMethodOrThrow({
+    targetKey: connection.targetKey,
+    methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    connectionMethods: definition.connectionMethods,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+  });
+  const supportsClientSecret = formMethod.secretFields.some(
+    (field) => field.name === "clientSecret",
+  );
+  const conversion = await convertGitHubAppManifest({
+    apiBaseUrl: parsedTargetConfig.apiBaseUrl,
+    code,
+  });
+  const parsedSecrets = parseUpdateFormSecretsOrThrow({
+    targetKey: connection.targetKey,
+    method: formMethod,
+    secrets: buildConvertedConnectionSecrets({
+      conversion,
+      supportsClientSecret,
+    }),
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+  });
+
+  const organizationCredentialKey = await ctx.db.query.organizationCredentialKeys.findFirst({
+    where: (table, { eq }) => eq(table.organizationId, redirectSession.organizationId),
+    orderBy: (table, { desc }) => [desc(table.version)],
+  });
+
+  if (organizationCredentialKey === undefined) {
+    throw new Error(
+      `Organization credential key is missing for '${redirectSession.organizationId}'.`,
+    );
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
+  });
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
+    masterEncryptionKeyMaterial,
+  });
+
+  try {
+    return await ctx.db.transaction(async (tx) => {
+      const consumedSessionRows = await tx
+        .update(integrationConnectionRedirectSessions)
+        .set({
+          usedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(integrationConnectionRedirectSessions.id, redirectSession.id),
+            isNull(integrationConnectionRedirectSessions.usedAt),
+          ),
+        )
+        .returning({
+          id: integrationConnectionRedirectSessions.id,
+        });
+
+      if (consumedSessionRows.length !== 1) {
+        throw new BadRequestError(
+          IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+          "Redirect state has already been used.",
+        );
+      }
+
+      for (const parsedSecret of parsedSecrets) {
+        const encryptedSecret = encryptCredentialUtf8({
+          plaintext: parsedSecret.normalizedValue,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
+        });
+
+        const [createdCredential] = await tx
+          .insert(integrationCredentials)
+          .values({
+            organizationId: redirectSession.organizationId,
+            secretKind: parsedSecret.persistedSecretRef.secretKind,
+            ciphertext: encryptedSecret.ciphertext,
+            nonce: encryptedSecret.nonce,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            intendedFamilyId: connection.target.familyId,
+          })
+          .returning({
+            id: integrationCredentials.id,
+          });
+
+        if (createdCredential === undefined) {
+          throw new Error("Failed to create integration credential.");
+        }
+
+        await tx
+          .insert(integrationConnectionCredentials)
+          .values({
+            connectionId: connection.id,
+            credentialId: createdCredential.id,
+            slotKey: parsedSecret.persistedSecretRef.slotKey,
+          })
+          .onConflictDoUpdate({
+            target: [
+              integrationConnectionCredentials.connectionId,
+              integrationConnectionCredentials.slotKey,
+            ],
+            set: {
+              credentialId: createdCredential.id,
+            },
+          });
+      }
+
+      const [updatedConnection] = await tx
+        .update(integrationConnections)
+        .set({
+          config: {
+            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+            app_id: conversion.id.toString(),
+            app_slug: conversion.slug,
+            client_id: conversion.client_id,
+          },
+          updatedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(integrationConnections.id, connection.id),
+            eq(integrationConnections.organizationId, redirectSession.organizationId),
+          ),
+        )
+        .returning();
+
+      if (updatedConnection === undefined) {
+        throw new NotFoundError(
+          IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+          `Integration connection '${connection.id}' was not found.`,
+        );
+      }
+
+      await ensureImplicitConnectionWebhookSource({
+        db: tx,
+        organizationId: redirectSession.organizationId,
+        connectionId: updatedConnection.id,
+        targetKey: updatedConnection.targetKey,
+      });
+
+      return {
+        id: updatedConnection.id,
+        targetKey: updatedConnection.targetKey,
+      };
+    });
+  } finally {
+    unwrappedOrganizationCredentialKey.fill(0);
+  }
+}

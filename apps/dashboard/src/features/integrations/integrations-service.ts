@@ -15,6 +15,7 @@ export {
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startGitHubAppInstallation,
+  startGitHubAppManifestCreation,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
@@ -35,6 +36,7 @@ export {
   type IntegrationTarget,
   type RefreshedIntegrationConnectionResources,
   type StartedRedirectConnection,
+  type StartedGitHubAppManifestConnection,
   type StartedDeviceAuthorizationConnection,
   type CreatedIntegrationWebhookSource,
 } from "./integrations-service-shared.js";

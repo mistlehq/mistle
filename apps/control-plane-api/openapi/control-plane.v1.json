@@ -1514,6 +1514,141 @@
         }
       }
     },
+    "/p/integration/callbacks/github-app-manifest": {
+      "get": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "code",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error_description",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error_uri",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Complete GitHub App manifest creation on an existing connection and redirect to dashboard setup.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT",
+                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
+                            "REDIRECT_STATE_INVALID",
+                            "REDIRECT_STATE_EXPIRED",
+                            "REDIRECT_STATE_ALREADY_USED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/p/integration/callbacks/:targetKey/oauth2-authorization-code": {
       "get": {
         "tags": ["Integrations"],
@@ -4530,6 +4665,216 @@
                           "type": "string",
                           "enum": [
                             "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
+                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integration/connections/:connectionId/github-app-manifest/start": {
+      "post": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "manifest": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  },
+                  "owner": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["personal"]
+                          }
+                        },
+                        "required": ["kind"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["organization"]
+                          },
+                          "organizationSlug": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$"
+                          }
+                        },
+                        "required": ["kind", "organizationSlug"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": ["manifest", "owner"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Create a GitHub App manifest registration form submission.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "submissionUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "properties": {
+                        "manifest": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["manifest", "state"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["submissionUrl", "fields"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_GITHUB_APP_MANIFEST_START_INPUT",
                             "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                           ]
                         },

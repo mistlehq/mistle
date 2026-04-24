@@ -18,6 +18,7 @@ import * as listIntegrationWebhookSources from "./list-integration-webhook-sourc
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
 import * as startGitHubAppInstallationConnection from "./start-github-app-installation-connection/index.js";
+import * as startGitHubAppManifestConnection from "./start-github-app-manifest-connection/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
 import * as updateFormConnection from "./update-form-connection/index.js";
 import * as updateIntegrationConnection from "./update-integration-connection/index.js";
@@ -92,6 +93,9 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
     startGitHubAppInstallationConnection.route,
     startGitHubAppInstallationConnection.handler,
   );
+
+  routes.use(startGitHubAppManifestConnection.route.path, requireAuthSession);
+  routes.openapi(startGitHubAppManifestConnection.route, startGitHubAppManifestConnection.handler);
 
   routes.use(startOAuth2AuthorizationCodeConnection.route.path, requireAuthSession);
   routes.openapi(

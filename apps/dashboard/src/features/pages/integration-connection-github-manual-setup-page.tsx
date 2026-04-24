@@ -35,6 +35,7 @@ import {
   listIntegrationDirectory,
   listIntegrationWebhookSources,
   startGitHubAppInstallation,
+  startGitHubAppManifestCreation,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
@@ -449,7 +450,17 @@ function resolveJsonParseErrorMessage(error: unknown): string {
 
 export function validateGitHubManifestJson(value: string): GitHubManifestValidation {
   try {
-    JSON.parse(value);
+    const parsedManifest: unknown = JSON.parse(value);
+    if (
+      typeof parsedManifest !== "object" ||
+      parsedManifest === null ||
+      Array.isArray(parsedManifest)
+    ) {
+      return {
+        message: "Manifest must be a JSON object.",
+        status: "invalid",
+      };
+    }
     return { status: "valid" };
   } catch (error) {
     return {
@@ -462,6 +473,44 @@ export function validateGitHubManifestJson(value: string): GitHubManifestValidat
 export function formatGitHubManifestJson(value: string): string {
   const parsedManifest: unknown = JSON.parse(value);
   return JSON.stringify(parsedManifest, null, 2);
+}
+
+function parseGitHubManifestRecord(value: string): Record<string, unknown> {
+  const parsedManifest: unknown = JSON.parse(value);
+  if (
+    typeof parsedManifest !== "object" ||
+    parsedManifest === null ||
+    Array.isArray(parsedManifest)
+  ) {
+    throw new Error("Manifest must be a JSON object.");
+  }
+
+  const manifest: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(parsedManifest)) {
+    manifest[key] = entryValue;
+  }
+  return manifest;
+}
+
+function submitGitHubAppManifestForm(input: {
+  submissionUrl: string;
+  fields: Record<string, string>;
+}): void {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = input.submissionUrl;
+  form.style.display = "none";
+
+  for (const [name, value] of Object.entries(input.fields)) {
+    const field = document.createElement("input");
+    field.type = "hidden";
+    field.name = name;
+    field.value = value;
+    form.append(field);
+  }
+
+  document.body.append(form);
+  form.submit();
 }
 
 function createGitHubManifestFormatOnBlurExtension(input: {
@@ -752,10 +801,13 @@ function GitHubSetupUrls(input: {
 
 function GitHubAppSetupActions(input: {
   canInstall: boolean;
+  canCreateManifest: boolean;
+  createManifestPending: boolean;
   isInstalled: boolean;
   isManifestMode: boolean;
   isRedirectingToInstallation: boolean;
   isSecretReplacementDialogOpen: boolean;
+  onCreateManifest: () => void;
   onStartInstallation: () => void;
   startInstallationPending: boolean;
 }): React.JSX.Element {
@@ -765,7 +817,11 @@ function GitHubAppSetupActions(input: {
   return (
     <FormPageActionBar>
       {input.isManifestMode && !input.isInstalled ? (
-        <Button disabled type="button">
+        <Button
+          disabled={!input.canCreateManifest || input.createManifestPending}
+          onClick={input.onCreateManifest}
+          type="button"
+        >
           Create app in GitHub
         </Button>
       ) : null}
@@ -933,6 +989,51 @@ export function GitHubAppSetupPane(input: {
         resolveApiErrorMessage({
           error,
           fallbackMessage: "Could not start GitHub App installation.",
+        }),
+      );
+    },
+  });
+  const startManifestCreationMutation = useMutation({
+    mutationFn: async () => {
+      if (manifestAppOwnerKind === null) {
+        throw new Error("Select where the GitHub App should be created.");
+      }
+
+      const normalizedOrganizationSlug = manifestOrganizationSlug.trim();
+      const owner:
+        | {
+            kind: "personal";
+          }
+        | {
+            kind: "organization";
+            organizationSlug: string;
+          } =
+        manifestAppOwnerKind === "personal"
+          ? {
+              kind: "personal",
+            }
+          : {
+              kind: "organization",
+              organizationSlug: normalizedOrganizationSlug,
+            };
+
+      return startGitHubAppManifestCreation({
+        connectionId: input.connection.id,
+        manifest: parseGitHubManifestRecord(manifestValue),
+        owner,
+      });
+    },
+    onSuccess: ({ fields, submissionUrl }) => {
+      submitGitHubAppManifestForm({
+        submissionUrl,
+        fields,
+      });
+    },
+    onError: (error) => {
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create GitHub App manifest.",
         }),
       );
     },
@@ -1178,6 +1279,11 @@ export function GitHubAppSetupPane(input: {
     }),
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
+  const manifestValidation = validateGitHubManifestJson(manifestValue);
+  const canCreateManifest =
+    manifestValidation.status === "valid" &&
+    (manifestAppOwnerKind === "personal" ||
+      (manifestAppOwnerKind === "organization" && manifestOrganizationSlug.trim().length > 0));
 
   return (
     <FormPageStack>
@@ -1249,11 +1355,16 @@ export function GitHubAppSetupPane(input: {
               isManifestMode={setupMode === "manifest"}
               isRedirectingToInstallation={isRedirectingToInstallation}
               isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
+              onCreateManifest={() => {
+                void startManifestCreationMutation.mutateAsync();
+              }}
               onStartInstallation={() => {
                 setActionErrorMessage(null);
                 setIsRedirectingToInstallation(true);
                 void startInstallationMutation.mutateAsync().catch(() => undefined);
               }}
+              canCreateManifest={canCreateManifest}
+              createManifestPending={startManifestCreationMutation.isPending}
               startInstallationPending={startInstallationMutation.isPending}
             />
           </div>
