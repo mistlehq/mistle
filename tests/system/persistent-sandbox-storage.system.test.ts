@@ -1215,95 +1215,103 @@ async function preparePersistentSandbox(input: {
 }
 
 describe("persistent sandbox storage", () => {
-  it("starts a persistent sandbox with the durable paths exposed", async ({ fixture }) => {
-    const sandboxInstanceIdsToCleanup: string[] = [];
-    let testError: unknown;
+  itForE2B(
+    "starts a persistent sandbox with the durable paths exposed",
+    async ({ fixture }) => {
+      const sandboxInstanceIdsToCleanup: string[] = [];
+      let testError: unknown;
 
-    try {
-      const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
-        fixture,
-        email: `persistent-start-paths-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
-      });
-      sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+      try {
+        const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
+          fixture,
+          email: `persistent-start-paths-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
+        });
+        sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
 
-      await assertDurablePathsExposed({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
-    } catch (error) {
-      testError = error;
-    } finally {
-      await finalizePersistentSandboxTest({
-        fixture,
-        sandboxInstanceIds: sandboxInstanceIdsToCleanup,
-        testError,
-      });
-    }
-  }, 300_000);
+        await assertDurablePathsExposed({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+      } catch (error) {
+        testError = error;
+      } finally {
+        await finalizePersistentSandboxTest({
+          fixture,
+          sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+          testError,
+        });
+      }
+    },
+    300_000,
+  );
 
-  it("preserves durable state across stop and resume", async ({ fixture }) => {
-    const sandboxInstanceIdsToCleanup: string[] = [];
-    let testError: unknown;
+  itForE2B(
+    "preserves durable state across stop and resume",
+    async ({ fixture }) => {
+      const sandboxInstanceIdsToCleanup: string[] = [];
+      let testError: unknown;
 
-    try {
-      const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
-        fixture,
-        email: `persistent-stop-resume-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
-      });
-      sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
-      const marker = `persistent-stop-resume-${randomUUID()}`;
+      try {
+        const { authenticatedSession, sandboxInstanceId } = await preparePersistentSandbox({
+          fixture,
+          email: `persistent-stop-resume-${fixture.sandboxProvider}-${randomUUID()}@example.com`,
+        });
+        sandboxInstanceIdsToCleanup.push(sandboxInstanceId);
+        const marker = `persistent-stop-resume-${randomUUID()}`;
 
-      await writeDurableState({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-        marker,
-      });
-      const initialContents = await readDurableState({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
-      expect(initialContents).toBe([marker, marker].join("\n"));
+        await writeDurableState({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+          marker,
+        });
+        const initialContents = await readDurableState({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+        expect(initialContents).toBe([marker, marker].join("\n"));
 
-      await stopSandboxInstance({
-        fixture,
-        sandboxInstanceId,
-      });
-      await waitForPersistedSandboxStatus({
-        fixture,
-        sandboxInstanceId,
-        expectedStatus: "stopped",
-      });
+        await stopSandboxInstance({
+          fixture,
+          sandboxInstanceId,
+        });
+        await waitForPersistedSandboxStatus({
+          fixture,
+          sandboxInstanceId,
+          expectedStatus: "stopped",
+        });
 
-      await resumeSandboxInstance({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
-      await waitForSandboxReady({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
+        await resumeSandboxInstance({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+        await waitForSandboxReady({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
 
-      const resumedContents = await readDurableState({
-        fixture,
-        authenticatedSession,
-        sandboxInstanceId,
-      });
-      expect(resumedContents).toBe([marker, marker].join("\n"));
-    } catch (error) {
-      testError = error;
-    } finally {
-      await finalizePersistentSandboxTest({
-        fixture,
-        sandboxInstanceIds: sandboxInstanceIdsToCleanup,
-        testError,
-      });
-    }
-  }, 300_000);
+        const resumedContents = await readDurableState({
+          fixture,
+          authenticatedSession,
+          sandboxInstanceId,
+        });
+        expect(resumedContents).toBe([marker, marker].join("\n"));
+      } catch (error) {
+        testError = error;
+      } finally {
+        await finalizePersistentSandboxTest({
+          fixture,
+          sandboxInstanceIds: sandboxInstanceIdsToCleanup,
+          testError,
+        });
+      }
+    },
+    300_000,
+  );
 
   itForE2B(
     "preserves durable state across provider compute replacement",

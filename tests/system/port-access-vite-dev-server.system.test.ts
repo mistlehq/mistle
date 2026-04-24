@@ -325,7 +325,7 @@ async function waitForTcpListenerReadyInSandbox(input: {
             "-lc",
             [
               "set -eu",
-              `${NodeToolCommand} node -e ${shellQuote(
+              `${NodeToolCommand} -e ${shellQuote(
                 [
                   'const net = require("node:net");',
                   `const socket = net.createConnection({ host: "127.0.0.1", port: ${String(input.port)} });`,
