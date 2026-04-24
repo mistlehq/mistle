@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  TextLink,
 } from "@mistle/ui";
 import {
   ArrowCircleUpIcon,
@@ -411,19 +412,19 @@ export function ChatComposer({
             </div>
           )}
           {pullRequest === null ? null : (
-            <a
-              className="hover:text-foreground flex min-w-0 items-center gap-1.5 transition-colors"
+            <TextLink
+              className="items-center gap-1.5"
               href={pullRequest.url}
-              rel="noreferrer"
-              target="_blank"
+              opensInNewWindow
               title={pullRequest.title}
+              variant="subtle"
             >
               <GitPullRequestIcon aria-hidden="true" className="size-4 shrink-0" />
               <span className="truncate">
                 PR #{String(pullRequest.number)}
                 {pullRequest.isDraft ? " Draft" : ""}
               </span>
-            </a>
+            </TextLink>
           )}
         </div>
       )}

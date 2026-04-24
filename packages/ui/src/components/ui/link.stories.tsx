@@ -31,3 +31,12 @@ export const ListItem: Story = {
     variant: "listItem",
   },
 };
+
+export const Subtle: Story = {
+  args: {
+    children: "PR #124",
+    href: "https://github.com/mistle/example/pull/124",
+    opensInNewWindow: true,
+    variant: "subtle",
+  },
+};

@@ -14,6 +14,8 @@ const textLinkVariants = cva(
           "text-primary underline decoration-[1px] underline-offset-[0.18em] hover:decoration-[1.5px] hover:underline-offset-[0.24em] focus-visible:decoration-[1.5px] focus-visible:underline-offset-[0.24em]",
         listItem:
           "text-foreground font-medium no-underline hover:underline focus-visible:underline",
+        subtle:
+          "text-muted-foreground no-underline hover:text-foreground focus-visible:text-foreground",
       },
     },
     defaultVariants: {
