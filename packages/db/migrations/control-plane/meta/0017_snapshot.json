@@ -4449,12 +4449,7 @@
       },
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "sandbox_profile_versions_state_check": {
-          "name": "sandbox_profile_versions_state_check",
-          "value": "\"control_plane\".\"sandbox_profile_versions\".\"state\" in ('draft', 'published')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "control_plane.sandbox_profiles": {
