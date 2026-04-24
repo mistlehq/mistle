@@ -1342,11 +1342,18 @@ export function GitHubAppSetupPane(input: {
   if (input.manifestCreationSucceeded === true && !isInstalled) {
     return (
       <FormPageStack>
+        <Notice title="GitHub App created successfully" variant="success">
+          The app credentials have been saved to this Mistle connection.
+        </Notice>
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">
-            <Notice title="GitHub App creation success." variant="success">
-              Install the app to choose the GitHub account and repositories Mistle can access.
-            </Notice>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-medium">Install GitHub App</h2>
+              <p className="text-muted-foreground text-sm">
+                Click Install App to open GitHub, choose the account and repositories Mistle can
+                access, and finish linking this connection.
+              </p>
+            </div>
             {actionErrorMessage === null ? null : (
               <Notice title="Could not continue setup" variant="alert">
                 {actionErrorMessage}

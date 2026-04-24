@@ -178,12 +178,16 @@ describe("GitHubManualSetupPane", () => {
       manifestCreationSucceeded: true,
     });
 
-    const successTitle = screen.getByText("GitHub App creation success.");
+    const successTitle = screen.getByText("GitHub App created successfully");
     expect(successTitle).toBeTruthy();
     expect(successTitle.closest("[data-slot='notice']")).toBeTruthy();
     expect(
+      screen.getByText("The app credentials have been saved to this Mistle connection."),
+    ).toBeTruthy();
+    expect(screen.getByText("Install GitHub App")).toBeTruthy();
+    expect(
       screen.getByText(
-        "Install the app to choose the GitHub account and repositories Mistle can access.",
+        "Click Install App to open GitHub, choose the account and repositories Mistle can access, and finish linking this connection.",
       ),
     ).toBeTruthy();
     const installAppButton = screen.getByRole("button", { name: "Install App" });
